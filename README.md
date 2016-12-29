@@ -1,19 +1,24 @@
-Building MultiChain
-=====================
+MultiChain
+==========
+
+[MultiChain](http://www.multichain.com/) is an open source platform for private blockchains, which offers a rich set of features including extensive configurability, permissions management, native assets and data streams. Although it is designed to enable private blockchains, MultiChain provides maximal compatibility with the bitcoin ecosysten, including the peer-to-peer protocol, transaction and block formats and [Bitcoin Core](https://bitcoin.org/en/bitcoin-core/) APIs.
+
+    Copyright (c) 2014-2017 Coin Sciences Ltd
+    License: GNU General Public License version 3, see COPYING.
 
 System requirements
---------------------
+-------------------
 
-These instructions have been tested on Ubuntu 14.04 x64 only.
+These compilation instructions have been tested on Ubuntu 14.04 x64 only.
 
-C++ compilers are memory-hungry. It is recommended to have at least 1 GB of memory available when compiling MultiChain. With 512MB of memory or less compilation will take much longer due to swap thrashing.
+C++ compilers are memory-hungry, so it is recommended to have at least 1 GB of memory available when compiling MultiChain. With less memory, compilation may take much longer due to swapfile thrashing.
 
 
-Linux Build Notes (currently Ubuntu only)
-=====================
+Linux Build Notes (on Ubuntu 14.04 x64)
+=================
 
 Install dependencies
-----------------------------------------------
+--------------------
 
     sudo apt-get update
     sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils
@@ -25,7 +30,7 @@ Install dependencies
     sudo apt-get install libdb4.8-dev libdb4.8++-dev
 
 Compile MultiChain for Ubuntu (64-bit)
----------------------
+-----------------------------
 
     ./autogen.sh
     ./configure
@@ -34,16 +39,16 @@ Compile MultiChain for Ubuntu (64-bit)
 Notes
 -----
 
-This will build `multichaind`, `multichain-cli` and `multitchain-util` in the `src` directory.
+* This will build `multichaind`, `multichain-cli` and `multitchain-util` in the `src` directory.
 
-The release is built with GCC and then `strip multichaind` to strip the debug symbols, which reduces the executable size by about 90%.
+* The release is built with GCC after which `strip multichaind` strings the debug symbols, which reduces the executable size by about 90%.
 
 
-Windows Build Notes (cross compilation on Ubuntu)
+Windows Build Notes (cross-compiled on Ubuntu 14.04 x64)
 =====================
 
 Install dependencies
-----------------------------------------------
+--------------------
 
     sudo apt-get update
     sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils
@@ -55,7 +60,7 @@ Install dependencies
     sudo apt-get install libdb4.8-dev libdb4.8++-dev
 
 Compile MultiChain for Windows (64-bit)
----------------------
+------------------------------
 
     ./autogen.sh
     cd depends
@@ -67,5 +72,4 @@ Compile MultiChain for Windows (64-bit)
 Notes
 -----
 
-This will build `multichaind.exe`, `multichain-cli.exe` and `multitchain-util.exe` in the `src` directory.
-
+* This will build `multichaind.exe`, `multichain-cli.exe` and `multitchain-util.exe` in the `src` directory.
