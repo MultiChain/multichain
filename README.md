@@ -4,7 +4,10 @@ MultiChain
 [MultiChain](http://www.multichain.com/) is an open source platform for private blockchains, which offers a rich set of features including extensive configurability, permissions management, native assets and data streams. Although it is designed to enable private blockchains, MultiChain provides maximal compatibility with the bitcoin ecosysten, including the peer-to-peer protocol, transaction and block formats and [Bitcoin Core](https://bitcoin.org/en/bitcoin-core/) APIs.
 
     Copyright (c) 2014-2017 Coin Sciences Ltd
-    License: GNU General Public License version 3, see COPYING.
+    License: GNU General Public License version 3, see COPYING
+
+    Portions copyright (c) 2009-2016 The Bitcoin Core developers
+    Portions copyright many others - see individual files
 
 System requirements
 -------------------
