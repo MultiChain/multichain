@@ -44,7 +44,7 @@ Notes
 * The release is built with GCC after which `strip multichaind` strings the debug symbols, which reduces the executable size by about 90%.
 
 
-Windows Build Notes (cross-compiled on Ubuntu 14.04 x64)
+Windows Build Notes (on Ubuntu 14.04 x64)
 =====================
 
 Install dependencies
