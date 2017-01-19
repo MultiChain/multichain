@@ -440,7 +440,9 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "\n" + _("MultiChain runtime parameters") + "\n";    
     strUsage += "  -handshakelocal=<address>                " + _("Manually override the wallet address which is used for handshaking with other peers in a MultiChain blockchain.") + "\n";
     strUsage += "  -hideknownopdrops=<n>                    " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON_RPC calls (default: %u)"), 0) + "\n";
-    strUsage += "  -miningrequirespeers=<n>                 " + _("If set overrides mining-reqires-peers blockhain setting, values 0/1.") + "\n";
+    strUsage += "  -miningrequirespeers=<n>                 " + _("If set overrides mining-requires-peers blockchain setting, values 0/1.") + "\n";
+    strUsage += "  -minemptyblocks=<n>                      " + _("If set overrides mine-empty-blocks blockchain setting, values 0/1.") + "\n";
+    strUsage += "  -minerturnover=<n>                       " + _("If set overrides mine-turnover blockchain setting, values 0-1.") + "\n";
     strUsage += "  -shrinkdebugfilesize=<n>                 " + _("If set debug.log is shrinked to size in range <n> - 5<n>.") + "\n";
     
     strUsage += "\n" + _("Wallet optimization options:") + "\n";

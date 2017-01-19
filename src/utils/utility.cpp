@@ -277,6 +277,11 @@ void mc_RandomSeed(unsigned int seed)
     srand(seed);
 }
 
+double mc_RandomDouble()
+{
+    return (double)rand()/RAND_MAX;
+}
+
 unsigned int mc_RandomInRange(unsigned int min,unsigned int max)
 {
     double scaled = (double)rand()/RAND_MAX;

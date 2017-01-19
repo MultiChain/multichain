@@ -11,6 +11,7 @@
 #include "chain/pow.h"
 #include "utils/tinyformat.h"
 #include "structs/uint256.h"
+#include "keys/pubkey.h"
 
 #include <vector>
 
@@ -145,6 +146,8 @@ public:
 /* MCHN START */    
     int nHeightMinedByMe;
     uint32_t nCanMine;
+    double dTimeReceived;
+    CPubKey kMiner;
 /* MCHN END */
     
     void SetNull()
@@ -171,6 +174,7 @@ public:
 /* MCHN START */    
         nHeightMinedByMe=0;
         nCanMine=0;
+        dTimeReceived=0.;
 /* MCHN END */
     }
 

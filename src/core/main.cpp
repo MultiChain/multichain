@@ -2447,7 +2447,12 @@ void static UpdateTip(CBlockIndex *pindexNew) {
       chainActive.Tip()->GetBlockHash().ToString(), chainActive.Height(), log(chainActive.Tip()->nChainWork.getdouble())/log(2.0), (unsigned long)chainActive.Tip()->nChainTx,
       DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
       Checkpoints::GuessVerificationProgress(chainActive.Tip()), (unsigned int)pcoinsTip->GetCacheSize());
-
+    
+    if(chainActive.Tip()->kMiner.IsValid())
+    {
+        CBitcoinAddress addr=CBitcoinAddress(chainActive.Tip()->kMiner.GetID());
+        LogPrint("mchn","mchn-block: height: %d, miner: %s\n", chainActive.Tip()->nHeight,addr.ToString().c_str());
+    }
     cvBlockChange.notify_all();
 
     // Check the version of the last 100 blocks to see if we need to upgrade:
@@ -3644,10 +3649,18 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
     }
 
 /* MCHN START*/    
+    pindex->dTimeReceived=mc_TimeNowAsDouble();
+            
     if(!VerifyBlockSignature(&block,false))
     {
         return false;
+    }    
+    
+    if(block.vSigner[0])
+    {
+        pindex->kMiner.Set(block.vSigner+1, block.vSigner+1+block.vSigner[0]);
     }
+            
 /* MCHN END*/    
     
 

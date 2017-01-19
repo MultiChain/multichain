@@ -222,6 +222,7 @@ void mc_MemoryDumpCharSize(const void *ptr,int from,int len,int row_size);
 void mc_MemoryDumpCharSizeToFile(FILE *fHan,const void *ptr, int from, int len,int row_size);          
 void mc_DumpSize(const char * message,const void *ptr,int size,int row_size);
 void mc_RandomSeed(unsigned int seed);
+double mc_RandomDouble();
 unsigned int mc_RandomInRange(unsigned int min,unsigned int max);
 unsigned int mc_TimeNowAsUInt();
 double mc_TimeNowAsDouble();

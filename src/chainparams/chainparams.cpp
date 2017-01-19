@@ -183,6 +183,7 @@ public:
 
         fRequireRPCPassword = true;
         fMiningRequiresPeers = true;
+        fMineEmptyBlocks = true;
         fDefaultCheckMemPool = false;
         fAllowMinDifficultyBlocks = false;
         fRequireStandard = true;
@@ -242,6 +243,7 @@ public:
 
         fRequireRPCPassword = true;
         fMiningRequiresPeers = true;
+        fMineEmptyBlocks = true;
         fDefaultCheckMemPool = false;
         fAllowMinDifficultyBlocks = true;
         fRequireStandard = false;
@@ -287,6 +289,7 @@ public:
 
         fRequireRPCPassword = false;
         fMiningRequiresPeers = false;
+        fMineEmptyBlocks = true;
         fDefaultCheckMemPool = true;
         fAllowMinDifficultyBlocks = true;
         fRequireStandard = false;
@@ -314,6 +317,7 @@ public:
 
         fRequireRPCPassword = false;
         fMiningRequiresPeers = false;
+        fMineEmptyBlocks = true;
         fDefaultCheckMemPool = true;
         fAllowMinDifficultyBlocks = false;
         fMineBlocksOnDemand = true;
@@ -498,6 +502,8 @@ public:
         
         fMiningRequiresPeers = (mc_gState->m_NetworkParams->GetInt64Param("miningrequirespeers") != 0);
         fMiningRequiresPeers=GetBoolArg("-miningrequirespeers", fMiningRequiresPeers);
+        fMineEmptyBlocks = (mc_gState->m_NetworkParams->GetInt64Param("mineemptyblocks") != 0);
+        fMineEmptyBlocks=GetBoolArg("-mineemptyblocks", fMineEmptyBlocks);
         fAllowMinDifficultyBlocks = (mc_gState->m_NetworkParams->GetInt64Param("allowmindifficultyblocks") != 0);
         fRequireStandard = (mc_gState->m_NetworkParams->GetInt64Param("onlyacceptstdtxs") != 0);
         fRequireStandard=GetBoolArg("-requirestandard", fRequireStandard);
