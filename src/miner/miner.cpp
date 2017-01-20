@@ -1093,7 +1093,7 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
         {
             if(!fInMinerPool)
             {            
-                if( (*lpdActiveMiners < 0.5) || (dMinerDrift * mc_RandomDouble() < 1./(*lpdActiveMiners)))
+                if( (*lpdActiveMiners < 0.5) || ( mc_RandomDouble() < dMinerDrift /(*lpdActiveMiners)))
                 {
                     fInMinerPool=true;
                     nMinerPoolSize++;
