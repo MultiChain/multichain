@@ -434,6 +434,7 @@ static const CRPCCommand vRPCCommands[] =
     { "control",            "clearmempool",           &clearmempool,           true,      false,      false },
     { "control",            "setlastblock",           &setlastblock,           true,      false,      false },
     { "control",            "getblockchainparams",    &getblockchainparams,    true,      false,      false }, 
+    { "control",            "getruntimeparams",       &getruntimeparams,       true,      false,      false }, 
 /* MCHN END */    
 
     /* P2P networking */

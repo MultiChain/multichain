@@ -176,6 +176,68 @@ public:
 #endif
 
 /* MCHN START */
+
+Value convertparam(string str)
+{   
+    long lValue;
+    double dValue;
+            
+    if(str == "0")
+    {
+        return 0;
+    }
+    
+    if(str == "0.0")
+    {
+        return 0.;
+    }
+    
+    lValue=atol(str.c_str());
+    
+    if(lValue)
+    {
+        return lValue;
+    }
+    
+    dValue=atof(str.c_str());
+    
+    if( (dValue < -1.e-13) || (dValue > 1.e-13) )
+    {
+        return dValue;
+    }
+    
+    return str;    
+}
+
+Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 1)                                            
+        throw runtime_error("Help message not found\n");
+    
+    Object obj;
+    BOOST_FOREACH(const PAIRTYPE(string,vector<string>)& entry, mapMultiArgs)
+    {
+        if(entry.second.size())
+        {
+            if(entry.second.size() == 1)
+            {
+                obj.push_back(Pair(entry.first,convertparam(entry.second[0])));                    
+            }
+            else
+            {
+                Array arr;
+
+                for(int i=0;i<(int)entry.second.size();i++)
+                {
+                    arr.push_back(convertparam(entry.second[i]));
+                }
+                obj.push_back(Pair(entry.first,arr));                    
+            }
+        }
+    }
+    return obj;
+}
+
 Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)                                            // MCHN
@@ -462,8 +524,9 @@ Value getaddresses(const Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'verbose' parameter, should be boolean");                                                                
         }        
     }
-    
+
     Array ret;
+
     if((mc_gState->m_WalletMode & MC_WMD_TXS))
     {
         int entity_count;
@@ -512,9 +575,9 @@ Value getaddresses(const Array& params, bool fHelp)
                 }
                 if (pwalletMain && pwalletMain->mapAddressBook.count(dest))
                     addr.push_back(Pair("account", pwalletMain->mapAddressBook[dest].name));
-    /* MCHN START */        
+
                 SetSynchronizedFlag(dest,addr);
-    /* MCHN END */        
+
                 ret.push_back(addr);            
             }
             else

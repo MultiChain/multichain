@@ -191,6 +191,7 @@ extern json_spirit::Value getassetbalances(const json_spirit::Array& params, boo
 extern json_spirit::Value gettotalbalances(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value sendassettoaddress(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getblockchainparams(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getruntimeparams(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value preparelockunspent(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value createrawexchange(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value appendrawexchange(const json_spirit::Array& params, bool fHelp);

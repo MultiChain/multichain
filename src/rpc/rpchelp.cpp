@@ -3444,6 +3444,15 @@ void mc_InitRPCHelpMap15()
             "   Pass 0 to go back to using the system time."
         ));
        
+    mapHelpStrings.insert(std::make_pair("getruntimeparams",
+            "getruntimeparams \n"
+            "Returns an object containing various runtime parameters.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getruntimeparams", "")
+            + HelpExampleRpc("getruntimeparams", "")
+        ));
+    
+    
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
