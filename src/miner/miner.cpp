@@ -1123,6 +1123,7 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
         else
         {
             dEmergencyMiners=(double)GetMaxActiveMinersCount();
+            *lpdMiningStartTime=dExpectedTimeMax;
             *lpdMiningStartTime += dSpread;
             *lpdMiningStartTime -= dSpread / (nMinerPoolSize + 1);                                
             *lpdMiningStartTime += dAverageCreateBlockTime + mc_RandomDouble() * dAverageCreateBlockTime;
