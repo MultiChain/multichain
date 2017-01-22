@@ -58,7 +58,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
     { "anyonecanreceiveempty"                  , "anyone-can-receive-empty"                ,
                    MC_PRM_BOOLEAN | MC_PRM_USER | MC_PRM_CLONE                  , -1,         1,          0,         0, 0.0, 10007, 0, "-mc-anyonecanreceiveempty",
                    "anyonecancreate","",
-                   "Anyone can receive empty output, i.e. without permission grants, asset transafrs and zero native currency."},
+                   "Anyone can receive empty output, i.e. without permission grants, asset transfers and zero native currency."},
     { "anyonecancreate"                  , "anyone-can-create"                ,
                    MC_PRM_BOOLEAN | MC_PRM_USER | MC_PRM_CLONE                  , -1,         0,          0,         0, 0.0, 10006, 0, "-mc-anyonecancreate",
                    "anyonecanissue","",
