@@ -1113,6 +1113,16 @@ Value addmultisigaddress(const Array& params, bool fHelp)
         pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
     }
 
+    CScript outer = GetScriptForDestination(innerID);
+    
+    if(IsMine(*pwalletMain, outer) == ISMINE_NO)
+    {
+        if (!pwalletMain->HaveWatchOnly(outer))
+        {
+            if (!pwalletMain->AddWatchOnly(outer))
+                throw JSONRPCError(RPC_WALLET_ERROR, "Error adding address to wallet");            
+        }
+    }
     
     return CBitcoinAddress(innerID).ToString();
 }
@@ -2071,7 +2081,6 @@ Value getwalletinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("walletversion", pwalletMain->GetVersion()));
     obj.push_back(Pair("balance",       ValueFromAmount(pwalletMain->GetBalance())));
     obj.push_back(Pair("walletdbversion", mc_gState->GetWalletDBVersion()));                
-    int coin_count=0;
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) 
     {
         obj.push_back(Pair("txcount",       (int)pwalletTxsMain->m_Database->m_DBStat.m_Count));        
@@ -2082,7 +2091,7 @@ Value getwalletinfo(const Array& params, bool fHelp)
     }
     vector<COutput> vecOutputs;
     pwalletMain->AvailableCoins(vecOutputs, false, NULL, false,true);
-    obj.push_back(Pair("outputcount",  (int)vecOutputs.size()));                
+    obj.push_back(Pair("utxocount",  (int)vecOutputs.size()));                
     obj.push_back(Pair("keypoololdest", pwalletMain->GetOldestKeyPoolTime()));
     obj.push_back(Pair("keypoolsize",   (int)pwalletMain->GetKeyPoolSize()));
     if (pwalletMain->IsCrypted())
