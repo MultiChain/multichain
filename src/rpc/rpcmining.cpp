@@ -214,6 +214,8 @@ Value prioritisetransaction(const Array& params, bool fHelp)
     if (fHelp || params.size() != 3)
         throw runtime_error("Help message not found\n");
 
+    throw JSONRPCError(RPC_INVALID_REQUEST, "Transaction prioritization is not supported in this version of MultiChain");        
+    
 /* MCHN START */    
 //    uint256 hash = ParseHashStr(params[0].get_str(), "txid");
 
@@ -250,6 +252,8 @@ Value getblocktemplate(const Array& params, bool fHelp)
     if (fHelp || params.size() > 1)
         throw runtime_error("Help message not found\n");
 
+    throw JSONRPCError(RPC_INVALID_REQUEST, "getblocktemplate is not supported in this version of MultiChain");        
+    
     std::string strMode = "template";
     Value lpval = Value::null;
     if (params.size() > 0)
@@ -488,6 +492,8 @@ Value submitblock(const Array& params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error("Help message not found\n");
 
+    throw JSONRPCError(RPC_INVALID_REQUEST, "submitblock is not supported in this version of MultiChain");            
+    
     CBlock block;
     if (!DecodeHexBlk(block, params[0].get_str()))
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");

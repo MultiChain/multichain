@@ -1270,7 +1270,7 @@ Value listreceivedbyaccount(const Array& params, bool fHelp)
 
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are ot supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
     }            
 
     return ListReceived(params, true);
