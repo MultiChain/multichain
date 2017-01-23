@@ -2101,7 +2101,7 @@ void mc_InitRPCHelpMap10()
             + HelpExampleRpc("grantwithdata", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", admin, 48656C6C6F20576F726C64210A")
         ));
     
-    mapHelpStrings.insert(std::make_pair("",
+    mapHelpStrings.insert(std::make_pair("grantwithdatafrom",
             "grantwithdatafrom from-address \"to-address(es)\" \"permission(s)\" data-hex|object ( native-amount startblock endblock )\n"
             "\nGrant permission with metadata using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
