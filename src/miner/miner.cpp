@@ -953,11 +953,10 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
         return *lpdMiningStartTime;
     }        
     
-    dMinerDrift=(double)(mc_gState->m_NetworkParams->GetInt64Param("miningturnover"))/MC_PRM_DECIMAL_GRANULARITY;
-    string sMinerDrift=GetArg("-miningturnover", "Not Set");
-    if(sMinerDrift != "Not Set")
+    dMinerDrift=Params().MiningTurnover();
+    if(dMinerDrift > 1.0)
     {
-        dMinerDrift=atof(sMinerDrift.c_str());
+        dMinerDrift=1.0;
     }    
     dMinerDrift-=dMinerDriftMin;
     if(dMinerDrift < 0)

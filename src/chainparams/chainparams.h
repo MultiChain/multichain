@@ -61,6 +61,8 @@ public:
     bool MiningRequiresPeers() const { return fMiningRequiresPeers; }
     /** Make miner mine empty blocks */
     bool MineEmptyBlocks() const { return fMineEmptyBlocks; }
+    /** Mining turnover */
+    double MiningTurnover() const { return dMiningTurnover; }
     /** Default value for -checkmempool argument */
     bool DefaultCheckMemPool() const { return fDefaultCheckMemPool; }
     /** Allow mining of a min-difficulty block */
@@ -107,6 +109,7 @@ protected:
     bool fRequireRPCPassword;
     bool fMiningRequiresPeers;
     bool fMineEmptyBlocks;
+    double dMiningTurnover;
     bool fDefaultCheckMemPool;
     bool fAllowMinDifficultyBlocks;
     bool fRequireStandard;

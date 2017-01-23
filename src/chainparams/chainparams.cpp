@@ -184,6 +184,7 @@ public:
         fRequireRPCPassword = true;
         fMiningRequiresPeers = true;
         fMineEmptyBlocks = true;
+        dMiningTurnover=1.0;
         fDefaultCheckMemPool = false;
         fAllowMinDifficultyBlocks = false;
         fRequireStandard = true;
@@ -244,6 +245,7 @@ public:
         fRequireRPCPassword = true;
         fMiningRequiresPeers = true;
         fMineEmptyBlocks = true;
+        dMiningTurnover=1.0;
         fDefaultCheckMemPool = false;
         fAllowMinDifficultyBlocks = true;
         fRequireStandard = false;
@@ -290,6 +292,7 @@ public:
         fRequireRPCPassword = false;
         fMiningRequiresPeers = false;
         fMineEmptyBlocks = true;
+        dMiningTurnover=1.0;
         fDefaultCheckMemPool = true;
         fAllowMinDifficultyBlocks = true;
         fRequireStandard = false;
@@ -318,6 +321,7 @@ public:
         fRequireRPCPassword = false;
         fMiningRequiresPeers = false;
         fMineEmptyBlocks = true;
+        dMiningTurnover=1.0;
         fDefaultCheckMemPool = true;
         fAllowMinDifficultyBlocks = false;
         fMineBlocksOnDemand = true;
@@ -504,6 +508,13 @@ public:
         fMiningRequiresPeers=GetBoolArg("-miningrequirespeers", fMiningRequiresPeers);
         fMineEmptyBlocks = (mc_gState->m_NetworkParams->GetInt64Param("mineemptyblocks") != 0);
         fMineEmptyBlocks=GetBoolArg("-mineemptyblocks", fMineEmptyBlocks);
+        dMiningTurnover=(double)(mc_gState->m_NetworkParams->GetInt64Param("miningturnover"))/MC_PRM_DECIMAL_GRANULARITY;
+        string sMinerDrift=GetArg("-miningturnover", "Not Set");
+        if(sMinerDrift != "Not Set")
+        {
+            dMiningTurnover=atof(sMinerDrift.c_str());
+        }    
+        
         fAllowMinDifficultyBlocks = (mc_gState->m_NetworkParams->GetInt64Param("allowmindifficultyblocks") != 0);
         fRequireStandard = (mc_gState->m_NetworkParams->GetInt64Param("onlyacceptstdtxs") != 0);
         fRequireStandard=GetBoolArg("-requirestandard", fRequireStandard);

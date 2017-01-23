@@ -177,36 +177,22 @@ public:
 
 /* MCHN START */
 
-Value convertparam(string str)
-{   
-    long lValue;
-    double dValue;
-            
-    if(str == "0")
+string getparamstring(string param)
+{
+    string str;
+    str="";
+    if(mapMultiArgs.count(param))
     {
-        return 0;
+        for(int i=0;i<(int)mapMultiArgs[param].size();i++)
+        {
+            if(str.size())
+            {
+                str += ",";
+            }
+            str += mapMultiArgs[param][i];
+        }        
     }
-    
-    if(str == "0.0")
-    {
-        return 0.;
-    }
-    
-    lValue=atol(str.c_str());
-    
-    if(lValue)
-    {
-        return lValue;
-    }
-    
-    dValue=atof(str.c_str());
-    
-    if( (dValue < -1.e-13) || (dValue > 1.e-13) )
-    {
-        return dValue;
-    }
-    
-    return str;    
+    return str;
 }
 
 Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
@@ -215,26 +201,52 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
         throw runtime_error("Help message not found\n");
     
     Object obj;
-    BOOST_FOREACH(const PAIRTYPE(string,vector<string>)& entry, mapMultiArgs)
+    obj.push_back(Pair("daemon",GetBoolArg("-daemon",false)));                    
+    obj.push_back(Pair("datadir",mc_gState->m_Params->DataDir(0,0)));                    
+    obj.push_back(Pair("debug",getparamstring("-debug")));   
+    obj.push_back(Pair("port",GetListenPort()));   
+    obj.push_back(Pair("reindex",GetBoolArg("-reindex",false)));                    
+    obj.push_back(Pair("rescan",GetBoolArg("-rescan",false)));                    
+    obj.push_back(Pair("rpcallowip",getparamstring("-rpcallowip")));   
+    obj.push_back(Pair("rpcport",GetArg("-rpcport", BaseParams().RPCPort())));   
+    obj.push_back(Pair("txindex",GetBoolArg("-txindex",true)));                    
+    obj.push_back(Pair("autocombineminconf",GetArg("-autocombineminconf", 1)));                    
+    obj.push_back(Pair("autocombinemininputs",GetArg("-autocombinemininputs", 50)));                    
+    obj.push_back(Pair("autocombinemaxinputs",GetArg("-autocombinemaxinputs", 100)));                    
+    obj.push_back(Pair("autocombinedelay",GetArg("-autocombinedelay", 1)));                    
+    obj.push_back(Pair("autocombinesuspend",GetArg("-autocombinesuspend", 15)));                    
+    obj.push_back(Pair("autosubscribe",GetArg("-autosubscribe","")));   
+    CKeyID keyID;
+    CPubKey pkey;            
+    if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_CONNECT))
     {
-        if(entry.second.size())
+        LogPrintf("mchn: Cannot find address having connect permission, trying default key\n");
+        pkey=pwalletMain->vchDefaultKey;
+    }
+    keyID=pkey.GetID();    
+    obj.push_back(Pair("handshakelocal",GetArg("-handshakelocal",CBitcoinAddress(keyID).ToString())));   
+    obj.push_back(Pair("hideknownopdrops",GetBoolArg("-hideknownopdrops",false)));                    
+    obj.push_back(Pair("maxshowndata",GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)));                    
+    obj.push_back(Pair("miningrequirespeers",Params().MiningRequiresPeers()));                    
+    obj.push_back(Pair("mineemptyblocks",Params().MineEmptyBlocks()));                    
+    obj.push_back(Pair("miningturnover",Params().MiningTurnover()));                    
+    obj.push_back(Pair("shortoutput",GetBoolArg("-shortoutput",false)));                    
+    if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
+    {
+        if(mc_gState->m_WalletMode & MC_WMD_MAP_TXS)
         {
-            if(entry.second.size() == 1)
-            {
-                obj.push_back(Pair(entry.first,convertparam(entry.second[0])));                    
-            }
-            else
-            {
-                Array arr;
-
-                for(int i=0;i<(int)entry.second.size();i++)
-                {
-                    arr.push_back(convertparam(entry.second[i]));
-                }
-                obj.push_back(Pair(entry.first,arr));                    
-            }
+            obj.push_back(Pair("walletdbversion", -1));                
+        }
+        else
+        {
+            obj.push_back(Pair("walletdbversion", 2));
         }
     }
+    else
+    {
+        obj.push_back(Pair("walletdbversion", 1));
+    }
+    
     return obj;
 }
 
