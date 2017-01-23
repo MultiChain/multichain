@@ -21,6 +21,23 @@ int mc_State::GetNumericVersion()
     return MULTICHAIN_BUILD_DESC_NUMERIC;
 }
 
+int mc_State::GetWalletDBVersion()
+{
+    if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
+    {
+        if(mc_gState->m_WalletMode & MC_WMD_MAP_TXS)
+        {
+            return -1;                
+        }
+        else
+        {
+            return 2;                
+        }
+    }
+    
+    return 1;
+}
+
 int mc_State::GetProtocolVersion()
 {
     return MULTICHAIN_PROTOCOL_VERSION;

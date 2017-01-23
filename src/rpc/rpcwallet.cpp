@@ -2070,23 +2070,19 @@ Value getwalletinfo(const Array& params, bool fHelp)
     Object obj;
     obj.push_back(Pair("walletversion", pwalletMain->GetVersion()));
     obj.push_back(Pair("balance",       ValueFromAmount(pwalletMain->GetBalance())));
-    if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
+    obj.push_back(Pair("walletdbversion", mc_gState->GetWalletDBVersion()));                
+    int coin_count=0;
+    if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) 
     {
         obj.push_back(Pair("txcount",       (int)pwalletTxsMain->m_Database->m_DBStat.m_Count));        
-        if(mc_gState->m_WalletMode & MC_WMD_MAP_TXS)
-        {
-            obj.push_back(Pair("walletdbversion", -1));                
-        }
-        else
-        {
-            obj.push_back(Pair("walletdbversion", 2));
-        }
     }
     else
     {
         obj.push_back(Pair("txcount",       (int)pwalletMain->mapWallet.size()));
-        obj.push_back(Pair("walletdbversion", 1));
     }
+    vector<COutput> vecOutputs;
+    pwalletMain->AvailableCoins(vecOutputs, false, NULL, false,true);
+    obj.push_back(Pair("outputcount",  (int)vecOutputs.size()));                
     obj.push_back(Pair("keypoololdest", pwalletMain->GetOldestKeyPoolTime()));
     obj.push_back(Pair("keypoolsize",   (int)pwalletMain->GetKeyPoolSize()));
     if (pwalletMain->IsCrypted())

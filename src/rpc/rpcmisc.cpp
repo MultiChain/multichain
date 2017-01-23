@@ -84,21 +84,7 @@ Value getinfo(const Array& params, bool fHelp)
     if (pwalletMain) {
         obj.push_back(Pair("walletversion", pwalletMain->GetVersion()));
         obj.push_back(Pair("balance",       ValueFromAmount(pwalletMain->GetBalance())));
-        if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
-        {
-            if(mc_gState->m_WalletMode & MC_WMD_MAP_TXS)
-            {
-                obj.push_back(Pair("walletdbversion", -1));                
-            }
-            else
-            {
-                obj.push_back(Pair("walletdbversion", 2));
-            }
-        }
-        else
-        {
-            obj.push_back(Pair("walletdbversion", 1));
-        }
+        obj.push_back(Pair("walletdbversion", mc_gState->GetWalletDBVersion()));                
     }
 #endif
 /* MCHN START */    
@@ -235,21 +221,7 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     obj.push_back(Pair("genproclimit",GetArg("-genproclimit", 1)));                    
     obj.push_back(Pair("mineblocksondemand",Params().MineBlocksOnDemand()));                    
     obj.push_back(Pair("shortoutput",GetBoolArg("-shortoutput",false)));                    
-    if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
-    {
-        if(mc_gState->m_WalletMode & MC_WMD_MAP_TXS)
-        {
-            obj.push_back(Pair("walletdbversion", -1));                
-        }
-        else
-        {
-            obj.push_back(Pair("walletdbversion", 2));
-        }
-    }
-    else
-    {
-        obj.push_back(Pair("walletdbversion", 1));
-    }
+    obj.push_back(Pair("walletdbversion", mc_gState->GetWalletDBVersion()));                
     
     return obj;
 }
