@@ -1572,11 +1572,12 @@ void static BitcoinMiner(CWallet *pwallet)
 /* MCHN START */    
             double wTimeNow=mc_TimeNowAsDouble();
 //            if(wTimeNow>wStartTime+100)
-            if(wTimeNow>wStartTime+0.1)
+            if(wTimeNow>wStartTime+0.01)
             {
                 wCount[wPos]=wThisCount;
                 wTime[wPos]=wTimeNow-wStartTime;
                 wPos=(wPos+1)%wSize;
+                dHashesPerSec=wThisCount/(wTimeNow-wStartTime);
             }
             
             } 

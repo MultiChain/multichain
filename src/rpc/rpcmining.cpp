@@ -85,7 +85,7 @@ Value getgenerate(const Array& params, bool fHelp)
     if (fHelp || params.size() != 0)
         throw runtime_error("Help message not found\n");
 
-    return GetBoolArg("-gen", false);
+    return GetBoolArg("-gen", true);
 }
 
 
@@ -101,7 +101,11 @@ Value setgenerate(const Array& params, bool fHelp)
     if (params.size() > 0)
         fGenerate = params[0].get_bool();
 
-    int nGenProcLimit = -1;
+    int nGenProcLimit = 1;
+    if(Params().Interval() > 0)
+    {
+        nGenProcLimit = -1;
+    }
     if (params.size() > 1)
     {
         nGenProcLimit = params[1].get_int();
@@ -128,7 +132,9 @@ Value setgenerate(const Array& params, bool fHelp)
         Array blockHashes;
         while (nHeight < nHeightEnd)
         {
-            auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey));
+            int canMine=0;
+            auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithDefaultKey(pwalletMain,&canMine));
+//            auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey));
             if (!pblocktemplate.get())
                 throw JSONRPCError(RPC_INTERNAL_ERROR, "Wallet keypool empty");
             CBlock *pblock = &pblocktemplate->block;
@@ -139,7 +145,7 @@ Value setgenerate(const Array& params, bool fHelp)
 //                IncrementExtraNonce(pblock, chainActive.Tip(), nExtraNonce);
 /* MCHN START */                
             }
-            while (!CheckProofOfWork(pblock->GetHash(), pblock->nBits)) {
+            while (!CheckProofOfWork(pblock->GetHash(), pblock->nBits, true)) {
                 // Yes, there is a chance every nonce could fail to satisfy the -regtest
                 // target -- 1 in 2^(2^32). That ain't gonna happen.
                 ++pblock->nNonce;
@@ -166,9 +172,10 @@ Value gethashespersec(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error("Help message not found\n");
-
+/*
     if (GetTimeMillis() - nHPSTimerStart > 8000)
         return (int64_t)0;
+ */ 
     return (int64_t)dHashesPerSec;
 }
 #endif
@@ -185,7 +192,7 @@ Value getmininginfo(const Array& params, bool fHelp)
     obj.push_back(Pair("currentblocktx",   (uint64_t)nLastBlockTx));
     obj.push_back(Pair("difficulty",       (double)GetDifficulty()));
     obj.push_back(Pair("errors",           GetWarnings("statusbar")));
-    obj.push_back(Pair("genproclimit",     (int)GetArg("-genproclimit", -1)));
+    obj.push_back(Pair("genproclimit",     (int)GetArg("-genproclimit", 1)));
     obj.push_back(Pair("networkhashps",    getnetworkhashps(params, false)));
     obj.push_back(Pair("pooledtx",         (uint64_t)mempool.size()));
     obj.push_back(Pair("testnet",          Params().TestnetToBeDeprecatedFieldRPC()));
