@@ -16,6 +16,11 @@ const char* mc_State::GetFullVersion()
     return MULTICHAIN_FULL_VERSION;
 }
 
+int mc_State::GetNumericVersion()
+{
+    return MULTICHAIN_BUILD_DESC_NUMERIC;
+}
+
 int mc_State::GetProtocolVersion()
 {
     return MULTICHAIN_PROTOCOL_VERSION;

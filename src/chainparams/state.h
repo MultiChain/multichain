@@ -205,6 +205,7 @@ typedef struct mc_State
     
     const char* GetVersion();
     const char* GetFullVersion();
+    int GetNumericVersion();
     int GetProtocolVersion();
     const char* GetSeedNode();
     
