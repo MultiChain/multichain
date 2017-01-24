@@ -2083,7 +2083,7 @@ Value getwalletinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("walletdbversion", mc_gState->GetWalletDBVersion()));                
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) 
     {
-        obj.push_back(Pair("txcount",       (int)pwalletTxsMain->m_Database->m_DBStat.m_Count));        
+        obj.push_back(Pair("txcount",       (int)pwalletTxsMain->m_Database->m_DBStat.m_Count+(int)pwalletTxsMain->m_UnconfirmedSends.size()));        
     }
     else
     {
