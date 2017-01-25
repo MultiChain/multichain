@@ -4645,6 +4645,14 @@ void CompleteProcessVersion(CNode* pfrom)
             pfrom->PushMessage("getaddr");
             pfrom->fGetAddr = true;
         }
+        if(mc_gState->GetSeedNode())
+        {
+            if(strcmp(mc_gState->GetSeedNode(),pfrom->addr.ToStringIPPort().c_str()) == 0)
+            {
+                LogPrint("mchn","Adding seed address %s\n",pfrom->addr.ToStringIPPort().c_str());
+                addrman.Add(pfrom->addr, CNetAddr("127.0.0.1"));
+            }
+        }
         addrman.Good(pfrom->addr);
     }
     // Relay alerts
