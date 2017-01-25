@@ -943,6 +943,7 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
     }
     
     *lphLastBlockHash=pindexTip->GetBlockHash();
+    *lpnMemPoolSize=mempool.hashList->m_Count;
     
     if( (Params().Interval() > 0) ||                                            // POW 
         (mc_gState->m_Permissions->m_Block <= 1) )    
@@ -952,6 +953,7 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
         *lpdMiningStartTime=mc_TimeNowAsDouble();                               // start mining immediately
         return *lpdMiningStartTime;
     }        
+    
     
     dMinerDrift=Params().MiningTurnover();
     if(dMinerDrift > 1.0)
