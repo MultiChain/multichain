@@ -668,6 +668,10 @@ int mc_MultichainParams::SetGlobals()
     MAX_OP_RETURN_RELAY=GetArg("-datacarriersize", MAX_OP_RETURN_RELAY);
     MAX_BLOCK_SIZE=(unsigned int)GetInt64Param("maximumblocksize");    
     DEFAULT_BLOCK_MAX_SIZE=MAX_BLOCK_SIZE;    
+    while(MAX_BLOCK_SIZE>MAX_BLOCKFILE_SIZE)
+    {
+        MAX_BLOCKFILE_SIZE *= 2;
+    }
     MAX_STANDARD_TX_SIZE=(unsigned int)GetInt64Param("maxstdtxsize");    
     MAX_SCRIPT_ELEMENT_SIZE=(unsigned int)GetInt64Param("maxstdelementsize");
     COINBASE_MATURITY=(int)GetInt64Param("rewardspendabledelay");    

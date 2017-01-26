@@ -9,6 +9,7 @@ unsigned int MIN_RELAY_TX_FEE = 1000;                                           
 unsigned int MAX_OP_RETURN_RELAY = 40;                                          // standard.h
 unsigned int MAX_BLOCK_SIZE = 1000000;                                          // block.h
 unsigned int DEFAULT_BLOCK_MAX_SIZE = 750000;                                   // main.h
+unsigned int MAX_BLOCKFILE_SIZE = 0x8000000;                                    // main.h
 unsigned int MAX_STANDARD_TX_SIZE = 100000;                                     // main.h
 int COINBASE_MATURITY = 100;                                                    // main.h
 int64_t COIN = 100000000;                                                       // amount.h
