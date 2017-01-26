@@ -672,6 +672,10 @@ int mc_MultichainParams::SetGlobals()
     {
         MAX_BLOCKFILE_SIZE *= 2;
     }
+    while(MAX_BLOCK_SIZE>MAX_SIZE)
+    {
+        MAX_SIZE *= 2;
+    }
     MAX_STANDARD_TX_SIZE=(unsigned int)GetInt64Param("maxstdtxsize");    
     MAX_SCRIPT_ELEMENT_SIZE=(unsigned int)GetInt64Param("maxstdelementsize");
     COINBASE_MATURITY=(int)GetInt64Param("rewardspendabledelay");    

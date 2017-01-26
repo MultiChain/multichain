@@ -21,7 +21,9 @@
 
 class CScript;
 
-static const unsigned int MAX_SIZE = 0x02000000;
+//static const unsigned int MAX_SIZE = 0x02000000;
+extern unsigned int MAX_SIZE;                                     // MCHN global
+
 
 /**
  * Used to bypass the rule against non-const reference to temporary
