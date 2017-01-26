@@ -27,7 +27,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
                    "targetblocktime","",
                    "Content of the 'testnet' field of API responses, for compatibility."},
     { "targetblocktime"                        , "target-block-time"                    ,
-                   MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE                  , -1,        15,         5,     86400, 0.0, 10001, 0, "-mc-targetblocktime",
+                   MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE                  , -1,        15,         1,     86400, 0.0, 10001, 0, "-mc-targetblocktime",
                    "maximumblocksize","",
                    "Target time between blocks (transaction confirmation delay), seconds."},
     { "maximumblocksize"                       , "maximum-block-size"               , 
