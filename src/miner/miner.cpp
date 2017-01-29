@@ -1267,7 +1267,7 @@ void static BitcoinMiner(CWallet *pwallet)
                 {
                     int active_nodes=0;
                     
-                    while ((active_nodes == 0) && (mc_gState->m_Permissions->GetMinerCount() > 1))
+                    while ((active_nodes == 0) && (mc_gState->m_Permissions->GetMinerCount() > 1) && Params().MiningRequiresPeers())
                     {
                         vector<CNode*> vNodesCopy = vNodes;
                         BOOST_FOREACH(CNode* pnode, vNodesCopy)

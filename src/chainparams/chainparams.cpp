@@ -503,24 +503,28 @@ public:
         
 //        convertSeed6(vFixedSeeds, pnSeed6_test, ARRAYLEN(pnSeed6_test));
 
+        SetMultiChainRuntimeParams();
         
-        fMiningRequiresPeers = (mc_gState->m_NetworkParams->GetInt64Param("miningrequirespeers") != 0);
-        fMiningRequiresPeers=GetBoolArg("-miningrequirespeers", fMiningRequiresPeers);
-        fMineEmptyBlocks = (mc_gState->m_NetworkParams->GetInt64Param("mineemptyblocks") != 0);
-        fMineEmptyBlocks=GetBoolArg("-mineemptyblocks", fMineEmptyBlocks);
-        dMiningTurnover=(double)(mc_gState->m_NetworkParams->GetInt64Param("miningturnover"))/MC_PRM_DECIMAL_GRANULARITY;
-        string sMinerDrift=GetArg("-miningturnover", "Not Set");
-        if(sMinerDrift != "Not Set")
-        {
-            dMiningTurnover=atof(sMinerDrift.c_str());
-        }    
-        nLockAdminMineRounds=GetArg("-lockadminminerounds",mc_gState->m_NetworkParams->GetInt64Param("lockadminminerounds"));
-        fAllowMinDifficultyBlocks = (mc_gState->m_NetworkParams->GetInt64Param("allowmindifficultyblocks") != 0);
         fRequireStandard = (mc_gState->m_NetworkParams->GetInt64Param("onlyacceptstdtxs") != 0);
         fRequireStandard=GetBoolArg("-requirestandard", fRequireStandard);
         fMineBlocksOnDemand = GetBoolArg("-mineblocksondemand", false);
         fTestnetToBeDeprecatedFieldRPC = (mc_gState->m_NetworkParams->GetInt64Param("chainistestnet") != 0);
 
+    }
+    
+    void SetMultiChainRuntimeParams()
+    {
+        fMiningRequiresPeers = (mc_gState->m_NetworkParams->GetInt64Param("miningrequirespeers") != 0);
+        fMiningRequiresPeers=GetBoolArg("-miningrequirespeers", fMiningRequiresPeers);        
+        nLockAdminMineRounds=GetArg("-lockadminminerounds",mc_gState->m_NetworkParams->GetInt64Param("lockadminminerounds"));        
+        fMineEmptyBlocks = (mc_gState->m_NetworkParams->GetInt64Param("mineemptyblocks") != 0);
+        fMineEmptyBlocks=GetBoolArg("-mineemptyblocks", fMineEmptyBlocks);        
+        dMiningTurnover=(double)(mc_gState->m_NetworkParams->GetInt64Param("miningturnover"))/MC_PRM_DECIMAL_GRANULARITY;
+        string sMinerDrift=GetArg("-miningturnover", "Not Set");
+        if(sMinerDrift != "Not Set")
+        {
+            dMiningTurnover=atof(sMinerDrift.c_str());
+        }                    
     }
     
     void SetGenesis()
@@ -738,6 +742,11 @@ bool SelectMultiChainParams(const char *NetworkName)
     pCurrentParams = &multiChainParams;
     
     return true;
+}
+
+void SetMultiChainRuntimeParams()
+{
+    multiChainParams.SetMultiChainRuntimeParams();
 }
 
 bool InitializeMultiChainParams()

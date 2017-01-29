@@ -227,6 +227,99 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     return obj;
 }
 
+bool paramtobool(Value param)
+{
+    if(param.type() == int_type)
+    {
+        if(param.get_int())
+        {
+            return true;
+        }
+        else
+        {
+            return false;            
+        }
+    }
+    if(param.type() != bool_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                            
+    }    
+    
+    return param.get_bool();    
+}
+
+Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 2)                                            
+        throw runtime_error("Help message not found\n");
+    
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        throw JSONRPCError(RPC_INVALID_REQUEST, "This API is supported only if protocol=multichain");                
+    }
+    
+    string param_name=params[0].get_str();
+    bool fFound=false;
+    if(param_name == "miningrequirespeers")
+    {
+        mapArgs ["-" + param_name]=paramtobool(params[1]) ? "1" : "0";
+        fFound=true;
+    }
+    if(param_name == "mineemptyblocks")
+    {
+        mapArgs ["-" + param_name]=paramtobool(params[1]) ? "1" : "0";
+        fFound=true;
+    }
+    if(param_name == "miningturnover")
+    {
+        if(params[1].type() == real_type)
+        {
+            double dValue=params[1].get_real();
+            if( (dValue >= 0.) && (dValue <= 1.) )
+            {
+                mapArgs ["-" + param_name]= strprintf("%f", dValue);                                                                
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Should be in range (0,1)"));                                                
+            }
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                                            
+        }
+        fFound=true;
+    }
+    if(param_name == "lockadminminerounds")
+    {
+        if(params[1].type() == int_type)
+        {
+            int nValue=params[1].get_int();
+            if( nValue >= 0 )
+            {
+                mapArgs ["-" + param_name]=strprintf("%d", nValue);                                
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Should be non-negative"));                                                
+            }
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                                            
+        }
+        fFound=true;
+    }
+    if(!fFound)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, string("Unsupported parameter"));                                                    
+    }
+
+    SetMultiChainRuntimeParams();    
+    
+    return Value::null;
+}    
+
 Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)                                            // MCHN

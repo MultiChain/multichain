@@ -3451,6 +3451,17 @@ void mc_InitRPCHelpMap15()
             + HelpExampleRpc("getruntimeparams", "")
         ));
     
+    mapHelpStrings.insert(std::make_pair("setruntimeparam",
+            "setruntimeparam \"parameter-name\" parameter-value \n"
+            "Sets value for runtime parameter\n"
+            "\nArguments:\n"
+            "1. \"parameter-name\"  (string, required) Parameter name: miningrequirespeers, mineemptyblocks, miningturnover, lockadminminerounds\n"
+            "2. parameter-value     (required) parameter value\n"
+            "\nExamples:\n"
+            + HelpExampleCli("setruntimeparam", "\"miningturnover\" 0.3")
+            + HelpExampleRpc("setruntimeparam", "\"miningturnover\", 0.3")
+        ));
+    
     
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""

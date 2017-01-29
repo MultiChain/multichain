@@ -165,6 +165,8 @@ bool SelectParamsFromCommandLine();
 
 bool SelectMultiChainParams(const char *NetworkName);
 bool InitializeMultiChainParams();
+void SetMultiChainRuntimeParams();
+
 
 /* MCHN END */
 

@@ -35,6 +35,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "sendtoaddress", 1 },
     { "send", 1 },
 /* MCHN START */    
+    { "setruntimeparam", 1 },                                                             
     { "createkeypairs", 0 },                                                             
     { "combineunspent", 1 },                                                             
     { "combineunspent", 2 },                                                             
