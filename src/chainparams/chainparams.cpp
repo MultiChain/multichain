@@ -514,7 +514,7 @@ public:
         {
             dMiningTurnover=atof(sMinerDrift.c_str());
         }    
-        
+        nLockAdminMineRounds=GetArg("-lockadminminerounds",mc_gState->m_NetworkParams->GetInt64Param("lockadminminerounds"));
         fAllowMinDifficultyBlocks = (mc_gState->m_NetworkParams->GetInt64Param("allowmindifficultyblocks") != 0);
         fRequireStandard = (mc_gState->m_NetworkParams->GetInt64Param("onlyacceptstdtxs") != 0);
         fRequireStandard=GetBoolArg("-requirestandard", fRequireStandard);

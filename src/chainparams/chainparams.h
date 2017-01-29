@@ -59,6 +59,8 @@ public:
     bool RequireRPCPassword() const { return fRequireRPCPassword; }
     /** Make miner wait to have peers to avoid wasting work */
     bool MiningRequiresPeers() const { return fMiningRequiresPeers; }
+    /** Maximal depth of blockchain reorganization since last change in governance model, in miner diveristy rounds */
+    int LockAdminMineRounds() const { return nLockAdminMineRounds; }
     /** Make miner mine empty blocks */
     bool MineEmptyBlocks() const { return fMineEmptyBlocks; }
     /** Mining turnover */
@@ -107,6 +109,7 @@ protected:
     CBlock genesis;
     std::vector<CAddress> vFixedSeeds;
     bool fRequireRPCPassword;
+    int nLockAdminMineRounds;
     bool fMiningRequiresPeers;
     bool fMineEmptyBlocks;
     double dMiningTurnover;

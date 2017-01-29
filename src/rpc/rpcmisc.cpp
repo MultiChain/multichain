@@ -217,6 +217,7 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     obj.push_back(Pair("miningrequirespeers",Params().MiningRequiresPeers()));                    
     obj.push_back(Pair("mineemptyblocks",Params().MineEmptyBlocks()));                    
     obj.push_back(Pair("miningturnover",Params().MiningTurnover()));                    
+    obj.push_back(Pair("lockadminminerounds",Params().LockAdminMineRounds()));                    
     obj.push_back(Pair("gen",GetBoolArg("-gen", true)));                    
     obj.push_back(Pair("genproclimit",GetArg("-genproclimit", 1)));                    
     obj.push_back(Pair("mineblocksondemand",Params().MineBlocksOnDemand()));                    

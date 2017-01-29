@@ -29,6 +29,10 @@
 #define MC_PFL_ENTITY_GENESIS   0x00000002
 #define MC_PFL_HAVE_PENDING     0x01000000
 
+#define MC_PFB_NONE               0x00000000
+#define MC_PFB_MINED_BEFORE       0x00000001                                    // Idential with FoundInDB value of normal row
+#define MC_PFB_GOVERNANCE_CHANGE  0x00000002
+
 #define MC_PLS_SIZE_ENTITY            32
 #define MC_PLS_SIZE_ADDRESS           20
 #define MC_PLS_SIZE_HASH              32
@@ -112,7 +116,7 @@ typedef struct mc_BlockLedgerRow
     uint32_t m_AdminCount;                                                      // AdminCount
     uint32_t m_MinerCount;                                                      // MinerCount
     unsigned char m_CommitHash[MC_PLS_SIZE_HASH];                               // BlockHash
-    uint32_t m_FoundInDB;                                                       // Row is found in database
+    uint32_t m_BlockFlags;                                                      // Flags MC_PBF_ constants
     uint32_t m_BlockReceived;                                                   // BlockHeight
     uint64_t m_ThisRow;                                                         // Row in the ledger    
     
@@ -236,6 +240,7 @@ typedef struct mc_Permissions
     int GetActiveMinerCount();
     
     int GetBlockMiner(uint32_t block,unsigned char* lpMiner);
+    uint32_t FindGovernanceModelChange(uint32_t from,uint32_t to);
     
     int CanConnect(const void* lpEntity,const void* lpAddress);
     int CanSend(const void* lpEntity,const void* lpAddress);
@@ -266,6 +271,7 @@ typedef struct mc_Permissions
     int SetPermissionInternal(const void* lpEntity,const void* lpAddress,uint32_t type,const void* lpAdmin,uint32_t from,uint32_t to,uint32_t timestamp,uint32_t flags,int update_mempool);
     int CommitInternal(const void* lpMiner,const void* lpHash);
     int RollBackInternal(int block);
+    uint32_t CalculateBlockFlags();
     
     int UpdateCounts();
     int AdminConsensus(uint32_t type);

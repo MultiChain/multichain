@@ -3513,6 +3513,37 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
         return state.DoS(100, error("%s : rejected by checkpoint lock-in at %d", __func__, nHeight),
                          REJECT_CHECKPOINT, "checkpoint mismatch");
 
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    {
+        if(Params().Interval() <= 0)
+        {
+            if(pindexPrev != chainActive.Tip())
+            {
+                if( (mc_gState->m_NetworkParams->GetInt64Param("anyonecanadmin") == 0) && 
+                    (mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine") == 0) )
+                {
+                    const CBlockIndex *pindexFork;
+                    pindexFork=chainActive.FindFork(pindexPrev);
+                    int nMaxHeight=chainActive.Height()-Params().LockAdminMineRounds()*mc_gState->m_Permissions->GetMinerCount();
+                    int nMinHeight=pindexFork->nHeight;
+                    if( (nMinHeight <= nMaxHeight) && (nMinHeight > 0) )
+                    {
+                        int nGovernanceModelChangeHeight=mc_gState->m_Permissions->FindGovernanceModelChange(nMinHeight,nMaxHeight);
+                        if(nGovernanceModelChangeHeight)
+                        {
+                            LogPrint("mchn","mchn: Deep fork rejected: tip: %d, height: %d, fork: %d, rounds: %d; stop: %d\n",
+                                    chainActive.Height(),nHeight,pindexFork->nHeight,Params().LockAdminMineRounds(),nGovernanceModelChangeHeight);
+                            return state.Invalid(error("%s : rejected by lockadminrounds, fork: %d, change: %d", __func__,nMinHeight,nGovernanceModelChangeHeight),
+                                                 REJECT_INVALID, "reorg-too-deep");                        
+                        }
+                        LogPrint("mchn","mchn: Deep fork accepted: tip: %d, height: %d, fork: %d, rounds: %d\n",
+                                chainActive.Height(),nHeight,pindexFork->nHeight,Params().LockAdminMineRounds());
+                    }
+                }                                
+            }
+        }
+    }
+    
     // Don't accept any forks from the main chain prior to last checkpoint
     CBlockIndex* pcheckpoint = Checkpoints::GetLastCheckpoint();
     if (pcheckpoint && nHeight < pcheckpoint->nHeight)
