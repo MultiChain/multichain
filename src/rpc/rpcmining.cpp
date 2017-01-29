@@ -136,7 +136,24 @@ Value setgenerate(const Array& params, bool fHelp)
             auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithDefaultKey(pwalletMain,&canMine));
 //            auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey));
             if (!pblocktemplate.get())
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "Wallet keypool empty");
+            {
+                if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+                {
+                    if(nGenerate > 1)
+                    {
+                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't find enough wallet addresses with mining permission to mine given number of blocks");
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't find wallet address with mining permission");                        
+                    }
+                }
+                else
+                {
+                    throw JSONRPCError(RPC_INTERNAL_ERROR, "Wallet keypool empty");
+                }
+            }
+                
             CBlock *pblock = &pblocktemplate->block;
             {
                 LOCK(cs_main);
@@ -492,8 +509,6 @@ Value submitblock(const Array& params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error("Help message not found\n");
 
-    throw JSONRPCError(RPC_INVALID_REQUEST, "submitblock is not supported in this version of MultiChain");            
-    
     CBlock block;
     if (!DecodeHexBlk(block, params[0].get_str()))
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
