@@ -310,6 +310,26 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         }
         fFound=true;
     }
+    if(param_name == "maxshowndata")
+    {
+        if(params[1].type() == int_type)
+        {
+            int nValue=params[1].get_int();
+            if( nValue >= 0 )
+            {
+                mapArgs ["-" + param_name]=strprintf("%d", nValue);                                
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Should be non-negative"));                                                
+            }
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                                            
+        }
+        fFound=true;
+    }
     if(!fFound)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, string("Unsupported parameter"));                                                    
