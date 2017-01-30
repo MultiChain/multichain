@@ -34,7 +34,7 @@ std::string HelpMessageCli()
     strUsage += "  -conf=<file>             " + strprintf(_("Specify configuration file (default: %s)"), "multichain.conf") + "\n";
     strUsage += "  -datadir=<dir>           " + _("Specify data directory") + "\n";
 /* MCHN START */    
-    strUsage += "  -requestout=<requestout> " + _("Send request to stderr, stdout or null (not print it at all), default stderr") + "\n";
+    strUsage += "  -requestout=<requestout> " + _("Send request to stderr, stdout or null (not print it at all), default stderr") + "\n"; 
     strUsage += "  -saveclilog=<n>          " + _("If <n>=0 multichain-cli history is not saved, default 1") + "\n";
 /*    
     strUsage += "  -testnet               " + _("Use the test network") + "\n";
