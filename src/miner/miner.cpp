@@ -971,7 +971,6 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
 
     *lpdMiningStartTime=mc_TimeNowAsDouble() + 0.5 * dTargetSpacing;        
     dExpectedTimeByLast=pindexTip->dTimeReceived+dTargetSpacing;
-//    if(pindexTip->dTimeReceived <= 0.5)
     if(dExpectedTimeByLast < mc_TimeNowAsDouble() + dTargetSpacing - 0.5 * dSpread) // Can happen while in reorg or if dTimeReceived is not set
     {
         dExpectedTimeByLast=mc_TimeNowAsDouble() + dTargetSpacing;
@@ -1047,17 +1046,7 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
         }
         nMinerPoolSize=nStdMinerPoolSize;
         nStdMinerPoolSize=(int)(dMinerDrift * nStdMinerPoolSize) + 1;            
-        
-/*        
-        double dStdMinerPoolSize;
-        dStdMinerPoolSize=dMinerDrift * nStdMinerPoolSize + 1;
-        nStdMinerPoolSize=(int)dStdMinerPoolSize;
-        if(mc_RandomDouble()<dStdMinerPoolSize-nStdMinerPoolSize)
-        {
-            nStdMinerPoolSize++;
-        }
-*/
-        
+               
         dActualMinerDrift=dMinerDrift;
         if(dActualMinerDrift < dMinerDriftMin)
         {
@@ -1106,20 +1095,11 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
             *lpdActiveMiners=(double)GetMaxActiveMinersCount() - nMinerPoolSize;            
             *lpdActiveMiners/=dActualMinerDrift;
         }
-/*        
-        else
-        {
-            *lpdActiveMiners *= (1. - dActualMinerDrift);            
-        }
- */ 
+
         if(fInMinerPool)
         {
             *lpdMiningStartTime += mc_RandomDouble() * dSpread;
             *lpdMiningStartTime -= dSpread / (nMinerPoolSize + 1);                    
-/*            
-            LogPrint("mchn","mchn-miner: E %8.3f %8.3f %8.3f %8.3f  %8.3f %8.3f\n",
-                    *lpdMiningStartTime-mc_TimeNowAsDouble(),mc_TimeNowAsDouble(),*lpdMiningStartTime,dExpectedTime,dExpectedTimeByPast,dExpectedTimeByLast);                        
-*/            
         }
         else
         {
@@ -1195,24 +1175,13 @@ void static BitcoinMiner(CWallet *pwallet)
     canMine=MC_PTP_MINE;
     prevCanMine=canMine;
     
-//    int nActiveMiners=0;
     double dActiveMiners=-1;
     double dMiningStartTime=-1.;
-//    double dAverageCreateBlockTime=0.1;
     uint256 hLastBlockHash=0;
-//    int nLastBlockHeight=0;
     int nMemPoolSize=0;    
     set <CTxDestination> sMinerPool;
     CPubKey kMiner;
     
-/*    
-    double AverageTime=0;
-    double dHashesTarget=0;    
-    double wHashesPerSec=0;    
-    uint64_t ulTarget=0;
-    uint32_t ExpectedInterval=mc_RandomInRange((int)(0.5*(Params().TargetSpacing())),(int)(1.5*(Params().TargetSpacing())));
-    int ExpectedBlock=mc_gState->m_Permissions->m_Block;
- */
     int wSize=10;
     int wPos=0;
     uint64_t wCount[10];
@@ -1220,11 +1189,6 @@ void static BitcoinMiner(CWallet *pwallet)
     memset(wCount,0,wSize*sizeof(uint64_t));
     memset(wTime,0,wSize*sizeof(uint64_t));
     
-/*    
-    uint32_t tExpectedLastBlock=0;
-    uint32_t tExpectedMedian=0;
-    uint32_t tExpected=0;
- */ 
 /* MCHN END */            
     
 
@@ -1290,26 +1254,6 @@ void static BitcoinMiner(CWallet *pwallet)
             unsigned int nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
             CBlockIndex* pindexPrev = chainActive.Tip();
             
-/* MCHN START */    
-
-/*
-//            uint32_t ExpectedTime=Params().TargetSpacing();//mc_RandomInRange(0,Params().TargetSpacing()*2);            
-            if(mc_gState->m_Permissions->m_Block != ExpectedBlock)
-            {
-                ExpectedInterval=Params().TargetSpacing();
-                if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
-                {
-                    ExpectedInterval=4;
-//                    ExpectedInterval/=2;
-                }
-                
-                ExpectedInterval=mc_RandomInRange((int)(0.5*ExpectedInterval),(int)(1.5*ExpectedInterval));
-                ExpectedBlock=mc_gState->m_Permissions->m_Block;                
-            }
- */ 
-//            uint32_t ExpectedTime=ExpectedInterval;
-//            auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey));
-            
             if(Params().MineEmptyBlocks())
             {
                 nMemPoolSize=1;
@@ -1322,123 +1266,34 @@ void static BitcoinMiner(CWallet *pwallet)
             }
             else
             {
-//            LogPrint("mchn","mchn-miner: A\n");
                 if(!kMiner.IsValid())
                 {
-//            LogPrint("mchn","mchn-miner: B\n");
                     canMine=0;                    
                 }
                 else
                 {
-//            LogPrint("mchn","mchn-miner: C\n");
                     if( !Params().MineEmptyBlocks()
                             && not_setup_period
                             && (mempool.hashList->m_Count == 0)
                             )
                     {
-//            LogPrint("mchn","mchn-miner: D\n");
                         canMine=0;
                     }
                 }
             }
 
-/* 
-            else
-            {
-//                if(mc_gState->m_NetworkParams->IsProtocolMultichain())
-                {
-                    CBlock *pblock = &pblocktemplate->block;
-                    if(pblock->GetBlockTime()-pindexPrev->GetBlockTime() < ExpectedTime)
-                    {
-                        ExpectedTime-=(pblock->GetBlockTime()-pindexPrev->GetBlockTime());
-                    }
-                    else
-                    {
-                        ExpectedTime=0;
-                    }
-                    ExpectedTime+=mc_TimeNowAsUInt();     
-
-//                    tExpectedLastBlock=ExpectedTime;
-
-                    int past_blocks=24;
-                    int found_blocks=0;
-                    CBlockIndex* pindexPast=pindexPrev;
-                    uint64_t avTime=0;
-                    for(int i=0;i<past_blocks;i++)
-                    {
-                        if(pindexPast)
-                        {
-                            avTime+=pindexPast->GetBlockTime();
-                            found_blocks++;
-                            pindexPast=pindexPast->pprev;
-                        }
-                    }
-                    if(found_blocks)
-                    {                
-                        uint64_t exTime=avTime/found_blocks+(found_blocks-1)*Params().TargetSpacing()/2+ExpectedInterval;
-//                        tExpectedMedian=exTime;
-                        if(exTime<ExpectedTime)
-                        {
-                            ExpectedTime=exTime;
-                        }
-                    }
-
-//                    tExpected=ExpectedTime;
-
-                    uint64_t wTotalCount=0;
-                    uint64_t wTotalTime=0;
-                    bool take_it=true;
-
-                    AverageTime=0;
-                    for(int i=0;i<wSize;i++)
-                    {
-                        if(wTime[i]>0)
-                        {
-                            wTotalCount+=wCount[i];
-                            wTotalTime+=wTime[i];
-                        }
-                        else
-                        {
-                            take_it=false;
-                        }
-                    }
-                    if(wTotalTime>0)
-                    {
-                        wHashesPerSec=1000*(double)wTotalCount/(double)wTotalTime;
-                    }
-                    if(take_it)
-                    {
-                        uint256 hashRequired = uint256().SetCompact(pblock->nBits);
-                        memcpy(&ulTarget,(unsigned char*)&hashRequired+26,6);
-                        dHashesTarget=0xffffffffffff/(double)ulTarget;
-                        AverageTime=dHashesTarget/wHashesPerSec;
-                    }
-                    AverageTime/=mc_gState->m_Permissions->GetActiveMinerCount();
-                    if(mc_TimeNowAsUInt()+AverageTime<ExpectedTime)
-                    {
-                        if(mc_gState->m_Permissions->m_Block > 1)
-                        {
-                            canMine=0;
-                        }
-                    }
-                }
-            }
-*/
             if(mc_gState->m_NodePausedState & MC_NPS_MINING)
             {
-//            LogPrint("mchn","mchn-miner: E\n");
                 canMine=0;
             }            
             
             if(fReindex)
             {
-//            LogPrint("mchn","mchn-miner: F\n");
                 canMine=0;                
             }
             
             if(canMine & MC_PTP_MINE)
             {
-//            LogPrint("mchn","mchn-miner: G\n");
                 const unsigned char *pubkey_hash=(unsigned char *)Hash160(kMiner.begin(),kMiner.end()).begin();
                 CScript scriptPubKey = CScript() << OP_DUP << OP_HASH160 << vector<unsigned char>(pubkey_hash, pubkey_hash + 20) << OP_EQUALVERIFY << OP_CHECKSIG;
                 canMine=prevCanMine;
@@ -1447,7 +1302,6 @@ void static BitcoinMiner(CWallet *pwallet)
 /* MCHN END */    
             if (!pblocktemplate.get())
             {
-//            LogPrint("mchn","mchn-miner: H\n");
                 LogPrintf("Error in MultiChainMiner: Keypool ran out, please call keypoolrefill before restarting the mining thread\n");
                 return;
             }
