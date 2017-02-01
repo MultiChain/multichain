@@ -24,6 +24,8 @@
 #include "multichain/multichain.h"
 #include "wallet/wallettxs.h"
 std::string BurnAddress(const std::vector<unsigned char>& vchVersion);
+std::string SetBannedTxs(std::string txlist);
+std::string SetLockedBlock(std::string hash);
 /* MCHN END */
 
 #include <boost/assign/list_of.hpp>
@@ -212,6 +214,8 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     }
     keyID=pkey.GetID();    
     obj.push_back(Pair("handshakelocal",GetArg("-handshakelocal",CBitcoinAddress(keyID).ToString())));   
+    obj.push_back(Pair("bantx",GetArg("-bantx","")));                    
+    obj.push_back(Pair("lockblock",GetArg("-lockblock","")));                        
     obj.push_back(Pair("hideknownopdrops",GetBoolArg("-hideknownopdrops",false)));                    
     obj.push_back(Pair("maxshowndata",GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)));                    
     obj.push_back(Pair("miningrequirespeers",Params().MiningRequiresPeers()));                    
@@ -229,6 +233,14 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
 
 bool paramtobool(Value param)
 {
+    if(param.type() == str_type)
+    {
+        if(param.get_str() == "true")
+        {
+            return true;
+        }
+        return atoi(param.get_str().c_str()) != 0;
+    }
     if(param.type() == int_type)
     {
         if(param.get_int())
@@ -272,9 +284,17 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
     }
     if(param_name == "miningturnover")
     {
-        if(params[1].type() == real_type)
+        if( (params[1].type() == real_type) || (params[1].type() == str_type) )
         {
-            double dValue=params[1].get_real();
+            double dValue;
+            if(params[1].type() == real_type)
+            {
+                dValue=params[1].get_real();
+            }
+            else
+            {
+                dValue=atof(params[1].get_str().c_str());
+            }
             if( (dValue >= 0.) && (dValue <= 1.) )
             {
                 mapArgs ["-" + param_name]= strprintf("%f", dValue);                                                                
@@ -291,10 +311,19 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         fFound=true;
     }
     if(param_name == "lockadminminerounds")
+    if(param_name == "maxshowndata")
     {
-        if(params[1].type() == int_type)
+        if( (params[1].type() == int_type) || (params[1].type() == str_type) )
         {
             int nValue=params[1].get_int();
+            if(params[1].type() == int_type)
+            {
+                nValue=params[1].get_int();
+            }
+            else
+            {
+                nValue=atoi(params[1].get_str().c_str());
+            }
             if( nValue >= 0 )
             {
                 mapArgs ["-" + param_name]=strprintf("%d", nValue);                                
@@ -310,23 +339,43 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         }
         fFound=true;
     }
-    if(param_name == "maxshowndata")
+    if(param_name == "bantx")
     {
-        if(params[1].type() == int_type)
+        if(params[1].type() == str_type)
         {
-            int nValue=params[1].get_int();
-            if( nValue >= 0 )
+            string error=SetBannedTxs(params[1].get_str());
+            if(error.size())
             {
-                mapArgs ["-" + param_name]=strprintf("%d", nValue);                                
+                throw JSONRPCError(RPC_INVALID_PARAMETER, error);                                                                        
             }
             else
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Should be non-negative"));                                                
+                mapArgs ["-" + param_name]=params[1].get_str();                                
             }
-        }
+        }   
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                                            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                                                        
+        }
+        fFound=true;
+    }
+    if(param_name == "lockblock")
+    {
+        if(params[1].type() == str_type)
+        {
+            string error=SetLockedBlock(params[1].get_str());
+            if(error.size())
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, error);                                                                        
+            }
+            else
+            {
+                mapArgs ["-" + param_name]=params[1].get_str();                                
+            }
+        }   
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                                                        
         }
         fFound=true;
     }

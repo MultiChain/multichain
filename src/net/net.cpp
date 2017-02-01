@@ -2188,6 +2188,7 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     fSyncedOnce=false;
     fCanConnectLocal=false;
     fCanConnectRemote=false;
+    fLastIgnoreIncoming=false;
 /* MCHN END */    
     
     {

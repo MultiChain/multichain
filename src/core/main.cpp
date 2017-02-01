@@ -110,6 +110,10 @@ struct COrphanTx {
 };
 map<uint256, COrphanTx> mapOrphanTransactions;
 map<uint256, set<uint256> > mapOrphanTransactionsByPrev;
+vector <uint256> vBannedTxs;
+uint256 hLockedBlock;
+CBlockIndex *pindexLockedBlock;
+
 void EraseOrphansFor(NodeId peer);
 
 /* MCHN START */
@@ -513,7 +517,22 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
     // Make sure pindexBestKnownBlock is up to date, we'll need it.
     ProcessBlockAvailability(nodeid);
 
-    if (state->pindexBestKnownBlock == NULL || state->pindexBestKnownBlock->nChainWork < chainActive.Tip()->nChainWork) {
+    CBlockIndex *pindexBestKnownBlock=state->pindexBestKnownBlock;
+    
+    if(pindexLockedBlock)
+    {
+        if(pindexBestKnownBlock)
+        {
+            CBlockIndex *pindexCommonAncestor;
+            pindexCommonAncestor=LastCommonAncestor(state->pindexBestKnownBlock,pindexLockedBlock);
+            if(pindexCommonAncestor != pindexLockedBlock)
+            {
+                pindexBestKnownBlock=pindexCommonAncestor;
+            }            
+        }
+    }
+    
+    if (pindexBestKnownBlock == NULL || pindexBestKnownBlock->nChainWork < chainActive.Tip()->nChainWork) {
         // This peer has nothing interesting.
         return;
     }
@@ -521,13 +540,13 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
     if (state->pindexLastCommonBlock == NULL) {
         // Bootstrap quickly by guessing a parent of our best tip is the forking point.
         // Guessing wrong in either direction is not a problem.
-        state->pindexLastCommonBlock = chainActive[std::min(state->pindexBestKnownBlock->nHeight, chainActive.Height())];
+        state->pindexLastCommonBlock = chainActive[std::min(pindexBestKnownBlock->nHeight, chainActive.Height())];
     }
 
     // If the peer reorganized, our previous pindexLastCommonBlock may not be an ancestor
     // of their current tip anymore. Go back enough to fix that.
-    state->pindexLastCommonBlock = LastCommonAncestor(state->pindexLastCommonBlock, state->pindexBestKnownBlock);
-    if (state->pindexLastCommonBlock == state->pindexBestKnownBlock)
+    state->pindexLastCommonBlock = LastCommonAncestor(state->pindexLastCommonBlock, pindexBestKnownBlock);
+    if (state->pindexLastCommonBlock == pindexBestKnownBlock)
         return;
 
     std::vector<CBlockIndex*> vToFetch;
@@ -536,7 +555,7 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
     // linked block we have in common with this peer. The +1 is so we can detect stalling, namely if we would be able to
     // download that next block if the window were 1 larger.
     int nWindowEnd = state->pindexLastCommonBlock->nHeight + BLOCK_DOWNLOAD_WINDOW;
-    int nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
+    int nMaxHeight = std::min<int>(pindexBestKnownBlock->nHeight, nWindowEnd + 1);
     NodeId waitingfor = -1;
     while (pindexWalk->nHeight < nMaxHeight) {
         // Read up to 128 (or more, if more blocks than that are needed) successors of pindexWalk (towards
@@ -544,7 +563,7 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
         // as iterating over ~100 CBlockIndex* entries anyway.
         int nToFetch = std::min(nMaxHeight - pindexWalk->nHeight, std::max<int>(count - vBlocks.size(), 128));
         vToFetch.resize(nToFetch);
-        pindexWalk = state->pindexBestKnownBlock->GetAncestor(pindexWalk->nHeight + nToFetch);
+        pindexWalk = pindexBestKnownBlock->GetAncestor(pindexWalk->nHeight + nToFetch);
         vToFetch[nToFetch - 1] = pindexWalk;
         for (unsigned int i = nToFetch - 1; i > 0; i--) {
             vToFetch[i - 1] = vToFetch[i]->pprev;
@@ -2443,7 +2462,7 @@ void static UpdateTip(CBlockIndex *pindexNew) {
     nTimeBestReceived = GetTime();
     mempool.AddTransactionsUpdated(1);
 
-    LogPrintf("UpdateTip: new best=%s  height=%d  log2_work=%.8g  tx=%lu  date=%s progress=%f  cache=%u\n",
+    LogPrintf("UpdateTip:            new best=%s  height=%d  log2_work=%.8g  tx=%lu  date=%s progress=%f  cache=%u\n",
       chainActive.Tip()->GetBlockHash().ToString(), chainActive.Height(), log(chainActive.Tip()->nChainWork.getdouble())/log(2.0), (unsigned long)chainActive.Tip()->nChainTx,
       DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
       Checkpoints::GuessVerificationProgress(chainActive.Tip()), (unsigned int)pcoinsTip->GetCacheSize());
@@ -2451,7 +2470,7 @@ void static UpdateTip(CBlockIndex *pindexNew) {
     if(chainActive.Tip()->kMiner.IsValid())
     {
         CBitcoinAddress addr=CBitcoinAddress(chainActive.Tip()->kMiner.GetID());
-        LogPrint("mchn","mchn-block: height: %d, miner: %s\n", chainActive.Tip()->nHeight,addr.ToString().c_str());
+        LogPrint("mcblock","mchn-block: height: %d, miner: %s\n", chainActive.Tip()->nHeight,addr.ToString().c_str());
     }
     cvBlockChange.notify_all();
 
@@ -2705,12 +2724,12 @@ static CBlockIndex* FindMostWorkChain() {
                 
                 if(take_it)
                 {
-                    LogPrint("mchn","mchn: Choosing chain from %d candidates, current height: %d\n",(int)setBlockIndexCandidates.size(),chainActive.Tip()->nHeight);
+                    LogPrint("mcblock","mchn-block: Choosing chain from %d candidates, current height: %d\n",(int)setBlockIndexCandidates.size(),chainActive.Tip()->nHeight);
                     for (it = setBlockIndexCandidates.begin(); it != setBlockIndexCandidates.end(); ++it)
                     {
                         CBlockIndex* pindex=*it;
                         work=(uint32_t)mc_GetLE(&(pindex->nChainWork),32);
-                        LogPrint("mchn","mchn: Forked block index: %s, work: %d, height: %d, mined-by-me: %d, can-mine: %d\n",pindex->GetBlockHash().ToString().c_str(),
+                        LogPrint("mcblock","mchn-block: Forked block index: %s, work: %d, height: %d, mined-by-me: %d, can-mine: %d\n",pindex->GetBlockHash().ToString().c_str(),
                                 work, pindex->nHeight,pindex->nHeightMinedByMe,pindex->nCanMine);                    
                     }                
                 }
@@ -2718,9 +2737,56 @@ static CBlockIndex* FindMostWorkChain() {
             
             set<CBlockIndex*, CBlockIndexWorkComparator> setTempBlockIndexCandidates;
             std::set<CBlockIndex*, CBlockIndexWorkComparator>::iterator fit;
+            
+/*            
+            const CBlockIndex *pindexLockedFork;
+            pindexLockedFork=NULL;
+            if(pindexLockedBlock)
+            {
+                if(!chainActive.Contains(pindexLockedBlock))
+                {
+                    pindexLockedFork=chainActive.FindFork(pindexLockedBlock);                
+                }
+            }
+*/
+            
             for (fit = setBlockIndexCandidates.begin(); fit != setBlockIndexCandidates.end(); ++fit)
             {
-                setTempBlockIndexCandidates.insert(*fit);
+//                bool fLocked=false;                
+                CBlockIndex *pindexCandidate=*fit;
+                if(pindexLockedBlock)
+                {
+                    CBlockIndex *pindexCommonAncestor;
+                    pindexCommonAncestor=LastCommonAncestor(pindexCandidate,pindexLockedBlock);
+                    if(pindexCommonAncestor != pindexLockedBlock)
+                    {
+                        pindexCandidate=pindexCommonAncestor;
+                    }
+/*                    
+                    const CBlockIndex *pindexFork;
+                    pindexFork=chainActive.FindFork(*fit);
+                    if(pindexLockedFork)
+                    {
+                        if(pindexFork->nHeight < pindexLockedFork->nHeight)
+                        {
+                            fLocked=true;
+                        }                        
+                    }
+                    else
+                    {
+                        if(pindexFork->nHeight < pindexLockedBlock->nHeight)
+                        {
+                            fLocked=true;
+                        }            
+                    }                    
+ */ 
+                }
+//                if(!fLocked)
+                if(setTempBlockIndexCandidates.find(pindexCandidate) == setTempBlockIndexCandidates.end())
+                {
+//                    setTempBlockIndexCandidates.insert(*fit);
+                    setTempBlockIndexCandidates.insert(pindexCandidate);
+                }
             }
             
 /* MCHN END */                        
@@ -2738,7 +2804,7 @@ static CBlockIndex* FindMostWorkChain() {
             {
                 CBlockIndex* pindex=*it;
                 work=(uint32_t)mc_GetLE(&(pindex->nChainWork),32);
-                LogPrint("mchn","mchn: Selected forked block index: %s, Active chain tip: %s\n",pindex->GetBlockHash().ToString().c_str(),
+                LogPrint("mcblock","mchn-block: Selected forked block index: %s, Active chain tip: %s\n",pindex->GetBlockHash().ToString().c_str(),
                         chainActive.Tip()->GetBlockHash().ToString().c_str());                    
                 
             }
@@ -2833,7 +2899,7 @@ void UpdateChainMiningStatus(const CBlock &block,CBlockIndex *pindexNew)
         }
         if(pindexNew->pprev)
         {
-            LogPrint("mchn","mchn: New block index: %s, prev: %s, height: %d, mined-by-me: %d, can-mine: %d\n",block.GetHash().ToString().c_str(),
+            LogPrint("mcblock","mchn-block: New block index:   %s, prev: %s, height: %d, mined-by-me: %d, can-mine: %d\n",block.GetHash().ToString().c_str(),
                     pindexNew->pprev->GetBlockHash().ToString().c_str(),
                     pindexNew->nHeight,pindexNew->nHeightMinedByMe,pindexNew->nCanMine);
         }
@@ -2995,10 +3061,10 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
             {
                 if(chainActive.Tip())
                 {
-                    LogPrint("mchn","Possible reorg: %d %d->%d\n",attempt,chainActive.Tip()->nHeight,pindexMostWork->nHeight);
+                    LogPrint("mcblock","mchn-block: Possible reorg: %d %d->%d\n",attempt,chainActive.Tip()->nHeight,pindexMostWork->nHeight);
                     if(chainActive.Tip()->nHeight == pindexMostWork->nHeight)
                     {
-                        LogPrint("mchn","Same-height reorg: %d %d(%d)->%d(%d)\n",attempt,chainActive.Tip()->nCanMine,chainActive.Tip()->nHeight-chainActive.Tip()->nHeightMinedByMe,
+                        LogPrint("mcblock","mchn-block: Same-height reorg: %d %d(%d)->%d(%d)\n",attempt,chainActive.Tip()->nCanMine,chainActive.Tip()->nHeight-chainActive.Tip()->nHeightMinedByMe,
                                 pindexMostWork->nCanMine,pindexMostWork->nHeight-pindexMostWork->nHeightMinedByMe);                        
                     }
                 }
@@ -3017,14 +3083,14 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
                     CPubKey pubkey;            
                     chainActive.Tip()->nCanMine=pwalletMain->GetKeyFromAddressBook(pubkey,MC_PTP_MINE) ? MC_PTP_MINE : 0;
                     
-                    LogPrint("mchn","mchn: Chain activated: block: %s (height %d), can-mine: %d\n",
+                    LogPrint("mcblock","mchn-block: Chain activated:   %s (height %d), can-mine: %d\n",
                             chainActive.Tip()->GetBlockHash().ToString().c_str(), chainActive.Tip()->nHeight,chainActive.Tip()->nCanMine);
                     
                     if(nCanMine != chainActive.Tip()->nCanMine)
                     {
 //                        if(!pwalletMain->GetKeyFromAddressBook(pubkey,MC_PTP_MINE))
                         {
-                            LogPrint("mchn","mchn: Wallet mine permission changed on block: %s (height %d), reactivating best chain\n",
+                            LogPrint("mcblock","mchn-block: Wallet mine permission changed on block: %s (height %d), reactivating best chain\n",
                                     chainActive.Tip()->GetBlockHash().ToString().c_str(), chainActive.Tip()->nHeight);
                             pindexMostWork=NULL;
                             continue;
@@ -3096,6 +3162,16 @@ string SetLastBlock(uint256 hash)
         CBlock block;
         CBlockIndex* pblockindex = mapBlockIndex[hash];
 
+        if (pblockindex->nStatus & BLOCK_FAILED_MASK)
+        {
+            return "Block is invalid";
+        }
+        if ( (pblockindex->nStatus & BLOCK_HAVE_DATA) == 0 )
+//        if (!pblockindex->IsValid(BLOCK_VALID_SCRIPTS))
+        {
+            return "Block is invalid, probably we have only header";            
+        }
+        
         if(!ReadBlockFromDisk(block, pblockindex))
         {
             return "Block not found";
@@ -3107,6 +3183,8 @@ string SetLastBlock(uint256 hash)
             ActivateBestChain(state);
             return error;
         }        
+        setBlockIndexCandidates.insert(pblockindex);
+
         LogPrintf("Set active chain tip: %s\n",hash.GetHex().c_str());
         if(pblockindex->nHeightMinedByMe == pblockindex->nHeight)
         {
@@ -3123,6 +3201,165 @@ string SetLastBlock(uint256 hash)
     }    
     return "";
 }
+
+string SetBannedTxs(string txlist)
+{
+    set<string> setStrings;
+    vector <uint256> vTxs;
+    stringstream ss(txlist); 
+    string tok;
+    
+    vTxs.clear();
+    
+    while(getline(ss, tok, ',')) 
+    {
+        if(tok.size())
+        {
+            if (setStrings.count(tok))
+            {
+                return string("Invalid parameter, duplicate banned transaction: ")+tok;
+            }
+            if (!IsHex(tok))
+            {
+                return string("Invalid parameter, -bantx element must be hexadecimal string (not '")+tok+"')";                
+            }
+            if (tok.size() != 64)
+            {
+                return string("Invalid parameter, -bantx element must be 32-byte hexadecimal string (not '")+tok+"')";                
+            }
+            
+            uint256 result;
+            result.SetHex(tok);
+
+            setStrings.insert(tok);
+            vTxs.push_back(result);
+        }
+    }
+    
+    vBannedTxs=vTxs;
+    return "";
+}
+
+string SetLockedBlock(string hash)
+{
+    uint256 hashOld;
+    CBlockIndex* pindexLockedBlockOld;
+    
+    hashOld=hLockedBlock;
+    pindexLockedBlockOld=pindexLockedBlock;
+    
+    if(hash.size())
+    {
+        if (!IsHex(hash))
+        {
+            return string("Invalid parameter, -lockblock must be hexadecimal string (not '")+hash+"')";                
+        }
+        if (hash.size() != 64)
+        {
+            return string("Invalid parameter, -lockblock must be 32-byte hexadecimal string (not '")+hash+"')";                
+        }
+
+        hLockedBlock.SetHex(hash);            
+    }
+    else
+    {
+        if(hLockedBlock != 0)
+        {
+            pindexLockedBlock=NULL;
+            LogPrintf("Removing locked block, activating best chain...\n");                
+            hLockedBlock=0;
+            SetLastBlock(0);                
+        }
+    }
+
+    pindexLockedBlock=NULL;
+    
+    if(hLockedBlock != 0)
+    {
+        LogPrintf("Setting locked block %s\n",hLockedBlock.ToString().c_str());
+        BlockMap::iterator mi = mapBlockIndex.find(hLockedBlock);
+        if (mi != mapBlockIndex.end()) 
+        {
+            pindexLockedBlock = mi->second;
+        }
+        else
+        {
+            LogPrintf("Block %s not found, chain will be switched if it will appear on alternative chain\n",hLockedBlock.ToString().c_str());     
+            BOOST_FOREACH(CNode* pnode, vNodes)
+            {
+                pnode->PushMessage("getheaders", chainActive.GetLocator(chainActive.Tip()), uint256(0));                
+            }
+        }
+        if(pindexLockedBlock)
+        {
+            if(!chainActive.Contains(pindexLockedBlock))
+            {
+                const CBlockIndex *pindexFork;
+                pindexFork=chainActive.FindFork(pindexLockedBlock);
+                
+                CBlockIndex *pindexWalk;
+                pindexWalk=pindexLockedBlock;
+                while( (pindexWalk != pindexFork) && ( (pindexWalk->nStatus & BLOCK_HAVE_DATA) == 0 ) )
+                {
+                    pindexWalk=pindexWalk->pprev;
+                }
+                
+                if(pindexWalk == pindexLockedBlock)
+                {
+                    BlockMap::iterator it = mapBlockIndex.begin();
+                    while (it != mapBlockIndex.end()) 
+                    {
+                        if (it->second->IsValid(BLOCK_VALID_TRANSACTIONS) && it->second->nChainTx && setBlockIndexCandidates.value_comp()(pindexWalk, it->second)) 
+                        {
+                            CBlockIndex *pindexCandidate=it->second;
+                            if(pindexCandidate->GetAncestor(pindexWalk->nHeight) == pindexWalk)
+                            {
+                                pindexWalk=pindexCandidate;
+                            }
+                        }
+                        it++;
+                    }
+                }
+                
+                LogPrintf("Block %s found on alternative chain at height %d\n",
+                        hLockedBlock.ToString().c_str(),pindexLockedBlock->nHeight);                
+                LogPrintf("Fork: %s at height %d\n",
+                        pindexFork->GetBlockHash().ToString().c_str(),pindexFork->nHeight);                
+                LogPrintf("Switching to best known block %s at height %d\n",
+                        pindexWalk->GetBlockHash().ToString().c_str(),pindexWalk->nHeight);                
+                
+                string error=SetLastBlock(pindexWalk->GetBlockHash());                
+                if(error.size())
+                {
+                    LogPrintf("ERROR: Cannot switch to chain with block %s: %d\n",hLockedBlock.ToString().c_str(),error.c_str());                                    
+                    hLockedBlock=hashOld;
+                    pindexLockedBlock=pindexLockedBlockOld;
+                    return string("Cannot switch to locked block: ")+error;                
+                }
+            }
+            else
+            {
+                LogPrintf("Block %s already in active chain at height %d\n",hLockedBlock.ToString().c_str(),pindexLockedBlock->nHeight);                
+            }
+        }
+    }
+    
+    return "";
+}
+
+bool CanMineWithLockedBlock()
+{
+    if(pindexLockedBlock)
+    {
+        if(!chainActive.Contains(pindexLockedBlock))
+        {
+            return false;
+        }        
+    }
+    
+    return true;
+}
+
 
 /* MCHN END */
 
@@ -3513,17 +3750,88 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
         return state.DoS(100, error("%s : rejected by checkpoint lock-in at %d", __func__, nHeight),
                          REJECT_CHECKPOINT, "checkpoint mismatch");
 
+    bool fWaitingForLocked=false;
+    if(pindexLockedBlock)
+    {
+        if(!chainActive.Contains(pindexLockedBlock))
+        {
+            fWaitingForLocked=true;
+        }
+    }
+    else
+    {
+        if(hLockedBlock != 0)
+        {
+            fWaitingForLocked=true;            
+        }        
+    }
+    const CBlockIndex *pindexFork;
+    pindexFork=chainActive.FindFork(pindexPrev);
+/*    
+    const CBlockIndex *pindexFork;
+    pindexFork=NULL;
+    pindexFork=chainActive.FindFork(pindexPrev);
+    if(pindexLockedBlock)
+    {
+        if(chainActive.Contains(pindexLockedBlock))
+        {
+            if(pindexFork->nHeight < pindexLockedBlock->nHeight)
+            {
+                LogPrint("mcblock","mchn-block: Fork rejected, locked: block %s, tip: %d, height: %d, fork: %d, locked: %d\n",block.GetHash().ToString().c_str(),
+                        chainActive.Height(),nHeight,pindexFork->nHeight,pindexLockedBlock->nHeight);
+                return state.Invalid(error("%s : rejected by lockblock in active chain, fork: %d, locked: %d", __func__,pindexFork->nHeight,pindexLockedBlock->nHeight),
+                                     REJECT_INVALID, "locked-block-reorg-in");                                    
+            }            
+        }
+        else
+        {
+            fWaitingForLocked=true;
+            if(nHeight == pindexLockedBlock->nHeight)
+            {
+                if(block->GetHash() != pindexLockedBlock->GetBlockHash())
+                {
+                    LogPrint("mcblock","mchn-block: Fork rejected, locked on the same height: block %s, height: %d, locked block: %s\n",
+                            block.GetHash().ToString().c_str(),nHeight,pindexLockedBlock->GetBlockHash());
+                    return state.Invalid(error("%s : rejected by lockblock not in active chain, locked: %d", __func__,pindexLockedBlock->nHeight),
+                                         REJECT_INVALID, "locked-block-reorg-out");                                                        
+                }
+            }
+            else
+            {
+                if(nHeight > pindexLockedBlock->nHeight)
+                if(pindexPrev->GetAncestor(pindexLockedBlock->nHeight) != pindexLockedBlock)
+                
+                
+            }
+            CBlockIndex *pindexCommonAncestor=LastCommonAncestor(pindexPrev,pindexLockedBlock)
+            const CBlockIndex *pindexLockedFork;
+            pindexLockedFork=chainActive.FindFork(pindexLockedBlock);
+            if(pindexFork->nHeight < pindexLockedFork->nHeight)
+            {
+                LogPrint("mcblock","mchn-block: Fork rejected, locked: block %s, tip: %d, height: %d, fork: %d, locked: %d, locked fork: %d\n",block.GetHash().ToString().c_str(),
+                        chainActive.Height(),nHeight,pindexFork->nHeight,pindexLockedBlock->nHeight,pindexLockedFork->nHeight);
+                return state.Invalid(error("%s : rejected by lockblock not in active chain, fork: %d, locked: %d", __func__,pindexFork->nHeight,pindexLockedBlock->nHeight),
+                                     REJECT_INVALID, "locked-block-reorg-out");                                    
+            }                        
+        }
+    }
+    else
+    {
+        if(hLockedBlock != 0)
+        {
+            fWaitingForLocked=true;            
+        }
+    }
+ */   
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-        if(Params().Interval() <= 0)
+        if( (Params().Interval() <= 0) && !fWaitingForLocked )
         {
             if(pindexPrev != chainActive.Tip())
             {
                 if( (mc_gState->m_NetworkParams->GetInt64Param("anyonecanadmin") == 0) && 
                     (mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine") == 0) )
                 {
-                    const CBlockIndex *pindexFork;
-                    pindexFork=chainActive.FindFork(pindexPrev);
                     int nMaxHeight=chainActive.Height()-Params().LockAdminMineRounds()*mc_gState->m_Permissions->GetMinerCount();
                     int nMinHeight=pindexFork->nHeight;
                     if( (nMinHeight <= nMaxHeight) && (nMinHeight > 0) )
@@ -3531,12 +3839,12 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
                         int nGovernanceModelChangeHeight=mc_gState->m_Permissions->FindGovernanceModelChange(nMinHeight,nMaxHeight);
                         if(nGovernanceModelChangeHeight)
                         {
-                            LogPrint("mchn","mchn: Deep fork rejected: tip: %d, height: %d, fork: %d, rounds: %d; stop: %d\n",
+                            LogPrint("mcblock","mchn-block: Deep fork rejected: block %s, tip: %d, height: %d, fork: %d, rounds: %d; stop: %d\n",block.GetHash().ToString().c_str(),
                                     chainActive.Height(),nHeight,pindexFork->nHeight,Params().LockAdminMineRounds(),nGovernanceModelChangeHeight);
                             return state.Invalid(error("%s : rejected by lockadminrounds, fork: %d, change: %d", __func__,nMinHeight,nGovernanceModelChangeHeight),
                                                  REJECT_INVALID, "reorg-too-deep");                        
                         }
-                        LogPrint("mchn","mchn: Deep fork accepted: tip: %d, height: %d, fork: %d, rounds: %d\n",
+                        LogPrint("mcblock","mchn-block: Deep fork accepted: block %s, tip: %d, height: %d, fork: %d, rounds: %d\n",block.GetHash().ToString().c_str(),
                                 chainActive.Height(),nHeight,pindexFork->nHeight,Params().LockAdminMineRounds());
                     }
                 }                                
@@ -3661,6 +3969,23 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
     if (ppindex)
         *ppindex = pindex;
 
+    if(pindexLockedBlock == NULL)
+    {
+        if(hLockedBlock == pindex->GetBlockHash())
+        {
+            pindexLockedBlock=pindex;
+            if(!chainActive.Contains(pindexLockedBlock))
+            {
+                const CBlockIndex *pindexFork;
+                pindexFork=chainActive.FindFork(pindexLockedBlock);
+
+                LogPrintf("Accepted header for block %s found on alternative chain at height %d, rewinding to fork block %s at height %d\n",
+                        hLockedBlock.ToString().c_str(),pindexLockedBlock->nHeight,pindexFork->GetBlockHash().ToString().c_str(),pindexFork->nHeight);                
+                string error=SetLastBlock(pindexFork->GetBlockHash());                                
+            }
+        }
+    }
+    
     return true;
 }
 
@@ -3811,6 +4136,13 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
         bool ret = AcceptBlock(*pblock, state, &pindex, dbp);
         if (pindex && pfrom) {
             mapBlockSource[pindex->GetBlockHash()] = pfrom->GetId();
+        }
+        if(pindexLockedBlock == NULL)
+        {
+            if(hLockedBlock == pblock->GetHash())
+            {
+                pindexLockedBlock=pindex;
+            }
         }
         if (!ret)
             return error("%s : AcceptBlock FAILED", __func__);
@@ -6186,12 +6518,34 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         }
         if(!ignore_incoming)
         {
+            if(pto->fLastIgnoreIncoming)
+            {
+                BOOST_FOREACH(const QueuedBlock& entry, state.vBlocksInFlight)
+                    mapBlocksInFlight.erase(entry.hash);
+                
+                state.vBlocksInFlight.clear();//.front().nTime=nNow;
+                vector <CInv> currentAskFor;
+                while (!pto->mapAskFor.empty())
+                {
+                    const CInv& inv = (*pto->mapAskFor.begin()).second;
+                    if (!AlreadyHave(inv) || (inv.type == MSG_BLOCK))
+                    {
+                        currentAskFor.push_back(inv);
+                        pto->mapAskFor.erase(pto->mapAskFor.begin());                    
+                    }
+                }
+                for(int i=0;i<(int)currentAskFor.size();i++)
+                {
+                    pto->mapAskFor.insert(std::make_pair(nNow, currentAskFor[i]));
+                }
+                LogPrintf("Resuming incoming, %d inventory items will be requested\n", (int) pto->mapAskFor.size());
+            }
 /* MCHN END */        
         // In case there is a block that has been in flight from this peer for (2 + 0.5 * N) times the block interval
         // (with N the number of validated blocks that were in flight at the time it was requested), disconnect due to
         // timeout. We compensate for in-flight blocks to prevent killing off peers due to our own downstream link
         // being saturated. We only count validated in-flight blocks so peers can't advertize nonexisting block hashes
-        // to unreasonably increase our timeout.
+        // to unreasonably increase our timeout.            
         if (!pto->fDisconnect && state.vBlocksInFlight.size() > 0 && state.vBlocksInFlight.front().nTime < nNow - 500000 * Params().TargetSpacing() * (4 + state.vBlocksInFlight.front().nValidatedQueuedBefore)) {
             LogPrintf("Timeout downloading block %s from peer=%d, disconnecting\n", state.vBlocksInFlight.front().hash.ToString(), pto->id);
             pto->fDisconnect = true;
@@ -6283,6 +6637,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             pto->PushMessage("getdata", vGetData);
 /* MCHN START */        
         }
+        pto->fLastIgnoreIncoming=ignore_incoming;
 /* MCHN END */                
     }
     return true;

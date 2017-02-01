@@ -37,6 +37,8 @@
 #include "multichain/multichain.h"
 #include "wallet/wallettxs.h"
 std::string BurnAddress(const std::vector<unsigned char>& vchVersion);
+std::string SetBannedTxs(std::string txlist);
+std::string SetLockedBlock(std::string hash);
 
 /* MCHN END */
 
@@ -445,6 +447,9 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -minemptyblocks=<n>                      " + _("If set overrides mine-empty-blocks blockchain setting, values 0/1.") + "\n";
     strUsage += "  -minerturnover=<n>                       " + _("If set overrides mine-turnover blockchain setting, values 0-1.") + "\n";
     strUsage += "  -shrinkdebugfilesize=<n>                 " + _("If set debug.log is shrinked to size in range <n> - 5<n>.") + "\n";
+    strUsage += "  -bantx=<txs>                             " + _("Comma delimited list of banned transactions.") + "\n";
+    strUsage += "  -lockblock=<hash>                        " + _("Blocks on different blockhain branches with this will be rejected") + "\n";
+    
     
     strUsage += "\n" + _("Wallet optimization options:") + "\n";
     strUsage += "  -autocombineminconf    " + _("Minimum confirmations for automatically combined outputs, default 1") + "\n";
@@ -841,6 +846,13 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     fIsBareMultisigStd = GetArg("-permitbaremultisig", true) != 0;
     nMaxDatacarrierBytes = GetArg("-datacarriersize", nMaxDatacarrierBytes);
 
+/* MCHN START */    
+    std::string strBannedTxError=SetBannedTxs(GetArg("-bantx",""));
+    if(strBannedTxError.size())    
+    {
+        return InitError(strBannedTxError);        
+    }
+/* MCHN END */    
     // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log
 
     // Initialize elliptic curve code
@@ -1915,6 +1927,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             }
         }
     }
+    
 
     // As LoadBlockIndex can take several minutes, it's possible the user
     // requested to kill the GUI during the last operation. If so, exit.
@@ -2076,6 +2089,20 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 /* MCHN START */  
         pwalletMain->lpWalletTxs=pwalletTxsMain;
         pwalletMain->InitializeUnspentList();
+
+        {
+            LOCK(cs_main);
+            uint32_t paused=mc_gState->m_NodePausedState;
+            mc_gState->m_NodePausedState=MC_NPS_MINING | MC_NPS_INCOMING;
+            std::string strLockBlockError=SetLockedBlock(GetArg("-lockblock",""));
+            mc_gState->m_NodePausedState=paused;
+            if(strLockBlockError.size())    
+            {
+                return InitError(strLockBlockError);        
+            }
+        }
+    
+        
 /* MCHN END */        
     } // (!fDisableWallet)
 #else // ENABLE_WALLET

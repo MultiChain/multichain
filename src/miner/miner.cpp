@@ -28,6 +28,9 @@
 
 using namespace std;
 
+bool CanMineWithLockedBlock();
+
+
 //////////////////////////////////////////////////////////////////////////////
 //
 // BitcoinMiner
@@ -772,8 +775,8 @@ CBlockTemplate* CreateNewBlockWithDefaultKey(CWallet *pwallet,int *canMine)
 
 bool ProcessBlockFound(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
 {
-    LogPrintf("%s\n", pblock->ToString());
-    LogPrintf("generated %s\n", FormatMoney(pblock->vtx[0].vout[0].nValue));
+//    LogPrintf("%s\n", pblock->ToString());
+    LogPrint("mcminer","mchn-miner: generated %s\n", FormatMoney(pblock->vtx[0].vout[0].nValue));
 
     // Found a solution
     {
@@ -1279,6 +1282,13 @@ void static BitcoinMiner(CWallet *pwallet)
                     {
                         canMine=0;
                     }
+                    else
+                    {
+                        if(!CanMineWithLockedBlock())
+                        {
+                            canMine=0;
+                        }
+                    }
                 }
             }
 
@@ -1308,7 +1318,7 @@ void static BitcoinMiner(CWallet *pwallet)
             CBlock *pblock = &pblocktemplate->block;
             IncrementExtraNonce(pblock, pindexPrev, nExtraNonce,pwallet);
 
-            LogPrintf("Running MultiChainMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
+            LogPrint("mcminer","mchn: Running MultiChainMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
                 ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION));
 
             //
@@ -1340,10 +1350,12 @@ void static BitcoinMiner(CWallet *pwallet)
 
                         SetThreadPriority(THREAD_PRIORITY_NORMAL);
 
-                        LogPrint("mcminer","mchn: MultiChainMiner: Block Found - %s, height: %d\n",hash.GetHex(),mc_gState->m_Permissions->m_Block+1);
+                        LogPrintf("MultiChainMiner: Block Found - %s, prev: %s, height: %d, txs: %d\n",
+                                hash.GetHex(),pblock->hashPrevBlock.ToString().c_str(),mc_gState->m_Permissions->m_Block+1,(int)pblock->vtx.size());
+/*                        
                         LogPrintf("MultiChainMiner:\n");
                         LogPrintf("proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex(), hashTarget.GetHex());
-                     
+*/                     
 /* MCHN START */                        
                         if(!ProcessBlockFound(pblock, *pwallet, reservekey))
                         {
