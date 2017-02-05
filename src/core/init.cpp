@@ -1059,17 +1059,19 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 seed_error="Couldn't disconnect from the seed node, please restart multichaind";
 //                return InitError(_("Couldn't disconnect from the seed node, please restart multichaind"));            
             }
-            
-            
-//            seed_error="Couldn't connect to the seed node";
-            if(seed_port.size() == 0)
-            {
-                seed_error=strprintf("Couldn't connect to the seed node %s - please specify port number explicitly.",seed_node);                
-            }
             else
             {
-                seed_error=strprintf("Couldn't connect to the seed node %s on port %s - please check multichaind is running at that address and that your firewall settings allow incoming connections.",                
-                    seed_ip.c_str(),seed_port.c_str());
+            
+//            seed_error="Couldn't connect to the seed node";
+                if(seed_port.size() == 0)
+                {
+                    seed_error=strprintf("Couldn't connect to the seed node %s - please specify port number explicitly.",seed_node);                
+                }
+                else
+                {
+                    seed_error=strprintf("Couldn't connect to the seed node %s on port %s - please check multichaind is running at that address and that your firewall settings allow incoming connections.",                
+                        seed_ip.c_str(),seed_port.c_str());
+                }
             }
 //            return InitError(_("Couldn't connect to the seed node"));            
         }
@@ -1546,7 +1548,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                             strErrors << _("Cannot write default address") << "\n";
                     }
                     
-                    
+/*                    
                     if(seed_error.size())
                     {
                         sprintf(bufOutput,"\nError: %s\n\n",seed_error.c_str());
@@ -1554,6 +1556,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     }
                     else
                     {
+ */ 
                         if(!GetBoolArg("-shortoutput", false))
                         {    
                             sprintf(bufOutput,"Blockchain successfully initialized.\n\n");             
@@ -1581,12 +1584,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                             sprintf(bufOutput,"%s\n",CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());                            
                             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                         }
-                    }
-                    
 /*                    
-                    delete pwalletMain;
-                    pwalletMain=NULL;
- */ 
+                    }
+*/                    
                     return false;
                 }
             }
