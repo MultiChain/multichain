@@ -96,6 +96,16 @@ int64_t mc_MultichainParams::GetInt64Param(const char *param)
     return mc_GetLE(ptr,size);
 }
 
+double mc_MultichainParams::GetDoubleParam(const char *param)
+{
+    int n=(int)mc_gState->m_NetworkParams->GetInt64Param(param);
+    if(n < 0)
+    {
+        return -(double)((-n) / MC_PRM_DECIMAL_GRANULARITY);
+    }
+    return (double)(n / MC_PRM_DECIMAL_GRANULARITY);    
+}
+
 
 void* mc_MultichainParams::GetParam(const char *param,int* size)
 {
@@ -432,6 +442,12 @@ int mc_MultichainParams::Create(const char* name,int version)
     return MC_ERR_NOERROR;
 }
 
+double mc_MultichainParams::ParamAccuracy()
+{
+    return 1./(double)MC_PRM_DECIMAL_GRANULARITY;
+}
+
+
 int mc_MultichainParams::Read(const char* name)
 {
     return Read(name,0,NULL,0);
@@ -596,7 +612,15 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
                     }
                     if((MultichainParamArray+i)->m_Type & MC_PRM_DECIMAL)
                     {
-                        *(int32_t*)ptrData=(int32_t)(atof(ptr)*MC_PRM_DECIMAL_GRANULARITY+0.5);
+                        double d=atof(ptr);
+                        if(d >= 0)
+                        {
+                            *(int32_t*)ptrData=(int32_t)(d*MC_PRM_DECIMAL_GRANULARITY+ParamAccuracy());                            
+                        }
+                        else
+                        {
+                            *(int32_t*)ptrData=-(int32_t)(-d*MC_PRM_DECIMAL_GRANULARITY+ParamAccuracy());                                                        
+                        }
                     }
                     else
                     {
@@ -620,7 +644,7 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
                     }
                     if((MultichainParamArray+i)->m_Type & MC_PRM_DECIMAL)
                     {
-                        *(int32_t*)ptrData=(int32_t)(atof(ptr)*MC_PRM_DECIMAL_GRANULARITY+0.5);
+                        *(int32_t*)ptrData=(int32_t)(atof(ptr)*MC_PRM_DECIMAL_GRANULARITY+ParamAccuracy());
                     }
                     else
                     {
@@ -1261,7 +1285,15 @@ int mc_MultichainParams::Print(FILE* fileHan)
                             {
                                 if(mc_GetLE(ptr,4))
                                 {
-                                    d=((double)mc_GetLE(ptr,4)+0.1)/MC_PRM_DECIMAL_GRANULARITY;
+                                    int n=(int)mc_GetLE(ptr,4);
+                                    if(n >= 0)
+                                    {
+                                        d=((double)n+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
+                                    }
+                                    else
+                                    {
+                                        d=-((double)(-n)+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;                                        
+                                    }
                                     sprintf(line+strlen(line),"%0.6g",d);                                                                
                                 }
                                 else
@@ -1280,7 +1312,7 @@ int mc_MultichainParams::Print(FILE* fileHan)
                             {
                                 if(mc_GetLE(ptr,4))
                                 {
-                                    d=((double)mc_GetLE(ptr,4)+0.1)/MC_PRM_DECIMAL_GRANULARITY;
+                                    d=((double)mc_GetLE(ptr,4)+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
                                     sprintf(line+strlen(line),"%0.6g",d);                                                                
                                 }
                                 else
@@ -1357,12 +1389,12 @@ int mc_MultichainParams::Print(FILE* fileHan)
                                         d1=0;
                                         if((m_lpParams+i)->m_MinIntegerValue)
                                         {
-                                            d1=((double)((m_lpParams+i)->m_MinIntegerValue)+0.1)/MC_PRM_DECIMAL_GRANULARITY;
+                                            d1=((double)((m_lpParams+i)->m_MinIntegerValue)+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
                                         }
                                         d2=0;
                                         if((m_lpParams+i)->m_MaxIntegerValue)
                                         {
-                                            d2=((double)((m_lpParams+i)->m_MaxIntegerValue)+0.1)/MC_PRM_DECIMAL_GRANULARITY;
+                                            d2=((double)((m_lpParams+i)->m_MaxIntegerValue)+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
                                         }
                                         fprintf(fileHan," (%0.6g - %0.6g)",d1,d2);                            
                                     }

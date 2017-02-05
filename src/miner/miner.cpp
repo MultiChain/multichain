@@ -906,7 +906,7 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
     double dRelativeSpread=1.;
     double dRelativeMinerPoolSize=0.25;
     double dAverageCreateBlockTime=2;
-    double dMinerDriftMin=1/(double)MC_PRM_DECIMAL_GRANULARITY;
+    double dMinerDriftMin=mc_gState->m_NetworkParams->ParamAccuracy();
     double dEmergencyMinersConvergenceRate=2.;    
     int nPastBlocks=12;
     
@@ -1265,7 +1265,51 @@ void static BitcoinMiner(CWallet *pwallet)
             unsigned int nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
             CBlockIndex* pindexPrev = chainActive.Tip();
             
-            if(Params().MineEmptyBlocks())
+            bool fMineEmptyBlocks=true;
+            if(Params().MineEmptyRounds()+mc_gState->m_NetworkParams->ParamAccuracy()>= 0)
+            {
+                fMineEmptyBlocks=false;
+                CBlockIndex* pindex=pindexPrev;
+                int nMaxEmptyBlocks,nEmptyBlocks,nMinerCount;
+
+                nMaxEmptyBlocks=0;
+                nEmptyBlocks=0;
+                if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+                {
+                    if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine"))
+                    {
+                        fMineEmptyBlocks=true;
+                    }
+                    else
+                    {
+                        nMinerCount=mc_gState->m_Permissions->GetMinerCount()-mc_gState->m_Permissions->GetActiveMinerCount()+1;
+                        double d=Params().MineEmptyRounds()*nMinerCount-mc_gState->m_NetworkParams->ParamAccuracy();
+                        if(d >= 0)
+                        {
+                            nMaxEmptyBlocks=(int)d+1;
+                        }
+                        
+                        fMineEmptyBlocks=false;
+                        while(!fMineEmptyBlocks && (pindex != NULL) && (nEmptyBlocks < nMaxEmptyBlocks))
+                        {
+                            if(pindex->nTx > 1)
+                            {
+                                fMineEmptyBlocks=true;
+                            }
+                            else
+                            {
+                                nEmptyBlocks++;
+                                pindex=pindex->pprev;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    fMineEmptyBlocks=true;
+                }                
+            }
+            if(fMineEmptyBlocks)
             {
                 nMemPoolSize=1;
             }
@@ -1283,7 +1327,7 @@ void static BitcoinMiner(CWallet *pwallet)
                 }
                 else
                 {
-                    if( !Params().MineEmptyBlocks()
+                    if( !fMineEmptyBlocks
                             && not_setup_period
                             && (mempool.hashList->m_Count == 0)
                             )

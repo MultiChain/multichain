@@ -62,7 +62,7 @@ public:
     /** Maximal depth of blockchain reorganization since last change in governance model, in miner diveristy rounds */
     int LockAdminMineRounds() const { return nLockAdminMineRounds; }
     /** Make miner mine empty blocks */
-    bool MineEmptyBlocks() const { return fMineEmptyBlocks; }
+    double MineEmptyRounds() const { return dMineEmptyRounds; }
     /** Mining turnover */
     double MiningTurnover() const { return dMiningTurnover; }
     /** Default value for -checkmempool argument */
@@ -111,7 +111,7 @@ protected:
     bool fRequireRPCPassword;
     int nLockAdminMineRounds;
     bool fMiningRequiresPeers;
-    bool fMineEmptyBlocks;
+    double dMineEmptyRounds;
     double dMiningTurnover;
     bool fDefaultCheckMemPool;
     bool fAllowMinDifficultyBlocks;

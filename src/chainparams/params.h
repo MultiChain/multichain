@@ -111,6 +111,7 @@ typedef struct mc_MultichainParams
     int FindParam(const char *param);
     void* GetParam(const char *param,int* size);
     int64_t GetInt64Param(const char *param);
+    double GetDoubleParam(const char *param);
     
     int SetParam(const char *param,const char* value,int size);
     int SetParam(const char *param,int64_t value);
@@ -124,6 +125,7 @@ typedef struct mc_MultichainParams
     const unsigned char* AddressScriptVersion();
     int ProtocolVersion();
     int IsProtocolMultichain();
+    double ParamAccuracy();
     
 
     

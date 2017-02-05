@@ -219,7 +219,7 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     obj.push_back(Pair("hideknownopdrops",GetBoolArg("-hideknownopdrops",false)));                    
     obj.push_back(Pair("maxshowndata",GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)));                    
     obj.push_back(Pair("miningrequirespeers",Params().MiningRequiresPeers()));                    
-    obj.push_back(Pair("mineemptyblocks",Params().MineEmptyBlocks()));                    
+    obj.push_back(Pair("mineemptyrounds",Params().MineEmptyRounds()));                    
     obj.push_back(Pair("miningturnover",Params().MiningTurnover()));                    
     obj.push_back(Pair("lockadminminerounds",Params().LockAdminMineRounds()));                    
     obj.push_back(Pair("gen",GetBoolArg("-gen", true)));                    
@@ -280,6 +280,27 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
     if(param_name == "mineemptyblocks")
     {
         mapArgs ["-" + param_name]=paramtobool(params[1]) ? "1" : "0";
+        fFound=true;
+    }
+    if(param_name == "mineemptyrounds")
+    {
+        if( (params[1].type() == real_type) || (params[1].type() == str_type) )
+        {
+            double dValue;
+            if(params[1].type() == real_type)
+            {
+                dValue=params[1].get_real();
+            }
+            else
+            {
+                dValue=atof(params[1].get_str().c_str());
+            }
+            mapArgs ["-" + param_name]= strprintf("%f", dValue);                                                                
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                                            
+        }
         fFound=true;
     }
     if(param_name == "miningturnover")
@@ -464,7 +485,16 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                     case MC_PRM_INT32:
                         if((mc_gState->m_NetworkParams->m_lpParams+i)->m_Type & MC_PRM_DECIMAL)
                         {
-                            param_value=((double)mc_GetLE(ptr,4))/MC_PRM_DECIMAL_GRANULARITY;
+//                            param_value=((double)(int)mc_GetLE(ptr,4))/MC_PRM_DECIMAL_GRANULARITY;
+                            int n=(int)mc_GetLE(ptr,4);
+                            if(n >= 0)
+                            {
+                                param_value=((double)n+mc_gState->m_NetworkParams->ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
+                            }
+                            else
+                            {
+                                param_value=-((double)(-n)+mc_gState->m_NetworkParams->ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;                                        
+                            }
                         }
                         else
                         {
@@ -474,7 +504,7 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                     case MC_PRM_UINT32:
                         if((mc_gState->m_NetworkParams->m_lpParams+i)->m_Type & MC_PRM_DECIMAL)
                         {
-                            param_value=((double)mc_GetLE(ptr,4))/MC_PRM_DECIMAL_GRANULARITY;
+                            param_value=((double)mc_GetLE(ptr,4)+mc_gState->m_NetworkParams->ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
                         }
                         else
                         {

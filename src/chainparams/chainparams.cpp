@@ -183,7 +183,7 @@ public:
 
         fRequireRPCPassword = true;
         fMiningRequiresPeers = true;
-        fMineEmptyBlocks = true;
+        dMineEmptyRounds = -1.;
         dMiningTurnover=1.0;
         fDefaultCheckMemPool = false;
         fAllowMinDifficultyBlocks = false;
@@ -244,7 +244,7 @@ public:
 
         fRequireRPCPassword = true;
         fMiningRequiresPeers = true;
-        fMineEmptyBlocks = true;
+        dMineEmptyRounds = -1.;
         dMiningTurnover=1.0;
         fDefaultCheckMemPool = false;
         fAllowMinDifficultyBlocks = true;
@@ -291,7 +291,7 @@ public:
 
         fRequireRPCPassword = false;
         fMiningRequiresPeers = false;
-        fMineEmptyBlocks = true;
+        dMineEmptyRounds = -1.;
         dMiningTurnover=1.0;
         fDefaultCheckMemPool = true;
         fAllowMinDifficultyBlocks = true;
@@ -320,7 +320,7 @@ public:
 
         fRequireRPCPassword = false;
         fMiningRequiresPeers = false;
-        fMineEmptyBlocks = true;
+        dMineEmptyRounds = -1.;
         dMiningTurnover=1.0;
         fDefaultCheckMemPool = true;
         fAllowMinDifficultyBlocks = false;
@@ -517,9 +517,13 @@ public:
         fMiningRequiresPeers = (mc_gState->m_NetworkParams->GetInt64Param("miningrequirespeers") != 0);
         fMiningRequiresPeers=GetBoolArg("-miningrequirespeers", fMiningRequiresPeers);        
         nLockAdminMineRounds=GetArg("-lockadminminerounds",mc_gState->m_NetworkParams->GetInt64Param("lockadminminerounds"));        
-        fMineEmptyBlocks = (mc_gState->m_NetworkParams->GetInt64Param("mineemptyblocks") != 0);
-        fMineEmptyBlocks=GetBoolArg("-mineemptyblocks", fMineEmptyBlocks);        
-        dMiningTurnover=(double)(mc_gState->m_NetworkParams->GetInt64Param("miningturnover"))/MC_PRM_DECIMAL_GRANULARITY;
+        dMineEmptyRounds=mc_gState->m_NetworkParams->GetDoubleParam("mineemptyrounds");
+        string sMineEmptyRounds=GetArg("-mineemptyrounds", "Not Set");
+        if(sMineEmptyRounds != "Not Set")
+        {
+            dMineEmptyRounds=atof(sMineEmptyRounds.c_str());
+        }                    
+        dMiningTurnover=mc_gState->m_NetworkParams->GetDoubleParam("miningturnover");
         string sMinerDrift=GetArg("-miningturnover", "Not Set");
         if(sMinerDrift != "Not Set")
         {

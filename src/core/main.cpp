@@ -3896,7 +3896,8 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
                 if( (mc_gState->m_NetworkParams->GetInt64Param("anyonecanadmin") == 0) && 
                     (mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine") == 0) )
                 {
-                    int nMaxHeight=chainActive.Height()-Params().LockAdminMineRounds()*mc_gState->m_Permissions->GetMinerCount();
+                    int nMinerCount=mc_gState->m_Permissions->GetMinerCount()-mc_gState->m_Permissions->GetActiveMinerCount()+1;
+                    int nMaxHeight=chainActive.Height()-Params().LockAdminMineRounds()*nMinerCount;
                     int nMinHeight=pindexFork->nHeight;
                     if( (nMinHeight <= nMaxHeight) && (nMinHeight > 0) )
                     {

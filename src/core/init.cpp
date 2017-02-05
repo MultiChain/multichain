@@ -444,7 +444,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -hideknownopdrops=<n>                    " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON_RPC calls (default: %u)"), 0) + "\n";
     strUsage += "  -lockadminminerounds=<n>                 " + _("If set overrides lock-admin-mine-rounds blockchain setting.") + "\n";
     strUsage += "  -miningrequirespeers=<n>                 " + _("If set overrides mining-requires-peers blockchain setting, values 0/1.") + "\n";
-    strUsage += "  -minemptyblocks=<n>                      " + _("If set overrides mine-empty-blocks blockchain setting, values 0/1.") + "\n";
+    strUsage += "  -mineemptyrounds=<n>                     " + _("If set overrides mine-empty-blocks blockchain setting, values 0.0-1000.0 or -1.") + "\n";
     strUsage += "  -minerturnover=<n>                       " + _("If set overrides mine-turnover blockchain setting, values 0-1.") + "\n";
     strUsage += "  -shrinkdebugfilesize=<n>                 " + _("If set debug.log is shrinked to size in range <n> - 5<n>.") + "\n";
     strUsage += "  -bantx=<txs>                             " + _("Comma delimited list of banned transactions.") + "\n";
