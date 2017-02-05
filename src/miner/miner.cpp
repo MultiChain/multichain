@@ -29,6 +29,7 @@
 using namespace std;
 
 bool CanMineWithLockedBlock();
+bool IsTxBanned(uint256 txid);
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -353,6 +354,11 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
                 LogPrint("mchn","mchn: Miner: Tx not found in the mempool: %s\n",hash.GetHex().c_str());
                 continue;
             }
+            if(IsTxBanned(hash))
+            {
+                LogPrint("mchn","mchn: Miner: Banned Tx: %s\n",hash.GetHex().c_str());
+                continue;                
+            }
             
             const CTransaction& tx = mempool.mapTx[hash].GetTx();
 /* MCHN END */        
@@ -434,7 +440,9 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
             mempool.ApplyDeltas(hash, dPriority, nTotalIn);
 
             CFeeRate feeRate(nTotalIn-tx.GetValueOut(), nTxSize);
-
+/* MCHN START */
+            
+/* MCHN END */            
             if (porphan)
             {
                 LogPrint("mchn","mchn: Miner: Orphan %s\n",tx.GetHash().GetHex().c_str());

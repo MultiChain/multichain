@@ -846,13 +846,6 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     fIsBareMultisigStd = GetArg("-permitbaremultisig", true) != 0;
     nMaxDatacarrierBytes = GetArg("-datacarriersize", nMaxDatacarrierBytes);
 
-/* MCHN START */    
-    std::string strBannedTxError=SetBannedTxs(GetArg("-bantx",""));
-    if(strBannedTxError.size())    
-    {
-        return InitError(strBannedTxError);        
-    }
-/* MCHN END */    
     // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log
 
     // Initialize elliptic curve code
@@ -1791,6 +1784,14 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
     // ********************************************************* Step 7: load block chain
 
+/* MCHN START */    
+    std::string strBannedTxError=SetBannedTxs(GetArg("-bantx",""));
+    if(strBannedTxError.size())    
+    {
+        return InitError(strBannedTxError);        
+    }
+/* MCHN END */    
+    
     fReindex = GetBoolArg("-reindex", false);
 
     // Upgrading to 0.8; hard-link the old blknnnn.dat files into /blocks/

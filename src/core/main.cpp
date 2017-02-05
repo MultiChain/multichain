@@ -68,6 +68,7 @@ bool MultichainNode_SendInv(CNode *pnode);
 bool MultichainNode_AcceptData(CNode *pnode);
 bool MultichainNode_IgnoreIncoming(CNode *pnode);
 bool MultichainNode_IsLocal(CNode *pnode);
+bool IsTxBanned(uint256 txid);
 
 
 
@@ -110,7 +111,8 @@ struct COrphanTx {
 };
 map<uint256, COrphanTx> mapOrphanTransactions;
 map<uint256, set<uint256> > mapOrphanTransactionsByPrev;
-vector <uint256> vBannedTxs;
+set <uint256> setBannedTxs;
+set <uint256> setBannedTxBlocks;
 uint256 hLockedBlock;
 CBlockIndex *pindexLockedBlock;
 
@@ -577,6 +579,15 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
                 // We consider the chain that this peer is on invalid.
                 return;
             }
+/* MCHN START */                        
+            if(setBannedTxBlocks.size())
+            {
+                if(setBannedTxBlocks.find(pindex->GetBlockHash()) != setBannedTxBlocks.end())
+                {
+                    return;
+                }
+            }
+/* MCHN END */            
             if (pindex->nStatus & BLOCK_HAVE_DATA) {
                 if (pindex->nChainTx)
                     state->pindexLastCommonBlock = pindex;
@@ -1088,6 +1099,11 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     if (!CheckTransaction(tx, state))
         return error("AcceptToMemoryPool: : CheckTransaction failed");
 
+    if(IsTxBanned(tx.GetHash()))
+    {
+        return error("AcceptToMemoryPool: banned transaction: %s",tx.GetHash().ToString());
+    }
+    
     // Coinbase is only valid in a block, not as a loose transaction
     if (tx.IsCoinBase())
         return state.DoS(100, error("AcceptToMemoryPool: : coinbase as individual tx"),
@@ -3236,8 +3252,27 @@ string SetBannedTxs(string txlist)
         }
     }
     
-    vBannedTxs=vTxs;
+    LogPrintf("Setting banned transaction list: %4d transactions\n",(int)vTxs.size());
+    setBannedTxBlocks.clear();
+    setBannedTxs.clear();
+    for(unsigned int i=0;i<vTxs.size();i++)
+    {
+        setBannedTxs.insert(vTxs[i]);
+        LogPrintf("Banned transaction set: %4d %s\n",i,vTxs[i].ToString().c_str());
+    }
     return "";
+}
+
+bool IsTxBanned(uint256 txid)
+{
+    if(setBannedTxs.size())
+    {
+        if(setBannedTxs.find(txid) != setBannedTxs.end())
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 string SetLockedBlock(string hash)
@@ -3360,6 +3395,19 @@ bool CanMineWithLockedBlock()
     return true;
 }
 
+void InvalidateBlockIfFoundInBlockIndex(const CBlock& block)
+{
+    uint256 hash = block.GetHash();
+    BlockMap::iterator miSelf = mapBlockIndex.find(hash);
+    CBlockIndex *pindex = NULL;
+    if (miSelf != mapBlockIndex.end()) 
+    {
+        CValidationState state;
+        
+        pindex = miSelf->second;
+        InvalidateBlock(state,pindex);
+    }    
+}
 
 /* MCHN END */
 
@@ -3712,6 +3760,22 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
         if (!CheckTransaction(tx, state))
             return error("CheckBlock() : CheckTransaction failed");
 
+    if(setBannedTxs.size())
+    {
+        BOOST_FOREACH(const CTransaction& tx, block.vtx)
+        {
+            if(IsTxBanned(tx.GetHash()))
+            {
+                if(setBannedTxBlocks.find(block.GetHash()) == setBannedTxBlocks.end())
+                {
+                    setBannedTxBlocks.insert(block.GetHash());
+                }
+                return error("CheckBlock() : banned transaction: %s",tx.GetHash().ToString());
+            }
+        }
+    }
+    
+    
     unsigned int nSigOps = 0;
     BOOST_FOREACH(const CTransaction& tx, block.vtx)
     {

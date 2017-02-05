@@ -22,6 +22,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
 bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs, string& reason);
 bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& reason);
 bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string& reason);
+bool IsTxBanned(uint256 txid);
 
 
 bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
@@ -31,6 +32,23 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
     
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
     {
+        for(pos=from;pos<pool.hashList->m_Count;pos++)
+        {
+            hash=*(uint256*)pool.hashList->GetRow(pos);
+            if(pool.exists(hash))
+            {
+                if(IsTxBanned(hash))
+                {
+                    const CTransaction& tx = pool.mapTx[hash].GetTx();
+                    string reason;
+                    string removed_type="";
+                    list<CTransaction> removed;
+                    removed_type="banned";                                    
+                    LogPrintf("mchn: Tx %s removed from the mempool (%s), reason: %s\n",tx.GetHash().ToString().c_str(),removed_type.c_str(),reason.c_str());
+                    pool.remove(tx, removed, true, "replay");                    
+                }
+            }
+        }
         return true;
     }    
     
@@ -48,46 +66,53 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
             string removed_type="";
             list<CTransaction> removed;
             
-            if(mc_gState->m_Features->Streams())
+            if(IsTxBanned(hash))
             {
-                LOCK(pool.cs);
-                CCoinsView dummy;
-                CCoinsViewCache view(&dummy);
-                CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
-                view.SetBackend(viewMemPool);
-                if(!AcceptMultiChainTransaction(tx,view,-1,accept,reason))
-                {
-                    removed_type="rejected";                    
-                }
+                removed_type="banned";                                    
             }
             else
-            {                
-                if(removed_type.size() == 0)
-                {
-                    if(!AcceptPermissionsAndCheckForDust(tx,accept,reason))
-                    {
-                        removed_type="permissions";
-                    }
-                }
-                if(removed_type.size() == 0)
-                {
-                    if(!AcceptAssetGenesis(tx,-1,true,reason))
-                    {
-                        removed_type="issue";
-                    }        
-                }
-                if(removed_type.size() == 0)
+            {
+                if(mc_gState->m_Features->Streams())
                 {
                     LOCK(pool.cs);
                     CCoinsView dummy;
                     CCoinsViewCache view(&dummy);
                     CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
                     view.SetBackend(viewMemPool);
-                    if(!AcceptAssetTransfers(tx, view, reason))
+                    if(!AcceptMultiChainTransaction(tx,view,-1,accept,reason))
                     {
-                        removed_type="transfer";
+                        removed_type="rejected";                    
                     }
-                }            
+                }
+                else
+                {                
+                    if(removed_type.size() == 0)
+                    {
+                        if(!AcceptPermissionsAndCheckForDust(tx,accept,reason))
+                        {
+                            removed_type="permissions";
+                        }
+                    }
+                    if(removed_type.size() == 0)
+                    {
+                        if(!AcceptAssetGenesis(tx,-1,true,reason))
+                        {
+                            removed_type="issue";
+                        }        
+                    }
+                    if(removed_type.size() == 0)
+                    {
+                        LOCK(pool.cs);
+                        CCoinsView dummy;
+                        CCoinsViewCache view(&dummy);
+                        CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
+                        view.SetBackend(viewMemPool);
+                        if(!AcceptAssetTransfers(tx, view, reason))
+                        {
+                            removed_type="transfer";
+                        }
+                    }            
+                }
             }
 
             if(removed_type.size())
