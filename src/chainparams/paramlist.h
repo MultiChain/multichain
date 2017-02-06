@@ -127,7 +127,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
     { "miningrequirespeers"               , "mining-requires-peers"             ,
                    MC_PRM_BOOLEAN | MC_PRM_USER | MC_PRM_CLONE | MC_PRM_NOHASH  , -1,         1,          0,         0, 0.0, 10001, 0, "-mc-miningrequirespeers",
                    "mineemptyrounds","",
-                   "Default for whether nodes only mine blocks if connected to other nodes."},                   
+                   "Default for whether nodes only mine blocks if connected to other nodes (ignored if only one permitted miner)."},                   
     { "mineemptyrounds"                   , "mine-empty-rounds"             ,
                    MC_PRM_INT32   | MC_PRM_USER | MC_PRM_CLONE | MC_PRM_DECIMAL | MC_PRM_NOHASH, -1,  -1000000,    -1000000,  1000000000, 0.0, 10007, 0, "-mc-mineemptyrounds",
                    "miningturnover","",
