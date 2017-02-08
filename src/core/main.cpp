@@ -96,7 +96,6 @@ bool fTxIndex = false;
 bool fIsBareMultisigStd = true;
 unsigned int nCoinCacheSize = 5000;
 
-
 /** Fees smaller than this (in satoshi) are considered zero fee (for relaying and mining) */
 /* MCHN START */
 //CFeeRate minRelayTxFee = CFeeRate(1000);
@@ -375,9 +374,7 @@ bool MultichainNode_IsBlockChainSynced(CNode *pnode)
     
     return pnode->fSyncedOnce;
 }
-
-
-
+        
 /* MCHN END */
 
 
@@ -2080,7 +2077,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 {
                     root_stream_name_size=0;
                 }    
-                if(root_stream_name_size)
+                if(root_stream_name_size > 1)
                 {
                     if(pwalletTxsMain)
                     {

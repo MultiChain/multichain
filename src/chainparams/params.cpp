@@ -458,10 +458,12 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
     mc_MapStringString *mapConfig;
     int err;
     int size,offset,i,version,len0,len1,len2;
+    char empty_string[1];
     mc_OneMultichainParam *param;
     char *ptrData;
     const char *ptr;
-        
+    empty_string[0]=0x00;    
+    
     if(name == NULL)
     {
         return MC_ERR_INTERNAL_ERROR;
@@ -543,8 +545,21 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
                 ptr=NULL;;
             }
         }        
-        
-        
+/*
+        if(argc == 0)
+        {
+            if((MultichainParamArray+i)->m_Type & MC_PRM_SPECIAL)
+            {
+                if(strcmp((MultichainParamArray+i)->m_Name,"rootstreamname") == 0)
+                {
+                    if(ptr == NULL)
+                    {
+                        ptr=(const char*)&empty_string;
+                    }
+                }                                               
+            }
+        }
+*/
         if(ptr)
         {        
             strcpy(m_lpData+offset,param->m_Name);
@@ -1225,17 +1240,22 @@ int mc_MultichainParams::Print(FILE* fileHan)
                 if(size == 0)
                 {
                     ptr=NULL;
-                }
+                }                
                 else
                 {
                     if(((m_lpParams+i)->m_Type & MC_PRM_DATA_TYPE_MASK) == MC_PRM_STRING)
                     {
                         if(size == 1)
                         {
-                            ptr=NULL;                    
+                            if( (((m_lpParams+i)->m_Type & MC_PRM_SPECIAL) == 0) ||
+                                (strcmp((m_lpParams+i)->m_Name,"rootstreamname") != 0) )   
+                            {
+                                ptr=NULL;                    
+                            }
                         }
                     }
                 }
+
                 if(ptr)
                 {
                     switch((m_lpParams+i)->m_Type & MC_PRM_DATA_TYPE_MASK)

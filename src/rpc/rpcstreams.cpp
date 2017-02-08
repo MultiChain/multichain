@@ -21,7 +21,7 @@ void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
         if(CoinSparkAssetRefDecode(buf_a,str.c_str(),str.size()))
         {
             memset(buf_n,0,MC_AST_ASSET_REF_SIZE);
-            if(memcmp(buf_a,buf_n,MC_AST_ASSET_REF_SIZE) == 0)
+            if(memcmp(buf_a,buf_n,4) == 0)
             {
                 unsigned char *root_stream_name;
                 int root_stream_name_size;
@@ -30,7 +30,7 @@ void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
                 {
                     root_stream_name_size=0;
                 }    
-                if(root_stream_name_size)
+                if( (root_stream_name_size > 1) && (memcmp(buf_a,buf_n,MC_AST_ASSET_REF_SIZE) == 0) )
                 {
                     str=strprintf("%s",root_stream_name);
                 }
@@ -188,7 +188,21 @@ Value liststreams(const Array& params, bool fHelp)
         }
     }
     
-    mc_AdjustStartAndCount(&count,&start,streams->GetCount());
+    
+    unsigned char *root_stream_name;
+    int root_stream_name_size;
+    root_stream_name=(unsigned char *)mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
+    if( (root_stream_name_size <= 1) && (inputStrings.size() == 0) )            // Patch, to be removed in 10008
+    {
+        mc_AdjustStartAndCount(&count,&start,streams->GetCount()-1);        
+        start++;            
+    }
+    else
+    {
+        mc_AdjustStartAndCount(&count,&start,streams->GetCount());        
+    }
+    
+    
     Array partial_results;
     int unconfirmed_count=0;
     if(count > 0)
@@ -244,9 +258,13 @@ Value liststreams(const Array& params, bool fHelp)
     }
         
     bool return_partial=false;
-    if(count != streams->GetCount())
+    if(count != streams->GetCount()-1)
     {
         return_partial=true;
+    }
+    if( (root_stream_name_size <= 1) && (inputStrings.size() == 0) )            // Patch, to be removed in 10008
+    {
+        return_partial=true;        
     }
     mc_gState->m_Assets->FreeEntityList(streams);
     if(return_partial)

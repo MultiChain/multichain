@@ -609,6 +609,8 @@ int mc_ReadConfigFile(
         set<string> setOptions;
         setOptions.insert("*");
 
+//        boost::program_options::detail::config_file_iterator it(streamConfig, setOptions), end;
+//        while(it != end)
         for (boost::program_options::detail::config_file_iterator it(streamConfig, setOptions), end; it != end; ++it)
         {
             // Don't overwrite existing settings so command line settings override bitcoin.conf
@@ -628,6 +630,15 @@ int mc_ReadConfigFile(
             {
                 (*mapMultiSettingsRet)[strKey].push_back(it->value[0]);
             }
+/*            
+            try
+            {
+                ++it;
+            }
+            catch(std::exception &e1) {
+                ++it;
+            }
+ */ 
         }
     } catch(std::exception &e) {
         fprintf(stderr,"ERROR: reading configuration file: %s\n", e.what());

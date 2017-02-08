@@ -18,6 +18,7 @@
 using namespace std;
 using namespace json_spirit;
 
+uint256 hGenesisCoinbaseTxID=0;
 
 CScript RemoveOpDropsIfNeeded(const CScript& scriptInput)
 {
@@ -61,6 +62,21 @@ bool CoinSparkAssetRefDecode(unsigned char *bin, const char* string, const size_
     return true;
 }
 
+uint256 mc_GenesisCoinbaseTxID()
+{
+    if(hGenesisCoinbaseTxID == 0)
+    {
+        CBlock block;
+        if(ReadBlockFromDisk(block, chainActive[0]))
+        {
+            hGenesisCoinbaseTxID=block.vtx[0].GetHash();
+        }        
+    }
+    
+    return hGenesisCoinbaseTxID;
+}
+
+
 int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset_ref,char *name,int *multiple,int *type,int entity_type)
 {
     int ret=0;
@@ -91,6 +107,19 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
             if( (entity_type != MC_ENT_TYPE_ANY) && ((int)entity.GetEntityType() != entity_type) )
             {
                 ret=-1;
+            }
+            else
+            {
+                unsigned char *root_stream_name;
+                int root_stream_name_size;
+                root_stream_name=(unsigned char *)mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
+                if(root_stream_name_size <= 1)
+                {
+                    if(hash == mc_GenesisCoinbaseTxID())
+                    {
+                        ret=-1;                            
+                    }
+                }
             }
             if(entity.IsFollowOn())
             {
@@ -2394,7 +2423,7 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
             if(CoinSparkAssetRefDecode(buf_a,str.c_str(),str.size()))
             {
                 memset(buf_n,0,MC_AST_ASSET_REF_SIZE);
-                if(memcmp(buf_a,buf_n,MC_AST_ASSET_REF_SIZE) == 0)
+                if(memcmp(buf_a,buf_n,4) == 0)
                 {
                     unsigned char *root_stream_name;
                     int root_stream_name_size;
@@ -2403,7 +2432,7 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
                     {
                         root_stream_name_size=0;
                     }    
-                    if(root_stream_name_size)
+                    if( (root_stream_name_size > 1) && (memcmp(buf_a,buf_n,MC_AST_ASSET_REF_SIZE) == 0) )
                     {
                         str=strprintf("%s",root_stream_name);
                     }

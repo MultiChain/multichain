@@ -331,8 +331,8 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         }
         fFound=true;
     }
-    if(param_name == "lockadminminerounds")
-    if(param_name == "maxshowndata")
+    if( (param_name == "lockadminminerounds") ||
+        (param_name == "maxshowndata") )
     {
         if( (params[1].type() == int_type) || (params[1].type() == str_type) )
         {
@@ -438,17 +438,18 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
             {
                 ptr=NULL;
             }
+/*            
             else
             {
                 if(((mc_gState->m_NetworkParams->m_lpParams+i)->m_Type & MC_PRM_DATA_TYPE_MASK) == MC_PRM_STRING)
-                {
+                {                    
                     if(size == 1)
                     {
                         ptr=NULL;                    
                     }
                 }
             }
-
+*/
             if(fDisplay)
             {
                 param_name=(mc_gState->m_NetworkParams->m_lpParams+i)->m_DisplayName;
