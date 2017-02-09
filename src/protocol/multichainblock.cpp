@@ -122,7 +122,7 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
             }
             else
             {
-                pwalletTxsMain->AddTx(NULL,tx,-1,NULL,-1);            
+                pwalletTxsMain->AddTx(NULL,tx,-1,NULL,-1,0);            
             }
         }
     }

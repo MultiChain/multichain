@@ -1493,7 +1493,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
                     {
                         if(pindex->nHeight)                                     // Skip 0-block coinbase
                         {
-                            err=pwalletTxsMain->AddTx(imp,tx,pindex->nHeight,&pos,block_tx_index);
+                            err=pwalletTxsMain->AddTx(imp,tx,pindex->nHeight,&pos,block_tx_index,pindex->GetBlockHash());
                         }
                     }
                 }
@@ -1544,7 +1544,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
                     {
                         const CTransaction& tx = mempool.mapTx[hash].GetTx();
                         LogPrint("wallet","wtxs: Mempool tx: %s\n",hash.ToString().c_str());
-                        pwalletTxsMain->AddTx(imp,tx,-1,NULL,-1);            
+                        pwalletTxsMain->AddTx(imp,tx,-1,NULL,-1,0);            
                     }
                 }
                 
@@ -3049,7 +3049,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
         }
         else
         {
-            pwalletTxsMain->AddTx(NULL,wtxNew,-1,NULL,-1);   
+            pwalletTxsMain->AddTx(NULL,wtxNew,-1,NULL,-1,0);   
             SyncWithWallets(wtxNew, NULL);            
         }
     

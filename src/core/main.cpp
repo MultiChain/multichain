@@ -1391,7 +1391,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 /* MCHN START */    
     if(fAddToWallet)
     {
-        pwalletTxsMain->AddTx(NULL,tx,-1,NULL,-1);
+        pwalletTxsMain->AddTx(NULL,tx,-1,NULL,-1,0);
     }
 /* MCHN END */    
     if(fAddToWallet)
@@ -2647,7 +2647,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     for (unsigned int i = 0; i < pblock->vtx.size(); i++)
     {
         const CTransaction &tx = pblock->vtx[i];
-        err=pwalletTxsMain->AddTx(NULL,tx,pindexNew->nHeight,&pos,i);
+        err=pwalletTxsMain->AddTx(NULL,tx,pindexNew->nHeight,&pos,i,pindexNew->GetBlockHash());
         if(err)
         {
             return error("ConnectTip() : ConnectBlock %s failed, Wtxs AddTx %s, error: %d", pindexNew->GetBlockHash().ToString(),tx.GetHash().ToString(),err);

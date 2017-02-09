@@ -47,7 +47,8 @@ typedef struct mc_WalletTxs
               const CTransaction& tx,                                           // Tx to add
               int block,                                                        // block height, -1 for mempool
               CDiskTxPos* block_pos,                                            // Position in the block
-              uint32_t block_tx_index);                                         // Tx index in block
+              uint32_t block_tx_index,                                          // Tx index in block
+              uint256 block_hash);                                              // Block hash
                                            
     
     int AddTx(                                                                  // Adds tx to the wallet
@@ -55,7 +56,8 @@ typedef struct mc_WalletTxs
               const CWalletTx& tx,                                              // Tx to add
               int block,                                                        // block height, -1 for mempool
               CDiskTxPos* block_pos,                                            // Position in the block
-              uint32_t block_tx_index);                                         // Tx index in block
+              uint32_t block_tx_index,                                          // Tx index in block
+              uint256 block_hash);                                              // Block hash
     
     int BeforeCommit(mc_TxImport *import);                                      // Should be called before re-adding tx while processing block
     int Commit(mc_TxImport *import);                                            // Commit when block was processed
