@@ -35,6 +35,7 @@ void WalletTxNotify(mc_TxImport *imp,const CWalletTx& tx,int block,bool fFound,u
 
     boost::replace_all(strNotifyCmd, "%s", tx.GetHash().ToString());
 
+    boost::replace_all(strNotifyCmd, "%m", strprintf("%m",mc_gState->m_NetworkParams->Name()));
     boost::replace_all(strNotifyCmd, "%c", strprintf("%d",fFound ? 0 : 1));
     boost::replace_all(strNotifyCmd, "%n", strprintf("%d",block));
     boost::replace_all(strNotifyCmd, "%b", block_hash.ToString());
