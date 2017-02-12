@@ -82,8 +82,8 @@ void WalletTxNotify(mc_TxImport *imp,const CWalletTx& tx,int block,bool fFound,u
         }        
     }
 
-    boost::replace_all(strNotifyCmd, "%a", strAddresses);
-    boost::replace_all(strNotifyCmd, "%e", strEntities);
+    boost::replace_all(strNotifyCmd, "%a", (strAddresses.size() > 0) ? strAddresses : "\"\"");
+    boost::replace_all(strNotifyCmd, "%e", (strEntities.size() > 0) ? strEntities : "\"\"");
 
     Object result;
     TxToJSON(tx, block_hash, result);        
