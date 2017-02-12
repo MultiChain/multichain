@@ -706,7 +706,7 @@ int64_t nHPSTimerStart = 0;
 // nonce is 0xffff0000 or above, the block is rebuilt and nNonce starts over at
 // zero.
 //
-bool static ScanHash(const CBlockHeader *pblock, uint32_t& nNonce, uint256 *phash)
+bool static ScanHash(const CBlockHeader *pblock, uint32_t& nNonce, uint256 *phash,uint16_t success_and_mask)
 {
     // Write the first 76 bytes of the block header to a double-SHA256 state.
     CHash256 hasher;
@@ -714,7 +714,6 @@ bool static ScanHash(const CBlockHeader *pblock, uint32_t& nNonce, uint256 *phas
     ss << *pblock;
     assert(ss.size() == 80);
     hasher.Write((unsigned char*)&ss[0], 76);
-
     while (true) {
         nNonce++;
 
@@ -724,9 +723,15 @@ bool static ScanHash(const CBlockHeader *pblock, uint32_t& nNonce, uint256 *phas
 
         // Return the nonce if the hash has at least some zero bits,
         // caller will check if it has enough to reach the target
-        if (((uint16_t*)phash)[15] == 0)
+/*        
+        if (((uint16_t*)phash)[15] == 0) 
             return true;
-
+*/
+        if( (((uint16_t*)phash)[15] & success_and_mask) == 0)
+        {
+            return true;            
+        }
+        
         // If nothing found after trying for a while, return -1
         if ((nNonce & 0xffff) == 0)
 //        if ((nNonce & 0xff) == 0)
@@ -1200,6 +1205,18 @@ void static BitcoinMiner(CWallet *pwallet)
     memset(wCount,0,wSize*sizeof(uint64_t));
     memset(wTime,0,wSize*sizeof(uint64_t));
     
+    uint16_t success_and_mask=0xffff;
+    int min_bits;
+    
+    if(Params().Interval() <= 0)
+    {
+        min_bits=(int)mc_gState->m_NetworkParams->GetInt64Param("powminimumbits");
+        if(min_bits < 16)
+        {
+            success_and_mask = success_and_mask << (16 - min_bits);
+        }
+    }
+    
 /* MCHN END */            
     
 
@@ -1385,7 +1402,7 @@ void static BitcoinMiner(CWallet *pwallet)
             double wStartTime=mc_TimeNowAsDouble();
             uint64_t wThisCount=0;
             while (true) {
-                bool fFound = ScanHash(pblock, nNonce, &hash);
+                bool fFound = ScanHash(pblock, nNonce, &hash, success_and_mask);
                 uint32_t nHashesDone = nNonce - nOldNonce;
                 nOldNonce = nNonce;
 

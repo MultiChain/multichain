@@ -181,7 +181,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
                    "powminimumbits","Advanced mining parameters",
                    "Skip checking whether block hashes demonstrate proof of work."},
     { "powminimumbits"                      , "pow-minimum-bits"                    ,
-                   MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE                  , -1,        16,          1,        32, 0.0, 10001, 0, "-mc-powminimumbits",
+                   MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE                  , -1,         8,          1,        32, 0.0, 10001, 0, "-mc-powminimumbits",
                    "targetadjustfreq","",
                    "Initial and minimum proof of work difficulty, in leading zero bits."},
     { "targetadjustfreq"                    , "target-adjust-freq"                  , 
