@@ -35,7 +35,6 @@ void WalletTxNotify(mc_TxImport *imp,const CWalletTx& tx,int block,bool fFound,u
 
     boost::replace_all(strNotifyCmd, "%s", tx.GetHash().ToString());
 
-    boost::replace_all(strNotifyCmd, "%m", strprintf("%m",mc_gState->m_NetworkParams->Name()));
     boost::replace_all(strNotifyCmd, "%c", strprintf("%d",fFound ? 0 : 1));
     boost::replace_all(strNotifyCmd, "%n", strprintf("%d",block));
     boost::replace_all(strNotifyCmd, "%b", block_hash.ToString());
@@ -85,12 +84,15 @@ void WalletTxNotify(mc_TxImport *imp,const CWalletTx& tx,int block,bool fFound,u
     boost::replace_all(strNotifyCmd, "%a", (strAddresses.size() > 0) ? strAddresses : "\"\"");
     boost::replace_all(strNotifyCmd, "%e", (strEntities.size() > 0) ? strEntities : "\"\"");
 
+    string str=strprintf("%s",mc_gState->m_NetworkParams->Name());
+    boost::replace_all(str, "\"", "\\\"");        
+    boost::replace_all(strNotifyCmd, "%m", "\"" + str + "\"");
+    
     Object result;
     TxToJSON(tx, block_hash, result);        
-    string str=write_string(Value(result),false);
+    str=write_string(Value(result),false);
     boost::replace_all(str, "\"", "\\\"");        
     boost::replace_all(strNotifyCmd, "%j", "\"" + str + "\"");
-
     
     boost::thread t(runCommand, strNotifyCmd); // thread runs free        
 }

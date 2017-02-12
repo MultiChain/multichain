@@ -4235,7 +4235,8 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
         }
     }    
  */ 
-    if(GetBoolArg("-shrinkdebugfilesize",false))
+//    if(GetBoolArg("-shrinkdebugfilesize",false))
+    if (GetBoolArg("-shrinkdebugfile", !fDebug))
     {
         ShrinkDebugFile();
     }
