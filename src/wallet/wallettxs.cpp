@@ -231,6 +231,14 @@ int mc_WalletTxs::Initialize(
     return err;
 }
 
+int mc_WalletTxs::SetMode(uint32_t mode, uint32_t mask)
+{
+    m_Mode &= ~mask;
+    m_Mode |= mode;
+    
+    return MC_ERR_NOERROR;
+}
+
 int mc_WalletTxs::Destroy()
 {
     if(m_Database)

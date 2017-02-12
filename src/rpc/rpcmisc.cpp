@@ -430,6 +430,39 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         }
         fFound=true;
     }
+    if(param_name == "autosubscribe")
+    {
+        if(params[1].type() == str_type)
+        {
+            string autosubscribe=params[1].get_str();
+            uint32_t mode=MC_WMD_NONE;
+            if(autosubscribe=="streams")
+            {
+                mode |= MC_WMD_AUTOSUBSCRIBE_STREAMS;
+            }
+            if(autosubscribe=="assets")
+            {
+                mode |= MC_WMD_AUTOSUBSCRIBE_ASSETS;
+            }
+            if( (autosubscribe=="assets,streams") || (autosubscribe=="streams,assets"))
+            {
+                mode |= MC_WMD_AUTOSUBSCRIBE_STREAMS;
+                mode |= MC_WMD_AUTOSUBSCRIBE_ASSETS;
+            }                
+            
+            if(pwalletTxsMain)
+            {
+                pwalletTxsMain->SetMode(mode,MC_WMD_AUTOSUBSCRIBE_STREAMS | MC_WMD_AUTOSUBSCRIBE_ASSETS);
+            }
+            mapArgs ["-" + param_name]=params[1].get_str();                                
+        }   
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                                                        
+        }
+        fFound=true;
+    }
+    
     if(!fFound)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, string("Unsupported parameter"));                                                    

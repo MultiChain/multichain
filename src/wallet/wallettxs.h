@@ -37,6 +37,10 @@ typedef struct mc_WalletTxs
               const char *name,                                                 // Chain name
               uint32_t mode);                                                   // Unused
 
+    int SetMode(                                                                // Sets wallet mode
+                uint32_t mode,                                                  // Mode to set
+                uint32_t mask);                                                 // Mask to set, old mode outside this mask will be untouched
+    
     void BindWallet(CWallet *lpWallet);
     
     int AddEntity(mc_TxEntity *entity,uint32_t flags);                          // Adds entity to chain import
