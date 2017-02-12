@@ -190,14 +190,18 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
         throw runtime_error("Help message not found\n");
     
     Object obj;
+/*    
     obj.push_back(Pair("daemon",GetBoolArg("-daemon",false)));                    
     obj.push_back(Pair("datadir",mc_gState->m_Params->DataDir(0,0)));                    
     obj.push_back(Pair("debug",getparamstring("-debug")));   
+ */ 
     obj.push_back(Pair("port",GetListenPort()));   
     obj.push_back(Pair("reindex",GetBoolArg("-reindex",false)));                    
     obj.push_back(Pair("rescan",GetBoolArg("-rescan",false)));                    
+/*    
     obj.push_back(Pair("rpcallowip",getparamstring("-rpcallowip")));   
     obj.push_back(Pair("rpcport",GetArg("-rpcport", BaseParams().RPCPort())));   
+ */ 
     obj.push_back(Pair("txindex",GetBoolArg("-txindex",true)));                    
     obj.push_back(Pair("autocombineminconf",GetArg("-autocombineminconf", 1)));                    
     obj.push_back(Pair("autocombinemininputs",GetArg("-autocombinemininputs", 50)));                    
@@ -224,10 +228,11 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     obj.push_back(Pair("lockadminminerounds",Params().LockAdminMineRounds()));                    
     obj.push_back(Pair("gen",GetBoolArg("-gen", true)));                    
     obj.push_back(Pair("genproclimit",GetArg("-genproclimit", 1)));                    
-    obj.push_back(Pair("mineblocksondemand",Params().MineBlocksOnDemand()));                    
+    obj.push_back(Pair("mineblocksondemand",Params().MineBlocksOnDemand()));  
+/*
     obj.push_back(Pair("shortoutput",GetBoolArg("-shortoutput",false)));                    
     obj.push_back(Pair("walletdbversion", mc_gState->GetWalletDBVersion()));                
-    
+*/
     return obj;
 }
 
@@ -278,6 +283,11 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         fFound=true;
     }
     if(param_name == "mineemptyblocks")
+    {
+        mapArgs ["-" + param_name]=paramtobool(params[1]) ? "1" : "0";
+        fFound=true;
+    }
+    if(param_name == "hideknownopdrops")
     {
         mapArgs ["-" + param_name]=paramtobool(params[1]) ? "1" : "0";
         fFound=true;
@@ -388,6 +398,26 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
             if(error.size())
             {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, error);                                                                        
+            }
+            else
+            {
+                mapArgs ["-" + param_name]=params[1].get_str();                                
+            }
+        }   
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                                                        
+        }
+        fFound=true;
+    }
+    if(param_name == "handshakelocal")
+    {
+        if(params[1].type() == str_type)
+        {
+            CBitcoinAddress address(params[1].get_str());
+            if (!address.IsValid())    
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid address");                                                                        
             }
             else
             {
