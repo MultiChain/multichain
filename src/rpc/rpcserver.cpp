@@ -48,6 +48,39 @@ static boost::asio::io_service::work *rpc_dummy_work = NULL;
 static std::vector<CSubNet> rpc_allow_subnets; //!< List of subnets to allow RPC connections from
 static std::vector< boost::shared_ptr<ip::tcp::acceptor> > rpc_acceptors;
 
+string JSONRPCRequestForLog(const string& strMethod, const Array& params, const Value& id)
+{
+    Object request;
+    request.push_back(Pair("method", strMethod));
+    map<string, int>::iterator it = mapLogParamCounts.find(strMethod);
+    if (it != mapLogParamCounts.end())
+    {
+        Array visible_params;
+        if(it->second != 0)
+        {
+            if(strMethod == "signrawtransaction")
+            {
+                visible_params=params;
+                if (visible_params.size() > 2 && visible_params[2].type() != null_type) 
+                {
+                    visible_params[2]="[<PRIVATE KEYS>]";
+                }
+            }
+        }
+        request.push_back(Pair("params", visible_params));
+    }
+    else
+    {
+        request.push_back(Pair("params", params));
+    }
+/*    
+    request.push_back(Pair("id", id));
+    request.push_back(Pair("chain_name", string(mc_gState->m_Params->NetworkName())));
+ */ 
+    return write_string(Value(request), false) + "\n";
+}
+
+
 void RPCTypeCheck(const Array& params,
                   const list<Value_type>& typesExpected,
                   bool fAllowNull)
@@ -1302,7 +1335,7 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
     try
     {
         // Execute
-        string strRequest = JSONRPCRequest(strMethod, params, 1);
+        string strRequest = JSONRPCRequestForLog(strMethod, params, 1);
         LogPrint("mcapi","mcapi: API request: %s\n",strRequest.c_str());
         
         Value result;
@@ -1344,7 +1377,7 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
                             strResult=JSONRPCReply(result, Value::null, 1);       
                             if(strcmp(strResultNone.c_str(),strResult.c_str()))
                             {
-                                string strRequestBad = JSONRPCRequest(strMethod, params, 1);
+                                string strRequestBad = JSONRPCRequestForLog(strMethod, params, 1);
                                 LogPrint("walletcompare","walletcompare: ERROR: Result mismatch on API request: %s\n",strRequestBad.c_str());
                                 LogPrint("walletcompare","walletcompare: %s\n",strResultNone.c_str());
                                 LogPrint("walletcompare","walletcompare: %s\n",strResult.c_str());
@@ -1394,3 +1427,4 @@ std::string HelpExampleRpc(string methodname, string args){
 
 const CRPCTable tableRPC;
 std::map<std::string, std::string> mapHelpStrings;
+std::map<std::string, int> mapLogParamCounts;

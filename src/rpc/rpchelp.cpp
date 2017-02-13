@@ -3472,6 +3472,15 @@ void mc_InitRPCHelpMap15()
 }
 
 
+void mc_InitRPCLogParamCountMap()
+{
+    mapLogParamCounts.insert(std::make_pair("encryptwallet",0));
+    mapLogParamCounts.insert(std::make_pair("walletpassphrase",0));
+    mapLogParamCounts.insert(std::make_pair("walletpassphrasechange",0));
+    mapLogParamCounts.insert(std::make_pair("importprivkey",0));
+    mapLogParamCounts.insert(std::make_pair("signrawtransaction",-1));
+}
+
 void mc_InitRPCHelpMap()
 {
     mc_InitRPCHelpMap01();
@@ -3489,5 +3498,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap13();
     mc_InitRPCHelpMap14();
     mc_InitRPCHelpMap15();
+    
+    mc_InitRPCLogParamCountMap();
 }
 

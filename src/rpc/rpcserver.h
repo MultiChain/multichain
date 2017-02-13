@@ -120,6 +120,7 @@ extern const CRPCTable tableRPC;
 
 /* MCHN START */
 extern std::map<std::string, std::string> mapHelpStrings;
+extern std::map<std::string, int> mapLogParamCounts;
 void mc_InitRPCHelpMap();
 std::string mc_RPCHelpString(std::string strMethod);
 /* MCHN END */
