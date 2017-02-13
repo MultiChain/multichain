@@ -1319,6 +1319,10 @@ void static BitcoinMiner(CWallet *pwallet)
                                 pindex=pindex->pprev;
                             }
                         }
+                        if(pindex == NULL)
+                        {
+                            fMineEmptyBlocks=true;
+                        }
                     }
                 }
                 else

@@ -129,7 +129,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
                    "mineemptyrounds","",
                    "Nodes only mine blocks if connected to other nodes (ignored if only one permitted miner)."},                   
     { "mineemptyrounds"                   , "mine-empty-rounds"             ,
-                   MC_PRM_INT32   | MC_PRM_USER | MC_PRM_CLONE | MC_PRM_DECIMAL | MC_PRM_NOHASH, -1,  -1000000,    -1000000,  1000000000, 0.0, 10007, 0, "-mc-mineemptyrounds",
+                   MC_PRM_INT32   | MC_PRM_USER | MC_PRM_CLONE | MC_PRM_DECIMAL | MC_PRM_NOHASH, -1,  10000000,    -1000000,  1000000000, 0.0, 10007, 0, "-mc-mineemptyrounds",
                    "miningturnover","",
                    "Mine this many rounds of empty blocks before pausing to wait for new transactions. If negative, continue indefinitely (ignored if target-adjust-freq>0). Non-integer allowed."},                   
     { "miningturnover"                    , "mining-turnover"             ,
