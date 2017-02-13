@@ -84,9 +84,12 @@ void WalletTxNotify(mc_TxImport *imp,const CWalletTx& tx,int block,bool fFound,u
     boost::replace_all(strNotifyCmd, "%a", (strAddresses.size() > 0) ? strAddresses : "\"\"");
     boost::replace_all(strNotifyCmd, "%e", (strEntities.size() > 0) ? strEntities : "\"\"");
 
-    string str=strprintf("%s",mc_gState->m_NetworkParams->Name());
+    string str=strprintf("%s",mc_gState->m_NetworkParams->Name());              
     boost::replace_all(str, "\"", "\\\"");        
     boost::replace_all(strNotifyCmd, "%m", "\"" + str + "\"");
+    
+// If chain name (retrieved by %m) contains %j, it will be replaced by full JSON. 
+// It is minor issue, but one should be careful when adding other "free text" specifications
     
     Object result;
     TxToJSON(tx, block_hash, result);        
