@@ -788,7 +788,7 @@ CBlockTemplate* CreateNewBlockWithDefaultKey(CWallet *pwallet,int *canMine)
 
 bool ProcessBlockFound(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
 {
-//    LogPrintf("%s\n", pblock->ToString());
+    LogPrint("mchnminor","%s\n", pblock->ToString());
     LogPrint("mcminer","mchn-miner: generated %s\n", FormatMoney(pblock->vtx[0].vout[0].nValue));
 
     // Found a solution
