@@ -547,7 +547,7 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
     if(verbose)
     {
         result.push_back(Pair("exchanges", exchanges));
-        result.push_back(Pair("data", aMetaData));
+//        result.push_back(Pair("data", aMetaData));
     }    
     
 //    result.push_back(Pair("error", strError));
