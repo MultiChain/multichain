@@ -6597,8 +6597,8 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                     if (!AlreadyHave(inv) || (inv.type == MSG_BLOCK))
                     {
                         currentAskFor.push_back(inv);
-                        pto->mapAskFor.erase(pto->mapAskFor.begin());                    
                     }
+                    pto->mapAskFor.erase(pto->mapAskFor.begin());                    
                 }
                 for(int i=0;i<(int)currentAskFor.size();i++)
                 {
