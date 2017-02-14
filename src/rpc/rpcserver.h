@@ -197,7 +197,7 @@ extern json_spirit::Value setruntimeparam(const json_spirit::Array& params, bool
 extern json_spirit::Value preparelockunspent(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value createrawexchange(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value appendrawexchange(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value completeexchange(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value completerawexchange(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value decoderawexchange(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value appendrawmetadata(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value grantfromcmd(const json_spirit::Array& params, bool fHelp);

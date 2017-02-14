@@ -3463,14 +3463,44 @@ void mc_InitRPCHelpMap15()
             + HelpExampleRpc("setruntimeparam", "\"miningturnover\", 0.3")
         ));
     
+}
+
+void mc_InitRPCHelpMap16()
+{
+    mapHelpStrings.insert(std::make_pair("completerawexchange",
+            "completerawexchange hex txid vout ask-assets ( data-hex|object ) \n"
+            "\nCompletes existing exchange transaction, adds fee if needed\n"
+            "Returns hex-encoded raw transaction.\n"
+            + HelpRequiringPassphraseWrapper() +
+            "\nArguments:\n"
+            "1. \"hex\"      (string, required) The transaction hex string\n"
+            "2. \"txid\"            (string, required) Transaction ID of the output prepared by preparelockunspent.\n"
+            "3. \"vout\"            (numeric, required) Output index\n"
+            "4. \"ask-assets\"      (object, required) A json object of assets to ask\n"
+            "    {\n"
+            "      \"asset-identifier\" : asset-quantity\n"
+            "      ,...\n"
+            "    }\n"                
+            "5. data-hex    (string, optional) Data hex string\n"
+            "or\n"
+            "5. publish-new-stream-item    (object, optional) A json object with stream item\n"
+            "    {\n"                
+            "      \"for\" : stream-identifier       (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "      \"key\" : key                     (string,optional, default: \"\") Item key\n"
+            "      \"data\" : data-hex               (string,optional, default: \"\") Data hex string\n"
+            "    }\n"                                
+            "\nResult:\n"
+            "\"transaction\"            (string) hex string of the transaction\n"
+            "\nExamples:\n"
+            + HelpExampleCli("completerawexchange", "\"hexstring\" f4c3dd510dd55761015c9d96bff7793b0d501dd6f01a959fd7dd02478fb47dfb 1 \"{\\\"1234-5678-1234\\\":200}\"" )
+            + HelpExampleRpc("completerawexchange", "\"hexstring\",\"f4c3dd510dd55761015c9d96bff7793b0d501dd6f01a959fd7dd02478fb47dfb\",1,\"{\\\"1234-5678-1234\\\":200}\\\"")
+        ));
     
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
        
-       
 }
-
 
 void mc_InitRPCLogParamCountMap()
 {
@@ -3498,6 +3528,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap13();
     mc_InitRPCHelpMap14();
     mc_InitRPCHelpMap15();
+    mc_InitRPCHelpMap16();
     
     mc_InitRPCLogParamCountMap();
 }

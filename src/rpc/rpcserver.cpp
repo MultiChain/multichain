@@ -593,7 +593,7 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "preparelockunspent",     &preparelockunspent,     false,     false,      true },
     { "wallet",             "createrawexchange",      &createrawexchange,      false,     false,      true },
     { "wallet",             "appendrawexchange",      &appendrawexchange,      false,     false,      true },
-    { "wallet",             "completeexchange",       &completeexchange,       false,     false,      true },
+    { "wallet",             "completerawexchange",    &completerawexchange,    false,     false,      true },
     { "wallet",             "decoderawexchange",      &decoderawexchange,      false,     false,      true },
     
     { "wallet",             "grantfrom",              &grantfromcmd,           false,     false,      true }, 

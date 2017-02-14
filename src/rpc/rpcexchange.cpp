@@ -18,7 +18,7 @@ bool AcceptExchange(const CTransaction& tx, vector <CTxOut>& inputs, vector <str
     return GetTxInputsAsTxOuts(tx, inputs, errors, reason);
 }
 
-Object ExchangeAssetEntry(uint256 hash,const CTxOut txout,mc_Script *lpScript,mc_Buffer *asset_amounts,mc_Buffer *total_amounts,bool& can_disable,string& strError)
+Object ExchangeAssetEntry(uint256 hash,const CTxOut txout,mc_Script *lpScript,mc_Buffer *asset_amounts,mc_Buffer *total_amounts,bool& can_disable,bool allow_sighashall,string& strError)
 {
     Object result;
     CBitcoinAddress address;
@@ -48,7 +48,17 @@ Object ExchangeAssetEntry(uint256 hash,const CTxOut txout,mc_Script *lpScript,mc
 
                 if(hash_type != (SIGHASH_SINGLE | SIGHASH_ANYONECANPAY))
                 {
-                    strError="Signature hash type should be SINGLE | SIGHASH_ANYONECANPAY";                    
+                    if(allow_sighashall)
+                    {
+                        if(hash_type != SIGHASH_ALL)
+                        {                        
+                            strError="Signature hash type should be SINGLE | SIGHASH_ANYONECANPAY or SIGHASH_ALL";                                            
+                        }
+                    }
+                    else
+                    {
+                        strError="Signature hash type should be SINGLE | SIGHASH_ANYONECANPAY";                    
+                    }
                 }          
 
                 elem = lpScript->GetData(1,&elem_size);
@@ -193,7 +203,7 @@ Object ExchangeAssetEntry(uint256 hash,const CTxOut txout,mc_Script *lpScript,mc
     return result;
 }
 
-Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& native_balance,mc_Buffer *lpAssets,bool& is_complete,string& strError)
+Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& native_balance,mc_Buffer *lpAssets,bool& is_complete,bool allow_last_sighashall,string& strError)
 {
     Object result;
     strError="";
@@ -242,12 +252,23 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
         
         entry_error=input_errors[i];
         
-        Object offer=ExchangeAssetEntry(tx.vin[i].prevout.hash,input_txouts[i],lpScript,asset_amounts,lpAssets,can_disable,entry_error);
+        Object offer=ExchangeAssetEntry(tx.vin[i].prevout.hash,input_txouts[i],lpScript,asset_amounts,lpAssets,can_disable,
+                (i==(int)input_txouts.size()-1) ? allow_last_sighashall : false,entry_error);
+        
+        
         
         offer.push_back(Pair("txid",  tx.vin[i].prevout.hash.ToString()));    
         offer.push_back(Pair("vout",  (uint64_t)(tx.vin[i].prevout.n)));    
         
         exchange.push_back(Pair("offer", offer));
+        if(entry_error.size() == 0)
+        {
+            if (!VerifyScript(script2, input_txouts[i].scriptPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, TransactionSignatureChecker(&tx, i)))
+            {
+                entry_error="Wrong signature";
+            }
+        }
+        
         if(entry_error.size())
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, entry_error + strprintf("; Input: %d, txid: %s, vout: %d",i,tx.vin[i].prevout.hash.GetHex().c_str(),tx.vin[i].prevout.n));        
@@ -255,7 +276,7 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
         
         entry_error="";
         lpScript->Clear();
-        exchange.push_back(Pair("ask", ExchangeAssetEntry(0,tx.vout[i],lpScript,asset_amounts,lpAssets,can_disable,entry_error)));
+        exchange.push_back(Pair("ask", ExchangeAssetEntry(0,tx.vout[i],lpScript,asset_amounts,lpAssets,can_disable,true,entry_error)));
         if(entry_error.size())
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, entry_error+ strprintf("; Output: %d,",i));        
@@ -265,6 +286,55 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
         exchanges.push_back(exchange);
     }
     
+    Array aMetaData;
+    set<uint256> streams_already_seen;
+    
+    if(tx.vout.size() > tx.vin.size())
+    {
+        for(int i=(int)input_txouts.size();i<(int)tx.vout.size();i++)
+        {
+            const CTxOut& txout = tx.vout[i];
+            if(!txout.scriptPubKey.IsUnspendable())
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Too many outputs");                        
+            }            
+            else
+            {
+                const CScript& script1 = tx.vout[i].scriptPubKey;        
+                CScript::const_iterator pc1 = script1.begin();
+                size_t elem_size;
+                const unsigned char *elem;
+
+                lpScript->Clear();
+                lpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);                
+                
+                if(lpScript->GetNumElements()<=1)
+                {
+                    if(lpScript->GetNumElements()==1)
+                    {
+                        elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
+                        aMetaData.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
+                    }                        
+                }
+                else
+                {
+                    Value data_item_entry=DataItemEntry(tx,i,streams_already_seen, 0x03);
+                    if(!data_item_entry.is_null())
+                    {
+                        aMetaData.push_back(data_item_entry);
+                    }
+                    else
+                    {
+                        elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
+                        if(elem_size)
+                        {
+                            aMetaData.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
+                        }
+                    }
+                }                
+            }
+        }        
+    }
 
     
     delete lpScript;
@@ -471,10 +541,13 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
             
         result.push_back(Pair("complete", is_complete));
     }
+    
+    
 
     if(verbose)
     {
         result.push_back(Pair("exchanges", exchanges));
+        result.push_back(Pair("data", aMetaData));
     }    
     
 //    result.push_back(Pair("error", strError));
@@ -762,7 +835,7 @@ Value appendrawexchange(const json_spirit::Array& params, bool fHelp)
         LOCK(cs_main);
         Object decode_result;
         
-        decode_result=DecodeExchangeTransaction(tx,0,native_balance,asset_amounts,is_complete,strError);
+        decode_result=DecodeExchangeTransaction(tx,0,native_balance,asset_amounts,is_complete,false,strError);
     }
 
     delete asset_amounts;
@@ -774,9 +847,164 @@ Value appendrawexchange(const json_spirit::Array& params, bool fHelp)
     return result;
 }
 
-Value completeexchange(const json_spirit::Array& params, bool fHelp)
+Value completerawexchange(const json_spirit::Array& params, bool fHelp)
 {
-    return "";
+    if (fHelp || params.size() < 4 || params.size() > 5)
+        throw runtime_error("Help message not found\n");
+
+    COutPoint offer_input;
+    mc_Script *lpScript;
+    lpScript=new mc_Script;
+    CAmount nAmount=0;
+    
+    
+    string strError=FindExchangeOutPoint(params,1,offer_input,nAmount,lpScript);
+    if(strError.size())
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, strError);                            
+    }
+  
+    CTxOut preparedTxOut;
+    if(!FindPreparedTxOut(preparedTxOut,offer_input,strError))
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, strError);                            
+    }
+    
+    const CScript& script1 = preparedTxOut.scriptPubKey;        
+    CTxDestination addressRet;        
+    if(!ExtractDestination(script1, addressRet))
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Cannot extract address from prepared output");                                    
+    }
+
+    CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
+    if(lpKeyID == NULL)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Prepared output should be pay-to-pubkeyhash");                                    
+    }
+    
+    if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpKeyID)) == 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Address of prepared output doesn't have send permission");                                    
+    }
+    
+    if(mc_gState->m_Permissions->CanReceive(NULL,(unsigned char*)(lpKeyID)) == 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Address of prepared output doesn't have receive permission");                                    
+    }
+    
+    vector<CTxDestination> addresses;    
+    addresses.push_back(addressRet);        
+    
+    CScript scriptPubKey = GetScriptForDestination(addresses[0]);
+    
+    for(int element=0;element < lpScript->GetNumElements();element++)
+    {
+        size_t elem_size;    
+        const unsigned char *elem;
+        elem = lpScript->GetData(element,&elem_size);
+        if(elem)
+        {
+            scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
+        }
+        else
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid script");
+    }
+    
+    CMutableTransaction tx;
+    
+    vector<unsigned char> txData(ParseHex(params[0].get_str()));
+    
+    CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION);
+    ssData >> tx;
+    
+    CTxOut txout(nAmount, scriptPubKey);
+
+    tx.vout.push_back(txout);
+    tx.vin.push_back(CTxIn(offer_input));
+    
+    if(params.size() > 4)
+    {    
+        mc_EntityDetails found_entity;
+        CScript scriptOpReturn=ParseRawMetadata(params[4],0x0002,NULL,&found_entity);
+        
+        if(found_entity.GetEntityType() == MC_ENT_TYPE_STREAM)
+        {        
+            const unsigned char *aptr;
+
+            aptr=GetAddressIDPtr(addresses[0]);
+            if(aptr)
+            {
+                if((found_entity.AnyoneCanWrite() == 0) && (mc_gState->m_Permissions->CanWrite(found_entity.GetTxID(),aptr) == 0))
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Publishing in this stream is not allowed from this address");                                                                        
+                }                                                 
+                if(mc_gState->m_Permissions->CanSend(NULL,aptr) == 0)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Address doesn't have send permission");                                                                        
+                }                                                 
+            }
+        }
+        
+        CTxOut txoutdata(0, scriptOpReturn);
+        tx.vout.push_back(txoutdata);        
+    }    
+    
+    if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
+    {
+        int err;
+        const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(offer_input.hash,NULL,&err);
+        if(err)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Output not found in wallet");                                        
+        }
+        if(!SignSignature(*pwalletMain, wtx.vout[offer_input.n].scriptPubKey, tx, tx.vin.size()-1, SIGHASH_ALL ))
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Signing transaction failed");                                    
+        }
+    }
+    else
+    {
+        std::map<uint256, CWalletTx>::const_iterator it = pwalletMain->mapWallet.find(offer_input.hash);
+
+        if (it == pwalletMain->mapWallet.end())
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Output not found in wallet");                            
+        }
+
+        const CWalletTx* pcoin = &(*it).second;
+
+
+        if(!SignSignature(*pwalletMain, pcoin->vout[offer_input.n].scriptPubKey, tx, tx.vin.size()-1, SIGHASH_ALL ))
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Signing transaction failed");                                    
+        }
+    }        
+    delete lpScript;
+    
+    bool is_complete=true;
+    int64_t native_balance;
+    
+    mc_Buffer *asset_amounts;
+    asset_amounts=new mc_Buffer;
+    mc_InitABufferMap(asset_amounts);
+    asset_amounts->Clear();
+    
+    {
+        LOCK(cs_main);
+        Object decode_result;
+        
+        decode_result=DecodeExchangeTransaction(tx,0,native_balance,asset_amounts,is_complete,true,strError);
+    }
+
+    delete asset_amounts;
+    
+    if(!is_complete)
+    {
+        throw JSONRPCError(RPC_INVALID_REQUEST, "Incomplete exchange");                                            
+    }
+    
+    return EncodeHexTx(tx);
 }
 
 Value decoderawexchange(const json_spirit::Array& params, bool fHelp)
@@ -819,7 +1047,7 @@ Value decoderawexchange(const json_spirit::Array& params, bool fHelp)
     {
         LOCK(cs_main);
         
-        result=DecodeExchangeTransaction(tx,verbose,native_balance,asset_amounts,is_complete,strError);
+        result=DecodeExchangeTransaction(tx,verbose,native_balance,asset_amounts,is_complete,true,strError);
     }
 
     delete asset_amounts;
