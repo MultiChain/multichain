@@ -239,6 +239,7 @@ void mc_RemoveDir(const char *network_name,const char *dir_name);
 int mc_GetDataDirArg(char *buf);
 void mc_UnsetDataDirArg();
 void mc_SetDataDirArg(char *buf);
+void mc_ExpandDataDirParam();
 void mc_AdjustStartAndCount(int *count,int *start,int size);
 
 
@@ -270,6 +271,7 @@ void __US_SemWait(void* sem);
 void __US_SemPost(void* sem);
 void __US_SemDestroy(void* sem);
 uint64_t __US_ThreadID();
+const char* __US_UserHomeDir();
 
 
 #ifdef	__cplusplus

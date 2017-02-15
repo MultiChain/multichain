@@ -20,6 +20,8 @@ int main(int argc, char* argv[])
     mc_gState->m_Params->Parse(argc, argv);
     mc_gState->m_Params->ReadConfig(NULL);
     
+    mc_ExpandDataDirParam();
+    
     printf("MultiChain utilities %s\n\n",mc_gState->GetFullVersion());
              
     err=MC_ERR_OPERATION_NOT_SUPPORTED;

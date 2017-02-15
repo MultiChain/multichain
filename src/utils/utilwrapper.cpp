@@ -329,6 +329,27 @@ void mc_SetDataDirArg(char *buf)
 }
 
 
+void mc_ExpandDataDirParam()
+{
+    if (mapArgs.count("-datadir"))
+    {
+        string original=mapArgs["-datadir"];
+        if(original.size() > 1)
+        {
+            if( (*(original.c_str()) == '~') && (*(original.c_str() + 1) == '/') )
+            {
+                const char *homedir=__US_UserHomeDir();
+
+                if(homedir)
+                {
+                    mapArgs["-datadir"]=strprintf("%s%s",homedir,original.c_str()+1);                    
+                }
+            }
+        }
+    }    
+}
+
+
 
 const boost::filesystem::path mc_GetDataDir(const char *network_name,int create)
 {

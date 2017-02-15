@@ -129,6 +129,9 @@ static bool AppInitRPC(int argc, char* argv[])
         fprintf(stdout, "%s", strUsage.c_str());
         return false;
     }
+
+    mc_ExpandDataDirParam();
+    
     
 /*    
     if (!boost::filesystem::is_directory(GetDataDir(false))) {
