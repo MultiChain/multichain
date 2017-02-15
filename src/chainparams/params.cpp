@@ -101,9 +101,9 @@ double mc_MultichainParams::GetDoubleParam(const char *param)
     int n=(int)mc_gState->m_NetworkParams->GetInt64Param(param);
     if(n < 0)
     {
-        return -(double)((-n) / MC_PRM_DECIMAL_GRANULARITY);
+        return -((double)(-n) / MC_PRM_DECIMAL_GRANULARITY);
     }
-    return (double)(n / MC_PRM_DECIMAL_GRANULARITY);    
+    return (double)n / MC_PRM_DECIMAL_GRANULARITY;    
 }
 
 
