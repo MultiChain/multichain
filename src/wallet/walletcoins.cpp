@@ -2117,14 +2117,24 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                                                 }                                                                                    
                                             }
                                             else
-                                            {                                                    
+                                            {                        
+                                                if( (mc_gState->m_NetworkParams->GetInt64Param("initialblockreward") != 0) || 
+                                                     (mc_gState->m_NetworkParams->GetInt64Param("firstblockreward") > 0))
+                                                {
+                                                    strFailReason=_("No unspent outputs are available. Please send a transaction to this node or address first and wait for its confirmation."); 
+                                                }
+                                                else
+                                                {
+                                                    strFailReason=_("No unspent outputs are available. Please send a transaction, with zero amount, to this node or address first and wait for its confirmation.");                                                     
+                                                }
+/*
                                                 if(required & MC_PTP_WRITE)     // publish always comes with addresses set, SEND fails before write
                                                 {
                                                     strFailReason = _("No unspent output with write permission");                                                                                                 
                                                 }
                                                 else
                                                 {
-                                                    if(addresses->size() == 1)
+                                                    if( (addresses != NULL) && (addresses->size() == 1) )
                                                     {
                                                         strFailReason = _("No unspent output from this address");                                                                                      
                                                     }
@@ -2133,6 +2143,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                                                         strFailReason = _("No unspent outputs found in this wallet");                                                                                                                                  
                                                     }
                                                 }
+ */ 
                                             }
                                             break;
                                     }

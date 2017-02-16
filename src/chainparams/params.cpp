@@ -96,6 +96,16 @@ int64_t mc_MultichainParams::GetInt64Param(const char *param)
     return mc_GetLE(ptr,size);
 }
 
+double mc_MultichainParams::GetDoubleParam(const char *param)
+{
+    int n=(int)mc_gState->m_NetworkParams->GetInt64Param(param);
+    if(n < 0)
+    {
+        return -((double)(-n) / MC_PRM_DECIMAL_GRANULARITY);
+    }
+    return (double)n / MC_PRM_DECIMAL_GRANULARITY;    
+}
+
 
 void* mc_MultichainParams::GetParam(const char *param,int* size)
 {
@@ -432,6 +442,12 @@ int mc_MultichainParams::Create(const char* name,int version)
     return MC_ERR_NOERROR;
 }
 
+double mc_MultichainParams::ParamAccuracy()
+{
+    return 1./(double)MC_PRM_DECIMAL_GRANULARITY;
+}
+
+
 int mc_MultichainParams::Read(const char* name)
 {
     return Read(name,0,NULL,0);
@@ -442,10 +458,12 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
     mc_MapStringString *mapConfig;
     int err;
     int size,offset,i,version,len0,len1,len2;
+    char empty_string[1];
     mc_OneMultichainParam *param;
     char *ptrData;
     const char *ptr;
-        
+    empty_string[0]=0x00;    
+    
     if(name == NULL)
     {
         return MC_ERR_INTERNAL_ERROR;
@@ -527,8 +545,21 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
                 ptr=NULL;;
             }
         }        
-        
-        
+/*
+        if(argc == 0)
+        {
+            if((MultichainParamArray+i)->m_Type & MC_PRM_SPECIAL)
+            {
+                if(strcmp((MultichainParamArray+i)->m_Name,"rootstreamname") == 0)
+                {
+                    if(ptr == NULL)
+                    {
+                        ptr=(const char*)&empty_string;
+                    }
+                }                                               
+            }
+        }
+*/
         if(ptr)
         {        
             strcpy(m_lpData+offset,param->m_Name);
@@ -596,7 +627,15 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
                     }
                     if((MultichainParamArray+i)->m_Type & MC_PRM_DECIMAL)
                     {
-                        *(int32_t*)ptrData=(int32_t)(atof(ptr)*MC_PRM_DECIMAL_GRANULARITY+0.5);
+                        double d=atof(ptr);
+                        if(d >= 0)
+                        {
+                            *(int32_t*)ptrData=(int32_t)(d*MC_PRM_DECIMAL_GRANULARITY+ParamAccuracy());                            
+                        }
+                        else
+                        {
+                            *(int32_t*)ptrData=-(int32_t)(-d*MC_PRM_DECIMAL_GRANULARITY+ParamAccuracy());                                                        
+                        }
                     }
                     else
                     {
@@ -620,7 +659,7 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
                     }
                     if((MultichainParamArray+i)->m_Type & MC_PRM_DECIMAL)
                     {
-                        *(int32_t*)ptrData=(int32_t)(atof(ptr)*MC_PRM_DECIMAL_GRANULARITY+0.5);
+                        *(int32_t*)ptrData=(int32_t)(atof(ptr)*MC_PRM_DECIMAL_GRANULARITY+ParamAccuracy());
                     }
                     else
                     {
@@ -1201,17 +1240,22 @@ int mc_MultichainParams::Print(FILE* fileHan)
                 if(size == 0)
                 {
                     ptr=NULL;
-                }
+                }                
                 else
                 {
                     if(((m_lpParams+i)->m_Type & MC_PRM_DATA_TYPE_MASK) == MC_PRM_STRING)
                     {
                         if(size == 1)
                         {
-                            ptr=NULL;                    
+                            if( (((m_lpParams+i)->m_Type & MC_PRM_SPECIAL) == 0) ||
+                                (strcmp((m_lpParams+i)->m_Name,"rootstreamname") != 0) )   
+                            {
+                                ptr=NULL;                    
+                            }
                         }
                     }
                 }
+
                 if(ptr)
                 {
                     switch((m_lpParams+i)->m_Type & MC_PRM_DATA_TYPE_MASK)
@@ -1261,7 +1305,15 @@ int mc_MultichainParams::Print(FILE* fileHan)
                             {
                                 if(mc_GetLE(ptr,4))
                                 {
-                                    d=((double)mc_GetLE(ptr,4)+0.1)/MC_PRM_DECIMAL_GRANULARITY;
+                                    int n=(int)mc_GetLE(ptr,4);
+                                    if(n >= 0)
+                                    {
+                                        d=((double)n+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
+                                    }
+                                    else
+                                    {
+                                        d=-((double)(-n)+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;                                        
+                                    }
                                     sprintf(line+strlen(line),"%0.6g",d);                                                                
                                 }
                                 else
@@ -1280,7 +1332,7 @@ int mc_MultichainParams::Print(FILE* fileHan)
                             {
                                 if(mc_GetLE(ptr,4))
                                 {
-                                    d=((double)mc_GetLE(ptr,4)+0.1)/MC_PRM_DECIMAL_GRANULARITY;
+                                    d=((double)mc_GetLE(ptr,4)+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
                                     sprintf(line+strlen(line),"%0.6g",d);                                                                
                                 }
                                 else
@@ -1357,12 +1409,12 @@ int mc_MultichainParams::Print(FILE* fileHan)
                                         d1=0;
                                         if((m_lpParams+i)->m_MinIntegerValue)
                                         {
-                                            d1=((double)((m_lpParams+i)->m_MinIntegerValue)+0.1)/MC_PRM_DECIMAL_GRANULARITY;
+                                            d1=((double)((m_lpParams+i)->m_MinIntegerValue)+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
                                         }
                                         d2=0;
                                         if((m_lpParams+i)->m_MaxIntegerValue)
                                         {
-                                            d2=((double)((m_lpParams+i)->m_MaxIntegerValue)+0.1)/MC_PRM_DECIMAL_GRANULARITY;
+                                            d2=((double)((m_lpParams+i)->m_MaxIntegerValue)+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
                                         }
                                         fprintf(fileHan," (%0.6g - %0.6g)",d1,d2);                            
                                     }

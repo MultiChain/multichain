@@ -1113,6 +1113,16 @@ Value addmultisigaddress(const Array& params, bool fHelp)
         pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
     }
 
+    CScript outer = GetScriptForDestination(innerID);
+    
+    if(IsMine(*pwalletMain, outer) == ISMINE_NO)
+    {
+        if (!pwalletMain->HaveWatchOnly(outer))
+        {
+            if (!pwalletMain->AddWatchOnly(outer))
+                throw JSONRPCError(RPC_WALLET_ERROR, "Error adding address to wallet");            
+        }
+    }
     
     return CBitcoinAddress(innerID).ToString();
 }
@@ -1270,7 +1280,7 @@ Value listreceivedbyaccount(const Array& params, bool fHelp)
 
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are ot supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
     }            
 
     return ListReceived(params, true);
@@ -2070,23 +2080,18 @@ Value getwalletinfo(const Array& params, bool fHelp)
     Object obj;
     obj.push_back(Pair("walletversion", pwalletMain->GetVersion()));
     obj.push_back(Pair("balance",       ValueFromAmount(pwalletMain->GetBalance())));
-    if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
+    obj.push_back(Pair("walletdbversion", mc_gState->GetWalletDBVersion()));                
+    if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) 
     {
-        obj.push_back(Pair("txcount",       (int)pwalletTxsMain->m_Database->m_DBStat.m_Count));        
-        if(mc_gState->m_WalletMode & MC_WMD_MAP_TXS)
-        {
-            obj.push_back(Pair("walletdbversion", -1));                
-        }
-        else
-        {
-            obj.push_back(Pair("walletdbversion", 2));
-        }
+        obj.push_back(Pair("txcount",       (int)pwalletTxsMain->m_Database->m_DBStat.m_Count+(int)pwalletTxsMain->m_UnconfirmedSends.size()));        
     }
     else
     {
         obj.push_back(Pair("txcount",       (int)pwalletMain->mapWallet.size()));
-        obj.push_back(Pair("walletdbversion", 1));
     }
+    vector<COutput> vecOutputs;
+    pwalletMain->AvailableCoins(vecOutputs, false, NULL, false,true);
+    obj.push_back(Pair("utxocount",  (int)vecOutputs.size()));                
     obj.push_back(Pair("keypoololdest", pwalletMain->GetOldestKeyPoolTime()));
     obj.push_back(Pair("keypoolsize",   (int)pwalletMain->GetKeyPoolSize()));
     if (pwalletMain->IsCrypted())

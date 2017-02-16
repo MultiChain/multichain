@@ -285,6 +285,7 @@ public:
     bool fVerackackSent;
     bool fParameterSetVerified;
     bool fSyncedOnce;
+    bool fLastIgnoreIncoming;
     bool fCanConnectRemote;
     bool fCanConnectLocal;
     CKeyID kAddrRemote;

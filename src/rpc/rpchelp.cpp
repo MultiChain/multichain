@@ -448,8 +448,7 @@ void mc_InitRPCHelpMap03()
             "See the getgenerate call for the current setting.\n"
             "\nArguments:\n"
             "1. generate         (boolean, required) Set to true to turn on generation, off to turn off.\n"
-            "2. genproclimit     (numeric, optional) Set the processor limit for when generation is on. Can be -1 for unlimited.\n"
-            "                    Note: in -regtest mode, genproclimit controls how many blocks are generated immediately.\n"
+            "2. genproclimit     (numeric, optional, default = 1) Set the processor limit for when generation is on. Can be -1 for unlimited.\n"
             "\nResult\n"
             "[ blockhashes ]     (array, -regtest only) hashes of blocks generated\n"
             "\nExamples:\n"
@@ -1308,13 +1307,13 @@ void mc_InitRPCHelpMap06()
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"hex\"      (string, required) The transaction hex string\n"
-            "2. \"txid\"            (string, required) Transaction ID of the output prepared by preparelockunspent, if omitted last created output is used\n"
+            "2. \"txid\"            (string, required) Transaction ID of the output prepared by preparelockunspent.\n"
             "3. \"vout\"            (numeric, required) Output index\n"
             "4. \"ask-assets\"      (object, required) A json object of assets to ask\n"
-            "    [\n"
+            "    {\n"
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
-            "    ]\n"                
+            "    }\n"                
             "\nResult:\n"
             "{\n"
             "  \"hex\": \"value\",        (string) The raw transaction with signature(s) (hex-encoded string)\n"
@@ -1404,13 +1403,13 @@ void mc_InitRPCHelpMap06()
             "Note that the transaction should be completed by appendrawexchange\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. \"txid\"            (string, required) Transaction ID of the output prepared by preparelockunspent, if omitted last created output is used\n"
+            "1. \"txid\"            (string, required) Transaction ID of the output prepared by preparelockunspent.\n"
             "2. \"vout\"            (numeric, required) Output index\n"
             "3. \"ask-assets\"      (object, required) A json object of assets to ask\n"
-            "    [\n"
+            "    {\n"
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
-            "    ]\n"                
+            "    }\n"                
             "\nResult:\n"
             "\"transaction\"            (string) hex string of the transaction\n"
             "\nExamples:\n"
@@ -2101,7 +2100,7 @@ void mc_InitRPCHelpMap10()
             + HelpExampleRpc("grantwithdata", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", admin, 48656C6C6F20576F726C64210A")
         ));
     
-    mapHelpStrings.insert(std::make_pair("",
+    mapHelpStrings.insert(std::make_pair("grantwithdatafrom",
             "grantwithdatafrom from-address \"to-address(es)\" \"permission(s)\" data-hex|object ( native-amount startblock endblock )\n"
             "\nGrant permission with metadata using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
@@ -2868,10 +2867,10 @@ void mc_InitRPCHelpMap13()
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. asset-quantities    (object, required) A json object of assets to send\n"
-            "    [\n"
+            "    {\n"
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
-            "    ]\n"                
+            "    }\n"                
             "2. lock    (boolean, optiona, default=true) Lock prepared unspent output\n"
             "\nResult:\n"
             "{\n"
@@ -2891,10 +2890,10 @@ void mc_InitRPCHelpMap13()
             "\nArguments:\n"
             "1. from-address        (string, required) Address to send from .\n"
             "2. asset-quantities    (object, required) A json object of assets to send\n"
-            "    [\n"
+            "    {\n"
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
-            "    ]\n"                
+            "    }\n"                
             "3. lock    (boolean, optiona, default=true) Lock prepared unspent output\n"
             "\nResult:\n"
             "{\n"
@@ -3223,10 +3222,10 @@ void mc_InitRPCHelpMap14()
             "2. amount      (numeric, required) The amount in native currency to send. eg 0.1\n"
             "or\n"
             "2. asset-quantities    (object, required) A json object of assets to send\n"
-            "    [\n"
+            "    {\n"
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
-            "    ]\n"                                
+            "    }\n"                                
             "3. data-hex    (string, required) Data hex string\n"
             "or\n"
             "3. publish-new-stream-item    (object, required) A json object with stream item\n"
@@ -3252,10 +3251,10 @@ void mc_InitRPCHelpMap14()
             "2. amount      (numeric, required) The amount in native currency to send. eg 0.1\n"
             "or\n"
             "2. asset-quantities    (object, required) A json object of assets to send\n"
-            "    [\n"
+            "    {\n"
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
-            "    ]\n"                                
+            "    }\n"                                
             "3. data-hex    (string, required) Data hex string\n"
             "or\n"
             "3. publish-new-stream-item    (object, required) A json object with stream item\n"
@@ -3282,10 +3281,10 @@ void mc_InitRPCHelpMap14()
             "3. amount              (numeric, required) The amount in native currency to send. eg 0.1\n"
             "or\n"
             "3. asset-quantities    (object, required) A json object of assets to send\n"
-            "    [\n"
+            "    {\n"
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
-            "    ]\n"                                
+            "    }\n"                                
             "4. data-hex            (string, required) Data hex string\n"
             "or\n"
             "4. publish-new-stream-item    (object, required) A json object with stream item\n"
@@ -3312,10 +3311,10 @@ void mc_InitRPCHelpMap14()
             "3. amount              (numeric, required) The amount in native currency to send. eg 0.1\n"
             "or\n"
             "3. asset-quantities    (object, required) A json object of assets to send\n"
-            "    [\n"
+            "    {\n"
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
-            "    ]\n"                                
+            "    }\n"                                
             "4. data-hex            (string, required) Data hex string\n"
             "or\n"
             "4. publish-new-stream-item    (object, required) A json object with stream item\n"
@@ -3444,13 +3443,82 @@ void mc_InitRPCHelpMap15()
             "   Pass 0 to go back to using the system time."
         ));
        
+    mapHelpStrings.insert(std::make_pair("getruntimeparams",
+            "getruntimeparams \n"
+            "Returns an object containing various runtime parameters.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getruntimeparams", "")
+            + HelpExampleRpc("getruntimeparams", "")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("setruntimeparam",
+            "setruntimeparam \"parameter-name\" parameter-value \n"
+            "Sets value for runtime parameter\n"
+            "\nArguments:\n"
+            "1. \"parameter-name\"  (string, required) Parameter name, one of the following:\n"
+            "                                           miningrequirespeers,\n"
+            "                                           mineemptyrounds,\n"
+            "                                           miningturnover,\n"
+            "                                           lockadminminerounds,\n"
+            "                                           maxshowndata, \n"
+            "                                           bantx,\n"
+            "                                           lockblock,\n"
+            "                                           autosubscribe,\n"
+            "                                           handshakelocal,\n"
+            "                                           hideknownopdrops\n"
+            "2. parameter-value     (required) parameter value\n"
+            "\nExamples:\n"
+            + HelpExampleCli("setruntimeparam", "\"miningturnover\" 0.3")
+            + HelpExampleRpc("setruntimeparam", "\"miningturnover\", 0.3")
+        ));
+    
+}
+
+void mc_InitRPCHelpMap16()
+{
+    mapHelpStrings.insert(std::make_pair("completerawexchange",
+            "completerawexchange hex txid vout ask-assets ( data-hex|object ) \n"
+            "\nCompletes existing exchange transaction, adds fee if needed\n"
+            "Returns hex-encoded raw transaction.\n"
+            + HelpRequiringPassphraseWrapper() +
+            "\nArguments:\n"
+            "1. \"hex\"      (string, required) The transaction hex string\n"
+            "2. \"txid\"            (string, required) Transaction ID of the output prepared by preparelockunspent.\n"
+            "3. \"vout\"            (numeric, required) Output index\n"
+            "4. \"ask-assets\"      (object, required) A json object of assets to ask\n"
+            "    {\n"
+            "      \"asset-identifier\" : asset-quantity\n"
+            "      ,...\n"
+            "    }\n"                
+            "5. data-hex    (string, optional) Data hex string\n"
+            "or\n"
+            "5. publish-new-stream-item    (object, optional) A json object with stream item\n"
+            "    {\n"                
+            "      \"for\" : stream-identifier       (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "      \"key\" : key                     (string,optional, default: \"\") Item key\n"
+            "      \"data\" : data-hex               (string,optional, default: \"\") Data hex string\n"
+            "    }\n"                                
+            "\nResult:\n"
+            "\"transaction\"            (string) hex string of the transaction\n"
+            "\nExamples:\n"
+            + HelpExampleCli("completerawexchange", "\"hexstring\" f4c3dd510dd55761015c9d96bff7793b0d501dd6f01a959fd7dd02478fb47dfb 1 \"{\\\"1234-5678-1234\\\":200}\"" )
+            + HelpExampleRpc("completerawexchange", "\"hexstring\",\"f4c3dd510dd55761015c9d96bff7793b0d501dd6f01a959fd7dd02478fb47dfb\",1,\"{\\\"1234-5678-1234\\\":200}\\\"")
+        ));
+    
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
        
-       
 }
 
+void mc_InitRPCLogParamCountMap()
+{
+    mapLogParamCounts.insert(std::make_pair("encryptwallet",0));
+    mapLogParamCounts.insert(std::make_pair("walletpassphrase",0));
+    mapLogParamCounts.insert(std::make_pair("walletpassphrasechange",0));
+    mapLogParamCounts.insert(std::make_pair("importprivkey",0));
+    mapLogParamCounts.insert(std::make_pair("signrawtransaction",-1));
+}
 
 void mc_InitRPCHelpMap()
 {
@@ -3469,5 +3537,8 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap13();
     mc_InitRPCHelpMap14();
     mc_InitRPCHelpMap15();
+    mc_InitRPCHelpMap16();
+    
+    mc_InitRPCLogParamCountMap();
 }
 

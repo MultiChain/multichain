@@ -37,6 +37,8 @@
 #include "multichain/multichain.h"
 #include "wallet/wallettxs.h"
 std::string BurnAddress(const std::vector<unsigned char>& vchVersion);
+std::string SetBannedTxs(std::string txlist);
+std::string SetLockedBlock(std::string hash);
 
 /* MCHN END */
 
@@ -348,7 +350,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -maxtxfee=<amt>        " + strprintf(_("Maximum total fees to use in a single wallet transaction, setting too low may abort large transactions (default: %s)"), FormatMoney(maxTxFee)) + "\n";
     strUsage += "  -upgradewallet         " + _("Upgrade wallet to latest format") + " " + _("on startup") + "\n";
     strUsage += "  -wallet=<file>         " + _("Specify wallet file (within data directory)") + " " + strprintf(_("(default: %s)"), "wallet.dat") + "\n";
-    strUsage += "  -walletnotify=<cmd>    " + _("Execute command when a wallet transaction changes (%s in cmd is replaced by TxID)") + "\n";
+    strUsage += "  -walletnotify=<cmd>    " + _("Notification command to execute for transactions related to wallet addresses or subscribed assets/streams (more details and % substitutions online)") + "\n";
 /* MCHN START */    
     strUsage += "  -walletdbversion=1|2   " + _("Specify wallet version, 1 - not scalable, 2 (default) - scalable") + "\n";
     strUsage += "  -autosubscribe=streams|assets|\"streams,assets\"|\"assets,streams\" " + _("Automatically subscribe to new streams and/or assets") + "\n";
@@ -440,8 +442,14 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "\n" + _("MultiChain runtime parameters") + "\n";    
     strUsage += "  -handshakelocal=<address>                " + _("Manually override the wallet address which is used for handshaking with other peers in a MultiChain blockchain.") + "\n";
     strUsage += "  -hideknownopdrops=<n>                    " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON_RPC calls (default: %u)"), 0) + "\n";
-    strUsage += "  -miningrequirespeers=<n>                 " + _("If set overrides mining-reqires-peers blockhain setting, values 0/1.") + "\n";
-    strUsage += "  -shrinkdebugfilesize=<n>                 " + _("If set debug.log is shrinked to size in range <n> - 5<n>.") + "\n";
+    strUsage += "  -lockadminminerounds=<n>                 " + _("If set overrides lock-admin-mine-rounds blockchain setting.") + "\n";
+    strUsage += "  -miningrequirespeers=<n>                 " + _("If set overrides mining-requires-peers blockchain setting, values 0/1.") + "\n";
+    strUsage += "  -mineemptyrounds=<n>                     " + _("If set overrides mine-empty-rounds blockchain setting, values 0.0-1000.0 or -1.") + "\n";
+    strUsage += "  -miningturnover=<n>                      " + _("If set overrides mining-turnover blockchain setting, values 0-1.") + "\n";
+    strUsage += "  -shrinkdebugfilesize=<n>                 " + _("If set debug.log is shrinked to size in range <n> - 5<n>, in bytes") + "\n";
+    strUsage += "  -bantx=<txids>                           " + _("Comma delimited list of banned transactions.") + "\n";
+    strUsage += "  -lockblock=<hash>                        " + _("Blocks on branches without this block will be rejected") + "\n";
+    
     
     strUsage += "\n" + _("Wallet optimization options:") + "\n";
     strUsage += "  -autocombineminconf    " + _("Minimum confirmations for automatically combined outputs, default 1") + "\n";
@@ -1051,17 +1059,19 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 seed_error="Couldn't disconnect from the seed node, please restart multichaind";
 //                return InitError(_("Couldn't disconnect from the seed node, please restart multichaind"));            
             }
-            
-            
-//            seed_error="Couldn't connect to the seed node";
-            if(seed_port.size() == 0)
-            {
-                seed_error=strprintf("Couldn't connect to the seed node %s - please specify port number explicitly.",seed_node);                
-            }
             else
             {
-                seed_error=strprintf("Couldn't connect to the seed node %s on port %s - please check multichaind is running at that address and that your firewall settings allow incoming connections.",                
-                    seed_ip.c_str(),seed_port.c_str());
+            
+//            seed_error="Couldn't connect to the seed node";
+                if(seed_port.size() == 0)
+                {
+                    seed_error=strprintf("Couldn't connect to the seed node %s - please specify port number explicitly.",seed_node);                
+                }
+                else
+                {
+                    seed_error=strprintf("Couldn't connect to the seed node %s on port %s - please check multichaind is running at that address and that your firewall settings allow incoming connections.",                
+                        seed_ip.c_str(),seed_port.c_str());
+                }
             }
 //            return InitError(_("Couldn't connect to the seed node"));            
         }
@@ -1538,7 +1548,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                             strErrors << _("Cannot write default address") << "\n";
                     }
                     
-                    
+/*                    
                     if(seed_error.size())
                     {
                         sprintf(bufOutput,"\nError: %s\n\n",seed_error.c_str());
@@ -1546,6 +1556,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     }
                     else
                     {
+ */ 
                         if(!GetBoolArg("-shortoutput", false))
                         {    
                             sprintf(bufOutput,"Blockchain successfully initialized.\n\n");             
@@ -1573,12 +1584,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                             sprintf(bufOutput,"%s\n",CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());                            
                             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                         }
-                    }
-                    
 /*                    
-                    delete pwalletMain;
-                    pwalletMain=NULL;
- */ 
+                    }
+*/                    
                     return false;
                 }
             }
@@ -1776,6 +1784,14 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
     // ********************************************************* Step 7: load block chain
 
+/* MCHN START */    
+    std::string strBannedTxError=SetBannedTxs(GetArg("-bantx",""));
+    if(strBannedTxError.size())    
+    {
+        return InitError(strBannedTxError);        
+    }
+/* MCHN END */    
+    
     fReindex = GetBoolArg("-reindex", false);
 
     // Upgrading to 0.8; hard-link the old blknnnn.dat files into /blocks/
@@ -1912,6 +1928,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             }
         }
     }
+    
 
     // As LoadBlockIndex can take several minutes, it's possible the user
     // requested to kill the GUI during the last operation. If so, exit.
@@ -2073,6 +2090,20 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 /* MCHN START */  
         pwalletMain->lpWalletTxs=pwalletTxsMain;
         pwalletMain->InitializeUnspentList();
+
+        {
+            LOCK(cs_main);
+            uint32_t paused=mc_gState->m_NodePausedState;
+            mc_gState->m_NodePausedState=MC_NPS_MINING | MC_NPS_INCOMING;
+            std::string strLockBlockError=SetLockedBlock(GetArg("-lockblock",""));
+            mc_gState->m_NodePausedState=paused;
+            if(strLockBlockError.size())    
+            {
+                return InitError(strLockBlockError);        
+            }
+        }
+    
+        
 /* MCHN END */        
     } // (!fDisableWallet)
 #else // ENABLE_WALLET

@@ -4,10 +4,101 @@
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "wallet/wallettxs.h"
+#include "utils/core_io.h"
+
+#include "json/json_spirit_utils.h"
+#include "json/json_spirit_value.h"
+using namespace json_spirit;
+
+#include <boost/thread.hpp>
+#include <boost/algorithm/string/replace.hpp>
+#include "json/json_spirit_writer_template.h"
 
 int64_t GetAdjustedTime();
+void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
+bool CBitcoinAddressFromTxEntity(CBitcoinAddress &address,mc_TxEntity *lpEntity);
 
 using namespace std;
+
+
+void WalletTxNotify(mc_TxImport *imp,const CWalletTx& tx,int block,bool fFound,uint256 block_hash)
+{
+    std::string strNotifyCmd = GetArg("-walletnotify", "");
+    if ( strNotifyCmd.empty() )
+    {
+        return;
+    }
+    if(imp->m_ImportID)
+    {
+        return;        
+    }
+
+    boost::replace_all(strNotifyCmd, "%s", tx.GetHash().ToString());
+
+    boost::replace_all(strNotifyCmd, "%c", strprintf("%d",fFound ? 0 : 1));
+    boost::replace_all(strNotifyCmd, "%n", strprintf("%d",block));
+    boost::replace_all(strNotifyCmd, "%b", block_hash.ToString());
+    boost::replace_all(strNotifyCmd, "%h", EncodeHexTx(*static_cast<const CTransaction*>(&tx)));
+
+    string strAddresses="";
+    string strEntities="";
+    CBitcoinAddress address;
+    mc_EntityDetails entity;
+    uint256 txid;
+    
+    for(int i=0;i<imp->m_TmpEntities->GetCount();i++)
+    {
+        mc_TxEntity *lpent;
+        lpent=(mc_TxEntity *)imp->m_TmpEntities->GetRow(i);
+        if(lpent->m_EntityType & MC_TET_CHAINPOS)
+        {
+            switch(lpent->m_EntityType & MC_TET_TYPE_MASK)
+            {
+                case MC_TET_PUBKEY_ADDRESS:
+                case MC_TET_SCRIPT_ADDRESS:
+                    if(CBitcoinAddressFromTxEntity(address,lpent))
+                    {
+                        if(strAddresses.size())
+                        {
+                            strAddresses += ",";
+                        }
+                        strAddresses += address.ToString();
+                    }
+                    break;
+                case MC_TET_STREAM:
+                case MC_TET_ASSET:
+                    if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,lpent->m_EntityID))
+                    {
+                        if(strEntities.size())
+                        {
+                            strEntities += ",";                            
+                        }        
+                        txid=*(uint256*)entity.GetTxID();
+                        strEntities += txid.ToString();
+                    }
+                    break;
+            }
+        }        
+    }
+
+    boost::replace_all(strNotifyCmd, "%a", (strAddresses.size() > 0) ? strAddresses : "\"\"");
+    boost::replace_all(strNotifyCmd, "%e", (strEntities.size() > 0) ? strEntities : "\"\"");
+
+    string str=strprintf("%s",mc_gState->m_NetworkParams->Name());              
+    boost::replace_all(str, "\"", "\\\"");        
+    boost::replace_all(strNotifyCmd, "%m", "\"" + str + "\"");
+    
+// If chain name (retrieved by %m) contains %j, it will be replaced by full JSON. 
+// It is minor issue, but one should be careful when adding other "free text" specifications
+    
+    Object result;
+    TxToJSON(tx, block_hash, result);        
+    str=write_string(Value(result),false);
+    boost::replace_all(str, "\"", "\\\"");        
+    boost::replace_all(strNotifyCmd, "%j", "\"" + str + "\"");
+    
+    boost::thread t(runCommand, strNotifyCmd); // thread runs free        
+}
 
 void mc_Coin::Zero()
 {
@@ -143,6 +234,14 @@ int mc_WalletTxs::Initialize(
         m_UnconfirmedSends= GetUnconfirmedSends(m_Database->m_DBStat.m_Block);
     }    
     return err;
+}
+
+int mc_WalletTxs::SetMode(uint32_t mode, uint32_t mask)
+{
+    m_Mode &= ~mask;
+    m_Mode |= mode;
+    
+    return MC_ERR_NOERROR;
 }
 
 int mc_WalletTxs::Destroy()
@@ -1581,7 +1680,7 @@ CWalletTx mc_WalletTxChoppedCopy(CWallet *lpWallet,const CWalletTx& tx)
 }
 
 
-int mc_WalletTxs::AddTx(mc_TxImport *import,const CTransaction& tx,int block,CDiskTxPos* block_pos,uint32_t block_tx_index)
+int mc_WalletTxs::AddTx(mc_TxImport *import,const CTransaction& tx,int block,CDiskTxPos* block_pos,uint32_t block_tx_index,uint256 block_hash)
 {
     if((m_Mode & MC_WMD_TXS) == 0)
     {
@@ -1589,10 +1688,10 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CTransaction& tx,int block,CDi
     }    
     CWalletTx wtx(m_lpWallet,tx);
     
-    return AddTx(import,wtx,block,block_pos,block_tx_index);
+    return AddTx(import,wtx,block,block_pos,block_tx_index,block_hash);
 }
 
-int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskTxPos* block_pos,uint32_t block_tx_index)
+int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskTxPos* block_pos,uint32_t block_tx_index,uint256 block_hash)
 {
     int err,i,j,entcount,lockres,entpos;
     mc_TxImport *imp;
@@ -1628,6 +1727,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     std::vector<mc_Coin> txoutsOut;
     uint256 hash;
     unsigned char *ptrOut;
+    bool fAlreadyInTheWalletForNotify;   
     
     uint32_t txsize;
     uint32_t txfullsize;
@@ -2293,6 +2393,17 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
         block_tx_offset=0;        
     }
     
+    fAlreadyInTheWalletForNotify=false;
+    if(!GetArg("-walletnotify", "").empty())
+    {
+        mc_TxDefRow StoredTxDef;
+        if(m_Database->GetTx(&StoredTxDef,(unsigned char*)&hash) == 0)
+        {
+            fAlreadyInTheWalletForNotify=true;
+        }        
+    }
+    
+    
     LogPrint("wallet","wtxs: Found %d entities in tx %s, flags: %08X, import %d\n",imp->m_TmpEntities->GetCount(),tx.GetHash().ToString().c_str(),flags,imp->m_ImportID);
     err=m_Database->AddTx(imp,(unsigned char*)&hash,(unsigned char*)&ss[0],txsize,txfullsize,block,block_file,block_offset,block_tx_offset,block_tx_index,flags,timestamp,imp->m_TmpEntities);
     if(err == MC_ERR_NOERROR)                                                   // Adding tx to unconfirmed send
@@ -2306,6 +2417,8 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
             }
         }
     }
+    
+    WalletTxNotify(imp,tx,block,fAlreadyInTheWalletForNotify,block_hash);
     
     if(err == MC_ERR_NOERROR)                                                   // Updating UTXO map
     {

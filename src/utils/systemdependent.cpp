@@ -38,6 +38,7 @@
 #include <dlfcn.h>  // We need if of dlopen
 #include <unistd.h> // We need it for sleep
 
+#include <pwd.h>
 
 #include "utils/define.h"
 #include "utils/declare.h"
@@ -163,6 +164,18 @@ uint64_t __US_ThreadID()
     return (uint64_t)pthread_self();
 }
 
+const char* __US_UserHomeDir()
+{
+    const char *homedir;
+
+    if ((homedir = getenv("HOME")) == NULL) 
+    {
+        homedir = getpwuid(getuid())->pw_dir;
+    }    
+    
+    return homedir;
+}
+
 #else
 
 #include "windows.h"
@@ -220,6 +233,11 @@ void __US_SemDestroy(void* sem)
 uint64_t __US_ThreadID()
 {
     return (uint64_t)GetCurrentThreadId ();
+}
+
+const char* __US_UserHomeDir()
+{
+    return NULL;
 }
 
 #endif

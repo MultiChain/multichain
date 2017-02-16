@@ -120,6 +120,7 @@ extern const CRPCTable tableRPC;
 
 /* MCHN START */
 extern std::map<std::string, std::string> mapHelpStrings;
+extern std::map<std::string, int> mapLogParamCounts;
 void mc_InitRPCHelpMap();
 std::string mc_RPCHelpString(std::string strMethod);
 /* MCHN END */
@@ -191,10 +192,12 @@ extern json_spirit::Value getassetbalances(const json_spirit::Array& params, boo
 extern json_spirit::Value gettotalbalances(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value sendassettoaddress(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getblockchainparams(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getruntimeparams(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value setruntimeparam(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value preparelockunspent(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value createrawexchange(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value appendrawexchange(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value completeexchange(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value completerawexchange(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value decoderawexchange(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value appendrawmetadata(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value grantfromcmd(const json_spirit::Array& params, bool fHelp);

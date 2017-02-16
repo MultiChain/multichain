@@ -30,25 +30,26 @@ std::string HelpMessageCli()
 {
     string strUsage;
     strUsage += _("Options:") + "\n";
-    strUsage += "  -?                     " + _("This help message") + "\n";
-    strUsage += "  -conf=<file>           " + strprintf(_("Specify configuration file (default: %s)"), "multichain.conf") + "\n";
-    strUsage += "  -datadir=<dir>         " + _("Specify data directory") + "\n";
+    strUsage += "  -?                       " + _("This help message") + "\n";
+    strUsage += "  -conf=<file>             " + strprintf(_("Specify configuration file (default: %s)"), "multichain.conf") + "\n";
+    strUsage += "  -datadir=<dir>           " + _("Specify data directory") + "\n";
 /* MCHN START */    
-    strUsage += "  -saveclilog=<n>        " + _("If <n>=0 multichain-cli history is not saved, default 1") + "\n";
+    strUsage += "  -requestout=<requestout> " + _("Send request to stderr, stdout or null (not print it at all), default stderr") + "\n"; 
+    strUsage += "  -saveclilog=<n>          " + _("If <n>=0 multichain-cli history is not saved, default 1") + "\n";
 /*    
     strUsage += "  -testnet               " + _("Use the test network") + "\n";
     strUsage += "  -regtest               " + _("Enter regression test mode, which uses a special chain in which blocks can be "
                                                 "solved instantly. This is intended for regression testing tools and app development.") + "\n";
  */ 
 /* MCHN END */    
-    strUsage += "  -rpcconnect=<ip>       " + strprintf(_("Send commands to node running on <ip> (default: %s)"), "127.0.0.1") + "\n";
-    strUsage += "  -rpcport=<port>        " + _("Connect to JSON-RPC on <port> ") + "\n";
-    strUsage += "  -rpcwait               " + _("Wait for RPC server to start") + "\n";
-    strUsage += "  -rpcuser=<user>        " + _("Username for JSON-RPC connections") + "\n";
-    strUsage += "  -rpcpassword=<pw>      " + _("Password for JSON-RPC connections") + "\n";
+    strUsage += "  -rpcconnect=<ip>         " + strprintf(_("Send commands to node running on <ip> (default: %s)"), "127.0.0.1") + "\n";
+    strUsage += "  -rpcport=<port>          " + _("Connect to JSON-RPC on <port> ") + "\n";
+    strUsage += "  -rpcwait                 " + _("Wait for RPC server to start") + "\n";
+    strUsage += "  -rpcuser=<user>          " + _("Username for JSON-RPC connections") + "\n";
+    strUsage += "  -rpcpassword=<pw>        " + _("Password for JSON-RPC connections") + "\n";
 
     strUsage += "\n" + _("SSL options: ") + "\n";
-    strUsage += "  -rpcssl                " + _("Use OpenSSL (https) for JSON-RPC connections") + "\n";
+    strUsage += "  -rpcssl                  " + _("Use OpenSSL (https) for JSON-RPC connections") + "\n";
 
     return strUsage;
 }
@@ -128,6 +129,9 @@ static bool AppInitRPC(int argc, char* argv[])
         fprintf(stdout, "%s", strUsage.c_str());
         return false;
     }
+
+    mc_ExpandDataDirParam();
+    
     
 /*    
     if (!boost::filesystem::is_directory(GetDataDir(false))) {
@@ -225,7 +229,15 @@ Object CallRPC(const string& strMethod, const Array& params)
     string strPost = HTTPPost(strRequest, mapRequestHeaders);
     stream << strPost << std::flush;
 
-    printf("%s\n",strRequest.c_str());
+    string requestout=GetArg("-requestout","stderr");
+    if(requestout == "stdout")
+    {
+        fprintf(stdout, "%s\n", strRequest.c_str());        
+    }
+    if(requestout == "stderr")
+    {
+        fprintf(stderr, "%s\n", strRequest.c_str());        
+    }
     
     // Receive HTTP reply status
     int nProto = 0;

@@ -277,6 +277,11 @@ void mc_RandomSeed(unsigned int seed)
     srand(seed);
 }
 
+double mc_RandomDouble()
+{
+    return (double)rand()/RAND_MAX;
+}
+
 unsigned int mc_RandomInRange(unsigned int min,unsigned int max)
 {
     double scaled = (double)rand()/RAND_MAX;
@@ -1672,7 +1677,9 @@ int mc_SaveCliCommandToLog(const char *fileName, int argc, char* argv[])
             {
                 if((strcmp(argv[a],"encryptwallet") == 0) ||
                    (strcmp(argv[a],"walletpassphrase") == 0) ||    
-                   (strcmp(argv[a],"walletpassphrasechange") == 0))
+                   (strcmp(argv[a],"walletpassphrasechange") == 0) || 
+                   (strcmp(argv[a],"signrawtransaction") == 0) || 
+                   (strcmp(argv[a],"importprivkey") == 0))
                 {
                     return 0;
                 }

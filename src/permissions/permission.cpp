@@ -2612,11 +2612,153 @@ int mc_Permissions::Commit(const void* lpMiner,const void* lpHash)
     return result;
 }
 
+/** Finds blocks in range with governance model change */
+
+uint32_t mc_Permissions::FindGovernanceModelChange(uint32_t from,uint32_t to)
+{
+    int64_t last_block_row;
+    mc_BlockLedgerRow pldRow;
+    mc_BlockLedgerRow pldLast;    
+    uint32_t type;
+    uint32_t block,start;
+    uint32_t found=0;
+            
+    Lock(0);
+    
+    type=MC_PTP_BLOCK_INDEX;        
+
+    start=from;
+    if(start == 0)
+    {
+        start=1;
+    }
+    block=to;
+    if((int)block > m_Block)
+    {
+        block=m_Block;
+    }
+    
+    if(block < from)
+    {
+        goto exitlbl;
+    }
+    
+    pldLast.Zero();
+    pldRow.Zero();
+    
+    sprintf((char*)pldRow.m_Address,"Block %08X row",block);
+
+    GetPermission(pldRow.m_Address,type,(mc_PermissionLedgerRow*)&pldLast);
+         
+    if(m_Ledger->Open() <= 0)
+    {
+        LogString("Error: FindGovernanceModelChange: couldn't open ledger");
+        goto exitlbl;
+    }
+    
+    last_block_row=pldLast.m_ThisRow;
+    while( (block >= start) && (found == 0) )
+    {
+        m_Ledger->GetRow(last_block_row,(mc_PermissionLedgerRow*)&pldRow);
+        if(pldRow.m_BlockFlags & MC_PFB_GOVERNANCE_CHANGE)
+        {
+            found=block;
+            goto exitlbl;
+        }
+        block--;
+        last_block_row=pldRow.m_PrevRow;
+    }
+    
+    m_Ledger->Close();
+
+exitlbl:
+    UnLock();
+
+    return found;
+}
+
+/** Calculate block flags before commit */
+
+uint32_t mc_Permissions::CalculateBlockFlags()
+{
+    int i,mprow;
+    uint32_t flags=MC_PFB_NONE;
+    mc_PermissionLedgerRow pldRow;
+    mc_PermissionLedgerRow pldLast;
+    mc_PermissionLedgerRow pldNext;
+    
+    for(i=0;i<m_MemPool->GetCount();i++)
+    {
+        if( (flags & MC_PFB_GOVERNANCE_CHANGE) == 0)
+        {
+            memcpy((unsigned char*)&pldRow+m_Ledger->m_KeyOffset,m_MemPool->GetRow(i),m_Ledger->m_TotalSize);
+
+            if( (pldRow.m_Type & (MC_PTP_ADMIN | MC_PTP_MINE)) &&
+                (mc_IsNullEntity(pldRow.m_Entity)) &&
+                (pldRow.m_Consensus > 0) )
+            {                    
+                memcpy((unsigned char*)&pldNext,(unsigned char*)&pldRow,m_Ledger->m_TotalSize);
+                pldNext.m_PrevRow=pldRow.m_ThisRow;
+                mprow=0;
+                while(mprow>=0)
+                {
+                    mprow=m_MemPool->Seek((unsigned char*)&pldNext+m_Ledger->m_KeyOffset);
+                    if(mprow>=0)
+                    {
+                        memcpy((unsigned char*)&pldNext+m_Ledger->m_KeyOffset,m_MemPool->GetRow(mprow),m_Ledger->m_TotalSize);
+                        if(pldNext.m_Consensus)
+                        {
+                            mprow=-1;
+                        }                            
+                        pldNext.m_PrevRow=pldNext.m_ThisRow;
+                    }
+                }
+                if( (pldNext.m_Consensus == 0) || (pldNext.m_ThisRow == pldRow.m_ThisRow) )
+                {
+                    pldLast.Zero();
+                    GetPermission(pldRow.m_Entity,pldRow.m_Address,pldRow.m_Type,&pldLast,0);            
+                    if(pldLast.m_ThisRow)
+                    {
+                        if(pldRow.m_BlockFrom != pldLast.m_BlockFrom)
+                        {
+                            if( ((uint32_t)(m_Block+1) < pldRow.m_BlockFrom) || ((uint32_t)(m_Block+1) < pldLast.m_BlockFrom) )
+                            {
+                                flags |= MC_PFB_GOVERNANCE_CHANGE;
+                            }
+                        }
+                        if(pldRow.m_BlockTo != pldLast.m_BlockTo)
+                        {
+                            if( ((uint32_t)(m_Block+1) < pldRow.m_BlockTo) || ((uint32_t)(m_Block+1) < pldLast.m_BlockTo) )
+                            {
+                                flags |= MC_PFB_GOVERNANCE_CHANGE;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if(pldRow.m_BlockFrom < pldRow.m_BlockTo)
+                        {
+                            if( (uint32_t)(m_Block+1) < pldRow.m_BlockTo ) 
+                            {
+                                flags |= MC_PFB_GOVERNANCE_CHANGE;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }    
+    
+    
+    return flags;
+}
+
 /** Commits block, external, no lock */
 
 int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
 {
     int i,err,thisBlock,value_len,pld_items;
+    uint32_t block_flags;
     char msg[256];
     
     mc_PermissionDBRow pdbRow;
@@ -2628,6 +2770,7 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
     
     err=MC_ERR_NOERROR;
     
+    block_flags=CalculateBlockFlags();
     pld_items=m_MemPool->GetCount();
     
     if(lpMiner)
@@ -2645,7 +2788,8 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
         pldBlockRow.m_BlockReceived=thisBlock;
         memcpy(pldBlockRow.m_CommitHash,lpHash,MC_PLS_SIZE_HASH);
         pldBlockRow.m_ThisRow=m_Row;
-        pldBlockRow.m_FoundInDB=pldBlockLast.m_FoundInDB;
+        pldBlockRow.m_BlockFlags=pldBlockLast.m_BlockFlags & MC_PFB_MINED_BEFORE;
+        pldBlockRow.m_BlockFlags |= block_flags;
         m_MemPool->Add((unsigned char*)&pldBlockRow+m_Ledger->m_KeyOffset,(unsigned char*)&pldBlockRow+m_Ledger->m_ValueOffset);
         m_Row++;                
         
@@ -2658,7 +2802,8 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
         pldBlockRow.m_BlockReceived=thisBlock;
         memcpy(pldBlockRow.m_CommitHash,lpHash,MC_PLS_SIZE_HASH);
         pldBlockRow.m_ThisRow=m_Row;
-        pldBlockRow.m_FoundInDB=pldBlockLast.m_FoundInDB;
+        pldBlockRow.m_BlockFlags=pldBlockLast.m_BlockFlags & MC_PFB_MINED_BEFORE;
+        pldBlockRow.m_BlockFlags |= block_flags;
         m_MemPool->Add((unsigned char*)&pldBlockRow+m_Ledger->m_KeyOffset,(unsigned char*)&pldBlockRow+m_Ledger->m_ValueOffset);
         m_Row++;                                
     }

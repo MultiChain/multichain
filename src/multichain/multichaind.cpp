@@ -87,7 +87,9 @@ bool AppInit(int argc, char* argv[])
             return false;
         }
     }
-
+    
+    mc_ExpandDataDirParam();
+    
     if(!mc_DoesParentDataDirExist())
     {
         fprintf(stderr,"\nError: Data directory %s needs to exist before calling multichaind. Exiting...\n\n",mapArgs["-datadir"].c_str());

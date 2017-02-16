@@ -647,6 +647,8 @@ Value getmultibalances(const Array& params, bool fHelp)
     {
         if( (params[0].type() != str_type) || (params[0].get_str() != "*") )
         {        
+            filter = filter | ISMINE_WATCH_ONLY;        
+            
             setAddresses=ParseAddresses(params[0],filter);
             if(setAddresses.size() == 0)
             {

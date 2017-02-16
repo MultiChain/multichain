@@ -73,7 +73,7 @@ static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 50000;
 extern int MAX_OP_RETURN_SHOWN;
 /* MCHN END */
 /** The maximum size of a blk?????.dat file (since 0.8) */
-static const unsigned int MAX_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
+extern unsigned int MAX_BLOCKFILE_SIZE;                                     // MCHN global
 /** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
 static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
 /** The pre-allocation chunk size for rev?????.dat files (since 0.8) */

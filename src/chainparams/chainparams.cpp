@@ -183,6 +183,8 @@ public:
 
         fRequireRPCPassword = true;
         fMiningRequiresPeers = true;
+        dMineEmptyRounds = -1.;
+        dMiningTurnover=1.0;
         fDefaultCheckMemPool = false;
         fAllowMinDifficultyBlocks = false;
         fRequireStandard = true;
@@ -242,6 +244,8 @@ public:
 
         fRequireRPCPassword = true;
         fMiningRequiresPeers = true;
+        dMineEmptyRounds = -1.;
+        dMiningTurnover=1.0;
         fDefaultCheckMemPool = false;
         fAllowMinDifficultyBlocks = true;
         fRequireStandard = false;
@@ -287,6 +291,8 @@ public:
 
         fRequireRPCPassword = false;
         fMiningRequiresPeers = false;
+        dMineEmptyRounds = -1.;
+        dMiningTurnover=1.0;
         fDefaultCheckMemPool = true;
         fAllowMinDifficultyBlocks = true;
         fRequireStandard = false;
@@ -314,6 +320,8 @@ public:
 
         fRequireRPCPassword = false;
         fMiningRequiresPeers = false;
+        dMineEmptyRounds = -1.;
+        dMiningTurnover=1.0;
         fDefaultCheckMemPool = true;
         fAllowMinDifficultyBlocks = false;
         fMineBlocksOnDemand = true;
@@ -495,15 +503,32 @@ public:
         
 //        convertSeed6(vFixedSeeds, pnSeed6_test, ARRAYLEN(pnSeed6_test));
 
+        SetMultiChainRuntimeParams();
         
-        fMiningRequiresPeers = (mc_gState->m_NetworkParams->GetInt64Param("miningrequirespeers") != 0);
-        fMiningRequiresPeers=GetBoolArg("-miningrequirespeers", fMiningRequiresPeers);
-        fAllowMinDifficultyBlocks = (mc_gState->m_NetworkParams->GetInt64Param("allowmindifficultyblocks") != 0);
         fRequireStandard = (mc_gState->m_NetworkParams->GetInt64Param("onlyacceptstdtxs") != 0);
         fRequireStandard=GetBoolArg("-requirestandard", fRequireStandard);
         fMineBlocksOnDemand = GetBoolArg("-mineblocksondemand", false);
         fTestnetToBeDeprecatedFieldRPC = (mc_gState->m_NetworkParams->GetInt64Param("chainistestnet") != 0);
 
+    }
+    
+    void SetMultiChainRuntimeParams()
+    {
+        fMiningRequiresPeers = (mc_gState->m_NetworkParams->GetInt64Param("miningrequirespeers") != 0);
+        fMiningRequiresPeers=GetBoolArg("-miningrequirespeers", fMiningRequiresPeers);        
+        nLockAdminMineRounds=GetArg("-lockadminminerounds",mc_gState->m_NetworkParams->GetInt64Param("lockadminminerounds"));        
+        dMineEmptyRounds=mc_gState->m_NetworkParams->GetDoubleParam("mineemptyrounds");
+        string sMineEmptyRounds=GetArg("-mineemptyrounds", "Not Set");
+        if(sMineEmptyRounds != "Not Set")
+        {
+            dMineEmptyRounds=atof(sMineEmptyRounds.c_str());
+        }                    
+        dMiningTurnover=mc_gState->m_NetworkParams->GetDoubleParam("miningturnover");
+        string sMinerDrift=GetArg("-miningturnover", "Not Set");
+        if(sMinerDrift != "Not Set")
+        {
+            dMiningTurnover=atof(sMinerDrift.c_str());
+        }                    
     }
     
     void SetGenesis()
@@ -721,6 +746,11 @@ bool SelectMultiChainParams(const char *NetworkName)
     pCurrentParams = &multiChainParams;
     
     return true;
+}
+
+void SetMultiChainRuntimeParams()
+{
+    multiChainParams.SetMultiChainRuntimeParams();
 }
 
 bool InitializeMultiChainParams()

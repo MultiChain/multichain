@@ -329,6 +329,27 @@ void mc_SetDataDirArg(char *buf)
 }
 
 
+void mc_ExpandDataDirParam()
+{
+    if (mapArgs.count("-datadir"))
+    {
+        string original=mapArgs["-datadir"];
+        if(original.size() > 1)
+        {
+            if( (*(original.c_str()) == '~') && (*(original.c_str() + 1) == '/') )
+            {
+                const char *homedir=__US_UserHomeDir();
+
+                if(homedir)
+                {
+                    mapArgs["-datadir"]=strprintf("%s%s",homedir,original.c_str()+1);                    
+                }
+            }
+        }
+    }    
+}
+
+
 
 const boost::filesystem::path mc_GetDataDir(const char *network_name,int create)
 {
@@ -609,6 +630,8 @@ int mc_ReadConfigFile(
         set<string> setOptions;
         setOptions.insert("*");
 
+//        boost::program_options::detail::config_file_iterator it(streamConfig, setOptions), end;
+//        while(it != end)
         for (boost::program_options::detail::config_file_iterator it(streamConfig, setOptions), end; it != end; ++it)
         {
             // Don't overwrite existing settings so command line settings override bitcoin.conf
@@ -628,6 +651,15 @@ int mc_ReadConfigFile(
             {
                 (*mapMultiSettingsRet)[strKey].push_back(it->value[0]);
             }
+/*            
+            try
+            {
+                ++it;
+            }
+            catch(std::exception &e1) {
+                ++it;
+            }
+ */ 
         }
     } catch(std::exception &e) {
         fprintf(stderr,"ERROR: reading configuration file: %s\n", e.what());
@@ -668,6 +700,14 @@ int mc_MultichainParams::SetGlobals()
     MAX_OP_RETURN_RELAY=GetArg("-datacarriersize", MAX_OP_RETURN_RELAY);
     MAX_BLOCK_SIZE=(unsigned int)GetInt64Param("maximumblocksize");    
     DEFAULT_BLOCK_MAX_SIZE=MAX_BLOCK_SIZE;    
+    while(MAX_BLOCK_SIZE>MAX_BLOCKFILE_SIZE)
+    {
+        MAX_BLOCKFILE_SIZE *= 2;
+    }
+    while(MAX_BLOCK_SIZE>MAX_SIZE)
+    {
+        MAX_SIZE *= 2;
+    }
     MAX_STANDARD_TX_SIZE=(unsigned int)GetInt64Param("maxstdtxsize");    
     MAX_SCRIPT_ELEMENT_SIZE=(unsigned int)GetInt64Param("maxstdelementsize");
     COINBASE_MATURITY=(int)GetInt64Param("rewardspendabledelay");    
