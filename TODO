@@ -1,14 +1,5 @@
 TO DO BEFORE MULTICHAIN 1.0 BETA
 --------------------------------
-* Automatic checkpointing for admin/miner permission changes
-* Add parameter for minimum transactions per block
-* Increase maximum data size per transaction from 8 MB to 32+ MB
-* Add monotonically increasing version number to getinfo
-* Allow metadata and P2SH addresses in exchange APIs
-* Fix APIs for performing external mining
-* Reactivate transaction notifications mechanism in new wallet
-* Add getruntimeparams command to retrieve runtime parameters
-* Add parameters to clearmempool and setlastblock to support rollback
 * Review and organize error codes
 * Review online and built-in documentation for consistency
 * Review upstream security patches since Bitcoin Core 0.10
