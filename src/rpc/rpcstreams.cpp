@@ -36,7 +36,7 @@ void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
                 }
                 else
                 {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, string("Stream with this stream reference not found: ")+str);                    
+                    throw JSONRPCError(RPC_ENTITY_NOT_FOUND, string("Stream with this stream reference not found: ")+str);                    
                 }
             }
         }
@@ -45,13 +45,13 @@ void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
         switch(ret)
         {
             case -1:
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Stream with this txid not found: ")+str);
+                throw JSONRPCError(RPC_ENTITY_NOT_FOUND, string("Stream with this txid not found: ")+str);
                 break;
             case -2:
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Stream with this stream reference not found: ")+str);
+                throw JSONRPCError(RPC_ENTITY_NOT_FOUND, string("Stream with this stream reference not found: ")+str);
                 break;
             case -3:
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Stream with this name not found: ")+str);
+                throw JSONRPCError(RPC_ENTITY_NOT_FOUND, string("Stream with this name not found: ")+str);
                 break;
             case -4:
                 throw JSONRPCError(RPC_INVALID_PARAMETER, string("Could not parse stream key: ")+str);
@@ -65,7 +65,7 @@ void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
     }
     else
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid stream identifier");        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid stream identifier");        
     }
            
     if(entity)
@@ -74,7 +74,7 @@ void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
         {
             if(entity->GetEntityType() != MC_ENT_TYPE_STREAM)
             {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid stream identifier, not stream");                        
+                throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Invalid stream identifier, not stream");                        
             }
         }    
     }    
@@ -166,7 +166,7 @@ Value liststreams(const Array& params, bool fHelp)
     }
     
     if(streams == NULL)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Cannot open entity database");
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot open entity database");
 
     output_level=0x1E;
     
@@ -286,7 +286,7 @@ Value createcmd(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
     }
     
     Array ext_params;
@@ -306,7 +306,7 @@ Value createfromcmd(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
     }
     
     if (strcmp(params[1].get_str().c_str(),"stream"))
@@ -339,7 +339,7 @@ Value createfromcmd(const Array& params, bool fHelp)
     {
         if(stream_name == "*")
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid stream name");                                                                                            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid stream name: *");                                                                                            
         }
     }
 
@@ -357,7 +357,7 @@ Value createfromcmd(const Array& params, bool fHelp)
         {
             if(type == 3)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream or asset with this name already exists");                                    
+                throw JSONRPCError(RPC_DUPLICATE_NAME, "Stream or asset with this name already exists");                                    
             }
             else
             {
@@ -460,12 +460,12 @@ Value createfromcmd(const Array& params, bool fHelp)
 
         if(fromaddresses.size() != 1)
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Single from-address should be specified");                        
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
         }
 
         if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Private key for from-address is not found in this wallet");                        
+            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
         }
         
         set<CTxDestination> thisFromAddresses;
@@ -478,7 +478,7 @@ Value createfromcmd(const Array& params, bool fHelp)
         CPubKey pkey;
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_CREATE,&thisFromAddresses))
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "from-address doesn't have create permission");                
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have create permission");                
         }   
     }
     else
@@ -486,7 +486,7 @@ Value createfromcmd(const Array& params, bool fHelp)
         CPubKey pkey;
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_CREATE))
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "This wallet doesn't have keys with create permission");                
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with create permission");                
         }        
     }
     
@@ -513,7 +513,7 @@ Value publish(const Array& params, bool fHelp)
     
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
     }
     
     Array ext_params;
@@ -533,12 +533,12 @@ Value publishfrom(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
     }
        
     if(params[2].get_str() == "*")
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid item-key-string"));                
+        throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid item-key-string: *"));                
     }
     
     mc_Script *lpScript;
@@ -559,11 +559,11 @@ Value publishfrom(const Array& params, bool fHelp)
 
         if(fromaddresses.size() != 1)
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Single from-address should be specified");                        
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
         }
         if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Private key for from-address is not found in this wallet");                        
+            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
         }
     }
 
@@ -641,11 +641,11 @@ Value subscribe(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
     }   
        
     // Whether to perform rescan after import
@@ -730,11 +730,11 @@ Value unsubscribe(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
     }   
        
 
@@ -820,11 +820,11 @@ Value getstreamitem(const Array& params, bool fHelp)
    
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
     }   
            
     mc_EntityDetails stream_entity;
@@ -838,7 +838,7 @@ Value getstreamitem(const Array& params, bool fHelp)
 
     if(!pwalletTxsMain->FindEntity(&entStat))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Not subscribed to this stream");                                
+        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
     }
     
     
@@ -870,7 +870,7 @@ Value getstreamitem(const Array& params, bool fHelp)
     
     if(entry.size() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "This transaction does not contain items of this stream");                
+        throw JSONRPCError(RPC_TX_NOT_FOUND, "This transaction does not contain items of this stream");                
     }
     
     return entry;
@@ -883,11 +883,11 @@ Value liststreamitems(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
     }   
            
     mc_TxEntityStat entStat;
@@ -962,7 +962,7 @@ Value liststreamitems(const Array& params, bool fHelp)
     }
     if(!pwalletTxsMain->FindEntity(&entStat))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Not subscribed to this stream");                                
+        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
     }
     
     mc_Buffer *entity_rows;
@@ -1049,11 +1049,11 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
     }   
     
     if(params[1].get_str() == "*")
@@ -1145,7 +1145,7 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
     }
     if(!pwalletTxsMain->FindEntity(&entStat))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Not subscribed to this stream");                                
+        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
     }
 
     getSubKeyEntityFromKey(params[1].get_str(),entStat,&entity);
@@ -1187,11 +1187,11 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
     }   
            
     if(params[1].get_str() == "*")
@@ -1284,7 +1284,7 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
     }
     if(!pwalletTxsMain->FindEntity(&entStat))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Not subscribed to this stream");                                
+        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
     }
 
     getSubKeyEntityFromPublisher(params[1].get_str(),entStat,&entity);
@@ -1524,7 +1524,7 @@ Value liststreamkeys_or_publishers(const Array& params,bool is_publishers)
     
     if(!pwalletTxsMain->FindEntity(&entStat))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Not subscribed to this stream");                                
+        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
     }
 
     vector<string> inputStrings;
@@ -1580,11 +1580,11 @@ Value liststreamkeys(const Array& params, bool fHelp)
     
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
     }   
            
     return liststreamkeys_or_publishers(params,false);
@@ -1596,12 +1596,12 @@ Value liststreampublishers(const Array& params, bool fHelp)
         throw runtime_error("Help message not found\n");
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
     }   
     
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
     }
            
     return liststreamkeys_or_publishers(params,true);

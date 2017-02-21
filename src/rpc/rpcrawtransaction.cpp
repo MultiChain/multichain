@@ -482,7 +482,7 @@ Value getrawtransaction(const Array& params, bool fHelp)
     CTransaction tx;
     uint256 hashBlock = 0;
     if (!GetTransaction(hash, tx, hashBlock, true))
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available about transaction");
+        throw JSONRPCError(RPC_TX_NOT_FOUND, "No information available about transaction");
 
 /* MCHN START */    
     CMutableTransaction txToShow=tx;
@@ -704,13 +704,13 @@ Value appendrawchange(const Array& params, bool fHelp)
     {
         if(strError.size())
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, strError);        
+            throw JSONRPCError(RPC_OUTPUT_NOT_FOUND, strError);        
         }
         BOOST_FOREACH(const string& err, input_errors)
         {
             if(err.size())
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, err);        
+                throw JSONRPCError(RPC_OUTPUT_NOT_FOUND, err);        
             }
         }        
     }
@@ -760,7 +760,7 @@ Value appendrawchange(const Array& params, bool fHelp)
     
     if(nAmount < 0)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Insufficient funds, output native currency value is higher than input");                        
+        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds, output native currency value is higher than input");                        
     }
     
     amounts->Clear();
@@ -769,7 +769,7 @@ Value appendrawchange(const Array& params, bool fHelp)
         if(mc_GetABRefType(asset_amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_GENESIS)
 //        if((int)mc_GetLE(asset_amounts->GetRow(i)+4,4)<0)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Unconfirmed issue transaction in input");        
+            throw JSONRPCError(RPC_UNCONFIRMED_ENTITY, "Unconfirmed issue transaction in input");        
         }
         if(mc_GetABRefType(asset_amounts->GetRow(i)) != MC_AST_ASSET_REF_TYPE_SPECIAL)
 //        if((int)mc_GetLE(asset_amounts->GetRow(i),4)>0)          
@@ -777,7 +777,7 @@ Value appendrawchange(const Array& params, bool fHelp)
             int64_t quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
             if(quantity < 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Insufficient funds, output asset value is higher than input");                        
+                throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds, output asset value is higher than input");                        
             }
             if(quantity > 0)
             {
@@ -840,7 +840,7 @@ Value appendrawchange(const Array& params, bool fHelp)
     
     if(nAmount < nFeeAmount)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Insufficient funds, remaining native currency value is lower than required fee");                        
+        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds, remaining native currency value is lower than required fee");                        
     }
     
     txNew.vin.clear();
@@ -862,7 +862,7 @@ Value appendrawchange(const Array& params, bool fHelp)
         {
             if(amounts->GetCount() > 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Insufficient funds, remaining native currency value is lower than required fee + change amount");                                            
+                throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds, output asset value is higher than input");                                            
             }
         }
         else
@@ -883,7 +883,7 @@ Value appendrawchange(const Array& params, bool fHelp)
                     {
                         if(amounts->GetCount() > 0)
                         {
-                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Insufficient funds, remaining native currency value is lower than required fee + change amount");                                            
+                            throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds, output asset value is higher than input");                                            
                         }
                         else
                         {
@@ -1021,7 +1021,7 @@ void AddCacheInputScriptIfNeeded(CMutableTransaction& rawTx,Array inputs, bool f
                 }
                 else
                 {
-                    throw JSONRPCError(RPC_INVALID_PARAMS, "Previous output scriptPubKey not found");                    
+                    throw JSONRPCError(RPC_OUTPUT_NOT_FOUND, "Previous output scriptPubKey not found");                    
                 }
             }
         }
@@ -1177,7 +1177,7 @@ Value createrawtransaction(const Array& params, bool fHelp)
  */  
         if(!mc_gState->m_Assets->FindEntityByFullRef(&entity,mc_gState->m_TmpAssetsOut->GetRow(0)))
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Follow-on script rejected - asset not found");                                                
+            throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Follow-on script rejected - asset not found");                                                
         }
     }
     
@@ -1308,7 +1308,7 @@ Value disablerawtransaction(const Array& params, bool fHelp)
     if( (mc_gState->m_NetworkParams->IsProtocolMultichain() == 0) ||
         ( (pwalletMain->lpAssetGroups == NULL) || (pwalletMain->lpAssetGroups == 0) ) )
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "disablerawtransaction supported only for protocol=multichain");
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "disablerawtransaction supported only for protocol=multichain");
     }    
 
     CTransaction tx;
@@ -1439,15 +1439,15 @@ Value disablerawtransaction(const Array& params, bool fHelp)
     {
         if(!permission_found)
         {
-            throw JSONRPCError(RPC_INVALID_REQUEST, "At least one of the input addresses should have send and receive permission ");            
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "At least one of the input addresses should have send and receive permission ");            
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_REQUEST, strLastError);                        
+            throw JSONRPCError(RPC_TRANSACTION_REJECTED, strLastError);                        
         }
     }
     
-    throw JSONRPCError(RPC_INVALID_REQUEST, "Couldn't find unspent input in this tx belonging to this wallet.");
+    throw JSONRPCError(RPC_INPUTS_NOT_MINE, "Couldn't find unspent input in this tx belonging to this wallet.");
 }
 
 /* MCHN END */
@@ -1565,7 +1565,7 @@ Value signrawtransaction(const Array& params, bool fHelp)
         Array prevTxs = params[1].get_array();
         BOOST_FOREACH(Value& p, prevTxs) {
             if (p.type() != obj_type)
-                throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "expected object with {\"txid'\",\"vout\",\"scriptPubKey\"}");
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "expected object with {\"txid'\",\"vout\",\"scriptPubKey\"}");
 
             Object prevOut = p.get_obj();
 
@@ -1575,7 +1575,7 @@ Value signrawtransaction(const Array& params, bool fHelp)
 
             int nOut = find_value(prevOut, "vout").get_int();
             if (nOut < 0)
-                throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "vout must be positive");
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "vout must be positive");
 
             vector<unsigned char> pkData(ParseHexO(prevOut, "scriptPubKey"));
             CScript scriptPubKey(pkData.begin(), pkData.end());
@@ -1586,7 +1586,7 @@ Value signrawtransaction(const Array& params, bool fHelp)
                     string err("Previous output scriptPubKey mismatch:\n");
                     err = err + coins->vout[nOut].scriptPubKey.ToString() + "\nvs:\n"+
                         scriptPubKey.ToString();
-                    throw JSONRPCError(RPC_DESERIALIZATION_ERROR, err);
+                    throw JSONRPCError(RPC_OUTPUT_NOT_FOUND, err);
                 }
                 if ((unsigned int)nOut >= coins->vout.size())
                     coins->vout.resize(nOut+1);
@@ -1700,7 +1700,7 @@ Value sendrawtransaction(const Array& params, bool fHelp)
             {
                 if(state.GetRejectReason().size())
                 {
-                    throw JSONRPCError(RPC_TRANSACTION_ERROR, state.GetRejectReason());
+                    throw JSONRPCError(RPC_TRANSACTION_REJECTED, state.GetRejectReason());
                 }
                 else
                 {
@@ -1722,7 +1722,7 @@ Value sendrawtransaction(const Array& params, bool fHelp)
                     LogPrint("mchn","mchn: Wallet lost mine permission on tx: %s (height %d) - sendrawtransaction, reactivating best chain\n",
                             tx.GetHash().ToString().c_str(), chainActive.Tip()->nHeight);
                     if (!ActivateBestChain(state, NULL))
-                        throw JSONRPCError(RPC_TRANSACTION_ERROR, state.GetRejectReason());
+                        throw JSONRPCError(RPC_INTERNAL_ERROR, state.GetRejectReason());
                 }
             }
         }

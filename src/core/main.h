@@ -148,6 +148,7 @@ static const uint64_t nMinDiskSpace = 52428800;
 std::string MultichainServerAddress();
 void ClearMemPools();
 std::string SetLastBlock(uint256 hash);
+std::string SetLastBlock(uint256 hash,bool *fNotFound);
 //void InvalidWTx(const uint256& wtxid, const std::string& reason);
 /* MCHN END */
 

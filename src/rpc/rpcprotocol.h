@@ -77,6 +77,26 @@ enum RPCErrorCode
     RPC_WALLET_WRONG_ENC_STATE      = -15, //! Command given in wrong wallet encryption state (encrypting an encrypted wallet etc.)
     RPC_WALLET_ENCRYPTION_FAILED    = -16, //! Failed to encrypt the wallet
     RPC_WALLET_ALREADY_UNLOCKED     = -17, //! Wallet is already unlocked
+    
+    //! MultiChain specific errors
+    
+    RPC_NOT_ALLOWED                 = -701,  //! Given action is not allowed in current database state 
+    RPC_NOT_SUPPORTED               = -702,  //! API not supported
+    RPC_NOT_SUBSCRIBED              = -703,  //! Not subscribed to asset/stream
+    RPC_INSUFFICIENT_PERMISSIONS    = -704,  //! Insufficient permission
+    RPC_DUPLICATE_NAME              = -705,  //! Entity with this name already found 
+    RPC_UNCONFIRMED_ENTITY          = -706,  //! Unconfirmed entity
+    RPC_EXCHANGE_ERROR              = -707,  //! Invalid exchange or error in one of exchange components
+    RPC_ENTITY_NOT_FOUND            = -708,  //! Entity with specified identifier not found
+    RPC_WALLET_ADDRESS_NOT_FOUND    = -709,  //! Address not found in the wallet 
+    RPC_TX_NOT_FOUND                = -710,  //! tx not found
+    RPC_BLOCK_NOT_FOUND             = -711,  //! block not found
+    RPC_OUTPUT_NOT_FOUND            = -712,  //! Output not found in UTXO database and mempool
+    RPC_OUTPUT_NOT_DATA             = -713,  //! Output doesn't contain data
+    RPC_INPUTS_NOT_MINE             = -714,  //! Inputs in transaction don't belong to this wallet 
+    RPC_WALLET_OUTPUT_NOT_FOUND     = -715,  //! Output not found in the wallet
+    RPC_WALLET_NO_UNSPENT_OUTPUTS   = -716,  //! No unspent outputs in this wallet
+    
 };
 
 /**

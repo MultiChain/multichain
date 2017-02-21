@@ -169,52 +169,6 @@ Value importprivkey(const Array& params, bool fHelp)
         pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true, true);
     }
     
-/*    
-    string strSecret = params[0].get_str();
-    CBitcoinSecret vchSecret;
-    bool fGood = vchSecret.SetString(strSecret);
-
-    if (!fGood) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key encoding");
-
-    CKey key = vchSecret.GetKey();
-    if (!key.IsValid()) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Private key outside allowed range");
-
-    CPubKey pubkey = key.GetPubKey();
-    assert(key.VerifyPubKey(pubkey));
-    CKeyID vchAddress = pubkey.GetID();
-    {
-        pwalletMain->MarkDirty();
-        pwalletMain->SetAddressBook(vchAddress, strLabel, "receive");
-
-        // Don't throw error in case a key is already there
-        if (pwalletMain->HaveKey(vchAddress))
-            return Value::null;
-
-        pwalletMain->mapKeyMetadata[vchAddress].nCreateTime = 1;
-
-        if (!pwalletMain->AddKeyPubKey(key, pubkey))
-            throw JSONRPCError(RPC_WALLET_ERROR, "Error adding key to wallet");
-
-        // whenever a key is imported, we need to scan the whole chain
-        pwalletMain->nTimeFirstKey = 1; // 0 would be considered 'no value'
-
-        if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
-        {
-            mc_TxEntity entity;
-            const CKeyID& KeyID=pubkey.GetID();
-
-            memcpy(entity.m_EntityID,&KeyID,MC_TDB_ENTITY_ID_SIZE);
-            entity.m_EntityType=MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS;
-            pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
-            entity.m_EntityType=MC_TET_PUBKEY_ADDRESS | MC_TET_TIMERECEIVED;
-            pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
-        }
-        
-        if (fRescan) {
-            pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true, true);
-        }
-    }
-*/
     return Value::null;
 }
 
@@ -322,45 +276,6 @@ Value importaddress(const Array& params, bool fHelp)
     }        
         
     {
-/*
-        // add to address book or update label
-        if (address.IsValid())
-            pwalletMain->SetAddressBook(address.Get(), strLabel, "receive");
-
-        // Don't throw error in case an address is already there
-        if (pwalletMain->HaveWatchOnly(script))
-            return Value::null;
-
-        pwalletMain->MarkDirty();
-
-        if (!pwalletMain->AddWatchOnly(script))
-            throw JSONRPCError(RPC_WALLET_ERROR, "Error adding address to wallet");
-
-        if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
-        {
-            mc_TxEntity entity;
-            CTxDestination addressRet=address.Get();        
-            const CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
-            const CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
-
-            if(lpKeyID)
-            {
-                memcpy(entity.m_EntityID,lpKeyID,MC_TDB_ENTITY_ID_SIZE);
-                entity.m_EntityType=MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS;
-                pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
-                entity.m_EntityType=MC_TET_PUBKEY_ADDRESS | MC_TET_TIMERECEIVED;
-                pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
-            }
-            if(lpScriptID)
-            {
-                memcpy(entity.m_EntityID,lpScriptID,MC_TDB_ENTITY_ID_SIZE);
-                entity.m_EntityType=MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS;
-                pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
-                entity.m_EntityType=MC_TET_SCRIPT_ADDRESS | MC_TET_TIMERECEIVED;
-                pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);                    
-            }
-        }
-*/        
         if (fRescan)
         {
             pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true, true);
@@ -499,7 +414,7 @@ Value dumpprivkey(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_TYPE_ERROR, "Address does not refer to a key");
     CKey vchSecret;
     if (!pwalletMain->GetKey(keyID, vchSecret))
-        throw JSONRPCError(RPC_WALLET_ERROR, "Private key for address " + strAddress + " is not known");
+        throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for address " + strAddress + " is not known");
     return CBitcoinSecret(vchSecret).ToString();
 }
 

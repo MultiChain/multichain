@@ -45,7 +45,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level);
 Value OpReturnEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout);
 Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uint32_t stream_output_level);
 Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level);
-string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript);
+string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript,int *eErrorCode);
 bool FindPreparedTxOut(CTxOut& txout,COutPoint outpoint,string& reason);
 bool GetTxInputsAsTxOuts(const CTransaction& tx, vector <CTxOut>& inputs, vector <string>& errors,string& reason);
 CScript GetScriptForString(string source);

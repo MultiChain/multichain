@@ -95,7 +95,7 @@ Value setgenerate(const Array& params, bool fHelp)
         throw runtime_error("Help message not found\n");
 
     if (pwalletMain == NULL)
-        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Method not found (disabled)");
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Method not found (disabled)");
 
     bool fGenerate = true;
     if (params.size() > 0)
@@ -141,11 +141,11 @@ Value setgenerate(const Array& params, bool fHelp)
                 {
                     if(nGenerate > 1)
                     {
-                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't find enough wallet addresses with mining permission to mine given number of blocks");
+                        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Couldn't find enough wallet addresses with mining permission to mine given number of blocks");
                     }
                     else
                     {
-                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't find wallet address with mining permission");                        
+                        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Couldn't find wallet address with mining permission");                        
                     }
                 }
                 else
@@ -231,7 +231,7 @@ Value prioritisetransaction(const Array& params, bool fHelp)
     if (fHelp || params.size() != 3)
         throw runtime_error("Help message not found\n");
 
-    throw JSONRPCError(RPC_INVALID_REQUEST, "Transaction prioritization is not supported in this version of MultiChain");        
+    throw JSONRPCError(RPC_NOT_SUPPORTED, "Transaction prioritization is not supported in this version of MultiChain");        
     
 /* MCHN START */    
 //    uint256 hash = ParseHashStr(params[0].get_str(), "txid");
@@ -269,7 +269,7 @@ Value getblocktemplate(const Array& params, bool fHelp)
     if (fHelp || params.size() > 1)
         throw runtime_error("Help message not found\n");
 
-    throw JSONRPCError(RPC_INVALID_REQUEST, "getblocktemplate is not supported in this version of MultiChain");        
+    throw JSONRPCError(RPC_NOT_SUPPORTED, "getblocktemplate is not supported in this version of MultiChain");        
     
     std::string strMode = "template";
     Value lpval = Value::null;

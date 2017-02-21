@@ -10,6 +10,7 @@
 #include "coincontrol.h"
 #include "script/sign.h"
 #include "utils/utilmoneystr.h"
+#include "rpc/rpcprotocol.h"
 
 extern mc_WalletTxs* pwalletTxsMain;
 
@@ -1800,7 +1801,7 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
 
 bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript, CAmount> >& vecSend,
                                 CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, std::string& strFailReason, const CCoinControl* coinControl,
-                                const set<CTxDestination>* addresses,int min_conf,int min_inputs,int max_inputs,const vector<COutPoint>* lpCoinsToUse,uint32_t flags)
+                                const set<CTxDestination>* addresses,int min_conf,int min_inputs,int max_inputs,const vector<COutPoint>* lpCoinsToUse,uint32_t flags,int *eErrorCode)
 {   
     double start_time=mc_TimeNowAsDouble();
     double last_time,this_time;
@@ -1810,6 +1811,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
     if(csperf_debug_print)if(vecSend.size())printf("Start                                   \n");
     last_time=this_time;
     
+    if(eErrorCode)*eErrorCode=RPC_INVALID_PARAMETER;
     CAmount nValue = 0;
     BOOST_FOREACH (const PAIRTYPE(CScript, CAmount)& s, vecSend)
     {
@@ -2089,23 +2091,29 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                             if(!SelectAssetCoins(lpWallet,nTotalOutValue,vCoins,in_map,in_amounts,in_special_row,in_asset_row,coinControl))
                             {
                                 strFailReason = _("Insufficient funds");
+                                if(eErrorCode)*eErrorCode=RPC_WALLET_INSUFFICIENT_FUNDS;
                                 if(mc_GetABRefType(out_amounts->GetRow(asset)) == MC_AST_ASSET_REF_TYPE_SPECIAL)
                                 {
                                     switch(mc_GetLE(out_amounts->GetRow(asset)+4,4))
                                     {
                                         case MC_PTP_ISSUE | MC_PTP_SEND:
+                                            if(eErrorCode)*eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
                                             strFailReason = _("No unspent output with issue permission");                                         
                                             break;
                                         case MC_PTP_CREATE | MC_PTP_SEND:
+                                            if(eErrorCode)*eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
                                             strFailReason = _("No unspent output with create permission");                                         
                                             break;
                                         case MC_PTP_ACTIVATE | MC_PTP_SEND:
+                                            if(eErrorCode)*eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
                                             strFailReason = _("No unspent output with activate or admin permission");                                         
                                             break;
                                         case MC_PTP_ADMIN | MC_PTP_SEND:
+                                            if(eErrorCode)*eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
                                             strFailReason = _("No unspent output with admin permission");                                         
                                             break;
                                         case MC_PTP_WRITE | MC_PTP_SEND:
+                                            if(eErrorCode)*eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
                                             strFailReason = _("No unspent output with write permission");                                         
                                             break;
                                         case MC_PTP_SEND:
@@ -2113,11 +2121,13 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                                             {
                                                 if(no_send_coins)
                                                 {
+                                                    if(eErrorCode)*eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
                                                     strFailReason = _("Insufficient funds, but there are coins belonging to addresses without send or receive permission.");
                                                 }                                                                                    
                                             }
                                             else
                                             {                        
+                                                if(eErrorCode)*eErrorCode=RPC_WALLET_NO_UNSPENT_OUTPUTS;
                                                 if( (mc_gState->m_NetworkParams->GetInt64Param("initialblockreward") != 0) || 
                                                      (mc_gState->m_NetworkParams->GetInt64Param("firstblockreward") > 0))
                                                 {
@@ -2152,6 +2162,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                                 {
                                     if(no_send_coins)
                                     {
+                                        if(eErrorCode)*eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
                                         strFailReason = _("Insufficient funds, but there are coins belonging to addresses without send or receive permission.");
                                     }                                    
                                 }
@@ -2218,6 +2229,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
             {
                 if(vecSend.size() == 0)                                         // We cannot select new coins as only combined outputs are parsed
                 {
+                    if(eErrorCode)*eErrorCode=RPC_WALLET_INSUFFICIENT_FUNDS;
                     strFailReason = _("Combine transaction requires extra native currency amount");
                     goto exitlbl;                                                
                 }
@@ -2228,8 +2240,10 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                 if(!SelectAssetCoins(lpWallet,nTotalOutValue,vCoins,in_map,in_amounts,in_special_row,in_special_row[3],coinControl))
                 {
                     strFailReason = _("Insufficient funds");
+                    if(eErrorCode)*eErrorCode=RPC_WALLET_INSUFFICIENT_FUNDS;
                     if(no_send_coins)
                     {
+                        if(eErrorCode)*eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
                         strFailReason = _("Insufficient funds, but there are coins belonging to addresses without send permission.");
                     }
                     goto exitlbl;                            
@@ -2244,6 +2258,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                 missing_amount=BuildAssetTransaction(lpWallet,wtxNew,change_address,nFeeRet,vecSend,vCoins,in_amounts,change_amounts,required,min_output,tmp_amounts,lpScript,in_special_row,&usedAddresses,flags,strFailReason);                
                 if(missing_amount<0)                                            // Error
                 {
+                    if(eErrorCode)*eErrorCode=RPC_WALLET_INSUFFICIENT_FUNDS;
                     goto exitlbl; 
                 }
             }            
@@ -2295,11 +2310,11 @@ exitlbl:
 
 bool CWallet::CreateMultiChainTransaction(const vector<pair<CScript, CAmount> >& vecSend,
                                 CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, std::string& strFailReason, const CCoinControl* coinControl,
-                                const set<CTxDestination>* addresses,int min_conf,int min_inputs,int max_inputs,const vector<COutPoint>* lpCoinsToUse)
+                                const set<CTxDestination>* addresses,int min_conf,int min_inputs,int max_inputs,const vector<COutPoint>* lpCoinsToUse, int *eErrorCode)
 {
     if( (lpAssetGroups != NULL) && (lpAssetGroups != 0) )
     {
-        return CreateAssetGroupingTransaction(this, vecSend,wtxNew,reservekey,nFeeRet,strFailReason,coinControl,addresses,min_conf,min_inputs,max_inputs,lpCoinsToUse,MC_CSF_ALLOW_SPENDABLE_P2SH | MC_CSF_SIGN);        
+        return CreateAssetGroupingTransaction(this, vecSend,wtxNew,reservekey,nFeeRet,strFailReason,coinControl,addresses,min_conf,min_inputs,max_inputs,lpCoinsToUse,MC_CSF_ALLOW_SPENDABLE_P2SH | MC_CSF_SIGN, eErrorCode);        
     } 
     return true;
 }

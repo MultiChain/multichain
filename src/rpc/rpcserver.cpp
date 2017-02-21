@@ -134,21 +134,21 @@ CAmount AmountFromValue(const Value& value)
     {
         if(dAmount != 0)
         {
-            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount");            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");            
         }
     }
     else
     {
         if (dAmount < 0.0 || dAmount > (double)MAX_MONEY/(double)COIN)                                  // MCHN - was <=
-            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount");        
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");        
     }
     
 //    if (dAmount < 0.0 || dAmount > 21000000.0)                                  // MCHN - was <=
-//        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount");
+//        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");
 /* MCHN END */    
     CAmount nAmount = roundint64(dAmount * COIN);
     if (!MoneyRange(nAmount))
-        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");
     return nAmount;
 }
 
@@ -385,7 +385,7 @@ Value pausecmd(const Array& params, bool fHelp)
     }
     
     if(type == 0)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid task");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid task");
     
     LOCK(cs_main);
     
@@ -408,7 +408,7 @@ Value resumecmd(const Array& params, bool fHelp)
     }
     
     if(type == 0)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid task");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid task");
     
     LOCK(cs_main);
     

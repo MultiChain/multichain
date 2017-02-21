@@ -225,7 +225,7 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
 
     if(strError.size())
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, strError);        
+        throw JSONRPCError(RPC_EXCHANGE_ERROR, strError);        
     }
     
     native_balance=0;
@@ -271,7 +271,7 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
         
         if(entry_error.size())
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, entry_error + strprintf("; Input: %d, txid: %s, vout: %d",i,tx.vin[i].prevout.hash.GetHex().c_str(),tx.vin[i].prevout.n));        
+            throw JSONRPCError(RPC_EXCHANGE_ERROR, entry_error + strprintf("; Input: %d, txid: %s, vout: %d",i,tx.vin[i].prevout.hash.GetHex().c_str(),tx.vin[i].prevout.n));        
         }
         
         entry_error="";
@@ -279,7 +279,7 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
         exchange.push_back(Pair("ask", ExchangeAssetEntry(0,tx.vout[i],lpScript,asset_amounts,lpAssets,can_disable,true,entry_error)));
         if(entry_error.size())
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, entry_error+ strprintf("; Output: %d,",i));        
+            throw JSONRPCError(RPC_EXCHANGE_ERROR, entry_error+ strprintf("; Output: %d,",i));        
         }
                 
 //        exchange.push_back(Pair("amount",ValueFromAmount((int64_t)input_txouts[i].nValue-(int64_t)tx.vout[i].nValue)));
@@ -296,7 +296,7 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
             const CTxOut& txout = tx.vout[i];
             if(!txout.scriptPubKey.IsUnspendable())
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Too many outputs");                        
+                throw JSONRPCError(RPC_EXCHANGE_ERROR, "Too many outputs");                        
             }            
             else
             {
@@ -490,10 +490,11 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
                 Value param=tocomplete;
                 uint256 offer_hash;            
                 CAmount nAmount;
-                string strError=ParseRawOutputObject(param,nAmount,lpScript);
+                int eErrorCode;
+                string strError=ParseRawOutputObject(param,nAmount,lpScript,&eErrorCode);
                 if(strError.size())
                 {
-                    throw JSONRPCError(RPC_INTERNAL_ERROR, strError);                            
+                    throw JSONRPCError(eErrorCode, strError);                            
                 }
 
                 nAmount=-native_balance+dust+required_fee;
@@ -524,7 +525,6 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
 
                 {
                     LOCK (pwalletMain->cs_wallet_send);
-
                     if (!pwalletMain->CreateTransaction(scriptPubKey, nAmount, scriptOpReturn, wtxNew, reservekey, nFeeRequired, strError))
                     {
                         result.push_back(Pair("cancomplete", false));            
@@ -557,7 +557,7 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
 
 
 
-string FindExchangeOutPoint(const json_spirit::Array& params,int first_param,COutPoint& offer_input,CAmount& nAmount,mc_Script *lpScript)
+string FindExchangeOutPoint(const json_spirit::Array& params,int first_param,COutPoint& offer_input,CAmount& nAmount,mc_Script *lpScript,int *eErrorCode)
 {
     string strError="";
     
@@ -580,6 +580,7 @@ string FindExchangeOutPoint(const json_spirit::Array& params,int first_param,COu
     nAmount=0;
     lpScript->Clear();
     
+    *eErrorCode=RPC_INVALID_PARAMETER;
     if (params[first_param+2].type() != obj_type)
     {
         strError= "Invalid ask assets object";        
@@ -587,7 +588,7 @@ string FindExchangeOutPoint(const json_spirit::Array& params,int first_param,COu
     }
     else
     {
-        string strError=ParseRawOutputObject(params[first_param+2],nAmount,lpScript);
+        string strError=ParseRawOutputObject(params[first_param+2],nAmount,lpScript,eErrorCode);
         if(strError.size())
         {
             return strError;
@@ -614,40 +615,40 @@ Value createrawexchange(const json_spirit::Array& params, bool fHelp)
     mc_Script *lpScript;
     lpScript=new mc_Script;
     CAmount nAmount=0;
-    
-    string strError=FindExchangeOutPoint(params,0,offer_input,nAmount,lpScript);
+    int eErrorCode;
+    string strError=FindExchangeOutPoint(params,0,offer_input,nAmount,lpScript,&eErrorCode);
     if(strError.size())
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, strError);                            
+        throw JSONRPCError(eErrorCode, strError);                            
     }
 
     CTxOut preparedTxOut;
     if(!FindPreparedTxOut(preparedTxOut,offer_input,strError))
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, strError);                            
+        throw JSONRPCError(RPC_WALLET_OUTPUT_NOT_FOUND, strError);                            
     }
     
     const CScript& script1 = preparedTxOut.scriptPubKey;        
     CTxDestination addressRet;        
     if(!ExtractDestination(script1, addressRet))
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Cannot extract address from prepared output");                                    
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Cannot extract address from prepared output");                                    
     }
 
     CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
     if(lpKeyID == NULL)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Prepared output should be pay-to-pubkeyhash");                                    
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Prepared output should be pay-to-pubkeyhash");                                    
     }
     
     if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpKeyID)) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Address of prepared output doesn't have send permission");                                    
+        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Address of prepared output doesn't have send permission");                                    
     }
     
     if(mc_gState->m_Permissions->CanReceive(NULL,(unsigned char*)(lpKeyID)) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Address of prepared output doesn't have receive permission");                                    
+        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Address of prepared output doesn't have receive permission");                                    
     }
     
     vector<CTxDestination> addresses;    
@@ -667,7 +668,7 @@ Value createrawexchange(const json_spirit::Array& params, bool fHelp)
             scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
         }
         else
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid script");
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
     }
     
     CMutableTransaction tx;
@@ -683,11 +684,11 @@ Value createrawexchange(const json_spirit::Array& params, bool fHelp)
         const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(offer_input.hash,NULL,&err);
         if(err)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Output not found in wallet");                                        
+            throw JSONRPCError(RPC_WALLET_OUTPUT_NOT_FOUND, "Output not found in wallet");                                        
         }
         if(!SignSignature(*pwalletMain, wtx.vout[offer_input.n].scriptPubKey, tx, tx.vin.size()-1, SIGHASH_SINGLE | SIGHASH_ANYONECANPAY ))
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Signing transaction failed");                                    
+            throw JSONRPCError(RPC_WALLET_ERROR, "Signing transaction failed");                                    
         }
     }
     else
@@ -696,7 +697,7 @@ Value createrawexchange(const json_spirit::Array& params, bool fHelp)
 
         if (it == pwalletMain->mapWallet.end())
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Output not found in wallet");                            
+            throw JSONRPCError(RPC_WALLET_OUTPUT_NOT_FOUND, "Output not found in wallet");                            
         }
 
         const CWalletTx* pcoin = &(*it).second;
@@ -704,7 +705,7 @@ Value createrawexchange(const json_spirit::Array& params, bool fHelp)
 
         if(!SignSignature(*pwalletMain, pcoin->vout[offer_input.n].scriptPubKey, tx, tx.vin.size()-1, SIGHASH_SINGLE | SIGHASH_ANYONECANPAY ))
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Signing transaction failed");                                    
+            throw JSONRPCError(RPC_WALLET_ERROR, "Signing transaction failed");                                    
         }
     }
         
@@ -724,41 +725,41 @@ Value appendrawexchange(const json_spirit::Array& params, bool fHelp)
     mc_Script *lpScript;
     lpScript=new mc_Script;
     CAmount nAmount=0;
+    int eErrorCode;
     
-    
-    string strError=FindExchangeOutPoint(params,1,offer_input,nAmount,lpScript);
+    string strError=FindExchangeOutPoint(params,1,offer_input,nAmount,lpScript,&eErrorCode);
     if(strError.size())
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, strError);                            
+        throw JSONRPCError(eErrorCode, strError);                            
     }
   
     CTxOut preparedTxOut;
     if(!FindPreparedTxOut(preparedTxOut,offer_input,strError))
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, strError);                            
+        throw JSONRPCError(RPC_WALLET_OUTPUT_NOT_FOUND, strError);                            
     }
     
     const CScript& script1 = preparedTxOut.scriptPubKey;        
     CTxDestination addressRet;        
     if(!ExtractDestination(script1, addressRet))
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Cannot extract address from prepared output");                                    
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Cannot extract address from prepared output");                                    
     }
 
     CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
     if(lpKeyID == NULL)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Prepared output should be pay-to-pubkeyhash");                                    
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Prepared output should be pay-to-pubkeyhash");                                    
     }
     
     if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpKeyID)) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Address of prepared output doesn't have send permission");                                    
+        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Address of prepared output doesn't have send permission");                                    
     }
     
     if(mc_gState->m_Permissions->CanReceive(NULL,(unsigned char*)(lpKeyID)) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Address of prepared output doesn't have receive permission");                                    
+        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Address of prepared output doesn't have receive permission");                                    
     }
     
     vector<CTxDestination> addresses;    
@@ -776,7 +777,7 @@ Value appendrawexchange(const json_spirit::Array& params, bool fHelp)
             scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
         }
         else
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid script");
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
     }
     
     CMutableTransaction tx;
@@ -797,11 +798,11 @@ Value appendrawexchange(const json_spirit::Array& params, bool fHelp)
         const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(offer_input.hash,NULL,&err);
         if(err)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Output not found in wallet");                                        
+            throw JSONRPCError(RPC_WALLET_OUTPUT_NOT_FOUND, "Output not found in wallet");                                        
         }
         if(!SignSignature(*pwalletMain, wtx.vout[offer_input.n].scriptPubKey, tx, tx.vin.size()-1, SIGHASH_SINGLE | SIGHASH_ANYONECANPAY ))
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Signing transaction failed");                                    
+            throw JSONRPCError(RPC_WALLET_ERROR, "Signing transaction failed");                                    
         }
     }
     else
@@ -810,7 +811,7 @@ Value appendrawexchange(const json_spirit::Array& params, bool fHelp)
 
         if (it == pwalletMain->mapWallet.end())
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Output not found in wallet");                            
+            throw JSONRPCError(RPC_WALLET_OUTPUT_NOT_FOUND, "Output not found in wallet");                            
         }
 
         const CWalletTx* pcoin = &(*it).second;
@@ -818,7 +819,7 @@ Value appendrawexchange(const json_spirit::Array& params, bool fHelp)
 
         if(!SignSignature(*pwalletMain, pcoin->vout[offer_input.n].scriptPubKey, tx, tx.vin.size()-1, SIGHASH_SINGLE | SIGHASH_ANYONECANPAY ))
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Signing transaction failed");                                    
+            throw JSONRPCError(RPC_WALLET_ERROR, "Signing transaction failed");                                    
         }
     }        
     delete lpScript;
@@ -856,41 +857,41 @@ Value completerawexchange(const json_spirit::Array& params, bool fHelp)
     mc_Script *lpScript;
     lpScript=new mc_Script;
     CAmount nAmount=0;
+    int eErrorCode;
     
-    
-    string strError=FindExchangeOutPoint(params,1,offer_input,nAmount,lpScript);
+    string strError=FindExchangeOutPoint(params,1,offer_input,nAmount,lpScript,&eErrorCode);
     if(strError.size())
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, strError);                            
+        throw JSONRPCError(eErrorCode, strError);                            
     }
   
     CTxOut preparedTxOut;
     if(!FindPreparedTxOut(preparedTxOut,offer_input,strError))
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, strError);                            
+        throw JSONRPCError(RPC_WALLET_OUTPUT_NOT_FOUND, strError);                            
     }
     
     const CScript& script1 = preparedTxOut.scriptPubKey;        
     CTxDestination addressRet;        
     if(!ExtractDestination(script1, addressRet))
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Cannot extract address from prepared output");                                    
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Cannot extract address from prepared output");                                    
     }
 
     CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
     if(lpKeyID == NULL)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Prepared output should be pay-to-pubkeyhash");                                    
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Prepared output should be pay-to-pubkeyhash");                                    
     }
     
     if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpKeyID)) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Address of prepared output doesn't have send permission");                                    
+        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Address of prepared output doesn't have send permission");                                    
     }
     
     if(mc_gState->m_Permissions->CanReceive(NULL,(unsigned char*)(lpKeyID)) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Address of prepared output doesn't have receive permission");                                    
+        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Address of prepared output doesn't have receive permission");                                    
     }
     
     vector<CTxDestination> addresses;    
@@ -908,7 +909,7 @@ Value completerawexchange(const json_spirit::Array& params, bool fHelp)
             scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
         }
         else
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid script");
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
     }
     
     CMutableTransaction tx;
@@ -937,11 +938,11 @@ Value completerawexchange(const json_spirit::Array& params, bool fHelp)
             {
                 if((found_entity.AnyoneCanWrite() == 0) && (mc_gState->m_Permissions->CanWrite(found_entity.GetTxID(),aptr) == 0))
                 {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Publishing in this stream is not allowed from this address");                                                                        
+                    throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Publishing in this stream is not allowed from this address");                                                                        
                 }                                                 
                 if(mc_gState->m_Permissions->CanSend(NULL,aptr) == 0)
                 {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Address doesn't have send permission");                                                                        
+                    throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Address doesn't have send permission");                                                                        
                 }                                                 
             }
         }
@@ -956,11 +957,11 @@ Value completerawexchange(const json_spirit::Array& params, bool fHelp)
         const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(offer_input.hash,NULL,&err);
         if(err)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Output not found in wallet");                                        
+            throw JSONRPCError(RPC_WALLET_OUTPUT_NOT_FOUND, "Output not found in wallet");                                        
         }
         if(!SignSignature(*pwalletMain, wtx.vout[offer_input.n].scriptPubKey, tx, tx.vin.size()-1, SIGHASH_ALL ))
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Signing transaction failed");                                    
+            throw JSONRPCError(RPC_WALLET_ERROR, "Signing transaction failed");                                    
         }
     }
     else
@@ -969,7 +970,7 @@ Value completerawexchange(const json_spirit::Array& params, bool fHelp)
 
         if (it == pwalletMain->mapWallet.end())
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Output not found in wallet");                            
+            throw JSONRPCError(RPC_WALLET_OUTPUT_NOT_FOUND, "Output not found in wallet");                            
         }
 
         const CWalletTx* pcoin = &(*it).second;
@@ -977,7 +978,7 @@ Value completerawexchange(const json_spirit::Array& params, bool fHelp)
 
         if(!SignSignature(*pwalletMain, pcoin->vout[offer_input.n].scriptPubKey, tx, tx.vin.size()-1, SIGHASH_ALL ))
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Signing transaction failed");                                    
+            throw JSONRPCError(RPC_WALLET_ERROR, "Signing transaction failed");                                    
         }
     }        
     delete lpScript;
@@ -1001,7 +1002,7 @@ Value completerawexchange(const json_spirit::Array& params, bool fHelp)
     
     if(!is_complete)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "Incomplete exchange");                                            
+        throw JSONRPCError(RPC_EXCHANGE_ERROR, "Incomplete exchange");                                            
     }
     
     return EncodeHexTx(tx);

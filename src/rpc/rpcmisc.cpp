@@ -272,7 +272,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
     
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "This API is supported only if protocol=multichain");                
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "This API is supported only if protocol=multichain");                
     }
     
     string param_name=params[0].get_str();
@@ -417,7 +417,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
             CBitcoinAddress address(params[1].get_str());
             if (!address.IsValid())    
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid address");                                                                        
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");                                                                        
             }
             else
             {
@@ -916,7 +916,7 @@ Value createmultisig(const Array& params, bool fHelp)
     {
         if(mc_gState->m_NetworkParams->GetInt64Param("allowp2shoutputs") == 0)
         {
-            throw JSONRPCError(RPC_INVALID_REQUEST, "P2SH outputs are not  allowed for this network");
+            throw JSONRPCError(RPC_NOT_ALLOWED, "P2SH outputs are not allowed for this blockchain");
         }
     }
 /* MCHN END */    

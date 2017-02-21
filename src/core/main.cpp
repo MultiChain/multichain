@@ -3154,9 +3154,18 @@ void ClearMemPools()
         LogPrintf("mempool cleared\n");
     }
 }
-
 string SetLastBlock(uint256 hash)
 {
+    return SetLastBlock(hash,NULL);
+}
+
+string SetLastBlock(uint256 hash,bool *fNotFound)
+{
+    if(fNotFound)
+    {
+        *fNotFound=false;
+    }
+    
     {
         LOCK(cs_main);
         
@@ -3169,6 +3178,10 @@ string SetLastBlock(uint256 hash)
         
         if (mapBlockIndex.count(hash) == 0)
         {
+            if(fNotFound)
+            {
+                *fNotFound=true;
+            }
             return "Block not found";
         }
         
@@ -3182,11 +3195,19 @@ string SetLastBlock(uint256 hash)
         if ( (pblockindex->nStatus & BLOCK_HAVE_DATA) == 0 )
 //        if (!pblockindex->IsValid(BLOCK_VALID_SCRIPTS))
         {
+            if(fNotFound)
+            {
+                *fNotFound=true;
+            }
             return "Block is invalid, probably we have only header";            
         }
         
         if(!ReadBlockFromDisk(block, pblockindex))
         {
+            if(fNotFound)
+            {
+                *fNotFound=true;
+            }
             return "Block not found";
         }
         

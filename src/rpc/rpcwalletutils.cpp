@@ -195,7 +195,7 @@ void SendMoneyToSeveralAddresses(const std::vector<CTxDestination> addresses, CA
                     scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
                 }
                 else
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid script");
+                    throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
             }
         }        
         
@@ -206,14 +206,15 @@ void SendMoneyToSeveralAddresses(const std::vector<CTxDestination> addresses, CA
     
     CReserveKey reservekey(pwalletMain);
     CAmount nFeeRequired;
-    if (!pwalletMain->CreateTransaction(scriptPubKeys, nValue, scriptOpReturn, wtxNew, reservekey, nFeeRequired, strError, NULL, lpFromAddresses))
+    int eErrorCode;
+    if (!pwalletMain->CreateTransaction(scriptPubKeys, nValue, scriptOpReturn, wtxNew, reservekey, nFeeRequired, strError, NULL, lpFromAddresses, 1,-1,-1, NULL, &eErrorCode))
     {
 /*        
         if (nValue + nFeeRequired > pwalletMain->GetBalance())
             strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its amount, complexity, or use of recently received funds!", FormatMoney(nFeeRequired));
  */ 
         LogPrintf("SendMoney() : %s\n", strError);
-        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+        throw JSONRPCError(eErrorCode, strError);
     }
     
     string strRejectReason;
@@ -221,11 +222,11 @@ void SendMoneyToSeveralAddresses(const std::vector<CTxDestination> addresses, CA
     {
         if(strRejectReason.size())
         {
-            throw JSONRPCError(RPC_WALLET_ERROR, "Error: The transaction was rejected: " + strRejectReason);
+            throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Error: The transaction was rejected: " + strRejectReason);
         }
         else
         {
-            throw JSONRPCError(RPC_WALLET_ERROR, "Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.");
+            throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.");
         }                        
     }            
 }
@@ -279,11 +280,11 @@ vector<CTxDestination> ParseAddresses(string param, bool create_full_list, bool 
             {
                 if(allow_scripthash)
                 {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid address (only pubkeyhash and scripthash addresses are supported) : ")+tok);                
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address (only pubkeyhash and scripthash addresses are supported) : ")+tok);                
                 }
                 else
                 {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid address (only pubkeyhash addresses are supported) : ")+tok);                                    
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address (only pubkeyhash addresses are supported) : ")+tok);                                    
                 }
             }
         }
@@ -303,11 +304,11 @@ void FindAddressesWithPublishPermission(vector<CTxDestination>& fromaddresses,mc
         {
             if((stream_entity->AnyoneCanWrite() == 0) && (mc_gState->m_Permissions->CanWrite(stream_entity->GetTxID(),aptr) == 0))
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Publishing in this stream is not allowed from this address");                                                                        
+                throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Publishing in this stream is not allowed from this address");                                                                        
             }                                                 
             if(mc_gState->m_Permissions->CanSend(NULL,aptr) == 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "from-address doesn't have send permission");                                                                        
+                throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have send permission");                                                                        
             }                                                 
         }
     }
@@ -333,7 +334,7 @@ void FindAddressesWithPublishPermission(vector<CTxDestination>& fromaddresses,mc
         }                    
         if(!publisher_found)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "This wallet contains no addresses with permission to write to this stream and global send permission.");                                                                                            
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet contains no addresses with permission to write to this stream and global send permission.");                                                                                            
         }
     }    
 }
@@ -365,7 +366,7 @@ set<string> ParseAddresses(Value param, isminefilter filter)
                         isminetype fIsMine=IsMine(*pwalletMain,dest);
                         if (!(fIsMine & filter))
                         {
-                            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Non-wallet address : ")+tok);                                                                    
+                            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, string("Non-wallet address : ")+tok);                                                                    
                         }
                     }
 
@@ -373,12 +374,12 @@ set<string> ParseAddresses(Value param, isminefilter filter)
                 }
                 else
                 {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid address (only pubkeyhash and scripthash addresses are supported) : ")+tok);                                    
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address (only pubkeyhash and scripthash addresses are supported) : ")+tok);                                    
                 }
             }
             else
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid address, expected string"));                                                        
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address, expected string"));                                                        
             }
         }            
     }
@@ -394,7 +395,7 @@ set<string> ParseAddresses(Value param, isminefilter filter)
                 if (!(fIsMine & filter))
                 {
                     CBitcoinAddress address(dest);
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, string("Non-wallet address : ")+address.ToString().c_str());                                                                    
+                    throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, string("Non-wallet address : ")+address.ToString().c_str());                                                                    
                 }
             }
             setAddresses.insert(CBitcoinAddress(dest).ToString());
