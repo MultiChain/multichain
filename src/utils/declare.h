@@ -272,6 +272,8 @@ void __US_SemPost(void* sem);
 void __US_SemDestroy(void* sem);
 uint64_t __US_ThreadID();
 const char* __US_UserHomeDir();
+char * __US_FullPath(const char* path, char *full_path, int len);
+
 
 
 #ifdef	__cplusplus

@@ -31,6 +31,7 @@ using namespace std;
 void EnsureWalletIsUnlocked();
 /* MCHN START */
 vector<string> ParseStringList(Value param);
+char * __US_FullPath(const char* path, char *full_path, int len);
 /* MCHN END */
 
 std::string static EncodeDumpTime(int64_t nTime) {
@@ -424,6 +425,20 @@ Value dumpwallet(const Array& params, bool fHelp)
     if (fHelp || params.size() != 1)
         throw runtime_error("Help message not found\n");
 
+    char bufOutput[MC_DCT_DB_MAX_PATH+1];
+    char *full_path=__US_FullPath(params[0].get_str().c_str(),bufOutput,MC_DCT_DB_MAX_PATH+1);
+    
+    if(full_path)
+    {
+        char bufWallet[MC_DCT_DB_MAX_PATH+1];
+        mc_GetFullFileName(mc_gState->m_NetworkParams->Name(),"wallet",".dat",MC_FOM_RELATIVE_TO_DATADIR,bufWallet);
+
+        if(strcmp(full_path,bufWallet) == 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Cannot dump wallet file to itself");        
+        }
+    }
+    
     EnsureWalletIsUnlocked();
 
     ofstream file;
