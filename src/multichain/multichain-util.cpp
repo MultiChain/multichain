@@ -18,6 +18,8 @@ int main(int argc, char* argv[])
     mc_gState=new mc_State;
      
     mc_gState->m_Params->Parse(argc, argv);
+    mc_CheckDataDirInConfFile();
+
     mc_gState->m_Params->ReadConfig(NULL);
     
     mc_ExpandDataDirParam();

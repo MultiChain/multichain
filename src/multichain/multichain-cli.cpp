@@ -93,7 +93,8 @@ static bool AppInitRPC(int argc, char* argv[])
     mc_gState=new mc_State;
     
     mc_gState->m_Params->Parse(argc, argv);
-    
+    mc_CheckDataDirInConfFile();
+   
     if(mc_gState->m_Params->NetworkName())
     {
         if(strlen(mc_gState->m_Params->NetworkName()) > MC_PRM_NETWORK_NAME_MAX_SIZE)

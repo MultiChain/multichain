@@ -240,6 +240,7 @@ int mc_GetDataDirArg(char *buf);
 void mc_UnsetDataDirArg();
 void mc_SetDataDirArg(char *buf);
 void mc_ExpandDataDirParam();
+void mc_CheckDataDirInConfFile();
 void mc_AdjustStartAndCount(int *count,int *start,int size);
 
 
