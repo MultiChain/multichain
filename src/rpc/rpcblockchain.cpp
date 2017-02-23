@@ -29,6 +29,7 @@ bool CreateAssetBalanceList(const CTxOut& out,mc_Buffer *amounts,mc_Script *lpSc
 Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level);
 Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong);
 string EncodeHexTx(const CTransaction& tx);
+int OrphanPoolSize();
 /* MCHN END */
 
 void ScriptPubKeyToJSON(const CScript& scriptPubKey, Object& out, bool fIncludeHex);
@@ -602,6 +603,7 @@ Value getmempoolinfo(const Array& params, bool fHelp)
     Object ret;
     ret.push_back(Pair("size", (int64_t) mempool.size()));
     ret.push_back(Pair("bytes", (int64_t) mempool.GetTotalTxSize()));
+    ret.push_back(Pair("orphan", OrphanPoolSize()));
 
     return ret;
 }

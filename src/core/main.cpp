@@ -748,6 +748,11 @@ unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans)
     return nEvicted;
 }
 
+int OrphanPoolSize()
+{
+    return (int)mapOrphanTransactions.size();
+}
+
 
 /* MCHN START */
 bool IsStandardTx(const CTransaction& tx, string& reason,bool check_for_dust)
