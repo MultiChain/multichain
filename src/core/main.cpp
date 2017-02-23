@@ -6558,6 +6558,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                     continue;
 
                 // trickle out tx inv to protect privacy
+/*                
                 if (inv.type == MSG_TX && !fSendTrickle)
                 {
                     // 1/4 of tx invs blast to all immediately
@@ -6574,7 +6575,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                         continue;
                     }
                 }
-
+*/
                 // returns true if wasn't already contained in the set
                 if (pto->setInventoryKnown.insert(inv).second)
                 {
