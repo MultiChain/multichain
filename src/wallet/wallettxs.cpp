@@ -231,7 +231,7 @@ int mc_WalletTxs::Initialize(
     
     if(err == MC_ERR_NOERROR)
     {
-        m_UnconfirmedSends= GetUnconfirmedSends(m_Database->m_DBStat.m_Block);
+        m_UnconfirmedSends= GetUnconfirmedSends(m_Database->m_DBStat.m_Block,m_UnconfirmedSendsHashes);
     }    
     return err;
 }
@@ -427,12 +427,19 @@ int mc_WalletTxs::Commit(mc_TxImport *import)
     {
         if(imp->m_ImportID == 0)
         {
-            std::map<uint256,CWalletTx> mapUnconfirmed= GetUnconfirmedSends(m_Database->m_DBStat.m_Block-1);// Confirmed txs are filtered out
+            std::vector<uint256> vUnconfirmedHashes;
+            std::map<uint256,CWalletTx> mapUnconfirmed= GetUnconfirmedSends(m_Database->m_DBStat.m_Block-1,vUnconfirmedHashes);// Confirmed txs are filtered out
             m_UnconfirmedSends.clear();
+            m_UnconfirmedSendsHashes.clear();
             LogPrint("wallet","wtxs: Unconfirmed wallet transactions: %d\n",mapUnconfirmed.size());
-            for (map<uint256,CWalletTx>::const_iterator it = mapUnconfirmed.begin(); it != mapUnconfirmed.end(); ++it)
+//            for (map<uint256,CWalletTx>::const_iterator it = mapUnconfirmed.begin(); it != mapUnconfirmed.end(); ++it)            
+            BOOST_FOREACH(const uint256& hash, vUnconfirmedHashes) 
             {
-                AddToUnconfirmedSends(m_Database->m_DBStat.m_Block,it->second);
+                std::map<uint256,CWalletTx>::const_iterator it = mapUnconfirmed.find(hash);
+                if (it != mapUnconfirmed.end())
+                {                
+                    AddToUnconfirmedSends(m_Database->m_DBStat.m_Block,it->second);
+                }
             }
         }
     }
@@ -797,7 +804,8 @@ int mc_WalletTxs::RollBack(mc_TxImport *import,int block)
     {
         if(imp->m_ImportID == 0)                                                // Copying conflicted transactions, they may become valid and should be rechecked
         {
-            std::map<uint256,CWalletTx> mapUnconfirmed= GetUnconfirmedSends(m_Database->m_DBStat.m_Block);
+            std::vector<uint256> vUnconfirmedHashes;
+            std::map<uint256,CWalletTx> mapUnconfirmed= GetUnconfirmedSends(m_Database->m_DBStat.m_Block,vUnconfirmedHashes);
             for (map<uint256,CWalletTx>::const_iterator it = mapUnconfirmed.begin(); it != mapUnconfirmed.end(); ++it)
             {
                 m_Database->GetTx(&txdef,(unsigned char*)&(it->first));
@@ -1343,6 +1351,7 @@ int mc_WalletTxs::AddToUnconfirmedSends(int block, const CWalletTx& tx)
     FILE* fHan;
     char ShortName[65];                                     
     char FileName[MC_DCT_DB_MAX_PATH];                      
+    uint256 hash;
     
     if((m_Mode & MC_WMD_TXS) == 0)
     {
@@ -1368,7 +1377,9 @@ int mc_WalletTxs::AddToUnconfirmedSends(int block, const CWalletTx& tx)
     
     fileout << tx;
 
-    m_UnconfirmedSends.insert(make_pair(tx.GetHash(), tx));
+    hash=tx.GetHash();
+    m_UnconfirmedSends.insert(make_pair(hash, tx));
+    m_UnconfirmedSendsHashes.push_back(hash);
     
     return MC_ERR_NOERROR;
 }
@@ -1397,7 +1408,7 @@ int mc_WalletTxs::SaveTxFlag(const unsigned char *hash,uint32_t flag,int set_fla
     return err;
 }
 
-std::map<uint256,CWalletTx> mc_WalletTxs::GetUnconfirmedSends(int block)
+std::map<uint256,CWalletTx> mc_WalletTxs::GetUnconfirmedSends(int block,std::vector<uint256>& unconfirmedSendsHashes)
 {
     map<uint256,CWalletTx> outMap;
     char ShortName[65];                                     
@@ -1437,6 +1448,7 @@ std::map<uint256,CWalletTx> mc_WalletTxs::GetUnconfirmedSends(int block)
                 if (it == outMap.end())
                 {
                     outMap.insert(make_pair(hash, wtx));                
+                    unconfirmedSendsHashes.push_back(hash);
                 }            
             }
         } 

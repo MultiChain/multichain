@@ -1578,28 +1578,33 @@ void CWallet::ReacceptWalletTransactions()
     {        
         pwalletTxsMain->Lock();
         LogPrint("wallet","ReacceptWalletTransactions: %ld txs in unconfirmed pool \n", pwalletTxsMain->m_UnconfirmedSends.size());
-        BOOST_FOREACH(PAIRTYPE(const uint256, CWalletTx)& item, pwalletTxsMain->m_UnconfirmedSends)
+//        BOOST_FOREACH(PAIRTYPE(const uint256, CWalletTx)& item, pwalletTxsMain->m_UnconfirmedSends)
+        BOOST_FOREACH(const uint256& wtxid, pwalletTxsMain->m_UnconfirmedSendsHashes) 
         {
-            const uint256& wtxid = item.first;
-            CWalletTx& wtx = item.second;
-            int nDepth = wtx.GetDepthInMainChain();
-            LogPrint("wallet","Unconfirmed wtx: %s, depth: %d\n", wtxid.ToString(),nDepth);
-            
-            if (!wtx.IsCoinBase() && nDepth < 0)
-            {
-                LOCK(mempool.cs);
-                
-                LogPrint("wallet","Reaccepting wtx %s\n", wtxid.ToString());
-                if(!wtx.AcceptToMemoryPool(false))
+            map<uint256,CWalletTx>::iterator item = pwalletTxsMain->m_UnconfirmedSends.find(wtxid);
+            if(item != pwalletTxsMain->m_UnconfirmedSends.end())
+            {                
+//                const uint256& wtxid = item.first;
+                CWalletTx& wtx = item->second;
+                int nDepth = wtx.GetDepthInMainChain();
+                LogPrint("wallet","Unconfirmed wtx: %s, depth: %d\n", wtxid.ToString(),nDepth);
+
+                if (!wtx.IsCoinBase() && nDepth < 0)
                 {
-                    LogPrintf("Tx %s was not accepted to mempool, setting INVALID flag\n", wtxid.ToString());
-                    pwalletTxsMain->SaveTxFlag((unsigned char*)&wtxid,MC_TFL_INVALID,1);
-                }
-                else
-                {
-                    LogPrint("wallet","Unconfirmed wtx %s already in mempool, ignoring\n", wtxid.ToString());                    
-                }
-            }            
+                    LOCK(mempool.cs);
+
+                    LogPrint("wallet","Reaccepting wtx %s\n", wtxid.ToString());
+                    if(!wtx.AcceptToMemoryPool(false))
+                    {
+                        LogPrintf("Tx %s was not accepted to mempool, setting INVALID flag\n", wtxid.ToString());
+                        pwalletTxsMain->SaveTxFlag((unsigned char*)&wtxid,MC_TFL_INVALID,1);
+                    }
+                    else
+                    {
+                        LogPrint("wallet","Unconfirmed wtx %s already in mempool, ignoring\n", wtxid.ToString());                    
+                    }
+                }            
+            }
         }            
         pwalletTxsMain->UnLock();
     }
@@ -1670,24 +1675,33 @@ void CWallet::ResendWalletTransactions(bool fForce)
     {
         LOCK(cs_wallet);
         // Sort them in chronological order
-        multimap<unsigned int, CWalletTx*> mapSorted;
         
         if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
         {
             pwalletTxsMain->Lock();
-            BOOST_FOREACH(PAIRTYPE(const uint256, CWalletTx)& item, pwalletTxsMain->m_UnconfirmedSends)
+//            BOOST_FOREACH(PAIRTYPE(const uint256, CWalletTx)& item, pwalletTxsMain->m_UnconfirmedSends)
+            BOOST_FOREACH(const uint256& wtxid, pwalletTxsMain->m_UnconfirmedSendsHashes) 
             {
-                CWalletTx& wtx = item.second;
-                // Don't rebroadcast until it's had plenty of time that
-                // it should have gotten in already by now.
-                if (nTimeBestReceived - (int64_t)wtx.nTimeReceived > mc_gState->m_NetworkParams->GetInt64Param("targetblocktime"))
-                    mapSorted.insert(make_pair(wtx.nTimeReceived, &wtx));
+                map<uint256,CWalletTx>::iterator item = pwalletTxsMain->m_UnconfirmedSends.find(wtxid);
+                if(item != pwalletTxsMain->m_UnconfirmedSends.end())
+                {                
+                    CWalletTx& wtx = item->second;
+                    // Don't rebroadcast until it's had plenty of time that
+                    // it should have gotten in already by now.
+                    if (nTimeBestReceived - (int64_t)wtx.nTimeReceived > mc_gState->m_NetworkParams->GetInt64Param("targetblocktime"))
+                    {
+                        LogPrint("wallet","Wallet tx %s resent\n",wtx.GetHash().ToString().c_str());
+                        wtx.RelayWalletTransaction();                        
+                    }
+//                        mapSorted.insert(make_pair(wtx.nTimeReceived, &wtx));
+                }
                 
             }            
             pwalletTxsMain->UnLock();
         }
         else
         {
+            multimap<unsigned int, CWalletTx*> mapSorted;
             BOOST_FOREACH(PAIRTYPE(const uint256, CWalletTx)& item, mapWallet)
             {
                 CWalletTx& wtx = item.second;
@@ -1699,12 +1713,12 @@ void CWallet::ResendWalletTransactions(bool fForce)
     /* MCHN END */    
                     mapSorted.insert(make_pair(wtx.nTimeReceived, &wtx));
             }
-        }
-        BOOST_FOREACH(PAIRTYPE(const unsigned int, CWalletTx*)& item, mapSorted)
-        {
-            CWalletTx& wtx = *item.second;
-            LogPrint("wallet","Wallet tx %s resent\n",wtx.GetHash().ToString().c_str());
-            wtx.RelayWalletTransaction();
+            BOOST_FOREACH(PAIRTYPE(const unsigned int, CWalletTx*)& item, mapSorted)
+            {
+                CWalletTx& wtx = *item.second;
+                LogPrint("wallet","Wallet tx %s resent\n",wtx.GetHash().ToString().c_str());
+                wtx.RelayWalletTransaction();
+            }
         }
     }
 }

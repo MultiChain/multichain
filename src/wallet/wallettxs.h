@@ -21,6 +21,7 @@ typedef struct mc_WalletTxs
     uint32_t m_Mode;
     std::map<COutPoint, mc_Coin> m_UTXOs[MC_TDB_MAX_IMPORTS];    
     std::map<uint256,CWalletTx> m_UnconfirmedSends;
+    std::vector<uint256> m_UnconfirmedSendsHashes;
     std::map<uint256, CWalletTx> vAvailableCoins;    
     
     mc_WalletTxs()
@@ -134,7 +135,7 @@ typedef struct mc_WalletTxs
     
     int RollBackSubKeys(mc_TxImport *import,int block,mc_TxEntityStat *parent_entity,mc_Buffer *lpSubKeyEntRowBuffer); // Rollback subkeys to specific block
     
-    std::map<uint256,CWalletTx> GetUnconfirmedSends(int block);                 // Internal. Retrieves list of unconfirmed txs sent by this wallet for specific block
+    std::map<uint256,CWalletTx> GetUnconfirmedSends(int block,std::vector<uint256>& unconfirmedSendsHashes);                 // Internal. Retrieves list of unconfirmed txs sent by this wallet for specific block
     void GetSingleInputEntity(const CWalletTx& tx,mc_TxEntity *input_entity);
     int RemoveUnconfirmedSends(int block);              
     int SaveUTXOMap(int import_id,int block);
