@@ -797,7 +797,7 @@ Value appendrawchange(const Array& params, bool fHelp)
 
         if(amounts->GetCount() > assets_per_opdrop)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Too many assets, maximal number for this chain - %d",assets_per_opdrop));                        
+            throw JSONRPCError(RPC_NOT_ALLOWED, strprintf("Too many assets, maximal number for this chain - %d",assets_per_opdrop));                        
         }
     }
     
@@ -933,7 +933,7 @@ void AddCacheInputScriptIfNeeded(CMutableTransaction& rawTx,Array inputs, bool f
             bool fIsHex;
             if( (scriptPubKeyString.type() != str_type) || (scriptPubKeyString.get_str().size() == 0) )
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, scriptPubKey must be not empty string");            
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, scriptPubKey must not be empty");            
             }
             
             vector<unsigned char> dataData(ParseHex(scriptPubKeyString.get_str().c_str(),fIsHex));    
@@ -1286,7 +1286,7 @@ Value appendrawmetadata(const json_spirit::Array& params, bool fHelp)
  */ 
         if(!mc_gState->m_Assets->FindEntityByFullRef(&entity,mc_gState->m_TmpAssetsOut->GetRow(0)))
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Follow-on script rejected - asset not found");                                                
+            throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Follow-on script rejected - asset not found");                                                
         }
     }
     

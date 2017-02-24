@@ -194,7 +194,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
     unsigned char buf_a[MC_AST_ASSET_REF_SIZE];    
     if(CoinSparkAssetRefDecode(buf_a,asset_name.c_str(),asset_name.size()))
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset name: asset reference");                                                                                                    
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset name, looks like an asset reference");                                                                                                    
     }
     
     if(asset_name.size())
@@ -532,7 +532,7 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
                 {
                     if(mc_gState->m_Permissions->CanIssue(entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
                     {
-                        throw JSONRPCError(RPC_NOT_ALLOWED, "Issuing more units for this asset is not allowed from this address");                                                                        
+                        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Issuing more units for this asset is not allowed from this address");                                                                        
                     }                                                 
                 }
                 else
@@ -690,7 +690,7 @@ Value getmultibalances(const Array& params, bool fHelp)
             uint256 hash=*(uint256*)entity.GetTxID();
             if (setAssets.count(hash))
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicate asset: ")+inputStrings[is]);                        
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, duplicate asset: " + inputStrings[is]);                        
             }
             setAssets.insert(hash);
         }
@@ -1473,12 +1473,12 @@ Value listassets(const Array& params, bool fHelp)
             count=params[2].get_int();
             if(count < 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));                            
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
         }
     }
     start=-count;
@@ -1490,7 +1490,7 @@ Value listassets(const Array& params, bool fHelp)
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid start"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
         }
     }
     
@@ -1922,7 +1922,7 @@ Value getassettransaction(const Array& params, bool fHelp)
     
     if(entry.size() == 0)
     {
-        throw JSONRPCError(RPC_TX_NOT_FOUND, "Specified asset was not transferred in this transaction");                
+        throw JSONRPCError(RPC_TX_NOT_FOUND, "This transaction was not found for this asset");                
     }
     
     delete asset_amounts;
@@ -1980,12 +1980,12 @@ Value listassettransactions(const Array& params, bool fHelp)
             count=params[2].get_int();
             if(count < 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));                            
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
         }
     }
     start=-count;
@@ -1997,7 +1997,7 @@ Value listassettransactions(const Array& params, bool fHelp)
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid start"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
         }
     }
     
@@ -2018,7 +2018,7 @@ Value listassettransactions(const Array& params, bool fHelp)
     }
     if(!pwalletTxsMain->FindEntity(&entStat))
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "Not subscribed to this asset");                                
+        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this asset");                                
     }
     
     mc_Buffer *entity_rows;

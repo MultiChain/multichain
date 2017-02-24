@@ -595,7 +595,7 @@ Value listaddresstransactions(const Array& params, bool fHelp)
     
     if(fromaddresses.size() != 1)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Single address should be specified");                        
     }
     
     set<CTxDestination> thisFromAddresses;
@@ -799,7 +799,7 @@ Value getaddresstransaction(const Array& params, bool fHelp)
     
     if(fromaddresses.size() != 1)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Single address should be specified");                        
     }
     
     set<CTxDestination> thisFromAddresses;
@@ -830,7 +830,7 @@ Value getaddresstransaction(const Array& params, bool fHelp)
     
     if(entry.size() == 0)
     {
-        throw JSONRPCError(RPC_TX_NOT_FOUND, "Specified address is not involved in transaction");                                
+        throw JSONRPCError(RPC_TX_NOT_FOUND, "This transaction was not found for this address");                                
     }
     
     delete lpScript;

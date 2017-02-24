@@ -218,7 +218,7 @@ Value setaccount(const Array& params, bool fHelp)
         pwalletMain->SetAddressBook(address.Get(), strAccount, "receive");
     }
     else
-        throw JSONRPCError(RPC_MISC_ERROR, "setaccount can only be used with own address");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "setaccount can only be used with own address");
 
     return Value::null;
 }
@@ -306,7 +306,7 @@ void SendMoney(const CTxDestination &address, CAmount nValue, CWalletTx& wtxNew,
     {
         strError = "Error: Wallet locked, unable to create transaction!";
         LogPrintf("SendMoney() : %s", strError);
-        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+        throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, strError);
     }
 
     // Parse Bitcoin address
@@ -342,7 +342,7 @@ void SendMoney(const CTxDestination &address, CAmount nValue, CWalletTx& wtxNew,
     {
         LogPrint("mchnminor","mchn: Sending script with %d OP_DROP element(s)",dropscript->GetNumElements());
         if(dropscript->GetNumElements() > mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropscount") )
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid number of elements in script");
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid number of elements in script");
 
         for(int element=0;element < dropscript->GetNumElements();element++)
         {
@@ -352,7 +352,7 @@ void SendMoney(const CTxDestination &address, CAmount nValue, CWalletTx& wtxNew,
                 scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
             }
             else
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid script");
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
         }
     }        
     
@@ -377,7 +377,7 @@ void SendMoney(const CTxDestination &address, CAmount nValue, CWalletTx& wtxNew,
         if (nValue + nFeeRequired > pwalletMain->GetBalance())
             strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its amount, complexity, or use of recently received funds!", FormatMoney(nFeeRequired));
         LogPrintf("SendMoney() : %s\n", strError);
-        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, strError);
     }
 /* MCHN START */
     string strRejectReason;
@@ -385,11 +385,11 @@ void SendMoney(const CTxDestination &address, CAmount nValue, CWalletTx& wtxNew,
     {
         if(strRejectReason.size())
         {
-            throw JSONRPCError(RPC_WALLET_ERROR, "Error: The transaction was rejected: " + strRejectReason);
+            throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Error: The transaction was rejected: " + strRejectReason);
         }
         else
         {
-            throw JSONRPCError(RPC_WALLET_ERROR, "Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.");
+            throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Error: this transaction was rejected. This may be because you are sharing private keys between nodes, and another node has spent the funds used by this transaction.");
         }                        
     }        
     
@@ -483,12 +483,12 @@ Value listaddresses(const Array& params, bool fHelp)
             count=params[2].get_int();
             if(count < 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));                            
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
         }
     }
     
@@ -501,7 +501,7 @@ Value listaddresses(const Array& params, bool fHelp)
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid start"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
         }
     }
     
@@ -609,12 +609,12 @@ Value gettxoutdata(const Array& params, bool fHelp)
             count=params[2].get_int();
             if(count < 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));                            
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
         }
     }
     
@@ -627,7 +627,7 @@ Value gettxoutdata(const Array& params, bool fHelp)
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid start"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
         }
     }
 
@@ -693,15 +693,15 @@ Value signmessage(const Array& params, bool fHelp)
 
     CBitcoinAddress addr(strAddress);
     if (!addr.IsValid())
-        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid address");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
 
     CKeyID keyID;
     if (!addr.GetKeyID(keyID))
-        throw JSONRPCError(RPC_TYPE_ERROR, "Address does not refer to key");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Address does not refer to key");
 
     CKey key;
     if (!pwalletMain->GetKey(keyID, key))
-        throw JSONRPCError(RPC_WALLET_ERROR, "Private key not available");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Private key not available");
 
     CHashWriter ss(SER_GETHASH, 0);
     ss << strMessageMagic;
@@ -709,7 +709,7 @@ Value signmessage(const Array& params, bool fHelp)
 
     vector<unsigned char> vchSig;
     if (!key.SignCompact(ss.GetHash(), vchSig))
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Sign failed");
+        throw JSONRPCError(RPC_WALLET_ERROR, "Sign failed");
 
     return EncodeBase64(&vchSig[0], vchSig.size());
 }

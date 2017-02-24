@@ -132,7 +132,7 @@ Value createrawsendfrom(const Array& params, bool fHelp)
             {
                 if(!s.value_.get_bool())
                 {
-                    throw JSONRPCError(RPC_WALLET_ERROR, "Transaction was not signed properly");                    
+                    throw JSONRPCError(RPC_TRANSACTION_ERROR, "Transaction was not signed properly");                    
                 }
             }
             if(s.name_=="hex")
@@ -502,9 +502,9 @@ Value combineunspent(const Array& params, bool fHelp)
         {
             CBitcoinAddress address(tok);
             if (!address.IsValid())
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address: ")+tok);            
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+tok);            
             if (setAddress.count(address))
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ")+tok);
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, duplicated address: "+tok);
             CTxDestination dest=address.Get();            
             CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
             if(lpKeyID)
@@ -514,7 +514,7 @@ Value combineunspent(const Array& params, bool fHelp)
             }
             else
             {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address (only pubkeyhash addresses are supported) : ")+tok);                
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address (only pubkeyhash addresses are supported) : "+tok);                
             }
         }
     }
@@ -526,7 +526,7 @@ Value combineunspent(const Array& params, bool fHelp)
     {
         strError = "Error: Wallet locked, unable to create transaction!";
         LogPrintf("CombineUnspent() : %s", strError);
-        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+        throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, strError);
     }
 
     
@@ -568,7 +568,7 @@ Value combineunspent(const Array& params, bool fHelp)
     {
         strError="Not enough inputs";
         LogPrintf("CombineUnspent() : %s\n", strError);
-        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+//        throw JSONRPCError(RPC_WALLET_ERROR, strError);
     }
     
     return  results;
@@ -867,7 +867,7 @@ Value sendassetfrom(const Array& params, bool fHelp)
         {
             if(entity.IsUnconfirmedGenesis())
             {
-                throw JSONRPCError(RPC_UNCONFIRMED_ENTITY, string("Unconfirmed asset: ")+params[2].get_str());            
+                throw JSONRPCError(RPC_UNCONFIRMED_ENTITY, "Unconfirmed asset: "+params[2].get_str());            
             }
         }
         multiple=entity.GetAssetMultiple();
@@ -1005,7 +1005,7 @@ Value sendassettoaddress(const Array& params, bool fHelp)
         {
             if(entity.IsUnconfirmedGenesis())
             {
-                throw JSONRPCError(RPC_UNCONFIRMED_ENTITY, string("Unconfirmed asset: ")+params[1].get_str());            
+                throw JSONRPCError(RPC_UNCONFIRMED_ENTITY, "Unconfirmed asset: "+params[1].get_str());            
             }
         }
         multiple=entity.GetAssetMultiple();

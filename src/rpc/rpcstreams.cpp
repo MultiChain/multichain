@@ -36,7 +36,7 @@ void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
                 }
                 else
                 {
-                    throw JSONRPCError(RPC_ENTITY_NOT_FOUND, string("Stream with this stream reference not found: ")+str);                    
+                    throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Stream with this stream reference not found: "+str);                    
                 }
             }
         }
@@ -45,20 +45,20 @@ void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
         switch(ret)
         {
             case -1:
-                throw JSONRPCError(RPC_ENTITY_NOT_FOUND, string("Stream with this txid not found: ")+str);
+                throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Stream with this txid not found: "+str);
                 break;
             case -2:
-                throw JSONRPCError(RPC_ENTITY_NOT_FOUND, string("Stream with this stream reference not found: ")+str);
+                throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Stream with this stream reference not found: "+str);
                 break;
             case -3:
-                throw JSONRPCError(RPC_ENTITY_NOT_FOUND, string("Stream with this name not found: ")+str);
+                throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Stream with this name not found: "+str);
                 break;
             case -4:
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Could not parse stream key: ")+str);
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Could not parse stream key: "+str);
                 break;
 /*                
             case 1:
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Unconfirmed stream: ")+str);
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Unconfirmed stream: "+str);
                 break;
  */ 
         }
@@ -99,12 +99,12 @@ Value liststreams(const Array& params, bool fHelp)
             count=params[2].get_int();
             if(count < 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));                            
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
         }
     }
     start=-count;
@@ -116,7 +116,7 @@ Value liststreams(const Array& params, bool fHelp)
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid start"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
         }
     }
     
@@ -286,7 +286,7 @@ Value createcmd(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
     }
     
     Array ext_params;
@@ -306,7 +306,7 @@ Value createfromcmd(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
     }
     
     if (strcmp(params[1].get_str().c_str(),"stream"))
@@ -346,7 +346,7 @@ Value createfromcmd(const Array& params, bool fHelp)
     unsigned char buf_a[MC_AST_ASSET_REF_SIZE];    
     if(CoinSparkAssetRefDecode(buf_a,stream_name.c_str(),stream_name.size()))
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid stream name");                                                                                                    
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid stream name, looks like a stream reference");                                                                                                    
     }
             
     
@@ -513,7 +513,7 @@ Value publish(const Array& params, bool fHelp)
     
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
     }
     
     Array ext_params;
@@ -533,12 +533,12 @@ Value publishfrom(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
     }
        
     if(params[2].get_str() == "*")
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid item-key-string: *"));                
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid item-key-string: *");                
     }
     
     mc_Script *lpScript;
@@ -641,7 +641,7 @@ Value subscribe(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
@@ -730,7 +730,7 @@ Value unsubscribe(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
@@ -805,7 +805,7 @@ Value unsubscribe(const Array& params, bool fHelp)
         if(pwalletTxsMain->Unsubscribe(streams))
         {
             delete streams;
-            throw JSONRPCError(RPC_INTERNAL_ERROR, string("Couldn't unsubscribe from stream"));                                    
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't unsubscribe from stream");                                    
         }
     }
 
@@ -820,7 +820,7 @@ Value getstreamitem(const Array& params, bool fHelp)
    
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
@@ -870,7 +870,7 @@ Value getstreamitem(const Array& params, bool fHelp)
     
     if(entry.size() == 0)
     {
-        throw JSONRPCError(RPC_TX_NOT_FOUND, "This transaction does not contain items of this stream");                
+        throw JSONRPCError(RPC_TX_NOT_FOUND, "This transaction was not found in this stream");                
     }
     
     return entry;
@@ -883,7 +883,7 @@ Value liststreamitems(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
@@ -924,12 +924,12 @@ Value liststreamitems(const Array& params, bool fHelp)
             count=params[2].get_int();
             if(count < 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));                            
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
         }
     }
     start=-count;
@@ -941,7 +941,7 @@ Value liststreamitems(const Array& params, bool fHelp)
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid start"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
         }
     }
     
@@ -1049,7 +1049,7 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
@@ -1107,12 +1107,12 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
             count=params[3].get_int();
             if(count < 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));                            
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
         }
     }
     start=-count;
@@ -1124,7 +1124,7 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid start"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
         }
     }
     
@@ -1187,7 +1187,7 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
@@ -1246,12 +1246,12 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
             count=params[3].get_int();
             if(count < 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));                            
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
         }
     }
     start=-count;
@@ -1263,7 +1263,7 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid start"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
         }
     }
     
@@ -1478,12 +1478,12 @@ Value liststreamkeys_or_publishers(const Array& params,bool is_publishers)
             count=params[3].get_int();
             if(count < 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));                            
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
         }
     }
     start=-count;
@@ -1495,7 +1495,7 @@ Value liststreamkeys_or_publishers(const Array& params,bool is_publishers)
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid start"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
         }
     }
     
@@ -1580,7 +1580,7 @@ Value liststreamkeys(const Array& params, bool fHelp)
     
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
@@ -1601,7 +1601,7 @@ Value liststreampublishers(const Array& params, bool fHelp)
     
     if(mc_gState->m_Features->Streams() == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
     }
            
     return liststreamkeys_or_publishers(params,true);

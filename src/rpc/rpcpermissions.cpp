@@ -35,9 +35,9 @@ Value grantoperation(const Array& params)
     {
         CBitcoinAddress address(tok);
         if (!address.IsValid())
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address: ")+tok);            
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+tok);            
         if (setAddress.count(address))
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ")+tok);
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, duplicated address: "+tok);
         addresses.push_back(address.Get());
         setAddress.insert(address);
     }
@@ -207,7 +207,7 @@ Value grantoperation(const Array& params)
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Please use createrawtransaction to grant/revoke from P2SH addresses");                                                
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Please use raw transactions to grant/revoke from P2SH addresses");                                                
         }
         if(found_entity.GetEntityType() == MC_ENT_TYPE_STREAM)
         {
@@ -507,7 +507,7 @@ Value listpermissions(const Array& params, bool fHelp)
             string tok=inputStrings[is];
             CBitcoinAddress address(tok);
             if (!address.IsValid())
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address: ")+tok);            
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+tok);            
             addresses.push_back(address.Get());            
         }        
         

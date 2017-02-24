@@ -151,7 +151,7 @@ void SendMoneyToSeveralAddresses(const std::vector<CTxDestination> addresses, CA
     {
         strError = "Error: Wallet locked, unable to create transaction!";
         LogPrintf("SendMoney() : %s", strError);
-        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+        throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, strError);
     }
 
     set<CTxDestination> thisFromAddresses;
@@ -185,7 +185,7 @@ void SendMoneyToSeveralAddresses(const std::vector<CTxDestination> addresses, CA
         {
             LogPrint("mchnminor","mchn: Sending script with %d OP_DROP element(s)",dropscript->GetNumElements());
             if(dropscript->GetNumElements() > mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropscount") )
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid number of elements in script");
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid number of elements in script");
 
             for(int element=0;element < dropscript->GetNumElements();element++)
             {
@@ -226,7 +226,7 @@ void SendMoneyToSeveralAddresses(const std::vector<CTxDestination> addresses, CA
         }
         else
         {
-            throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.");
+            throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Error: this transaction was rejected. This may be because you are sharing private keys between nodes, and another node has spent the funds used by this transaction.");
         }                        
     }            
 }
@@ -264,9 +264,9 @@ vector<CTxDestination> ParseAddresses(string param, bool create_full_list, bool 
         {
             CBitcoinAddress address(tok);
             if (!address.IsValid())
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address: ")+tok);            
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+tok);            
             if (setAddress.count(address))
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ")+tok);
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, duplicated address: "+tok);
                 CTxDestination dest=address.Get();
             CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
             CScriptID *lpScriptID=boost::get<CScriptID> (&dest);
@@ -280,11 +280,11 @@ vector<CTxDestination> ParseAddresses(string param, bool create_full_list, bool 
             {
                 if(allow_scripthash)
                 {
-                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address (only pubkeyhash and scripthash addresses are supported) : ")+tok);                
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address (only pubkeyhash and scripthash addresses are supported) : "+tok);                
                 }
                 else
                 {
-                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address (only pubkeyhash addresses are supported) : ")+tok);                                    
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address (only pubkeyhash addresses are supported) : "+tok);                                    
                 }
             }
         }
@@ -352,9 +352,9 @@ set<string> ParseAddresses(Value param, isminefilter filter)
                 string tok=vtok.get_str();
                 CBitcoinAddress address(tok);
                 if (!address.IsValid())
-                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address: ")+tok);            
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+tok);            
                 if (setAddresses.count(address.ToString()))
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicate address: ")+tok);
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, duplicate address: "+tok);
                 const CTxDestination dest=address.Get();
                 const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
                 const CScriptID *lpScriptID=boost::get<CScriptID> (&dest);
@@ -366,7 +366,7 @@ set<string> ParseAddresses(Value param, isminefilter filter)
                         isminetype fIsMine=IsMine(*pwalletMain,dest);
                         if (!(fIsMine & filter))
                         {
-                            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, string("Non-wallet address : ")+tok);                                                                    
+                            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Non-wallet address : "+tok);                                                                    
                         }
                     }
 
@@ -374,12 +374,12 @@ set<string> ParseAddresses(Value param, isminefilter filter)
                 }
                 else
                 {
-                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address (only pubkeyhash and scripthash addresses are supported) : ")+tok);                                    
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address (only pubkeyhash and scripthash addresses are supported) : "+tok);                                    
                 }
             }
             else
             {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address, expected string"));                                                        
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address, expected string");                                                        
             }
         }            
     }
@@ -395,7 +395,7 @@ set<string> ParseAddresses(Value param, isminefilter filter)
                 if (!(fIsMine & filter))
                 {
                     CBitcoinAddress address(dest);
-                    throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, string("Non-wallet address : ")+address.ToString().c_str());                                                                    
+                    throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Non-wallet address: "+address.ToString());                                                                    
                 }
             }
             setAddresses.insert(CBitcoinAddress(dest).ToString());

@@ -212,7 +212,10 @@ Value importaddress(const Array& params, bool fHelp)
         inputScripts.push_back(script);
         
         if (::IsMine(*pwalletMain, script) == ISMINE_SPENDABLE)
-            throw JSONRPCError(RPC_WALLET_ERROR, "The wallet already contains the private key for this address or script");
+        {
+//            throw JSONRPCError(RPC_WALLET_ERROR, "The wallet already contains the private key for this address or script");
+            return Value::null;    
+        }
         
         if (!pwalletMain->HaveWatchOnly(script))
         {
@@ -297,7 +300,7 @@ Value importwallet(const Array& params, bool fHelp)
     ifstream file;
     file.open(params[0].get_str().c_str(), std::ios::in | std::ios::ate);
     if (!file.is_open())
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Cannot open wallet dump file");
+        throw JSONRPCError(RPC_GENERAL_FILE_ERROR, "Cannot open wallet dump file");
 
     int64_t nTimeBegin = chainActive.Tip()->GetBlockTime();
 
@@ -412,7 +415,7 @@ Value dumpprivkey(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid MultiChain address");
     CKeyID keyID;
     if (!address.GetKeyID(keyID))
-        throw JSONRPCError(RPC_TYPE_ERROR, "Address does not refer to a key");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Address does not refer to a key");
     CKey vchSecret;
     if (!pwalletMain->GetKey(keyID, vchSecret))
         throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for address " + strAddress + " is not known");
@@ -444,7 +447,7 @@ Value dumpwallet(const Array& params, bool fHelp)
     ofstream file;
     file.open(params[0].get_str().c_str());
     if (!file.is_open())
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Cannot open wallet dump file");
+        throw JSONRPCError(RPC_GENERAL_FILE_ERROR, "Cannot open wallet dump file");
 
     std::map<CKeyID, int64_t> mapKeyBirth;
     std::set<CKeyID> setKeyPool;

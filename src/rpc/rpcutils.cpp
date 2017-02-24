@@ -1680,7 +1680,7 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
             if (address.IsValid())
             {            
                 if (setAddress.count(address))
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ")+s.name_);
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, duplicated address: "+s.name_);
                 setAddress.insert(address);            
             }
         }
@@ -2378,13 +2378,13 @@ vector<string> ParseStringList(Value param)
             {
                 string tok=vtok.get_str();
                 if (setStrings.count(tok))
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicate value: ")+tok);
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, duplicate value: "+tok);
                 setStrings.insert(tok);
                 vStrings.push_back(tok);
             }
             else
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid value, expected array of strings"));                                                        
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value, expected array of strings");                                                        
             }
         }            
     }
@@ -2397,14 +2397,14 @@ vector<string> ParseStringList(Value param)
             while(getline(ss, tok, ',')) 
             {
                 if (setStrings.count(tok))
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicate value: ")+tok);
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, duplicate value: "+tok);
                 setStrings.insert(tok);
                 vStrings.push_back(tok);
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid value, expected string or array"));                                                                    
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value, expected string or array");                                                                    
         }
     }
 
@@ -2479,11 +2479,11 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
                 throw JSONRPCError(RPC_ENTITY_NOT_FOUND, entity_nameU+string(" with this name not found: ")+str);
                 break;
             case -4:
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Could not parse ")+entity_nameL+string(" key: ")+str);
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Could not parse "+entity_nameL+" key: "+str);
                 break;
 /*                
             case 1:
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Unconfirmed stream: ")+str);
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Unconfirmed stream: "+str);
                 break;
  */ 
         }
