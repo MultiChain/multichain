@@ -72,8 +72,9 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
                 mTemplates.insert(make_pair(TX_NULL_DATA, CScript() << OP_DROPDATA << OP_DROP << OP_DROPDATA << OP_DROP << OP_RETURN << OP_SMALLDATA));            
             }
         
-            mTemplates.insert(make_pair(TX_SCRIPTHASH, CScript() << OP_HASH160 << OP_PUBKEYHASH << OP_EQUAL));
         }
+        
+        mTemplates.insert(make_pair(TX_SCRIPTHASH, CScript() << OP_HASH160 << OP_PUBKEYHASH << OP_EQUAL));
 /* MCHN END */    
     }
 
@@ -300,7 +301,7 @@ bool ExtractDestinationScriptValid(const CScript& scriptPubKey, CTxDestination& 
     return false;
 }
 
-bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
+bool ExtractDestinationFull(const CScript& scriptPubKey, CTxDestination& addressRet)
 {
     vector<valtype> vSolutions;
     txnouttype whichType;
@@ -330,7 +331,7 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
     return false;
 }
 
-bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet)
+bool ExtractDestinationsFull(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet)
 {
     addressRet.clear();
     typeRet = TX_NONSTANDARD;
@@ -375,6 +376,208 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
 
     return true;
 }
+
+bool IsStandardNullData(const CScript& scriptPubKey)
+{
+    opcodetype opcode;
+    vector<unsigned char> vch;
+    bool recheck=false;
+    int op_drop_count=0;
+    unsigned int sizes[2];
+    sizes[0]=0;
+    sizes[1]=0;
+    
+    CScript::const_iterator pc = scriptPubKey.begin();
+    
+    while( op_drop_count < 3 )
+    {
+        if(!scriptPubKey.GetOp(pc, opcode))
+        {
+            return false;
+        }
+        if(opcode == OP_RETURN)
+        {
+            op_drop_count=3;
+        }
+        else
+        {
+            if(op_drop_count == 2)
+            {
+                return false;
+            }
+        }
+        if( opcode < OP_PUSHDATA1 )
+        {
+            sizes[op_drop_count]=(unsigned int)opcode;
+        }
+        else
+        {
+            if( opcode <= OP_PUSHDATA4 )
+            {
+                recheck=true;
+            }            
+        }
+        if(op_drop_count < 3)
+        {
+            if(!scriptPubKey.GetOp(pc, opcode))
+            {
+                return false;
+            }
+            if(opcode != OP_DROP)
+            {
+                return false;
+            }
+            op_drop_count++;
+        }        
+    }
+
+    if(mc_gState->m_Features->VerifySizeOfOpDropElements())
+    {
+        if(recheck)
+        {
+            pc = scriptPubKey.begin();
+
+            op_drop_count=0;
+            while( op_drop_count < 3 )
+            {
+                scriptPubKey.GetOp(pc, opcode, vch);
+                if(opcode == OP_RETURN)
+                {
+                    op_drop_count=3;
+                }
+                if( opcode >= OP_PUSHDATA1 )
+                {
+                    if( opcode <= OP_PUSHDATA4 )
+                    {
+                        sizes[op_drop_count]=(unsigned int)vch.size();
+                    }            
+                }
+                if(op_drop_count < 3)
+                {
+                    op_drop_count++;
+                }        
+            }
+        }
+        if( (sizes[0] > MAX_SCRIPT_ELEMENT_SIZE) || (sizes[1] > MAX_SCRIPT_ELEMENT_SIZE) )
+        {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet)
+{
+    addressRet.clear();
+    typeRet = TX_NONSTANDARD;
+    opcodetype opcode;
+    vector<unsigned char> vch;
+
+    CScript::const_iterator pc = scriptPubKey.begin();
+    
+    if (scriptPubKey.GetOp(pc, opcode))
+    {
+        if(opcode == OP_DUP)
+        {
+            if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_HASH160) )
+            {
+                return false;
+            }
+            if ( !scriptPubKey.GetOp(pc, opcode, vch) || (vch.size() != 20) )
+            {
+                return false;
+            }
+            addressRet.push_back(CKeyID(uint160(vch)));
+            if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_EQUALVERIFY) )
+            {
+                return false;
+            }
+            if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_CHECKSIG) )
+            {
+                return false;
+            }
+            typeRet = TX_PUBKEYHASH;
+        }
+        else
+        {
+            if(opcode == OP_HASH160)
+            {
+                if ( !scriptPubKey.GetOp(pc, opcode, vch) || (vch.size() != 20) )
+                {
+                    return false;
+                }
+                addressRet.push_back(CScriptID(uint160(vch)));
+                if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_EQUAL) )
+                {
+                    return false;
+                }
+                typeRet = TX_SCRIPTHASH;
+            }
+            else
+            {
+                if(IsStandardNullData(scriptPubKey))
+                {
+                    typeRet=TX_NULL_DATA;
+                    return false;
+                }
+                else
+                {
+                    return ExtractDestinationsFull(scriptPubKey,typeRet,addressRet,nRequiredRet);
+                }
+            }
+        }
+    }
+    
+    if (pc < scriptPubKey.end())                                                // This code should match behavior of RemoveOpDrops
+    {
+        if (scriptPubKey.GetOp(pc, opcode))
+        {
+            if(opcode != OP_RETURN)
+            {
+                if (pc < scriptPubKey.end())                                    
+                {
+                    if (scriptPubKey.GetOp(pc, opcode))
+                    {
+                        if(opcode == OP_DROP)
+                        {
+                            return true;
+                        }
+                    }                    
+                }
+            }
+        }
+    }    
+    else
+    {
+        return true;
+    }
+    
+    addressRet.clear();
+    typeRet = TX_NONSTANDARD;
+    return true;
+}
+
+bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
+{
+    vector<CTxDestination> addressRets;
+    txnouttype typeRet;
+    int nRequiredRet;
+    
+    if(!ExtractDestinations(scriptPubKey,typeRet,addressRets,nRequiredRet))
+    {
+        return false; 
+    }
+    
+    if(typeRet == TX_MULTISIG)
+    {
+        return false;
+    }
+    
+    addressRet=addressRets[0];
+    return true;
+}
+
 
 namespace
 {
