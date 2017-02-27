@@ -27,4 +27,7 @@ typedef uint8_t isminefilter;
 isminetype IsMine(const CKeyStore& keystore, const CScript& scriptPubKey);
 isminetype IsMine(const CKeyStore& keystore, const CTxDestination& dest);
 
+isminetype IsMineKeyID(const CKeyStore& keystore, const CKeyID& dest);
+isminetype IsMineScriptID(const CKeyStore& keystore, const CScriptID& dest);
+
 #endif // BITCOIN_WALLET_ISMINE_H

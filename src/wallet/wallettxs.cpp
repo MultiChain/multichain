@@ -899,7 +899,16 @@ int mc_WalletTxs::RollBack(mc_TxImport *import,int block)
                                                         {
                                                             memcpy(&(txout.m_EntityID),entity.m_EntityID,MC_TDB_ENTITY_ID_SIZE);
                                                             txout.m_EntityType=entity.m_EntityType;
-                                                            isminefilter mine = m_lpWallet ? IsMine(*m_lpWallet, dest) : ISMINE_NO;
+                                                            isminefilter mine;
+                                                            if(entity.m_EntityType & MC_TET_PUBKEY_ADDRESS)
+                                                            {
+                                                                mine = m_lpWallet ? IsMineKeyID(*m_lpWallet, *lpKeyID) : ISMINE_NO;
+                                                            }
+                                                            else
+                                                            {
+                                                                mine = m_lpWallet ? IsMineScriptID(*m_lpWallet, *lpScriptID) : ISMINE_NO;                                                                
+                                                            }
+//                                                            isminefilter mine = m_lpWallet ? IsMine(*m_lpWallet, dest) : ISMINE_NO;
                                                             if(mine & ISMINE_SPENDABLE) //Spendable flag is used to avoid IsMine calculation in coin selection
                                                             {
                                                                 txout.m_Flags |= MC_TFL_IS_SPENDABLE;
@@ -1867,17 +1876,20 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                     entity.Zero();
                     const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
                     const CScriptID *lpScriptID=boost::get<CScriptID> (&dest);
+                    isminefilter mine=ISMINE_NO;
                     if(lpKeyID)
                     {
                         memcpy(entity.m_EntityID,lpKeyID,MC_TDB_ENTITY_ID_SIZE);
                         entity.m_EntityType=MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS;
+                        mine = m_lpWallet ? IsMineKeyID(*m_lpWallet, *lpKeyID) : ISMINE_NO;
                     }
                     if(lpScriptID)
                     {
                         memcpy(entity.m_EntityID,lpScriptID,MC_TDB_ENTITY_ID_SIZE);
                         entity.m_EntityType=MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS;
+                        mine = m_lpWallet ? IsMineScriptID(*m_lpWallet, *lpScriptID) : ISMINE_NO;                                                                
                     }
-                    isminefilter mine = IsMine(*m_lpWallet, dest);
+//                    isminefilter mine = IsMine(*m_lpWallet, dest);
                     if((mine & ISMINE_SPENDABLE) == ISMINE_NO)
                     {
                         fAllInputsFromMe=false;
@@ -2009,19 +2021,22 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                 entity.Zero();
                 const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
                 const CScriptID *lpScriptID=boost::get<CScriptID> (&dest);
+                isminefilter mine=ISMINE_NO;
                 if(lpKeyID)
                 {
                     memcpy(entity.m_EntityID,lpKeyID,MC_TDB_ENTITY_ID_SIZE);
                     entity.m_EntityType=MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS;
+                    mine = m_lpWallet ? IsMineKeyID(*m_lpWallet, *lpKeyID) : ISMINE_NO;
                 }
                 if(lpScriptID)
                 {
                     memcpy(entity.m_EntityID,lpScriptID,MC_TDB_ENTITY_ID_SIZE);
                     entity.m_EntityType=MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS;
+                    mine = m_lpWallet ? IsMineScriptID(*m_lpWallet, *lpScriptID) : ISMINE_NO;                                                                
                 }
                 if(entity.m_EntityType)
                 {
-                    isminefilter mine = m_lpWallet ? IsMine(*m_lpWallet, dest) : ISMINE_NO;
+//                    isminefilter mine = m_lpWallet ? IsMine(*m_lpWallet, dest) : ISMINE_NO;
 
                     fOutputIsSpendable=false;
                     if(mine & ISMINE_SPENDABLE)
