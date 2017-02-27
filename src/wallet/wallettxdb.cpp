@@ -1965,6 +1965,7 @@ int mc_TxDB::GetList(
     }
     if(first<=0)
     {
+        count-=1-first;
         first=1;
     }
     if(first+count-1 <= last)

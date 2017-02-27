@@ -2523,6 +2523,7 @@ bool static DisconnectTip(CValidationState &state) {
     mempool.check(pcoinsTip);
     // Read block from disk.
     CBlock block;
+    LogPrint("mcblockperf","mchn-block-perf: Disconnecting block %s (height %d), %d transactions in mempool\n",pindexDelete->GetBlockHash().ToString(),pindexDelete->nHeight,(int)mempool.size());
     if (!ReadBlockFromDisk(block, pindexDelete))
         return state.Abort("Failed to read block");
     // Apply the block atomically to the chain state.
@@ -2539,18 +2540,22 @@ bool static DisconnectTip(CValidationState &state) {
         return false;
     
 /* MCHN START */    
+    LogPrint("mcblockperf","mchn-block-perf: Mempool hash list defragmentation\n");
     int old_height=pindexDelete->nHeight;
     mempool.defragmentHashList();
     int new_txs=mempool.hashList->m_Count;
     LogPrint("mchn","mchn: Disconnecting block %s (height %d) from permission DB (%d transactions in mempool)\n",pindexDelete->GetBlockHash().ToString(),old_height,new_txs);
     mempool.shiftHashList(block.vtx.size());
     setBlockTransactions[old_height%MC_TXSET_BLOCKS].clear();
+    LogPrint("mcblockperf","mchn-block-perf: Rolling back permission and asset databases\n");
     mc_gState->m_Permissions->RollBack(old_height-1);
     mc_gState->m_Assets->RollBack(old_height-1);
+    LogPrint("mcblockperf","mchn-block-perf: Rolling back wallet\n");
     if(mc_gState->m_WalletMode & MC_WMD_TXS)
     {
         pwalletTxsMain->RollBack(NULL,old_height-1);
     }
+    LogPrint("mcblockperf","mchn-block-perf: Resurrecting mempool transactions from the disconnected block\n");
 /* MCHN END */    
     
     // Resurrect mempool transactions from the disconnected block.
@@ -2569,7 +2574,9 @@ bool static DisconnectTip(CValidationState &state) {
     mempool.removeCoinbaseSpends(pcoinsTip, pindexDelete->nHeight);
 /* MCHN START */    
 //    mempool.defragmentHashList();
+    LogPrint("mcblockperf","mchn-block-perf: Replaying mempool\n");
     ReplayMemPool(mempool,new_shift,true);
+    LogPrint("mcblockperf","mchn-block-perf: Mempool hash list defragmentation\n");
     mempool.defragmentHashList();
 /* MCHN END */    
     
@@ -2581,6 +2588,7 @@ bool static DisconnectTip(CValidationState &state) {
     BOOST_FOREACH(const CTransaction &tx, block.vtx) {
         SyncWithWallets(tx, NULL);
     }
+    LogPrint("mcblockperf","mchn-block-perf: Disconnecting block completed, %d transactions in mempool\n",(int)mempool.size());
     return true;
 }
 
@@ -2605,6 +2613,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
             return state.Abort("Failed to read block");
         pblock = &block;
     }
+    LogPrint("mcblockperf","mchn-block-perf: Connecting block %s (height %d), %d transactions in mempool\n",pindexNew->GetBlockHash().ToString().c_str(),pindexNew->nHeight,(int)mempool.size());
     // Apply the block atomically to the chain state.
     int64_t nTime2 = GetTimeMicros(); nTimeReadFromDisk += nTime2 - nTime1;
     int64_t nTime3;
@@ -2633,6 +2642,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     LogPrint("bench", "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
     // Remove conflicting transactions from the mempool.
     list<CTransaction> txConflicted;
+    LogPrint("mcblockperf","mchn-block-perf: Removing block txs from mempool\n");
     mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted);
     mempool.check(pcoinsTip);
 /* MCHN START */    
@@ -2643,12 +2653,14 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     LogPrint("wallet","wtxs: Committing block %d\n",pindexNew->nHeight);
     
     int err=MC_ERR_NOERROR;
+    LogPrint("mcblockperf","mchn-block-perf: Wallet, before commit\n");
     err=pwalletTxsMain->BeforeCommit(NULL);
     if(err)
     {
         return error("ConnectTip() : ConnectBlock %s failed, Wtxs BeforeCommit, error: %d", pindexNew->GetBlockHash().ToString(),err);
     }
     CDiskTxPos pos(pindexNew->GetBlockPos(), GetSizeOfCompactSize(pblock->vtx.size()));
+    LogPrint("mcblockperf","mchn-block-perf: Adding block txs to wallet\n");
     for (unsigned int i = 0; i < pblock->vtx.size(); i++)
     {
         const CTransaction &tx = pblock->vtx[i];
@@ -2659,11 +2671,13 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
         }
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
     }
+    LogPrint("mcblockperf","mchn-block-perf: Wallet commit\n");
     err=pwalletTxsMain->Commit(NULL);    
     if(err)
     {
         return error("ConnectTip() : ConnectBlock %s failed, Wtxs Commit, error: %d", pindexNew->GetBlockHash().ToString(),err);
     }    
+    LogPrint("mcblockperf","mchn-block-perf: Wallet cleanup\n");
     err=pwalletTxsMain->CleanUpAfterBlock(NULL,pindexNew->nHeight,pindexNew->nHeight-1);
     if(err)
     {
@@ -2691,6 +2705,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
 //    CTransaction emptyTx;                                                       // Triggering wallet optimization
 //    SyncWithWallets(emptyTx, pblock);
 /* MCHN END */    
+    LogPrint("mcblockperf","mchn-block-perf: Connecting block completed, %d transactions in mempool\n",(int)mempool.size());
 
     int64_t nTime6 = GetTimeMicros(); nTimePostConnect += nTime6 - nTime5; nTimeTotal += nTime6 - nTime1;
     LogPrint("bench", "  - Connect postprocess: %.2fms [%.2fs]\n", (nTime6 - nTime5) * 0.001, nTimePostConnect * 0.000001);
@@ -2935,6 +2950,8 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     const CBlockIndex *pindexOldTip = chainActive.Tip();
     const CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
 
+    LogPrint("mcblockperf","mchn-block-perf: Best chain activation\n");
+    
     // Disconnect active blocks which are no longer in the best chain.
     while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
         if (!DisconnectTip(state))
@@ -2990,14 +3007,18 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
         mc_gState->m_Permissions->ClearMemPool();
         mc_gState->m_Assets->ClearMemPool();
 
+        LogPrint("mcblockperf","mchn-block-perf: Replaying mempool\n");
         ReplayMemPool(mempool,0,true);
+        LogPrint("mcblockperf","mchn-block-perf: Defragmenting mempool hash list\n");
         mempool.defragmentHashList();
         
+        LogPrint("mcblockperf","mchn-block-perf: Reaccepting wallet transactions\n");
         if(pwalletMain)
         {
             pwalletMain->ReacceptWalletTransactions();                          // Some wallet transactions may become invalid in reorg            
                                                                                 // Some may become invalid if not confirmed in time
         }
+        LogPrint("mcblockperf","mchn-block-perf: Best chain activation completed\n");
 
 /* MCHN START */        
         if(pwalletMain)

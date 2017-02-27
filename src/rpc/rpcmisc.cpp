@@ -346,7 +346,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
     {
         if( (params[1].type() == int_type) || (params[1].type() == str_type) )
         {
-            int nValue=params[1].get_int();
+            int nValue;
             if(params[1].type() == int_type)
             {
                 nValue=params[1].get_int();
