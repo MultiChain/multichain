@@ -236,7 +236,7 @@ int ScriptSigArgsExpected(txnouttype t, const std::vector<std::vector<unsigned c
     return -1;
 }
 
-bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType)
+bool IsStandardFull(const CScript& scriptPubKey, txnouttype& whichType)
 {
     vector<valtype> vSolutions;
     if (!Solver(scriptPubKey, whichType, vSolutions))
@@ -575,6 +575,125 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
     }
     
     addressRet=addressRets[0];
+    return true;
+}
+
+bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType)
+{
+    opcodetype opcode;
+    vector<unsigned char> vch;
+    whichType = TX_NONSTANDARD;
+    int max_op_drops;
+
+    CScript::const_iterator pc = scriptPubKey.begin();
+    
+    if (scriptPubKey.GetOp(pc, opcode))
+    {
+        if(opcode == OP_DUP)
+        {
+            if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_HASH160) )
+            {
+                return false;
+            }
+            if ( !scriptPubKey.GetOp(pc, opcode, vch) || (vch.size() != 20) )
+            {
+                return false;
+            }
+            if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_EQUALVERIFY) )
+            {
+                return false;
+            }
+            if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_CHECKSIG) )
+            {
+                return false;
+            }
+            whichType = TX_PUBKEYHASH;            
+        }
+        else
+        {
+            if(opcode == OP_HASH160)
+            {
+                if ( !scriptPubKey.GetOp(pc, opcode, vch) || (vch.size() != 20) )
+                {
+                    return false;
+                }
+                if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_EQUAL) )
+                {
+                    return false;
+                }
+                whichType = TX_SCRIPTHASH;
+            }
+            else
+            {
+                if(IsStandardNullData(scriptPubKey))
+                {
+                    whichType=TX_NULL_DATA;
+                    return true;
+                }
+                else
+                {
+                    return IsStandardFull(scriptPubKey,whichType);
+                }
+            }
+        }
+    }
+
+    max_op_drops=mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropscount");
+    
+    if(mc_gState->m_Features->VerifySizeOfOpDropElements())
+    {
+        for(int d=0;d<=max_op_drops;d++)
+        {
+            if (pc < scriptPubKey.end())                                            
+            {
+                if ( !scriptPubKey.GetOp(pc, opcode, vch) || (vch.size() > MAX_SCRIPT_ELEMENT_SIZE) )
+                {
+                    whichType = TX_NONSTANDARD;
+                    return false;
+                }
+                if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_DROP) )
+                {
+                    whichType = TX_NONSTANDARD;
+                    return false;
+                }
+            }
+            else
+            {
+                return true;
+            }
+        }
+    }
+    else
+    {
+        for(int d=0;d<=max_op_drops;d++)
+        {
+            if (pc < scriptPubKey.end())                                            
+            {
+                if ( !scriptPubKey.GetOp(pc, opcode) )
+                {
+                    whichType = TX_NONSTANDARD;
+                    return false;
+                }
+                if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_DROP) )
+                {
+                    whichType = TX_NONSTANDARD;
+                    return false;
+                }
+            }        
+            else
+            {
+                return true;
+            }
+        }        
+    }
+    
+    
+    if (pc < scriptPubKey.end())                                                
+    {
+        whichType = TX_NONSTANDARD;
+        return false;
+    }    
+    
     return true;
 }
 

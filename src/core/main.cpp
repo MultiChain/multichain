@@ -910,16 +910,46 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
     {
         const CTxOut& prev = mapInputs.GetOutputFor(tx.vin[i]);
 
-        vector<vector<unsigned char> > vSolutions;
         txnouttype whichType;
-        // get the scriptPubKey corresponding to this input:
         const CScript& prevScript = prev.scriptPubKey;
+        
+/*        
+        vector<vector<unsigned char> > vSolutions;
+        // get the scriptPubKey corresponding to this input:
         if (!Solver(prevScript, whichType, vSolutions))
             return false;
         int nArgsExpected = ScriptSigArgsExpected(whichType, vSolutions);
+*/
+        vector<CTxDestination> addressRets;
+        int nRequiredRet;
+        if(!ExtractDestinations(prevScript,whichType,addressRets,nRequiredRet))
+        {
+            return false; 
+        }
+        
+        int nArgsExpected=-1;
+        switch (whichType)
+        {
+            case TX_PUBKEYHASH:
+                nArgsExpected=2;
+                break;
+            case TX_SCRIPTHASH:
+                nArgsExpected=1;
+                break;
+            case TX_PUBKEY:
+                nArgsExpected=1;
+                break;
+            case TX_MULTISIG:
+                nArgsExpected=nRequiredRet+1;
+                break;
+            case TX_NONSTANDARD:
+            case TX_NULL_DATA:
+                nArgsExpected=-1;
+                break;
+        }
         if (nArgsExpected < 0)
             return false;
-
+        
         // Transactions with extra stuff in their scriptSigs are
         // non-standard. Note that this EvalScript() call will
         // be quick, because if there are any operations
@@ -1315,6 +1345,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
 /* MCHN END */        
         
+/*        
         if(mc_gState->m_Features->Streams())
         {
             if(!AcceptMultiChainTransaction(tx,view,-1,false,reason))
@@ -1324,6 +1355,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                                  REJECT_NONSTANDARD, reason);
             }
         }
+*/
         
 /* MCHN END */            
 

@@ -644,7 +644,11 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
             LogPrintf("CreateNewBlock(): total size %u\n", nBlockSize);
         }
 
-
+        if(GetBoolArg("-avoidtestingblockvalidity",false))
+        {
+            testValidity=false;
+        }
+        
         if(testValidity)
         {            
 /* MCHN END */    
