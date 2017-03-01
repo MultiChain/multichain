@@ -4295,9 +4295,28 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
             return error("%s : AcceptBlock FAILED", __func__);
     }
 
-    if (!ActivateBestChain(state, pblock))
-        return error("%s : ActivateBestChain failed", __func__);
-
+    bool activate=true;
+    if(GetBoolArg("-waitforbetterblock",false))
+    {
+        uint256 hash=pblock->GetHash();
+        BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
+        {            
+            if(item.second->pprev)
+            {
+                if(item.second->pprev->GetBlockHash() == hash)
+                {
+                    activate=false;
+                    LogPrint("mcblockperf","mchn-block-perf: Found better block than %s (height %d) - %s\n",
+                            hash.ToString().c_str(),item.second->pprev->nHeight,item.second->GetBlockHash().ToString().c_str());
+                }
+            }
+        }
+    }
+    if(activate)
+    {
+        if (!ActivateBestChain(state, pblock))
+            return error("%s : ActivateBestChain failed", __func__);
+    }
 /* MCHN START */    
 /*
     CBlockIndex* pblockindex = mapBlockIndex[pblock->GetHash()];
