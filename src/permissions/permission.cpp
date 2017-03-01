@@ -251,6 +251,10 @@ int mc_Permissions::Zero()
     m_Semaphore=NULL;
     m_LockedBy=0;
     
+    m_MempoolPermissions=NULL;
+    m_MempoolPermissionsToReplay=NULL;
+    m_CheckForMempoolFlag=0;
+    
     return MC_ERR_NOERROR;
 }
 
@@ -337,6 +341,14 @@ int mc_Permissions::Initialize(const char *name,int mode)
     
     err=m_CopiedMemPool->Initialize(m_Ledger->m_KeySize,m_Ledger->m_TotalSize,0);
     
+    m_MempoolPermissions=new mc_Buffer;
+    
+    err=m_MempoolPermissions->Initialize(sizeof(mc_MempoolPermissionRow),sizeof(mc_MempoolPermissionRow),0);
+
+    m_MempoolPermissionsToReplay=new mc_Buffer;
+    
+    err=m_MempoolPermissionsToReplay->Initialize(sizeof(mc_MempoolPermissionRow),sizeof(mc_MempoolPermissionRow),0);
+    
     pldBlock=-1;
     pldLastRow=1;
     
@@ -398,6 +410,56 @@ int mc_Permissions::Initialize(const char *name,int mode)
     LogString(msg);
     return MC_ERR_NOERROR;
 }
+
+void mc_Permissions::MempoolPermissionsCopy()
+{
+    m_MempoolPermissionsToReplay->Clear();
+    if(m_MempoolPermissions->GetCount())
+    {
+        m_MempoolPermissionsToReplay->SetCount(m_MempoolPermissions->GetCount());
+        memcpy(m_MempoolPermissionsToReplay->GetRow(0),m_MempoolPermissions->GetRow(0),m_MempoolPermissions->m_Size);
+        m_MempoolPermissions->Clear();
+    }
+}
+
+int mc_Permissions::MempoolPermissionsCheck(int from, int to)
+{
+    int i;
+    mc_MempoolPermissionRow *row;
+    for(i=from;i<to;i++)
+    {
+        row=(mc_MempoolPermissionRow*)m_MempoolPermissionsToReplay->GetRow(i);
+        switch(row->m_Type)
+        {
+            case MC_PTP_SEND:
+                if(CanSend(row->m_Entity,row->m_Address) == 0)
+                {
+                    return 0;
+                }
+                break;
+            case MC_PTP_RECEIVE:
+                if(CanReceive(row->m_Entity,row->m_Address) == 0)
+                {
+                    return 0;
+                }
+                break;
+            case MC_PTP_WRITE:
+                if(CanWrite(row->m_Entity,row->m_Address) == 0)
+                {
+                    return 0;
+                }
+                break;
+        }
+    }
+    
+    for(i=from;i<to;i++)
+    {
+        m_MempoolPermissions->Add(m_MempoolPermissionsToReplay->GetRow(i));
+    }
+    
+    return 1;
+}
+
 
 /** Logging message */
 
@@ -471,6 +533,16 @@ int mc_Permissions::Destroy()
     if(m_CopiedMemPool)
     {
         delete m_CopiedMemPool;        
+    }
+
+    if(m_MempoolPermissions)
+    {
+        delete m_MempoolPermissions;
+    }
+    
+    if(m_MempoolPermissionsToReplay)
+    {
+        delete m_MempoolPermissionsToReplay;
     }
     
     Zero();
@@ -779,6 +851,7 @@ int mc_Permissions::CanConnect(const void* lpEntity,const void* lpAddress)
 int mc_Permissions::CanSend(const void* lpEntity,const void* lpAddress)
 {
     int result;
+    mc_MempoolPermissionRow row;
     
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
     {
@@ -831,6 +904,17 @@ int mc_Permissions::CanSend(const void* lpEntity,const void* lpAddress)
         result = MC_PTP_SEND; 
     }
     
+    if(result)
+    {
+        if(m_CheckForMempoolFlag)
+        {
+            memcpy(&row.m_Entity,lpEntity,MC_PLS_SIZE_ENTITY);
+            memcpy(&row.m_Address,lpAddress,MC_PLS_SIZE_ADDRESS);
+            row.m_Type=MC_PTP_SEND;
+            m_MempoolPermissions->Add(&row);
+        }
+    }
+    
     UnLock();
     
     return result;
@@ -841,6 +925,7 @@ int mc_Permissions::CanSend(const void* lpEntity,const void* lpAddress)
 int mc_Permissions::CanReceive(const void* lpEntity,const void* lpAddress)
 {
     int result;
+    mc_MempoolPermissionRow row;
 
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
     {
@@ -877,6 +962,17 @@ int mc_Permissions::CanReceive(const void* lpEntity,const void* lpAddress)
         result = MC_PTP_RECEIVE; 
     }
     
+    if(result)
+    {
+        if(m_CheckForMempoolFlag)
+        {
+            memcpy(&row.m_Entity,lpEntity,MC_PLS_SIZE_ENTITY);
+            memcpy(&row.m_Address,lpAddress,MC_PLS_SIZE_ADDRESS);
+            row.m_Type=MC_PTP_RECEIVE;
+            m_MempoolPermissions->Add(&row);
+        }
+    }
+    
     UnLock();
     
     return result;
@@ -887,6 +983,7 @@ int mc_Permissions::CanReceive(const void* lpEntity,const void* lpAddress)
 int mc_Permissions::CanWrite(const void* lpEntity,const void* lpAddress)
 {
     int result;
+    mc_MempoolPermissionRow row;
 
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
     {
@@ -900,6 +997,17 @@ int mc_Permissions::CanWrite(const void* lpEntity,const void* lpAddress)
     if(result)
     {
         result = MC_PTP_WRITE; 
+    }
+    
+    if(result)
+    {
+        if(m_CheckForMempoolFlag)
+        {
+            memcpy(&row.m_Entity,lpEntity,MC_PLS_SIZE_ENTITY);
+            memcpy(&row.m_Address,lpAddress,MC_PLS_SIZE_ADDRESS);
+            row.m_Type=MC_PTP_WRITE;
+            m_MempoolPermissions->Add(&row);
+        }
     }
     
     UnLock();

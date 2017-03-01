@@ -39,6 +39,13 @@
 
 
 
+typedef struct mc_MempoolPermissionRow
+{    
+    unsigned char m_Entity[MC_PLS_SIZE_ENTITY];                                 // Entity genesis transaction TxID, all 0s for master permissions 
+    unsigned char m_Address[MC_PLS_SIZE_ADDRESS];                               // Address 
+    uint32_t m_Type;                                                            // Permission type MC_PTP_ constants
+} mc_MempoolPermissionRow;
+
 /** Database record structure */
 
 typedef struct mc_PermissionDBRow
@@ -202,6 +209,11 @@ typedef struct mc_Permissions
     int m_ClearedMinerCount;
     
     mc_Buffer   *m_CopiedMemPool;
+
+    int m_CheckForMempoolFlag;
+    mc_Buffer               *m_MempoolPermissions;
+    mc_Buffer               *m_MempoolPermissionsToReplay;    
+    
     
     void *m_Semaphore;
     uint64_t m_LockedBy;
@@ -260,6 +272,10 @@ typedef struct mc_Permissions
     mc_Buffer *GetPermissionList(const void* lpEntity,const void* lpAddress,uint32_t type,mc_Buffer *old_buffer);
     mc_Buffer *GetPermissionDetails(mc_PermissionDetails *plsRow);
     void FreePermissionList(mc_Buffer *permissions);
+    
+    void MempoolPermissionsCopy();
+    int MempoolPermissionsCheck(int from, int to);
+    
     
 // Internal functions    
     int Zero();    

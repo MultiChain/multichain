@@ -51,7 +51,8 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                  const CCoinsViewCache &inputs,
                                  int offset,
                                  bool accept,
-                                 string& reason);
+                                 string& reason,
+                                 bool *replay);
 bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs, string& reason);
 bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& reason);
 bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string& reason);
@@ -1352,7 +1353,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             {
                 return state.DoS(0,
                                  error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
-                                 REJECT_NONSTANDARD, reason);
+                                 REJECT_NONSTANDARD, reason, NULL);
             }
         }
 */
@@ -1389,9 +1390,13 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                 
 /* MCHN START */
         
+        bool replay=true;
+        int permissions_from,permissions_to;
+        permissions_from=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
+        
         if(mc_gState->m_Features->Streams())
         {
-            if(!AcceptMultiChainTransaction(tx,view,-1,true,reason))
+            if(!AcceptMultiChainTransaction(tx,view,-1,true,reason, &replay))
             {
                 return state.DoS(0,
                                  error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
@@ -1419,7 +1424,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                                  REJECT_INVALID, reason);
             }
         }
-        
+        permissions_to=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
+        entry.SetReplayNodeParams(replay,permissions_from,permissions_to);
 /* MCHN END */
         // Store transaction in memory
         pool.addUnchecked(hash, entry);
@@ -2102,7 +2108,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             string reason;
             if(mc_gState->m_Features->Streams())
             {
-                if(!AcceptMultiChainTransaction(tx,view,offset,true,reason))
+                if(!AcceptMultiChainTransaction(tx,view,offset,true,reason,NULL))
                 {
                     return state.DoS(100, error(reason.c_str()),
                                  REJECT_INVALID, "bad-transaction");            
@@ -2273,7 +2279,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             {
                 if(mc_gState->m_Features->Streams())
                 {
-                    if(!AcceptMultiChainTransaction(tx,view,offset,true,reason))
+                    if(!AcceptMultiChainTransaction(tx,view,offset,true,reason,NULL))
                     {
                         return state.DoS(0,
                                          error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", tx.GetHash().ToString(),reason),
@@ -2342,7 +2348,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             {
                 if(mc_gState->m_Features->Streams())
                 {
-                    if(!AcceptMultiChainTransaction(tx,view,coinbase_offset,true,reason))
+                    if(!AcceptMultiChainTransaction(tx,view,coinbase_offset,true,reason,NULL))
                     {
                         return false;       
                     }

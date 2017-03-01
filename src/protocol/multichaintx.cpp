@@ -205,7 +205,8 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                                             vector <int> vInputHashTypes,
                                             vector <txnouttype> vInputScriptTypes,
                                             bool fReturnFalseIfFound,
-                                            string& reason)
+                                            string& reason,
+                                            bool *fFullReplayCheckRequired)
 {    
     int update_mempool=0;
     mc_EntityDetails entity;
@@ -553,6 +554,8 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
         }
     }
     
+    *fFullReplayCheckRequired=true;
+    
     issuers.clear();
     if(vInputDestinations.size())
     {
@@ -773,7 +776,8 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                  const CCoinsViewCache &inputs,
                                  int offset,
                                  bool accept,
-                                 string& reason)
+                                 string& reason,
+                                 bool *replay)
 {
     bool fScriptHashAllFound;
     bool fSeedNodeInvolved;
@@ -781,6 +785,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
     bool fShouldHaveDestination;
     bool fRejectIfOpDropOpReturn;
     bool fCheckCachedScript;
+    bool fFullReplayCheckRequired;
     int nNewEntityOutput;
     unsigned char details_script[MC_ENT_MAX_SCRIPT_SIZE];
     int details_script_size;
@@ -811,6 +816,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
         }        
     }
     
+    fFullReplayCheckRequired=false;
     fScriptHashAllFound=false;     
     fRejectIfOpDropOpReturn=false;
     mc_gState->m_TmpAssetsIn->Clear();
@@ -1521,6 +1527,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                         {
                                             if( ( (type & (MC_PTP_ADMIN | MC_PTP_MINE)) == 0) || vInputCanGrantAdminMine[i] || (entity.GetEntityType() > 0) )
                                             {
+                                                fFullReplayCheckRequired=true;
                                                 if(mc_gState->m_Permissions->SetPermission(entity.GetTxID(),ptr,type,(unsigned char*)&vInputDestinations[i],from,to,timestamp,flags,1) == 0)
                                                 {
                                                     fAdminFound=true;
@@ -1651,7 +1658,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                                                                 // Checking asset geneses and follow-ons
                                                                                 // If new entity is found - asset genesis is forbidden, otherwise they will have the same reference
                                                                                 // If we fail here only permission db was updated. it will be rolled back
-    if(!AcceptAssetGenesisFromPredefinedIssuers(tx,offset,accept,vInputDestinations,vInputHashTypes,vInputScriptTypes,(nNewEntityOutput >= 0),reason))
+    if(!AcceptAssetGenesisFromPredefinedIssuers(tx,offset,accept,vInputDestinations,vInputHashTypes,vInputScriptTypes,(nNewEntityOutput >= 0),reason,&fFullReplayCheckRequired))
     {
         fReject=true;
         goto exitlbl;                                                                                
@@ -1669,6 +1676,8 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
         int update_mempool;
         uint256 txid;
         mc_EntityDetails entity;
+        
+        fFullReplayCheckRequired=true;
         
         update_mempool=0;
         if(accept)
@@ -1799,6 +1808,11 @@ exitlbl:
     if(!accept || fReject)                                                      // Rolling back permission database if we were just checking or error occurred    
     {
         mc_gState->m_Permissions->RollBackToCheckPoint();
+    }
+
+    if(replay)
+    {
+        *replay=fFullReplayCheckRequired;
     }
 
     if(fReject)

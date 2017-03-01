@@ -47,6 +47,12 @@ private:
     double dPriority; //! Priority when entering the mempool
     unsigned int nHeight; //! Chain height when entering the mempool
 
+    bool fFullReplay;
+    int nPermissionsFrom;
+    int nPermissionsTo;
+    int nWalletFrom;
+    int nWalletTo;
+    
 public:
     CTxMemPoolEntry(const CTransaction& _tx, const CAmount& _nFee,
                     int64_t _nTime, double _dPriority, unsigned int _nHeight);
@@ -59,6 +65,15 @@ public:
     size_t GetTxSize() const { return nTxSize; }
     int64_t GetTime() const { return nTime; }
     unsigned int GetHeight() const { return nHeight; }
+    
+    void ResetReplayParams();
+    void SetReplayNodeParams(bool replay, int from, int to);
+    void SetReplayWalletParams(int from, int to);
+    bool FullReplayRequired() const { return fFullReplay; }
+    int ReplayPermissionFrom() const { return nPermissionsFrom; }
+    int ReplayPermissionTo() const { return nPermissionsTo; }
+    int ReplayWalletFrom() const { return nWalletFrom; }
+    int ReplayWalletTo() const { return nWalletFrom; }
 };
 
 class CMinerPolicyEstimator;
