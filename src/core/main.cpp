@@ -4300,6 +4300,7 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
     }
 
     bool activate=true;
+/*    
     if(GetBoolArg("-waitforbetterblock",false))
     {
         uint256 hash=pblock->GetHash();
@@ -4316,6 +4317,7 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
             }
         }
     }
+ */ 
     if(activate)
     {
         if (!ActivateBestChain(state, pblock))
