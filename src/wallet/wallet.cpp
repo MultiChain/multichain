@@ -1593,11 +1593,14 @@ void CWallet::ReacceptWalletTransactions()
                 {
                     LOCK(mempool.cs);
 
-                    LogPrint("wallet","Reaccepting wtx %s\n", wtxid.ToString());
-                    if(!wtx.AcceptToMemoryPool(false))
+                    if (!mempool.exists(wtxid))
                     {
-                        LogPrintf("Tx %s was not accepted to mempool, setting INVALID flag\n", wtxid.ToString());
-                        pwalletTxsMain->SaveTxFlag((unsigned char*)&wtxid,MC_TFL_INVALID,1);
+                        LogPrint("wallet","Reaccepting wtx %s\n", wtxid.ToString());
+                        if(!wtx.AcceptToMemoryPool(false))
+                        {
+                            LogPrintf("Tx %s was not accepted to mempool, setting INVALID flag\n", wtxid.ToString());
+                            pwalletTxsMain->SaveTxFlag((unsigned char*)&wtxid,MC_TFL_INVALID,1);
+                        }
                     }
                     else
                     {

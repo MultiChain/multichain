@@ -569,7 +569,7 @@ protected:
     virtual void SetBestChain(const CBlockLocator &locator) {};
     virtual void UpdatedTransaction(const uint256 &hash) {};
     virtual void Inventory(const uint256 &hash) {};
-    virtual void ResendWalletTransactions() {};
+    virtual void ResendWalletTransactions(bool fForce) {};
     virtual void BlockChecked(const CBlock&, const CValidationState&) {};
     friend void ::RegisterValidationInterface(CValidationInterface*);
     friend void ::UnregisterValidationInterface(CValidationInterface*);
