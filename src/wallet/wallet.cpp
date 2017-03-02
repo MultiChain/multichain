@@ -1669,8 +1669,11 @@ void CWallet::ResendWalletTransactions(bool fForce)
         return;
 
     // Only do it if there's been a new block since last time
-    if (!fForce && (nTimeBestReceived < nLastResend))
-        return;
+    if(GetTime() < nNextResend + 3 * mc_gState->m_NetworkParams->GetInt64Param("targetblocktime") )
+    {
+        if (!fForce && (nTimeBestReceived < nLastResend))
+            return;
+    }
     nLastResend = GetTime();
 
     // Rebroadcast any of our txes that aren't in a block yet

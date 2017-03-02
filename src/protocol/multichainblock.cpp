@@ -80,8 +80,7 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
                 {
                     int permissions_from,permissions_to;
                     permissions_from=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
-                    if(entry.FullReplayRequired() || 
-                       (mc_gState->m_Permissions->MempoolPermissionsCheck(entry.ReplayPermissionFrom(),entry.ReplayPermissionTo()) == 0) )
+                    if(entry.FullReplayRequired())
                     {
                         LOCK(pool.cs);
                         CCoinsView dummy;
@@ -92,6 +91,13 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
                         {
                             removed_type="rejected";                    
                         }
+                    }
+                    else
+                    {
+                       if(mc_gState->m_Permissions->MempoolPermissionsCheck(entry.ReplayPermissionFrom(),entry.ReplayPermissionTo()) == 0) 
+                       {
+                            removed_type="rejected";                                               
+                       }                        
                     }
                     if(removed_type.size() == 0)
                     {

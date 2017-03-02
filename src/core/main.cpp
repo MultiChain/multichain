@@ -2282,7 +2282,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                     if(!AcceptMultiChainTransaction(tx,view,offset,true,reason,NULL))
                     {
                         return state.DoS(0,
-                                         error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", tx.GetHash().ToString(),reason),
+                                         error("ConnectBlock: : AcceptMultiChainTransaction failed %s : %s", tx.GetHash().ToString(),reason),
                                          REJECT_NONSTANDARD, reason);
                     }
                 }
@@ -2970,7 +2970,7 @@ void UpdateChainMiningStatus(const CBlock &block,CBlockIndex *pindexNew)
         }
         if(pindexNew->pprev)
         {
-            LogPrint("mcblock","mchn-block: New block index:   %s, prev: %s, height: %d, mined-by-me: %d, can-mine: %d\n",block.GetHash().ToString().c_str(),
+            LogPrint("mcblock","mchn-block: New block index:   %s, prev: %s, height: %d, mined-by-me: %d, can-mine: %d\n",pindexNew->GetBlockHash().ToString().c_str(),
                     pindexNew->pprev->GetBlockHash().ToString().c_str(),
                     pindexNew->nHeight,pindexNew->nHeightMinedByMe,pindexNew->nCanMine);
         }
@@ -5927,6 +5927,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         }
 
         CBlockIndex *pindexLast = NULL;
+        int first_height=-1;
         BOOST_FOREACH(const CBlockHeader& header, headers) {
             CValidationState state;
             if (pindexLast != NULL && header.hashPrevBlock != pindexLast->GetBlockHash()) {
@@ -5941,11 +5942,16 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                     return error("invalid header received");
                 }
             }
+            if(first_height < 0)
+            {
+                first_height=pindexLast->nHeight;
+            }
         }
-
         if (pindexLast)
+        {
+            LogPrint("mcblock","mchn-block: Received headers: %d-%d,  peer=%d\n",first_height,pindexLast->nHeight,pfrom->id);            
             UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
-
+        }
         if (nCount == MAX_HEADERS_RESULTS && pindexLast) {
             // Headers message had its maximum size; the peer may have more headers.
             // TODO: optimize: if pindexLast is an ancestor of chainActive.Tip or pindexBestHeader, continue
@@ -5980,6 +5986,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 /* MCHN END */        
             
         LogPrint("net", "received block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
+        LogPrint("mcblock","mchn-block: Received block:   %s,  peer=%d\n",inv.hash.ToString().c_str(),pfrom->id);
 
         pfrom->AddInventoryKnown(inv);
         
@@ -6758,6 +6765,8 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                 vGetData.push_back(CInv(MSG_BLOCK, pindex->GetBlockHash()));
                 MarkBlockAsInFlight(pto->GetId(), pindex->GetBlockHash(), pindex);
                 LogPrint("net", "Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
+                    pindex->nHeight, pto->id);
+                LogPrint("mcblock", "Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
                     pindex->nHeight, pto->id);
             }
             if (state.nBlocksInFlight == 0 && staller != -1) {
