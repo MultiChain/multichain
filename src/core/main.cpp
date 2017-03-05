@@ -6779,12 +6779,13 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             
             if(!pto->vRecvMsg.empty())
             {
-               std::deque<CNetMessage>::iterator it = pto->vRecvMsg.begin();
+                std::deque<CNetMessage>::iterator it = pto->vRecvMsg.begin();
                 CNetMessage& msg1 = *it;
                 if(msg1.complete())
                 {
                     if(msg1.hdr.GetCommand() == "block")
                     {
+                        LogPrint("mcblockperf","mchn-block-perf: There is still block to process from peer=%d, no timeout\n",pto->id);
                         fTimeout=false;
                     }
                 }
@@ -6825,6 +6826,11 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                     LogPrint("net", "Stall started peer=%d\n", staller);
                 }
             }
+        }
+        else
+        {
+            LogPrint("mcblockperf","mchn-block-perf: No block download. fDisconnect: %d, fClient: %d, fFetch: %d, nBlocksInFlight: %d\n",
+                    pto->fDisconnect,pto->fClient,fFetch,state.nBlocksInFlight);            
         }
 /* MCHN START */        
         }
