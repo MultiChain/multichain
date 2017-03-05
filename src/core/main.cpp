@@ -6805,10 +6805,11 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         //
         vector<CInv> vGetData;
 /* MCHN START */        
+        bool fFetchBlocks=true;
         if(!ignore_incoming)
         {
 /* MCHN END */        
-        if (!pto->fDisconnect && !pto->fClient && fFetch && state.nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
+        if (!pto->fDisconnect && !pto->fClient && fFetchBlocks && state.nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
             vector<CBlockIndex*> vToDownload;
             NodeId staller = -1;            
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload, staller);
@@ -6826,11 +6827,6 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                     LogPrint("net", "Stall started peer=%d\n", staller);
                 }
             }
-        }
-        else
-        {
-            LogPrint("mcblockperf","mchn-block-perf: No block download. fDisconnect: %d, fClient: %d, fFetch: %d, nBlocksInFlight: %d\n",
-                    pto->fDisconnect,pto->fClient,fFetch,state.nBlocksInFlight);            
         }
 /* MCHN START */        
         }
