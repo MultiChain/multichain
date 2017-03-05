@@ -6363,9 +6363,35 @@ bool ProcessMessages(CNode* pfrom)
     std::deque<CNetMessage>::iterator it = pfrom->vRecvMsg.begin();
     while (!pfrom->fDisconnect && it != pfrom->vRecvMsg.end()) {
         // Don't bother if send buffer is too full to respond anyway
+        CNetMessage& msg1 = *it;
+        if(msg1.complete())
+        {
+            if(msg1.hdr.GetCommand() == "block")
+            {
+                LogPrint("mcblockperf","mchn-block-perf: New block, peer=%d\n", pfrom->id);
+            }                
+        }
+        
         if (pfrom->nSendSize >= SendBufferSize())
-            break;
-
+        {
+            
+            CNetMessage& msg1 = *it;
+            if(msg1.complete())
+            {
+                if(msg1.hdr.GetCommand() == "block")
+                {
+                    LogPrint("mcblockperf","mchn-block-perf: Processing block, though send buffer is full (%d), peer=%d\n", (int)pfrom->nSendSize,pfrom->id);
+                }                
+                else
+                {
+                    break;
+                }
+            }
+            else
+            {
+                break;
+            }
+        }
         // get next message
         CNetMessage& msg = *it;
 
@@ -6380,7 +6406,7 @@ bool ProcessMessages(CNode* pfrom)
 
         if(msg.hdr.GetCommand() == "block")
         {
-            LogPrint("mcnet","mcnet: Processing message: %s, peer=%d\n", msg.hdr.GetCommand(),pfrom->id);
+            LogPrint("mcblockperf","mchn-block-perf: Processing new block, peer=%d\n",pfrom->id);
         }
         // at this point, any failure means we can delete the current message
         it++;
@@ -6749,8 +6775,25 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         // to unreasonably increase our timeout.            
         if (!pto->fDisconnect && state.vBlocksInFlight.size() > 0 && state.vBlocksInFlight.front().nTime < nNow - 500000 * Params().TargetSpacing() * (4 + 1)) {
 //        if (!pto->fDisconnect && state.vBlocksInFlight.size() > 0 && state.vBlocksInFlight.front().nTime < nNow - 500000 * Params().TargetSpacing() * (4 + state.vBlocksInFlight.front().nValidatedQueuedBefore)) {
-            LogPrintf("Timeout downloading block %s from peer=%d, disconnecting\n", state.vBlocksInFlight.front().hash.ToString(), pto->id);
-            pto->fDisconnect = true;
+            bool fTimeout=true;
+            
+            if(!pto->vRecvMsg.empty())
+            {
+               std::deque<CNetMessage>::iterator it = pto->vRecvMsg.begin();
+                CNetMessage& msg1 = *it;
+                if(msg1.complete())
+                {
+                    if(msg1.hdr.GetCommand() == "block")
+                    {
+                        fTimeout=false;
+                    }
+                }
+            }
+            if(fTimeout)
+            {
+                LogPrintf("Timeout downloading block %s from peer=%d, disconnecting\n", state.vBlocksInFlight.front().hash.ToString(), pto->id);
+                pto->fDisconnect = true;
+            }
         }
 /* MCHN START */        
         }
