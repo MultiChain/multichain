@@ -619,7 +619,10 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
         nBytes -= handled;
 
         if (msg.complete())
+        {
             msg.nTime = GetTimeMicros();
+            LogPrint("mcnet","mcnet: complete message: %s, peer=%d\n", msg.hdr.GetCommand(),id);
+        }
     }
 
     return true;
@@ -652,6 +655,8 @@ int CNetMessage::readHeader(const char *pch, unsigned int nBytes)
     if (hdr.nMessageSize > MAX_SIZE)
             return -1;
 
+    LogPrint("mcnet","mcnet: received header: %s\n", hdr.GetCommand());
+    
     // switch state to reading message data
     in_data = true;
 

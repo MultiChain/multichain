@@ -165,21 +165,21 @@ void FindSigner(CBlock *block,unsigned char *sig,int *sig_size,uint32_t *hash_ty
             {
                 for (unsigned int j = 0; j < tx.vout.size(); j++)
                 {
-                    mc_gState->m_TmpScript->Clear();
+                    mc_gState->m_TmpScript1->Clear();
 
                     const CScript& script1 = tx.vout[j].scriptPubKey;        
                     CScript::const_iterator pc1 = script1.begin();
 
-                    mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+                    mc_gState->m_TmpScript1->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
 
-                    for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
+                    for (int e = 0; e < mc_gState->m_TmpScript1->GetNumElements(); e++)
                     {
                         if(block->vSigner[0] == 0)
                         {
-                            mc_gState->m_TmpScript->SetElement(e);                        
+                            mc_gState->m_TmpScript1->SetElement(e);                        
                             *sig_size=255;
                             key_size=255;    
-                            if(mc_gState->m_TmpScript->GetBlockSignature(sig,sig_size,hash_type,block->vSigner+1,&key_size) == 0)
+                            if(mc_gState->m_TmpScript1->GetBlockSignature(sig,sig_size,hash_type,block->vSigner+1,&key_size) == 0)
                             {
                                 block->vSigner[0]=(unsigned char)key_size;
                             }            

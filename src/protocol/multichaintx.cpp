@@ -609,7 +609,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                 size_t elem_size;
                 const unsigned char *elem;
 
-                elem = mc_gState->m_TmpScript1->GetData(0,&elem_size);
+                elem = mc_gState->m_TmpScript->GetData(0,&elem_size);
 
                 if(elem_size > 1)                                               // If this is multisig with one signature it should be OP_0
                 {
@@ -2201,7 +2201,7 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
             size_t elem_size;
             const unsigned char *elem;
 
-            elem = mc_gState->m_TmpScript1->GetData(0,&elem_size);
+            elem = mc_gState->m_TmpScript->GetData(0,&elem_size);
 
             if(elem_size > 1)                                                   // If this is multisig with one signature it should be OP_0
             {
@@ -2375,7 +2375,7 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
     bool reject;
     bool sighashall_found;
     int pass;
-        
+    mc_Script *lpInputScript=NULL;    
     
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
     {
@@ -2391,8 +2391,8 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
         const CScript& script2 = tx.vin[i].scriptSig;        
         CScript::const_iterator pc2 = script2.begin();
 
-        mc_gState->m_TmpScript1->Clear();
-        mc_gState->m_TmpScript1->SetScript((unsigned char*)(&pc2[0]),(size_t)(script2.end()-pc2),MC_SCR_TYPE_SCRIPTSIG);
+        mc_gState->m_TmpScript->Clear();
+        mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc2[0]),(size_t)(script2.end()-pc2),MC_SCR_TYPE_SCRIPTSIG);
 
         admin_outputs[i]=tx.vout.size();
         if(tx.IsCoinBase())
@@ -2402,13 +2402,13 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
         else
         {
             bool is_pay_to_pubkeyhash=false;
-            if(mc_gState->m_TmpScript1->GetNumElements() == 2)
+            if(mc_gState->m_TmpScript->GetNumElements() == 2)
             {
                 size_t elem_size;
                 const unsigned char *elem;
                 unsigned char hash_type;
 
-                elem = mc_gState->m_TmpScript1->GetData(0,&elem_size);
+                elem = mc_gState->m_TmpScript->GetData(0,&elem_size);
                 
                 if(elem_size > 1)
                 {
@@ -2439,18 +2439,18 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
             {
                 int first_sig=1;
                 int this_sig;
-                if(mc_gState->m_TmpScript1->GetNumElements() == 1)              // pay to pubkey
+                if(mc_gState->m_TmpScript->GetNumElements() == 1)              // pay to pubkey
                 {
                     first_sig=0;
                 }
                 this_sig=first_sig;
-                while(this_sig<mc_gState->m_TmpScript1->GetNumElements())
+                while(this_sig<mc_gState->m_TmpScript->GetNumElements())
                 {
                     size_t elem_size;
                     const unsigned char *elem;
                     unsigned char hash_type;
 
-                    elem = mc_gState->m_TmpScript1->GetData(this_sig,&elem_size);
+                    elem = mc_gState->m_TmpScript->GetData(this_sig,&elem_size);
                     if(elem_size > 1)
                     {
                         hash_type=elem[elem_size-1] & 0x1f;
@@ -2463,7 +2463,7 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
                     }
                     else                                                        // First element of redeemScript
                     {
-                        this_sig=mc_gState->m_TmpScript1->GetNumElements();
+                        this_sig=mc_gState->m_TmpScript->GetNumElements();
                     }
                 }
             }
@@ -2473,6 +2473,8 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
     reject=false;
     seed_node_involved=false;
     mc_gState->m_Permissions->SetCheckPoint();
+    
+    lpInputScript=new mc_Script;
     
     for(pass=0;pass<3;pass++)
     {
@@ -2631,18 +2633,18 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
                                     const CScript& script2 = tx.vin[i].scriptSig;        
                                     CScript::const_iterator pc2 = script2.begin();
 
-                                    mc_gState->m_TmpScript1->Clear();
-                                    mc_gState->m_TmpScript1->SetScript((unsigned char*)(&pc2[0]),(size_t)(script2.end()-pc2),MC_SCR_TYPE_SCRIPTSIG);
+                                    lpInputScript->Clear();
+                                    lpInputScript->SetScript((unsigned char*)(&pc2[0]),(size_t)(script2.end()-pc2),MC_SCR_TYPE_SCRIPTSIG);
 
-                                    if(mc_gState->m_TmpScript1->GetNumElements() > 1)
+                                    if(lpInputScript->GetNumElements() > 1)
                                     {
                                         size_t elem_size;
                                         const unsigned char *elem;
 
-                                        elem = mc_gState->m_TmpScript1->GetData(0,&elem_size);
+                                        elem = lpInputScript->GetData(0,&elem_size);
                                         if(elem_size > 1)                       // it is not multisig with one signature
                                         {
-                                            elem = mc_gState->m_TmpScript1->GetData(1,&elem_size);
+                                            elem = lpInputScript->GetData(1,&elem_size);
                                             const unsigned char *pubkey_hash=(unsigned char *)Hash160(elem,elem+elem_size).begin();
                                             if(mc_gState->m_Permissions->SetPermission(NULL,ptr,type,pubkey_hash,from,to,timestamp,flags,1) == 0)
                                             {
@@ -2749,6 +2751,11 @@ exitlbl:
     if(!accept || reject)
     {
         mc_gState->m_Permissions->RollBackToCheckPoint();
+    }
+
+    if(lpInputScript)
+    {
+        delete lpInputScript;
     }
 
     return !reject;
