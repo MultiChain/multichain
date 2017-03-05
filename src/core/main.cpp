@@ -6790,6 +6790,13 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                     }
                 }
             }
+            if(!fTimeout)
+            {
+                if (state.vBlocksInFlight.front().nTime < nNow - 500000 * Params().TargetSpacing() * (4 + state.vBlocksInFlight.front().nValidatedQueuedBefore)) 
+                {
+                    fTimeout=true;
+                }
+            }
             if(fTimeout)
             {
                 LogPrintf("Timeout downloading block %s from peer=%d, disconnecting\n", state.vBlocksInFlight.front().hash.ToString(), pto->id);
