@@ -3067,10 +3067,13 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
         LogPrint("mcblockperf","mchn-block-perf: Best chain activation completed\n");
 
 /* MCHN START */        
-        if(pwalletMain)
+        if (!fImporting && !fReindex)
         {
-            CTransaction emptyTx;                                                   // Triggering wallet optimization
-            SyncWithWallets(emptyTx, pblock);
+            if(pwalletMain)
+            {
+                CTransaction emptyTx;                                                   // Triggering wallet optimization
+                SyncWithWallets(emptyTx, pblock);
+            }
         }
 /* MCHN END */    
         
