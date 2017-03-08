@@ -618,6 +618,7 @@ int mc_TxDB::AddToFile(const unsigned char *tx,
     
 exitlbl:
 
+    fsync(FileHan);
     close(FileHan);
     return err;
 }

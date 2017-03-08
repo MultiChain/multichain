@@ -139,6 +139,7 @@ int mc_EntityLedger::Close()
 {
     if(m_FileHan>0)
     {
+        fsync(m_FileHan);
         close(m_FileHan);
     }    
     m_FileHan=0;
