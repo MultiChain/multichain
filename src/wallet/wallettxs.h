@@ -14,6 +14,35 @@
 
 #define MC_TDB_MAX_OP_RETURN_SIZE             256
 
+typedef struct mc_WalletCachedSubKey
+{
+    mc_TxEntity m_Entity;
+    mc_TxEntity m_SubkeyEntity;
+    uint160 m_SubKeyHash;
+    uint32_t m_Flags;
+    
+    void Zero();
+    void Set(mc_TxEntity* entity,mc_TxEntity* subkey_entity,uint160 subkey_hash,uint32_t flags);
+    
+    mc_WalletCachedSubKey()
+    {
+        Zero();
+    }
+    
+} mc_WalletCachedSubKey;
+
+typedef struct mc_WalletCachedAddTx
+{
+    std::vector<mc_Coin> m_TxOutsIn;
+    std::vector<mc_Coin> m_TxOutsOut;
+    std::vector<mc_WalletCachedSubKey> m_SubKeys;
+    std::vector<mc_TxEntity> m_Entities;
+    uint32_t m_Flags;
+    bool fSingleInputEntity;
+
+    
+} mc_WalletCachedAddTx;
+
 typedef struct mc_WalletTxs
 {
     mc_TxDB *m_Database;
@@ -121,6 +150,7 @@ typedef struct mc_WalletTxs
     int GetEntityListCount();
     mc_TxEntityStat *GetEntity(int row);
 
+    std::string Summary();                                                      // Wallet summary
     
 // Internal functions
     
@@ -134,6 +164,8 @@ typedef struct mc_WalletTxs
                    int set_flag);                                               // 1 if set, 0 if unset
     
     int RollBackSubKeys(mc_TxImport *import,int block,mc_TxEntityStat *parent_entity,mc_Buffer *lpSubKeyEntRowBuffer); // Rollback subkeys to specific block
+
+    int LoadUnconfirmedSends(int block,int file_block); 
     
     std::map<uint256,CWalletTx> GetUnconfirmedSends(int block,std::vector<uint256>& unconfirmedSendsHashes);                 // Internal. Retrieves list of unconfirmed txs sent by this wallet for specific block
     void GetSingleInputEntity(const CWalletTx& tx,mc_TxEntity *input_entity);

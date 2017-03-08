@@ -200,6 +200,19 @@ void mc_WalletTxs::BindWallet(CWallet *lpWallet)
     m_lpWallet=lpWallet;    
 }
 
+string mc_WalletTxs::Summary()
+{
+    if(m_Database->m_Imports->m_Block != m_Database->m_DBStat.m_Block)
+    {
+        LogPrintf("wtxs: ERROR! Wallet block count mismatch: %d -> %d\n",m_Database->m_Imports->m_Block != m_Database->m_DBStat.m_Block);
+    }
+    return strprintf("Block: %d, Txs: %d, Unconfirmed: %d, UTXOs: %d",
+            m_Database->m_Imports->m_Block,
+            (int)m_Database->m_DBStat.m_Count,
+            (int)m_UnconfirmedSends.size(),
+            (int)m_UTXOs[0].size());
+}
+
 
 int mc_WalletTxs::Initialize(
           const char *name,  
@@ -231,7 +244,14 @@ int mc_WalletTxs::Initialize(
     
     if(err == MC_ERR_NOERROR)
     {
-        m_UnconfirmedSends= GetUnconfirmedSends(m_Database->m_DBStat.m_Block,m_UnconfirmedSendsHashes);
+//        m_UnconfirmedSends= GetUnconfirmedSends(m_Database->m_DBStat.m_Block,m_UnconfirmedSendsHashes);
+        m_UnconfirmedSends.clear();
+        m_UnconfirmedSendsHashes.clear();
+        if(m_Database->m_DBStat.m_Block > 0)                                    // If node crashed during commit we may want to reload unconfirmed txs of the previous block    
+        {
+            LoadUnconfirmedSends(m_Database->m_DBStat.m_Block,m_Database->m_DBStat.m_Block-1);            
+        }
+        LoadUnconfirmedSends(m_Database->m_DBStat.m_Block,m_Database->m_DBStat.m_Block);
     }    
     return err;
 }
@@ -427,11 +447,12 @@ int mc_WalletTxs::Commit(mc_TxImport *import)
     {
         if(imp->m_ImportID == 0)
         {
-            std::vector<uint256> vUnconfirmedHashes;
-            std::map<uint256,CWalletTx> mapUnconfirmed= GetUnconfirmedSends(m_Database->m_DBStat.m_Block-1,vUnconfirmedHashes);// Confirmed txs are filtered out
             m_UnconfirmedSends.clear();
             m_UnconfirmedSendsHashes.clear();
-            LogPrint("wallet","wtxs: Unconfirmed wallet transactions: %d\n",mapUnconfirmed.size());
+            LoadUnconfirmedSends(m_Database->m_DBStat.m_Block,m_Database->m_DBStat.m_Block-1);
+/*            
+            std::vector<uint256> vUnconfirmedHashes;
+            std::map<uint256,CWalletTx> mapUnconfirmed= GetUnconfirmedSends(m_Database->m_DBStat.m_Block-1,vUnconfirmedHashes);// Confirmed txs are filtered out
 //            for (map<uint256,CWalletTx>::const_iterator it = mapUnconfirmed.begin(); it != mapUnconfirmed.end(); ++it)            
             BOOST_FOREACH(const uint256& hash, vUnconfirmedHashes) 
             {
@@ -441,6 +462,8 @@ int mc_WalletTxs::Commit(mc_TxImport *import)
                     AddToUnconfirmedSends(m_Database->m_DBStat.m_Block,it->second);
                 }
             }
+ */ 
+            LogPrint("wallet","wtxs: Unconfirmed wallet transactions: %d\n",m_UnconfirmedSends.size());
         }
     }
        
@@ -452,6 +475,25 @@ int mc_WalletTxs::Commit(mc_TxImport *import)
     LogPrint("wallet","wtxs: Commit: Import: %d, Block: %d\n",imp->m_ImportID,imp->m_Block);
     m_Database->UnLock();
     return err;        
+}
+
+int mc_WalletTxs::LoadUnconfirmedSends(int block,int file_block)
+{
+    std::vector<uint256> vUnconfirmedHashes;
+    std::map<uint256,CWalletTx> mapUnconfirmed= GetUnconfirmedSends(file_block,vUnconfirmedHashes);// Confirmed txs are filtered out
+    BOOST_FOREACH(const uint256& hash, vUnconfirmedHashes) 
+    {
+        std::map<uint256,CWalletTx>::const_iterator it = mapUnconfirmed.find(hash);
+        if (it != mapUnconfirmed.end())
+        {                
+            std::map<uint256,CWalletTx>::const_iterator it1 = m_UnconfirmedSends.find(hash);
+            if (it1 == m_UnconfirmedSends.end())
+            {                
+                AddToUnconfirmedSends(block,it->second);
+            }
+        }
+    }
+    return MC_ERR_NOERROR;
 }
 
 /*
@@ -1572,6 +1614,7 @@ int mc_WalletTxs::LoadUTXOMap(int import_id,int block)
 {
     char ShortName[65];                                     
     char FileName[MC_DCT_DB_MAX_PATH];                      
+    FILE *fHan;
     int import_pos;
     bool fHaveUtxo;
     map<COutPoint, mc_Coin> mapOut;
@@ -1597,7 +1640,14 @@ int mc_WalletTxs::LoadUTXOMap(int import_id,int block)
 
     mc_GetFullFileName(m_Database->m_Name,ShortName,".dat",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR, FileName);
     
-    CAutoFile filein(fopen(FileName,"rb+"), SER_DISK, CLIENT_VERSION);
+    fHan=fopen(FileName,"rb+");
+    
+    if(fHan == NULL)
+    {
+        LogPrintf("wtxs: Cannot open unspent outputs file\n");
+    }
+    
+    CAutoFile filein(fHan, SER_DISK, CLIENT_VERSION);
     
     fHaveUtxo=true;
     while(fHaveUtxo)
@@ -1700,6 +1750,21 @@ CWalletTx mc_WalletTxChoppedCopy(CWallet *lpWallet,const CWalletTx& tx)
     return wtx;
 }
 
+void mc_WalletCachedSubKey::Set(mc_TxEntity* entity,mc_TxEntity* subkey_entity,uint160 subkey_hash,uint32_t flags)
+{
+    memcpy(&m_Entity,entity,sizeof(mc_TxEntity));
+    memcpy(&m_SubkeyEntity,subkey_entity,sizeof(mc_TxEntity));
+    m_SubKeyHash=subkey_hash;
+    m_Flags=flags;    
+}
+
+void mc_WalletCachedSubKey::Zero()
+{
+    m_Entity.Zero();
+    m_SubkeyEntity.Zero();
+    m_SubKeyHash=0;
+    m_Flags=0;
+}
 
 int mc_WalletTxs::AddTx(mc_TxImport *import,const CTransaction& tx,int block,CDiskTxPos* block_pos,uint32_t block_tx_index,uint256 block_hash)
 {

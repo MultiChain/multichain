@@ -1577,7 +1577,7 @@ void CWallet::ReacceptWalletTransactions()
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {        
         pwalletTxsMain->Lock();
-        LogPrint("wallet","ReacceptWalletTransactions: %ld txs in unconfirmed pool \n", pwalletTxsMain->m_UnconfirmedSends.size());
+        LogPrintf("ReacceptWalletTransactions: %ld txs in unconfirmed pool \n", pwalletTxsMain->m_UnconfirmedSends.size());
 //        BOOST_FOREACH(PAIRTYPE(const uint256, CWalletTx)& item, pwalletTxsMain->m_UnconfirmedSends)
         BOOST_FOREACH(const uint256& wtxid, pwalletTxsMain->m_UnconfirmedSendsHashes) 
         {
@@ -1586,20 +1586,27 @@ void CWallet::ReacceptWalletTransactions()
             {                
 //                const uint256& wtxid = item.first;
                 CWalletTx& wtx = item->second;
-                int nDepth = wtx.GetDepthInMainChain();
-                LogPrint("wallet","Unconfirmed wtx: %s, depth: %d\n", wtxid.ToString(),nDepth);
 
-                if (!wtx.IsCoinBase() && nDepth < 0)
+                if (!wtx.IsCoinBase())// && nDepth < 0)
                 {
                     LOCK(mempool.cs);
 
                     if (!mempool.exists(wtxid))
                     {
-                        LogPrint("wallet","Reaccepting wtx %s\n", wtxid.ToString());
-                        if(!wtx.AcceptToMemoryPool(false))
+                        int nDepth = wtx.GetDepthInMainChain();
+                        LogPrint("wallet","Unconfirmed wtx: %s, depth: %d\n", wtxid.ToString(),nDepth);
+                        if(nDepth < 0)
                         {
-                            LogPrintf("Tx %s was not accepted to mempool, setting INVALID flag\n", wtxid.ToString());
-                            pwalletTxsMain->SaveTxFlag((unsigned char*)&wtxid,MC_TFL_INVALID,1);
+                            LogPrint("wallet","Reaccepting wtx %s\n", wtxid.ToString());
+                            if(!wtx.AcceptToMemoryPool(false))
+                            {
+                                LogPrintf("Tx %s was not accepted to mempool, setting INVALID flag\n", wtxid.ToString());
+                                pwalletTxsMain->SaveTxFlag((unsigned char*)&wtxid,MC_TFL_INVALID,1);
+                            }
+                        }
+                        else
+                        {
+                            LogPrintf("wtxs: Internal error! Unconfirmed wtx %s already in the chain\n", wtxid.ToString());                                                                
                         }
                     }
                     else
@@ -1607,6 +1614,10 @@ void CWallet::ReacceptWalletTransactions()
                         LogPrint("wallet","Unconfirmed wtx %s already in mempool, ignoring\n", wtxid.ToString());                    
                     }
                 }            
+            }
+            else
+            {
+                LogPrintf("wtxs: Internal error! Unconfirmed wtx %s details not found\n", wtxid.ToString());                                    
             }
         }            
         pwalletTxsMain->UnLock();
@@ -3013,7 +3024,8 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
     
     {
         LOCK2(cs_main, cs_wallet);
-        LogPrintf("CommitTransaction:\n%s", wtxNew.ToString());
+        LogPrintf("CommitTransaction: %s, vin: %d, vout: %d\n",wtxNew.GetHash().ToString().c_str(),(int)wtxNew.vin.size(),(int)wtxNew.vout.size());
+        LogPrint("wallet","CommitTransaction:\n%s", wtxNew.ToString());
         {
 /* MCHN START */            
             if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
@@ -4014,16 +4026,18 @@ int CMerkleTx::GetDepthInMainChainINTERNAL(const CBlockIndex* &pindexRet) const
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
         mc_TxDefRow txdef;
-        pwalletTxsMain->FindWalletTx(GetHash(),&txdef);       
-        if((txdef.m_Flags & MC_TFL_INVALID) == 0)
+        if(pwalletTxsMain->FindWalletTx(GetHash(),&txdef) == MC_ERR_NOERROR)
         {
-            if(txdef.m_Block >= 0)
+            if((txdef.m_Flags & MC_TFL_INVALID) == 0)
             {
-                if(txdef.m_Block <= chainActive.Height())
+                if(txdef.m_Block >= 0)
                 {
-                    pindex=chainActive[txdef.m_Block];
-                }
-            }        
+                    if(txdef.m_Block <= chainActive.Height())
+                    {
+                        pindex=chainActive[txdef.m_Block];
+                    }
+                }        
+            }
         }
         if (!pindex || !chainActive.Contains(pindex))
             return 0;

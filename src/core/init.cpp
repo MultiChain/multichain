@@ -1344,6 +1344,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 }        
             }
         }
+        LogPrint("mcblockperf","mchn-block-perf: Wallet initialization completed (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
         LogPrintf("Wallet mode: %08X\n",mc_gState->m_WalletMode);
         if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
         {
@@ -1862,11 +1863,32 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 if (fReindex)
                     pblocktree->WriteReindexing(true);
 
+                if(mc_gState->m_WalletMode & MC_WMD_TXS)
+                {
+                    bool fFirstRunForLoadChain = true;
+                    pwalletMain = new CWallet(strWalletFile);
+                    DBErrors nLoadWalletRetForLoadChain = pwalletMain->LoadWallet(fFirstRunForLoadChain);
+                    if (nLoadWalletRetForLoadChain != DB_LOAD_OK)
+                    {
+                        strLoadError = _("Error loading wallet before loading chain");
+                        break;
+                    }
+                    pwalletTxsMain->BindWallet(pwalletMain);
+                }
+    
+                
                 if (!LoadBlockIndex()) {
                     strLoadError = _("Error loading block database");
                     break;
                 }
 
+                if(pwalletMain)
+                {
+                    pwalletTxsMain->BindWallet(NULL);
+                    delete pwalletMain;
+                    pwalletMain=NULL;
+                }
+                
                 // If the loaded chain has a wrong genesis, bail out immediately
                 // (we're likely using a testnet datadir, or the other way around).
                 if (!mapBlockIndex.empty() && mapBlockIndex.count(Params().HashGenesisBlock()) == 0)
@@ -2178,10 +2200,10 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 #endif
 
     // ********************************************************* Step 11: finished
-
+/*
     SetRPCWarmupFinished();
     uiInterface.InitMessage(_("Done loading"));
-    
+*/    
 #ifdef ENABLE_WALLET
     if (pwalletMain) {
         // Add wallet transactions that aren't already in a block to mapTransactions
@@ -2192,6 +2214,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     }
 #endif
 
+    SetRPCWarmupFinished();                                                     // Should be here, otherwise wallet can double spend
+    uiInterface.InitMessage(_("Done loading"));
 
 /* MCHN START */    
     if(!GetBoolArg("-shortoutput", false))
