@@ -1191,7 +1191,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         mc_gState->m_Assets= new mc_AssetDB;
         if(mc_gState->m_Assets->Initialize(mc_gState->m_Params->NetworkName(),0))                                
         {
-            seed_error=strprintf("ERROR: Couldn't initialize asset database for blockchain %s. Exiting...\n",mc_gState->m_Params->NetworkName());
+            seed_error=strprintf("ERROR: Couldn't initialize asset database for blockchain %s. Please restart multichaind with reindex=1.\n",mc_gState->m_Params->NetworkName());
             return InitError(_(seed_error.c_str()));        
         }
         

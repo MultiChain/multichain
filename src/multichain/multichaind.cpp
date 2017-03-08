@@ -235,7 +235,14 @@ bool AppInit(int argc, char* argv[])
     err=mc_gState->m_Permissions->Initialize(mc_gState->m_Params->NetworkName(),0);                                
     if(err)
     {
-        fprintf(stderr,"\nERROR: Couldn't initialize permission database for blockchain %s. Probably multichaind for this blockchain is already running. Exiting...\n",mc_gState->m_Params->NetworkName());
+        if(err == MC_ERR_CORRUPTED)
+        {
+            fprintf(stderr,"\nERROR: Couldn't initialize permission database for blockchain %s. Probably multichaind for this blockchain is already running. Exiting...\n",mc_gState->m_Params->NetworkName());                        
+        }
+        else
+        {
+            fprintf(stderr,"\nERROR: Couldn't initialize permission database for blockchain %s. Probably multichaind for this blockchain is already running. Exiting...\n",mc_gState->m_Params->NetworkName());
+        }
         delete mc_gState;                
         return false;
     }

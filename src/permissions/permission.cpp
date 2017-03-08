@@ -377,19 +377,22 @@ int mc_Permissions::Initialize(const char *name,int mode)
     m_Ledger->Close();
     if(pdbBlock != pldBlock)
     {
-        LogString("Initialize: Database corrupted 1");
+        sprintf(msg,"Initialize: Database corrupted, blocks, Ledger: %d, DB: %d",pldBlock,pdbBlock);
+        LogString(msg);
         return MC_ERR_CORRUPTED;
     }
 
     if(pdbLastRow != pldLastRow)
     {
-        LogString("Initialize: Database corrupted 2");
+        sprintf(msg,"Initialize: Database corrupted, rows, Ledger: %ld, DB: %ld",pldLastRow,pdbLastRow);
+        LogString(msg);
         return MC_ERR_CORRUPTED;
     }
 
     if(pldLastRow > ledger_size)
     {
-        LogString("Initialize: Database corrupted 3");
+        sprintf(msg,"Initialize: Database corrupted, size, last row: %ld, file size: %ld",pldLastRow,ledger_size);
+        LogString(msg);
         return MC_ERR_CORRUPTED;        
     }
     
