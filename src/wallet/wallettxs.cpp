@@ -1431,6 +1431,9 @@ int mc_WalletTxs::AddToUnconfirmedSends(int block, const CWalletTx& tx)
     hash=tx.GetHash();
     m_UnconfirmedSends.insert(make_pair(hash, tx));
     m_UnconfirmedSendsHashes.push_back(hash);
+
+    
+//    FileCommit(fHan);                                                         // In the worst case we'll lose some transactions
     
     return MC_ERR_NOERROR;
 }
@@ -1606,6 +1609,7 @@ int mc_WalletTxs::SaveUTXOMap(int import_id,int block)
         fileout << it->second;        
     }
 
+    FileCommit(fHan);
     
     return MC_ERR_NOERROR;
 }
