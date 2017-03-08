@@ -302,9 +302,9 @@ int mc_AssetDB::Zero()
 
 int mc_AssetDB::Initialize(const char *name,int mode)
 {
-    int err,value_len;    
+    int err,value_len,take_it;    
     int32_t adbBlock,aldBlock;
-    uint64_t adbLastPos,aldLastPos;
+    uint64_t adbLastPos,aldLastPos,this_pos;
     
     unsigned char *ptr;
 
@@ -404,6 +404,42 @@ int mc_AssetDB::Initialize(const char *name,int mode)
     }
 
     m_Ledger->Close();
+    
+    if(adbBlock < aldBlock)
+    {
+        if(m_Ledger->Open() <= 0)
+        {
+            return MC_ERR_DBOPEN_ERROR;
+        }
+    
+        this_pos=aldLastPos;
+        take_it=1;
+
+        while(take_it && (this_pos>0))
+        {            
+            m_Ledger->GetRow(this_pos,&aldRow);
+        
+            if(aldRow.m_Block <= adbBlock)
+            {
+                take_it=0;
+            }
+            if(take_it)
+            {
+                this_pos=aldRow.m_PrevPos;
+            }
+        }
+
+        aldLastPos=this_pos;
+
+        m_Ledger->GetRow(0,&aldRow);
+        aldRow.m_Block=adbBlock;
+        aldRow.m_PrevPos=m_PrevPos;
+        m_Ledger->SetZeroRow(&aldRow);
+        
+        m_Ledger->Close();  
+
+        aldBlock=adbBlock;
+    }
     
     if(adbBlock != aldBlock)
     {

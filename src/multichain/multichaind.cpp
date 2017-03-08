@@ -237,7 +237,7 @@ bool AppInit(int argc, char* argv[])
     {
         if(err == MC_ERR_CORRUPTED)
         {
-            fprintf(stderr,"\nERROR: Couldn't initialize permission database for blockchain %s. Probably multichaind for this blockchain is already running. Exiting...\n",mc_gState->m_Params->NetworkName());                        
+            fprintf(stderr,"\nERROR: Couldn't initialize permission database for blockchain %s. Please restart multichaind with reindex=1.\n",mc_gState->m_Params->NetworkName());                        
         }
         else
         {

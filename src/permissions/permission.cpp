@@ -263,9 +263,9 @@ int mc_Permissions::Zero()
 
 int mc_Permissions::Initialize(const char *name,int mode)
 {
-    int err,value_len;    
+    int err,value_len,take_it;    
     int32_t pdbBlock,pldBlock;
-    uint64_t pdbLastRow,pldLastRow;
+    uint64_t pdbLastRow,pldLastRow,this_row;
     uint64_t ledger_size;
     char msg[256];
     
@@ -375,8 +375,53 @@ int mc_Permissions::Initialize(const char *name,int mode)
     m_Row=ledger_size;
 
     m_Ledger->Close();
-    if(pdbBlock != pldBlock)
+    if(pdbBlock < pldBlock)
     {
+        sprintf(msg,"Initialize: Database corrupted, blocks, Ledger: %d, DB: %d, trying to repair.",pldBlock,pdbBlock);
+        LogString(msg);
+        if(m_Ledger->Open() <= 0)
+        {
+            LogString("Error: Repair: couldn't open ledger");
+            return MC_ERR_DBOPEN_ERROR;
+        }
+    
+        this_row=m_Row-1;
+        take_it=1;
+        if(this_row == 0)
+        {
+            take_it=0;
+        }
+    
+        while(take_it && (this_row>0))
+        {
+            m_Ledger->GetRow(this_row,&pldRow);
+        
+            if((int32_t)pldRow.m_BlockReceived <= pdbBlock)
+            {
+                take_it=0;
+            }
+            if(take_it)
+            {
+                this_row--;
+            }            
+        }
+        
+        this_row++;
+
+        m_Ledger->GetRow(0,&pldRow);
+
+        pldRow.m_BlockTo=pdbBlock;
+        pldRow.m_PrevRow=this_row;
+        m_Ledger->SetRow(0,&pldRow);        
+
+        m_Ledger->Close();  
+
+        pldBlock=pdbBlock;
+        pldLastRow=this_row;        
+    }
+    
+    if(pdbBlock != pldBlock)
+    {        
         sprintf(msg,"Initialize: Database corrupted, blocks, Ledger: %d, DB: %d",pldBlock,pdbBlock);
         LogString(msg);
         return MC_ERR_CORRUPTED;
