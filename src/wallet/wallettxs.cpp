@@ -469,6 +469,8 @@ int mc_WalletTxs::Commit(mc_TxImport *import)
         }
     }
        
+    FlushUnconfirmedSends(m_Database->m_DBStat.m_Block);
+    
     if(err)
     {
         LogPrintf("wtxs: Commit: Error: %d\n",err);        
@@ -1400,6 +1402,36 @@ int mc_WalletTxs::DropImport(mc_TxImport *import)
     LogPrint("wallet","wtxs: DropImport: Import: %d, Block: %d\n",gen,m_Database->m_DBStat.m_Block);
     m_Database->UnLock();
     return err;                    
+}
+
+int mc_WalletTxs::FlushUnconfirmedSends(int block)
+{
+    FILE* fHan;
+    char ShortName[65];                                     
+    char FileName[MC_DCT_DB_MAX_PATH];                      
+    uint256 hash;
+    
+    if((m_Mode & MC_WMD_TXS) == 0)
+    {
+        return MC_ERR_NOT_SUPPORTED;
+    }    
+    if(m_Database == NULL)
+    {
+        return MC_ERR_INTERNAL_ERROR;
+    }
+
+    sprintf(ShortName,"wallet/uncsend_%d",block);
+
+    mc_GetFullFileName(m_Database->m_Name,ShortName,".dat",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,FileName);
+    fHan=fopen(FileName,"ab+");
+    
+    if(fHan == NULL)
+    {
+        return MC_ERR_FILE_WRITE_ERROR;
+    }
+    
+    FileCommit(fHan);                                                           
+    fclose(fHan);    
 }
 
 int mc_WalletTxs::AddToUnconfirmedSends(int block, const CWalletTx& tx)

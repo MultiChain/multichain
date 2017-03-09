@@ -158,6 +158,7 @@ typedef struct mc_WalletTxs
     int Destroy();
     
     int AddToUnconfirmedSends(int block,const CWalletTx& tx);
+    int FlushUnconfirmedSends(int block);
     int SaveTxFlag(                                                             // Changes tx flag setting (if tx is found))
                    const unsigned char *hash,                                   // Tx ID
                    uint32_t flag,                                               // Flag to set/unset
