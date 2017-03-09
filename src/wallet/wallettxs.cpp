@@ -536,7 +536,7 @@ int mc_WalletTxs::CleanUpAfterBlock(mc_TxImport *import,int block,int prev_block
         RemoveUTXOMap(imp->m_ImportID,prev_block-MC_TDB_UTXO_SET_WINDOW_SIZE);
         if(imp->m_ImportID == 0)
         {
-            RemoveUnconfirmedSends(prev_block);
+            RemoveUnconfirmedSends(prev_block-MC_TDB_UTXO_SET_WINDOW_SIZE);
         }
     }
     LogPrint("wallet","wtxs: CleanUpAfterBlock: Import: %d, Block: %d\n",imp->m_ImportID,imp->m_Block);
@@ -1432,6 +1432,8 @@ int mc_WalletTxs::FlushUnconfirmedSends(int block)
     
     FileCommit(fHan);                                                           
     fclose(fHan);    
+    
+    return MC_ERR_NOERROR;
 }
 
 int mc_WalletTxs::AddToUnconfirmedSends(int block, const CWalletTx& tx)
