@@ -3045,15 +3045,6 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
     
     if(err == MC_ERR_NOERROR)
     {
-        err=m_Database->m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
-        if(err)
-        {
-            LogString("Error: Commit: DB commit error");                                    
-        }
-    }    
-    
-    if(err == MC_ERR_NOERROR)
-    {
         m_Block++;
         UpdateCounts();        
         m_Block--;
@@ -3087,6 +3078,15 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
     }
     
     m_Ledger->Close();
+    
+    if(err == MC_ERR_NOERROR)
+    {
+        err=m_Database->m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
+        if(err)
+        {
+            LogString("Error: Commit: DB commit error");                                    
+        }
+    }    
     
     
     if(err)
@@ -3211,17 +3211,6 @@ int mc_Permissions::RollBackInternal(int block)
 
     if(err == MC_ERR_NOERROR)
     {
-        m_Ledger->GetRow(0,&pldRow);
-
-        pldRow.m_BlockTo=block;
-        pldRow.m_PrevRow=this_row;
-        m_Ledger->SetRow(0,&pldRow);        
-    }
-    
-    m_Ledger->Close();  
-    
-    if(err == MC_ERR_NOERROR)
-    {
         pdbRow.Zero();
         
         ptr=(unsigned char*)m_Database->m_DB->Read((char*)&pdbRow+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err);
@@ -3248,6 +3237,17 @@ int mc_Permissions::RollBackInternal(int block)
     {
         err=m_Database->m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
     }    
+    
+    if(err == MC_ERR_NOERROR)
+    {
+        m_Ledger->GetRow(0,&pldRow);
+
+        pldRow.m_BlockTo=block;
+        pldRow.m_PrevRow=this_row;
+        m_Ledger->SetRow(0,&pldRow);        
+    }
+    
+    m_Ledger->Close();  
     
     if(err == MC_ERR_NOERROR)
     {

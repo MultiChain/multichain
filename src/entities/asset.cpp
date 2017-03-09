@@ -1462,15 +1462,6 @@ int mc_AssetDB::RollBack(int block)
     }
 
     m_PrevPos=this_pos;
-
-    if(err == MC_ERR_NOERROR)
-    {
-        m_Ledger->GetRow(0,&aldRow);
-        aldRow.m_Block=block;
-        aldRow.m_PrevPos=m_PrevPos;
-        m_Ledger->SetZeroRow(&aldRow);
-    }
-    
     
     if(err == MC_ERR_NOERROR)
     {
@@ -1492,6 +1483,14 @@ int mc_AssetDB::RollBack(int block)
     {
         err=m_Database->m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
     }    
+    
+    if(err == MC_ERR_NOERROR)
+    {
+        m_Ledger->GetRow(0,&aldRow);
+        aldRow.m_Block=block;
+        aldRow.m_PrevPos=m_PrevPos;
+        m_Ledger->SetZeroRow(&aldRow);
+    }
     
     if(err == MC_ERR_NOERROR)
     {
