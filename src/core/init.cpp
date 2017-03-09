@@ -1321,7 +1321,10 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     mc_gState->m_WalletMode |= MC_WMD_AUTOSUBSCRIBE_ASSETS;
                 }                
 
-                pwalletTxsMain->Initialize(mc_gState->m_NetworkParams->Name(),mc_gState->m_WalletMode);
+                if(pwalletTxsMain->Initialize(mc_gState->m_NetworkParams->Name(),mc_gState->m_WalletMode))
+                {
+                    return InitError("Wallet tx database corrupted. Please restart multichaind with -rescan\n");                        
+                }
 
                 if(mc_gState->m_WalletMode & MC_WMD_AUTO)
                 {

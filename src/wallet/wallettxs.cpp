@@ -14,6 +14,8 @@ using namespace json_spirit;
 #include <boost/algorithm/string/replace.hpp>
 #include "json/json_spirit_writer_template.h"
 
+#define MC_TDB_UTXO_SET_WINDOW_SIZE        20
+
 int64_t GetAdjustedTime();
 void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
 bool CBitcoinAddressFromTxEntity(CBitcoinAddress &address,mc_TxEntity *lpEntity);
@@ -527,7 +529,10 @@ int mc_WalletTxs::CleanUpAfterBlock(mc_TxImport *import,int block,int prev_block
     }    
      
     m_Database->Lock(1,0);
-    RemoveUTXOMap(imp->m_ImportID,prev_block);
+    if(prev_block-MC_TDB_UTXO_SET_WINDOW_SIZE >= 0)
+    {
+        RemoveUTXOMap(imp->m_ImportID,prev_block-MC_TDB_UTXO_SET_WINDOW_SIZE);
+    }
     if(imp->m_ImportID == 0)
     {
         RemoveUnconfirmedSends(prev_block);
@@ -1431,9 +1436,8 @@ int mc_WalletTxs::AddToUnconfirmedSends(int block, const CWalletTx& tx)
     hash=tx.GetHash();
     m_UnconfirmedSends.insert(make_pair(hash, tx));
     m_UnconfirmedSendsHashes.push_back(hash);
-
     
-//    FileCommit(fHan);                                                         // In the worst case we'll lose some transactions
+    FileCommit(fHan);                                                           // If we not do it, in the worst case we'll lose some transactions
     
     return MC_ERR_NOERROR;
 }
@@ -1649,6 +1653,10 @@ int mc_WalletTxs::LoadUTXOMap(int import_id,int block)
     if(fHan == NULL)
     {
         LogPrintf("wtxs: Cannot open unspent outputs file\n");
+        if(block > 0)
+        {
+            return MC_ERR_NOERROR;
+        }
     }
     
     CAutoFile filein(fHan, SER_DISK, CLIENT_VERSION);
