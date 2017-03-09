@@ -1128,7 +1128,7 @@ void JSONRequest::parse(const Value& valRequest)
         throw JSONRPCError(RPC_INVALID_REQUEST, "Method must be a string");
     strMethod = valMethod.get_str();
     if (strMethod != "getblocktemplate")
-        LogPrint("rpc", "ThreadRPCServer method=%s\n", strMethod);
+        LogPrint("rpc", "ThreadRPCServer method=%s\n", SanitizeString(strMethod));
 
 /* MCHN START */    
     Value valChainName = find_value(request, "chain_name");

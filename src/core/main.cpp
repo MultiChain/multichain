@@ -5238,7 +5238,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 /* MCHN END */
 
     RandAddSeedPerfmon();
-    LogPrint("net", "received: %s (%u bytes) peer=%d\n", strCommand, vRecv.size(), pfrom->id);
+    LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
     if (mapArgs.count("-dropmessagestest") && GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
     {
         LogPrintf("dropmessagestest DROPPING RECV MESSAGE\n");
@@ -6443,7 +6443,7 @@ bool ProcessMessages(CNode* pfrom)
             if (memcmp(msg.hdr.pchMessageStart, mc_gState->m_NetworkParams->DefaultMessageStart(), MESSAGE_START_SIZE) != 0) {
                 if(mc_gState->m_NetworkParams->m_Status != MC_PRM_STATUS_EMPTY)
                 {
-                    LogPrintf("mchn: PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%d\n", msg.hdr.GetCommand(), pfrom->id);
+                    LogPrintf("mchn: PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%d\n", SanitizeString(msg.hdr.GetCommand()), pfrom->id);
                     fOk = false;
                     break;
                 }
@@ -6459,19 +6459,19 @@ bool ProcessMessages(CNode* pfrom)
         CMessageHeader& hdr = msg.hdr;
         if (!hdr.IsValid(fSkipMessageStartCheck))
         {
-            LogPrintf("mchn: PROCESSMESSAGE: ERRORS IN HEADER %s peer=%d\n", hdr.GetCommand(), pfrom->id);
+            LogPrintf("mchn: PROCESSMESSAGE: ERRORS IN HEADER %s peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
             continue;
         }
         string strCommand = hdr.GetCommand();
         
 /* MCHN START */            
-        LogPrint("mchnminor","mchn: RECV: %s, peer=%d\n", hdr.GetCommand(), pfrom->id);
+        LogPrint("mchnminor","mchn: RECV: %s, peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
         
         if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY)
         {
             if((strCommand != "verack") && (strCommand != "version"))
             {
-                LogPrintf("IGNORED %s, peer=%d\n", hdr.GetCommand(), pfrom->id);                        
+                LogPrintf("IGNORED %s, peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);                        
                 fOk = false;
                 break;                
             }
@@ -6481,7 +6481,7 @@ bool ProcessMessages(CNode* pfrom)
         {
             if((strCommand != "verackack") && (strCommand != "verack") && (strCommand != "version"))
             {
-                LogPrintf("mchn: IGNORED %s, peer=%d\n", hdr.GetCommand(), pfrom->id);                        
+                LogPrintf("mchn: IGNORED %s, peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);                        
                 fOk = false;
                 break;                
             }
@@ -6500,7 +6500,7 @@ bool ProcessMessages(CNode* pfrom)
         if (nChecksum != hdr.nChecksum)
         {
             LogPrintf("ProcessMessages(%s, %u bytes) : CHECKSUM ERROR nChecksum=%08x hdr.nChecksum=%08x\n",
-               strCommand, nMessageSize, nChecksum, hdr.nChecksum);
+               SanitizeString(strCommand), nMessageSize, nChecksum, hdr.nChecksum);
             continue;
         }
 
@@ -6524,12 +6524,12 @@ bool ProcessMessages(CNode* pfrom)
             if (strstr(e.what(), "end of data"))
             {
                 // Allow exceptions from under-length message on vRecv
-                LogPrintf("ProcessMessages(%s, %u bytes) : Exception '%s' caught, normally caused by a message being shorter than its stated length\n", strCommand, nMessageSize, e.what());
+                LogPrintf("ProcessMessages(%s, %u bytes) : Exception '%s' caught, normally caused by a message being shorter than its stated length\n", SanitizeString(strCommand), nMessageSize, e.what());
             }
             else if (strstr(e.what(), "size too large"))
             {
                 // Allow exceptions from over-long size
-                LogPrintf("ProcessMessages(%s, %u bytes) : Exception '%s' caught\n", strCommand, nMessageSize, e.what());
+                LogPrintf("ProcessMessages(%s, %u bytes) : Exception '%s' caught\n", SanitizeString(strCommand), nMessageSize, e.what());
             }
             else
             {
@@ -6546,7 +6546,7 @@ bool ProcessMessages(CNode* pfrom)
         }
 
         if (!fRet)
-            LogPrintf("ProcessMessage(%s, %u bytes) FAILED peer=%d\n", strCommand, nMessageSize, pfrom->id);
+            LogPrintf("ProcessMessage(%s, %u bytes) FAILED peer=%d\n", SanitizeString(strCommand), nMessageSize, pfrom->id);
 
         break;
     }
