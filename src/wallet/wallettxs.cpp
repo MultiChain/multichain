@@ -532,10 +532,10 @@ int mc_WalletTxs::CleanUpAfterBlock(mc_TxImport *import,int block,int prev_block
     if(prev_block-MC_TDB_UTXO_SET_WINDOW_SIZE >= 0)
     {
         RemoveUTXOMap(imp->m_ImportID,prev_block-MC_TDB_UTXO_SET_WINDOW_SIZE);
-    }
-    if(imp->m_ImportID == 0)
-    {
-        RemoveUnconfirmedSends(prev_block);
+        if(imp->m_ImportID == 0)
+        {
+            RemoveUnconfirmedSends(prev_block);
+        }
     }
     LogPrint("wallet","wtxs: CleanUpAfterBlock: Import: %d, Block: %d\n",imp->m_ImportID,imp->m_Block);
     m_Database->UnLock();
