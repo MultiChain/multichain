@@ -5726,6 +5726,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         LOCK(cs_main);
 
+        if (IsInitialBlockDownload())
+            return true;
+
+          
         CBlockIndex* pindex = NULL;
         if (locator.IsNull())
         {
