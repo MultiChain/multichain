@@ -372,6 +372,8 @@ typedef struct mc_TxDB
                   uint32_t fileid,
                   uint32_t offset);
     
+    int FlushDataFile(uint32_t fileid);
+    
     void LogString(const char *message);
     
     

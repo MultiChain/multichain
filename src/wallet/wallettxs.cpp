@@ -1437,7 +1437,7 @@ int mc_WalletTxs::AddToUnconfirmedSends(int block, const CWalletTx& tx)
     m_UnconfirmedSends.insert(make_pair(hash, tx));
     m_UnconfirmedSendsHashes.push_back(hash);
     
-    FileCommit(fHan);                                                           // If we not do it, in the worst case we'll lose some transactions
+//    FileCommit(fHan);                                                           // If we not do it, in the worst case we'll lose some transactions
     
     return MC_ERR_NOERROR;
 }

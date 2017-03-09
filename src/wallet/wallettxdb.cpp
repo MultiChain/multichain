@@ -586,6 +586,26 @@ void mc_TxDB::Dump(const char *message)
     fclose(fHan);
 }
 
+int mc_TxDB::FlushDataFile(uint32_t fileid)
+{
+    char FileName[MC_DCT_DB_MAX_PATH];         
+    int FileHan,err;
+    sprintf(FileName,"%s%05u.dat",m_LobFileNamePrefix,fileid);
+    
+    err=MC_ERR_NOERROR;
+    
+    FileHan=open(FileName,_O_BINARY | O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    
+    if(FileHan<=0)
+    {
+        return MC_ERR_INTERNAL_ERROR;
+    }
+    fsync(FileHan);
+    close(FileHan);
+    return MC_ERR_NOERROR;
+}
+
+
 int mc_TxDB::AddToFile(const unsigned char *tx,
                           uint32_t txsize,
                           uint32_t fileid,
@@ -618,7 +638,7 @@ int mc_TxDB::AddToFile(const unsigned char *tx,
     
 exitlbl:
 
-    fsync(FileHan);
+//    fsync(FileHan);
     close(FileHan);
     return err;
 }
@@ -783,6 +803,7 @@ int mc_TxDB::AddSubKeyDef(
         {
             if(LastFileSize+size>MC_TDB_MAX_TXS_FILE_SIZE)                          // New file is needed
             {
+                FlushDataFile(LastFileID);
                 LastFileID+=1;
                 LastFileSize=0;
             }
@@ -1097,6 +1118,7 @@ int mc_TxDB::AddTx(mc_TxImport *import,
         
         if(LastFileSize+size>MC_TDB_MAX_TXS_FILE_SIZE)                          // New file is needed
         {
+            FlushDataFile(LastFileID);
             LastFileID+=1;
             LastFileSize=0;
         }
@@ -1640,6 +1662,8 @@ int mc_TxDB::Commit(mc_TxImport *import)
             goto exitlbl;
         }                            
     }
+    
+    FlushDataFile(m_DBStat.m_LastFileID);
 
     err=m_Database->m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
     if(err)
