@@ -175,6 +175,7 @@ typedef struct mc_EntityLedger
     void Zero();
     int Open();
     int Close();
+    void Flush();
     void SetName(const char *name);
     int GetRow(int64_t pos,mc_EntityLedgerRow *row);
     int64_t GetSize();

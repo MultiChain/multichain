@@ -133,13 +133,20 @@ int mc_EntityLedger::Open()
     return m_FileHan;            
 }
 
+void mc_EntityLedger::Flush()
+{
+    if(m_FileHan>0)
+    {
+        fsync(m_FileHan);
+    }    
+}
+
 /** Close ledger file */
 
 int mc_EntityLedger::Close()
 {
     if(m_FileHan>0)
     {
-        fsync(m_FileHan);
         close(m_FileHan);
     }    
     m_FileHan=0;
@@ -1293,6 +1300,7 @@ int mc_AssetDB::Commit()
         m_Ledger->SetZeroRow(&aldRow);
     }
     
+    m_Ledger->Flush();
     m_Ledger->Close();    
     
     if(err == MC_ERR_NOERROR)

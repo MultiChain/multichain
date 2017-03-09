@@ -156,6 +156,7 @@ typedef struct mc_PermissionLedger
     void Zero();
     int Open();
     int Close();
+    void Flush();
     void SetName(const char *name);
     int GetRow(uint64_t RowID,mc_PermissionLedgerRow *row);
     uint64_t GetSize();

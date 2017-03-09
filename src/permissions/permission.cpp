@@ -135,13 +135,22 @@ int mc_PermissionLedger::Open()
     return m_FileHan;            
 }
 
+void mc_PermissionLedger::Flush()
+{
+    if(m_FileHan>0)
+    {
+        fsync(m_FileHan);
+    }    
+}
+
+
+
 /** Close ledger file */
 
 int mc_PermissionLedger::Close()
 {
     if(m_FileHan>0)
     {
-        fsync(m_FileHan);
         close(m_FileHan);
     }    
     m_FileHan=0;
@@ -3077,6 +3086,7 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
         m_Ledger->SetRow(0,&pldRow);
     }
     
+    m_Ledger->Flush();
     m_Ledger->Close();
     
     if(err == MC_ERR_NOERROR)
