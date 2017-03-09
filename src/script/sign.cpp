@@ -149,7 +149,7 @@ bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CMutabl
     }
 
     // Test solution
-    if(GetBoolArg("-verifyjustsigned",true))
+    if(GetBoolArg("-verifyjustsigned",false))
     {
         return VerifyScript(txin.scriptSig, fromPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, MutableTransactionSignatureChecker(&txTo, nIn));
     }
