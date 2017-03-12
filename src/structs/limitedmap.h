@@ -28,7 +28,13 @@ protected:
     size_type nMaxSize;
 
 public:
-    limitedmap(size_type nMaxSizeIn = 0) { nMaxSize = nMaxSizeIn; }
+//    limitedmap(size_type nMaxSizeIn = 0) { nMaxSize = nMaxSizeIn; }
+    limitedmap(size_type nMaxSizeIn)
+    {
+        assert(nMaxSizeIn > 0);
+        nMaxSize = nMaxSizeIn;
+    }
+    
     const_iterator begin() const { return map.begin(); }
     const_iterator end() const { return map.end(); }
     size_type size() const { return map.size(); }
@@ -39,13 +45,14 @@ public:
     {
         std::pair<iterator, bool> ret = map.insert(x);
         if (ret.second) {
-            if (nMaxSize && map.size() == nMaxSize) {
+//            if (nMaxSize && map.size() == nMaxSize) {
+            if (map.size() > nMaxSize) {                
                 map.erase(rmap.begin()->second);
                 rmap.erase(rmap.begin());
             }
             rmap.insert(make_pair(x.second, ret.first));
         }
-        return;
+//        return;
     }
     void erase(const key_type& k)
     {
@@ -82,11 +89,18 @@ public:
     size_type max_size() const { return nMaxSize; }
     size_type max_size(size_type s)
     {
+/*        
         if (s)
             while (map.size() > s) {
                 map.erase(rmap.begin()->second);
                 rmap.erase(rmap.begin());
             }
+ */ 
+        assert(s > 0);
+        while (map.size() > s) {
+            map.erase(rmap.begin()->second);
+            rmap.erase(rmap.begin());
+        }        
         nMaxSize = s;
         return nMaxSize;
     }
