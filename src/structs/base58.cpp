@@ -212,7 +212,8 @@ bool CBase58Data::SetString(const char* psz, unsigned int nVersionBytes)
     
     
 /* MCHN END */    
-    OPENSSL_cleanse(&vchTemp[0], vchData.size());
+//    OPENSSL_cleanse(&vchTemp[0], vchData.size());
+    OPENSSL_cleanse(&vchTemp[0], vchTemp.size());
     return true;
 }
 
