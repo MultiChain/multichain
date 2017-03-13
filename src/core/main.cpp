@@ -53,6 +53,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                  bool accept,
                                  string& reason,
                                  bool *replay);
+bool ExtractDestinationScriptValid(const CScript& scriptPubKey, CTxDestination& addressRet);
 bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs, string& reason);
 bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& reason);
 bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string& reason);
@@ -1798,9 +1799,11 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
 {
     if (!tx.IsCoinBase())
     {
+/*                
         if (pvChecks)
             pvChecks->reserve(tx.vin.size());
-
+*/
+                
         // This doesn't trigger the DoS code on purpose; if it did, it would make it easier
         // for an attacker to attempt to split the network.
         if (!inputs.HaveInputs(tx))
@@ -1812,6 +1815,10 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
         int nSpendHeight = pindexPrev->nHeight + 1;
         CAmount nValueIn = 0;
         CAmount nFees = 0;
+        int async_count=0;
+        
+        vector <unsigned int> vSendPermissionFlags;
+        
         for (unsigned int i = 0; i < tx.vin.size(); i++)
         {
             const COutPoint &prevout = tx.vin[i].prevout;
@@ -1831,8 +1838,46 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
             if (!MoneyRange(coins->vout[prevout.n].nValue) || !MoneyRange(nValueIn))
                 return state.DoS(100, error("CheckInputs() : txin values out of range"),
                                  REJECT_INVALID, "bad-txns-inputvalues-outofrange");
+            unsigned int send_permission_flags=0;
 
+            CTxDestination addressRet;     
+            if(pvChecks)
+            {
+                if(ExtractDestinationScriptValid(coins->vout[prevout.n].scriptPubKey, addressRet))
+                {
+                    CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
+                    if(lpKeyID != NULL)
+                    {
+                        if(!mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpKeyID)))
+                        {
+                            return state.Invalid(error("CheckInputs() : %s input %d doesn't have send permission", tx.GetHash().ToString(),i));
+                        }                            
+                        send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
+                        async_count++;
+                    }
+                    else
+                    {
+                        CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
+                        if(lpScriptID)
+                        {
+                            if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpScriptID)))
+                            {
+                                send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
+                                async_count++;
+                            }                
+                        }
+                    }                    
+                }
+            }
+
+            vSendPermissionFlags.push_back(send_permission_flags);
         }
+
+        if(async_count)
+        {
+            if (pvChecks)
+                pvChecks->reserve(async_count);
+        }        
 
         if (nValueIn < tx.GetValueOut())
             return state.DoS(100, error("CheckInputs() : %s value in (%s) < value out (%s)",
@@ -1863,24 +1908,9 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                 assert(coins);
 
                 // Verify signature
-                CScriptCheck check(*coins, tx, i, flags, cacheStore);
-/*                
-                CScript script2=(*coins).vout[tx.vin[i].prevout.n].scriptPubKey;
-                CScript::const_iterator pc = script2.begin();
-                CScript::const_iterator pend = script2.end();                 
-                opcodetype opcode;
-                vector<unsigned char> vchPushValue;
-                int count=0;
-                while(pc<pend)
-                {
-                    if (script2.GetOp(pc, opcode, vchPushValue))
-                    {
-                        printf("A%d %d\n",count,vchPushValue.size());
-                    }
-                    count++;                    
-                }
-  */              
-                if (pvChecks) {
+                CScriptCheck check(*coins, tx, i, flags | vSendPermissionFlags[i], cacheStore);
+//                if (pvChecks) {
+                if ( (pvChecks != NULL) && (vSendPermissionFlags[i] != 0) ) {
                     pvChecks->push_back(CScriptCheck());
                     check.swap(pvChecks->back());
                 } else if (!check()) {
