@@ -276,6 +276,8 @@ int mc_Permissions::Initialize(const char *name,int mode)
     int32_t pdbBlock,pldBlock;
     uint64_t pdbLastRow,pldLastRow,this_row;
     uint64_t ledger_size;
+    mc_BlockLedgerRow pldBlockRow;
+    char block_row_addr[32];
     char msg[256];
     
     unsigned char *ptr;
@@ -457,6 +459,33 @@ int mc_Permissions::Initialize(const char *name,int mode)
     m_ClearedAdminCount=m_AdminCount;
     m_ClearedMinerCount=m_MinerCount;
 
+    if(m_Ledger->Open() <= 0)
+    {
+        LogString("Error: Couldn't open ledger");
+        return MC_ERR_DBOPEN_ERROR;
+    }
+    
+    if(m_Row-1 > 0)                                                             // Last row can contain wrong admin/mine count in case of hard crash
+    {
+        sprintf(block_row_addr,"Block %08X row",m_Block);
+        m_Ledger->GetRow(m_Row-1,(mc_PermissionLedgerRow*)&pldBlockRow);        
+        if(memcmp((char*)pldBlockRow.m_Address,block_row_addr,strlen(block_row_addr)))
+        {
+            m_Ledger->Close();  
+            LogString("Error: Last ledger row doesn't contain block information");
+            return MC_ERR_DBOPEN_ERROR;            
+        }
+        pldBlockRow.m_AdminCount=m_AdminCount;
+        pldBlockRow.m_MinerCount=m_MinerCount;
+        m_Ledger->SetRow(m_Row-1,(mc_PermissionLedgerRow*)&pldBlockRow);
+        m_Ledger->GetRow(m_Row-2,(mc_PermissionLedgerRow*)&pldBlockRow);        
+        pldBlockRow.m_AdminCount=m_AdminCount;
+        pldBlockRow.m_MinerCount=m_MinerCount;
+        m_Ledger->SetRow(m_Row-2,(mc_PermissionLedgerRow*)&pldBlockRow);
+        m_Ledger->Close();  
+    }
+    
+    
     m_Semaphore=__US_SemCreate();
     if(m_Semaphore == NULL)
     {
@@ -3054,16 +3083,20 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
     
     if(err == MC_ERR_NOERROR)
     {
+/*        
         m_Block++;
         UpdateCounts();        
         m_Block--;
         m_ClearedAdminCount=m_AdminCount;
         m_ClearedMinerCount=m_MinerCount;
+ */ 
         for(i=pld_items;i<m_MemPool->GetCount();i++)
         {
             memcpy((unsigned char*)&pldBlockRow+m_Ledger->m_KeyOffset,m_MemPool->GetRow(i),m_Ledger->m_TotalSize);
+/*            
             pldBlockRow.m_AdminCount=m_AdminCount;
             pldBlockRow.m_MinerCount=m_MinerCount;
+ */ 
             if(i)
             {
                 m_Ledger->WriteRow((mc_PermissionLedgerRow*)&pldBlockRow);
@@ -3072,8 +3105,7 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
             {
                 m_Ledger->SetRow(m_Row-m_MemPool->GetCount(),(mc_PermissionLedgerRow*)&pldBlockRow);
             }
-        }
-        
+        }        
     }    
     
     if(err == MC_ERR_NOERROR)
@@ -3097,6 +3129,29 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
             LogString("Error: Commit: DB commit error");                                    
         }
     }    
+
+    if(m_Ledger->Open() <= 0)
+    {
+        LogString("Error: Commit: couldn't open ledger");
+        return MC_ERR_DBOPEN_ERROR;
+    }
+
+    if(err == MC_ERR_NOERROR)
+    {
+        m_Block++;
+        UpdateCounts();        
+        m_Block--;
+        m_ClearedAdminCount=m_AdminCount;
+        m_ClearedMinerCount=m_MinerCount;
+        for(i=pld_items;i<m_MemPool->GetCount();i++)
+        {
+            m_Ledger->GetRow(m_Row-m_MemPool->GetCount()+i,(mc_PermissionLedgerRow*)&pldBlockRow);
+            pldBlockRow.m_AdminCount=m_AdminCount;
+            pldBlockRow.m_MinerCount=m_MinerCount;
+            m_Ledger->SetRow(m_Row-m_MemPool->GetCount()+i,(mc_PermissionLedgerRow*)&pldBlockRow);
+        }        
+    }    
+    m_Ledger->Close();
     
     
     if(err)
