@@ -1,11 +1,14 @@
-// Copyright 2014 BitPay Inc.
-// Distributed under the MIT/X11 software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2009-2010 Satoshi Nakamoto
+// Copyright (c) 2009-2013 The Bitcoin developers
+// Original code was distributed under the MIT software license.
+// Copyright (c) 2014-2017 Coin Sciences Ltd
+// MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include <string.h>
 #include <vector>
 #include <stdio.h>
 #include "univalue.h"
+#include "univalue_utffilter.h"
 
 using namespace std;
 
@@ -39,6 +42,7 @@ static const char *hatoui(const char *first, const char *last,
 enum jtokentype getJsonToken(string& tokenVal, unsigned int& consumed,
                             const char *raw)
 {
+        printf("A\n");
     tokenVal.clear();
     consumed = 0;
 
@@ -169,15 +173,19 @@ enum jtokentype getJsonToken(string& tokenVal, unsigned int& consumed,
         raw++;                                // skip "
 
         string valStr;
-
+        JSONUTF8StringFilter writer(valStr);
+        printf("A\n");
+        
         while (*raw) {
-            if (*raw < 0x20)
+//            if (*raw < 0x20)
+            if ((unsigned char)*raw < 0x20)            
                 return JTOK_ERR;
 
             else if (*raw == '\\') {
                 raw++;                        // skip backslash
 
                 switch (*raw) {
+/*                    
                 case '"':  valStr += "\""; break;
                 case '\\': valStr += "\\"; break;
                 case '/':  valStr += "/"; break;
@@ -186,15 +194,24 @@ enum jtokentype getJsonToken(string& tokenVal, unsigned int& consumed,
                 case 'n':  valStr += "\n"; break;
                 case 'r':  valStr += "\r"; break;
                 case 't':  valStr += "\t"; break;
-
+*/
+                case '"':  writer.push_back('\"'); break;
+                case '\\': writer.push_back('\\'); break;
+                case '/':  writer.push_back('/'); break;
+                case 'b':  writer.push_back('\b'); break;
+                case 'f':  writer.push_back('\f'); break;
+                case 'n':  writer.push_back('\n'); break;
+                case 'r':  writer.push_back('\r'); break;
+                case 't':  writer.push_back('\t'); break;
+                    
                 case 'u': {
-                    char buf[4] = {0,0,0,0};
-                    char *last = &buf[0];
+//                    char buf[4] = {0,0,0,0};
+//                    char *last = &buf[0];
                     unsigned int codepoint;
                     if (hatoui(raw + 1, raw + 1 + 4, codepoint) !=
                                raw + 1 + 4)
                         return JTOK_ERR;
-
+/*
                     if (codepoint <= 0x7f)
                          *last = (char)codepoint;
                     else if (codepoint <= 0x7FF) {
@@ -204,9 +221,10 @@ enum jtokentype getJsonToken(string& tokenVal, unsigned int& consumed,
                         *last++ = (char)(0xE0 | (codepoint >> 12));
                         *last++ = (char)(0x80 | ((codepoint >> 6) & 0x3F));
                         *last = (char)(0x80 | (codepoint & 0x3F));
-                    }
-
+                    }                    
                     valStr += buf;
+*/
+                    writer.push_back_u(codepoint);
                     raw += 4;
                     break;
                     }
@@ -224,11 +242,15 @@ enum jtokentype getJsonToken(string& tokenVal, unsigned int& consumed,
             }
 
             else {
-                valStr += *raw;
+//                valStr += *raw;
+                writer.push_back(*raw);
                 raw++;
             }
         }
 
+        if (!writer.finalize())
+            return JTOK_ERR;
+        printf("B\n");
         tokenVal = valStr;
         consumed = (raw - rawStart);
         return JTOK_STRING;
