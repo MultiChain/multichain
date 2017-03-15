@@ -474,6 +474,8 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
     opcodetype opcode;
     vector<unsigned char> vch;
 
+    nRequiredRet=1;
+    
     CScript::const_iterator pc = scriptPubKey.begin();
     
     if (scriptPubKey.GetOp(pc, opcode))
