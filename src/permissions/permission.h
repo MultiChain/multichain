@@ -291,7 +291,7 @@ typedef struct mc_Permissions
     uint32_t CalculateBlockFlags();
     
     int UpdateCounts();
-    int AdminConsensus(uint32_t type);
+    int AdminConsensus(const void* lpEntity,uint32_t type);
     
     int ClearMemPoolInternal();
 

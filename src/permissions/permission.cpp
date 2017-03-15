@@ -1728,7 +1728,7 @@ exitlbl:
 
 /** Returns number of admins required for consensus for specific permission type (NULL entity only) */
 
-int mc_Permissions::AdminConsensus(uint32_t type)
+int mc_Permissions::AdminConsensus(const void* lpEntity,uint32_t type)
 {
     int consensus;
         
@@ -1737,50 +1737,53 @@ int mc_Permissions::AdminConsensus(uint32_t type)
         return 1;
     }
     
-    switch(type)    
+    if(mc_IsNullEntity(lpEntity))
     {
-        case MC_PTP_ADMIN:
-        case MC_PTP_MINE:
-        case MC_PTP_ACTIVATE:
-        case MC_PTP_ISSUE:
-        case MC_PTP_CREATE:
-            if(IsSetupPeriod())            
-            {
-                return 1;
-            }
-
-            consensus=0;
-            if(type == MC_PTP_ADMIN)
-            {
-                consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensusadmin");
-            }
-            if(type == MC_PTP_MINE)
-            {
-                consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensusmine");
-            }
-            if(type == MC_PTP_ACTIVATE)
-            {
-                if(mc_gState->m_Features->ActivatePermission() == 0)
+        switch(type)    
+        {
+            case MC_PTP_ADMIN:
+            case MC_PTP_MINE:
+            case MC_PTP_ACTIVATE:
+            case MC_PTP_ISSUE:
+            case MC_PTP_CREATE:
+                if(IsSetupPeriod())            
                 {
-                    return GetAdminCount()+1;
+                    return 1;
                 }
-                consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensusactivate");
-            }
-            if(type == MC_PTP_ISSUE)
-            {
-                consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensusissue");
-            }
-            if(type == MC_PTP_CREATE)
-            {
-                consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensuscreate");
-            }
 
-            if(consensus==0)
-            {
-                return 1;
-            }
-            
-            return (int)((GetAdminCount()*(uint32_t)consensus-1)/MC_PRM_DECIMAL_GRANULARITY)+1;            
+                consensus=0;
+                if(type == MC_PTP_ADMIN)
+                {
+                    consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensusadmin");
+                }
+                if(type == MC_PTP_MINE)
+                {
+                    consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensusmine");
+                }
+                if(type == MC_PTP_ACTIVATE)
+                {
+                    if(mc_gState->m_Features->ActivatePermission() == 0)
+                    {
+                        return GetAdminCount()+1;
+                    }
+                    consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensusactivate");
+                }
+                if(type == MC_PTP_ISSUE)
+                {
+                    consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensusissue");
+                }
+                if(type == MC_PTP_CREATE)
+                {
+                    consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensuscreate");
+                }
+
+                if(consensus==0)
+                {
+                    return 1;
+                }
+
+                return (int)((GetAdminCount()*(uint32_t)consensus-1)/MC_PRM_DECIMAL_GRANULARITY)+1;            
+        }
     }
     
     return 1;
@@ -1795,7 +1798,7 @@ int mc_Permissions::VerifyConsensus(mc_PermissionLedgerRow *newRow,mc_Permission
     mc_PermissionLedgerRow pldRow;
     mc_PermissionLedgerRow *ptr;
     
-    consensus=AdminConsensus(newRow->m_Type);
+    consensus=AdminConsensus(newRow->m_Entity,newRow->m_Type);
     required=consensus;
     
     if(remaining)
@@ -1946,7 +1949,7 @@ int mc_Permissions::FillPermissionDetails(mc_PermissionDetails *plsRow,mc_Buffer
     mc_PermissionLedgerRow *ptr;
     
     countLedgerRows=m_Row-m_MemPool->GetCount();
-    consensus=AdminConsensus(plsRow->m_Type);
+    consensus=AdminConsensus(plsRow->m_Entity,plsRow->m_Type);
     required=consensus;
     
     plsRow->m_RequiredAdmins=consensus;
@@ -2205,7 +2208,7 @@ int mc_Permissions::RequiredForConsensus(const void* lpEntity,const void* lpAddr
             }    
             else
             {
-                required=AdminConsensus(type);
+                required=AdminConsensus(lpEntity,type);
             }
             break;
         default:
