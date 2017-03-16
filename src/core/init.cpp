@@ -1618,7 +1618,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     LogPrintf("Node paused state is set to %08X\n",mc_gState->m_NodePausedState);
     
     pwalletMain=NULL;
-    
+
     if (fServer)
     {
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);

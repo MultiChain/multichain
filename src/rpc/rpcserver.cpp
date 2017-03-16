@@ -502,6 +502,7 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "listassets",             &listassets,             true,      false,      false },
     { "blockchain",         "listpermissions",        &listpermissions,        true,      false,      false },
     { "blockchain",         "liststreams",            &liststreams,            true,      false,      false },
+    { "blockchain",         "listupgrades",           &listupgrades,           true,      false,      false },
 /* MCHN END */    
     
     /* Mining */
@@ -599,6 +600,7 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "decoderawexchange",      &decoderawexchange,      false,     false,      true },
     
     { "wallet",             "grantfrom",              &grantfromcmd,           false,     false,      true }, 
+    { "wallet",             "approvefrom",            &approvefrom,            false,     false,      true }, 
     { "wallet",             "revokefrom",             &revokefromcmd,          false,     false,      true },
     { "wallet",             "issuefrom",              &issuefromcmd,           false,     false,      true },
     { "wallet",             "issuemorefrom",          &issuemorefromcmd,       false,     false,      true },
@@ -1328,6 +1330,14 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Method not found (disabled)");
 #endif
 
+    if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+    {
+        if( setAllowedWhenWaitingForUpgrade.count(strMethod) == 0 )
+        {
+            throw JSONRPCError(RPC_UPGRADE_REQUIRED, strprintf("BlockChain was upgraded to protocol version %d, please upgrade MultiChain",mc_gState->m_ProtocolVersionToUpgrade));
+        }
+    }
+    
     // Observe safe mode
     string strWarning = GetWarnings("rpc");
     if (strWarning != "" && !GetBoolArg("-disablesafemode", false) &&
@@ -1430,3 +1440,4 @@ std::string HelpExampleRpc(string methodname, string args){
 const CRPCTable tableRPC;
 std::map<std::string, std::string> mapHelpStrings;
 std::map<std::string, int> mapLogParamCounts;
+std::set<std::string> setAllowedWhenWaitingForUpgrade;

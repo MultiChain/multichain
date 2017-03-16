@@ -7,6 +7,8 @@
 
 #include "rpc/rpcwallet.h"
 
+Value createupgradefromcmd(const Array& params, bool fHelp);
+
 void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
 {
     unsigned char buf[32];
@@ -279,27 +281,7 @@ Value liststreams(const Array& params, bool fHelp)
     return results;
 }
 
-Value createcmd(const Array& params, bool fHelp)
-{
-    if (fHelp || params.size() < 3)
-        throw runtime_error("Help message not found\n");
-
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
-    
-    Array ext_params;
-    ext_params.push_back("*");
-    BOOST_FOREACH(const Value& value, params)
-    {
-        ext_params.push_back(value);
-    }
-    
-    return createfromcmd(ext_params,fHelp);    
-}
-
-Value createfromcmd(const Array& params, bool fHelp)
+Value createstreamfromcmd(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 4)
         throw runtime_error("Help message not found\n");
@@ -504,6 +486,48 @@ Value createfromcmd(const Array& params, bool fHelp)
     delete lpScript;
   
     return wtx.GetHash().GetHex();    
+}
+
+Value createfromcmd(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 4)
+        throw runtime_error("Help message not found\n");
+    
+    if(mc_gState->m_Features->Streams() == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
+    }
+    if (strcmp(params[1].get_str().c_str(),"stream") == 0)
+    {
+        return createstreamfromcmd(params,fHelp);    
+    }
+    
+    if (strcmp(params[1].get_str().c_str(),"upgrade") == 0)
+    {
+        return createupgradefromcmd(params,fHelp);    
+    }
+    
+    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type, should be stream");
+}
+
+Value createcmd(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 3)
+        throw runtime_error("Help message not found\n");
+
+    if(mc_gState->m_Features->Streams() == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
+    }
+    
+    Array ext_params;
+    ext_params.push_back("*");
+    BOOST_FOREACH(const Value& value, params)
+    {
+        ext_params.push_back(value);
+    }
+    
+    return createfromcmd(ext_params,fHelp);    
 }
 
 Value publish(const Array& params, bool fHelp)

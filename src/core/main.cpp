@@ -344,6 +344,58 @@ map<NodeId, CNodeState> mapNodeState;
 
 /* MCHN START */
 
+int MultichainNode_ApplyUpgrades()
+{
+    mc_EntityDetails entity;
+    mc_Buffer *permissions;
+    permissions=NULL;
+    map <uint64_t,int> map_sorted;
+
+    int m_OldProtocolVersion=mc_gState->m_ProtocolVersionToUpgrade;
+    
+    permissions=mc_gState->m_Permissions->GetUpgradeList(NULL,NULL);
+
+    for(int i=0;i<permissions->GetCount();i++)
+    {        
+        mc_PermissionDetails *plsRow;
+        plsRow=(mc_PermissionDetails *)(permissions->GetRow(i));
+        if(plsRow->m_Type == MC_PTP_UPGRADE)
+        {
+            map_sorted.insert(std::make_pair(plsRow->m_LastRow,i));
+        }        
+    }
+    
+    BOOST_FOREACH(PAIRTYPE(const uint64_t, int)& item, map_sorted)
+//    for(int i=0;i<upgrades->GetCount();i++)
+    {
+        int i=item.second;
+        mc_PermissionDetails *plsRow;
+        plsRow=(mc_PermissionDetails *)(permissions->GetRow(i));
+        if(plsRow->m_Type == MC_PTP_UPGRADE)
+        {
+            if(plsRow->m_BlockFrom < plsRow->m_BlockTo) 
+            {
+                if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,plsRow->m_Address))
+                {
+                    mc_gState->m_ProtocolVersionToUpgrade=entity.UpgradeProtocolVersion();
+                }
+            }            
+        }
+    }
+    
+    mc_gState->m_Permissions->FreePermissionList(permissions);
+    if(mc_gState->m_ProtocolVersionToUpgrade != m_OldProtocolVersion)
+    {
+        LogPrintf("New protocol upgrade version: %d (was %d)\n",mc_gState->m_ProtocolVersionToUpgrade,m_OldProtocolVersion);
+        if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+        {
+            LogPrintf("NODE IS SHOULD BE UPGRADED FROM %d TO %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
+        }
+    }
+    
+    return MC_ERR_NOERROR;
+}
+
 bool MultichainNode_IsBlockChainSynced(CNode *pnode)
 {
     if(pnode->fSyncedOnce)
@@ -1130,6 +1182,12 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     AssertLockHeld(cs_main);
     if (pfMissingInputs)
         *pfMissingInputs = false;
+    
+    if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+    {
+        return false;
+    }
+    
     if (!CheckTransaction(tx, state))
         return error("AcceptToMemoryPool: : CheckTransaction failed");
 
@@ -2615,6 +2673,8 @@ bool static DisconnectTip(CValidationState &state) {
     LogPrint("mcblockperf","mchn-block-perf: Rolling back permission and asset databases\n");
     mc_gState->m_Permissions->RollBack(old_height-1);
     mc_gState->m_Assets->RollBack(old_height-1);
+    
+    MultichainNode_ApplyUpgrades();        
     if(mc_gState->m_WalletMode & MC_WMD_TXS)
     {
         LogPrint("mcblockperf","mchn-block-perf: Rolling back wallet             (%s)\n",pwalletTxsMain->Summary());
@@ -2762,8 +2822,9 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
         SyncWithWallets(tx, NULL);
     }
     // ... and about transactions that got confirmed:
-/* MCHN START */    
+/* MCHN START */        
     VerifyBlockSignature(pblock,false);
+    MultichainNode_ApplyUpgrades();    
 /* MCHN END */    
     
     BOOST_FOREACH(const CTransaction &tx, pblock->vtx) {
@@ -2920,7 +2981,7 @@ static CBlockIndex* FindMostWorkChain() {
         while (pindexTest && !chainActive.Contains(pindexTest)) {
             assert(pindexTest->nStatus & BLOCK_HAVE_DATA);
             assert(pindexTest->nChainTx || pindexTest->nHeight == 0);
-            if (pindexTest->nStatus & BLOCK_FAILED_MASK) {
+            if ( (pindexTest->nStatus & BLOCK_FAILED_MASK) || ( setBannedTxBlocks.find(pindexTest->GetBlockHash()) != setBannedTxBlocks.end())){
                 // Candidate has an invalid ancestor, remove entire chain from the set.
                 if (pindexBestInvalid == NULL || pindexNew->nChainWork > pindexBestInvalid->nChainWork)
                     pindexBestInvalid = pindexNew;
@@ -3069,6 +3130,12 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
                 break;
             }
             }
+            if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+            {
+                LogPrintf("Cannot connect more blocks, required protocol version upgrade %d -> %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
+                fContinue = false;
+                break;                
+            }
         }
         
     }
@@ -3184,6 +3251,14 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
                     }
                 }
                 attempt++;
+            }
+            else
+            {
+                if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+                {
+                    LogPrintf("Cannot connect more blocks, required protocol version upgrade %d -> %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
+                    return true;
+                }
             }
 /* MCHN END */            
 
@@ -3373,6 +3448,18 @@ string SetBannedTxs(string txlist)
     }
     
     LogPrintf("Setting banned transaction list: %4d transactions\n",(int)vTxs.size());
+    BOOST_FOREACH(uint256 hash, setBannedTxBlocks)
+    {
+        BlockMap::iterator mi = mapBlockIndex.find(hash);
+        if (mi != mapBlockIndex.end()) 
+        {
+            if(setBlockIndexCandidates.find(mi->second) == setBlockIndexCandidates.end())
+            {
+                setBlockIndexCandidates.insert(mi->second);
+            }
+        }
+    }
+    
     setBannedTxBlocks.clear();
     setBannedTxs.clear();
     for(unsigned int i=0;i<vTxs.size();i++)
@@ -4696,6 +4783,8 @@ bool static LoadBlockIndexDB()
         LogPrint("mchn","mchn: Rolling back wallet txs DB to height %d\n",chainActive.Height());
         pwalletTxsMain->RollBack(NULL,chainActive.Height());
     }
+    MultichainNode_ApplyUpgrades();        
+    
 /* MCHN END */
     LogPrintf("LoadBlockIndexDB(): hashBestChain=%s height=%d date=%s progress=%f\n",
         chainActive.Tip()->GetBlockHash().ToString(), chainActive.Height(),

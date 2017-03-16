@@ -112,6 +112,8 @@ typedef struct mc_Features
     int CachedInputScript();
     int AnyoneCanReceiveEmpty();
     int FixedIn10007();
+    int Upgrades();
+    int FixedIn10008();
 } mc_Features;
 
 typedef struct mc_State
@@ -132,9 +134,10 @@ typedef struct mc_State
     mc_AssetDB              *m_Assets;
     mc_Features             *m_Features;
     int m_NetworkState;
-    uint32_t m_NodePausedState;
+    uint32_t m_NodePausedState;    
     uint32_t m_IPv4Address;
     uint32_t m_WalletMode;
+    int m_ProtocolVersionToUpgrade;
     void *m_pSeedNode;
     
     mc_Script               *m_TmpScript;
@@ -154,6 +157,7 @@ typedef struct mc_State
         m_TmpScript1=new mc_Script;
         m_NetworkState=MC_NTS_UNCONNECTED;
         m_NodePausedState=MC_NPS_NONE;
+        m_ProtocolVersionToUpgrade=0;
         m_IPv4Address=0;
         m_WalletMode=0;
         m_TmpAssetsOut=new mc_Buffer;
@@ -209,7 +213,6 @@ typedef struct mc_State
     int GetWalletDBVersion();
     int GetProtocolVersion();
     const char* GetSeedNode();
-    
 } cs_State;
 
 

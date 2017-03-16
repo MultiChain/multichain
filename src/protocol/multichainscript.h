@@ -61,6 +61,9 @@ typedef struct mc_Script
     int GetNewEntityType(uint32_t *type);
     int SetNewEntityType(const uint32_t type);
 
+    int GetApproval(uint32_t *approval,uint32_t *timestamp);
+    int SetApproval( uint32_t approval,uint32_t timestamp);
+    
     int GetNewEntityType(uint32_t *type,int *update,unsigned char* script,int *script_size);
     int SetNewEntityType(const uint32_t type,const int update,const unsigned char* script,int script_size);
 

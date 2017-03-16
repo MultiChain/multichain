@@ -96,7 +96,8 @@ enum RPCErrorCode
     RPC_INPUTS_NOT_MINE             = -714,  //! Inputs in transaction don't belong to this wallet 
     RPC_WALLET_OUTPUT_NOT_FOUND     = -715,  //! Output not found in the wallet
     RPC_WALLET_NO_UNSPENT_OUTPUTS   = -716,  //! No unspent outputs in this wallet
-    RPC_GENERAL_FILE_ERROR          =- 717,  //! General file error
+    RPC_GENERAL_FILE_ERROR          = -717,  //! General file error
+    RPC_UPGRADE_REQUIRED            = -718,  //! Upgrade required
     
 };
 

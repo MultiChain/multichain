@@ -796,6 +796,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
     vector <uint160> vInputDestinations;
     vector <int> vInputHashTypes;
     vector <bool> vInputCanGrantAdminMine;
+    vector <bool> vInputHadAdminPermissionBeforeThisTx;
     set <string> vAllowedAdmins;
     set <string> vAllowedActivators;
     
@@ -978,7 +979,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
             unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
             mc_EntityDetails entity;
             int receive_required;
-            uint32_t type,from,to,timestamp,flags;
+            uint32_t type,from,to,timestamp,flags,approval;
             unsigned char item_key[MC_ENT_MAX_ITEM_KEY_SIZE];
             int item_key_size,entity_update;
             int cs_offset,cs_new_offset,cs_size,cs_vin;
@@ -1103,7 +1104,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                 fReject=true;
                                 goto exitlbl;                                                                                                                            
                             }
-                            if(new_entity_type <= MC_ENT_TYPE_MAX)
+                            if(new_entity_type <= mc_gState->m_Assets->MaxEntityType())
                             {
                                 if(new_entity_type != MC_ENT_TYPE_ASSET)
                                 {
@@ -1178,8 +1179,27 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                     fReject=true;
                     goto exitlbl;                                                                                                                                        
                 }
+
+                if( (pass == 0) && (mc_gState->m_TmpScript->GetNumElements() == 3) ) // 2 OP_DROPs + OP_RETURN - possible upgrade approval
+                {
+                    if(mc_gState->m_Features->Upgrades())
+                    {
+                        mc_gState->m_TmpScript->SetElement(1);
+
+                        if(mc_gState->m_TmpScript->GetApproval(&approval,&timestamp) == 0)
+                        {
+                            if(vInputHadAdminPermissionBeforeThisTx.size() == 0)
+                            {
+                                for (unsigned int i = 0; i < tx.vin.size(); i++)
+                                {
+                                    vInputHadAdminPermissionBeforeThisTx.push_back(mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)&vInputDestinations[i]) != 0);
+                                }                                
+                            }
+                        }                        
+                    }
+                }
                 
-                if( (pass == 3) && (mc_gState->m_TmpScript->GetNumElements() == 3) ) // 2 OP_DROPs + OP_RETURN - item key or entity update
+                if( (pass == 3) && (mc_gState->m_TmpScript->GetNumElements() == 3) ) // 2 OP_DROPs + OP_RETURN - item key or entity update or upgrade approval
                 {
                     mc_gState->m_TmpScript->SetElement(0);
                                                                                 // Should be spke
@@ -1224,16 +1244,65 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                 goto exitlbl;                                                                                                                                                                    
                             }
                         }
-                        else                                                    // (pseudo)stream
+                        else                                                    // (pseudo)stream or upgrade
                         {
-                            mc_gState->m_TmpScript->SetElement(1);
-                                                                                // Should be spkk
-                            if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
+                            if((mc_gState->m_Features->Upgrades() == 0) || (entity.GetEntityType() != MC_ENT_TYPE_UPGRADE)) // (pseudo)stream
                             {
-                                reason="Metadata script rejected - wrong element, should be item key";
-                                fReject=true;
-                                goto exitlbl;                                                                                                                                        
-                            }                                            
+                                mc_gState->m_TmpScript->SetElement(1);
+                                                                                    // Should be spkk
+                                if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
+                                {
+                                    reason="Metadata script rejected - wrong element, should be item key";
+                                    fReject=true;
+                                    goto exitlbl;                                                                                                                                        
+                                }                                            
+                            }
+                            else                        
+                            {
+                                mc_gState->m_TmpScript->SetElement(1);          // Upgrade approval
+                                
+                                if(mc_gState->m_TmpScript->GetApproval(&approval,&timestamp))
+                                {
+                                    reason="Metadata script rejected - wrong element, should be upgrade approval";
+                                    fReject=true;
+                                    goto exitlbl;                                                                                                                                                                            
+                                }
+                                uint256 upgrade_hash=*(uint256*)(entity.GetTxID());
+                                if(approval)
+                                {
+                                    LogPrintf("Found approval script in tx %s for %s\n",
+                                            tx.GetHash().GetHex().c_str(),
+                                            upgrade_hash.ToString().c_str());
+                                }
+                                else
+                                {
+                                    LogPrintf("Found disapproval script in tx %s for %s\n",
+                                            tx.GetHash().GetHex().c_str(),
+                                            upgrade_hash.ToString().c_str());                                    
+                                }
+
+                                bool fAdminFound=false;
+                                for (unsigned int i = 0; i < tx.vin.size(); i++)
+                                {
+                                    if(vInputHadAdminPermissionBeforeThisTx[i])
+                                    {
+                                        if( (vInputHashTypes[i] == SIGHASH_ALL) || ( (vInputHashTypes[i] == SIGHASH_SINGLE) && (i == j) ) )
+                                        {
+                                            if(mc_gState->m_Permissions->SetApproval(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,approval,
+                                                                                     (unsigned char*)&vInputDestinations[i],entity.UpgradeStartBlock(),timestamp,MC_PFL_NONE,1) == 0)
+                                            {
+                                                fAdminFound=true;
+                                            }                                                                                    
+                                        }                                        
+                                    }
+                                }   
+                                if(!fAdminFound)
+                                {
+                                    reason="Inputs don't belong to valid admin for approval script";
+                                    fReject=true;
+                                    goto exitlbl;                                                            
+                                }                                
+                            }
                         }
                     }
                     else
@@ -1254,7 +1323,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                         }                                            
                     }
                     
-                    if(entity.GetEntityType() != MC_ENT_TYPE_ASSET)
+                    if( (entity.GetEntityType() != MC_ENT_TYPE_ASSET) && (entity.GetEntityType() != MC_ENT_TYPE_UPGRADE) )
                     {
                         fAllValidPublishers=true;
                         if(entity.AnyoneCanWrite() == 0)
@@ -1663,13 +1732,14 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
         fReject=true;
         goto exitlbl;                                                                                
     }
-    
-    if(nNewEntityOutput >= 0)                                                   
+            
+    if(nNewEntityOutput >= 0)                                                   // (pseudo)streams and upgrade                                               
     {
         vector <uint160> openers;
         vector <uint32_t> opener_flags;
         unsigned char opener_buf[24];
         
+        string entity_type_str;
         uint32_t flags=MC_PFL_NONE;        
         uint32_t timestamp=0;
         set <uint160> stored_openers;
@@ -1693,13 +1763,16 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
             {
                 if(mc_gState->m_Permissions->CanCreate(NULL,(unsigned char*)&vInputDestinations[i]))
                 {                            
-                    openers.push_back(vInputDestinations[i]);
-                    flags=MC_PFL_NONE;
-                    if(vInputScriptTypes[i] == TX_SCRIPTHASH)
+                    if( (new_entity_type != MC_ENT_TYPE_UPGRADE) || (mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)&vInputDestinations[i]) != 0) )
                     {
-                        flags |= MC_PFL_IS_SCRIPTHASH;
+                        openers.push_back(vInputDestinations[i]);
+                        flags=MC_PFL_NONE;
+                        if(vInputScriptTypes[i] == TX_SCRIPTHASH)
+                        {
+                            flags |= MC_PFL_IS_SCRIPTHASH;
+                        }
+                        opener_flags.push_back(flags);
                     }
-                    opener_flags.push_back(flags);
                 }                            
             }
         }                
@@ -1715,11 +1788,14 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
 
         mc_gState->m_TmpScript->Clear();
         mc_gState->m_TmpScript->AddElement();
-        txid=tx.GetHash();                                                      // Setting first record in teh per-entity permissions list
-        memset(opener_buf,0,sizeof(opener_buf));
-        err=mc_gState->m_Permissions->SetPermission(&txid,opener_buf,MC_PTP_CONNECT,
-                (unsigned char*)openers[0].begin(),0,(uint32_t)(-1),timestamp, MC_PFL_ENTITY_GENESIS ,update_mempool);
-            
+        txid=tx.GetHash();                                                      // Setting first record in the per-entity permissions list
+        
+        if(new_entity_type != MC_ENT_TYPE_UPGRADE)
+        {
+            memset(opener_buf,0,sizeof(opener_buf));
+            err=mc_gState->m_Permissions->SetPermission(&txid,opener_buf,MC_PTP_CONNECT,
+                    (unsigned char*)openers[0].begin(),0,(uint32_t)(-1),timestamp, MC_PFL_ENTITY_GENESIS ,update_mempool);
+        }
         for (unsigned int i = 0; i < openers.size(); i++)
         {
             if(err == MC_ERR_NOERROR)
@@ -1729,16 +1805,16 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                     memcpy(opener_buf,openers[i].begin(),sizeof(uint160));
                     mc_PutLE(opener_buf+sizeof(uint160),&opener_flags[i],4);
                     mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,opener_buf,sizeof(opener_buf));            
+                    if(new_entity_type != MC_ENT_TYPE_UPGRADE)
+                    {
                                                                                 // Granting default permissions to openers
-                    err=mc_gState->m_Permissions->SetPermission(&txid,opener_buf,MC_PTP_ADMIN | MC_PTP_ACTIVATE | MC_PTP_WRITE,
-                            (unsigned char*)openers[i].begin(),0,(uint32_t)(-1),timestamp,opener_flags[i] | MC_PFL_ENTITY_GENESIS ,update_mempool);
+                        err=mc_gState->m_Permissions->SetPermission(&txid,opener_buf,MC_PTP_ADMIN | MC_PTP_ACTIVATE | MC_PTP_WRITE,
+                                (unsigned char*)openers[i].begin(),0,(uint32_t)(-1),timestamp,opener_flags[i] | MC_PFL_ENTITY_GENESIS ,update_mempool);
+                    }
                     stored_openers.insert(openers[i]);
                 }
             }
         }        
-        
-        memset(opener_buf,0,sizeof(opener_buf));                                // Storing opener list in entity metadata
-        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,opener_buf,1);                    
         if(err)
         {
             reason=" Cannot update permission database for new entity";
@@ -1746,13 +1822,20 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
             goto exitlbl;                                                                                                                                                                
         }
         
+        memset(opener_buf,0,sizeof(opener_buf));                                // Storing opener list in entity metadata
+        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,opener_buf,1);                    
+        
         const unsigned char *special_script;
         size_t special_script_size=0;
         special_script=mc_gState->m_TmpScript->GetData(0,&special_script_size);
-        err=mc_gState->m_Assets->InsertStream(&txid,offset,new_entity_type,details_script,details_script_size,special_script,special_script_size,update_mempool);
+        err=mc_gState->m_Assets->InsertEntity(&txid,offset,new_entity_type,details_script,details_script_size,special_script,special_script_size,update_mempool);
         if(err)           
         {
             reason="New entity script rejected - could not insert new entity to database";
+            if(err == MC_ERR_ERROR_IN_SCRIPT)
+            {
+                reason="New entity script rejected - error in script";                        
+            }
             if(err == MC_ERR_FOUND)
             {
                 reason="New entity script rejected - entity with this name already exists";                        
@@ -1765,17 +1848,22 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
         {
             if(mc_gState->m_Assets->FindEntityByTxID(&entity,(unsigned char*)&txid))
             {
+                entity_type_str="stream";
+                if(new_entity_type == MC_ENT_TYPE_UPGRADE)
+                {
+                    entity_type_str="upgrade";
+                }
                 if(offset>=0)
                 {
-                    LogPrint("mchn","New stream. TxID: %s, StreamRef: %d-%d-%d, Name: %s\n",
-                            tx.GetHash().GetHex().c_str(),
+                    LogPrintf("New %s. TxID: %s, StreamRef: %d-%d-%d, Name: %s\n",
+                            entity_type_str.c_str(),tx.GetHash().GetHex().c_str(),
                             mc_gState->m_Assets->m_Block+1,offset,(int)(*((unsigned char*)&txid+0))+256*(int)(*((unsigned char*)&txid+1)),
                             entity.GetName());                                        
                 }
                 else
                 {
-                    LogPrint("mchn","New stream. TxID: %s, unconfirmed, Name: %s\n",
-                            tx.GetHash().GetHex().c_str(),entity.GetName());                                                            
+                    LogPrintf("New %s. TxID: %s, unconfirmed, Name: %s\n",
+                            entity_type_str.c_str(),tx.GetHash().GetHex().c_str(),entity.GetName());                                                            
                 }
             }
             else

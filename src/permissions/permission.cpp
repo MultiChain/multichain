@@ -4,6 +4,7 @@
 #include "multichain/multichain.h"
 
 unsigned char null_entity[MC_PLS_SIZE_ENTITY];
+unsigned char upgrade_entity[MC_PLS_SIZE_ENTITY];
 
 int mc_IsNullEntity(const void* lpEntity)
 {
@@ -12,6 +13,15 @@ int mc_IsNullEntity(const void* lpEntity)
         return 1;
     }
     if(memcmp(lpEntity,null_entity,MC_PLS_SIZE_ENTITY) == 0)
+    {
+        return 1;        
+    }
+    return 0;
+}
+
+int mc_IsUpgradeEntity(const void* lpEntity)
+{
+    if(memcmp(lpEntity,upgrade_entity,MC_PLS_SIZE_ENTITY) == 0)
     {
         return 1;        
     }
@@ -287,7 +297,9 @@ int mc_Permissions::Initialize(const char *name,int mode)
         
     strcpy(m_Name,name);
     memset(null_entity,0,MC_PLS_SIZE_ENTITY);
-
+    memset(upgrade_entity,0,MC_PLS_SIZE_ENTITY);
+    upgrade_entity[0]=0x01;
+    
     err=MC_ERR_NOERROR;
     
     m_Ledger=new mc_PermissionLedger;
@@ -694,7 +706,7 @@ uint32_t mc_Permissions::GetPossiblePermissionTypes(uint32_t entity_type)
         default:
             if(mc_gState->m_Features->FixedIn10007())
             {
-                if(entity_type <= MC_ENT_TYPE_MAX)
+                if(entity_type <= MC_ENT_TYPE_STREAM_MAX)
                 {
                     full_type = MC_PTP_WRITE | MC_PTP_ACTIVATE | MC_PTP_ADMIN;
                 }
@@ -905,6 +917,26 @@ uint32_t mc_Permissions::GetAllPermissions(const void* lpEntity,const void* lpAd
     
     return result;
 }
+
+/** Returns non-zero value if upgrade is approved */
+
+int mc_Permissions::IsApproved(const void* lpUpgrade)
+{
+    unsigned char address[MC_PLS_SIZE_ADDRESS];
+    int result;
+    
+    memset(address,0,MC_PLS_SIZE_ADDRESS);
+    memcpy(address,lpUpgrade,MC_PLS_SIZE_UPGRADE);
+    
+    Lock(0);
+            
+    result=GetPermission(upgrade_entity,address,MC_PTP_UPGRADE);
+    
+    UnLock();
+    
+    return result;    
+}
+
 /** Returns non-zero value if (entity,address) can connect */
 
 int mc_Permissions::CanConnect(const void* lpEntity,const void* lpAddress)
@@ -1785,6 +1817,26 @@ int mc_Permissions::AdminConsensus(const void* lpEntity,uint32_t type)
                 return (int)((GetAdminCount()*(uint32_t)consensus-1)/MC_PRM_DECIMAL_GRANULARITY)+1;            
         }
     }
+
+    if(mc_IsUpgradeEntity(lpEntity))
+    {
+        switch(type)    
+        {
+            case MC_PTP_UPGRADE:
+                if(IsSetupPeriod())            
+                {
+                    return 1;
+                }
+
+                consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensusupgrade");
+                if(consensus==0)
+                {
+                    return 1;
+                }
+
+                return (int)((GetAdminCount()*(uint32_t)consensus-1)/MC_PRM_DECIMAL_GRANULARITY)+1;            
+        }
+    }
     
     return 1;
 }
@@ -2250,6 +2302,23 @@ exitlbl:
     return result;
 }
 
+/** Returns list of upgrade approval */
+
+mc_Buffer *mc_Permissions::GetUpgradeList(const void* lpUpgrade,mc_Buffer *old_buffer)
+{
+    if(lpUpgrade)
+    {    
+        unsigned char address[MC_PLS_SIZE_ADDRESS];
+
+        memset(address,0,MC_PLS_SIZE_ADDRESS);
+        memcpy(address,lpUpgrade,MC_PLS_SIZE_UPGRADE);
+
+        return GetPermissionList(upgrade_entity,address,MC_PTP_CONNECT | MC_PTP_UPGRADE,old_buffer);
+    }
+    
+    return GetPermissionList(upgrade_entity,NULL,MC_PTP_CONNECT | MC_PTP_UPGRADE,old_buffer);    
+}
+
 /** Returns list of permission states */
 
 mc_Buffer *mc_Permissions::GetPermissionList(const void* lpEntity,const void* lpAddress,uint32_t type,mc_Buffer *old_buffer)
@@ -2502,6 +2571,39 @@ int mc_Permissions::SetPermission(const void* lpEntity,const void* lpAddress,uin
     return result;
 }
 
+/** Sets approval record, external, locks */
+
+int mc_Permissions::SetApproval(const void* lpUpgrade,uint32_t approval,const void* lpAdmin,uint32_t from,uint32_t timestamp,uint32_t flags,int update_mempool)
+{
+    int result=MC_ERR_NOERROR;
+    mc_PermissionLedgerRow row;
+    unsigned char address[MC_PLS_SIZE_ADDRESS];
+    memset(address,0,MC_PLS_SIZE_ADDRESS);
+    Lock(1);
+    
+    if(GetPermission(upgrade_entity,address,MC_PTP_CONNECT,&row,1) == 0)
+    {
+        result=SetPermissionInternal(upgrade_entity,address,MC_PTP_CONNECT,address,0,(uint32_t)(-1),timestamp, MC_PFL_ENTITY_GENESIS ,update_mempool);        
+    }
+    
+    
+    if(result == MC_ERR_NOERROR)
+    {
+        memcpy(address,lpUpgrade,MC_PLS_SIZE_UPGRADE);
+        if(lpAdmin == NULL)
+        {
+            result=SetPermissionInternal(upgrade_entity,address,MC_PTP_CONNECT,address,from,approval ? (uint32_t)(-1) : 0,timestamp, flags,update_mempool);                
+        }
+        else
+        {
+            result=SetPermissionInternal(upgrade_entity,address,MC_PTP_UPGRADE,lpAdmin,from,approval ? (uint32_t)(-1) : 0,timestamp, flags,update_mempool);                            
+        }
+    }
+
+    UnLock();    
+    return result;
+}
+
 /** Sets permission record, internal */
 
 int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAddress,uint32_t type,const void* lpAdmin,uint32_t from,uint32_t to,uint32_t timestamp,uint32_t flags,int update_mempool)
@@ -2539,6 +2641,10 @@ int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAdd
     else
     {
         types[num_types]=MC_PTP_ADMIN;num_types++;                
+    }
+    if(mc_gState->m_Features->Upgrades())
+    {
+        types[num_types]=MC_PTP_UPGRADE;num_types++;                        
     }
     
     err=MC_ERR_NOERROR;

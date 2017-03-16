@@ -1368,6 +1368,11 @@ void static BitcoinMiner(CWallet *pwallet)
                     }
                 }
             }
+            
+            if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+            {
+                canMine=0;
+            }
 
             if(mc_gState->m_NodePausedState & MC_NPS_MINING)
             {
@@ -1434,9 +1439,16 @@ void static BitcoinMiner(CWallet *pwallet)
                         LogPrintf("proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex(), hashTarget.GetHex());
 */                     
 /* MCHN START */                        
-                        if(!ProcessBlockFound(pblock, *pwallet, reservekey))
+                        if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
                         {
-                            __US_Sleep(1000);                                            
+                            LogPrintf("MultiChainMiner: Waiting for upgrade, block is dropped\n");
+                        }
+                        else
+                        {
+                            if(!ProcessBlockFound(pblock, *pwallet, reservekey))
+                            {
+                                __US_Sleep(1000);                                            
+                            }
                         }
 /* MCHN END */                        
                         
