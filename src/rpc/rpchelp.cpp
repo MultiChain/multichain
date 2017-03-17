@@ -1369,7 +1369,8 @@ void mc_InitRPCHelpMap06()
             "  or \n"
             "1. entity-type       (string, required) upgrade\n"
             "2. \"upgrade-name\"    (string, required) Upgrade name, if not \"\" should be unique.\n"
-            "3  custom-fields     (object, required)  a json object with custom fields\n"
+            "3. open              (boolean, required ) Should be false\n"
+            "4  custom-fields     (object, required)  a json object with custom fields\n"
             "    {\n"
             "      \"protocol-version\": version  (numeric, required) Protocol version to upgrade to\n"
             "      \"start-block\": block         (numeric, optional, default 0) Block to apply from \n"
@@ -1403,7 +1404,8 @@ void mc_InitRPCHelpMap06()
             "1. from-address      (string, required) Address used for creating.\n"
             "2. entity-type       (string, required) upgrade\n"
             "3. \"upgrade-name\"    (string, required) Upgrade name, if not \"\" should be unique.\n"
-            "4  custom-fields     (object, required)  a json object with custom fields\n"
+            "4. open              (boolean, required ) Should be false\n"
+            "5  custom-fields     (object, required)  a json object with custom fields\n"
             "    {\n"
             "      \"protocol-version\": version  (numeric, required) Protocol version to upgrade to \n"
             "      \"start-block\": block         (numeric, optional, default 0) Block to apply from \n"
@@ -3591,6 +3593,16 @@ void mc_InitRPCAllowedWhenWaitingForUpgradeSet()
     setAllowedWhenWaitingForUpgrade.insert("listpermissions");    
     setAllowedWhenWaitingForUpgrade.insert("decoderawtransaction");    
     setAllowedWhenWaitingForUpgrade.insert("getrawtransaction");    
+    setAllowedWhenWaitingForUpgrade.insert("dumpprivkey");    
+    setAllowedWhenWaitingForUpgrade.insert("getaddresses");    
+    setAllowedWhenWaitingForUpgrade.insert("listaddresses");    
+    setAllowedWhenWaitingForUpgrade.insert("createkeypairs");    
+    setAllowedWhenWaitingForUpgrade.insert("createmultisig");    
+    setAllowedWhenWaitingForUpgrade.insert("validateaddress");    
+    setAllowedWhenWaitingForUpgrade.insert("addnode");    
+    setAllowedWhenWaitingForUpgrade.insert("getpeerinfo");    
+    setAllowedWhenWaitingForUpgrade.insert("signmessage");    
+    setAllowedWhenWaitingForUpgrade.insert("verifymessage");    
 }
 
 void mc_InitRPCHelpMap()

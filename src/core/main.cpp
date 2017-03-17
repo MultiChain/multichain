@@ -389,7 +389,7 @@ int MultichainNode_ApplyUpgrades()
         LogPrintf("New protocol upgrade version: %d (was %d)\n",mc_gState->m_ProtocolVersionToUpgrade,m_OldProtocolVersion);
         if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
         {
-            LogPrintf("NODE IS SHOULD BE UPGRADED FROM %d TO %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
+            LogPrintf("NODE SHOULD BE UPGRADED FROM %d TO %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
         }
     }
     
