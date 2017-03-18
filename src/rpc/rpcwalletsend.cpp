@@ -95,6 +95,11 @@ Value createrawsendfrom(const Array& params, bool fHelp)
     string strError;
     uint32_t flags=MC_CSF_ALLOW_NOT_SPENDABLE_P2SH | MC_CSF_ALLOW_SPENDABLE_P2SH | MC_CSF_ALLOW_NOT_SPENDABLE;
     
+    if(!sign_it)
+    {
+        flags |= MC_CSF_ALLOWED_COINS_ARE_MINE;
+    }
+    
     EnsureWalletIsUnlocked();
     {
         LOCK (pwalletMain->cs_wallet_send);

@@ -1955,6 +1955,19 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                             }
                         }                            
                     }
+                    
+                    mc_Coin coin_fixed;
+                    bool use_fixed_coin=false;
+                    if(flags & MC_CSF_ALLOWED_COINS_ARE_MINE)
+                    {
+                        if((mine & ISMINE_SPENDABLE) != ISMINE_NO)
+                        {
+                            coin_fixed=coin;
+                            coin_fixed.m_Flags |= MC_TFL_IS_MINE_FOR_THIS_SEND;
+                            use_fixed_coin=true;
+                        }
+                    }
+                    
                     uint256 txid=coin.m_OutPoint.hash;
                     uint32_t vout=coin.m_OutPoint.n;
                     int nDepth=coin.GetDepthInMainChain();
@@ -1966,7 +1979,7 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                          (!fOnlyUnlocked || !IsLockedCoin(txid, vout)) && 
                          (!coinControl || !coinControl->HasSelected() || coinControl->IsSelected(txid, vout)))
                     {
-                        vCoins.push_back(COutput(NULL, vout, nDepth, (mine & ISMINE_SPENDABLE) != ISMINE_NO, coin));                
+                        vCoins.push_back(COutput(NULL, vout, nDepth, (mine & ISMINE_SPENDABLE) != ISMINE_NO, use_fixed_coin ? coin_fixed : coin));                
                     }            
                 }
             }                            
@@ -2770,16 +2783,26 @@ bool CWallet::SelectMultiChainCoinsMinConf(const CAmount& nTargetValue, int nCon
             }
             else
             {
-                if (!output.coin.IsTrusted())
+                if(output.coin.m_Flags & MC_TFL_IS_MINE_FOR_THIS_SEND)
                 {
-    //                printf("Not spendable\n");
-                    take_it=false;
+                    if (output.nDepth < nConfMine)
+                    {
+                        take_it=false;
+                    }                                    
                 }
-                if (output.nDepth < (((output.coin.m_Flags & MC_TFL_FROM_ME) > 0) ? nConfMine : nConfTheirs))
+                else
                 {
-    //                printf("Not enough confitmations\n");
-                    take_it=false;
-                }                
+                    if (!output.coin.IsTrusted())
+                    {
+        //                printf("Not spendable\n");
+                        take_it=false;
+                    }
+                    if (output.nDepth < (((output.coin.m_Flags & MC_TFL_FROM_ME) > 0) ? nConfMine : nConfTheirs))
+                    {
+        //                printf("Not enough confitmations\n");
+                        take_it=false;
+                    }                
+                }
             }
         }
         

@@ -69,12 +69,14 @@ struct mc_WalletTxs;
 #define MC_TFL_ALL_INPUTS_FROM_ME       0x00020000
 #define MC_TFL_IS_CHANGE                0x00040000
 #define MC_TFL_IS_SPENDABLE             0x00080000
+#define MC_TFL_IS_MINE_FOR_THIS_SEND    0x10000000
 #define MC_TFL_IMPOSSIBLE               0x80000000
 
 #define MC_CSF_ALLOW_SPENDABLE_P2SH     0x00000001
 #define MC_CSF_ALLOW_NOT_SPENDABLE_P2SH 0x00000002
 #define MC_CSF_ALLOW_NOT_SPENDABLE      0x00000004
 #define MC_CSF_SIGN                     0x00000008
+#define MC_CSF_ALLOWED_COINS_ARE_MINE   0x00000010
 
 
 class mc_Coin
