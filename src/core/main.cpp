@@ -1898,31 +1898,34 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                                  REJECT_INVALID, "bad-txns-inputvalues-outofrange");
             unsigned int send_permission_flags=0;
 
-            CTxDestination addressRet;     
-            if(ExtractDestinationScriptValid(coins->vout[prevout.n].scriptPubKey, addressRet))
+            if(fScriptChecks)
             {
-                CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
-                if(lpKeyID != NULL)
+                CTxDestination addressRet;     
+                if(ExtractDestinationScriptValid(coins->vout[prevout.n].scriptPubKey, addressRet))
                 {
-                    if(!mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpKeyID)))
+                    CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
+                    if(lpKeyID != NULL)
                     {
-                        return state.Invalid(error("CheckInputs() : %s input %d doesn't have send permission", tx.GetHash().ToString(),i));
-                    }                            
-                    send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
-                    async_count++;
-                }
-                else
-                {
-                    CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
-                    if(lpScriptID)
-                    {
-                        if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpScriptID)))
+                        if(!mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpKeyID)))
                         {
-                            send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
-                            async_count++;
-                        }                
+                            return state.Invalid(error("CheckInputs() : %s input %d doesn't have send permission", tx.GetHash().ToString(),i));
+                        }                            
+                        send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
+                        async_count++;
                     }
-                }                    
+                    else
+                    {
+                        CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
+                        if(lpScriptID)
+                        {
+                            if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpScriptID)))
+                            {
+                                send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
+                                async_count++;
+                            }                
+                        }
+                    }                    
+                }
             }
 
             vSendPermissionFlags.push_back(send_permission_flags);
