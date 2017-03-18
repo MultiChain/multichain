@@ -1792,7 +1792,23 @@ Value backupwallet(const Array& params, bool fHelp)
     if (fHelp || params.size() != 1)
         throw runtime_error("Help message not found\n");
 
-    string strDest = params[0].get_str();
+    char bufOutput[MC_DCT_DB_MAX_PATH+1];
+    char *full_path=__US_FullPath(params[0].get_str().c_str(),bufOutput,MC_DCT_DB_MAX_PATH+1);
+    
+    if(full_path)
+    {
+        char bufWallet[MC_DCT_DB_MAX_PATH+1];
+        mc_GetFullFileName(mc_gState->m_NetworkParams->Name(),"wallet",".dat",MC_FOM_RELATIVE_TO_DATADIR,bufWallet);
+
+        if(strcmp(full_path,bufWallet) == 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Cannot backup wallet file to itself");        
+        }
+    }
+    
+    
+//    string strDest = params[0].get_str();
+    string strDest = strprintf("%s",full_path);
     if (!BackupWallet(*pwalletMain, strDest))
         throw JSONRPCError(RPC_WALLET_ERROR, "Error: Wallet backup failed!");
 
