@@ -430,6 +430,35 @@ bool IsStandardNullData(const CScript& scriptPubKey)
             op_drop_count++;
         }        
     }
+    
+    if (pc < scriptPubKey.end())
+    {
+        if(pc + OP_PUSHDATA1 < scriptPubKey.end())
+        {
+            scriptPubKey.GetOp(pc, opcode, vch);
+            if (vch.size() > MAX_OP_RETURN_RELAY)
+            {
+                return false;
+            }
+        }
+        else
+        {
+            scriptPubKey.GetOp(pc, opcode);
+            if(opcode >= OP_PUSHDATA1)
+            {
+                return false;
+            }
+            if ((unsigned int)opcode > MAX_OP_RETURN_RELAY)
+            {
+                return false;
+            }            
+        }
+        if(scriptPubKey.GetOp(pc, opcode))
+        {
+            return false;
+        }
+        return false;
+    }
 
     if(mc_gState->m_Features->VerifySizeOfOpDropElements())
     {
@@ -644,7 +673,7 @@ bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType)
     
     if(mc_gState->m_Features->VerifySizeOfOpDropElements())
     {
-        for(int d=0;d<=max_op_drops;d++)
+        for(int d=0;d<max_op_drops;d++)
         {
             if (pc < scriptPubKey.end())                                            
             {
@@ -667,7 +696,7 @@ bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType)
     }
     else
     {
-        for(int d=0;d<=max_op_drops;d++)
+        for(int d=0;d<max_op_drops;d++)
         {
             if (pc < scriptPubKey.end())                                            
             {
