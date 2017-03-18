@@ -835,6 +835,8 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
     int group_id,group_count,i,pure_native_group;
     int count=0;
     int full_count,this_count,pure_native_count;
+    CAmount total_native;
+    int total_native_hit;
     
     vector <pair<int,int> > active_groups;                                      // Groups found in UTXOs
     
@@ -954,6 +956,8 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
     if(debug_print)printf("debg: Inputs - combine, multiple coins\n");
     
     coin_id=0;
+    total_native=0;
+    total_native_hit=0;
     
     BOOST_FOREACH(const COutput& out, vCoins)
     {       
@@ -982,17 +986,25 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
                         }                                        
                         if(active_groups[group_id].second > 0)                      
                         {
-                            for(int i=0;i<tmp_amounts->GetCount();i++)
+                            if(total_native + txout.nValue <= MAX_MONEY)
                             {
-                                DebugPrintAssetTxOut(hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
+                                for(int i=0;i<tmp_amounts->GetCount();i++)
+                                {
+                                    DebugPrintAssetTxOut(hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
+                                }
+                                if(!InsertCoinIntoMatrix(coin_id,hash,out_i,tmp_amounts,NULL,in_amounts,in_map,in_row,in_size,in_special_row,0))
+                                {
+                                    strFailReason=_("Internal error");
+                                    return false;
+                                }                
+                                count++;       
+                                active_groups[group_id].second-=1;
+                                total_native+=txout.nValue;
                             }
-                            if(!InsertCoinIntoMatrix(coin_id,hash,out_i,tmp_amounts,NULL,in_amounts,in_map,in_row,in_size,in_special_row,0))
+                            else
                             {
-                                strFailReason=_("Internal error");
-                                return false;
-                            }                
-                            count++;       
-                            active_groups[group_id].second-=1;
+                                total_native_hit=1;                                
+                            }
                         }
                     }
                 }
@@ -1002,7 +1014,7 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
         coin_id++;
     }
     
-    if(count<min_inputs)                                                        // Not enough coins to combine
+    if( (count<min_inputs) && ( (total_native_hit == 0) || (count == 1) ))                                                       // Not enough coins to combine
     {
         strFailReason = _("Not enough inputs");
         return false;
