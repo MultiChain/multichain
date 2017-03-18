@@ -194,7 +194,7 @@ Value liststreams(const Array& params, bool fHelp)
     unsigned char *root_stream_name;
     int root_stream_name_size;
     root_stream_name=(unsigned char *)mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
-    if( (root_stream_name_size <= 1) && (inputStrings.size() == 0) )            // Patch, to be removed in 10008
+    if( (root_stream_name_size <= 1) && (inputStrings.size() == 0) && (mc_gState->m_Features->FixedIn10008() == 0) )            // Patch, to be removed in 10008
     {
         mc_AdjustStartAndCount(&count,&start,streams->GetCount()-1);        
         start++;            
@@ -264,7 +264,7 @@ Value liststreams(const Array& params, bool fHelp)
     {
         return_partial=true;
     }
-    if( (root_stream_name_size <= 1) && (inputStrings.size() == 0) )            // Patch, to be removed in 10008
+    if( (root_stream_name_size <= 1) && (inputStrings.size() == 0)  && (mc_gState->m_Features->FixedIn10008() == 0) )            // Patch, to be removed in 10008
     {
         return_partial=true;        
     }

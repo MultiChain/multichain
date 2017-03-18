@@ -140,7 +140,7 @@ int mc_MultichainParams::Build(const unsigned char* pubkey, int pubkey_size)
         
         txNew.vin.resize(1);
         
-        if(root_stream_name_size)
+        if(root_stream_name_size > ( (mc_gState->m_Features->FixedIn10008() != 0) ? 1 : 0 ))
         {
             txNew.vout.resize(2);                        
         }
@@ -187,7 +187,7 @@ int mc_MultichainParams::Build(const unsigned char* pubkey, int pubkey_size)
             delete lpScript;            
         }
 
-        if(root_stream_name_size)
+        if(root_stream_name_size > ( (mc_gState->m_Features->FixedIn10008() != 0) ? 1 : 0 ))
         {        
             txNew.vout[1].nValue=0;
             lpDetails=new mc_Script;
