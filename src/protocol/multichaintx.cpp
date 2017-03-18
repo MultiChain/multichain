@@ -916,6 +916,17 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                     {
                         fScriptHashAllFound=true;
                     }
+                    if(mc_gState->m_Features->FixedIn10008())
+                    {
+                        if(sighash_type == SIGHASH_SINGLE)
+                        {
+                            if(i >= tx.vout.size())
+                            {
+                                reason="SIGHASH_SINGLE input without matching output";
+                                return false;                                
+                            }
+                        }                    
+                    }
                     if(check_last)
                     {
                         fRejectIfOpDropOpReturn=true;                           // pay-to-pubkey and bare multisig  script cannot be considered "publisher" for the stream, because we cannot
