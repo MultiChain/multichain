@@ -170,6 +170,11 @@ CDBEnv::VerifyResult CDBEnv::Verify(std::string strFile, bool (*recoverFunc)(CDB
     return (fRecovered ? RECOVER_OK : RECOVER_FAIL);
 }
 
+/* End of headers, beginning of key/value data */
+static const char *HEADER_END = "HEADER=END";
+/* End of key/value data */
+static const char *DATA_END = "DATA=END";
+
 bool CDBEnv::Salvage(std::string strFile, bool fAggressive, std::vector<CDBEnv::KeyValPair>& vResult)
 {
     LOCK(cs_db);
@@ -204,16 +209,28 @@ bool CDBEnv::Salvage(std::string strFile, bool fAggressive, std::vector<CDBEnv::
     // DATA=END
 
     string strLine;
-    while (!strDump.eof() && strLine != "HEADER=END")
+    while (!strDump.eof() && strLine != HEADER_END)
         getline(strDump, strLine); // Skip past header
 
     std::string keyHex, valueHex;
-    while (!strDump.eof() && keyHex != "DATA=END") {
+    while (!strDump.eof() && keyHex != DATA_END) {
         getline(strDump, keyHex);
-        if (keyHex != "DATA=END") {
+        if (keyHex != DATA_END) {
+            if (strDump.eof())
+               break;             
             getline(strDump, valueHex);
+            if (valueHex == DATA_END) {
+                LogPrintf("CDBEnv::Salvage: WARNING: Number of keys in data does not match number of values.\n");
+                break;
+            }
+              
             vResult.push_back(make_pair(ParseHex(keyHex), ParseHex(valueHex)));
         }
+    }
+
+    if (keyHex != DATA_END) {
+        LogPrintf("CDBEnv::Salvage: WARNING: Unexpected end of file while reading salvage output.\n");
+        return false;
     }
 
     return (result == 0);
