@@ -124,7 +124,7 @@ bool AppInit(int argc, char* argv[])
         fprintf(stdout, "%s", strUsage.c_str());
 
         delete mc_gState;                
-        return false;
+        return true;
     }
 
     if(!GetBoolArg("-shortoutput", false))
