@@ -600,7 +600,7 @@ int mc_TxDB::FlushDataFile(uint32_t fileid)
     {
         return MC_ERR_INTERNAL_ERROR;
     }
-    fsync(FileHan);
+    __US_FlushFile(FileHan);
     close(FileHan);
     return MC_ERR_NOERROR;
 }

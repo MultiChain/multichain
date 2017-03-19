@@ -200,6 +200,11 @@ char * __US_FullPath(const char* path, char *full_path, int len)
     return full_path;
 }
 
+void __US_FlushFile(int FileHan)
+{
+    fsync(FileHan);
+}
+
 #else
 
 #include "windows.h"
@@ -267,6 +272,12 @@ const char* __US_UserHomeDir()
 char * __US_FullPath(const char* path, char *full_path, int len)
 {
     return _fullpath(full_path,path,len);
+}
+
+void __US_FlushFile(int FileHan)
+{
+    HANDLE hFile = (HANDLE)_get_osfhandle(FileHan);
+    FlushFileBuffers(hFile);
 }
 
 #endif

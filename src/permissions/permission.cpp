@@ -149,7 +149,7 @@ void mc_PermissionLedger::Flush()
 {
     if(m_FileHan>0)
     {
-        fsync(m_FileHan);
+        __US_FlushFile(m_FileHan);
     }    
 }
 
