@@ -266,7 +266,7 @@ const char* __US_UserHomeDir()
 
 char * __US_FullPath(const char* path, char *full_path, int len)
 {
-    retrun _fullpath(full_path,path,len);
+    return _fullpath(full_path,path,len);
 }
 
 #endif
