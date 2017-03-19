@@ -1002,7 +1002,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         {
             LogPrintf("mchn: Default key is not found - creating new... \n");
             // Create new keyUser and set as default key
-            RandAddSeedPerfmon();
+//            RandAddSeedPerfmon();
 
             pwalletMain->SetMinVersion(FEATURE_LATEST); // permanently upgrade the wallet immediately
             CPubKey newDefaultKey;
@@ -1398,7 +1398,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             {
                 LogPrintf("mchn: Default key is not found - creating new... \n");
                 // Create new keyUser and set as default key
-                RandAddSeedPerfmon();
+//                RandAddSeedPerfmon();
 
                 pwalletMain->SetMinVersion(FEATURE_LATEST); // permanently upgrade the wallet immediately
                 CPubKey newDefaultKey;
@@ -2048,7 +2048,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         if (fFirstRun)
         {
             // Create new keyUser and set as default key
-            RandAddSeedPerfmon();
+//            RandAddSeedPerfmon();
 
             CPubKey newDefaultKey;
             if (pwalletMain->GetKeyFromPool(newDefaultKey)) {
@@ -2170,7 +2170,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     if (!strErrors.str().empty())
         return InitError(strErrors.str());
 
-    RandAddSeedPerfmon();
+//    RandAddSeedPerfmon();
 
     //// debug print
     LogPrintf("mapBlockIndex.size() = %u\n",   mapBlockIndex.size());

@@ -24,7 +24,8 @@ void mc_GetCompoundHash160(void *result,const void  *hash1,const void  *hash2)
 
 int mc_RandomEncodedBase58String(char * dest,int size)
 {
-    GetRandBytes((unsigned char*)dest, size);
+//    GetRandBytes((unsigned char*)dest, size);
+    GetStrongRandBytes((unsigned char*)dest, size);
     string str=EncodeBase58((unsigned char*)(&dest[0]),(unsigned char*)(&dest[0])+size);
     strcpy(dest,str.c_str());
     return MC_ERR_NOERROR;
