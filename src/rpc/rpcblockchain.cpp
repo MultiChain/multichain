@@ -603,7 +603,7 @@ Value getmempoolinfo(const Array& params, bool fHelp)
     Object ret;
     ret.push_back(Pair("size", (int64_t) mempool.size()));
     ret.push_back(Pair("bytes", (int64_t) mempool.GetTotalTxSize()));
-    ret.push_back(Pair("orphan", OrphanPoolSize()));
+//    ret.push_back(Pair("orphan", OrphanPoolSize()));
 
     return ret;
 }

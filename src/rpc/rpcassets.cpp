@@ -1544,19 +1544,9 @@ Value listassets(const Array& params, bool fHelp)
     
     if (params.size() > 1)    
     {
-        if(params[1].type() == int_type)
+        if(paramtobool(params[1]))
         {
-            if(params[1].get_int())
-            {
-                output_level=9;
-            }
-        }
-        if(params[1].type() == bool_type)
-        {
-            if(params[1].get_bool())
-            {
-                output_level=9;
-            }
+            output_level=9;
         }
     }
     
@@ -1894,20 +1884,7 @@ Value getassettransaction(const Array& params, bool fHelp)
     
     if (params.size() > 2)    
     {
-        if(params[2].type() == int_type)
-        {
-            if(params[2].get_int())
-            {
-                verbose=true;
-            }
-        }
-        if(params[2].type() == bool_type)
-        {
-            if(params[2].get_bool())
-            {
-                verbose=true;
-            }
-        }
+        verbose=paramtobool(params[2]);
     }
     
     const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
@@ -1956,20 +1933,7 @@ Value listassettransactions(const Array& params, bool fHelp)
     
     if (params.size() > 1)    
     {
-        if(params[1].type() == int_type)
-        {
-            if(params[1].get_int())
-            {
-                verbose=true;
-            }
-        }
-        if(params[1].type() == bool_type)
-        {
-            if(params[1].get_bool())
-            {
-                verbose=true;
-            }
-        }
+        verbose=paramtobool(params[1]);
     }
     
     count=10;

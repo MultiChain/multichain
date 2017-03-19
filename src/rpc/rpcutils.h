@@ -57,6 +57,7 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
 bool AssetCompareByRef(Value a,Value b);
 Array AssetArrayFromAmounts(mc_Buffer *asset_amounts,int issue_asset_id,uint256 hash,int show_type);
 void ParseRawAction(string action,bool& lock_it, bool& sign_it,bool& send_it);
+bool paramtobool(Value param);
 
 #endif	/* RPCMULTICHAINUTILS_H */
 

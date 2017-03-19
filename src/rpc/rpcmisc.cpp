@@ -236,33 +236,42 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     return obj;
 }
 
-bool paramtobool(Value param)
+bool paramtobool(Value param,bool strict)
 {
-    if(param.type() == str_type)
+    if(!strict)
     {
-        if(param.get_str() == "true")
+        if(param.type() == str_type)
         {
-            return true;
+            if(param.get_str() == "true")
+            {
+                return true;
+            }
+            return atoi(param.get_str().c_str()) != 0;
         }
-        return atoi(param.get_str().c_str()) != 0;
+        if(param.type() == int_type)
+        {
+            if(param.get_int())
+            {
+                return true;
+            }
+            else
+            {
+                return false;            
+            }
+        }
     }
-    if(param.type() == int_type)
-    {
-        if(param.get_int())
-        {
-            return true;
-        }
-        else
-        {
-            return false;            
-        }
-    }
+    
     if(param.type() != bool_type)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value type");                            
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value type, should be boolean");                            
     }    
     
     return param.get_bool();    
+}
+
+bool paramtobool(Value param)
+{
+    return paramtobool(param,true);
 }
 
 Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
@@ -279,17 +288,17 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
     bool fFound=false;
     if(param_name == "miningrequirespeers")
     {
-        mapArgs ["-" + param_name]=paramtobool(params[1]) ? "1" : "0";
+        mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
         fFound=true;
     }
     if(param_name == "mineemptyblocks")
     {
-        mapArgs ["-" + param_name]=paramtobool(params[1]) ? "1" : "0";
+        mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
         fFound=true;
     }
     if(param_name == "hideknownopdrops")
     {
-        mapArgs ["-" + param_name]=paramtobool(params[1]) ? "1" : "0";
+        mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
         fFound=true;
     }
     if(param_name == "mineemptyrounds")

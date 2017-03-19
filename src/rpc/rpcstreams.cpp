@@ -174,19 +174,9 @@ Value liststreams(const Array& params, bool fHelp)
     
     if (params.size() > 1)    
     {
-        if(params[1].type() == int_type)
+        if(paramtobool(params[1]))
         {
-            if(params[1].get_int())
-            {
-                output_level=0x3E;
-            }
-        }
-        if(params[1].type() == bool_type)
-        {
-            if(params[1].get_bool())
-            {
-                output_level=0x3E;
-            }
+            output_level=0x3E;            
         }
     }
     
@@ -872,20 +862,7 @@ Value getstreamitem(const Array& params, bool fHelp)
     
     if (params.size() > 2)    
     {
-        if(params[2].type() == int_type)
-        {
-            if(params[2].get_int())
-            {
-                verbose=true;
-            }
-        }
-        if(params[2].type() == bool_type)
-        {
-            if(params[2].get_bool())
-            {
-                verbose=true;
-            }
-        }
+        verbose=paramtobool(params[2]);
     }
     
     const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
@@ -924,20 +901,7 @@ Value liststreamitems(const Array& params, bool fHelp)
     
     if (params.size() > 1)    
     {
-        if(params[1].type() == int_type)
-        {
-            if(params[1].get_int())
-            {
-                verbose=true;
-            }
-        }
-        if(params[1].type() == bool_type)
-        {
-            if(params[1].get_bool())
-            {
-                verbose=true;
-            }
-        }
+        verbose=paramtobool(params[1]);
     }
     
     count=10;
@@ -1107,20 +1071,7 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
     
     if (params.size() > 2)    
     {
-        if(params[2].type() == int_type)
-        {
-            if(params[2].get_int())
-            {
-                verbose=true;
-            }
-        }
-        if(params[2].type() == bool_type)
-        {
-            if(params[2].get_bool())
-            {
-                verbose=true;
-            }
-        }
+        verbose=paramtobool(params[2]);
     }
 
     count=10;
@@ -1246,20 +1197,7 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
     
     if (params.size() > 2)    
     {
-        if(params[2].type() == int_type)
-        {
-            if(params[2].get_int())
-            {
-                verbose=true;
-            }
-        }
-        if(params[2].type() == bool_type)
-        {
-            if(params[2].get_bool())
-            {
-                verbose=true;
-            }
-        }
+        verbose=paramtobool(params[2]);
     }
 
     count=10;
@@ -1477,19 +1415,9 @@ Value liststreamkeys_or_publishers(const Array& params,bool is_publishers)
     
     if (params.size() > 2)    
     {
-        if(params[2].type() == int_type)
+        if(paramtobool(params[2]))
         {
-            if(params[2].get_int())
-            {
-                mode="all";
-            }
-        }
-        if(params[2].type() == bool_type)
-        {
-            if(params[2].get_bool())
-            {
-                mode="all";
-            }
+            mode="all";            
         }
     }
         

@@ -483,17 +483,10 @@ Value listpermissions(const Array& params, bool fHelp)
     int verbose=0;
     if (params.size() > 2)    
     {
-        if(params[2].type() == int_type)
+        if(paramtobool(params[2]))
         {
-            verbose=params[2].get_int();
-        }
-        if(params[2].type() == bool_type)
-        {
-            if(params[2].get_bool())
-            {
-                verbose=1;
-            }
-        }
+            verbose=1;
+        }        
     }
     
     permissions=NULL;

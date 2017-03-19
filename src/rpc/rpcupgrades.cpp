@@ -244,19 +244,9 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
     approval=1;
     if (params.size() > 2)    
     {
-        if(params[2].type() == int_type)
+        if(!paramtobool(params[2]))
         {
-            if(params[2].get_int() == 0)
-            {
-                approval=0;
-            }
-        }
-        if(params[2].type() == bool_type)
-        {
-            if(!params[2].get_bool())
-            {
-                approval=0;
-            }
+            approval=0;
         }
     }
     
@@ -336,18 +326,12 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
     int verbose=0;
     if (params.size() > 1)    
     {
-        if(params[1].type() == int_type)
+        if(paramtobool(params[1]))
         {
-            verbose=params[1].get_int();
-        }
-        if(params[1].type() == bool_type)
-        {
-            if(params[1].get_bool())
-            {
-                verbose=1;
-            }
-        }
+            verbose=1;
+        }        
     }
+        
     
     vector<string> inputStrings;
     if (params.size() > 0 && params[0].type() != null_type && ((params[0].type() != str_type) || (params[0].get_str() !="*" ) ) )

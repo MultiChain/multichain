@@ -1021,17 +1021,10 @@ Value decoderawexchange(const json_spirit::Array& params, bool fHelp)
     int verbose=0;
     if (params.size() > 1)    
     {
-        if(params[1].type() == int_type)
+        if(paramtobool(params[1]))
         {
-            verbose=params[1].get_int();
-        }
-        if(params[1].type() == bool_type)
-        {
-            if(params[1].get_bool())
-            {
-                verbose=1;
-            }
-        }
+            verbose=1;
+        }        
     }
     
 
