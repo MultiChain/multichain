@@ -351,7 +351,8 @@ int MultichainNode_ApplyUpgrades()
     permissions=NULL;
     map <uint64_t,int> map_sorted;
 
-    int m_OldProtocolVersion=mc_gState->m_ProtocolVersionToUpgrade;
+    int OldProtocolVersion=mc_gState->m_ProtocolVersionToUpgrade;
+    int NewProtocolVersion=0;
     
     permissions=mc_gState->m_Permissions->GetUpgradeList(NULL,NULL);
 
@@ -377,16 +378,18 @@ int MultichainNode_ApplyUpgrades()
             {
                 if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,plsRow->m_Address))
                 {
-                    mc_gState->m_ProtocolVersionToUpgrade=entity.UpgradeProtocolVersion();
+                    NewProtocolVersion=entity.UpgradeProtocolVersion();
                 }
             }            
         }
     }
     
     mc_gState->m_Permissions->FreePermissionList(permissions);
-    if(mc_gState->m_ProtocolVersionToUpgrade != m_OldProtocolVersion)
+    mc_gState->m_ProtocolVersionToUpgrade=NewProtocolVersion;
+    
+    if(mc_gState->m_ProtocolVersionToUpgrade != OldProtocolVersion)
     {
-        LogPrintf("New protocol upgrade version: %d (was %d)\n",mc_gState->m_ProtocolVersionToUpgrade,m_OldProtocolVersion);
+        LogPrintf("New protocol upgrade version: %d (was %d)\n",mc_gState->m_ProtocolVersionToUpgrade,OldProtocolVersion);
         if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
         {
             LogPrintf("NODE SHOULD BE UPGRADED FROM %d TO %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
@@ -3124,15 +3127,17 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
             }
         } else {
             PruneBlockIndexCandidates();
+/*            
             if(!GetBoolArg("-waitforbetterblock",false))
             {
-            
+*/            
             if (!pindexOldTip || chainActive.Tip()->nChainWork > pindexOldTip->nChainWork) {
                 // We're in a better position than we were. Return temporarily to release the lock.
                 fContinue = false;
                 break;
             }
-            }
+            
+//            }
             if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
             {
                 LogPrintf("Cannot connect more blocks, required protocol version upgrade %d -> %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
