@@ -3530,7 +3530,7 @@ void mc_InitRPCHelpMap16()
         ));
     
     mapHelpStrings.insert(std::make_pair("approvefrom",
-            "grantfrom from-address \"upgrade-identifier\" ( approve )\n"
+            "approvefrom from-address \"upgrade-identifier\" ( approve )\n"
             "\nGrant permission using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -3546,11 +3546,10 @@ void mc_InitRPCHelpMap16()
         ));
     
     mapHelpStrings.insert(std::make_pair("listupgrades",
-            "listupgrades (upgrade-identifier(s) verbose )\n"
+            "listupgrades (upgrade-identifier(s))\n"
             "1. \"upgrade-identifier(s)\" (string, optional, default=*, all upgrades) Upgrade identifier - one of the following: upgrade txid, upgrade reference, upgrade name.\n"
             "or\n"
             "1. upgrade-identifier(s)      (array, optional) A json array of upgrade identifiers \n"                
-            "2. verbose             (boolean, optional, default=false)  If true, returns list of pending approvals \n"
             "\nReturns list of defined streams\n"
             "\nExamples:\n"
             + HelpExampleCli("listupgrades", "")

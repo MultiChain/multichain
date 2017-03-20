@@ -731,7 +731,7 @@ Object UpgradeEntry(const unsigned char *txid)
             }
             offset=new_offset;
         }      
-        entry.push_back(Pair("details",fields));                    
+        entry.push_back(Pair("params",fields));                    
 //        entry.push_back(Pair("creators",openers));                    
         
     }

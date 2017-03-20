@@ -107,6 +107,10 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
                 {
                     throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid protocol version, should be non-negative");                                                                                    
                 }
+                if(protocol_version > mc_gState->m_NetworkParams->m_ProtocolVersion)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid protocol version, cannot upgrade to future version");                                                                                    
+                }
                 lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,(unsigned char*)&protocol_version,4);        
             }
             else
@@ -315,7 +319,7 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
 
 Value listupgrades(const json_spirit::Array& params, bool fHelp)
 {
-    if (fHelp || params.size() > 2)
+    if (fHelp || params.size() > 1)
         throw runtime_error("Help message not found\n");
 
     Array results;
@@ -323,6 +327,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
     
     upgrades=NULL;
     
+/*    
     int verbose=0;
     if (params.size() > 1)    
     {
@@ -331,7 +336,9 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
             verbose=1;
         }        
     }
-        
+*/
+    
+    int verbose=1;
     
     vector<string> inputStrings;
     if (params.size() > 0 && params[0].type() != null_type && ((params[0].type() != str_type) || (params[0].get_str() !="*" ) ) )
@@ -421,7 +428,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
         mc_PermissionDetails *plsDet;
         mc_PermissionDetails *plsPend;
         mc_EntityDetails upgrade_entity;
-        bool take_it;
+        bool take_it,approved;
         int flags,consensus,remaining;
         plsRow=(mc_PermissionDetails *)(upgrades->GetRow(i));
         
@@ -429,8 +436,10 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
         mc_gState->m_Assets->FindEntityByShortTxID(&upgrade_entity,plsRow->m_Address);
         
         entry=UpgradeEntry(upgrade_entity.GetTxID());
+        approved=true;
         if(plsRow->m_BlockFrom >= plsRow->m_BlockTo)
         {
+            approved=false;  
             entry.push_back(Pair("approved", false));            
         }
         else
@@ -449,7 +458,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
         }
         if(take_it)
         {
-            if( (plsRow->m_BlockFrom >= plsRow->m_BlockTo) && 
+            if( ( (plsRow->m_BlockFrom >= plsRow->m_BlockTo) && (inputStrings.size() == 0)) && 
                     (((flags & MC_PFL_HAVE_PENDING) == 0) || !verbose) )
             {
                 if(verbose)
@@ -496,6 +505,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
                     {
                         Object pend_obj;
                         Array pend_admins;
+                        bool take_pend=true;
                         uint32_t block_from=plsDet->m_BlockFrom;
                         uint32_t block_to=plsDet->m_BlockTo;
                         for(int k=j;k<details->GetCount();k++)
@@ -521,17 +531,28 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
                         }          
                         if(block_from >= block_to)
                         {
+                            if(!approved)
+                            {
+                                take_pend=false;
+                            }
                             pend_obj.push_back(Pair("approve", false));                            
                         }
                         else
                         {
+                            if(!approved)
+                            {
+                                take_pend=true;
+                            }
                             pend_obj.push_back(Pair("approve", true));                                                        
                         }
 //                        pend_obj.push_back(Pair("startblock", (int64_t)block_from));
 //                        pend_obj.push_back(Pair("endblock", (int64_t)block_to));                        
                         pend_obj.push_back(Pair("admins", pend_admins));
                         pend_obj.push_back(Pair("required", (int64_t)(consensus-pend_admins.size())));
-                        pending.push_back(pend_obj);                            
+                        if(take_pend)
+                        {
+                            pending.push_back(pend_obj);                            
+                        }
                     }
                 }                    
                 mc_gState->m_Permissions->FreePermissionList(details);                    
