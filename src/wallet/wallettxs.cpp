@@ -14,6 +14,8 @@ using namespace json_spirit;
 #include <boost/algorithm/string/replace.hpp>
 #include "json/json_spirit_writer_template.h"
 
+#define MC_TDB_UTXO_SET_WINDOW_SIZE        20
+
 int64_t GetAdjustedTime();
 void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
 bool CBitcoinAddressFromTxEntity(CBitcoinAddress &address,mc_TxEntity *lpEntity);
@@ -200,6 +202,19 @@ void mc_WalletTxs::BindWallet(CWallet *lpWallet)
     m_lpWallet=lpWallet;    
 }
 
+string mc_WalletTxs::Summary()
+{
+    if(m_Database->m_Imports->m_Block != m_Database->m_DBStat.m_Block)
+    {
+        LogPrintf("wtxs: ERROR! Wallet block count mismatch: %d -> %d\n",m_Database->m_Imports->m_Block != m_Database->m_DBStat.m_Block);
+    }
+    return strprintf("Block: %d, Txs: %d, Unconfirmed: %d, UTXOs: %d",
+            m_Database->m_Imports->m_Block,
+            (int)m_Database->m_DBStat.m_Count,
+            (int)m_UnconfirmedSends.size(),
+            (int)m_UTXOs[0].size());
+}
+
 
 int mc_WalletTxs::Initialize(
           const char *name,  
@@ -231,7 +246,14 @@ int mc_WalletTxs::Initialize(
     
     if(err == MC_ERR_NOERROR)
     {
-        m_UnconfirmedSends= GetUnconfirmedSends(m_Database->m_DBStat.m_Block);
+//        m_UnconfirmedSends= GetUnconfirmedSends(m_Database->m_DBStat.m_Block,m_UnconfirmedSendsHashes);
+        m_UnconfirmedSends.clear();
+        m_UnconfirmedSendsHashes.clear();
+        if(m_Database->m_DBStat.m_Block > 0)                                    // If node crashed during commit we may want to reload unconfirmed txs of the previous block    
+        {
+            LoadUnconfirmedSends(m_Database->m_DBStat.m_Block,m_Database->m_DBStat.m_Block-1);            
+        }
+        LoadUnconfirmedSends(m_Database->m_DBStat.m_Block,m_Database->m_DBStat.m_Block);
     }    
     return err;
 }
@@ -427,16 +449,28 @@ int mc_WalletTxs::Commit(mc_TxImport *import)
     {
         if(imp->m_ImportID == 0)
         {
-            std::map<uint256,CWalletTx> mapUnconfirmed= GetUnconfirmedSends(m_Database->m_DBStat.m_Block-1);// Confirmed txs are filtered out
             m_UnconfirmedSends.clear();
-            LogPrint("wallet","wtxs: Unconfirmed wallet transactions: %d\n",mapUnconfirmed.size());
-            for (map<uint256,CWalletTx>::const_iterator it = mapUnconfirmed.begin(); it != mapUnconfirmed.end(); ++it)
+            m_UnconfirmedSendsHashes.clear();
+            LoadUnconfirmedSends(m_Database->m_DBStat.m_Block,m_Database->m_DBStat.m_Block-1);
+/*            
+            std::vector<uint256> vUnconfirmedHashes;
+            std::map<uint256,CWalletTx> mapUnconfirmed= GetUnconfirmedSends(m_Database->m_DBStat.m_Block-1,vUnconfirmedHashes);// Confirmed txs are filtered out
+//            for (map<uint256,CWalletTx>::const_iterator it = mapUnconfirmed.begin(); it != mapUnconfirmed.end(); ++it)            
+            BOOST_FOREACH(const uint256& hash, vUnconfirmedHashes) 
             {
-                AddToUnconfirmedSends(m_Database->m_DBStat.m_Block,it->second);
+                std::map<uint256,CWalletTx>::const_iterator it = mapUnconfirmed.find(hash);
+                if (it != mapUnconfirmed.end())
+                {                
+                    AddToUnconfirmedSends(m_Database->m_DBStat.m_Block,it->second);
+                }
             }
+ */ 
+            LogPrint("wallet","wtxs: Unconfirmed wallet transactions: %d\n",m_UnconfirmedSends.size());
         }
     }
        
+    FlushUnconfirmedSends(m_Database->m_DBStat.m_Block);
+    
     if(err)
     {
         LogPrintf("wtxs: Commit: Error: %d\n",err);        
@@ -445,6 +479,25 @@ int mc_WalletTxs::Commit(mc_TxImport *import)
     LogPrint("wallet","wtxs: Commit: Import: %d, Block: %d\n",imp->m_ImportID,imp->m_Block);
     m_Database->UnLock();
     return err;        
+}
+
+int mc_WalletTxs::LoadUnconfirmedSends(int block,int file_block)
+{
+    std::vector<uint256> vUnconfirmedHashes;
+    std::map<uint256,CWalletTx> mapUnconfirmed= GetUnconfirmedSends(file_block,vUnconfirmedHashes);// Confirmed txs are filtered out
+    BOOST_FOREACH(const uint256& hash, vUnconfirmedHashes) 
+    {
+        std::map<uint256,CWalletTx>::const_iterator it = mapUnconfirmed.find(hash);
+        if (it != mapUnconfirmed.end())
+        {                
+            std::map<uint256,CWalletTx>::const_iterator it1 = m_UnconfirmedSends.find(hash);
+            if (it1 == m_UnconfirmedSends.end())
+            {                
+                AddToUnconfirmedSends(block,it->second);
+            }
+        }
+    }
+    return MC_ERR_NOERROR;
 }
 
 /*
@@ -478,10 +531,13 @@ int mc_WalletTxs::CleanUpAfterBlock(mc_TxImport *import,int block,int prev_block
     }    
      
     m_Database->Lock(1,0);
-    RemoveUTXOMap(imp->m_ImportID,prev_block);
-    if(imp->m_ImportID == 0)
+    if(prev_block-MC_TDB_UTXO_SET_WINDOW_SIZE >= 0)
     {
-        RemoveUnconfirmedSends(prev_block);
+        RemoveUTXOMap(imp->m_ImportID,prev_block-MC_TDB_UTXO_SET_WINDOW_SIZE);
+        if(imp->m_ImportID == 0)
+        {
+            RemoveUnconfirmedSends(prev_block-MC_TDB_UTXO_SET_WINDOW_SIZE);
+        }
     }
     LogPrint("wallet","wtxs: CleanUpAfterBlock: Import: %d, Block: %d\n",imp->m_ImportID,imp->m_Block);
     m_Database->UnLock();
@@ -797,7 +853,8 @@ int mc_WalletTxs::RollBack(mc_TxImport *import,int block)
     {
         if(imp->m_ImportID == 0)                                                // Copying conflicted transactions, they may become valid and should be rechecked
         {
-            std::map<uint256,CWalletTx> mapUnconfirmed= GetUnconfirmedSends(m_Database->m_DBStat.m_Block);
+            std::vector<uint256> vUnconfirmedHashes;
+            std::map<uint256,CWalletTx> mapUnconfirmed= GetUnconfirmedSends(m_Database->m_DBStat.m_Block,vUnconfirmedHashes);
             for (map<uint256,CWalletTx>::const_iterator it = mapUnconfirmed.begin(); it != mapUnconfirmed.end(); ++it)
             {
                 m_Database->GetTx(&txdef,(unsigned char*)&(it->first));
@@ -891,7 +948,16 @@ int mc_WalletTxs::RollBack(mc_TxImport *import,int block)
                                                         {
                                                             memcpy(&(txout.m_EntityID),entity.m_EntityID,MC_TDB_ENTITY_ID_SIZE);
                                                             txout.m_EntityType=entity.m_EntityType;
-                                                            isminefilter mine = m_lpWallet ? IsMine(*m_lpWallet, dest) : ISMINE_NO;
+                                                            isminefilter mine;
+                                                            if(entity.m_EntityType & MC_TET_PUBKEY_ADDRESS)
+                                                            {
+                                                                mine = m_lpWallet ? IsMineKeyID(*m_lpWallet, *lpKeyID) : ISMINE_NO;
+                                                            }
+                                                            else
+                                                            {
+                                                                mine = m_lpWallet ? IsMineScriptID(*m_lpWallet, *lpScriptID) : ISMINE_NO;                                                                
+                                                            }
+//                                                            isminefilter mine = m_lpWallet ? IsMine(*m_lpWallet, dest) : ISMINE_NO;
                                                             if(mine & ISMINE_SPENDABLE) //Spendable flag is used to avoid IsMine calculation in coin selection
                                                             {
                                                                 txout.m_Flags |= MC_TFL_IS_SPENDABLE;
@@ -1338,11 +1404,44 @@ int mc_WalletTxs::DropImport(mc_TxImport *import)
     return err;                    
 }
 
+int mc_WalletTxs::FlushUnconfirmedSends(int block)
+{
+    FILE* fHan;
+    char ShortName[65];                                     
+    char FileName[MC_DCT_DB_MAX_PATH];                      
+    uint256 hash;
+    
+    if((m_Mode & MC_WMD_TXS) == 0)
+    {
+        return MC_ERR_NOT_SUPPORTED;
+    }    
+    if(m_Database == NULL)
+    {
+        return MC_ERR_INTERNAL_ERROR;
+    }
+
+    sprintf(ShortName,"wallet/uncsend_%d",block);
+
+    mc_GetFullFileName(m_Database->m_Name,ShortName,".dat",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,FileName);
+    fHan=fopen(FileName,"ab+");
+    
+    if(fHan == NULL)
+    {
+        return MC_ERR_FILE_WRITE_ERROR;
+    }
+    
+    FileCommit(fHan);                                                           
+    fclose(fHan);    
+    
+    return MC_ERR_NOERROR;
+}
+
 int mc_WalletTxs::AddToUnconfirmedSends(int block, const CWalletTx& tx)
 {    
     FILE* fHan;
     char ShortName[65];                                     
     char FileName[MC_DCT_DB_MAX_PATH];                      
+    uint256 hash;
     
     if((m_Mode & MC_WMD_TXS) == 0)
     {
@@ -1368,7 +1467,11 @@ int mc_WalletTxs::AddToUnconfirmedSends(int block, const CWalletTx& tx)
     
     fileout << tx;
 
-    m_UnconfirmedSends.insert(make_pair(tx.GetHash(), tx));
+    hash=tx.GetHash();
+    m_UnconfirmedSends.insert(make_pair(hash, tx));
+    m_UnconfirmedSendsHashes.push_back(hash);
+    
+//    FileCommit(fHan);                                                           // If we not do it, in the worst case we'll lose some transactions
     
     return MC_ERR_NOERROR;
 }
@@ -1397,7 +1500,7 @@ int mc_WalletTxs::SaveTxFlag(const unsigned char *hash,uint32_t flag,int set_fla
     return err;
 }
 
-std::map<uint256,CWalletTx> mc_WalletTxs::GetUnconfirmedSends(int block)
+std::map<uint256,CWalletTx> mc_WalletTxs::GetUnconfirmedSends(int block,std::vector<uint256>& unconfirmedSendsHashes)
 {
     map<uint256,CWalletTx> outMap;
     char ShortName[65];                                     
@@ -1437,6 +1540,7 @@ std::map<uint256,CWalletTx> mc_WalletTxs::GetUnconfirmedSends(int block)
                 if (it == outMap.end())
                 {
                     outMap.insert(make_pair(hash, wtx));                
+                    unconfirmedSendsHashes.push_back(hash);
                 }            
             }
         } 
@@ -1543,6 +1647,7 @@ int mc_WalletTxs::SaveUTXOMap(int import_id,int block)
         fileout << it->second;        
     }
 
+    FileCommit(fHan);
     
     return MC_ERR_NOERROR;
 }
@@ -1551,6 +1656,7 @@ int mc_WalletTxs::LoadUTXOMap(int import_id,int block)
 {
     char ShortName[65];                                     
     char FileName[MC_DCT_DB_MAX_PATH];                      
+    FILE *fHan;
     int import_pos;
     bool fHaveUtxo;
     map<COutPoint, mc_Coin> mapOut;
@@ -1576,7 +1682,18 @@ int mc_WalletTxs::LoadUTXOMap(int import_id,int block)
 
     mc_GetFullFileName(m_Database->m_Name,ShortName,".dat",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR, FileName);
     
-    CAutoFile filein(fopen(FileName,"rb+"), SER_DISK, CLIENT_VERSION);
+    fHan=fopen(FileName,"rb+");
+    
+    if(fHan == NULL)
+    {
+        LogPrintf("wtxs: Cannot open unspent outputs file\n");
+        if(block > 0)
+        {
+            return MC_ERR_NOERROR;
+        }
+    }
+    
+    CAutoFile filein(fHan, SER_DISK, CLIENT_VERSION);
     
     fHaveUtxo=true;
     while(fHaveUtxo)
@@ -1679,6 +1796,21 @@ CWalletTx mc_WalletTxChoppedCopy(CWallet *lpWallet,const CWalletTx& tx)
     return wtx;
 }
 
+void mc_WalletCachedSubKey::Set(mc_TxEntity* entity,mc_TxEntity* subkey_entity,uint160 subkey_hash,uint32_t flags)
+{
+    memcpy(&m_Entity,entity,sizeof(mc_TxEntity));
+    memcpy(&m_SubkeyEntity,subkey_entity,sizeof(mc_TxEntity));
+    m_SubKeyHash=subkey_hash;
+    m_Flags=flags;    
+}
+
+void mc_WalletCachedSubKey::Zero()
+{
+    m_Entity.Zero();
+    m_SubkeyEntity.Zero();
+    m_SubKeyHash=0;
+    m_Flags=0;
+}
 
 int mc_WalletTxs::AddTx(mc_TxImport *import,const CTransaction& tx,int block,CDiskTxPos* block_pos,uint32_t block_tx_index,uint256 block_hash)
 {
@@ -1855,17 +1987,20 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                     entity.Zero();
                     const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
                     const CScriptID *lpScriptID=boost::get<CScriptID> (&dest);
+                    isminefilter mine=ISMINE_NO;
                     if(lpKeyID)
                     {
                         memcpy(entity.m_EntityID,lpKeyID,MC_TDB_ENTITY_ID_SIZE);
                         entity.m_EntityType=MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS;
+                        mine = m_lpWallet ? IsMineKeyID(*m_lpWallet, *lpKeyID) : ISMINE_NO;
                     }
                     if(lpScriptID)
                     {
                         memcpy(entity.m_EntityID,lpScriptID,MC_TDB_ENTITY_ID_SIZE);
                         entity.m_EntityType=MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS;
+                        mine = m_lpWallet ? IsMineScriptID(*m_lpWallet, *lpScriptID) : ISMINE_NO;                                                                
                     }
-                    isminefilter mine = IsMine(*m_lpWallet, dest);
+//                    isminefilter mine = IsMine(*m_lpWallet, dest);
                     if((mine & ISMINE_SPENDABLE) == ISMINE_NO)
                     {
                         fAllInputsFromMe=false;
@@ -1997,19 +2132,22 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                 entity.Zero();
                 const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
                 const CScriptID *lpScriptID=boost::get<CScriptID> (&dest);
+                isminefilter mine=ISMINE_NO;
                 if(lpKeyID)
                 {
                     memcpy(entity.m_EntityID,lpKeyID,MC_TDB_ENTITY_ID_SIZE);
                     entity.m_EntityType=MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS;
+                    mine = m_lpWallet ? IsMineKeyID(*m_lpWallet, *lpKeyID) : ISMINE_NO;
                 }
                 if(lpScriptID)
                 {
                     memcpy(entity.m_EntityID,lpScriptID,MC_TDB_ENTITY_ID_SIZE);
                     entity.m_EntityType=MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS;
+                    mine = m_lpWallet ? IsMineScriptID(*m_lpWallet, *lpScriptID) : ISMINE_NO;                                                                
                 }
                 if(entity.m_EntityType)
                 {
-                    isminefilter mine = m_lpWallet ? IsMine(*m_lpWallet, dest) : ISMINE_NO;
+//                    isminefilter mine = m_lpWallet ? IsMine(*m_lpWallet, dest) : ISMINE_NO;
 
                     fOutputIsSpendable=false;
                     if(mine & ISMINE_SPENDABLE)

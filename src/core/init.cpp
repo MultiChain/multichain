@@ -324,6 +324,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -proxy=<ip:port>       " + _("Connect through SOCKS5 proxy") + "\n";
     strUsage += "  -seednode=<ip>         " + _("Connect to a node to retrieve peer addresses, and disconnect") + "\n";
     strUsage += "  -timeout=<n>           " + strprintf(_("Specify connection timeout in milliseconds (minimum: 1, default: %d)"), DEFAULT_CONNECT_TIMEOUT) + "\n";
+/*    
 #ifdef USE_UPNP
 #if USE_UPNP
     strUsage += "  -upnp                  " + _("Use UPnP to map the listening port (default: 1 when listening)") + "\n";
@@ -331,6 +332,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -upnp                  " + strprintf(_("Use UPnP to map the listening port (default: %u)"), 0) + "\n";
 #endif
 #endif
+ */ 
     strUsage += "  -whitebind=<addr>      " + _("Bind to given address and whitelist peers connecting to it. Use [host]:port notation for IPv6") + "\n";
     strUsage += "  -whitelist=<netmask>   " + _("Whitelist peers connecting from the given netmask or IP address. Can be specified multiple times.") + "\n";
     strUsage += "                         " + _("Whitelisted peers cannot be DoS banned and their transactions are always relayed, even if they are already in the mempool, useful e.g. for a gateway") + "\n";
@@ -696,8 +698,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
     if (!GetBoolArg("-listen", true)) {
         // do not map ports or try to retrieve public IP when not listening (pointless)
+/*        
         if (SoftSetBoolArg("-upnp", false))
             LogPrintf("AppInit2 : parameter interaction: -listen=0 -> setting -upnp=0\n");
+ */ 
+        mapArgs["-upnp"] = std::string("0");
         if (SoftSetBoolArg("-discover", false))
             LogPrintf("AppInit2 : parameter interaction: -listen=0 -> setting -discover=0\n");
     }
@@ -997,7 +1002,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         {
             LogPrintf("mchn: Default key is not found - creating new... \n");
             // Create new keyUser and set as default key
-            RandAddSeedPerfmon();
+//            RandAddSeedPerfmon();
 
             pwalletMain->SetMinVersion(FEATURE_LATEST); // permanently upgrade the wallet immediately
             CPubKey newDefaultKey;
@@ -1191,7 +1196,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         mc_gState->m_Assets= new mc_AssetDB;
         if(mc_gState->m_Assets->Initialize(mc_gState->m_Params->NetworkName(),0))                                
         {
-            seed_error=strprintf("ERROR: Couldn't initialize asset database for blockchain %s. Exiting...\n",mc_gState->m_Params->NetworkName());
+            seed_error=strprintf("ERROR: Couldn't initialize asset database for blockchain %s. Please restart multichaind with reindex=1.\n",mc_gState->m_Params->NetworkName());
             return InitError(_(seed_error.c_str()));        
         }
         
@@ -1321,7 +1326,10 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     mc_gState->m_WalletMode |= MC_WMD_AUTOSUBSCRIBE_ASSETS;
                 }                
 
-                pwalletTxsMain->Initialize(mc_gState->m_NetworkParams->Name(),mc_gState->m_WalletMode);
+                if(pwalletTxsMain->Initialize(mc_gState->m_NetworkParams->Name(),mc_gState->m_WalletMode))
+                {
+                    return InitError("Wallet tx database corrupted. Please restart multichaind with -rescan\n");                        
+                }
 
                 if(mc_gState->m_WalletMode & MC_WMD_AUTO)
                 {
@@ -1344,6 +1352,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 }        
             }
         }
+        LogPrint("mcblockperf","mchn-block-perf: Wallet initialization completed (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
         LogPrintf("Wallet mode: %08X\n",mc_gState->m_WalletMode);
         if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
         {
@@ -1389,7 +1398,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             {
                 LogPrintf("mchn: Default key is not found - creating new... \n");
                 // Create new keyUser and set as default key
-                RandAddSeedPerfmon();
+//                RandAddSeedPerfmon();
 
                 pwalletMain->SetMinVersion(FEATURE_LATEST); // permanently upgrade the wallet immediately
                 CPubKey newDefaultKey;
@@ -1609,7 +1618,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     LogPrintf("Node paused state is set to %08X\n",mc_gState->m_NodePausedState);
     
     pwalletMain=NULL;
-    
+
     if (fServer)
     {
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
@@ -1862,11 +1871,32 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 if (fReindex)
                     pblocktree->WriteReindexing(true);
 
+                if(mc_gState->m_WalletMode & MC_WMD_TXS)
+                {
+                    bool fFirstRunForLoadChain = true;
+                    pwalletMain = new CWallet(strWalletFile);
+                    DBErrors nLoadWalletRetForLoadChain = pwalletMain->LoadWallet(fFirstRunForLoadChain);
+                    if (nLoadWalletRetForLoadChain != DB_LOAD_OK)
+                    {
+                        strLoadError = _("Error loading wallet before loading chain");
+                        break;
+                    }
+                    pwalletTxsMain->BindWallet(pwalletMain);
+                }
+    
+                
                 if (!LoadBlockIndex()) {
                     strLoadError = _("Error loading block database");
                     break;
                 }
 
+                if(pwalletMain)
+                {
+                    pwalletTxsMain->BindWallet(NULL);
+                    delete pwalletMain;
+                    pwalletMain=NULL;
+                }
+                
                 // If the loaded chain has a wrong genesis, bail out immediately
                 // (we're likely using a testnet datadir, or the other way around).
                 if (!mapBlockIndex.empty() && mapBlockIndex.count(Params().HashGenesisBlock()) == 0)
@@ -2018,7 +2048,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         if (fFirstRun)
         {
             // Create new keyUser and set as default key
-            RandAddSeedPerfmon();
+//            RandAddSeedPerfmon();
 
             CPubKey newDefaultKey;
             if (pwalletMain->GetKeyFromPool(newDefaultKey)) {
@@ -2140,7 +2170,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     if (!strErrors.str().empty())
         return InitError(strErrors.str());
 
-    RandAddSeedPerfmon();
+//    RandAddSeedPerfmon();
 
     //// debug print
     LogPrintf("mapBlockIndex.size() = %u\n",   mapBlockIndex.size());
@@ -2178,10 +2208,10 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 #endif
 
     // ********************************************************* Step 11: finished
-
+/*
     SetRPCWarmupFinished();
     uiInterface.InitMessage(_("Done loading"));
-    
+*/    
 #ifdef ENABLE_WALLET
     if (pwalletMain) {
         // Add wallet transactions that aren't already in a block to mapTransactions
@@ -2192,6 +2222,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     }
 #endif
 
+    SetRPCWarmupFinished();                                                     // Should be here, otherwise wallet can double spend
+    uiInterface.InitMessage(_("Done loading"));
 
 /* MCHN START */    
     if(!GetBoolArg("-shortoutput", false))

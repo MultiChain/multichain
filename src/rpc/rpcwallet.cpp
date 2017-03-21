@@ -76,7 +76,7 @@ Value getnewaddress(const Array& params, bool fHelp)
     {
         if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
         {
-            throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
         }            
         strAccount = AccountFromValue(params[0]);
     }
@@ -151,7 +151,7 @@ Value getaccountaddress(const Array& params, bool fHelp)
 
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
     }            
     
     // Parse the account first so we don't generate a key if there's an error
@@ -193,7 +193,7 @@ Value setaccount(const Array& params, bool fHelp)
 
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
     }            
     
     CBitcoinAddress address(params[0].get_str());
@@ -218,7 +218,7 @@ Value setaccount(const Array& params, bool fHelp)
         pwalletMain->SetAddressBook(address.Get(), strAccount, "receive");
     }
     else
-        throw JSONRPCError(RPC_MISC_ERROR, "setaccount can only be used with own address");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "setaccount can only be used with own address");
 
     return Value::null;
 }
@@ -231,7 +231,7 @@ Value getaccount(const Array& params, bool fHelp)
 
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
     }            
     
     CBitcoinAddress address(params[0].get_str());
@@ -257,7 +257,7 @@ Value getaddressesbyaccount(const Array& params, bool fHelp)
     {
         if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
         {
-            throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
         }            
     }
     
@@ -306,7 +306,7 @@ void SendMoney(const CTxDestination &address, CAmount nValue, CWalletTx& wtxNew,
     {
         strError = "Error: Wallet locked, unable to create transaction!";
         LogPrintf("SendMoney() : %s", strError);
-        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+        throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, strError);
     }
 
     // Parse Bitcoin address
@@ -342,7 +342,7 @@ void SendMoney(const CTxDestination &address, CAmount nValue, CWalletTx& wtxNew,
     {
         LogPrint("mchnminor","mchn: Sending script with %d OP_DROP element(s)",dropscript->GetNumElements());
         if(dropscript->GetNumElements() > mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropscount") )
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid number of elements in script");
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid number of elements in script");
 
         for(int element=0;element < dropscript->GetNumElements();element++)
         {
@@ -352,7 +352,7 @@ void SendMoney(const CTxDestination &address, CAmount nValue, CWalletTx& wtxNew,
                 scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
             }
             else
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid script");
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
         }
     }        
     
@@ -377,7 +377,7 @@ void SendMoney(const CTxDestination &address, CAmount nValue, CWalletTx& wtxNew,
         if (nValue + nFeeRequired > pwalletMain->GetBalance())
             strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its amount, complexity, or use of recently received funds!", FormatMoney(nFeeRequired));
         LogPrintf("SendMoney() : %s\n", strError);
-        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, strError);
     }
 /* MCHN START */
     string strRejectReason;
@@ -385,11 +385,11 @@ void SendMoney(const CTxDestination &address, CAmount nValue, CWalletTx& wtxNew,
     {
         if(strRejectReason.size())
         {
-            throw JSONRPCError(RPC_WALLET_ERROR, "Error: The transaction was rejected: " + strRejectReason);
+            throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Error: The transaction was rejected: " + strRejectReason);
         }
         else
         {
-            throw JSONRPCError(RPC_WALLET_ERROR, "Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.");
+            throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Error: this transaction was rejected. This may be because you are sharing private keys between nodes, and another node has spent the funds used by this transaction.");
         }                        
     }        
     
@@ -409,7 +409,7 @@ Value listaddresses(const Array& params, bool fHelp)
 
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
     }   
 
     Array result;
@@ -483,12 +483,12 @@ Value listaddresses(const Array& params, bool fHelp)
             count=params[2].get_int();
             if(count < 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));                            
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
         }
     }
     
@@ -501,7 +501,7 @@ Value listaddresses(const Array& params, bool fHelp)
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid start"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
         }
     }
     
@@ -574,13 +574,13 @@ Value gettxoutdata(const Array& params, bool fHelp)
         uint256 hashBlock = 0;
         if (!GetTransaction(hash, tx, hashBlock, true))
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available about transaction");
+            throw JSONRPCError(RPC_TX_NOT_FOUND, "No information available about transaction");
         }
     }
 
     if( (n<0) || (n >= (int)tx.vout.size()) ) 
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid vout");        
+        throw JSONRPCError(RPC_OUTPUT_NOT_FOUND, "Invalid vout");        
     }
             
     const CScript& script1 = tx.vout[n].scriptPubKey;        
@@ -593,7 +593,7 @@ Value gettxoutdata(const Array& params, bool fHelp)
     
     if(mc_gState->m_TmpScript->IsOpReturnScript() == 0)                      
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Output without metadata");        
+        throw JSONRPCError(RPC_OUTPUT_NOT_DATA, "Output without metadata");        
     }
     size_t elem_size;
     const unsigned char *elem;
@@ -609,12 +609,12 @@ Value gettxoutdata(const Array& params, bool fHelp)
             count=params[2].get_int();
             if(count < 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));                            
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
         }
     }
     
@@ -627,7 +627,7 @@ Value gettxoutdata(const Array& params, bool fHelp)
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid start"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
         }
     }
 
@@ -693,15 +693,15 @@ Value signmessage(const Array& params, bool fHelp)
 
     CBitcoinAddress addr(strAddress);
     if (!addr.IsValid())
-        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid address");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
 
     CKeyID keyID;
     if (!addr.GetKeyID(keyID))
-        throw JSONRPCError(RPC_TYPE_ERROR, "Address does not refer to key");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Address does not refer to key");
 
     CKey key;
     if (!pwalletMain->GetKey(keyID, key))
-        throw JSONRPCError(RPC_WALLET_ERROR, "Private key not available");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Private key not available");
 
     CHashWriter ss(SER_GETHASH, 0);
     ss << strMessageMagic;
@@ -709,7 +709,7 @@ Value signmessage(const Array& params, bool fHelp)
 
     vector<unsigned char> vchSig;
     if (!key.SignCompact(ss.GetHash(), vchSig))
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Sign failed");
+        throw JSONRPCError(RPC_WALLET_ERROR, "Sign failed");
 
     return EncodeBase64(&vchSig[0], vchSig.size());
 }
@@ -721,7 +721,7 @@ Value getreceivedbyaddress(const Array& params, bool fHelp)
 
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
     }            
     
     // Bitcoin address
@@ -762,7 +762,7 @@ Value getreceivedbyaccount(const Array& params, bool fHelp)
 
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
     }            
     
     // Minimum confirmations
@@ -896,7 +896,7 @@ Value getbalance(const Array& params, bool fHelp)
 
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are not supported with scalable wallet - if you need getbalance, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Accounts are not supported with scalable wallet - if you need getbalance, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
     }
     string strAccount = AccountFromValue(params[0]);
 
@@ -920,7 +920,7 @@ Value movecmd(const Array& params, bool fHelp)
 
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are not supported with scalable wallet - if you need move, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Accounts are not supported with scalable wallet - if you need move, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
     }
     
     string strFrom = AccountFromValue(params[0]);
@@ -973,7 +973,7 @@ Value sendfrom(const Array& params, bool fHelp)
 
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are not supported with scalable wallet - if you need sendfrom, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Accounts are not supported with scalable wallet - if you need sendfrom, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
     }
     
     string strAccount = AccountFromValue(params[0]);
@@ -1014,7 +1014,7 @@ Value sendmany(const Array& params, bool fHelp)
 
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are not supported with scalable wallet - if you need sendmany, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Accounts are not supported with scalable wallet - if you need sendmany, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
     }
     
     string strAccount = AccountFromValue(params[0]);
@@ -1070,7 +1070,7 @@ Value sendmany(const Array& params, bool fHelp)
 /* MCHN START */    
     string strRejectReason;
     if (!pwalletMain->CommitTransaction(wtx, keyChange,strRejectReason))
-        throw JSONRPCError(RPC_WALLET_ERROR, "Transaction commit failed: " + strRejectReason);
+        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Transaction commit failed: " + strRejectReason);
 /* MCHN END */    
 
     return wtx.GetHash().GetHex();
@@ -1091,7 +1091,7 @@ Value addmultisigaddress(const Array& params, bool fHelp)
     {
         if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
         {
-            throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
         }            
         strAccount = AccountFromValue(params[2]);
     }
@@ -1267,7 +1267,7 @@ Value listreceivedbyaddress(const Array& params, bool fHelp)
 
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
     }            
     
     return ListReceived(params, false);
@@ -1280,7 +1280,7 @@ Value listreceivedbyaccount(const Array& params, bool fHelp)
 
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Accounts are not supported with scalable wallet - if you need accounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
     }            
 
     return ListReceived(params, true);
@@ -1443,7 +1443,7 @@ Value listtransactions(const Array& params, bool fHelp)
     Array ret;
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Not supported with scalable wallet - if you need listtransactions, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Not supported with scalable wallet - if you need listtransactions, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
 /*
         mc_Buffer *entity_rows;
         entity_rows=new mc_Buffer;
@@ -1526,7 +1526,7 @@ Value listaccounts(const Array& params, bool fHelp)
 
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are not supported with scalable wallet - if you need listaccounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Accounts are not supported with scalable wallet - if you need listaccounts, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
     }   
 
     int nMinDepth = 1;
@@ -1738,7 +1738,7 @@ Value gettransaction(const Array& params, bool fHelp)
         const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,&err);
         if(err)
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid or non-wallet transaction id");            
+            throw JSONRPCError(RPC_TX_NOT_FOUND, "Invalid or non-wallet transaction id");            
         }            
         CAmount nCredit = wtx.GetCredit(filter);
         CAmount nDebit = wtx.GetDebit(filter);
@@ -1761,7 +1761,7 @@ Value gettransaction(const Array& params, bool fHelp)
     else
     {
         if (!pwalletMain->mapWallet.count(hash))
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid or non-wallet transaction id");
+            throw JSONRPCError(RPC_TX_NOT_FOUND, "Invalid or non-wallet transaction id");
         const CWalletTx& wtx = pwalletMain->mapWallet[hash];
 
         CAmount nCredit = wtx.GetCredit(filter);
@@ -1792,7 +1792,23 @@ Value backupwallet(const Array& params, bool fHelp)
     if (fHelp || params.size() != 1)
         throw runtime_error("Help message not found\n");
 
-    string strDest = params[0].get_str();
+    char bufOutput[MC_DCT_DB_MAX_PATH+1];
+    char *full_path=__US_FullPath(params[0].get_str().c_str(),bufOutput,MC_DCT_DB_MAX_PATH+1);
+    
+    if(full_path)
+    {
+        char bufWallet[MC_DCT_DB_MAX_PATH+1];
+        mc_GetFullFileName(mc_gState->m_NetworkParams->Name(),"wallet",".dat",MC_FOM_RELATIVE_TO_DATADIR,bufWallet);
+
+        if(strcmp(full_path,bufWallet) == 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Cannot backup wallet file to itself");        
+        }
+    }
+    
+    
+//    string strDest = params[0].get_str();
+    string strDest = strprintf("%s",full_path);
     if (!BackupWallet(*pwalletMain, strDest))
         throw JSONRPCError(RPC_WALLET_ERROR, "Error: Wallet backup failed!");
 

@@ -1358,14 +1358,26 @@ void mc_InitRPCHelpMap06()
             "\nCreates stream\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. entity-type       (string, required) The only possible value: stream\n"
+            "1. entity-type       (string, required) stream\n"
             "2. \"stream-name\"     (string, required) Stream name, if not \"\" should be unique.\n"
-            "3. open              (boolean, required) Allow anyone to publish in this stream\n"
+            "3. open              (boolean, required ) Allow anyone to publish in this stream\n"
             "4  custom-fields     (object, optional)  a json object with custom fields\n"
             "    {\n"
             "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
             "      ,...\n"
             "    }\n"
+            "  or \n"
+            "1. entity-type       (string, required) upgrade\n"
+            "2. \"upgrade-name\"    (string, required) Upgrade name, if not \"\" should be unique.\n"
+            "3. open              (boolean, required ) Should be false\n"
+            "4  custom-fields     (object, required)  a json object with custom fields\n"
+            "    {\n"
+            "      \"protocol-version\": version  (numeric, required) Protocol version to upgrade to\n"
+            "      \"start-block\": block         (numeric, optional, default 0) Block to apply from \n"
+            "      \"param-name\": \"param-value\"  (strings, required) The key is the parameter name, the value is parameter value\n"
+            "      ,...\n"
+            "    }\n"
+
             "\nResult:\n"
             "\"transactionid\"  (string) The transaction id.\n"
             "\nExamples:\n"
@@ -1380,12 +1392,24 @@ void mc_InitRPCHelpMap06()
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. from-address      (string, required) Address used for creating.\n"
-            "2. entity-type       (string, required) The only possible value: stream\n"
+            "2. entity-type       (string, required) stream\n"
             "3. \"stream-name\"     (string, required) Stream name, if not \"\" should be unique.\n"
             "4. open              (boolean, required) Allow anyone to publish in this stream\n"
             "5  custom-fields     (object, optional)  a json object with custom fields\n"
             "    {\n"
             "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
+            "      ,...\n"
+            "    }\n"
+            "  or \n"
+            "1. from-address      (string, required) Address used for creating.\n"
+            "2. entity-type       (string, required) upgrade\n"
+            "3. \"upgrade-name\"    (string, required) Upgrade name, if not \"\" should be unique.\n"
+            "4. open              (boolean, required ) Should be false\n"
+            "5  custom-fields     (object, required)  a json object with custom fields\n"
+            "    {\n"
+            "      \"protocol-version\": version  (numeric, required) Protocol version to upgrade to \n"
+            "      \"start-block\": block         (numeric, optional, default 0) Block to apply from \n"
+            "      \"param-name\": \"param-value\"  (strings, required) The key is the parameter name, the value is parameter value\n"
             "      ,...\n"
             "    }\n"
             "\nResult:\n"
@@ -3505,6 +3529,33 @@ void mc_InitRPCHelpMap16()
             + HelpExampleRpc("completerawexchange", "\"hexstring\",\"f4c3dd510dd55761015c9d96bff7793b0d501dd6f01a959fd7dd02478fb47dfb\",1,\"{\\\"1234-5678-1234\\\":200}\\\"")
         ));
     
+    mapHelpStrings.insert(std::make_pair("approvefrom",
+            "approvefrom from-address \"upgrade-identifier\" ( approve )\n"
+            "\nGrant permission using specific address.\n"
+            + HelpRequiringPassphraseWrapper() +
+            "\nArguments:\n"
+            "1. from-address          (string, required) Address used for approval.\n"
+            "2. \"upgrade-identifier\"  (string, required) Upgrade identifier - one of the following: upgrade txid, upgrade reference, upgrade name.\n"
+            "3. approve               (boolean, optional)  Approve or disapprove, default true\n"
+            "\nResult:\n"
+            "\"transactionid\"  (string) The transaction id.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("approvefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"upgrade1\"")
+            + HelpExampleCli("approvefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"upgrade1\" false")
+            + HelpExampleRpc("approvefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"upgrade1\", true")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("listupgrades",
+            "listupgrades (upgrade-identifier(s))\n"
+            "1. \"upgrade-identifier(s)\" (string, optional, default=*, all upgrades) Upgrade identifier - one of the following: upgrade txid, upgrade reference, upgrade name.\n"
+            "or\n"
+            "1. upgrade-identifier(s)      (array, optional) A json array of upgrade identifiers \n"                
+            "\nReturns list of defined streams\n"
+            "\nExamples:\n"
+            + HelpExampleCli("listupgrades", "")
+            + HelpExampleRpc("listupgrades", "")
+        ));
+    
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
@@ -3518,6 +3569,39 @@ void mc_InitRPCLogParamCountMap()
     mapLogParamCounts.insert(std::make_pair("walletpassphrasechange",0));
     mapLogParamCounts.insert(std::make_pair("importprivkey",0));
     mapLogParamCounts.insert(std::make_pair("signrawtransaction",-1));
+}
+
+void mc_InitRPCAllowedWhenWaitingForUpgradeSet()
+{
+    setAllowedWhenWaitingForUpgrade.insert("getinfo");    
+    setAllowedWhenWaitingForUpgrade.insert("help");    
+    setAllowedWhenWaitingForUpgrade.insert("stop");    
+    setAllowedWhenWaitingForUpgrade.insert("pause");    
+    setAllowedWhenWaitingForUpgrade.insert("resume");    
+    setAllowedWhenWaitingForUpgrade.insert("clearmempool");    
+    setAllowedWhenWaitingForUpgrade.insert("setlastblock");    
+    setAllowedWhenWaitingForUpgrade.insert("getblockchainparams");    
+    setAllowedWhenWaitingForUpgrade.insert("getruntimeparams");    
+    setAllowedWhenWaitingForUpgrade.insert("setruntimeparam");    
+    setAllowedWhenWaitingForUpgrade.insert("getblockchaininfo");    
+    setAllowedWhenWaitingForUpgrade.insert("getblockcount");    
+    setAllowedWhenWaitingForUpgrade.insert("getblock");    
+    setAllowedWhenWaitingForUpgrade.insert("getblockhash");    
+    setAllowedWhenWaitingForUpgrade.insert("getmempoolinfo");    
+    setAllowedWhenWaitingForUpgrade.insert("listupgrades");    
+    setAllowedWhenWaitingForUpgrade.insert("listpermissions");    
+    setAllowedWhenWaitingForUpgrade.insert("decoderawtransaction");    
+    setAllowedWhenWaitingForUpgrade.insert("getrawtransaction");    
+    setAllowedWhenWaitingForUpgrade.insert("dumpprivkey");    
+    setAllowedWhenWaitingForUpgrade.insert("getaddresses");    
+    setAllowedWhenWaitingForUpgrade.insert("listaddresses");    
+    setAllowedWhenWaitingForUpgrade.insert("createkeypairs");    
+    setAllowedWhenWaitingForUpgrade.insert("createmultisig");    
+    setAllowedWhenWaitingForUpgrade.insert("validateaddress");    
+    setAllowedWhenWaitingForUpgrade.insert("addnode");    
+    setAllowedWhenWaitingForUpgrade.insert("getpeerinfo");    
+    setAllowedWhenWaitingForUpgrade.insert("signmessage");    
+    setAllowedWhenWaitingForUpgrade.insert("verifymessage");    
 }
 
 void mc_InitRPCHelpMap()
@@ -3540,5 +3624,6 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap16();
     
     mc_InitRPCLogParamCountMap();
+    mc_InitRPCAllowedWhenWaitingForUpgradeSet();    
 }
 

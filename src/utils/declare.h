@@ -240,6 +240,7 @@ int mc_GetDataDirArg(char *buf);
 void mc_UnsetDataDirArg();
 void mc_SetDataDirArg(char *buf);
 void mc_ExpandDataDirParam();
+void mc_CheckDataDirInConfFile();
 void mc_AdjustStartAndCount(int *count,int *start,int size);
 
 
@@ -272,6 +273,9 @@ void __US_SemPost(void* sem);
 void __US_SemDestroy(void* sem);
 uint64_t __US_ThreadID();
 const char* __US_UserHomeDir();
+char * __US_FullPath(const char* path, char *full_path, int len);
+void __US_FlushFile(int FileHan);
+
 
 
 #ifdef	__cplusplus

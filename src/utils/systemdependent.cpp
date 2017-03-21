@@ -176,6 +176,35 @@ const char* __US_UserHomeDir()
     return homedir;
 }
 
+char * __US_FullPath(const char* path, char *full_path, int len)
+{
+    full_path[0]=0x00;
+    
+    if(strlen(path) > 1)
+    {
+        if( (path[0] == '~') && (path[1] == '/') )
+        {
+            const char *homedir=__US_UserHomeDir();
+
+            sprintf(full_path,"%s%s",homedir,path+1);
+            
+            return full_path;
+        }
+    }
+    
+    char *res= realpath(path, full_path); 
+    if(res == NULL)
+    {
+        res=NULL;
+    }
+    return full_path;
+}
+
+void __US_FlushFile(int FileHan)
+{
+    fsync(FileHan);
+}
+
 #else
 
 #include "windows.h"
@@ -238,6 +267,17 @@ uint64_t __US_ThreadID()
 const char* __US_UserHomeDir()
 {
     return NULL;
+}
+
+char * __US_FullPath(const char* path, char *full_path, int len)
+{
+    return _fullpath(full_path,path,len);
+}
+
+void __US_FlushFile(int FileHan)
+{
+    HANDLE hFile = (HANDLE)_get_osfhandle(FileHan);
+    FlushFileBuffers(hFile);
 }
 
 #endif

@@ -837,6 +837,10 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                     }
 /* MCHN START */                    
                     bool cannot_send=true;
+                    if(flags & SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK)
+                    {
+                        cannot_send=false;
+                    }
 //                    bool fSuccess = checker.CheckSig(vchSig, vchPubKey, scriptCode);
                     bool fSuccess = checker.CheckSig(vchSig, vchPubKey, scriptCode, cannot_send);
                     fSuccess &= !cannot_send;
@@ -1136,7 +1140,6 @@ bool TransactionSignatureChecker::CheckSig(const vector<unsigned char>& vchSigIn
 /* MCHN START */
     if(CheckSendPermission)
     {
-        
         if(mc_gState->m_NetworkParams->IsProtocolMultichain())
         {
             const unsigned char *pubkey_hash=(unsigned char *)Hash160(vchPubKey.begin(),vchPubKey.end()).begin();
@@ -1212,17 +1215,20 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, unsigne
                 return set_error(serror, SCRIPT_ERR_VERIFY);
             }
 
-            CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
-            if(lpScriptID)
+            if( (p2shflags & SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK) == 0)
             {
-                if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpScriptID)))
+                CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
+                if(lpScriptID)
                 {
-                    p2shflags |= SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
-                }                
-            }
-            else
-            {
-                return set_error(serror, SCRIPT_ERR_VERIFY);                
+                    if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpScriptID)))
+                    {
+                        p2shflags |= SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
+                    }                
+                }
+                else
+                {
+                    return set_error(serror, SCRIPT_ERR_VERIFY);                
+                }
             }
         }
  

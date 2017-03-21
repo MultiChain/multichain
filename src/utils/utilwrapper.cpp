@@ -349,6 +349,24 @@ void mc_ExpandDataDirParam()
     }    
 }
 
+void mc_CheckDataDirInConfFile()
+{
+    if (mapArgs.count("-datadir"))
+    {
+        return;
+    }    
+    
+    mc_MapStringString *mapConfig;
+    
+    mapConfig=new mc_MapStringString;
+    if(mc_ReadGeneralConfigFile(mapConfig,NULL,"multichain",".conf") == 0)
+    {
+        if(mapConfig->Get("datadir") != NULL)
+        {
+            mapArgs["-datadir"]=strprintf("%s",mapConfig->Get("datadir"));            
+        }
+    }    
+}
 
 
 const boost::filesystem::path mc_GetDataDir(const char *network_name,int create)

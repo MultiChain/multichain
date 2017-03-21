@@ -20,6 +20,7 @@
 #define MC_DCT_SCRIPT_MULTICHAIN_ENTITY_PREFIX 'e'
 #define MC_DCT_SCRIPT_MULTICHAIN_CASHED_SCRIPT_PREFIX 'i'
 #define MC_DCT_SCRIPT_MULTICHAIN_KEY_PREFIX 'k'
+#define MC_DCT_SCRIPT_MULTICHAIN_APPROVE_PREFIX 'a'
 #define MC_DCT_SCRIPT_MULTICHAIN_NEW_ENTITY_PREFIX 'n'
 #define MC_DCT_SCRIPT_MULTICHAIN_UPDATE_ENTITY_PREFIX 'u'
 #define MC_DCT_SCRIPT_MULTICHAIN_PERMISSIONS_PREFIX 'p'
@@ -1358,6 +1359,62 @@ int mc_Script::SetGeneralDetails(const unsigned char* script,int script_size)
     }
     
     return MC_ERR_NOERROR;
+}
+
+int mc_Script::GetApproval(uint32_t *approval,uint32_t *timestamp)
+{
+    unsigned char *ptr;
+     
+    if(m_CurrentElement<0)
+    {
+        return MC_ERR_INVALID_PARAMETER_VALUE;
+    }
+    
+    if(m_lpCoord[m_CurrentElement*2+1] != MC_DCT_SCRIPT_IDENTIFIER_LEN+1+5)
+    {
+        return MC_ERR_WRONG_SCRIPT;
+    }
+    
+    ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
+    
+    if(memcmp(ptr,MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
+    {
+        return MC_ERR_WRONG_SCRIPT;
+    }
+    
+    if(ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN] != MC_DCT_SCRIPT_MULTICHAIN_APPROVE_PREFIX)
+    {
+        return MC_ERR_WRONG_SCRIPT;
+    }
+    
+    ptr+=MC_DCT_SCRIPT_IDENTIFIER_LEN+1;
+    *approval=(uint32_t)mc_GetLE(ptr+ 0,1);
+    *timestamp=(uint32_t)mc_GetLE(ptr+1,4);
+    
+    return MC_ERR_NOERROR;    
+}
+
+int mc_Script::SetApproval(uint32_t approval,uint32_t timestamp)
+{
+    unsigned char buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+1+5];
+    unsigned char *ptr;
+    int err;
+    
+    err=AddElement();
+    if(err)
+    {
+        return err;
+    }
+    
+    ptr=buf;
+    memcpy(ptr,MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
+    ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_APPROVE_PREFIX;
+    
+    ptr+=MC_DCT_SCRIPT_IDENTIFIER_LEN+1;
+    mc_PutLE(ptr+0,&approval,1);
+    mc_PutLE(ptr+1,&timestamp,4);
+    
+    return SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+1+5);    
 }
 
 int mc_Script::GetNewEntityType(uint32_t *type,int *update,unsigned char* script,int *script_size)

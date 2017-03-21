@@ -576,7 +576,7 @@ public:
             }    
         }
 //        if((sizeOpReturn > 0) && (ptrOpReturnScript[0] == OP_RETURN))
-        if(root_stream_name_size)
+        if(root_stream_name_size > ( (mc_gState->m_Features->FixedIn10008() != 0) ? 1 : 0 ) )
         {
             txNew.vout.resize(2);                        
         }
@@ -625,7 +625,7 @@ public:
             delete lpScript;            
         }
         
-        if(root_stream_name_size)
+        if(root_stream_name_size > ( (mc_gState->m_Features->FixedIn10008() != 0) ? 1 : 0 ))
         {        
             txNew.vout[1].nValue=0;
             lpDetails=new mc_Script;

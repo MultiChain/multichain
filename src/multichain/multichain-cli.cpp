@@ -26,6 +26,8 @@ using namespace boost;
 using namespace boost::asio;
 using namespace json_spirit;
 
+static const int CONTINUE_EXECUTION=-1;
+
 std::string HelpMessageCli()
 {
     string strUsage;
@@ -73,7 +75,11 @@ public:
 
 };
 
-static bool AppInitRPC(int argc, char* argv[])
+//
+// This function returns either one of EXIT_ codes when it's expected to stop the process or
+// CONTINUE_EXECUTION when it's expected to continue further.
+//
+static int AppInitRPC(int argc, char* argv[])
 {
     //
     // Parameters
@@ -93,13 +99,14 @@ static bool AppInitRPC(int argc, char* argv[])
     mc_gState=new mc_State;
     
     mc_gState->m_Params->Parse(argc, argv);
-    
+    mc_CheckDataDirInConfFile();
+   
     if(mc_gState->m_Params->NetworkName())
     {
         if(strlen(mc_gState->m_Params->NetworkName()) > MC_PRM_NETWORK_NAME_MAX_SIZE)
         {
             fprintf(stderr, "ERROR: invalid chain name: %s\n",mc_gState->m_Params->NetworkName());
-            return false;
+            return EXIT_FAILURE;
         }
     }
     
@@ -127,7 +134,7 @@ static bool AppInitRPC(int argc, char* argv[])
         }
 
         fprintf(stdout, "%s", strUsage.c_str());
-        return false;
+        return EXIT_SUCCESS;
     }
 
     mc_ExpandDataDirParam();
@@ -164,7 +171,7 @@ static bool AppInitRPC(int argc, char* argv[])
                     if(read_err != MC_ERR_FILE_READ_ERROR)
                     {
                         fprintf(stderr,"ERROR: Couldn't read configuration file for blockchain %s. Please try upgrading MultiChain. Exiting...\n",mc_gState->m_Params->NetworkName());
-                        return false;
+                        return EXIT_FAILURE;
                     }
                 }
             }
@@ -179,7 +186,7 @@ static bool AppInitRPC(int argc, char* argv[])
     if(err)
     {
         fprintf(stderr,"ERROR: Couldn't read parameter file for blockchain %s. Exiting...\n",mc_gState->m_Params->NetworkName());
-        return false;
+        return EXIT_FAILURE;
     }
 
     RPCPort=mc_gState->m_Params->GetOption("-rpcport",RPCPort);
@@ -194,7 +201,7 @@ static bool AppInitRPC(int argc, char* argv[])
     }
  */ 
 
-    return true;
+    return CONTINUE_EXECUTION;
 }
 
 Object CallRPC(const string& strMethod, const Array& params)
@@ -363,9 +370,10 @@ int main(int argc, char* argv[])
 {
     SetupEnvironment();
     try {
-        if(!AppInitRPC(argc, argv))
-            return EXIT_FAILURE;
-    }
+        int ret = AppInitRPC(argc, argv);
+        if (ret != CONTINUE_EXECUTION)
+            return ret;
+     }
     catch (std::exception& e) {
         PrintExceptionContinue(&e, "AppInitRPC()");
         return EXIT_FAILURE;

@@ -35,9 +35,9 @@ Value grantoperation(const Array& params)
     {
         CBitcoinAddress address(tok);
         if (!address.IsValid())
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address: ")+tok);            
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+tok);            
         if (setAddress.count(address))
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ")+tok);
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, duplicated address: "+tok);
         addresses.push_back(address.Get());
         setAddress.insert(address);
     }
@@ -83,7 +83,7 @@ Value grantoperation(const Array& params)
     {
         if(params[5].get_int64()<0)
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,  "start_block should be non-negative");                            
+            throw JSONRPCError(RPC_INVALID_PARAMETER,  "start_block should be non-negative");                            
         }
         from=(uint32_t)params[5].get_int64();
     }
@@ -93,7 +93,7 @@ Value grantoperation(const Array& params)
     {
         if(params[6].get_int64()<0)
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "end_block should be non-negative or -1");                            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "end_block should be non-negative or -1");                            
         }
         to=(uint32_t)params[6].get_int64();
     }
@@ -106,7 +106,7 @@ Value grantoperation(const Array& params)
             {
                 if(!AddressCanReceive(txdest))
                 {
-                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Destination address doesn't have receive permission");        
+                    throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Destination address doesn't have receive permission");        
                 }
             }
         }
@@ -124,7 +124,7 @@ Value grantoperation(const Array& params)
         type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),entity.GetEntityType());
         
         if(type == 0)
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid permission");
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
         
         lpScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);        
     }
@@ -133,7 +133,7 @@ Value grantoperation(const Array& params)
         type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),MC_ENT_TYPE_NONE);
         
         if(type == 0)
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid permission");
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
         
         LogPrintf("mchn: Granting %s permission(s) to address %s (%ld-%ld)\n",permission_type,params[1].get_str(),from,to);
     }
@@ -150,7 +150,7 @@ Value grantoperation(const Array& params)
 
     if(fromaddresses.size() > 1)
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Single from-address should be specified");                        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
     }
     
     mc_EntityDetails found_entity;
@@ -164,7 +164,7 @@ Value grantoperation(const Array& params)
     {
         if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Private key for from-address is not found in this wallet");                        
+            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
         }
         
         CKeyID *lpKeyID=boost::get<CKeyID> (&fromaddresses[0]);
@@ -176,14 +176,14 @@ Value grantoperation(const Array& params)
                 {
                     if(mc_gState->m_Permissions->CanActivate(entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
                     {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, "from-address doesn't have activate or admin permission for this entity");                                                                        
+                        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have activate or admin permission for this entity");                                                                        
                     }                                                 
                 }
                 else
                 {
                     if(mc_gState->m_Permissions->CanAdmin(entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
                     {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, "from-address doesn't have admin permission for this entity");                                                                        
+                        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have admin permission for this entity");                                                                        
                     }                                                                     
                 }
             }
@@ -193,21 +193,21 @@ Value grantoperation(const Array& params)
                 {
                     if(mc_gState->m_Permissions->CanActivate(NULL,(unsigned char*)(lpKeyID)) == 0)
                     {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, "from-address doesn't have activate or admin permission");                                                                        
+                        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have activate or admin permission");                                                                        
                     }                                                 
                 }
                 else
                 {
                     if(mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)(lpKeyID)) == 0)
                     {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, "from-address doesn't have admin permission");                                                                        
+                        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have admin permission");                                                                        
                     }                                                                     
                 }                
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Please use createrawtransaction to grant/revoke from P2PKH addresses");                                                
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Please use raw transactions to grant/revoke from P2SH addresses");                                                
         }
         if(found_entity.GetEntityType() == MC_ENT_TYPE_STREAM)
         {
@@ -293,7 +293,7 @@ Value grantoperation(const Array& params)
             {
                 strErrorMessage+=" for this entity";                                
             }
-            throw JSONRPCError(RPC_INVALID_PARAMETER, strErrorMessage);                                                                        
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, strErrorMessage);                                                                        
         }
     }
     
@@ -477,23 +477,16 @@ Value listpermissions(const Array& params, bool fHelp)
     
     type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),entity.GetEntityType());
     if(type == 0)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid permission");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
     
     
     int verbose=0;
     if (params.size() > 2)    
     {
-        if(params[2].type() == int_type)
+        if(paramtobool(params[2]))
         {
-            verbose=params[2].get_int();
-        }
-        if(params[2].type() == bool_type)
-        {
-            if(params[2].get_bool())
-            {
-                verbose=1;
-            }
-        }
+            verbose=1;
+        }        
     }
     
     permissions=NULL;
@@ -507,7 +500,7 @@ Value listpermissions(const Array& params, bool fHelp)
             string tok=inputStrings[is];
             CBitcoinAddress address(tok);
             if (!address.IsValid())
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address: ")+tok);            
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+tok);            
             addresses.push_back(address.Get());            
         }        
         
@@ -548,7 +541,7 @@ Value listpermissions(const Array& params, bool fHelp)
     }
     
     if(permissions == NULL)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Cannot open permission database");
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot open permission database");
 
     for(int i=0;i<permissions->GetCount();i++)
     {

@@ -42,10 +42,11 @@ Array AddressEntries(const CTxOut& txout,txnouttype& typeRet);
 Value PermissionForFieldEntry(mc_EntityDetails *lpEntity);
 Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong);
 Object StreamEntry(const unsigned char *txid,uint32_t output_level);
+Object UpgradeEntry(const unsigned char *txid);
 Value OpReturnEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout);
 Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uint32_t stream_output_level);
 Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level);
-string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript);
+string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript,int *eErrorCode);
 bool FindPreparedTxOut(CTxOut& txout,COutPoint outpoint,string& reason);
 bool GetTxInputsAsTxOuts(const CTransaction& tx, vector <CTxOut>& inputs, vector <string>& errors,string& reason);
 CScript GetScriptForString(string source);
@@ -56,6 +57,7 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
 bool AssetCompareByRef(Value a,Value b);
 Array AssetArrayFromAmounts(mc_Buffer *asset_amounts,int issue_asset_id,uint256 hash,int show_type);
 void ParseRawAction(string action,bool& lock_it, bool& sign_it,bool& send_it);
+bool paramtobool(Value param);
 
 #endif	/* RPCMULTICHAINUTILS_H */
 

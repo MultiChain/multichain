@@ -24,7 +24,8 @@ void mc_GetCompoundHash160(void *result,const void  *hash1,const void  *hash2)
 
 int mc_RandomEncodedBase58String(char * dest,int size)
 {
-    GetRandBytes((unsigned char*)dest, size);
+//    GetRandBytes((unsigned char*)dest, size);
+    GetStrongRandBytes((unsigned char*)dest, size);
     string str=EncodeBase58((unsigned char*)(&dest[0]),(unsigned char*)(&dest[0])+size);
     strcpy(dest,str.c_str());
     return MC_ERR_NOERROR;
@@ -140,7 +141,7 @@ int mc_MultichainParams::Build(const unsigned char* pubkey, int pubkey_size)
         
         txNew.vin.resize(1);
         
-        if(root_stream_name_size)
+        if(root_stream_name_size > ( (mc_gState->m_Features->FixedIn10008() != 0) ? 1 : 0 ))
         {
             txNew.vout.resize(2);                        
         }
@@ -187,7 +188,7 @@ int mc_MultichainParams::Build(const unsigned char* pubkey, int pubkey_size)
             delete lpScript;            
         }
 
-        if(root_stream_name_size)
+        if(root_stream_name_size > ( (mc_gState->m_Features->FixedIn10008() != 0) ? 1 : 0 ))
         {        
             txNew.vout[1].nValue=0;
             lpDetails=new mc_Script;

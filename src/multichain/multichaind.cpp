@@ -78,6 +78,7 @@ bool AppInit(int argc, char* argv[])
     mc_gState=new mc_State;
     
     mc_gState->m_Params->Parse(argc, argv);
+    mc_CheckDataDirInConfFile();
     
     if(mc_gState->m_Params->NetworkName())
     {
@@ -87,6 +88,7 @@ bool AppInit(int argc, char* argv[])
             return false;
         }
     }
+    
     
     mc_ExpandDataDirParam();
     
@@ -122,7 +124,7 @@ bool AppInit(int argc, char* argv[])
         fprintf(stdout, "%s", strUsage.c_str());
 
         delete mc_gState;                
-        return false;
+        return true;
     }
 
     if(!GetBoolArg("-shortoutput", false))
@@ -233,7 +235,14 @@ bool AppInit(int argc, char* argv[])
     err=mc_gState->m_Permissions->Initialize(mc_gState->m_Params->NetworkName(),0);                                
     if(err)
     {
-        fprintf(stderr,"\nERROR: Couldn't initialize permission database for blockchain %s. Probably multichaind for this blockchain is already running. Exiting...\n",mc_gState->m_Params->NetworkName());
+        if(err == MC_ERR_CORRUPTED)
+        {
+            fprintf(stderr,"\nERROR: Couldn't initialize permission database for blockchain %s. Please restart multichaind with reindex=1.\n",mc_gState->m_Params->NetworkName());                        
+        }
+        else
+        {
+            fprintf(stderr,"\nERROR: Couldn't initialize permission database for blockchain %s. Probably multichaind for this blockchain is already running. Exiting...\n",mc_gState->m_Params->NetworkName());
+        }
         delete mc_gState;                
         return false;
     }

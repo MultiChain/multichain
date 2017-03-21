@@ -70,6 +70,10 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "liststreams", 1 },                                                            
     { "liststreams", 2 },                                                            
     { "liststreams", 3 },                                                            
+    { "listupgrades", 0 },
+    { "listupgrades", 1 },                                                            
+    { "listupgrades", 2 },                                                            
+    { "listupgrades", 3 },                                                            
     { "getassetbalances", 1 },
     { "getassetbalances", 2 },
     { "getassetbalances", 3 },
@@ -108,6 +112,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "grantfrom", 3 },                                                             
     { "grantfrom", 4 },                                                             
     { "grantfrom", 5 },                                                             
+    { "approvefrom", 2 },                                                             
     { "revokefrom", 3 },                                                            
     { "issuefrom", 2 },                                                            
     { "issuefrom", 3 },                                                            
@@ -317,6 +322,7 @@ static const CRPCConvertParamMayBeString vRPCConvertParamsMayBeString[] =
     { "liststreampublishers", 1 },
     { "listassets", 0 },
     { "liststreams", 0 },
+    { "listupgrades", 0 },
     { "listpermissions", 1 },
 };
 

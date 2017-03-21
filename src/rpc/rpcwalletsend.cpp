@@ -8,7 +8,7 @@
 #include "rpc/rpcwallet.h"
 bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript, CAmount> >& vecSend,
                                 CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, std::string& strFailReason, const CCoinControl* coinControl,
-                                const set<CTxDestination>* addresses,int min_conf,int min_inputs,int max_inputs,const vector<COutPoint>* lpCoinsToUse,uint32_t flags);
+                                const set<CTxDestination>* addresses,int min_conf,int min_inputs,int max_inputs,const vector<COutPoint>* lpCoinsToUse,uint32_t flags, int *eErrorCode);
 
 
 
@@ -25,7 +25,7 @@ Value createrawsendfrom(const Array& params, bool fHelp)
 
     if(fromaddresses.size() != 1)
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Single from-address should be specified");                        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
     }
 
 
@@ -59,7 +59,7 @@ Value createrawsendfrom(const Array& params, bool fHelp)
  */ 
         if(!mc_gState->m_Assets->FindEntityByFullRef(&entity,mc_gState->m_TmpAssetsOut->GetRow(0)))
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Follow-on script rejected - asset not found");                                                
+            throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Follow-on script rejected - asset not found");                                                
         }
     }
     
@@ -95,14 +95,19 @@ Value createrawsendfrom(const Array& params, bool fHelp)
     string strError;
     uint32_t flags=MC_CSF_ALLOW_NOT_SPENDABLE_P2SH | MC_CSF_ALLOW_SPENDABLE_P2SH | MC_CSF_ALLOW_NOT_SPENDABLE;
     
+    if(!sign_it)
+    {
+        flags |= MC_CSF_ALLOWED_COINS_ARE_MINE;
+    }
+    
     EnsureWalletIsUnlocked();
     {
         LOCK (pwalletMain->cs_wallet_send);
-        
-        if(!CreateAssetGroupingTransaction(pwalletMain, vecSend, rawTx, reservekey, nFeeRequired, strError, NULL, &thisFromAddresses, 1, -1, -1, NULL, flags))
+        int eErrorCode;
+        if(!CreateAssetGroupingTransaction(pwalletMain, vecSend, rawTx, reservekey, nFeeRequired, strError, NULL, &thisFromAddresses, 1, -1, -1, NULL, flags, &eErrorCode))
         {
             LogPrintf("createrawsendfrom : %s\n", strError);
-            throw JSONRPCError(RPC_WALLET_ERROR, strError);
+            throw JSONRPCError(eErrorCode, strError);
         }
     }
     
@@ -177,7 +182,7 @@ Value sendfromaddress(const Array& params, bool fHelp)
     
     if(!AddressCanReceive(address.Get()))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Destination address doesn't have receive permission");        
+        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Destination address doesn't have receive permission");        
     }
  
     
@@ -201,10 +206,11 @@ Value sendfromaddress(const Array& params, bool fHelp)
         }
         else
         {
-            string strError=ParseRawOutputObject(params[2],nAmount,lpScript);
+            int eErrorCode;
+            string strError=ParseRawOutputObject(params[2],nAmount,lpScript,&eErrorCode);
             if(strError.size())
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, strError);                            
+                throw JSONRPCError(eErrorCode, strError);                            
             }
         }
     }
@@ -222,12 +228,12 @@ Value sendfromaddress(const Array& params, bool fHelp)
 
         if(fromaddresses.size() != 1)
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Single from-address should be specified");                        
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
         }
 
         if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Private key for from-address is not found in this wallet");                        
+            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
         }
         
         set<CTxDestination> thisFromAddresses;
@@ -241,7 +247,7 @@ Value sendfromaddress(const Array& params, bool fHelp)
         CPubKey pkey;
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_SEND,&thisFromAddresses))
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "from-address doesn't have send permission");                
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have send permission");                
         }  
     }
     else
@@ -249,7 +255,7 @@ Value sendfromaddress(const Array& params, bool fHelp)
         CPubKey pkey;
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_SEND))
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "This wallet doesn't have keys with send permission");                
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with send permission");                
         }        
     }
 
@@ -282,7 +288,7 @@ Value sendwithmetadatafrom(const Array& params, bool fHelp)
     
     if(!AddressCanReceive(address.Get()))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Destination address doesn't have receive permission");        
+        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Destination address doesn't have receive permission");        
     }
  
     
@@ -306,10 +312,11 @@ Value sendwithmetadatafrom(const Array& params, bool fHelp)
         }
         else
         {
-            string strError=ParseRawOutputObject(params[2],nAmount,lpScript);
+            int eErrorCode;
+            string strError=ParseRawOutputObject(params[2],nAmount,lpScript,&eErrorCode);
             if(strError.size())
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, strError);                            
+                throw JSONRPCError(eErrorCode, strError);                            
             }
         }
     }
@@ -330,12 +337,12 @@ Value sendwithmetadatafrom(const Array& params, bool fHelp)
 
         if(fromaddresses.size() != 1)
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Single from-address should be specified");                        
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
         }
 
         if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Private key for from-address is not found in this wallet");                        
+            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
         }
         
 
@@ -347,7 +354,7 @@ Value sendwithmetadatafrom(const Array& params, bool fHelp)
         CPubKey pkey;
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_SEND,&thisFromAddresses))
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "from-address doesn't have send permission");                
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have send permission");                
         }   
         if(found_entity.GetEntityType() == MC_ENT_TYPE_STREAM)
         {
@@ -366,14 +373,14 @@ Value sendwithmetadatafrom(const Array& params, bool fHelp)
             }
             if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_SEND,&thisFromAddresses))
             {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "This wallet doesn't have keys with write permission for given stream and/or global send permission");                
+                throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with write permission for given stream and/or global send permission");                
             }        
         }
         else
         {
             if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_SEND))
             {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "This wallet doesn't have keys with send permission");                
+                throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with send permission");                
             }        
         }
     }
@@ -440,7 +447,7 @@ Value combineunspent(const Array& params, bool fHelp)
     
     if((nMinInputs < 2) || (nMinInputs > 1000))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid mininputs. Valid Range [2 - 1000].");        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mininputs. Valid Range [2 - 1000].");        
     }
     
     int nMaxInputs = 100;
@@ -449,12 +456,12 @@ Value combineunspent(const Array& params, bool fHelp)
     
     if((nMaxInputs < 2) || (nMaxInputs > 1000))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid maxinputs. Valid Range [2 - 1000].");        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid maxinputs. Valid Range [2 - 1000].");        
     }
     
     if(nMaxInputs < nMinInputs)
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "maxinputs below mininouts.");                
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "maxinputs below mininouts.");                
     }
     
     int nMaxTransactions = 1;
@@ -463,7 +470,7 @@ Value combineunspent(const Array& params, bool fHelp)
 
     if((nMaxTransactions < 1) || (nMaxTransactions > 20))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid maximum-transactions. Valid Range [1 - 20].");        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid maximum-transactions. Valid Range [1 - 20].");        
     }
     
     int nMaxTime = 30;
@@ -500,9 +507,9 @@ Value combineunspent(const Array& params, bool fHelp)
         {
             CBitcoinAddress address(tok);
             if (!address.IsValid())
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address: ")+tok);            
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+tok);            
             if (setAddress.count(address))
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ")+tok);
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, duplicated address: "+tok);
             CTxDestination dest=address.Get();            
             CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
             if(lpKeyID)
@@ -512,7 +519,7 @@ Value combineunspent(const Array& params, bool fHelp)
             }
             else
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid address (only pubkeyhash addresses are supported) : ")+tok);                
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address (only pubkeyhash addresses are supported) : "+tok);                
             }
         }
     }
@@ -524,7 +531,7 @@ Value combineunspent(const Array& params, bool fHelp)
     {
         strError = "Error: Wallet locked, unable to create transaction!";
         LogPrintf("CombineUnspent() : %s", strError);
-        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+        throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, strError);
     }
 
     
@@ -566,7 +573,7 @@ Value combineunspent(const Array& params, bool fHelp)
     {
         strError="Not enough inputs";
         LogPrintf("CombineUnspent() : %s\n", strError);
-        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+//        throw JSONRPCError(RPC_WALLET_ERROR, strError);
     }
     
     return  results;
@@ -583,12 +590,12 @@ Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp)
     
     if(fromaddresses.size() != 1)
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Single from-address should be specified");                        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
     }
 
     if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Private key for from-address is not found in this wallet");                        
+        throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
     }
 
     set<CTxDestination> thisFromAddresses;
@@ -601,7 +608,7 @@ Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp)
     CPubKey pkey;
     if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_SEND | MC_PTP_RECEIVE,&thisFromAddresses))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "from-address must have send and receive permission");                
+        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address must have send and receive permission");                
     }   
     vector<CTxDestination> addresses;    
     addresses.push_back(CTxDestination(pkey.GetID()));
@@ -619,10 +626,11 @@ Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp)
     }
     else
     {
-        string strError=ParseRawOutputObject(params[1],nAmount,lpScript);
+        int eErrorCode;
+        string strError=ParseRawOutputObject(params[1],nAmount,lpScript,&eErrorCode);
         if(strError.size())
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, strError);                            
+            throw JSONRPCError(eErrorCode, strError);                            
         }
     }
     
@@ -657,7 +665,7 @@ Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp)
             scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
         }
         else
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid script");
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
     }
     
     CScript::const_iterator pc0 = scriptPubKey.begin();
@@ -713,7 +721,7 @@ Value preparelockunspent(const json_spirit::Array& params, bool fHelp)
     CPubKey pkey;
     if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_SEND | MC_PTP_RECEIVE))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "This wallet doesn't have keys with send and receive permission");                
+        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with send and receive permission");                
     }
 
     vector<CTxDestination> addresses;    
@@ -733,10 +741,11 @@ Value preparelockunspent(const json_spirit::Array& params, bool fHelp)
     }
     else
     {
-        string strError=ParseRawOutputObject(params[0],nAmount,lpScript);
+        int eErrorCode;
+        string strError=ParseRawOutputObject(params[0],nAmount,lpScript,&eErrorCode);
         if(strError.size())
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, strError);                            
+            throw JSONRPCError(eErrorCode, strError);                            
         }
     }
     
@@ -772,7 +781,7 @@ Value preparelockunspent(const json_spirit::Array& params, bool fHelp)
             scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
         }
         else
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid script");
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
     }
     
     CScript::const_iterator pc0 = scriptPubKey.begin();
@@ -844,7 +853,7 @@ Value sendassetfrom(const Array& params, bool fHelp)
 
     if(!AddressCanReceive(address.Get()))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Destination address doesn't have receive permission");        
+        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Destination address doesn't have receive permission");        
     }
     
     mc_Script *lpScript;
@@ -863,21 +872,21 @@ Value sendassetfrom(const Array& params, bool fHelp)
         {
             if(entity.IsUnconfirmedGenesis())
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Unconfirmed asset: ")+params[2].get_str());            
+                throw JSONRPCError(RPC_UNCONFIRMED_ENTITY, "Unconfirmed asset: "+params[2].get_str());            
             }
         }
         multiple=entity.GetAssetMultiple();
     }
     else
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid asset reference");        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset reference");        
     }
     Value raw_qty=params[3];
     
     int64_t quantity = (int64_t)(raw_qty.get_real() * multiple + 0.499999);
     if(quantity<0)
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid asset quantity");        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset quantity");        
     }
     
     
@@ -907,12 +916,12 @@ Value sendassetfrom(const Array& params, bool fHelp)
 
         if(fromaddresses.size() != 1)
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Single from-address should be specified");                        
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
         }
 
         if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Private key for from-address is not found in this wallet");                        
+            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
         }
         
         set<CTxDestination> thisFromAddresses;
@@ -925,7 +934,7 @@ Value sendassetfrom(const Array& params, bool fHelp)
         CPubKey pkey;
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_SEND,&thisFromAddresses))
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "from-address doesn't have send permission");                
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have send permission");                
         }   
     }
     else
@@ -933,7 +942,7 @@ Value sendassetfrom(const Array& params, bool fHelp)
         CPubKey pkey;
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_SEND))
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "This wallet doesn't have keys with send permission");                
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with send permission");                
         }        
     }
 
@@ -982,7 +991,7 @@ Value sendassettoaddress(const Array& params, bool fHelp)
 
     if(!AddressCanReceive(address.Get()))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Destination address doesn't have receive permission");        
+        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Destination address doesn't have receive permission");        
     }
     
     mc_Script *lpScript;
@@ -1001,21 +1010,21 @@ Value sendassettoaddress(const Array& params, bool fHelp)
         {
             if(entity.IsUnconfirmedGenesis())
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Unconfirmed asset: ")+params[1].get_str());            
+                throw JSONRPCError(RPC_UNCONFIRMED_ENTITY, "Unconfirmed asset: "+params[1].get_str());            
             }
         }
         multiple=entity.GetAssetMultiple();
     }
     else
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid asset reference");        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset reference");        
     }
     Value raw_qty=params[2];
     
     int64_t quantity = (int64_t)(raw_qty.get_real() * multiple + 0.499999);
     if(quantity<=0)
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid asset quantity");        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset quantity");        
     }
     
     

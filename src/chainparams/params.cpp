@@ -1814,4 +1814,44 @@ int mc_Features::FixedIn10007()
     return ret;    
 }
 
+int mc_Features::Upgrades()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 10008)
+        {
+            ret=1;
+        }
+    }
+    
+    return ret;    
+}
+
+int mc_Features::FixedIn10008()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 10008)
+        {
+            ret=1;
+        }
+    }
+    
+    return ret;    
+}
+
 

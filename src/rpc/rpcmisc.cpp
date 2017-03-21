@@ -236,33 +236,42 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     return obj;
 }
 
-bool paramtobool(Value param)
+bool paramtobool(Value param,bool strict)
 {
-    if(param.type() == str_type)
+    if(!strict)
     {
-        if(param.get_str() == "true")
+        if(param.type() == str_type)
         {
-            return true;
+            if(param.get_str() == "true")
+            {
+                return true;
+            }
+            return atoi(param.get_str().c_str()) != 0;
         }
-        return atoi(param.get_str().c_str()) != 0;
+        if(param.type() == int_type)
+        {
+            if(param.get_int())
+            {
+                return true;
+            }
+            else
+            {
+                return false;            
+            }
+        }
     }
-    if(param.type() == int_type)
-    {
-        if(param.get_int())
-        {
-            return true;
-        }
-        else
-        {
-            return false;            
-        }
-    }
+    
     if(param.type() != bool_type)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                            
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value type, should be boolean");                            
     }    
     
     return param.get_bool();    
+}
+
+bool paramtobool(Value param)
+{
+    return paramtobool(param,true);
 }
 
 Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
@@ -272,24 +281,24 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
     
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "This API is supported only if protocol=multichain");                
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "This API is supported only if protocol=multichain");                
     }
     
     string param_name=params[0].get_str();
     bool fFound=false;
     if(param_name == "miningrequirespeers")
     {
-        mapArgs ["-" + param_name]=paramtobool(params[1]) ? "1" : "0";
+        mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
         fFound=true;
     }
     if(param_name == "mineemptyblocks")
     {
-        mapArgs ["-" + param_name]=paramtobool(params[1]) ? "1" : "0";
+        mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
         fFound=true;
     }
     if(param_name == "hideknownopdrops")
     {
-        mapArgs ["-" + param_name]=paramtobool(params[1]) ? "1" : "0";
+        mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
         fFound=true;
     }
     if(param_name == "mineemptyrounds")
@@ -309,7 +318,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                                            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value type");                                            
         }
         fFound=true;
     }
@@ -332,12 +341,12 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
             }
             else
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Should be in range (0,1)"));                                                
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Should be in range (0,1)");                                                
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                                            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value type");                                            
         }
         fFound=true;
     }
@@ -346,7 +355,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
     {
         if( (params[1].type() == int_type) || (params[1].type() == str_type) )
         {
-            int nValue=params[1].get_int();
+            int nValue;
             if(params[1].type() == int_type)
             {
                 nValue=params[1].get_int();
@@ -361,12 +370,12 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
             }
             else
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Should be non-negative"));                                                
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Should be non-negative");                                                
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                                            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value type");                                            
         }
         fFound=true;
     }
@@ -386,7 +395,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         }   
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                                                        
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value type");                                                        
         }
         fFound=true;
     }
@@ -406,7 +415,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         }   
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                                                        
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value type");                                                        
         }
         fFound=true;
     }
@@ -417,7 +426,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
             CBitcoinAddress address(params[1].get_str());
             if (!address.IsValid())    
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid address");                                                                        
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");                                                                        
             }
             else
             {
@@ -426,7 +435,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         }   
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                                                        
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value type");                                                        
         }
         fFound=true;
     }
@@ -458,14 +467,14 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         }   
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter value type"));                                                        
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value type");                                                        
         }
         fFound=true;
     }
     
     if(!fFound)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, string("Unsupported parameter"));                                                    
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Unsupported runtime parameter: " + param_name);                                                    
     }
 
     SetMultiChainRuntimeParams();    
@@ -717,12 +726,12 @@ Value createkeypairs(const Array& params, bool fHelp)
             count=params[0].get_int();
             if(count < 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));                            
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
         }
     }
             
@@ -916,7 +925,7 @@ Value createmultisig(const Array& params, bool fHelp)
     {
         if(mc_gState->m_NetworkParams->GetInt64Param("allowp2shoutputs") == 0)
         {
-            throw JSONRPCError(RPC_INVALID_REQUEST, "P2SH outputs are not  allowed for this network");
+            throw JSONRPCError(RPC_NOT_ALLOWED, "P2SH outputs are not allowed for this blockchain");
         }
     }
 /* MCHN END */    
@@ -945,17 +954,17 @@ Value verifymessage(const Array& params, bool fHelp)
 
     CBitcoinAddress addr(strAddress);
     if (!addr.IsValid())
-        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid address");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
 
     CKeyID keyID;
     if (!addr.GetKeyID(keyID))
-        throw JSONRPCError(RPC_TYPE_ERROR, "Address does not refer to key");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Address does not refer to key");
 
     bool fInvalid = false;
     vector<unsigned char> vchSig = DecodeBase64(strSign.c_str(), &fInvalid);
 
     if (fInvalid)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Malformed base64 encoding");
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Malformed base64 encoding");
 
     CHashWriter ss(SER_GETHASH, 0);
     ss << strMessageMagic;

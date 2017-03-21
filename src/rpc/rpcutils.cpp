@@ -646,6 +646,107 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
     return entry;
 }
 
+Object UpgradeEntry(const unsigned char *txid)
+{
+    Object entry;
+    mc_EntityDetails entity;
+    unsigned char *ptr;
+
+    if(txid == NULL)
+    {
+        entry.push_back(Pair("upgraderef", ""));
+        return entry;
+    }
+    
+    uint256 hash=*(uint256*)txid;
+    if(mc_gState->m_Assets->FindEntityByTxID(&entity,txid))
+    {        
+        ptr=(unsigned char *)entity.GetName();
+        
+        if(ptr && strlen((char*)ptr))
+        {
+            entry.push_back(Pair("name", string((char*)ptr)));            
+        }
+        entry.push_back(Pair("createtxid", hash.GetHex()));
+        ptr=(unsigned char *)entity.GetRef();
+        string streamref="";
+        if(entity.IsUnconfirmedGenesis())
+        {
+            Value null_value;
+            entry.push_back(Pair("upgraderef",null_value));
+        }
+        else
+        {
+            streamref += itostr((int)mc_GetLE(ptr,4));
+            streamref += "-";
+            streamref += itostr((int)mc_GetLE(ptr+4,4));
+            streamref += "-";
+            streamref += itostr((int)mc_GetLE(ptr+8,2));
+            entry.push_back(Pair("upgraderef", streamref));
+        }
+
+        entry.push_back(Pair("protocol-version",entity.UpgradeProtocolVersion()));                    
+        entry.push_back(Pair("start-block",(int64_t)entity.UpgradeStartBlock()));                    
+        
+        size_t value_size;
+        int64_t offset,new_offset;
+        uint32_t value_offset;
+        const unsigned char *ptr;
+
+        ptr=entity.GetScript();
+        
+        Object fields;
+        Array openers;
+        offset=0;
+        while(offset>=0)
+        {
+            new_offset=entity.NextParam(offset,&value_offset,&value_size);
+            if(value_offset > 0)
+            {
+                if(ptr[offset])
+                {
+                    string param_name((char*)ptr+offset);
+                    string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
+                    fields.push_back(Pair(param_name, param_value));                                                                        
+                }
+                else
+                {
+                    if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
+                    {
+                        if(value_size == 24)
+                        {
+                            unsigned char tptr[4];
+                            memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
+                            if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
+                            {
+                                openers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
+                            }
+                            else
+                            {
+                                openers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
+                            }
+                        }
+                    }                        
+                }
+            }
+            offset=new_offset;
+        }      
+        entry.push_back(Pair("params",fields));                    
+//        entry.push_back(Pair("creators",openers));                    
+        
+    }
+    else
+    {
+        Value null_value;
+        entry.push_back(Pair("name",null_value));
+        entry.push_back(Pair("createtxid",null_value));
+        entry.push_back(Pair("upgraderef", null_value));
+    }
+    
+    return entry;
+}
+
+
 Value OpReturnEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout)
 {
     string metadata="";
@@ -1048,7 +1149,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level)
 }
 
 
-string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, int *required)
+string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, int *required,int *eErrorCode)
 {
     string strError="";
     unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
@@ -1064,6 +1165,11 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
     string asset_name;
     string type_string;
     nAmount=0;
+    
+    if(eErrorCode)
+    {
+        *eErrorCode=RPC_INVALID_PARAMETER;
+    }
     
     memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
     
@@ -1441,18 +1547,34 @@ exitlbl:
     switch(asset_error)
     {
         case -1:
+            if(eErrorCode)
+            {
+                *eErrorCode=RPC_ENTITY_NOT_FOUND;
+            }
             strError=string("Issue transaction with this txid not found: ")+asset_name;
             break;
         case -2:
+            if(eErrorCode)
+            {
+                *eErrorCode=RPC_ENTITY_NOT_FOUND;
+            }
             strError=string("Issue transaction with this asset reference not found: ")+asset_name;
             break;
         case -3:
+            if(eErrorCode)
+            {
+                *eErrorCode=RPC_ENTITY_NOT_FOUND;
+            }
             strError=string("Issue transaction with this name not found: ")+asset_name;
             break;
         case -4:
             strError=string("Could not parse asset key: ")+asset_name;
             break;
         case 1:
+            if(eErrorCode)
+            {
+                *eErrorCode=RPC_UNCONFIRMED_ENTITY;
+            }
             strError=string("Unconfirmed asset: ")+asset_name;
             break;
     }
@@ -1464,9 +1586,9 @@ exitlbl:
     
 }
 
-string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript)
+string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript,int *eErrorCode)
 {
-    return ParseRawOutputObject(param,nAmount,lpScript,NULL);
+    return ParseRawOutputObject(param,nAmount,lpScript,NULL,eErrorCode);
 }
 
 bool FindPreparedTxOut(CTxOut& txout,COutPoint outpoint,string& reason)
@@ -1659,7 +1781,7 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
             if (address.IsValid())
             {            
                 if (setAddress.count(address))
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ")+s.name_);
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, duplicated address: "+s.name_);
                 setAddress.insert(address);            
             }
         }
@@ -1679,11 +1801,12 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
             const unsigned char *elem;
 
             nAmount=0;
-            
-            string strError=ParseRawOutputObject(s.value_,nAmount,lpScript, required);
+            int eErrorCode;
+
+            string strError=ParseRawOutputObject(s.value_,nAmount,lpScript, required,&eErrorCode);
             if(strError.size())
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, strError);                            
+                throw JSONRPCError(eErrorCode, strError);                            
             }
 
 /*            
@@ -1699,7 +1822,7 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
                     scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
                 }
                 else
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid script");
+                    throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
             }                
             delete lpScript;
         }
@@ -2356,13 +2479,13 @@ vector<string> ParseStringList(Value param)
             {
                 string tok=vtok.get_str();
                 if (setStrings.count(tok))
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicate value: ")+tok);
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, duplicate value: "+tok);
                 setStrings.insert(tok);
                 vStrings.push_back(tok);
             }
             else
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid value, expected array of strings"));                                                        
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value, expected array of strings");                                                        
             }
         }            
     }
@@ -2375,14 +2498,14 @@ vector<string> ParseStringList(Value param)
             while(getline(ss, tok, ',')) 
             {
                 if (setStrings.count(tok))
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicate value: ")+tok);
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, duplicate value: "+tok);
                 setStrings.insert(tok);
                 vStrings.push_back(tok);
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid value, expected string or array"));                                                                    
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value, expected string or array");                                                                    
         }
     }
 
@@ -2407,6 +2530,10 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
         case MC_ENT_TYPE_ASSET:
             entity_nameU="Asset";
             entity_nameL="asset";
+            break;
+        case MC_ENT_TYPE_UPGRADE:
+            entity_nameU="Upgrade";
+            entity_nameL="upgrade";
             break;
         default:
             entity_nameU="Entity";
@@ -2438,7 +2565,7 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
                     }
                     else
                     {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, string("Stream with this stream reference not found: ")+str);                    
+                        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, string("Stream with this stream reference not found: ")+str);                    
                     }
                 }
             }
@@ -2448,27 +2575,27 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
         switch(ret)
         {
             case -1:
-                throw JSONRPCError(RPC_INVALID_PARAMETER, entity_nameU+string(" with this txid not found: ")+str);
+                throw JSONRPCError(RPC_ENTITY_NOT_FOUND, entity_nameU+string(" with this txid not found: ")+str);
                 break;
             case -2:
-                throw JSONRPCError(RPC_INVALID_PARAMETER, entity_nameU+string(" with this reference not found: ")+str);
+                throw JSONRPCError(RPC_ENTITY_NOT_FOUND, entity_nameU+string(" with this reference not found: ")+str);
                 break;
             case -3:
-                throw JSONRPCError(RPC_INVALID_PARAMETER, entity_nameU+string(" with this name not found: ")+str);
+                throw JSONRPCError(RPC_ENTITY_NOT_FOUND, entity_nameU+string(" with this name not found: ")+str);
                 break;
             case -4:
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Could not parse ")+entity_nameL+string(" key: ")+str);
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Could not parse "+entity_nameL+" key: "+str);
                 break;
 /*                
             case 1:
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Unconfirmed stream: ")+str);
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Unconfirmed stream: "+str);
                 break;
  */ 
         }
     }
     else
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid "+entity_nameL+" identifier");        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid "+entity_nameL+" identifier");        
     }
            
     if(entity)
@@ -2478,7 +2605,7 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
             if((entity_type & entity->GetEntityType()) == 0)
 //            if(entity->GetEntityType() != MC_ENT_TYPE_STREAM)
             {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid "+entity_nameL+" identifier, not "+entity_nameL);                        
+                throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Invalid "+entity_nameL+" identifier, not "+entity_nameL);                        
             }
         }    
     }    

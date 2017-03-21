@@ -69,12 +69,14 @@ struct mc_WalletTxs;
 #define MC_TFL_ALL_INPUTS_FROM_ME       0x00020000
 #define MC_TFL_IS_CHANGE                0x00040000
 #define MC_TFL_IS_SPENDABLE             0x00080000
+#define MC_TFL_IS_MINE_FOR_THIS_SEND    0x10000000
 #define MC_TFL_IMPOSSIBLE               0x80000000
 
 #define MC_CSF_ALLOW_SPENDABLE_P2SH     0x00000001
 #define MC_CSF_ALLOW_NOT_SPENDABLE_P2SH 0x00000002
 #define MC_CSF_ALLOW_NOT_SPENDABLE      0x00000004
 #define MC_CSF_SIGN                     0x00000008
+#define MC_CSF_ALLOWED_COINS_ARE_MINE   0x00000010
 
 
 class mc_Coin
@@ -479,13 +481,13 @@ public:
                                 std::set<std::pair<uint256,unsigned int> >& setCoinsRet, CAmount& nValueRet, const CCoinControl* coinControl) const;    
     bool CreateMultiChainTransaction(const std::vector<std::pair<CScript, CAmount> >& vecSend,
                            CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, std::string& strFailReason, const CCoinControl *coinControl = NULL,
-                           const std::set<CTxDestination>* addresses = NULL,int min_conf = 1,int min_inputs = -1,int max_inputs = -1, const std::vector<COutPoint> *lpCoinsToUse = NULL);
+                           const std::set<CTxDestination>* addresses = NULL,int min_conf = 1,int min_inputs = -1,int max_inputs = -1, const std::vector<COutPoint> *lpCoinsToUse = NULL, int *eErrorCode = NULL);
     bool CreateTransaction(CScript scriptPubKey, const CAmount& nValue, CScript scriptOpReturn,
                            CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, std::string& strFailReason, const CCoinControl *coinControl = NULL,
-                           const std::set<CTxDestination>* addresses = NULL,int min_conf = 1,int min_inputs = -1,int max_inputs = -1, const std::vector<COutPoint> *lpCoinsToUse = NULL);
+                           const std::set<CTxDestination>* addresses = NULL,int min_conf = 1,int min_inputs = -1,int max_inputs = -1, const std::vector<COutPoint> *lpCoinsToUse = NULL, int *eErrorCode = NULL);
     bool CreateTransaction(std::vector<CScript> scriptPubKeys, const CAmount& nValue, CScript scriptOpReturn,
                            CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, std::string& strFailReason, const CCoinControl* coinControl = NULL,
-                           const std::set<CTxDestination>* addresses = NULL,int min_conf = 1,int min_inputs = -1,int max_inputs = -1, const std::vector<COutPoint> *lpCoinsToUse = NULL);
+                           const std::set<CTxDestination>* addresses = NULL,int min_conf = 1,int min_inputs = -1,int max_inputs = -1, const std::vector<COutPoint> *lpCoinsToUse = NULL, int *eErrorCode = NULL);
     bool CreateAndCommitOptimizeTransaction(CWalletTx& wtxNew,std::string& strFailReason,
                            const std::set<CTxDestination>* addresses = NULL,int min_conf = 1,int min_inputs = -1,int max_inputs = -1);
     bool OptimizeUnspentList(); 

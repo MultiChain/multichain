@@ -55,7 +55,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
     {
         nAmount = AmountFromValue(params[5]);
         if(nAmount < 0)
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid amount");
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");
     }
     // Wallet comments
     CWalletTx wtx;
@@ -81,25 +81,25 @@ Value issuefromcmd(const Array& params, bool fHelp)
     }
     
     if(dQuantity<0.)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid quantity. Should be positive.");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid quantity. Should be positive.");
     if(dUnit<=0.)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid smallest unit. Valid Range [0.00000001 - 1].");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid smallest unit. Valid Range [0.00000001 - 1].");
     if(dUnit>1.)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid smallest unit. Valid Range [0.00000001 - 1].");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid smallest unit. Valid Range [0.00000001 - 1].");
     
     multiple=(int)((1 + 0.1*dUnit)/dUnit);
     if(fabs((double)multiple*dUnit-1)>0.0001)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid smallest unit. 1 should be divisible by this number.");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid smallest unit. 1 should be divisible by this number.");
     
     quantity=(int64_t)(dQuantity*multiple+0.1);
     if(quantity<0)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid quantity or smallest unit. ");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid quantity or smallest unit. ");
     if( (quantity == 0) && (mc_gState->m_Features->FollowOnIssues() == 0) )
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid asset quantity");                
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset quantity");                
     }
     if(multiple<=0)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid quantity or smallest unit.");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid quantity or smallest unit.");
 
     int64_t quantity_to_check=(int64_t)((dQuantity+0.1*dUnit)/dUnit);
     double dDelta;
@@ -114,7 +114,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
     
     if(dDelta>1.e-14)
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Quantity should be divisible by smallest unit.");        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Quantity should be divisible by smallest unit.");        
         
     }
 
@@ -122,8 +122,9 @@ Value issuefromcmd(const Array& params, bool fHelp)
 
     if(!AddressCanReceive(address.Get()))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Destination address doesn't have receive permission");        
+        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Destination address doesn't have receive permission");        
     }
+    
     lpScript->SetAssetGenesis(quantity);
     
     mc_Script *lpDetailsScript;
@@ -186,14 +187,14 @@ Value issuefromcmd(const Array& params, bool fHelp)
     {
         if(asset_name == "*")
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset name");                                                                                            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset name: *");                                                                                            
         }
     }
     
     unsigned char buf_a[MC_AST_ASSET_REF_SIZE];    
     if(CoinSparkAssetRefDecode(buf_a,asset_name.c_str(),asset_name.size()))
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset name");                                                                                                    
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset name, looks like an asset reference");                                                                                                    
     }
     
     if(asset_name.size())
@@ -203,7 +204,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
         {
             if(type == 3)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Asset or stream with this name already exists");                                    
+                throw JSONRPCError(RPC_DUPLICATE_NAME, "Asset or stream with this name already exists");                                    
             }
             else
             {
@@ -287,12 +288,12 @@ Value issuefromcmd(const Array& params, bool fHelp)
 
         if(fromaddresses.size() != 1)
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Single from-address should be specified");                        
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
         }
 
         if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Private key for from-address is not found in this wallet");                        
+            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
         }
         
         set<CTxDestination> thisFromAddresses;
@@ -305,7 +306,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
         CPubKey pkey;
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_ISSUE,&thisFromAddresses))
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "from-address doesn't have issue permission");                
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have issue permission");                
         }   
     }
     else
@@ -313,7 +314,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
         CPubKey pkey;
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_ISSUE))
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "This wallet doesn't have keys with issue permission");                
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with issue permission");                
         }        
     }
     
@@ -356,7 +357,7 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
 
     if(mc_gState->m_Features->FollowOnIssues() == 0 )
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, string("API is not supported for this protocol version"));        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
     }
     
     CBitcoinAddress address(params[1].get_str());
@@ -369,7 +370,7 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     {
         nAmount = AmountFromValue(params[4]);
         if(nAmount < 0)
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid amount");
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");
     }
     
     mc_Script *lpScript;
@@ -387,14 +388,14 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
         {
             if(entity.IsUnconfirmedGenesis())
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Unconfirmed asset: ")+params[2].get_str());            
+                throw JSONRPCError(RPC_UNCONFIRMED_ENTITY, string("Unconfirmed asset: ")+params[2].get_str());            
             }
         }
         multiple=entity.GetAssetMultiple();        
     }
     else
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid asset reference");        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset identifier");        
     }
     
     Value raw_qty=params[3];
@@ -402,11 +403,11 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     int64_t quantity = (int64_t)(raw_qty.get_real() * multiple + 0.499999);
     if(quantity<0)
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid asset quantity");        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset quantity");        
     }
     if( (quantity == 0) && (mc_gState->m_Features->FollowOnIssues() == 0) )
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid asset quantity");                
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset quantity");                
     }
         
         
@@ -432,7 +433,7 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
 
     if(!AddressCanReceive(address.Get()))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Destination address doesn't have receive permission");        
+        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Destination address doesn't have receive permission");        
     }
     
     
@@ -501,12 +502,12 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
 
         if(fromaddresses.size() != 1)
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Single from-address should be specified");                        
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
         }
         
         if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Private key for from-address is not found in this wallet");                        
+            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
         }        
     }
     else
@@ -515,7 +516,7 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
         CPubKey pkey;
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_ISSUE))
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "This wallet doesn't have keys with issue permission");                
+            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "This wallet doesn't have keys with issue permission");                
         }        
  */ 
     }
@@ -531,12 +532,12 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
                 {
                     if(mc_gState->m_Permissions->CanIssue(entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
                     {
-                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Issuing more units for this asset is not allowed from this address");                                                                        
+                        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Issuing more units for this asset is not allowed from this address");                                                                        
                     }                                                 
                 }
                 else
                 {
-                    throw JSONRPCError(RPC_INTERNAL_ERROR, "Issuing more units is allowed only from P2PKH addresses");                                                
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Issuing more units is allowed only from P2PKH addresses");                                                
                 }
             }
             else
@@ -557,18 +558,18 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
                 }                    
                 if(!issuer_found)
                 {
-                    throw JSONRPCError(RPC_INTERNAL_ERROR, "Issuing more units for this asset is not allowed from this wallet");                                                                                            
+                    throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Issuing more units for this asset is not allowed from this wallet");                                                                                            
                 }
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Issuing more units not allowed for this asset: "+params[2].get_str());                            
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Issuing more units not allowed for this asset: "+params[2].get_str());                            
         }
     }   
     else
     {
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Asset not found");                
+        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Asset not found");                
     }
     
     
@@ -689,7 +690,7 @@ Value getmultibalances(const Array& params, bool fHelp)
             uint256 hash=*(uint256*)entity.GetTxID();
             if (setAssets.count(hash))
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicate asset: ")+inputStrings[is]);                        
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, duplicate asset: " + inputStrings[is]);                        
             }
             setAssets.insert(hash);
         }
@@ -987,7 +988,7 @@ Value getaddressbalances(const Array& params, bool fHelp)
     
     if(fromaddresses.size() != 1)
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Single from-address should be specified");                        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
     }
     
     isminefilter filter = ISMINE_SPENDABLE;
@@ -1242,7 +1243,7 @@ Value getassetbalances(const Array& params, bool fHelp)
             {
                 if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
                 {
-                    throw JSONRPCError(RPC_TRANSACTION_REJECTED, "Accounts are not supported with scalable wallet - if you need getassetbalances, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Accounts are not supported with scalable wallet - if you need getassetbalances, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
                 }            
             }
             BOOST_FOREACH(const PAIRTYPE(CBitcoinAddress, CAddressBookData)& item, pwalletMain->mapAddressBook)
@@ -1472,12 +1473,12 @@ Value listassets(const Array& params, bool fHelp)
             count=params[2].get_int();
             if(count < 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));                            
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
         }
     }
     start=-count;
@@ -1489,7 +1490,7 @@ Value listassets(const Array& params, bool fHelp)
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid start"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
         }
     }
     
@@ -1537,25 +1538,15 @@ Value listassets(const Array& params, bool fHelp)
     }
     
     if(assets == NULL)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Cannot open asset database");
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot open asset database");
 
     output_level=8;
     
     if (params.size() > 1)    
     {
-        if(params[1].type() == int_type)
+        if(paramtobool(params[1]))
         {
-            if(params[1].get_int())
-            {
-                output_level=9;
-            }
-        }
-        if(params[1].type() == bool_type)
-        {
-            if(params[1].get_bool())
-            {
-                output_level=9;
-            }
+            output_level=9;
         }
     }
     
@@ -1870,7 +1861,7 @@ Value getassettransaction(const Array& params, bool fHelp)
     
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
     }   
            
     mc_EntityDetails asset_entity;
@@ -1884,7 +1875,7 @@ Value getassettransaction(const Array& params, bool fHelp)
     
     if(!pwalletTxsMain->FindEntity(&entStat))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Not subscribed to this asset");                                
+        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this asset");                                
     }
     
     uint256 hash = ParseHashV(params[1], "parameter 2");
@@ -1893,20 +1884,7 @@ Value getassettransaction(const Array& params, bool fHelp)
     
     if (params.size() > 2)    
     {
-        if(params[2].type() == int_type)
-        {
-            if(params[2].get_int())
-            {
-                verbose=true;
-            }
-        }
-        if(params[2].type() == bool_type)
-        {
-            if(params[2].get_bool())
-            {
-                verbose=true;
-            }
-        }
+        verbose=paramtobool(params[2]);
     }
     
     const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
@@ -1921,7 +1899,7 @@ Value getassettransaction(const Array& params, bool fHelp)
     
     if(entry.size() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Specified asset was not transferred in this transaction");                
+        throw JSONRPCError(RPC_TX_NOT_FOUND, "This transaction was not found for this asset");                
     }
     
     delete asset_amounts;
@@ -1938,7 +1916,7 @@ Value listassettransactions(const Array& params, bool fHelp)
 
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
     }   
 
     Array retArray;
@@ -1955,20 +1933,7 @@ Value listassettransactions(const Array& params, bool fHelp)
     
     if (params.size() > 1)    
     {
-        if(params[1].type() == int_type)
-        {
-            if(params[1].get_int())
-            {
-                verbose=true;
-            }
-        }
-        if(params[1].type() == bool_type)
-        {
-            if(params[1].get_bool())
-            {
-                verbose=true;
-            }
-        }
+        verbose=paramtobool(params[1]);
     }
     
     count=10;
@@ -1979,12 +1944,12 @@ Value listassettransactions(const Array& params, bool fHelp)
             count=params[2].get_int();
             if(count < 0)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));                            
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
             }
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid count"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
         }
     }
     start=-count;
@@ -1996,7 +1961,7 @@ Value listassettransactions(const Array& params, bool fHelp)
         }
         else
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid start"));            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
         }
     }
     
@@ -2017,7 +1982,7 @@ Value listassettransactions(const Array& params, bool fHelp)
     }
     if(!pwalletTxsMain->FindEntity(&entStat))
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Not subscribed to this asset");                                
+        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this asset");                                
     }
     
     mc_Buffer *entity_rows;

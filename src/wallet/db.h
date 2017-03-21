@@ -36,8 +36,10 @@ class CDBEnv
 private:
     bool fDbEnvInit;
     bool fMockDb;
-    boost::filesystem::path path;
-
+    // Don't change into boost::filesystem::path, as that can result in
+    // shutdown problems/crashes caused by a static initialized internal pointer.
+    std::string strPath;
+ 
     void EnvShutdown();
 
 public:

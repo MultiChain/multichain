@@ -44,13 +44,17 @@
 #define MC_ENT_TYPE_NONE              0x00
 #define MC_ENT_TYPE_ASSET             0x01
 #define MC_ENT_TYPE_STREAM            0x02
-#define MC_ENT_TYPE_MAX               0x0F
+#define MC_ENT_TYPE_STREAM_MAX        0x0F
+#define MC_ENT_TYPE_UPGRADE           0x10
+#define MC_ENT_TYPE_MAX               0x10
 
-#define MC_ENT_SPRM_NAME               0x01
-#define MC_ENT_SPRM_FOLLOW_ONS         0x02
-#define MC_ENT_SPRM_ISSUER             0x03
-#define MC_ENT_SPRM_ANYONE_CAN_WRITE   0x04
-#define MC_ENT_SPRM_ASSET_MULTIPLE     0x41
+#define MC_ENT_SPRM_NAME                      0x01
+#define MC_ENT_SPRM_FOLLOW_ONS                0x02
+#define MC_ENT_SPRM_ISSUER                    0x03
+#define MC_ENT_SPRM_ANYONE_CAN_WRITE          0x04
+#define MC_ENT_SPRM_ASSET_MULTIPLE            0x41
+#define MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION  0x42
+#define MC_ENT_SPRM_UPGRADE_START_BLOCK       0x43
 
 #define MC_ENT_FLAG_OFFSET_IS_SET     0x00000001
 #define MC_ENT_FLAG_NAME_IS_SET       0x00000010
@@ -143,6 +147,8 @@ typedef struct mc_EntityDetails
 //    int HasFollowOns(); 
     int AllowedFollowOns(); 
     int AnyoneCanWrite(); 
+    int UpgradeProtocolVersion(); 
+    uint32_t UpgradeStartBlock(); 
     uint64_t GetQuantity();
     uint32_t GetEntityType();    
     const void* GetSpecialParam(uint32_t param,size_t* bytes);
@@ -175,6 +181,7 @@ typedef struct mc_EntityLedger
     void Zero();
     int Open();
     int Close();
+    void Flush();
     void SetName(const char *name);
     int GetRow(int64_t pos,mc_EntityLedgerRow *row);
     int64_t GetSize();
@@ -212,7 +219,7 @@ typedef struct mc_AssetDB
 
     int Initialize(const char *name,int mode);
         
-    int InsertStream(const void* txid, int offset, int entity_type, const void *script,size_t script_size, const void* special_script, size_t special_script_size,int update_mempool);
+    int InsertEntity(const void* txid, int offset, int entity_type, const void *script,size_t script_size, const void* special_script, size_t special_script_size,int update_mempool);
     int InsertAsset(const void* txid, int offset, uint64_t quantity,const char *name,int multiple,const void *script,size_t script_size, const void* special_script, size_t special_script_size,int update_mempool);
     int InsertAssetFollowOn(const void* txid, int offset, uint64_t quantity, const void *script,size_t script_size, const void* special_script, size_t special_script_size,const void* original_txid,int update_mempool);
     int Commit();
@@ -237,6 +244,7 @@ typedef struct mc_AssetDB
     int64_t GetTotalQuantity(mc_EntityDetails *entity);
     
     void RemoveFiles();
+    uint32_t MaxEntityType();
     
 //Internal functions    
     int Zero();

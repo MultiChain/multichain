@@ -134,21 +134,21 @@ CAmount AmountFromValue(const Value& value)
     {
         if(dAmount != 0)
         {
-            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount");            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");            
         }
     }
     else
     {
         if (dAmount < 0.0 || dAmount > (double)MAX_MONEY/(double)COIN)                                  // MCHN - was <=
-            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount");        
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");        
     }
     
 //    if (dAmount < 0.0 || dAmount > 21000000.0)                                  // MCHN - was <=
-//        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount");
+//        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");
 /* MCHN END */    
     CAmount nAmount = roundint64(dAmount * COIN);
     if (!MoneyRange(nAmount))
-        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");
     return nAmount;
 }
 
@@ -170,7 +170,9 @@ uint256 ParseHashV(const Value& v, string strName)
         strHex = v.get_str();
     if (!IsHex(strHex)) // Note: IsHex("") is false
         throw JSONRPCError(RPC_INVALID_PARAMETER, strName+" must be hexadecimal string (not '"+strHex+"')");
-    uint256 result;
+    if (64 != strHex.length())
+        throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("%s must be of length %d (not %d)", strName, 64, strHex.length()));
+     uint256 result;
     result.SetHex(strHex);
     return result;
 }
@@ -385,7 +387,7 @@ Value pausecmd(const Array& params, bool fHelp)
     }
     
     if(type == 0)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid task");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid task");
     
     LOCK(cs_main);
     
@@ -408,7 +410,7 @@ Value resumecmd(const Array& params, bool fHelp)
     }
     
     if(type == 0)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid task");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid task");
     
     LOCK(cs_main);
     
@@ -500,6 +502,7 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "listassets",             &listassets,             true,      false,      false },
     { "blockchain",         "listpermissions",        &listpermissions,        true,      false,      false },
     { "blockchain",         "liststreams",            &liststreams,            true,      false,      false },
+    { "blockchain",         "listupgrades",           &listupgrades,           true,      false,      false },
 /* MCHN END */    
     
     /* Mining */
@@ -597,6 +600,7 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "decoderawexchange",      &decoderawexchange,      false,     false,      true },
     
     { "wallet",             "grantfrom",              &grantfromcmd,           false,     false,      true }, 
+    { "wallet",             "approvefrom",            &approvefrom,            false,     false,      true }, 
     { "wallet",             "revokefrom",             &revokefromcmd,          false,     false,      true },
     { "wallet",             "issuefrom",              &issuefromcmd,           false,     false,      true },
     { "wallet",             "issuemorefrom",          &issuemorefromcmd,       false,     false,      true },
@@ -1128,7 +1132,7 @@ void JSONRequest::parse(const Value& valRequest)
         throw JSONRPCError(RPC_INVALID_REQUEST, "Method must be a string");
     strMethod = valMethod.get_str();
     if (strMethod != "getblocktemplate")
-        LogPrint("rpc", "ThreadRPCServer method=%s\n", strMethod);
+        LogPrint("rpc", "ThreadRPCServer method=%s\n", SanitizeString(strMethod));
 
 /* MCHN START */    
     Value valChainName = find_value(request, "chain_name");
@@ -1326,6 +1330,14 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Method not found (disabled)");
 #endif
 
+    if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+    {
+        if( setAllowedWhenWaitingForUpgrade.count(strMethod) == 0 )
+        {
+            throw JSONRPCError(RPC_UPGRADE_REQUIRED, strprintf("BlockChain was upgraded to protocol version %d, please upgrade MultiChain",mc_gState->m_ProtocolVersionToUpgrade));
+        }
+    }
+    
     // Observe safe mode
     string strWarning = GetWarnings("rpc");
     if (strWarning != "" && !GetBoolArg("-disablesafemode", false) &&
@@ -1428,3 +1440,4 @@ std::string HelpExampleRpc(string methodname, string args){
 const CRPCTable tableRPC;
 std::map<std::string, std::string> mapHelpStrings;
 std::map<std::string, int> mapLogParamCounts;
+std::set<std::string> setAllowedWhenWaitingForUpgrade;

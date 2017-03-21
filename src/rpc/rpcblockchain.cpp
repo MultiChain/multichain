@@ -29,6 +29,7 @@ bool CreateAssetBalanceList(const CTxOut& out,mc_Buffer *amounts,mc_Script *lpSc
 Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level);
 Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong);
 string EncodeHexTx(const CTransaction& tx);
+int OrphanPoolSize();
 /* MCHN END */
 
 void ScriptPubKeyToJSON(const CScript& scriptPubKey, Object& out, bool fIncludeHex);
@@ -222,7 +223,7 @@ Value getblockhash(const Array& params, bool fHelp)
 
     int64_t nHeight = params[0].get_int64();                                    // MCHN - was int
     if (nHeight < 0 || nHeight > chainActive.Height())
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
+        throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range");
 
     CBlockIndex* pblockindex = chainActive[nHeight];
     return pblockindex->GetBlockHash().GetHex();
@@ -237,7 +238,7 @@ Value clearmempool(const Array& params, bool fHelp)
     uint32_t required_paused_state=MC_NPS_INCOMING | MC_NPS_MINING;
     if((mc_gState->m_NodePausedState & required_paused_state) != required_paused_state)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "Local mining and the processing of incoming transactions and blocks should be paused.");        
+        throw JSONRPCError(RPC_NOT_ALLOWED, "Local mining and the processing of incoming transactions and blocks should be paused.");        
     }
     
     ClearMemPools();
@@ -253,7 +254,7 @@ Value setlastblock(const Array& params, bool fHelp)
     uint32_t required_paused_state=MC_NPS_INCOMING | MC_NPS_MINING;
     if((mc_gState->m_NodePausedState & required_paused_state) != required_paused_state)
     {
-        throw JSONRPCError(RPC_INVALID_REQUEST, "Local mining and the processing of incoming transactions and blocks should be paused.");        
+        throw JSONRPCError(RPC_NOT_ALLOWED, "Local mining and the processing of incoming transactions and blocks should be paused.");        
     }
     
     
@@ -272,7 +273,7 @@ Value setlastblock(const Array& params, bool fHelp)
                 nHeight+=chainActive.Height();
                 if (nHeight <= 0 || nHeight > chainActive.Height())
                 {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
+                    throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range");
                 }
             }
 
@@ -280,12 +281,20 @@ Value setlastblock(const Array& params, bool fHelp)
         }
         
         uint256 hash(strHash);
-
-        string result=SetLastBlock(hash);
+        bool fNotFound;
+        
+        string result=SetLastBlock(hash,&fNotFound);
 
         if(result.size())
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, result);                
+            if(fNotFound)
+            {
+                throw JSONRPCError(RPC_BLOCK_NOT_FOUND, result);                
+            }
+            else
+            {
+                throw JSONRPCError(RPC_VERIFY_REJECTED, result);                                
+            }
         }        
     }
     
@@ -304,7 +313,7 @@ Value getblock(const Array& params, bool fHelp)
     {
         int nHeight = atoi(params[0].get_str().c_str());
         if (nHeight < 0 || nHeight > chainActive.Height())
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
+            throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range");
 
         strHash=chainActive[nHeight]->GetBlockHash().GetHex();            
     }
@@ -335,7 +344,7 @@ Value getblock(const Array& params, bool fHelp)
     }    
     
     if (mapBlockIndex.count(hash) == 0)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+        throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block not found");
 
     CBlock block;
     CBlockIndex* pblockindex = mapBlockIndex[hash];
@@ -594,6 +603,7 @@ Value getmempoolinfo(const Array& params, bool fHelp)
     Object ret;
     ret.push_back(Pair("size", (int64_t) mempool.size()));
     ret.push_back(Pair("bytes", (int64_t) mempool.GetTotalTxSize()));
+//    ret.push_back(Pair("orphan", OrphanPoolSize()));
 
     return ret;
 }
@@ -610,7 +620,7 @@ Value invalidateblock(const Array& params, bool fHelp)
     {
         LOCK(cs_main);
         if (mapBlockIndex.count(hash) == 0)
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+            throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block not found");
 
         CBlockIndex* pblockindex = mapBlockIndex[hash];
         InvalidateBlock(state, pblockindex);
@@ -639,7 +649,7 @@ Value reconsiderblock(const Array& params, bool fHelp)
     {
         LOCK(cs_main);
         if (mapBlockIndex.count(hash) == 0)
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+            throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block not found");
 
         CBlockIndex* pblockindex = mapBlockIndex[hash];
         ReconsiderBlock(state, pblockindex);

@@ -16,6 +16,7 @@
 #define MC_PTP_MINE             0x00000100
 #define MC_PTP_ADMIN            0x00001000
 #define MC_PTP_ACTIVATE         0x00002000
+#define MC_PTP_UPGRADE          0x00010000
 #define MC_PTP_BLOCK_MINER      0x01000000
 #define MC_PTP_BLOCK_INDEX      0x02000000
 #define MC_PTP_ALL              0x00FFFFFF
@@ -36,8 +37,16 @@
 #define MC_PLS_SIZE_ENTITY            32
 #define MC_PLS_SIZE_ADDRESS           20
 #define MC_PLS_SIZE_HASH              32
+#define MC_PLS_SIZE_UPGRADE           16
 
 
+
+typedef struct mc_MempoolPermissionRow
+{    
+    unsigned char m_Entity[MC_PLS_SIZE_ENTITY];                                 // Entity genesis transaction TxID, all 0s for master permissions 
+    unsigned char m_Address[MC_PLS_SIZE_ADDRESS];                               // Address 
+    uint32_t m_Type;                                                            // Permission type MC_PTP_ constants
+} mc_MempoolPermissionRow;
 
 /** Database record structure */
 
@@ -149,6 +158,7 @@ typedef struct mc_PermissionLedger
     void Zero();
     int Open();
     int Close();
+    void Flush();
     void SetName(const char *name);
     int GetRow(uint64_t RowID,mc_PermissionLedgerRow *row);
     uint64_t GetSize();
@@ -202,6 +212,11 @@ typedef struct mc_Permissions
     int m_ClearedMinerCount;
     
     mc_Buffer   *m_CopiedMemPool;
+
+    int m_CheckForMempoolFlag;
+    mc_Buffer               *m_MempoolPermissions;
+    mc_Buffer               *m_MempoolPermissionsToReplay;    
+    
     
     void *m_Semaphore;
     uint64_t m_LockedBy;
@@ -220,6 +235,7 @@ typedef struct mc_Permissions
     int Initialize(const char *name,int mode);
 
     int SetPermission(const void* lpEntity,const void* lpAddress,uint32_t type,const void* lpAdmin,uint32_t from,uint32_t to,uint32_t timestamp,uint32_t flags,int update_mempool);
+    int SetApproval(const void* lpUpgrade,uint32_t approval,const void* lpAdmin,uint32_t from,uint32_t timestamp,uint32_t flags,int update_mempool);
     int Commit(const void* lpMiner,const void* lpHash);
     int RollBack(int block);
     int RollBack();
@@ -241,6 +257,8 @@ typedef struct mc_Permissions
     
     int GetBlockMiner(uint32_t block,unsigned char* lpMiner);
     uint32_t FindGovernanceModelChange(uint32_t from,uint32_t to);
+
+    int IsApproved(const void* lpUpgrade);
     
     int CanConnect(const void* lpEntity,const void* lpAddress);
     int CanSend(const void* lpEntity,const void* lpAddress);
@@ -258,8 +276,13 @@ typedef struct mc_Permissions
     
 
     mc_Buffer *GetPermissionList(const void* lpEntity,const void* lpAddress,uint32_t type,mc_Buffer *old_buffer);
+    mc_Buffer *GetUpgradeList(const void* lpUpgrade,mc_Buffer *old_buffer);
     mc_Buffer *GetPermissionDetails(mc_PermissionDetails *plsRow);
     void FreePermissionList(mc_Buffer *permissions);
+    
+    void MempoolPermissionsCopy();
+    int MempoolPermissionsCheck(int from, int to);
+    
     
 // Internal functions    
     int Zero();    
@@ -274,7 +297,7 @@ typedef struct mc_Permissions
     uint32_t CalculateBlockFlags();
     
     int UpdateCounts();
-    int AdminConsensus(uint32_t type);
+    int AdminConsensus(const void* lpEntity,uint32_t type);
     
     int ClearMemPoolInternal();
 

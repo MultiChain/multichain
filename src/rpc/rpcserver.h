@@ -121,6 +121,7 @@ extern const CRPCTable tableRPC;
 /* MCHN START */
 extern std::map<std::string, std::string> mapHelpStrings;
 extern std::map<std::string, int> mapLogParamCounts;
+extern std::set<std::string> setAllowedWhenWaitingForUpgrade;
 void mc_InitRPCHelpMap();
 std::string mc_RPCHelpString(std::string strMethod);
 /* MCHN END */
@@ -200,6 +201,7 @@ extern json_spirit::Value appendrawexchange(const json_spirit::Array& params, bo
 extern json_spirit::Value completerawexchange(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value decoderawexchange(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value appendrawmetadata(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value approvefrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value grantfromcmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value revokefromcmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value issuefromcmd(const json_spirit::Array& params, bool fHelp);
@@ -227,6 +229,7 @@ extern json_spirit::Value setlastblock(const json_spirit::Array& params, bool fH
 extern json_spirit::Value resendwallettransactions(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listaddresses(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreams(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listupgrades(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value createcmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value createfromcmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value publish(const json_spirit::Array& params, bool fHelp);

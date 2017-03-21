@@ -29,6 +29,28 @@ unsigned int HaveKeys(const vector<valtype>& pubkeys, const CKeyStore& keystore)
     return nResult;
 }
 
+isminetype IsMineKeyID(const CKeyStore& keystore, const CKeyID& dest)
+{
+    if (keystore.HaveKey(dest))
+        return ISMINE_SPENDABLE;
+    if (keystore.HaveWatchOnly(GetScriptForDestination(dest)))
+        return ISMINE_WATCH_ONLY;
+    return ISMINE_NO;    
+}
+
+isminetype IsMineScriptID(const CKeyStore& keystore, const CScriptID& dest)
+{
+    CScript subscript;
+    if (keystore.GetCScript(dest, subscript)) {
+        isminetype ret = IsMine(keystore, subscript);
+        if (ret == ISMINE_SPENDABLE)
+            return ret;
+    }    
+    if (keystore.HaveWatchOnly(GetScriptForDestination(dest)))
+        return ISMINE_WATCH_ONLY;
+    return ISMINE_NO;    
+}
+
 isminetype IsMine(const CKeyStore &keystore, const CTxDestination& dest)
 {
     CScript script = GetScriptForDestination(dest);

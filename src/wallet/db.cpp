@@ -57,7 +57,7 @@ void CDBEnv::EnvShutdown()
     if (ret != 0)
         LogPrintf("CDBEnv::EnvShutdown : Error %d shutting down database environment: %s\n", ret, DbEnv::strerror(ret));
     if (!fMockDb)
-        DbEnv(0).remove(path.string().c_str(), 0);
+        DbEnv(0).remove(strPath.c_str(), 0);
 }
 
 CDBEnv::CDBEnv() : dbenv(DB_CXX_NO_EXCEPTIONS)
@@ -83,10 +83,10 @@ bool CDBEnv::Open(const boost::filesystem::path& pathIn)
 
     boost::this_thread::interruption_point();
 
-    path = pathIn;
-    filesystem::path pathLogDir = path / "database";
+    strPath = pathIn.string();
+    boost::filesystem::path pathLogDir = pathIn / "database";
     TryCreateDirectory(pathLogDir);
-    filesystem::path pathErrorFile = path / "db.log";
+    boost::filesystem::path pathErrorFile = pathIn / "db.log";
     LogPrintf("CDBEnv::Open : LogDir=%s ErrorFile=%s\n", pathLogDir.string(), pathErrorFile.string());
 
     unsigned int nEnvFlags = 0;
@@ -103,7 +103,7 @@ bool CDBEnv::Open(const boost::filesystem::path& pathIn)
     dbenv.set_flags(DB_AUTO_COMMIT, 1);
     dbenv.set_flags(DB_TXN_WRITE_NOSYNC, 1);
     dbenv.log_set_config(DB_LOG_AUTO_REMOVE, 1);
-    int ret = dbenv.open(path.string().c_str(),
+    int ret = dbenv.open(strPath.c_str(),
                          DB_CREATE |
                              DB_INIT_LOCK |
                              DB_INIT_LOG |
@@ -170,6 +170,11 @@ CDBEnv::VerifyResult CDBEnv::Verify(std::string strFile, bool (*recoverFunc)(CDB
     return (fRecovered ? RECOVER_OK : RECOVER_FAIL);
 }
 
+/* End of headers, beginning of key/value data */
+static const char *HEADER_END = "HEADER=END";
+/* End of key/value data */
+static const char *DATA_END = "DATA=END";
+
 bool CDBEnv::Salvage(std::string strFile, bool fAggressive, std::vector<CDBEnv::KeyValPair>& vResult)
 {
     LOCK(cs_db);
@@ -204,16 +209,28 @@ bool CDBEnv::Salvage(std::string strFile, bool fAggressive, std::vector<CDBEnv::
     // DATA=END
 
     string strLine;
-    while (!strDump.eof() && strLine != "HEADER=END")
+    while (!strDump.eof() && strLine != HEADER_END)
         getline(strDump, strLine); // Skip past header
 
     std::string keyHex, valueHex;
-    while (!strDump.eof() && keyHex != "DATA=END") {
+    while (!strDump.eof() && keyHex != DATA_END) {
         getline(strDump, keyHex);
-        if (keyHex != "DATA_END") {
+        if (keyHex != DATA_END) {
+            if (strDump.eof())
+               break;             
             getline(strDump, valueHex);
+            if (valueHex == DATA_END) {
+                LogPrintf("CDBEnv::Salvage: WARNING: Number of keys in data does not match number of values.\n");
+                break;
+            }
+              
             vResult.push_back(make_pair(ParseHex(keyHex), ParseHex(valueHex)));
         }
+    }
+
+    if (keyHex != DATA_END) {
+        LogPrintf("CDBEnv::Salvage: WARNING: Unexpected end of file while reading salvage output.\n");
+        return false;
     }
 
     return (result == 0);
@@ -458,7 +475,7 @@ void CDBEnv::Flush(bool fShutdown)
                 dbenv.log_archive(&listp, DB_ARCH_REMOVE);
                 Close();
                 if (!fMockDb)
-                    boost::filesystem::remove_all(path / "database");
+                    boost::filesystem::remove_all(boost::filesystem::path(strPath) / "database");
             }
         }
     }

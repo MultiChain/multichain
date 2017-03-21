@@ -595,7 +595,7 @@ Value listaddresstransactions(const Array& params, bool fHelp)
     
     if(fromaddresses.size() != 1)
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Single from-address should be specified");                        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Single address should be specified");                        
     }
     
     set<CTxDestination> thisFromAddresses;
@@ -716,12 +716,12 @@ Value getwallettransaction(const Array& params, bool fHelp)
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
         if(pwalletTxsMain->FindWalletTx(hash,NULL))
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid or non-wallet transaction id");
+            throw JSONRPCError(RPC_TX_NOT_FOUND, "Invalid or non-wallet transaction id");
     }
     else
     {
         if (!pwalletMain->mapWallet.count(hash))
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid or non-wallet transaction id");
+            throw JSONRPCError(RPC_TX_NOT_FOUND, "Invalid or non-wallet transaction id");
     }
 
     mc_Buffer *asset_amounts;
@@ -749,7 +749,7 @@ Value getwallettransaction(const Array& params, bool fHelp)
     
     if(entry.size() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Wallet addresses with specified criteria are not involved in transaction");                                
+        throw JSONRPCError(RPC_TX_NOT_FOUND, "Wallet addresses with specified criteria are not involved in transaction");                                
     }
     
     
@@ -774,12 +774,12 @@ Value getaddresstransaction(const Array& params, bool fHelp)
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
         if(pwalletTxsMain->FindWalletTx(hash,NULL))
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid or non-wallet transaction id");
+            throw JSONRPCError(RPC_TX_NOT_FOUND, "Invalid or non-wallet transaction id");
     }
     else
     {
         if (!pwalletMain->mapWallet.count(hash))
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid or non-wallet transaction id");
+            throw JSONRPCError(RPC_TX_NOT_FOUND, "Invalid or non-wallet transaction id");
     }
 
     
@@ -799,7 +799,7 @@ Value getaddresstransaction(const Array& params, bool fHelp)
     
     if(fromaddresses.size() != 1)
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Single from-address should be specified");                        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Single address should be specified");                        
     }
     
     set<CTxDestination> thisFromAddresses;
@@ -830,7 +830,7 @@ Value getaddresstransaction(const Array& params, bool fHelp)
     
     if(entry.size() == 0)
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Specified address is not involved in transaction");                                
+        throw JSONRPCError(RPC_TX_NOT_FOUND, "This transaction was not found for this address");                                
     }
     
     delete lpScript;
