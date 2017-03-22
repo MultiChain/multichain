@@ -381,7 +381,9 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
                 }
                 else
                 {
-                    params.push_back(strVal);                    
+//                    params.push_back(strVal);                    
+                    std::string strConverted=convert_string_to_utf8(strVal);
+                    params.push_back(strConverted);
                 }
             }
             else
