@@ -12,8 +12,23 @@
 #include <sstream>
 #include <iomanip>
 
+
 namespace json_spirit
 {
+    
+    inline unsigned int utf8_len_and_mask(unsigned char c,unsigned int *mask)
+    {
+        if(c<0x80){*mask=0x7F;return 1;}
+        if(c<0xC0){*mask=0x00;return 0;}
+        if(c<0xE0){*mask=0x1F;return 2;}
+        if(c<0xF0){*mask=0x0F;return 3;}
+        if(c<0xF8){*mask=0x07;return 4;}
+        if(c<0xFC){*mask=0x03;return 5;}
+        if(c<0xFE){*mask=0x01;return 6;}
+        *mask=0x00;return 0;
+    }
+    
+    
     inline char to_hex_char( unsigned int c )
     {
         assert( c <= 0xF );
@@ -61,6 +76,46 @@ namespace json_spirit
     }
 
     template< class String_type >
+    String_type codepoint_to_string( unsigned int codepoint )
+    {
+        unsigned int part1,part2,len;
+        if(codepoint >= 0x10000)
+        {
+            part2=((codepoint-0x10000) & 0x3FF) + 0xDC00;
+            part1=(((codepoint-0x10000) >> 10) & 0x3FF) + 0xD800;
+            len=12;
+        }
+        else
+        {
+            part1=codepoint;
+            part2=0;
+            len=6;
+        }
+        
+        String_type result( len, '\\' );
+
+        result[1] = 'u';
+
+        result[ 5 ] = to_hex_char( part1 & 0x000F ); part1 >>= 4;
+        result[ 4 ] = to_hex_char( part1 & 0x000F ); part1 >>= 4;
+        result[ 3 ] = to_hex_char( part1 & 0x000F ); part1 >>= 4;
+        result[ 2 ] = to_hex_char( part1 & 0x000F );
+
+        if(part2)
+        {
+            result[6] = '\\';
+            result[7] = 'u';
+            
+            result[ 11 ] = to_hex_char( part2 & 0x000F ); part2 >>= 4;
+            result[ 10 ] = to_hex_char( part2 & 0x000F ); part2 >>= 4;
+            result[  9 ] = to_hex_char( part2 & 0x000F ); part2 >>= 4;
+            result[  8 ] = to_hex_char( part2 & 0x000F );                        
+        }
+        
+        return result;
+    }
+
+    template< class String_type >
     String_type add_esc_chars( const String_type& s )
     {
         typedef typename String_type::const_iterator Iter_type;
@@ -84,7 +139,22 @@ namespace json_spirit
             }
             else
             {
-                result += non_printable_to_string< String_type >( unsigned_c );
+                unsigned int codepoint=0;
+                unsigned int charlen,shift,j,mask;
+
+                charlen=utf8_len_and_mask(unsigned_c,&mask);
+                if( end - i >= charlen)
+                {
+                    shift=6*(charlen-1);
+                    codepoint |= ( unsigned_c & mask) << shift;
+                    for(j=1;j<charlen;j++)
+                    {
+                        shift-=6;
+                        codepoint |= ( *( ++i ) & 0x3F) << shift;            
+                    }
+                    result += codepoint_to_string< String_type >( codepoint );
+                }
+//                result += non_printable_to_string< String_type >( unsigned_c );
             }
         }
 

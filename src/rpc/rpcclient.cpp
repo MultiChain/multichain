@@ -364,7 +364,9 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
 
         // insert string value directly
         if (!rpcCvtTable.convert(strMethod, idx)) {
-            params.push_back(strVal);
+//            params.push_back(strVal);
+            std::string strConverted=convert_string_to_utf8(strVal);
+            params.push_back(strConverted);
         }
 
         // parse string as JSON, insert bool/number/object/etc. value
@@ -402,7 +404,9 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
                         }
                         else
                         {
-                            params.push_back(strVal);                                            
+                            std::string strConverted=convert_string_to_utf8(strVal);
+                            params.push_back(strConverted);
+//                            params.push_back(strVal);                                            
                         }
                     }
                 }

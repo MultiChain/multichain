@@ -6,6 +6,8 @@
 
 // json spirit version 4.03
 
+#include <stdio.h>
+
 #include "json_spirit_value.h"
 #include "json_spirit_error_position.h"
 
@@ -113,17 +115,38 @@ namespace json_spirit
                 if( end - begin >= 5 )  //  expecting "uHHHH..."
                 {
                     s += unicode_str_to_char< Char_type >( begin );  
-                }
+                        }
                 break;
             }
         }
     }
 
     template< class String_type >
+    void append_codepoint( String_type& s, unsigned int codepoint)
+    {
+        if (codepoint <= 0x7f)
+            s+=(char)codepoint;
+        else if (codepoint <= 0x7FF) {
+            s+=(char)(0xC0 | (codepoint >> 6));
+            s+=(char)(0x80 | (codepoint & 0x3F));
+        } else if (codepoint <= 0xFFFF) {
+            s+=(char)(0xE0 | (codepoint >> 12));
+            s+=(char)(0x80 | ((codepoint >> 6) & 0x3F));
+            s+=(char)(0x80 | (codepoint & 0x3F));
+        } else if (codepoint <= 0x1FFFFF) {
+            s+=(char)(0xF0 | (codepoint >> 18));
+            s+=(char)(0x80 | ((codepoint >> 12) & 0x3F));
+            s+=(char)(0x80 | ((codepoint >> 6) & 0x3F));
+            s+=(char)(0x80 | (codepoint & 0x3F));
+        }        
+    }
+            
+    template< class String_type >
     String_type substitute_esc_chars( typename String_type::const_iterator begin, 
                                    typename String_type::const_iterator end )
     {
         typedef typename String_type::const_iterator Iter_type;
+        typedef typename String_type::value_type Char_type;
 
         if( end - begin < 2 ) return String_type( begin, end );
 
@@ -135,7 +158,7 @@ namespace json_spirit
 
         Iter_type substr_start = begin;
         Iter_type i = begin;
-
+/*
         for( ; i < end_minus_1; ++i )
         {
             if( *i == '\\' )
@@ -146,6 +169,76 @@ namespace json_spirit
              
                 append_esc_char_and_incr_iter( result, i, end );
 
+                substr_start = i + 1;
+            }
+        }
+*/
+        unsigned int surpair=0;
+        unsigned int codepoint;
+        
+        for( ; i < end_minus_1; ++i )
+        {
+            if( *i == '\\' )
+            {
+                if(surpair == 0)
+                {
+                    result.append( substr_start, i );
+                }
+
+                ++i;  // skip the '\'
+             
+                if( *i == 'u' )
+                {
+                    if( end - i >= 5)
+                    {
+                        codepoint=0;
+                        for(int j=0; j < 4; j++)
+                        {
+                            const Char_type c( *( ++i ) );
+                            codepoint = 16 * codepoint + hex_to_num( c );
+                        }
+                        if (codepoint >= 0xD800 && codepoint < 0xDC00)          // First half of surrogate pair
+                        {        
+                            if (surpair == 0 )                                  
+                            {
+                                surpair = codepoint;
+                            }
+                            else
+                            {
+                                surpair=0;                                      // Two subsequent surrogate pair openers - fail
+                            }
+                        } 
+                        else 
+                        {
+                            if (codepoint >= 0xDC00 && codepoint < 0xE000)      // Second half of surrogate pair
+                            { 
+                                if (surpair)                                    // Open surrogate pair, expect second half
+                                { 
+                                                                                // Compute code point from UTF-16 surrogate pair
+                                    append_codepoint(result, 0x10000 + (((surpair - 0xD800)<<10) | (codepoint - 0xDC00)));
+                                    surpair = 0;
+                                }                                               // Second half doesn't follow a first half - ignore
+                            }
+                            else 
+                            {
+                                if (surpair)                                    // First half of surrogate pair not followed by second - ignore
+                                {
+                                    surpair=0;
+                                }
+                                else
+                                {
+                                    append_codepoint(result, codepoint);
+                                }
+                            }
+                        }
+                        
+                    }
+                }
+                else
+                {
+                    surpair=0;                                                  
+                    append_esc_char_and_incr_iter( result, i, end );
+                }
                 substr_start = i + 1;
             }
         }
@@ -574,6 +667,12 @@ namespace json_spirit
 //        return read_range( begin, s.end(), value );
         bool success = read_range( begin, s.end(), value );
         return success && begin == s.end();
+     }
+
+    template< class String_type>
+    String_type convert_string_to_utf8( const String_type& s)
+    {
+        return substitute_esc_chars< String_type >(s.begin(),  s.end());
      }
 
     template< class Istream_type >
