@@ -483,6 +483,7 @@ bool IsStandardNullData(const CScript& scriptPubKey)
                 }
                 if(op_drop_count < 3)
                 {
+                    scriptPubKey.GetOp(pc, opcode);
                     op_drop_count++;
                 }        
             }
