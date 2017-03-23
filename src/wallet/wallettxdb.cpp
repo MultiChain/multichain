@@ -1277,9 +1277,11 @@ int mc_TxDB::AddTx(mc_TxImport *import,
     if(newtx)
     {
         sprintf(txtype,"New");
+        sprintf(msg,"NewTx %s, block %d, flags %08X, import %d",txhex,block,flags,imp->m_ImportID);
     }
     else
     {
+        txhex[10]=0;
         if(duplicate)
         {
             sprintf(txtype,"Duplicate");            
@@ -1288,9 +1290,9 @@ int mc_TxDB::AddTx(mc_TxImport *import,
         {
             sprintf(txtype,"Update");            
         }
+        sprintf(msg,"%sTx %s, block %d, flags %08X, import %d",txtype,txhex,block,flags,imp->m_ImportID);
     }
     
-    sprintf(msg,"AddTx %s, block %d, flags %08X, import %d, %s",txhex,block,flags,imp->m_ImportID,txtype);
     LogString(msg);
 exitlbl:
     return err;
@@ -1536,8 +1538,6 @@ int mc_TxDB::Commit(mc_TxImport *import)
     }
     block=imp->m_Block+1;
     
-    sprintf(msg,"Committing block %d, New Txs: %d, New Rows: %d",block,rawmempool->GetCount(),mempool->GetCount());
-    LogString(msg);   
 
     for(i=0;i<rawmempool->GetCount();i++)                                       // New raw transactions
     {
@@ -1676,17 +1676,17 @@ exitlbl:
 
     if(err)
     {
-        sprintf(msg,"Could not commit block %d, error: %d",block,err);        
-        LogString(msg);
+        sprintf(msg,"Could not commit new Block %d, Txs: %d, Rows: %d, Error: %d",block,rawmempool->GetCount(),mempool->GetCount(),err);
+        LogString(msg);   
         RollBack(import,block-1);
     }
     else
     {
+        sprintf(msg,"NewBlock %d, Txs: %d, Rows: %d",block,rawmempool->GetCount(),mempool->GetCount());
+        LogString(msg);   
         mempool->Clear();
         rawmempool->Clear();
         m_RawUpdatePool->Clear();
-        sprintf(msg,"Block %d committed successfully",block);
-        LogString(msg);
     }
     Dump("After Commit");
 
