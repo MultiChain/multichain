@@ -11,7 +11,7 @@
 std::string HelpRequiringPassphraseWrapper()
 {
 #ifdef ENABLE_WALLET
-     return HelpRequiringPassphrase() + "\n";
+     return HelpRequiringPassphrase();
 #else
      return "";
 #endif    
@@ -47,10 +47,12 @@ void mc_InitRPCHelpMap01()
         ));
     
     mapHelpStrings.insert(std::make_pair("getblock",
-            "getblock hash|height ( verbose )\n"
+            "getblock \"hash\"|height ( verbose )\n"
             "\nReturns hex-encoded data or json object for block.\n"
             "\nArguments:\n"
-            "1. hash|height          (string, required) The block hash or block height in active chain\n"
+            "1. \"hash\"          (string, required) The block hash\n"
+            " or\n"
+            "1. height          (string, required) The block height in active chain\n"
             "2. verbose              (numeric or boolean, optional, default=1) 0(or false) - encoded data, 1(or true) - json object, 2 - with tx encoded data, 4 - with tx json object\n"
             "\nResult (for verbose = 1, see help getrawtransaction for details about transactions - verbose = 4):\n"
             "{\n"
@@ -206,10 +208,10 @@ void mc_InitRPCHelpMap01()
         ));
     
     mapHelpStrings.insert(std::make_pair("gettxout",
-            "gettxout txid n ( includemempool )\n"
+            "gettxout \"txid\" n ( includemempool )\n"
             "\nReturns details about an unspent transaction output.\n"
             "\nArguments:\n"
-            "1. txid           (string, required) The transaction id\n"
+            "1. \"txid\"           (string, required) The transaction id\n"
             "2. n              (numeric, required) vout value\n"
             "3. includemempool  (boolean, optional) Whether to included the mem pool\n"
             "\nResult:\n"
@@ -263,28 +265,33 @@ void mc_InitRPCHelpMap02()
         ));
     
     mapHelpStrings.insert(std::make_pair("listassets",
-            "listassets (asset-identifier(s) verbose count start )\n"
+            "listassets ( asset-identifier(s) verbose count start )\n"
+            "\nReturns list of defined assets\n"
+            "\nArguments:\n"
             "1. \"asset-identifier\" (string, optional) Asset identifier - one of the following: issue txid, asset reference, asset name.\n"
             "or\n"
             "1. asset-identifier(s)      (array, optional) A json array of asset identifiers \n"                
             "2. verbose      (boolean, optional, default=false) If true, returns list of all issue transactions, including follow-ons \n"
             "3. count        (number, optional, default=INT_MAX - all) The number of assets to display\n"
             "4. start        (number, optional, default=-count - last) Start from specific asset, 0 based, if negative - from the end\n"
-            "\nReturns list of defined assets\n"
+            "\nResult:\n"
+            "An array containing list of defined assets\n"            
             "\nExamples:\n"
             + HelpExampleCli("listassets", "")
             + HelpExampleRpc("listassets", "")
         ));
     
     mapHelpStrings.insert(std::make_pair("listpermissions",
-            "listpermissions (\"permission(s)\" \"address(es)\" verbose )\n"
-            "\nReturns list of addresses having one of the specified permissions\n"
+            "listpermissions ( \"permission(s)\" address(es) verbose )\n"
+            "\nReturns a list of all permissions which have been explicitly granted to addresses.\n"
             "\nArguments:\n"
             "1. \"permission(s)\"  (string, optional) Permission strings, comma delimited. Possible values: " + AllowedPermissions() + ". Default: all. \n"                
             "2. \"address(es)\"    (string, optional, default \"*\") The addresses to retrieve permissions for. \"*\" for all addresses\n"
             "or\n"
-            "2. \"address(es)\"  (array, optional) A json array of addresses to return permissions for\n"                
+            "2. address(es)  (array, optional) A json array of addresses to return permissions for\n"                
             "3. verbose            (boolean, optional, default=false) If true, returns list of pending grants \n"
+            "\nResult:\n"
+            "An array containing list of permissions\n"            
             "\nExamples:\n"
             + HelpExampleCli("listpermissions", "connect,send,receive")
             + HelpExampleCli("listpermissions", "all \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\"" )
@@ -292,14 +299,17 @@ void mc_InitRPCHelpMap02()
         ));
     
     mapHelpStrings.insert(std::make_pair("liststreams",
-            "liststreams (stream-identifier(s) verbose count start )\n"
+            "liststreams ( stream-identifier(s) verbose count start )\n"
+            "\nReturns list of defined streams\n"
+            "\nArguments:\n"
             "1. \"stream-identifier(s)\" (string, optional, default=*, all streams) Stream identifier - one of the following: issue txid, stream reference, stream name.\n"
             "or\n"
             "1. stream-identifier(s)      (array, optional) A json array of stream identifiers \n"                
             "2. verbose             (boolean, optional, default=false) If true, returns stream list of creators \n"
             "3. count               (number, optional, default=INT_MAX - all) The number of streams to display\n"
             "4. start               (number, optional, default=-count - last) Start from specific stream, 0 based, if negative - from the end\n"
-            "\nReturns list of defined streams\n"
+            "\nResult:\n"
+            "An array containing list of defined streams\n"            
             "\nExamples:\n"
             + HelpExampleCli("liststreams", "")
             + HelpExampleRpc("liststreams", "")
@@ -321,15 +331,19 @@ void mc_InitRPCHelpMap02()
     mapHelpStrings.insert(std::make_pair("clearmempool",
             "clearmempool \n"
             "\nRemoves all transactions from the TX memory pool.\n"
+            "Local mining and the processing of incoming transactions and blocks should be paused.\n"
             "\nExamples:\n"
             + HelpExampleCli("clearmempool", "")
             + HelpExampleRpc("clearmempool", "")
         ));
     
     mapHelpStrings.insert(std::make_pair("getblockchainparams",
-            "getblockchainparams ( displaynames )\n"
+            "getblockchainparams ( displaynames )\n"    
+            "\nReturns a list of values of this blockchain’s parameters\n"
+            "\nArguments:\n"
             "1. displaynames          (boolean, optional, default=true) use display names instead of internal\n"
-            "Returns an object containing various blockchain parameters.\n"
+            "\nResult:\n"
+            "An object containing various blockchain parameters.\n"
             "\nExamples:\n"
             + HelpExampleCli("getblockchainparams", "")
             + HelpExampleRpc("getblockchainparams", "")
@@ -337,7 +351,7 @@ void mc_InitRPCHelpMap02()
     
     mapHelpStrings.insert(std::make_pair("getinfo",
             "getinfo\n"
-            "Returns an object containing various state info.\n"
+            "\nReturns general information about this node and blockchain.\n"
             "\nResult:\n"
             "{\n"
             "  \"version\": xxxxx,           (numeric) the server version\n"
@@ -402,10 +416,13 @@ void mc_InitRPCHelpMap03()
         ));
     
     mapHelpStrings.insert(std::make_pair("setlastblock",
-            "setlastblock hash|height \n"
+            "setlastblock ( \"hash\"|height )\n"
             "\nSets last block in the chain.\n"
+            "Local mining and the processing of incoming transactions and blocks should be paused.\n"
             "\nArguments:\n"
-            "1. hash|height          (string, optional) The block hash or block height in active chain or height before current tip (if negative), if omitted - best chain is activated\n"
+            "1. \"hash\"          (string, optional) The block hash, if omitted - best chain is activated\n"
+            " or\n"
+            "1. height          (string, optional) The block height in active chain or height before current tip (if negative)\n"
             "\nResult:\n"
             "\"hash\"         (string) The block hash of the chain tip\n"
             "\nExamples:\n"
@@ -415,7 +432,7 @@ void mc_InitRPCHelpMap03()
     
     mapHelpStrings.insert(std::make_pair("stop",
              "stop\n"
-            "\nStop MultiChain server."
+            "\nShuts down the this blockchain node. Sends stop signal to MultiChain server."
         ));
     
     mapHelpStrings.insert(std::make_pair("getgenerate",
@@ -599,7 +616,7 @@ void mc_InitRPCHelpMap04()
         ));
     
     mapHelpStrings.insert(std::make_pair("addnode",
-            "addnode \"node\" add|remove|onetry\n"
+            "addnode \"node\" \"add\"|\"remove\"|\"onetry\"\n"
             "\nAttempts add or remove a node from the addnode list.\n"
             "Or try a connection to a node once.\n"
             "\nArguments:\n"
@@ -703,7 +720,7 @@ void mc_InitRPCHelpMap04()
     mapHelpStrings.insert(std::make_pair("getpeerinfo",
             "getpeerinfo\n"
             "\nReturns data about each connected network node as a json array of objects.\n"
-            "\nbResult:\n"
+            "\nResult:\n"
             "[\n"
             "  {\n"
             "    \"id\": n,                   (numeric) Peer index\n"
@@ -743,17 +760,18 @@ void mc_InitRPCHelpMap04()
             "\nRequests that a ping be sent to all other nodes, to measure ping time.\n"
             "Results provided in getpeerinfo, pingtime and pingwait fields are decimal seconds.\n"
             "Ping command is handled in queue with all other commands, so it measures processing backlog, not just network ping.\n"
+            "\nResult:\n"
             "\nExamples:\n"
             + HelpExampleCli("ping", "")
             + HelpExampleRpc("ping", "")
         ));
     
     mapHelpStrings.insert(std::make_pair("appendrawchange",
-            "appendrawchange tx-hex address ( native-fee )\n"
+            "appendrawchange \"tx-hex\" \"address\" ( native-fee )\n"
             "\nAppends change output to raw transaction, containing any remaining assets / native currency in the inputs that are not already sent to other outputs. \n"
             "\nArguments:\n"
-            "1. tx-hex       (string, required) The hex string of the raw transaction)\n"
-            "2. address      (string, required) The address to send the change to.\n"
+            "1. \"tx-hex\"       (string, required) The hex string of the raw transaction)\n"
+            "2. \"address\"      (string, required) The address to send the change to.\n"
             "3. native-fee   (numeric, optional) Native currency value deducted from that amount so it becomes a transaction fee. Default - calculated automatically\n"
             "\nResult:\n"
             "\"transaction\"            (string) hex string of the transaction\n"
@@ -764,17 +782,17 @@ void mc_InitRPCHelpMap04()
         ));
     
     mapHelpStrings.insert(std::make_pair("appendrawmetadata",
-            "appendrawmetadata tx-hex data-hex|object \n"
+            "appendrawmetadata \"tx-hex\" \"data-hex\"|object \n"
             "\nAppends new OP_RETURN output to existing raw transaction\n"
             "Returns hex-encoded raw transaction.\n"
             "\nArguments:\n"
             "1. \"tx-hex\"      (string, required) The transaction hex string\n"
             "2. \"data-hex\"    (string, required) Data hex string\n"
             "or\n"
-            "2. \"issue-details\"    (object, required) A json object with issue metadata\n"
+            "2. issue-details    (object, required) A json object with issue metadata\n"
             "    {\n"
-            "      \"create\" : asset                (string,required) asset\n" 
-            "      \"name\" : asset-name             (string,optional) Asset name\n"
+            "      \"create\" : \"asset\"                (string,required) asset\n" 
+            "      \"name\" : \"asset-name\"             (string,optional) Asset name\n"
             "      \"multiple\" : n                  (numeric,optional, default 1) Number of raw units in one displayed unit\n"
             "      \"open\" : true|false             (boolean, optional, default false) True if follow-on issues are allowed\n"                
             "      \"details\" :                     (object, optional)  a json object with custom fields\n"           
@@ -782,21 +800,21 @@ void mc_InitRPCHelpMap04()
             "          \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
             "          ,...\n"
             "        }\n"
-            "or\n"
-            "2. \"issuemore-details\"    (object, required) A json object with issuemore metadata\n"
+            " or\n"
+            "2. issuemore-details    (object, required) A json object with issuemore metadata\n"
             "    {\n"
-            "      \"update\" : asset-identifier     (string,required) Stream identifier - one of the following: asset txid, asset reference, asset name.\n"
+            "      \"update\" : \"asset-identifier\"     (string,required) Stream identifier - one of the following: asset txid, asset reference, asset name.\n"
             "      \"details\" :                     (object, optional)  a json object with custom fields\n"           
             "        {\n"
             "          \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
             "          ,...\n"
             "        }\n"
             "    }\n"                                
-            "or\n"
-            "2. \"create-new-stream\"    (object, required) A json object with new stream details\n"
+            " or\n"
+            "2. create-new-stream    (object, required) A json object with new stream details\n"
             "    {\n"                
-            "      \"create\" : stream               (string,required) stream\n"
-            "      \"name\" : stream-name            (string,optional) Stream name\n"
+            "      \"create\" : \"stream\"               (string,required) stream\n"
+            "      \"name\" : \"stream-name\"            (string,optional) Stream name\n"
             "      \"open\" : true|false             (string,optional, default: false) If true, anyone can publish\n"
             "      \"details\" :                     (object, optional)  a json object with custom fields\n"           
             "        {\n"
@@ -804,12 +822,12 @@ void mc_InitRPCHelpMap04()
             "          ,...\n"
             "        }\n"
             "    }\n"                                
-            "or\n"
+            " or\n"
             "2. publish-new-stream-item    (object, required) A json object with stream item\n"
             "    {\n"                
-            "      \"for\" : stream-identifier       (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
-            "      \"key\" : key                     (string,optional, default: \"\") Item key\n"
-            "      \"data\" : data-hex               (string,optional, default: \"\") Data hex string\n"
+            "      \"for\" : \"stream-identifier\"       (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "      \"key\" : \"key\"                     (string,optional, default: \"\") Item key\n"
+            "      \"data\" : \"data-hex\"               (string,optional, default: \"\") Data hex string\n"
             "    }\n"                                
             "\nResult:\n"
             "{\n"
@@ -882,11 +900,11 @@ void mc_InitRPCHelpMap05()
         ));
     
     mapHelpStrings.insert(std::make_pair("createrawtransaction",
-            "createrawtransaction [{\"txid\":\"id\",\"vout\":n},...] {\"address\":amount,...} ( [data] action ) \n"
+            "createrawtransaction [{\"txid\":\"id\",\"vout\":n},...] {\"address\":amount,...} ( [data] \"action\" ) \n"
             "\nCreate a transaction spending the given inputs.\n"
 
             "\nArguments:\n"
-            "1. \"transactions\"        (string, required) A json array of json objects\n"
+            "1. transactions        (array, required) A json array of json objects\n"
             "     [\n"
             "       {\n"
             "         \"txid\":\"id\",  (string, required) The transaction id\n"
@@ -897,7 +915,7 @@ void mc_InitRPCHelpMap05()
             "       }\n"
             "       ,...\n"
             "     ]\n"
-            "2. \"addresses\"           (string, required) a json object with addresses as keys and amounts as values\n"
+            "2. addresses           (object, required) a json object with addresses as keys and amounts as values\n"
             "    {\n"
             "      \"address\": \n"
             "        x.xxx              (numeric, required) The key is the address, the value is the native currency amount\n"
@@ -940,7 +958,7 @@ void mc_InitRPCHelpMap05()
             "      ,...\n"
             "    }\n"
             "3. data        (array, optional) Array of hexadecimal strings or data objects, see help appendrawdata for details.\n"
-            "4. action      (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
+            "4.\"action\"      (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
                 
 
             "\nResult:\n"
@@ -959,11 +977,11 @@ void mc_InitRPCHelpMap05()
         ));
     
     mapHelpStrings.insert(std::make_pair("decoderawtransaction",
-            "decoderawtransaction tx-hex\n"
+            "decoderawtransaction \"tx-hex\"\n"
             "\nReturn a JSON object representing the serialized, hex-encoded transaction.\n"
 
             "\nArguments:\n"
-            "1. tx-hex      (string, required) The transaction hex string\n"
+            "1. \"tx-hex\"      (string, required) The transaction hex string\n"
 
             "\nResult:\n"
             "{\n"
@@ -1029,7 +1047,7 @@ void mc_InitRPCHelpMap05()
         ));
     
     mapHelpStrings.insert(std::make_pair("getrawtransaction",
-            "getrawtransaction txid ( verbose )\n"
+            "getrawtransaction \"txid\" ( verbose )\n"
             "\nNOTE: By default this function only works sometimes. This is when the tx is in the mempool\n"
             "or there is an unspent output in the utxo for this transaction. To make it always work,\n"
             "you need to maintain a transaction index, using the -txindex command line option.\n"
@@ -1038,7 +1056,7 @@ void mc_InitRPCHelpMap05()
             "If verbose is non-zero, returns an Object with information about 'txid'.\n"
 
             "\nArguments:\n"
-            "1. txid          (string, required) The transaction id\n"
+            "1. \"txid\"          (string, required) The transaction id\n"
             "2. verbose       (numeric, optional, default=0) If 0, return a string, other return a json object\n"
 
             "\nResult (if verbose is not set or set to 0):\n"
@@ -1092,11 +1110,11 @@ void mc_InitRPCHelpMap05()
         ));
     
     mapHelpStrings.insert(std::make_pair("sendrawtransaction",
-            "sendrawtransaction tx-hex ( allowhighfees )\n"
+            "sendrawtransaction \"tx-hex\" ( allowhighfees )\n"
             "\nSubmits raw transaction (serialized, hex-encoded) to local node and network.\n"
             "\nAlso see createrawtransaction and signrawtransaction calls.\n"
             "\nArguments:\n"
-            "1. tx-hex           (string, required) The hex string of the raw transaction)\n"
+            "1. \"tx-hex\"           (string, required) The hex string of the raw transaction)\n"
             "2. allowhighfees    (boolean, optional, default=false) Allow high fees\n"
             "\nResult:\n"
             "\"hex\"             (string) The transaction hash in hex\n"
@@ -1112,7 +1130,7 @@ void mc_InitRPCHelpMap05()
         ));
     
     mapHelpStrings.insert(std::make_pair("signrawtransaction",
-            "signrawtransaction tx-hex ( [{\"txid\":\"id\",\"vout\":n,\"scriptPubKey\":\"hex\",\"redeemScript\":\"hex\"},...] [\"privatekey1\",...] sighashtype )\n"
+            "signrawtransaction \"tx-hex\" ( [{\"txid\":\"id\",\"vout\":n,\"scriptPubKey\":\"hex\",\"redeemScript\":\"hex\"},...] [\"privatekey1\",...] sighashtype )\n"
             "\nSign inputs for raw transaction (serialized, hex-encoded).\n"
             "The second optional argument (may be null) is an array of previous transaction outputs that\n"
             "this transaction depends on but may not yet be in the block chain.\n"
@@ -1120,8 +1138,8 @@ void mc_InitRPCHelpMap05()
             "keys that, if given, will be the only keys used to sign the transaction.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. tx-hex            (string, required) The transaction hex string\n"
-            "2. \"prevtxs\"       (string, optional) An json array of previous dependent transaction outputs\n"
+            "1. \"tx-hex\"            (string, required) The transaction hex string\n"
+            "2. prevtxs       (array, optional) An json array of previous dependent transaction outputs\n"
             "     [               (json array of json objects, or 'null' if none provided)\n"
             "       {\n"
             "         \"txid\":\"id\",             (string, required) The transaction id\n"
@@ -1131,7 +1149,7 @@ void mc_InitRPCHelpMap05()
             "       }\n"
             "       ,...\n"
             "    ]\n"
-            "3. \"privatekeys\"     (string, optional) A json array of base58-encoded private keys for signing\n"
+            "3.privatekeys     (array, optional) A json array of base58-encoded private keys for signing\n"
             "    [                  (json array of strings, or 'null' if none provided)\n"
             "      \"privatekey\"   (string) private key in base58-encoding\n"
             "      ,...\n"
@@ -1159,7 +1177,7 @@ void mc_InitRPCHelpMap05()
             "createkeypairs ( count )\n"
             "\nCreates public/private key pairs. These key pairs are not stored in the wallet.\n"
             "\nArguments: \n"
-            "1. \"count\"  (number, optional, default=1) Number of pairs to create.\n"
+            "1. count              (number, optional, default=1) Number of pairs to create.\n"
             "\nResult:\n"
             "[                     (json array of )\n"
             "   {\n"
@@ -1174,15 +1192,15 @@ void mc_InitRPCHelpMap05()
         ));
     
     mapHelpStrings.insert(std::make_pair("createmultisig",
-            "createmultisig nrequired [\"key\",...]\n"
+            "createmultisig nrequired keys\n"
             "\nCreates a multi-signature address with n signature of m keys required.\n"
             "It returns a json object with the address and redeemScript.\n"
 
             "\nArguments:\n"
             "1. nrequired      (numeric, required) The number of required signatures out of the n keys or addresses.\n"
-            "2. \"keys\"       (string, required) A json array of keys which are addresses or hex-encoded public keys\n"
+            "2. keys           (array, required) A json array of keys which are addresses or hex-encoded public keys\n"
             "     [\n"
-            "       \"key\"    (string) address or hex-encoded public key\n"
+            "       \"key\"      (string) address or hex-encoded public key\n"
             "       ,...\n"
             "     ]\n"
 
@@ -1236,19 +1254,19 @@ void mc_InitRPCHelpMap06()
         ));
     
     mapHelpStrings.insert(std::make_pair("validateaddress",
-            "validateaddress address\n"
+            "validateaddress \"address\"\n"
             "\nReturn information about the given  address.\n"
             "\nArguments:\n"
-            "1. address     (string, required) The address to validate\n"
+            "1. address                        (string, required) The address to validate\n"
             "\nResult:\n"
             "{\n"
             "  \"isvalid\" : true|false,         (boolean) If the address is valid or not. If not, this is the only property returned.\n"
-            "  \"address\" : \"address\", (string) The address validated\n"
+            "  \"address\" : \"address\",          (string) The address validated\n"
             "  \"ismine\" : true|false,          (boolean) If the address is yours or not\n"
             "  \"isscript\" : true|false,        (boolean) If the key is a script\n"
-            "  \"pubkey\" : \"publickeyhex\",    (string) The hex value of the raw public key\n"
+            "  \"pubkey\" : \"publickeyhex\",      (string) The hex value of the raw public key\n"
             "  \"iscompressed\" : true|false,    (boolean) If the address is compressed\n"
-            "  \"account\" : \"account\"         (string) The account associated with the address, \"\" is the default account\n"
+            "  \"account\" : \"account\"           (string) The account associated with the address, \"\" is the default account\n"
             "}\n"
             "\nExamples:\n"
             + HelpExampleCli("validateaddress", "\"1PSSGeFHDnKNxiEyFrD1wcEaHr9hrQDDWc\"")
@@ -1256,11 +1274,11 @@ void mc_InitRPCHelpMap06()
         ));
     
     mapHelpStrings.insert(std::make_pair("verifymessage",
-            "verifymessage address signature \"message\"\n"
+            "verifymessage \"address\" \"signature\" \"message\"\n"
             "\nVerify a signed message\n"
             "\nArguments:\n"
-            "1. address         (string, required) The address to use for the signature.\n"
-            "2. signature       (string, required) The signature provided by the signer in base 64 encoding (see signmessage).\n"
+            "1. \"address\"         (string, required) The address to use for the signature.\n"
+            "2. \"signature\"       (string, required) The signature provided by the signer in base 64 encoding (see signmessage).\n"
             "3. \"message\"     (string, required) The message that was signed.\n"
             "\nResult:\n"
             "true|false   (boolean) If the signature is verified or not.\n"
@@ -1276,14 +1294,14 @@ void mc_InitRPCHelpMap06()
         ));
     
     mapHelpStrings.insert(std::make_pair("addmultisigaddress",
-            "addmultisigaddress nrequired [\"key\",...] ( \"account\" )\n"
+            "addmultisigaddress nrequired keys ( \"account\" )\n"
             "\nAdd a nrequired-to-sign multisignature address to the wallet.\n"
             "Each key is a address or hex-encoded public key.\n"
             "If 'account' is specified, assign address to that account.\n"
 
             "\nArguments:\n"
-            "1. nrequired        (numeric, required) The number of required signatures out of the n keys or addresses.\n"
-            "2. \"keysobject\"   (string, required) A json array of addresses or hex-encoded public keys\n"
+            "1. nrequired      (numeric, required) The number of required signatures out of the n keys or addresses.\n"
+            "2. keys           (array, required) A json array of addresses or hex-encoded public keys\n"
             "     [\n"
             "       \"address\"  (string) address or hex-encoded public key\n"
             "       ...,\n"
@@ -1291,7 +1309,7 @@ void mc_InitRPCHelpMap06()
             "3. \"account\"      (string, optional) An account to assign the addresses to.\n"
 
             "\nResult:\n"
-            "\"address\"  (string) A address associated with the keys.\n"
+            "\"address\"         (string) A address associated with the keys.\n"
 
             "\nExamples:\n"
             "\nAdd a multisig address from 2 addresses\n"
@@ -1301,15 +1319,14 @@ void mc_InitRPCHelpMap06()
         ));
     
     mapHelpStrings.insert(std::make_pair("appendrawexchange",
-            "appendrawexchange hex txid vout ask-assets \n"
-            "\nAppends new offer/ask pair to existing exchange transaction adds fee if it completes exchange\n"
-            "Returns hex-encoded raw transaction.\n"
+            "appendrawexchange \"hex\" \"txid\" vout ask-assets \n"
+            "\nAdds to the raw atomic exchange transaction in tx-hex given by a previous call to createrawexchange or appendrawexchange. \n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"hex\"      (string, required) The transaction hex string\n"
             "2. \"txid\"            (string, required) Transaction ID of the output prepared by preparelockunspent.\n"
-            "3. \"vout\"            (numeric, required) Output index\n"
-            "4. \"ask-assets\"      (object, required) A json object of assets to ask\n"
+            "3. vout            (numeric, required) Output index\n"
+            "4. ask-assets      (object, required) A json object of assets to ask\n"
             "    {\n"
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
@@ -1354,11 +1371,11 @@ void mc_InitRPCHelpMap06()
         ));
     
     mapHelpStrings.insert(std::make_pair("create",
-            "create stream \"stream-name\" open ( custom-fields )\n"
+            "create \"entity-type\" \"entity-name\" open ( custom-fields )\n"
             "\nCreates stream\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. entity-type       (string, required) stream\n"
+            "1. \"entity-type\"       (string, required) stream\n"
             "2. \"stream-name\"     (string, required) Stream name, if not \"\" should be unique.\n"
             "3. open              (boolean, required ) Allow anyone to publish in this stream\n"
             "4  custom-fields     (object, optional)  a json object with custom fields\n"
@@ -1367,7 +1384,7 @@ void mc_InitRPCHelpMap06()
             "      ,...\n"
             "    }\n"
             "  or \n"
-            "1. entity-type       (string, required) upgrade\n"
+            "1. \"entity-type\"       (string, required) upgrade\n"
             "2. \"upgrade-name\"    (string, required) Upgrade name, if not \"\" should be unique.\n"
             "3. open              (boolean, required ) Should be false\n"
             "4  custom-fields     (object, required)  a json object with custom fields\n"
@@ -1387,11 +1404,11 @@ void mc_InitRPCHelpMap06()
         ));
     
     mapHelpStrings.insert(std::make_pair("createfrom",
-            "createfrom from-address stream \"stream-name\" open ( custom-fields )\n"
+            "createfrom \"from-address\" \"entity-type\" \"entity-name\" open ( custom-fields )\n"
             "\nCreates stream using specific address\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. from-address      (string, required) Address used for creating.\n"
+            "1. \"from-address\"      (string, required) Address used for creating.\n"
             "2. entity-type       (string, required) stream\n"
             "3. \"stream-name\"     (string, required) Stream name, if not \"\" should be unique.\n"
             "4. open              (boolean, required) Allow anyone to publish in this stream\n"
@@ -1401,7 +1418,7 @@ void mc_InitRPCHelpMap06()
             "      ,...\n"
             "    }\n"
             "  or \n"
-            "1. from-address      (string, required) Address used for creating.\n"
+            "1. \"from-address\"      (string, required) Address used for creating.\n"
             "2. entity-type       (string, required) upgrade\n"
             "3. \"upgrade-name\"    (string, required) Upgrade name, if not \"\" should be unique.\n"
             "4. open              (boolean, required ) Should be false\n"
@@ -1421,15 +1438,14 @@ void mc_InitRPCHelpMap06()
         ));
     
     mapHelpStrings.insert(std::make_pair("createrawexchange",
-            "createrawexchange txid vout ask-assets\n"
+            "createrawexchange \"txid\" vout ask-assets\n"
             "\nCreates new exchange transaction\n"
-            "Returns hex-encoded raw transaction.\n"
             "Note that the transaction should be completed by appendrawexchange\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"txid\"            (string, required) Transaction ID of the output prepared by preparelockunspent.\n"
-            "2. \"vout\"            (numeric, required) Output index\n"
-            "3. \"ask-assets\"      (object, required) A json object of assets to ask\n"
+            "2. vout            (numeric, required) Output index\n"
+            "3. ask-assets      (object, required) A json object of assets to ask\n"
             "    {\n"
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
@@ -1446,12 +1462,12 @@ void mc_InitRPCHelpMap06()
 void mc_InitRPCHelpMap07()
 {
     mapHelpStrings.insert(std::make_pair("createrawsendfrom",
-            "createrawsendfrom from-address {\"address\":amount,...} ( [data] action ) \n"
+            "createrawsendfrom \"from-address\" {\"address\":amount,...} ( [data] \"action\" ) \n"
             "\nCreate a transaction using the given sending address.\n"
 
             "\nArguments:\n"
-            "1. from-address  (string, required) Address to send from.\n"
-            "2. \"addresses\"           (string, required) a json object with addresses as keys and amounts as values\n"
+            "1. \"from-address\"  (string, required) Address to send from.\n"
+            "2. addresses           (array, required) a json object with addresses as keys and amounts as values\n"
             "    {\n"
             "      \"address\": \n"
             "        x.xxx              (numeric, required) The key is the address, the value is the native currency amount\n"
@@ -1494,7 +1510,7 @@ void mc_InitRPCHelpMap07()
             "      ,...\n"
             "    }\n"
             "3. data        (array, optional) Array of hexadecimal strings or data objects, see help appendrawdata for details.\n"
-            "4. action      (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
+            "4. \"action\"      (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
                 
 
             "\nResult:\n"
@@ -1513,25 +1529,25 @@ void mc_InitRPCHelpMap07()
         ));
     
     mapHelpStrings.insert(std::make_pair("decoderawexchange",
-            "decoderawexchange tx-hex ( verbose )\n"
+            "decoderawexchange \"tx-hex\" ( verbose )\n"
             "\nReturn a JSON object representing the serialized, hex-encoded exchange transaction.\n"
 
             "\nArguments:\n"
-            "1. tx-hex       (string, required) The exchange transaction hex string\n"
+            "1. \"tx-hex\"       (string, required) The exchange transaction hex string\n"
             "2. verbose      (boolean, optional, default=false) If true, returns array of all exchanges created by createrawexchange or appendrawexchange\n"
 
             "\nResults is an object with exchange details\n"
             "\nExamples:\n"
-            + HelpExampleCli("decoderawtransaction", "\"hexstring\"")
-            + HelpExampleRpc("decoderawtransaction", "\"hexstring\"")
+            + HelpExampleCli("decoderawexchange", "\"hexstring\"")
+            + HelpExampleRpc("decoderawexchange", "\"hexstring\"")
        ));
     
     mapHelpStrings.insert(std::make_pair("disablerawtransaction",
-            "disablerawtransaction tx-hex\n"
+            "disablerawtransaction \"tx-hex\"\n"
             "\nDisable raw transaction by spending one of its inputs and sending it back to the wallet.\n"
 
             "\nArguments:\n"
-            "1. tx-hex      (string, required) The transaction hex string\n"
+            "1. \"tx-hex\"      (string, required) The transaction hex string\n"
 
             "\nResult:\n"
             "\"transactionid\"  (string) The transaction id.\n"
@@ -1541,17 +1557,17 @@ void mc_InitRPCHelpMap07()
         ));
     
     mapHelpStrings.insert(std::make_pair("dumpprivkey",
-            "dumpprivkey address\n"
+            "dumpprivkey \"address\"\n"
             "\nReveals the private key corresponding to 'address'.\n"
             "Then the importprivkey can be used with this output\n"
             "\nArguments:\n"
-            "1. address   (string, required) The MultiChain address for the private key\n"
+            "1. \"address\"       (string, required) The MultiChain address for the private key\n"
             "\nResult:\n"
-            "\"key\"                (string) The private key\n"
+            "\"key\"              (string) The private key\n"
             "\nExamples:\n"
-            + HelpExampleCli("dumpprivkey", "\"myaddress\"")
+            + HelpExampleCli("dumpprivkey", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\"")
             + HelpExampleCli("importprivkey", "\"mykey\"")
-            + HelpExampleRpc("dumpprivkey", "\"myaddress\"")
+            + HelpExampleRpc("dumpprivkey", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\"")
         ));
     
     mapHelpStrings.insert(std::make_pair("dumpwallet",
@@ -1614,13 +1630,14 @@ void mc_InitRPCHelpMap07()
         ));
     
     mapHelpStrings.insert(std::make_pair("getaddressbalances",
-            "getaddressbalances address ( minconf includeLocked ) \n"
+            "getaddressbalances \"address\" ( minconf includeLocked ) \n"
             "\nReturns asset balances for specified address\n"
             "\nArguments:\n"
-            "1. address          (string, required) Address to return balance for.\n"
+            "1. \"address\"          (string, required) Address to return balance for.\n"
             "2. minconf          (numeric, optional, default=1) Only include transactions confirmed at least this many times.\n"
             "3. includeLocked    (bool, optional, default=false) Also take locked outputs into account\n"
-            "Results are an array of Objects with totals and details for each asset.\n"
+            "\nResult:\n"
+            "An array of Objects with totals and details for each asset.\n"
             "\nExamples:\n"
             "\nThe total amount in the server across all accounts\n"
             + HelpExampleCli("getaddressbalances", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\"")
@@ -1632,12 +1649,12 @@ void mc_InitRPCHelpMap07()
             "getaddresses ( verbose )\n"
             "\nReturns the list of all addresses in the wallet.\n"
             "\nArguments: \n"
-            "1. \"verbose\"  (boolean, optional, default=false) The account name.\n"
+            "1. verbose          (boolean, optional, default=false) The account name.\n"
             "\nResult:\n"
-            "[                     (json array of )\n"
-            "  \"address\"  (string) an address \n"
+            "[                   (json array of )\n"
+            "  \"address\"         (string) an address \n"
             "  or \n"
-            "  \"address-datails\"  (object) address details if verbose=true\n"
+            "  address-datails   (object) address details if verbose=true\n"
             "  ,...\n"
             "]\n"
             "\nExamples:\n"
@@ -1665,13 +1682,12 @@ void mc_InitRPCHelpMap08()
         ));
     
     mapHelpStrings.insert(std::make_pair("getaddresstransaction",
-            "getaddresstransaction address txid ( verbose )\n"
-            "\nGet detailed information about in-wallet transaction <txid>\n"
+            "getaddresstransaction \"address\" \"txid\" ( verbose )\n"
+            "\nProvides information about transaction txid related to address in this node’s wallet\n"
             "\nArguments:\n"
-            "1. address  (string, required) Address used for balance calculation.\n"
-            "2. txid     (string, required) The transaction id\n"
+            "1. \"address\"  (string, required) Address used for balance calculation.\n"
+            "2. \"txid\"     (string, required) The transaction id\n"
             "3. verbose  (bool, optional, default=false) If true, returns detailed array of inputs and outputs and raw hex of transactions\n"
-            "\nResult:\n"
             "\nResult:\n"
             "[\n"
             "  {\n"
@@ -1734,18 +1750,18 @@ void mc_InitRPCHelpMap08()
         ));
     
     mapHelpStrings.insert(std::make_pair("getassettransaction",
-            "getassettransaction \"asset-identifier\" txid ( verbose )\n"
-            "\nReturns stream item.\n"
+            "getassettransaction \"asset-identifier\" \"txid\" ( verbose )\n"
+            "\nRetrieves a specific transaction txid involving asset.\n"
             "\nArguments:\n"
             "1. \"asset-identifier\"(string, required) Asset identifier - one of the following: asset txid, asset reference, asset name.\n"
-            "2. txid          (string, required) The transaction id\n"
+            "2. \"txid\"          (string, required) The transaction id\n"
             "3. verbose       (boolean, optional, default=false) If true, returns information about item transaction \n"
             "\nResult:\n"
             "\"transaction\"  (object) Information about an individual transaction from the perspective of a particular asset.\n"
             "\nExamples:\n"
-            + HelpExampleCli("getassettransaction", "\"mytxid\"") 
-            + HelpExampleCli("getassettransaction", "\"mytxid\"  true") 
-            + HelpExampleRpc("getassettransaction", "\"mytxid\", false")
+            + HelpExampleCli("getassettransaction", "\"myasset\" \"mytxid\"") 
+            + HelpExampleCli("getassettransaction", "\"myasset\" \"mytxid\"  true") 
+            + HelpExampleRpc("getassettransaction", "\"myasset\", \"mytxid\", false")
         ));
     
     mapHelpStrings.insert(std::make_pair("getbalance",
@@ -1774,17 +1790,20 @@ void mc_InitRPCHelpMap08()
         ));
     
     mapHelpStrings.insert(std::make_pair("getmultibalances",
-            "getmultibalances ( \"address(es)\" assets minconf includeLocked includeWatchonly ) \n"
+            "getmultibalances ( address(es) assets minconf includeLocked includeWatchonly ) \n"
             "\nReturns asset balances for specified address\n"
             "\nArguments:\n"
             "1. \"address(es)\"  (string, optional) Address(es) to return balance for, comma delimited. Default - all\n"
             "or\n"
-            "1. \"address(es)\"  (array, optional) A json array of addresses to return balance for\n"                
-            "2. \"assets\"       (array or string, optional) Single asset identifier or json array of asset identifiers to return balance for, default \"*\"\n"                
+            "1. address(es)  (array, optional) A json array of addresses to return balance for\n"                
+            "2. \"asset\"       (string) Single asset identifier to return balance for, default \"*\"\n"                
+            "or\n"
+            "2. assets       (array, optional) Json array of asset identifiers to return balance for\n"                
             "3. minconf          (numeric, optional, default=1) Only include transactions confirmed at least this many times.\n"
             "4. includeWatchonly (bool, optional, default=false) Include transactions to watchonly addresses (see 'importaddress')\n"
             "5. includeLocked    (bool, optional, default=false) Also take locked outputs into account\n"
-            "Results are an Object of balance arrays with totals and details for each asset.\n"
+            "\nResult:\n"
+            "An object of balance arrays with totals and details for each address.\n"
             "\nExamples:\n"
             + HelpExampleCli("getmultibalances", "")
             + HelpExampleCli("getmultibalances", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\"")
@@ -1794,12 +1813,12 @@ void mc_InitRPCHelpMap08()
     mapHelpStrings.insert(std::make_pair("getnewaddress",
             "getnewaddress ( \"account\" )\n"
             "\nReturns a new address for receiving payments.\n"      
-            "If 'account' is specified (recommended), it is added to the address book \n"
+            "If 'account' is specified (deprecated), it is added to the address book \n"
             "so payments received with the address will be credited to 'account'.\n"
             "\nArguments:\n"
             "1. \"account\"        (string, optional) The account name for the address to be linked to. if not provided, the default account \"\" is used. It can also be set to the empty string \"\" to represent the default account. The account does not need to exist, it will be created if there is no account by the given name.\n"
             "\nResult:\n"
-            "\"address\"    (string) The new address\n"    
+            "\"address\"           (string) The new address\n"    
             "\nExamples:\n"
             + HelpExampleCli("getnewaddress", "")
             + HelpExampleCli("getnewaddress", "\"\"")
@@ -1861,11 +1880,11 @@ void mc_InitRPCHelpMap08()
 void mc_InitRPCHelpMap09()
 {
     mapHelpStrings.insert(std::make_pair("getstreamitem",
-            "getstreamitem \"stream-identifier\" txid ( verbose )\n"
+            "getstreamitem \"stream-identifier\" \"txid\" ( verbose )\n"
             "\nReturns stream item.\n"
             "\nArguments:\n"
             "1. \"stream-identifier\"(string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
-            "2. txid          (string, required) The transaction id\n"
+            "2. \"txid\"          (string, required) The transaction id\n"
             "3. verbose       (boolean, optional, default=false) If true, returns information about item transaction \n"
             "\nResult:\n"
             "\"stream-item\"  (object) Stream item.\n"
@@ -1877,15 +1896,13 @@ void mc_InitRPCHelpMap09()
     
     mapHelpStrings.insert(std::make_pair("gettotalbalances",
             "gettotalbalances ( minconf includeWatchonly includeLocked )\n"
-            "\nIf account is not specified, returns the server's total available asset balances.\n"
-            "If account is specified, returns the balances in the account.\n"
-            "Note that the account \"\" is not the same as leaving the parameter out.\n"
-            "The server total may be different to the balance in the default \"\" account.\n"
+            "\nReturns a list of all the asset balances in this node’s wallet, with at least minconf confirmations.\n"
             "\nArguments:\n"
             "1. minconf          (numeric, optional, default=1) Only include transactions confirmed at least this many times.\n"
             "2. includeWatchonly (bool, optional, default=false) Also include balance in watchonly addresses (see 'importaddress')\n"
             "3. includeLocked    (bool, optional, default=false) Also take locked outputs into account\n"
-            "Results are an array of Objects with totals and details for each asset.\n"
+            "\nResult:\n"
+            "An array of Objects with totals and details for each asset.\n"
             "\nExamples:\n"
             "\nThe total amount in the server across all accounts\n"
             + HelpExampleCli("gettotalbalances", "") +
@@ -1935,11 +1952,11 @@ void mc_InitRPCHelpMap09()
         ));
     
     mapHelpStrings.insert(std::make_pair("gettxoutdata",
-            "gettxoutdata txid n ( count-bytes start-byte )\n"
+            "gettxoutdata \"txid\" vout ( count-bytes start-byte )\n"
             "\nReturns metadata of transaction output.\n"
             "\nArguments:\n"
-            "1. txid           (string, required) The transaction id\n"
-            "2. n              (numeric, required) vout value\n"
+            "1. \"txid\"           (string, required) The transaction id\n"
+            "2. vout              (numeric, required) vout value\n"
             "3. count-bytes    (numeric, optional, default=INT_MAX) Number of bytes to return\n"
             "4. start-byte     (numeric, optional, default=0) start from specific byte \n"
             "\nResult:\n"
@@ -1975,13 +1992,12 @@ void mc_InitRPCHelpMap09()
         ));
     
     mapHelpStrings.insert(std::make_pair("getwallettransaction",
-            "getwallettransaction txid ( includeWatchonly verbose )\n"
+            "getwallettransaction \"txid\" ( includeWatchonly verbose )\n"
             "\nGet detailed information about in-wallet transaction <txid>\n"
             "\nArguments:\n"
-            "1. txid    (string, required) The transaction id\n"
-            "2. \"includeWatchonly\"    (bool, optional, default=false) Whether to include watchonly addresses in balance calculation and details[]\n"
+            "1. \"txid\"    (string, required) The transaction id\n"
+            "2. includeWatchonly    (bool, optional, default=false) Whether to include watchonly addresses in balance calculation and details[]\n"
             "3. verbose (bool, optional, default=false) If true, returns detailed array of inputs and outputs and raw hex of transactions\n"
-            "\nResult:\n"
             "\nResult:\n"
             "[\n"
             "  {\n"
@@ -2019,21 +2035,24 @@ void mc_InitRPCHelpMap09()
         ));
     
     mapHelpStrings.insert(std::make_pair("grant",
-            "grant \"address(es)\" \"permission(s)\" ( native-amount \"comment\" \"comment-to\" startblock endblock )\n"
+            "grant \"address(es)\" \"permission(s)\" ( native-amount startblock endblock \"comment\" \"comment-to\" )\n"
             "\nGrant permission(s) to a given address. \n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. \"address(es)\"   (string, required) The multichain addresses to send to (comma delimited)\n"
-            "2. \"permission(s)\" (string, required) Permission strings, comma delimited. Possible values: " + AllowedPermissions() + " \n"
-            "3. native-amount     (numeric, optional)  native currency amount to send. eg 0.1. Default - 0.0\n"
+            "1. \"address(es)\"     (string, required)  The multichain addresses to send to (comma delimited)\n"
+            "2. \"permission(s)\"   (string, required)  Permission strings, comma delimited. \n"
+            "                                          Global: " + AllowedPermissions() + " \n"
+            "                                          or per-asset: asset.issue,admin \n"
+            "                                          or per-stream: stream.write,activate,admin \n"
+            "3. native-amount     (numeric, optional) Native currency amount to send. eg 0.1. Default - 0.0\n"
             "4. startblock        (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
             "5. endblock          (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
-            "                             If -1 is specified default value is used.\n"
-            "6. \"comment\"       (string, optional) A comment used to store what the transaction is for. \n"
-            "                             This is not part of the transaction, just kept in your wallet.\n"
-            "7. \"comment-to\"    (string, optional) A comment to store the name of the person or organization \n"
-            "                             to which you're sending the transaction. This is not part of the \n"
-            "                             transaction, just kept in your wallet.\n"
+            "                                         If -1 is specified default value is used.\n"
+            "6. \"comment\"         (string, optional)  A comment used to store what the transaction is for. \n"
+            "                                         This is not part of the transaction, just kept in your wallet.\n"
+            "7. \"comment-to\"      (string, optional)  A comment to store the name of the person or organization \n"
+            "                                         to which you're sending the transaction. This is not part of the \n"
+            "                                         transaction, just kept in your wallet.\n"
             "\nResult:\n"
             "\"transactionid\"  (string) The transaction id.\n"
             "\nExamples:\n"
@@ -2044,22 +2063,25 @@ void mc_InitRPCHelpMap09()
         ));
     
     mapHelpStrings.insert(std::make_pair("grantfrom",
-            "grantfrom from-address \"to-address(es)\" \"permission(s)\" ( native-amount \"comment\" \"comment-to\" startblock endblock )\n"
+            "grantfrom \"from-address\" \"to-address(es)\" \"permission(s)\" ( native-amount startblock endblock \"comment\" \"comment-to\" )\n"
             "\nGrant permission using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. from-address        (string, required) Address used for grant.\n"
+            "1. \"from-address\"    (string, required) Address used for grant.\n"
             "2. \"to-address(es)\"  (string, required) The multichain addresses to grant permissions to\n"
-            "3. \"permission(s)\"   (string, required) Permission strings, comma delimited. Possible values: " + AllowedPermissions() + " \n"
-            "4. native-amount       (numeric, optional)  native currency amount to send. eg 0.1. Default - 0.0\n"
-            "5. startblock          (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
-            "6. endblock            (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
-            "                             If -1 is specified default value is used.\n"
-            "7. \"comment\"         (string, optional) A comment used to store what the transaction is for. \n"
-            "                             This is not part of the transaction, just kept in your wallet.\n"
-            "8. \"comment-to\"      (string, optional) A comment to store the name of the person or organization \n"
-            "                             to which you're sending the transaction. This is not part of the \n"
-            "                             transaction, just kept in your wallet.\n"
+            "3. \"permission(s)\"   (string, required)  Permission strings, comma delimited. \n"
+            "                                          Global: " + AllowedPermissions() + " \n"
+            "                                          or per-asset: asset.issue,admin \n"
+            "                                          or per-stream: stream.write,activate,admin \n"
+            "4. native-amount     (numeric, optional) Native currency amount to send. eg 0.1. Default - 0.0\n"
+            "5. startblock        (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
+            "6. endblock          (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
+            "                                         If -1 is specified default value is used.\n"
+            "7. \"comment\"         (string, optional)  A comment used to store what the transaction is for. \n"
+            "                                         This is not part of the transaction, just kept in your wallet.\n"
+            "8. \"comment-to\"      (string, optional)  A comment to store the name of the person or organization \n"
+            "                                         to which you're sending the transaction. This is not part of the \n"
+            "                                         transaction, just kept in your wallet.\n"
             "\nResult:\n"
             "\"transactionid\"  (string) The transaction id.\n"
             "\nExamples:\n"
@@ -2069,23 +2091,26 @@ void mc_InitRPCHelpMap09()
         ));
     
     mapHelpStrings.insert(std::make_pair("grantwithdata",
-            "grantwithdata \"address(es)\" \"permission(s)\" data-hex|object ( native-amount startblock endblock )\n"
+            "grantwithdata \"address(es)\" \"permission(s)\" \"data-hex\"|object ( native-amount startblock endblock )\n"
             "\nGrant permission(s) with metadata to a given address. \n"
             "\nArguments:\n"
-            "1. \"address(es)\"    (string, required) The multichain addresses to send to (comma delimited)\n"
-            "2. \"permission(s)\"  (string, required) Permission strings, comma delimited. Possible values: " + AllowedPermissions() + " \n"
-            "3. data-hex           (string, required) Data hex string\n"
+            "1. \"address(es)\"           (string, required) The multichain addresses to send to (comma delimited)\n"
+            "2. \"permission(s)\"         (string, required) Permission strings, comma delimited. \n"
+            "                                               Global: " + AllowedPermissions() + " \n"
+            "                                               or per-asset: asset.issue,admin \n"
+            "                                               or per-stream: stream.write,activate,admin \n"
+            "3. \"data-hex\"              (string, required) Data hex string\n"
             "or\n"
-            "3. publish-new-stream-item    (object, required) A json object with stream item\n"
+            "3. publish-new-stream-item (object, required) A json object with stream item\n"
             "    {\n"                
             "      \"for\" : stream-identifier       (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
             "      \"key\" : key                     (string,optional, default: \"\") Item key\n"
             "      \"data\" : data-hex               (string,optional, default: \"\") Data hex string\n"
             "    }\n"                                
-            "4. native-amount      (numeric, optional)  native currency amount to send. eg 0.1. Default - 0.0\n"
-            "5. startblock         (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
-            "6. endblock           (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
-            "                             If -1 is specified default value is used.\n"
+            "4. native-amount           (numeric, optional)  Native currency amount to send. eg 0.1. Default - 0.0\n"
+            "5. startblock              (numeric, optional)  Block to apply permissions from (inclusive). Default - 0\n"
+            "6. endblock                (numeric, optional)  Block to apply permissions to (exclusive). Default - 4294967295\n"
+            "                                                If -1 is specified default value is used.\n"
             "\nResult:\n"
             "\"transactionid\"  (string) The transaction id.\n"
             "\nExamples:\n"
@@ -2099,23 +2124,26 @@ void mc_InitRPCHelpMap09()
 void mc_InitRPCHelpMap10()
 {
     mapHelpStrings.insert(std::make_pair("grantwithmetadata",
-            "grantwithdata \"address(es)\" \"permission(s)\" data-hex|object ( native-amount startblock endblock )\n"
+            "grantwithdata \"address(es)\" \"permission(s)\" \"data-hex\"|object ( native-amount startblock endblock )\n"
             "\nGrant permission(s) with metadata to a given address. \n"
             "\nArguments:\n"
-            "1. \"address(es)\"    (string, required) The multichain addresses to send to (comma delimited)\n"
-            "2. \"permission(s)\"  (string, required) Permission strings, comma delimited. Possible values: " + AllowedPermissions() + " \n"
-            "3. data-hex           (string, required) Data hex string\n"
+            "1. \"address(es)\"           (string, required) The multichain addresses to send to (comma delimited)\n"
+            "2. \"permission(s)\"         (string, required)  Permission strings, comma delimited. \n"
+            "                                                Global: " + AllowedPermissions() + " \n"
+            "                                                or per-asset: asset.issue,admin \n"
+            "                                                or per-stream: stream.write,activate,admin \n"
+            "3. \"data-hex\"              (string, required) Data hex string\n"
             "or\n"
-            "3. publish-new-stream-item    (object, required) A json object with stream item\n"
+            "3. publish-new-stream-item (object, required) A json object with stream item\n"
             "    {\n"                
             "      \"for\" : stream-identifier       (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
             "      \"key\" : key                     (string,optional, default: \"\") Item key\n"
             "      \"data\" : data-hex               (string,optional, default: \"\") Data hex string\n"
             "    }\n"                                
-            "4. native-amount      (numeric, optional)  native currency amount to send. eg 0.1. Default - 0.0\n"
-            "5. startblock         (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
-            "6. endblock           (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
-            "                             If -1 is specified default value is used.\n"
+            "4. native-amount           (numeric, optional)  Native currency amount to send. eg 0.1. Default - 0.0\n"
+            "5. startblock              (numeric, optional)  Block to apply permissions from (inclusive). Default - 0\n"
+            "6. endblock                (numeric, optional)  Block to apply permissions to (exclusive). Default - 4294967295\n"
+            "                                                If -1 is specified default value is used.\n"
             "\nResult:\n"
             "\"transactionid\"  (string) The transaction id.\n"
             "\nExamples:\n"
@@ -2125,25 +2153,28 @@ void mc_InitRPCHelpMap10()
         ));
     
     mapHelpStrings.insert(std::make_pair("grantwithdatafrom",
-            "grantwithdatafrom from-address \"to-address(es)\" \"permission(s)\" data-hex|object ( native-amount startblock endblock )\n"
+            "grantwithdatafrom \"from-address\" \"to-address(es)\" \"permission(s)\" \"data-hex\"|object ( native-amount startblock endblock )\n"
             "\nGrant permission with metadata using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. from-address        (string, required) Address used for grant.\n"
-            "2. \"to-address(es)\"  (string, required) The multichain addresses to grant permissions to\n"
-            "3. \"permission(s)\"   (string, required) Permission strings, comma delimited. Possible values: " + AllowedPermissions() + " \n"
-            "4. data-hex            (string, required) Data hex string\n"
+            "1. \"from-address\"          (string, required) Address used for grant.\n"
+            "2. \"address(es)\"           (string, required) The multichain addresses to send to (comma delimited)\n"
+            "3. \"permission(s)\"         (string, required) Permission strings, comma delimited. \n"
+            "                                               Global: " + AllowedPermissions() + " \n"
+            "                                               or per-asset: asset.issue,admin \n"
+            "                                               or per-stream: stream.write,activate,admin \n"
+            "4. \"data-hex\"              (string, required) Data hex string\n"
             "or\n"
-            "4. publish-new-stream-item    (object, required) A json object with stream item\n"
+            "4. publish-new-stream-item (object, required) A json object with stream item\n"
             "    {\n"                
             "      \"for\" : stream-identifier       (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
             "      \"key\" : key                     (string,optional, default: \"\") Item key\n"
             "      \"data\" : data-hex               (string,optional, default: \"\") Data hex string\n"
             "    }\n"                                
-            "5. native-amount\"     (numeric, optional)  native currency amount to send. eg 0.1. Default - 0.0\n"
-            "6. startblock          (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
-            "7. endblock            (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
-            "                             If -1 is specified default value is used.\n"
+            "5. native-amount           (numeric, optional)  Native currency amount to send. eg 0.1. Default - 0.0\n"
+            "6. startblock              (numeric, optional)  Block to apply permissions from (inclusive). Default - 0\n"
+            "7. endblock                (numeric, optional)  Block to apply permissions to (exclusive). Default - 4294967295\n"
+            "                                                If -1 is specified default value is used.\n"
             "\nResult:\n"
             "\"transactionid\"  (string) The transaction id.\n"
             "\nExamples:\n"
@@ -2153,25 +2184,28 @@ void mc_InitRPCHelpMap10()
         ));
     
     mapHelpStrings.insert(std::make_pair("grantwithmetadatafrom",
-            "grantwithmetadatafrom from-address \"to-address(es)\" \"permission(s)\" data-hex|object ( native-amount startblock endblock )\n"
+            "grantwithmetadatafrom \"from-address\" \"to-address(es)\" \"permission(s)\" data-hex|object ( native-amount startblock endblock )\n"
             "\nGrant permission with metadata using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. from-address        (string, required) Address used for grant.\n"
-            "2. \"to-address(es)\"  (string, required) The multichain addresses to grant permissions to\n"
-            "3. \"permission(s)\"   (string, required) Permission strings, comma delimited. Possible values: " + AllowedPermissions() + " \n"
-            "4. data-hex            (string, required) Data hex string\n"
+            "1. \"from-address\"          (string, required) Address used for grant.\n"
+            "2. \"address(es)\"           (string, required) The multichain addresses to send to (comma delimited)\n"
+            "3. \"permission(s)\"         (string, required) Permission strings, comma delimited. \n"
+            "                                               Global: " + AllowedPermissions() + " \n"
+            "                                               or per-asset: asset.issue,admin \n"
+            "                                               or per-stream: stream.write,activate,admin \n"
+            "4. \"data-hex\"              (string, required) Data hex string\n"
             "or\n"
-            "4. publish-new-stream-item    (object, required) A json object with stream item\n"
+            "4. publish-new-stream-item (object, required) A json object with stream item\n"
             "    {\n"                
             "      \"for\" : stream-identifier       (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
             "      \"key\" : key                     (string,optional, default: \"\") Item key\n"
             "      \"data\" : data-hex               (string,optional, default: \"\") Data hex string\n"
             "    }\n"                                
-            "5. native-amount\"     (numeric, optional)  native currency amount to send. eg 0.1. Default - 0.0\n"
-            "6. startblock          (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
-            "7. endblock            (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
-            "                             If -1 is specified default value is used.\n"
+            "5. native-amount           (numeric, optional)  Native currency amount to send. eg 0.1. Default - 0.0\n"
+            "6. startblock              (numeric, optional)  Block to apply permissions from (inclusive). Default - 0\n"
+            "7. endblock                (numeric, optional)  Block to apply permissions to (exclusive). Default - 4294967295\n"
+            "                                                If -1 is specified default value is used.\n"
             "\nResult:\n"
             "\"transactionid\"  (string) The transaction id.\n"
             "\nExamples:\n"
@@ -2184,31 +2218,33 @@ void mc_InitRPCHelpMap10()
             "importaddress address(es) ( \"label\" rescan )\n"
             "\nAdds an address or script (in hex) that can be watched as if it were in your wallet but cannot be used to spend.\n"
             "\nArguments:\n"
-            "1. address(es)          (string, required) The addresses, comma delimited\n"
+            "1. \"address(es)\"        (string, required) The addresses, comma delimited\n"
             "or\n"
             "1. address(es)          (array, optional) A json array of addresses \n"                
-            "2. \"label\"          (string, optional, default=\"\") An optional label\n"
+            "2. \"label\"              (string, optional, default=\"\") An optional label\n"
             "3. rescan               (boolean, optional, default=true) Rescan the wallet for transactions\n"
             "\nNote: This call can take minutes to complete if rescan is true.\n"
+            "\nResult:\n"
             "\nExamples:\n"
             "\nImport an address with rescan\n"
-            + HelpExampleCli("importaddress", "\"myaddress\"") +
+            + HelpExampleCli("importaddress", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\"") +
             "\nImport using a label without rescan\n"
-            + HelpExampleCli("importaddress", "\"myaddress\" \"testing\" false") +
+            + HelpExampleCli("importaddress", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"testing\" false") +
             "\nAs a JSON-RPC call\n"
-            + HelpExampleRpc("importaddress", "\"myaddress\", \"testing\", false")
+            + HelpExampleRpc("importaddress", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"testing\", false")
         ));
     
     mapHelpStrings.insert(std::make_pair("importprivkey",
             "importprivkey privkey(s) ( \"label\" rescan )\n"
             "\nAdds a private key (as returned by dumpprivkey) to your wallet.\n"
             "\nArguments:\n"
-            "1. privkey(s)           (string, required) The private key (see dumpprivkey), comma delimited\n"
+            "1. \"privkey(s)\"         (string, required) The private key (see dumpprivkey), comma delimited\n"
             "or\n"
             "1. privkey(s)           (array, optional) A json array of private keys \n"                
-            "2. \"label\"            (string, optional, default=\"\") An optional label\n"
+            "2. \"label\"              (string, optional, default=\"\") An optional label\n"
             "3. rescan               (boolean, optional, default=true) Rescan the wallet for transactions\n"
             "\nNote: This call can take minutes to complete if rescan is true.\n"
+            "\nResult:\n"
             "\nExamples:\n"
             "\nDump a private key\n"
             + HelpExampleCli("dumpprivkey", "\"myaddress\"") +
@@ -2235,7 +2271,7 @@ void mc_InitRPCHelpMap10()
         ));
     
     mapHelpStrings.insert(std::make_pair("issue",
-            "issue address \"asset-name\"|asset-params quantity ( smallest-unit native-amount custom-fields )\n"
+            "issue \"address\" \"asset-name\"|asset-params quantity ( smallest-unit native-amount custom-fields )\n"
             "\nIssue new asset\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -2265,12 +2301,12 @@ void mc_InitRPCHelpMap10()
         ));
     
     mapHelpStrings.insert(std::make_pair("issuefrom",
-            "issuefrom from-address to-address \"asset-name\"|asset-params quantity ( smallest-unit native-amount custom-fields )\n"
+            "issuefrom \"from-address\" \"to-address\" \"asset-name\"|asset-params quantity ( smallest-unit native-amount custom-fields )\n"
             "\nIssue asset using specific address\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. from-address    (string, required) Address used for issuing.\n"
-            "2. to-address      (string, required) The  address to send newly created asset to.\n"
+            "1. \"from-address\"    (string, required) Address used for issuing.\n"
+            "2. \"to-address\"      (string, required) The  address to send newly created asset to.\n"
             "3. \"asset-name\"  (string, required) Asset name, if not \"\" should be unique.\n"
             "or\n"
             "3. asset-params    (object, required) A json object of with asset params\n"
@@ -2296,11 +2332,11 @@ void mc_InitRPCHelpMap10()
         ));
     
     mapHelpStrings.insert(std::make_pair("issuemore",
-            "issuemore address \"asset-identifier\" quantity ( native-amount custom-fields )\n"
+            "issuemore \"address\" \"asset-identifier\" quantity ( native-amount custom-fields )\n"
             "\nCreate more units for asset\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. address              (string, required) The address to send newly created asset to.\n"
+            "1. \"address\"              (string, required) The address to send newly created asset to.\n"
             "2. \"asset-identifier\" (string, required) Asset identifier - one of the following: issue txid, asset reference, asset name.\n"
             "3. quantity             (numeric, required) The asset total amount in display units. eg. 1234.56\n"
             "4. native-amount        (numeric, optional) native currency amount to send. eg 0.1, Default: minimum-per-output.\n"
@@ -2318,12 +2354,12 @@ void mc_InitRPCHelpMap10()
         ));
     
     mapHelpStrings.insert(std::make_pair("issuemorefrom",
-            "issuemorefrom from-address to-address \"asset-identifier\" quantity ( native-amount custom-fields )\n"
+            "issuemorefrom \"from-address\" \"to-address\" \"asset-identifier\" quantity ( native-amount custom-fields )\n"
             "\nCreate more units for asset from specific address\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. from-address         (string, required) Address used for issuing.\n"
-            "2. to-address           (string, required) The  address to send newly created asset to.\n"
+            "1. \"from-address\"         (string, required) Address used for issuing.\n"
+            "2. \"to-address\"           (string, required) The  address to send newly created asset to.\n"
             "3. \"asset-identifier\" (string, required) Asset identifier - one of the following: issue txid, asset reference, asset name.\n"
             "4. quantity             (numeric, required) The asset total amount in display units. eg. 1234.56\n"
             "5. native-amount        (numeric, optional) native currency amount to send. eg 0.1, Default: minimum-per-output.\n"
@@ -2347,7 +2383,7 @@ void mc_InitRPCHelpMap11()
     mapHelpStrings.insert(std::make_pair("keypoolrefill",
             "keypoolrefill ( newsize )\n"
             "\nFills the keypool."
-            + HelpRequiringPassphraseWrapper() + "\n"
+            + HelpRequiringPassphraseWrapper() + 
             "\nArguments\n"
             "1. newsize     (numeric, optional, default=100) The new keypool size\n"
             "\nExamples:\n"
@@ -2378,16 +2414,17 @@ void mc_InitRPCHelpMap11()
         ));
     
     mapHelpStrings.insert(std::make_pair("listaddresses",
-            "listaddresses (address(es) verbose count start ) \n"
+            "listaddresses ( address(es) verbose count start ) \n"
             "\nReturns asset balances for specified address\n"
             "\nArguments:\n"
             "1. \"address(es)\"  (string, optional, default *) Address(es) to return balance for, comma delimited. Default - all\n"
             "or\n"
-            "1. \"address(es)\"  (array, optional) A json array of addresses to return balance for\n"                
-            "2. \"verbose\"      (boolean, optional, default=false) If true return more information about address.\n"
-            "3. count        (number, optional, default=INT_MAX - all) The number of addresses to display\n"
-            "4. start        (number, optional, default=-count - last) Start from specific address, 0 based, if negative - from the end\n"
-            "Results are an Array of address Objects.\n"
+            "1. address(es)    (array, optional) A json array of addresses to return balance for\n"                
+            "2. verbose        (boolean, optional, default=false) If true return more information about address.\n"
+            "3. count          (number, optional, default=INT_MAX - all) The number of addresses to display\n"
+            "4. start          (number, optional, default=-count - last) Start from specific address, 0 based, if negative - from the end\n"
+            "\nResult:\n"
+            "An array of address Objects.\n"
             "\nExamples:\n"
             + HelpExampleCli("listaddresses", "")
             + HelpExampleCli("listaddresses", "\"*\" true")
@@ -2418,10 +2455,10 @@ void mc_InitRPCHelpMap11()
         ));
     
     mapHelpStrings.insert(std::make_pair("listaddresstransactions",
-            "listaddresstransactions address ( count skip verbose )\n"
-            "\nReturns up to 'count' most recent transactions skipping the first 'from' transactions for account 'account'.\n"
+            "listaddresstransactions \"address\" ( count skip verbose )\n"
+            "\nLists information about the <count> most recent transactions related to address in this node’s wallet.\n"
             "\nArguments:\n"
-            "1. address        (string, required)  Address to list transactions for.\n"
+            "1. \"address\"        (string, required)  Address to list transactions for.\n"
             "2. count          (numeric, optional, default=10) The number of transactions to return\n"
             "3. skip           (numeric, optional, default=0) The number of transactions to skip\n"
             "4. verbose        (boolean, optional, default=false) If true, returns detailed array of inputs and outputs and raw hex of transactions\n"
@@ -2466,7 +2503,7 @@ void mc_InitRPCHelpMap11()
     
     mapHelpStrings.insert(std::make_pair("listassettransactions",
              "listassettransactions \"asset-identifier\" ( verbose count start local-ordering )\n"
-            "\nReturns stream items.\n"
+            "\nLists transactions involving asset.\n"
             "\nArguments:\n"
             "1. \"asset-identifier\"(string, required) Asset identifier - one of the following: asset txid, asset reference, asset name.\n"
             "2. verbose      (boolean, optional, default=false) If true, returns information about transaction \n"
@@ -2474,7 +2511,7 @@ void mc_InitRPCHelpMap11()
             "4. start        (number, optional, default=-count - last) Start from specific transaction, 0 based, if negative - from the end\n"
             "5. local-ordering (boolean, optional, default=false) If true, transactions appear in the order they were processed by the wallet, if false - in the order they appear in blockchain\n"
             "\nResult:\n"
-            "\"stream-items\"  (array) List of stream items.\n"
+            "\"stream-items\"  (array) List of transactions.\n"
             "\nExamples:\n"
             + HelpExampleCli("listassettransactions", "\"test-asset\"") 
             + HelpExampleCli("listassettransactions", "\"test-asset\" true 10 100") 
@@ -2653,11 +2690,11 @@ void mc_InitRPCHelpMap12()
         ));
     
     mapHelpStrings.insert(std::make_pair("liststreampublisheritems",
-            "liststreampublisheritems \"stream-identifier\" address ( verbose count start local-ordering )\n"
+            "liststreampublisheritems \"stream-identifier\" \"address\" ( verbose count start local-ordering )\n"
             "\nReturns stream items for specific publisher.\n"
             "\nArguments:\n"
             "1. \"stream-identifier\"(string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
-            "2. address      (string, required) Publisher address\n"
+            "2. \"address\"      (string, required) Publisher address\n"
             "3. verbose      (boolean, optional, default=false) If true, returns information about item transaction \n"
             "4. count        (number, optional, default=10) The number of items to display\n"
             "5. start        (number, optional, default=-count - last) Start from specific item, 0 based, if negative - from the end\n"
@@ -2675,7 +2712,7 @@ void mc_InitRPCHelpMap12()
             "\nReturns stream publishers.\n"
             "\nArguments:\n"
             "1. \"stream-identifier\"(string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
-            "2. address(es)  (string, optional, default=*) Publisher addresses, comma delimited\n"
+            "2. \"address(es)\"  (string, optional, default=*) Publisher addresses, comma delimited\n"
             "or\n"
             "2. address(es)  (array, optional) A json array of publisher addresses \n"                
             "3. verbose      (boolean, optional, default=false) If true, returns extended information about publisher \n"
@@ -2746,7 +2783,7 @@ void mc_InitRPCHelpMap12()
         ));
     
     mapHelpStrings.insert(std::make_pair("listunspent",
-            "listunspent ( minconf maxconf [\"address\",...] )\n"
+            "listunspent ( minconf maxconf addresses )\n"
             "\nReturns array of unspent transaction outputs\n"
             "with between minconf and maxconf (inclusive) confirmations.\n"
             "Optionally filter to only include txouts paid to specified addresses.\n"
@@ -2755,7 +2792,7 @@ void mc_InitRPCHelpMap12()
             "\nArguments:\n"
             "1. minconf          (numeric, optional, default=1) The minimum confirmations to filter\n"
             "2. maxconf          (numeric, optional, default=9999999) The maximum confirmations to filter\n"
-            "3. \"addresses\"    (string) A json array of addresses to filter\n"
+            "3. addresses        (array, optional) A json array of addresses to filter\n"
             "    [\n"
             "      \"address\"   (string) address\n"
             "      ,...\n"
@@ -2782,7 +2819,7 @@ void mc_InitRPCHelpMap12()
     
     mapHelpStrings.insert(std::make_pair("listwallettransactions",
             "listwallettransactions ( count skip includeWatchonly verbose )\n"
-            "\nReturns up to 'count' most recent transactions skipping the first 'from' transactions for account 'account'.\n"
+            "\nLists information about the <count> most recent transactions in this node’s wallet.\n"
             "\nArguments:\n"
             "1. count            (numeric, optional, default=10) The number of transactions to return\n"
             "2. skip             (numeric, optional, default=0) The number of transactions to skip\n"
@@ -2837,7 +2874,7 @@ void mc_InitRPCHelpMap12()
             "Also see the listunspent call\n"
             "\nArguments:\n"
             "1. unlock            (boolean, required) Whether to unlock (true) or lock (false) the specified transactions\n"
-            "2. \"transactions\"  (string, required) A json array of objects. Each object the txid (string) vout (numeric)\n"
+            "2. transactions  (array, required) A json array of objects. Each object the txid (string) vout (numeric)\n"
             "     [           (json array of json objects)\n"
             "       {\n"
             "         \"txid\":\"id\",    (string) The transaction id\n"
@@ -2908,11 +2945,11 @@ void mc_InitRPCHelpMap13()
         ));
     
     mapHelpStrings.insert(std::make_pair("preparelockunspentfrom",
-            "preparelockunspentfrom from-address asset-quantities ( lock )\n"
+            "preparelockunspentfrom \"from-address\" asset-quantities ( lock )\n"
             "\nPrepares exchange transaction output for createrawexchange, appendrawexchange using specific address\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. from-address        (string, required) Address to send from .\n"
+            "1. \"from-address\"        (string, required) Address to send from .\n"
             "2. asset-quantities    (object, required) A json object of assets to send\n"
             "    {\n"
             "      \"asset-identifier\" : asset-quantity\n"
@@ -2931,13 +2968,13 @@ void mc_InitRPCHelpMap13()
         ));
     
     mapHelpStrings.insert(std::make_pair("publish",
-            "publish \"stream-identifier\" \"key\" data-hex\n"
+            "publish \"stream-identifier\" \"key\" \"data-hex\"\n"
             "\nPublishes stream item\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"stream-identifier\" (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
             "2. \"key\"   (string, required) Item key\n"
-            "3. data-hex   (string, required) Item data hex string\n"
+            "3. \"data-hex\"   (string, required) Item data hex string\n"
             "\nResult:\n"
             "\"transactionid\"  (string) The transaction id.\n"
             "\nExamples:\n"
@@ -2946,14 +2983,14 @@ void mc_InitRPCHelpMap13()
         ));
     
     mapHelpStrings.insert(std::make_pair("publishfrom",
-            "publishfrom from-address \"stream-identifier\" \"key\" data-hex\n"
-            "\nPublishes stream item\n"
+            "publishfrom \"from-address\" \"stream-identifier\" \"key\" \"data-hex\"\n"
+            "\nPublishes stream item from specific address\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. from-address          (string, required) Address used for issuing.\n"
+            "1. \"from-address\"          (string, required) Address used for issuing.\n"
             "2. \"stream-identifier\" (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
             "3. \"key\"               (string, required) Item key\n"
-            "4. data-hex              (string, required) Item data hex string\n"
+            "4. \"data-hex\"              (string, required) Item data hex string\n"
             "\nResult:\n"
             "\"transactionid\"  (string) The transaction id.\n"
             "\nExamples:\n"
@@ -2972,7 +3009,10 @@ void mc_InitRPCHelpMap13()
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"address(es)\"    (string, required) The addresses(es) to revoke permissions from\n"
-            "2. \"permission(s)\"  (string, required) Permission strings, comma delimited. Possible values: connect,send,receive,issue,mine,admin \n"
+            "2. \"permission(s)\"  (string, required) Permission strings, comma delimited. \n"
+            "                                        Global: " + AllowedPermissions() + " \n"
+            "                                        or per-asset: asset.issue,admin \n"
+            "                                        or per-stream: stream.write,activate,admin \n"
             "3. native-amount      (numeric, optional) native currency amount to send. eg 0.1. Default - 0\n"
             "4. \"comment\"        (string, optional) A comment used to store what the transaction is for. \n"
             "                             This is not part of the transaction, just kept in your wallet.\n"
@@ -2988,13 +3028,16 @@ void mc_InitRPCHelpMap13()
         ));
     
     mapHelpStrings.insert(std::make_pair("revokefrom",
-            "revokefrom from-address \"to-address(es)\" \"permission(s)\" ( native-amount \"comment\" \"comment-to\" )\n"
+            "revokefrom \"from-address\" \"to-address(es)\" \"permission(s)\" ( native-amount \"comment\" \"comment-to\" )\n"
             "\nRevoke permissions using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. from-address        (string, required) Addresses used for revoke.\n"
+            "1. \"from-address\"    (string, required) Addresses used for revoke.\n"
             "2. \"to-address(es)\"  (string, required) The addresses(es) to revoke permissions from. Comma delimited\n"
-            "3. \"permission(s)\"   (string, required) Permission strings, comma delimited. Possible values: connect,send,receive,issue,mine,admin \n"
+            "3. \"permission(s)\"   (string, required) Permission strings, comma delimited. \n"
+            "                                         Global: " + AllowedPermissions() + " \n"
+            "                                         or per-asset: asset.issue,admin \n"
+            "                                         or per-stream: stream.write,activate,admin \n"
             "4. native-amount       (numeric, optional) native currency amount to send. eg 0.1. Default - 0\n"
             "5. \"comment\"         (string, optional) A comment used to store what the transaction is for. \n"
             "                             This is not part of the transaction, just kept in your wallet.\n"
@@ -3010,14 +3053,14 @@ void mc_InitRPCHelpMap13()
         ));
     
     mapHelpStrings.insert(std::make_pair("send",
-            "send address amount|asset-quantities ( \"comment\" \"comment-to\" )\n"
+            "send \"address\" amount|asset-quantities ( \"comment\" \"comment-to\" )\n"
             "\nSend an amount (or several asset amounts) to a given address. The amount is a real and is rounded to the nearest 0.00000001\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. address         (string, required) The address to send to.\n"
             "2. amount          (numeric, required) The amount in native currency to send. eg 0.1\n"
             "or\n"
-            "2. \"asset-quantities\"    (object, required) A json object of assets to send\n"
+            "2. asset-quantities    (object, required) A json object of assets to send\n"
             "    {\n"
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
@@ -3036,14 +3079,14 @@ void mc_InitRPCHelpMap13()
         ));
     
     mapHelpStrings.insert(std::make_pair("sendtoaddress",
-            "sendtoaddress address amount|asset-quantities ( \"comment\" \"comment-to\" )\n"
+            "sendtoaddress \"address\" amount|asset-quantities ( \"comment\" \"comment-to\" )\n"
             "\nSend an amount (or several asset amounts) to a given address. The amount is a real and is rounded to the nearest 0.00000001\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. address         (string, required) The address to send to.\n"
+            "1. \"address\"         (string, required) The address to send to.\n"
             "2. amount          (numeric, required) The amount in native currency to send. eg 0.1\n"
             "or\n"
-            "2. \"asset-quantities\"    (object, required) A json object of assets to send\n"
+            "2. asset-quantities    (object, required) A json object of assets to send\n"
             "    {\n"
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
@@ -3062,11 +3105,11 @@ void mc_InitRPCHelpMap13()
         ));
     
     mapHelpStrings.insert(std::make_pair("sendasset",
-            "sendasset address \"asset-identifier\" asset-qty ( native-amount \"comment\" \"comment-to\" )\n"
+            "sendasset \"address\" \"asset-identifier\" asset-qty ( native-amount \"comment\" \"comment-to\" )\n"
             "\nSend asset amount to a given address. The amounts are real.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. address              (string, required) The address to send to.\n"
+            "1. \"address\"              (string, required) The address to send to.\n"
             "2. \"asset-identifier\" (string, required) Asset identifier - one of the following: issue txid, asset reference, asset name.\n"
             "3. asset-qty            (numeric, required) Asset quantity to send. eg 0.1\n"
             "4. native-amount        (numeric, optional) native currency amount to send. eg 0.1, Default: minimum-per-output.\n"
@@ -3088,11 +3131,11 @@ void mc_InitRPCHelpMap13()
 void mc_InitRPCHelpMap14()
 {
     mapHelpStrings.insert(std::make_pair("sendassettoaddress",
-            "sendassettoaddress address \"asset-identifier\" asset-qty ( native-amount \"comment\" \"comment-to\" )\n"
+            "sendassettoaddress \"address\" \"asset-identifier\" asset-qty ( native-amount \"comment\" \"comment-to\" )\n"
             "\nSend asset amount to a given address. The amounts are real.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. address              (string, required) The address to send to.\n"
+            "1. \"address\"              (string, required) The address to send to.\n"
             "2. \"asset-identifier\" (string, required) Asset identifier - one of the following: issue txid, asset reference, asset name.\n"
             "3. asset-qty            (numeric, required) Asset quantity to send. eg 0.1\n"
             "4. native-amount        (numeric, optional) native currency amount to send. eg 0.1, Default: minimum-per-output.\n"
@@ -3110,12 +3153,12 @@ void mc_InitRPCHelpMap14()
         ));
     
     mapHelpStrings.insert(std::make_pair("sendassetfrom",
-            "sendassetfrom from-address to-address \"asset-identifier\" asset-qty ( native-amount \"comment\" \"comment-to\" )\n"
+            "sendassetfrom \"from-address\" \"to-address\" \"asset-identifier\" asset-qty ( native-amount \"comment\" \"comment-to\" )\n"
             "\nSend an asset amount using specific address. \n" 
             + HelpRequiringPassphraseWrapper() + 
             "\nArguments:\n"
-            "1. from-address         (string, required) Address to send from. \n"
-            "2. to-address           (string, required) The address to send to.\n"
+            "1. \"from-address\"         (string, required) Address to send from. \n"
+            "2. \"to-address\"           (string, required) The address to send to.\n"
             "3. \"asset-identifier\" (string, required) Asset identifier - one of the following: issue txid, asset reference, asset name.\n"
             "4. asset-qty            (numeric, required) Asset quantity to send. eg 0.1\n"
             "5. native-amount        (numeric, optional) native currency amount to send. eg 0.1, Default: minimum-per-output.\n"
@@ -3133,12 +3176,12 @@ void mc_InitRPCHelpMap14()
         ));
     
     mapHelpStrings.insert(std::make_pair("sendfrom",
-            "sendfrom from-address to-address amount|asset-quantities ( \"comment\" \"comment-to\" )\n"
+            "sendfrom \"from-address\" \"to-address\" amount|asset-quantities ( \"comment\" \"comment-to\" )\n"
             "\nSend an amount (or several asset amounts) using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. from-address  (string, required) Address to send from.\n"
-            "2. to-address    (string, required) The address to send to.\n"
+            "1. \"from-address\"  (string, required) Address to send from.\n"
+            "2. \"to-address\"    (string, required) The address to send to.\n"
             "3. amount        (numeric, required) The amount in native currency to send. eg 0.1\n"
             "or\n"
             "3. asset-quantities    (object, required) A json object of assets to send\n"
@@ -3160,12 +3203,12 @@ void mc_InitRPCHelpMap14()
          ));
     
     mapHelpStrings.insert(std::make_pair("sendfromaddress",
-            "sendfrom from-address to-address amount|asset-quantities ( \"comment\" \"comment-to\" )\n"
+            "sendfrom \"from-address\" \"to-address\" amount|asset-quantities ( \"comment\" \"comment-to\" )\n"
             "\nSend an amount (or several asset amounts) using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. from-address  (string, required) Address to send from.\n"
-            "2. to-address    (string, required) The address to send to.\n"
+            "1. \"from-address\"  (string, required) Address to send from.\n"
+            "2. \"to-address\"    (string, required) The address to send to.\n"
             "3. amount        (numeric, required) The amount in native currency to send. eg 0.1\n"
             "or\n"
             "3. asset-quantities    (object, required) A json object of assets to send\n"
@@ -3190,7 +3233,7 @@ void mc_InitRPCHelpMap14()
             "sendfromaccount \"fromaccount\" toaddress amount ( minconf \"comment\" \"comment-to\" )\n"
             "\nSent an amount from an account to a address.\n"
             "The amount is a real and is rounded to the nearest 0.00000001."
-            + HelpRequiringPassphraseWrapper() + "\n"
+            + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"fromaccount\"       (string, required) The name of the account to send funds from. May be the default account using \"\".\n"
             "2. toaddress             (string, required) The address to send funds to.\n"
@@ -3215,7 +3258,7 @@ void mc_InitRPCHelpMap14()
     mapHelpStrings.insert(std::make_pair("sendmany",
             "sendmany \"fromaccount\" {\"address\":amount,...} ( minconf \"comment\" )\n"
             "\nSend multiple times. Amounts are double-precision floating point numbers."
-            + HelpRequiringPassphraseWrapper() + "\n"
+            + HelpRequiringPassphraseWrapper() + 
             "\nArguments:\n"
             "1. \"fromaccount\"         (string, required) The account to send the funds from, can be \"\" for the default account\n"
             "2. \"amounts\"             (string, required) A json object with addresses and amounts\n"
@@ -3238,11 +3281,11 @@ void mc_InitRPCHelpMap14()
         ));
     
     mapHelpStrings.insert(std::make_pair("sendwithdata",
-            "sendwithdata address amount|asset-quantities data-hex|object\n"
+            "sendwithdata \"address\" amount|asset-quantities \"data-hex\"|object\n"
             "\nSend an amount (or several asset amounts) to a given address with appended metadata. \n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. address     (string, required) The address to send to.\n"
+            "1. \"address\"     (string, required) The address to send to.\n"
             "2. amount      (numeric, required) The amount in native currency to send. eg 0.1\n"
             "or\n"
             "2. asset-quantities    (object, required) A json object of assets to send\n"
@@ -3250,7 +3293,7 @@ void mc_InitRPCHelpMap14()
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
             "    }\n"                                
-            "3. data-hex    (string, required) Data hex string\n"
+            "3. \"data-hex\"    (string, required) Data hex string\n"
             "or\n"
             "3. publish-new-stream-item    (object, required) A json object with stream item\n"
             "    {\n"                
@@ -3267,11 +3310,11 @@ void mc_InitRPCHelpMap14()
         ));
     
     mapHelpStrings.insert(std::make_pair("sendwithmetadata",
-            "sendwithmetadata address amount|asset-quantities data-hex|object\n"
+            "sendwithmetadata \"address\" amount|asset-quantities \"data-hex\"|object\n"
             "\nSend an amount (or several asset amounts) to a given address with appended metadata. \n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. address     (string, required) The address to send to.\n"
+            "1. \"address\"     (string, required) The address to send to.\n"
             "2. amount      (numeric, required) The amount in native currency to send. eg 0.1\n"
             "or\n"
             "2. asset-quantities    (object, required) A json object of assets to send\n"
@@ -3279,7 +3322,7 @@ void mc_InitRPCHelpMap14()
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
             "    }\n"                                
-            "3. data-hex    (string, required) Data hex string\n"
+            "3. \"data-hex\"    (string, required) Data hex string\n"
             "or\n"
             "3. publish-new-stream-item    (object, required) A json object with stream item\n"
             "    {\n"                
@@ -3296,12 +3339,12 @@ void mc_InitRPCHelpMap14()
         ));
     
     mapHelpStrings.insert(std::make_pair("sendwithdatafrom",
-            "sendwithdatafrom from-address to-address amount|asset-quantities data-hex|object\n"
+            "sendwithdatafrom \"from-address\" \"to-address\" amount|asset-quantities \"data-hex\"|object\n"
             "\nSend an amount (or several asset amounts) using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. from-address        (string, required) Address to send from.\n"
-            "2. to-address          (string, required) The address to send to.\n"
+            "1. \"from-address\"        (string, required) Address to send from.\n"
+            "2. \"to-address\"          (string, required) The address to send to.\n"
             "3. amount              (numeric, required) The amount in native currency to send. eg 0.1\n"
             "or\n"
             "3. asset-quantities    (object, required) A json object of assets to send\n"
@@ -3309,7 +3352,7 @@ void mc_InitRPCHelpMap14()
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
             "    }\n"                                
-            "4. data-hex            (string, required) Data hex string\n"
+            "4. \"data-hex\"            (string, required) Data hex string\n"
             "or\n"
             "4. publish-new-stream-item    (object, required) A json object with stream item\n"
             "    {\n"                
@@ -3383,11 +3426,11 @@ void mc_InitRPCHelpMap15()
         ));
     
     mapHelpStrings.insert(std::make_pair("signmessage",
-            "signmessage address \"message\"\n"
+            "signmessage \"address\" \"message\"\n"
             "\nSign a message with the private key of an address"
-            + HelpRequiringPassphraseWrapper() + "\n"
+            + HelpRequiringPassphraseWrapper() + 
             "\nArguments:\n"
-            "1. address             (string, required) The address to use for the private key.\n"
+            "1. \"address\"             (string, required) The address to use for the private key.\n"
             "2. \"message\"         (string, required) The message to create a signature of.\n"
             "\nResult:\n"
             "\"signature\"          (string) The signature of the message encoded in base 64\n"
@@ -3413,6 +3456,7 @@ void mc_InitRPCHelpMap15()
             "1. entity-identifier(s)      (array, optional) A json array of stream or asset identifiers \n"                
             "2. rescan               (boolean, optional, default=true) Rescan the wallet for transactions\n"
             "\nNote: This call can take minutes to complete if rescan is true.\n"
+            "\nResult:\n"
             "\nExamples:\n"
             "\nSubscribe to the stream with rescan\n"
             + HelpExampleCli("subscribe", "\"test-stream\"") +
@@ -3431,6 +3475,7 @@ void mc_InitRPCHelpMap15()
             "1. \"asset-identifier\"  (string, required) Asset identifier - one of the following: asset txid, asset reference, asset name.\n"
             "or\n"
             "1. entity-identifier(s)      (array, optional) A json array of stream or asset identifiers \n"                
+            "\nResult:\n"
             "\nExamples:\n"
             + HelpExampleCli("unsubscribe", "\"test-stream\"")
             + HelpExampleRpc("unsubscribe", "\"test-stream\", false")
@@ -3469,7 +3514,9 @@ void mc_InitRPCHelpMap15()
        
     mapHelpStrings.insert(std::make_pair("getruntimeparams",
             "getruntimeparams \n"
-            "Returns an object containing various runtime parameters.\n"
+            "\nReturns a selection of this node’s runtime parameters.\n"
+            "\nResult:\n"
+            "An object containing various runtime parameters\n"            
             "\nExamples:\n"
             + HelpExampleCli("getruntimeparams", "")
             + HelpExampleRpc("getruntimeparams", "")
@@ -3477,9 +3524,9 @@ void mc_InitRPCHelpMap15()
     
     mapHelpStrings.insert(std::make_pair("setruntimeparam",
             "setruntimeparam \"parameter-name\" parameter-value \n"
-            "Sets value for runtime parameter\n"
+            "\nSets value for runtime parameter\n"
             "\nArguments:\n"
-            "1. \"parameter-name\"  (string, required) Parameter name, one of the following:\n"
+            "1. \"parameter-name\"    (string, required) Parameter name, one of the following:\n"
             "                                           miningrequirespeers,\n"
             "                                           mineemptyrounds,\n"
             "                                           miningturnover,\n"
@@ -3491,6 +3538,7 @@ void mc_InitRPCHelpMap15()
             "                                           handshakelocal,\n"
             "                                           hideknownopdrops\n"
             "2. parameter-value     (required) parameter value\n"
+            "\nResult:\n"
             "\nExamples:\n"
             + HelpExampleCli("setruntimeparam", "\"miningturnover\" 0.3")
             + HelpExampleRpc("setruntimeparam", "\"miningturnover\", 0.3")
@@ -3531,7 +3579,7 @@ void mc_InitRPCHelpMap16()
     
     mapHelpStrings.insert(std::make_pair("approvefrom",
             "approvefrom from-address \"upgrade-identifier\" ( approve )\n"
-            "\nGrant permission using specific address.\n"
+            "\nApprove upgrade using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. from-address          (string, required) Address used for approval.\n"

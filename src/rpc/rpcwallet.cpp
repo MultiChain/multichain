@@ -47,7 +47,7 @@ static CCriticalSection cs_nWalletUnlockTime;
 std::string HelpRequiringPassphrase()
 {
     return pwalletMain && pwalletMain->IsCrypted()
-        ? "\nRequires wallet passphrase to be set with walletpassphrase call."
+        ? "\nRequires wallet passphrase to be set with walletpassphrase call.\n"
         : "";
 }
 
