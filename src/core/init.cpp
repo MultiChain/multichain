@@ -239,6 +239,25 @@ void HandleSIGTERM(int)
 #endif
 }
 
+string mc_ParseIPPort(string strAddr,int *port)
+{
+    *port=0;
+    string s_ip=strAddr;
+    stringstream ss(s_ip); 
+    string tok;
+    if(getline(ss, tok, ':'))
+    {
+        s_ip=tok;
+        if(getline(ss, tok, ':'))
+        {
+            *port=atoi(tok);
+        }
+    }            
+    return s_ip;
+}
+
+
+
 void HandleSIGHUP(int)
 {
     fReopenDebugLog = true;
@@ -320,7 +339,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -onion=<ip:port>       " + strprintf(_("Use separate SOCKS5 proxy to reach peers via Tor hidden services (default: %s)"), "-proxy") + "\n";
     strUsage += "  -onlynet=<net>         " + _("Only connect to nodes in network <net> (ipv4, ipv6 or onion)") + "\n";
     strUsage += "  -permitbaremultisig    " + strprintf(_("Relay non-P2SH multisig (default: %u)"), 1) + "\n";
-    strUsage += "  -port=<port>           " + strprintf(_("Listen for connections on <port> (default: %u or testnet: %u)"), 8333, 18333) + "\n";
+    strUsage += "  -port=<port>           " + _("Listen for connections on <port> ") + "\n";
     strUsage += "  -proxy=<ip:port>       " + _("Connect through SOCKS5 proxy") + "\n";
     strUsage += "  -seednode=<ip>         " + _("Connect to a node to retrieve peer addresses, and disconnect") + "\n";
     strUsage += "  -timeout=<n>           " + strprintf(_("Specify connection timeout in milliseconds (minimum: 1, default: %d)"), DEFAULT_CONNECT_TIMEOUT) + "\n";
@@ -1747,7 +1766,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
         if(found_ips > 1)
         {
-            sprintf(bufOutput,"\nThis host has multiple IP addresses, so from some networks:\n");
+            sprintf(bufOutput,"\nThis host has multiple IP addresses, so from some networks:\n\n");
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
             for(int i_ips=0;i_ips<found_ips;i_ips++)
             {
@@ -1755,7 +1774,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 {
                     unsigned char *ptr;
                     ptr=(unsigned char *)(all_ips+i_ips);
-                    sprintf(bufOutput,"multichaind %s@%u.%u.%u.%u:%d\n\n",mc_gState->m_NetworkParams->Name(),ptr[3],ptr[2],ptr[1],ptr[0],GetListenPort());
+                    sprintf(bufOutput,"multichaind %s@%u.%u.%u.%u:%d\n",mc_gState->m_NetworkParams->Name(),ptr[3],ptr[2],ptr[1],ptr[0],GetListenPort());
                     bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                     if(bytes_written != strlen(bufOutput))
                     {
@@ -1763,6 +1782,31 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     }
                 }                
             }        
+            sprintf(bufOutput,"\n");
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+        }
+        if (mapArgs.count("-externalip")) 
+        {            
+            sprintf(bufOutput,"\nBased on the -externalip setting, this node is reachable at:\n\n");
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+            BOOST_FOREACH(string strAddr, mapMultiArgs["-externalip"]) 
+            {
+                int port;
+                string s_ip=mc_ParseIPPort(strAddr,&port);
+                if(port>0)
+                {
+                    sprintf(bufOutput,"multichaind %s@%s\n",mc_gState->m_NetworkParams->Name(),strAddr.c_str());
+                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                    port=GetListenPort();
+                }
+                else
+                {
+                    sprintf(bufOutput,"multichaind %s@%s:%d\n",mc_gState->m_NetworkParams->Name(),strAddr.c_str(),GetListenPort());
+                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                    
+                }
+            }
+            sprintf(bufOutput,"\n");
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
         }
     }
     else
@@ -1785,10 +1829,19 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
     if (mapArgs.count("-externalip")) {
         BOOST_FOREACH(string strAddr, mapMultiArgs["-externalip"]) {
-            CService addrLocal(strAddr, GetListenPort(), fNameLookup);
+            int port;
+            string s_ip=mc_ParseIPPort(strAddr,&port);
+            if(port<=0)
+            {
+                port=GetListenPort();
+            }
+            
+//            CService addrLocal(strAddr, GetListenPort(), fNameLookup);
+            CService addrLocal(s_ip, port, fNameLookup);
             if (!addrLocal.IsValid())
                 return InitError(strprintf(_("Cannot resolve -externalip address: '%s'"), strAddr));
-            AddLocal(CService(strAddr, GetListenPort(), fNameLookup), LOCAL_MANUAL);
+//            AddLocal(CService(strAddr, GetListenPort(), fNameLookup), LOCAL_MANUAL);
+            AddLocal(CService(s_ip, port, fNameLookup), LOCAL_MANUAL);
         }
     }
 
