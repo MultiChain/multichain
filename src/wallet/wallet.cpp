@@ -2915,6 +2915,14 @@ bool CWallet::SelectMultiChainCoinsMinConf(const CAmount& nTargetValue, int nCon
         }
         if(setCoinsRet.size() == 0)
         {
+            if(nTargetValue == 0)
+            {
+                if (coinLowestLarger.second.first == 0)
+                    return false;
+                setCoinsRet.insert(coinLowestLarger.second);
+                nValueRet += coinLowestLarger.first;                
+                return true;
+            }
             return false;
         }
         return true;
