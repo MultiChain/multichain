@@ -90,7 +90,6 @@ bool AppInit(int argc, char* argv[])
     }
     
     
-    mc_ExpandDataDirParam();
     
     if(!mc_DoesParentDataDirExist())
     {

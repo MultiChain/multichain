@@ -137,7 +137,6 @@ static int AppInitRPC(int argc, char* argv[])
         return EXIT_SUCCESS;
     }
 
-    mc_ExpandDataDirParam();
     
     
 /*    
