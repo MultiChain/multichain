@@ -391,9 +391,17 @@ int MultichainNode_ApplyUpgrades()
     if(mc_gState->m_ProtocolVersionToUpgrade != OldProtocolVersion)
     {
         LogPrintf("New protocol upgrade version: %d (was %d)\n",mc_gState->m_ProtocolVersionToUpgrade,OldProtocolVersion);
-        if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+        if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->GetProtocolVersion())
         {
-            LogPrintf("NODE SHOULD BE UPGRADED FROM %d TO %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
+            LogPrintf("NODE SHOULD BE UPGRADED FROM %d TO %d\n",mc_gState->GetProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
+        }
+        else
+        {
+            if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+            {
+                LogPrintf("NODE IS UPGRADED FROM %d TO %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
+                mc_gState->m_NetworkParams->m_ProtocolVersion=mc_gState->m_ProtocolVersionToUpgrade;// UPGRADE CODE HERE
+            }        
         }
     }
     
@@ -3253,6 +3261,14 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
             
             nCanMine=pindexMostWork->nCanMine;
 /* MCHN START */            
+            
+            if( (mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion()) && 
+                chainActive.FindFork(pindexMostWork) == chainActive.Tip() )
+            {
+                LogPrintf("Cannot connect blocks, required protocol version upgrade %d -> %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
+                return true;                
+            }            
+            
             if(pindexMostWork->pprev != chainActive.Tip())
             {
                 if(chainActive.Tip())
@@ -3265,14 +3281,6 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
                     }
                 }
                 attempt++;
-            }
-            else
-            {
-                if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
-                {
-                    LogPrintf("Cannot connect more blocks, required protocol version upgrade %d -> %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
-                    return true;
-                }
             }
 /* MCHN END */            
 
@@ -4422,6 +4430,7 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
     
     // Preliminary checks
     bool checked = CheckBlock(*pblock, state);
+    bool activate=true;
         
     {
         LOCK(cs_main);
@@ -4447,6 +4456,15 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
             return error("%s : AcceptBlock FAILED", __func__);
         if(pindex)
         {
+            if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+            {
+                if(chainActive.FindFork(pindex) == chainActive.Tip())
+                {
+                    LogPrint("mcblock","Block %s is not connected, required protocol version upgrade %d -> %d\n",pindex->GetBlockHash().ToString().c_str(),
+                            mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
+                    activate=false;
+                }
+            }
             if(pindex->nHeight > nLastForkedHeight)
             {
                 if(pindex->nHeight <= chainActive.Height())
@@ -4461,7 +4479,6 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
     }
 
     
-    bool activate=true;
 /*    
     if(GetBoolArg("-waitforbetterblock",false))
     {
@@ -4480,8 +4497,10 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
         }
     }
  */ 
+    
     if(activate)
     {
+        
         if (!ActivateBestChain(state, pblock))
             return error("%s : ActivateBestChain failed", __func__);
     }
