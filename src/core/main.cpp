@@ -97,6 +97,7 @@ bool fReindex = false;
 bool fTxIndex = false;
 bool fIsBareMultisigStd = true;
 unsigned int nCoinCacheSize = 5000;
+int nLastForkedHeight=0;
 
 /** Fees smaller than this (in satoshi) are considered zero fee (for relaying and mining) */
 /* MCHN START */
@@ -808,6 +809,11 @@ unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans)
 int OrphanPoolSize()
 {
     return (int)mapOrphanTransactions.size();
+}
+
+int LastForkedHeight()
+{
+    return nLastForkedHeight;
 }
 
 
@@ -4439,8 +4445,22 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
         }
         if (!ret)
             return error("%s : AcceptBlock FAILED", __func__);
+        if(pindex)
+        {
+            if(pindex->nHeight > nLastForkedHeight)
+            {
+                if(pindex->nHeight <= chainActive.Height())
+                {
+                    if(pindex != chainActive.Tip())
+                    {
+                        nLastForkedHeight=pindex->nHeight;
+                    }
+                }
+            }
+        }
     }
 
+    
     bool activate=true;
 /*    
     if(GetBoolArg("-waitforbetterblock",false))
