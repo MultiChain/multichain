@@ -68,7 +68,7 @@ Value getinfo(const Array& params, bool fHelp)
 //    obj.push_back(Pair("protocolversion", PROTOCOL_VERSION));
     obj.push_back(Pair("version", mc_gState->GetVersion()));
     obj.push_back(Pair("nodeversion", mc_gState->GetNumericVersion()));
-    obj.push_back(Pair("protocolversion", mc_gState->m_NetworkParams->GetInt64Param("protocolversion")));
+    obj.push_back(Pair("protocolversion", mc_gState->m_NetworkParams->ProtocolVersion()));
     obj.push_back(Pair("chainname", string(mc_gState->m_NetworkParams->Name())));
     obj.push_back(Pair("description", string((char*)mc_gState->m_NetworkParams->GetParam("chaindescription",NULL))));
     obj.push_back(Pair("protocol", string((char*)mc_gState->m_NetworkParams->GetParam("chainprotocol",NULL))));    

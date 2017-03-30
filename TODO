@@ -1,8 +1,0 @@
-TO DO BEFORE MULTICHAIN 1.0 BETA
---------------------------------
-* Review and organize error codes
-* Review online and built-in documentation for consistency
-* Review upstream security patches since Bitcoin Core 0.10
-* Review and reduce log and other file sizes
-* Add interactive mode to multichain-cli for Windows
-* Port to Mac OS

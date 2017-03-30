@@ -30,6 +30,7 @@ using namespace std;
 
 bool CanMineWithLockedBlock();
 bool IsTxBanned(uint256 txid);
+int LastForkedHeight();
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -351,12 +352,12 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
             
             if(!mempool.exists(hash))
             {
-                LogPrint("mchn","mchn: Miner: Tx not found in the mempool: %s\n",hash.GetHex().c_str());
+                LogPrint("mchn","mchn-miner: Tx not found in the mempool: %s\n",hash.GetHex().c_str());
                 continue;
             }
             if(IsTxBanned(hash))
             {
-                LogPrint("mchn","mchn: Miner: Banned Tx: %s\n",hash.GetHex().c_str());
+                LogPrint("mchn","mchn-miner: Banned Tx: %s\n",hash.GetHex().c_str());
                 continue;                
             }
             
@@ -365,7 +366,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
             
             if (tx.IsCoinBase() || !IsFinalTx(tx, nHeight))
             {
-                LogPrint("mchn","mchn: Miner: Coinbase or not final tx found: %s\n",tx.GetHash().GetHex().c_str());
+                LogPrint("mchn","mchn-miner: Coinbase or not final tx found: %s\n",tx.GetHash().GetHex().c_str());
                 continue;
             }
             
@@ -422,7 +423,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
             }
             if (fMissingInputs)
             {
-                LogPrint("mchn","mchn: Miner: Missing inputs for %s\n",tx.GetHash().GetHex().c_str());
+                LogPrint("mchn","mchn-miner: Missing inputs for %s\n",tx.GetHash().GetHex().c_str());
                 continue;
             }
             
@@ -445,7 +446,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
 /* MCHN END */            
             if (porphan)
             {
-                LogPrint("mchn","mchn: Miner: Orphan %s\n",tx.GetHash().GetHex().c_str());
+                LogPrint("mchn","mchn-miner: Orphan %s\n",tx.GetHash().GetHex().c_str());
                 porphan->dPriority = dPriority;
                 porphan->feeRate = feeRate;
             }
@@ -489,7 +490,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
                 if(!overblocksize_logged)
                 {
                     overblocksize_logged=true;
-                    LogPrint("mchn","mchn: Miner: Over block size: %s\n",tx.GetHash().GetHex().c_str());
+                    LogPrint("mchn","mchn-miner: Over block size: %s\n",tx.GetHash().GetHex().c_str());
                 }
                 continue;
             }
@@ -497,7 +498,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
             unsigned int nTxSigOps = GetLegacySigOpCount(tx);
             if (nBlockSigOps + nTxSigOps >= MAX_BLOCK_SIGOPS)
             {
-                LogPrint("mchn","mchn: Miner: Over sigop count 1: %s\n",tx.GetHash().GetHex().c_str());
+                LogPrint("mchn","mchn-miner: Over sigop count 1: %s\n",tx.GetHash().GetHex().c_str());
                 continue;
             }
 
@@ -522,7 +523,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
 */
             if (!view.HaveInputs(tx))
             {
-                LogPrint("mchn","mchn: Miner: No inputs for %s\n",tx.GetHash().GetHex().c_str());
+                LogPrint("mchn","mchn-miner: No inputs for %s\n",tx.GetHash().GetHex().c_str());
                 continue;
             }
 
@@ -531,7 +532,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
             nTxSigOps += GetP2SHSigOpCount(tx, view);
             if (nBlockSigOps + nTxSigOps >= MAX_BLOCK_SIGOPS)
             {
-                LogPrint("mchn","mchn: Miner: Over sigop count 2: %s\n",tx.GetHash().GetHex().c_str());
+                LogPrint("mchn","mchn-miner: Over sigop count 2: %s\n",tx.GetHash().GetHex().c_str());
                 continue;
             }
 
@@ -545,7 +546,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
             if (!CheckInputs(tx, state, view, false, 0, true))    
 /* MCHN END */            
             {
-                LogPrint("mchn","mchn: Miner: CheckInput failure %s\n",tx.GetHash().GetHex().c_str());
+                LogPrint("mchn","mchn-miner: CheckInput failure %s\n",tx.GetHash().GetHex().c_str());
                 continue;
             }
                        
@@ -1204,6 +1205,7 @@ void static BitcoinMiner(CWallet *pwallet)
     
     int wSize=10;
     int wPos=0;
+    int EmptyBlockToMine;
     uint64_t wCount[10];
     double wTime[10];
     memset(wCount,0,wSize*sizeof(uint64_t));
@@ -1285,6 +1287,7 @@ void static BitcoinMiner(CWallet *pwallet)
             //
             unsigned int nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
             CBlockIndex* pindexPrev = chainActive.Tip();
+            EmptyBlockToMine=0;
             
             bool fMineEmptyBlocks=true;
             if(Params().MineEmptyRounds()+mc_gState->m_NetworkParams->ParamAccuracy()>= 0)
@@ -1333,6 +1336,15 @@ void static BitcoinMiner(CWallet *pwallet)
                 {
                     fMineEmptyBlocks=true;
                 }                
+            }
+            if(!fMineEmptyBlocks)
+            {
+                if(chainActive.Tip()->nHeight <= LastForkedHeight())
+                {
+                    EmptyBlockToMine=chainActive.Tip()->nHeight+1;
+                    LogPrint("mcminer","mchn-miner: Chain is forked on height %d, ignoring mine-empty-rounds, mining on height %d\n", LastForkedHeight(),chainActive.Tip()->nHeight+1);
+                    fMineEmptyBlocks=true;
+                }
             }
             if(fMineEmptyBlocks)
             {
@@ -1400,7 +1412,7 @@ void static BitcoinMiner(CWallet *pwallet)
             CBlock *pblock = &pblocktemplate->block;
             IncrementExtraNonce(pblock, pindexPrev, nExtraNonce,pwallet);
 
-            LogPrint("mcminer","mchn: Running MultiChainMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
+            LogPrint("mcminer","mchn-miner: Running MultiChainMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
                 ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION));
 
             //
@@ -1415,6 +1427,16 @@ void static BitcoinMiner(CWallet *pwallet)
             double wStartTime=mc_TimeNowAsDouble();
             uint64_t wThisCount=0;
             while (true) {
+                
+                if(EmptyBlockToMine)
+                {
+                    if(chainActive.Tip()->nHeight != EmptyBlockToMine-1)
+                    {
+                        LogPrint("mcminer","mchn-miner: Avoiding mining block %d, required %d\n", chainActive.Tip()->nHeight+1,EmptyBlockToMine);
+                        break;
+                    }
+                }
+                
                 bool fFound = ScanHash(pblock, nNonce, &hash, success_and_mask);
                 uint32_t nHashesDone = nNonce - nOldNonce;
                 nOldNonce = nNonce;

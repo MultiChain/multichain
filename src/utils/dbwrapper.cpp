@@ -332,7 +332,6 @@ int cs_Database::Write(char *key,int key_len,char *value,int value_len,int Optio
     {
         return MC_ERR_DBOPEN_ERROR;
     }
-    
     switch(m_Options & MC_OPT_DB_DATABASE_TYPE_MASK)
     {
         case MC_OPT_DB_DATABASE_LEVELDB:    
@@ -460,7 +459,18 @@ char *cs_Database::Read(char *key,int key_len,int *value_len,int Options,int *er
                 leveldb_iter_seek((leveldb_iterator_t*)m_Iterator, key, klen);
                 if(leveldb_iter_valid((leveldb_iterator_t*)m_Iterator))
                 {
-                    lpIterRead=leveldb_iter_value((leveldb_iterator_t*)m_Iterator, &vallen);
+                    lpIterRead=leveldb_iter_key((leveldb_iterator_t*)m_Iterator, &vallen);
+                    if(lpIterRead)
+                    {
+                        if( ((int)vallen == klen) && (memcmp(lpIterRead,key,klen) == 0) )
+                        {
+                            lpIterRead=leveldb_iter_value((leveldb_iterator_t*)m_Iterator, &vallen);                            
+                        }
+                        else
+                        {
+                            lpIterRead=NULL;
+                        }
+                    }                    
                 }
             }
             else

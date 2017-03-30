@@ -76,6 +76,7 @@ void mc_Params::Parse(int argc, const char* const argv[])
     int i,length;
     const char* exe_name;
     ParseParameters(argc,argv);
+    mc_ExpandDataDirParam();
     
     m_NumArguments=0;
     length=MC_DCT_SEED_NODE_MAX_SIZE+1;
@@ -364,6 +365,7 @@ void mc_CheckDataDirInConfFile()
         if(mapConfig->Get("datadir") != NULL)
         {
             mapArgs["-datadir"]=strprintf("%s",mapConfig->Get("datadir"));            
+            mc_ExpandDataDirParam();
         }
     }    
 }

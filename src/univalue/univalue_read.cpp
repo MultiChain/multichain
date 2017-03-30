@@ -42,7 +42,6 @@ static const char *hatoui(const char *first, const char *last,
 enum jtokentype getJsonToken(string& tokenVal, unsigned int& consumed,
                             const char *raw)
 {
-        printf("A\n");
     tokenVal.clear();
     consumed = 0;
 
@@ -174,7 +173,6 @@ enum jtokentype getJsonToken(string& tokenVal, unsigned int& consumed,
 
         string valStr;
         JSONUTF8StringFilter writer(valStr);
-        printf("A\n");
         
         while (*raw) {
 //            if (*raw < 0x20)
@@ -250,7 +248,6 @@ enum jtokentype getJsonToken(string& tokenVal, unsigned int& consumed,
 
         if (!writer.finalize())
             return JTOK_ERR;
-        printf("B\n");
         tokenVal = valStr;
         consumed = (raw - rawStart);
         return JTOK_STRING;

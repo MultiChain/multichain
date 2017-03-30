@@ -604,8 +604,10 @@ Value publishfrom(const Array& params, bool fHelp)
     lpDetailsScript->SetItemKey((unsigned char*)params[2].get_str().c_str(),params[2].get_str().size());
 
     lpDetailsScript->AddElement();
-    
-    lpDetailsScript->SetData(&dataData[0],dataData.size());
+    if(dataData.size())
+    {
+        lpDetailsScript->SetData(&dataData[0],dataData.size());
+    }
 
     size_t elem_size;
     const unsigned char *elem;

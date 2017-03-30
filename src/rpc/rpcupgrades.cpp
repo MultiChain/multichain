@@ -107,7 +107,7 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
                 {
                     throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid protocol version, should be non-negative");                                                                                    
                 }
-                if(protocol_version > mc_gState->m_NetworkParams->m_ProtocolVersion)
+                if(protocol_version > mc_gState->GetProtocolVersion())
                 {
                     throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid protocol version, cannot upgrade to future version");                                                                                    
                 }
