@@ -39,6 +39,9 @@
 #define MC_PLS_SIZE_HASH              32
 #define MC_PLS_SIZE_UPGRADE           16
 
+#define MC_PSE_UPGRADE                0x01                                      
+#define MC_PSE_ADMINMINERLIST         0x02                                      
+
 
 
 typedef struct mc_MempoolPermissionRow
@@ -61,6 +64,7 @@ typedef struct mc_PermissionDBRow
     uint32_t m_Flags;                                                           // Flags MC_PFL_ constants
     uint32_t m_Reserved1;                                                       // Reserved to align to 80 bytes
     void Zero();
+    int InBlockRange(uint32_t block);
 } mc_PermissionDBRow;
 
 /** Database */
@@ -282,6 +286,11 @@ typedef struct mc_Permissions
     
     void MempoolPermissionsCopy();
     int MempoolPermissionsCheck(int from, int to);
+
+    int RollBackBeforeMinerVerification(uint32_t block);
+    int RestoreAfterMinerVerification();
+    int AddAdminMiner(const void* lpAddress,uint32_t type);
+    
     
     
 // Internal functions    
