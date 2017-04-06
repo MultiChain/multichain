@@ -1672,7 +1672,8 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
                         {
                             if(memcmp(entity->GetTxID(),&(txin.prevout.hash),sizeof(uint256)) == 0)
                             {
-                                if(memcmp(bufEmptyAssetRef,amounts->GetRow(i),MC_AST_ASSET_QUANTITY_OFFSET) == 0)
+                                if( mc_GetABRefType(amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_GENESIS )                    
+//                                if(memcmp(bufEmptyAssetRef,amounts->GetRow(i),MC_AST_ASSET_QUANTITY_OFFSET) == 0)
                                 {
                                     quantity=mc_GetABQuantity(amounts->GetRow(i));
                                 }                            
@@ -1722,7 +1723,8 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
                     {
                         if(memcmp(entity->GetTxID(),&hash,sizeof(uint256)) == 0)
                         {
-                            if(memcmp(bufEmptyAssetRef,amounts->GetRow(i),MC_AST_ASSET_QUANTITY_OFFSET) == 0)
+                            if( mc_GetABRefType(amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_GENESIS )                    
+//                            if(memcmp(bufEmptyAssetRef,amounts->GetRow(i),MC_AST_ASSET_QUANTITY_OFFSET) == 0)
                             {
                                 quantity=mc_GetABQuantity(amounts->GetRow(i));
                             }                            
