@@ -665,7 +665,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
 
             txid=tx.GetHash();
             err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_CONNECT,
-                    (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool);
+                    (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
         }
             
         for (unsigned int i = 0; i < issuers.size(); i++)
@@ -680,7 +680,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                     if(new_issue)
                     {
                         err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_ADMIN | MC_PTP_ISSUE,
-                                (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool);
+                                (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
                     }
                     stored_issuers.insert(issuers[i]);
                 }
@@ -777,7 +777,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                  int offset,
                                  bool accept,
                                  string& reason,
-                                 bool *replay)
+                                 uint32_t *replay)
 {
     bool fScriptHashAllFound;
     bool fSeedNodeInvolved;
@@ -786,6 +786,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
     bool fRejectIfOpDropOpReturn;
     bool fCheckCachedScript;
     bool fFullReplayCheckRequired;
+    bool fAdminMinerGrant;
     int nNewEntityOutput;
     unsigned char details_script[MC_ENT_MAX_SCRIPT_SIZE];
     int details_script_size;
@@ -818,6 +819,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
     }
     
     fFullReplayCheckRequired=false;
+    fAdminMinerGrant=false;
     fScriptHashAllFound=false;     
     fRejectIfOpDropOpReturn=false;
     mc_gState->m_TmpAssetsIn->Clear();
@@ -1300,7 +1302,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                         if( (vInputHashTypes[i] == SIGHASH_ALL) || ( (vInputHashTypes[i] == SIGHASH_SINGLE) && (i == j) ) )
                                         {
                                             if(mc_gState->m_Permissions->SetApproval(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,approval,
-                                                                                     (unsigned char*)&vInputDestinations[i],entity.UpgradeStartBlock(),timestamp,MC_PFL_NONE,1) == 0)
+                                                                                     (unsigned char*)&vInputDestinations[i],entity.UpgradeStartBlock(),timestamp,MC_PFL_NONE,1,offset) == 0)
                                             {
                                                 fAdminFound=true;
                                             }                                                                                    
@@ -1519,6 +1521,10 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                     if(mc_gState->m_Features->CachedInputScript())
                                     {
                                         type &= ( MC_PTP_MINE | MC_PTP_ADMIN );                                        
+                                        if(type)
+                                        {
+                                            fAdminMinerGrant=true;                                            
+                                        }
                                     }
                                     else                                        
                                     {
@@ -1608,7 +1614,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                             if( ( (type & (MC_PTP_ADMIN | MC_PTP_MINE)) == 0) || vInputCanGrantAdminMine[i] || (entity.GetEntityType() > 0) )
                                             {
                                                 fFullReplayCheckRequired=true;
-                                                if(mc_gState->m_Permissions->SetPermission(entity.GetTxID(),ptr,type,(unsigned char*)&vInputDestinations[i],from,to,timestamp,flags,1) == 0)
+                                                if(mc_gState->m_Permissions->SetPermission(entity.GetTxID(),ptr,type,(unsigned char*)&vInputDestinations[i],from,to,timestamp,flags,1,offset) == 0)
                                                 {
                                                     fAdminFound=true;
                                                 }
@@ -1805,7 +1811,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
         {
             memset(opener_buf,0,sizeof(opener_buf));
             err=mc_gState->m_Permissions->SetPermission(&txid,opener_buf,MC_PTP_CONNECT,
-                    (unsigned char*)openers[0].begin(),0,(uint32_t)(-1),timestamp, MC_PFL_ENTITY_GENESIS ,update_mempool);
+                    (unsigned char*)openers[0].begin(),0,(uint32_t)(-1),timestamp, MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
         }
         for (unsigned int i = 0; i < openers.size(); i++)
         {
@@ -1820,7 +1826,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                     {
                                                                                 // Granting default permissions to openers
                         err=mc_gState->m_Permissions->SetPermission(&txid,opener_buf,MC_PTP_ADMIN | MC_PTP_ACTIVATE | MC_PTP_WRITE,
-                                (unsigned char*)openers[i].begin(),0,(uint32_t)(-1),timestamp,opener_flags[i] | MC_PFL_ENTITY_GENESIS ,update_mempool);
+                                (unsigned char*)openers[i].begin(),0,(uint32_t)(-1),timestamp,opener_flags[i] | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
                     }
                     stored_openers.insert(openers[i]);
                 }
@@ -1911,7 +1917,15 @@ exitlbl:
 
     if(replay)
     {
-        *replay=fFullReplayCheckRequired;
+        *replay=0;
+        if(fFullReplayCheckRequired)
+        {
+            *replay |= MC_PPL_REPLAY;
+        }
+        if(fAdminMinerGrant)
+        {
+            *replay |= MC_PPL_ADMINMINERGRANT;
+        }
     }
 
     if(fReject)
@@ -1921,6 +1935,297 @@ exitlbl:
 
     return !fReject;
 }
+
+bool AcceptAdminMinerPermissions(const CTransaction& tx,
+                                 int offset,
+                                 bool verify_signatures,
+                                 string& reason,
+                                 uint32_t *result)
+{
+    vector <txnouttype> vInputScriptTypes;
+    vector <uint160> vInputDestinations;
+    vector <int> vInputHashTypes;
+    vector <bool> vInputCanGrantAdminMine;
+    vector <bool> vInputHadAdminPermissionBeforeThisTx;
+    vector <CScript> vInputPrevOutputScripts;
+    bool fReject;    
+    bool fAdminFound;
+    int err;
+
+    if(result)
+    {
+        *result=0;
+    }
+    
+    if(tx.IsCoinBase())
+    {
+        return true;
+    }
+    
+    for (unsigned int i = 0; i < tx.vin.size(); i++)                            
+    {                                                                                                                                                                
+        vInputCanGrantAdminMine.push_back(false);
+        vInputPrevOutputScripts.push_back(CScript());
+        vInputDestinations.push_back(0);
+    }
+    
+    fReject=false;
+    fAdminFound=false;
+    for (unsigned int j = 0; j < tx.vout.size(); j++)
+    {
+        int cs_offset,cs_new_offset,cs_size,cs_vin;
+        unsigned char *cs_script;
+            
+        const CScript& script1 = tx.vout[j].scriptPubKey;        
+        CScript::const_iterator pc1 = script1.begin();
+
+
+        mc_gState->m_TmpScript->Clear();
+        mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+                       
+        if(mc_gState->m_TmpScript->IsOpReturnScript())                      
+        {                
+            if( mc_gState->m_TmpScript->GetNumElements() == 2 ) 
+            {
+                mc_gState->m_TmpScript->SetElement(0);
+                                                  
+                if(mc_gState->m_Features->CachedInputScript())
+                {
+                    cs_offset=0;
+                    while( (err=mc_gState->m_TmpScript->GetCachedScript(cs_offset,&cs_new_offset,&cs_vin,&cs_script,&cs_size)) != MC_ERR_WRONG_SCRIPT )
+                    {
+                        if(err != MC_ERR_NOERROR)
+                        {
+                            reason="Metadata script rejected - error in cached script";
+                            fReject=true;
+                            goto exitlbl;                                                                                                                            
+                        }
+                        if(cs_offset)
+                        {
+                            if( cs_vin >= (int)tx.vin.size() )
+                            {
+                                reason="Metadata script rejected - invalid input in cached script";
+                                fReject=true;
+                                goto exitlbl;                                                                                                                                                                
+                            }
+                            vInputPrevOutputScripts[cs_vin]=CScript(cs_script,cs_script+cs_size);                            
+                            vInputCanGrantAdminMine[cs_vin]=true;
+                            fAdminFound=true;
+                        }
+                        cs_offset=cs_new_offset;
+                    }
+                }
+            }
+        }
+    }
+
+    if(!fAdminFound)
+    {
+        goto exitlbl;                                                                                                                                                                        
+    }
+    
+    fAdminFound=false;
+    
+    for (unsigned int i = 0; i < tx.vin.size(); i++)        
+    {                                                                                                                                                                
+        if(vInputCanGrantAdminMine[i])
+        {
+            vInputCanGrantAdminMine[i]=false;
+            const CScript& script2 = tx.vin[i].scriptSig;        
+            CScript::const_iterator pc2 = script2.begin();
+            if(mc_gState->m_Features->FixedIn10007())
+            {
+                if (!script2.IsPushOnly())
+                {
+                    reason="sigScript should be push-only";
+                    fReject=true;
+                    goto exitlbl;                                                                                                                                                                
+                }
+            }
+
+            const CScript& script1 = vInputPrevOutputScripts[i];        
+            CScript::const_iterator pc1 = script1.begin();
+
+            txnouttype typeRet;
+            int nRequiredRet;
+            vector<CTxDestination> addressRets;
+            int op_addr_offset,op_addr_size,is_redeem_script,sighash_type,check_last;
+
+            sighash_type=SIGHASH_NONE;
+            if(ExtractDestinations(script1,typeRet,addressRets,nRequiredRet)) 
+            {
+                if ( (typeRet != TX_NULL_DATA) && (typeRet != TX_MULTISIG) )                                  
+                {
+                    CKeyID *lpKeyID=boost::get<CKeyID> (&addressRets[0]);
+                    CScriptID *lpScriptID=boost::get<CScriptID> (&addressRets[0]);
+                    if( (lpKeyID == NULL) && (lpScriptID == NULL) )
+                    {
+                        fReject=true;
+                        goto exitlbl;                                                                                                                                                                
+                    }
+                    if(lpKeyID)
+                    {
+                        vInputDestinations[i]=*(uint160*)lpKeyID;                               
+                    }
+                    if(lpScriptID)
+                    {
+                        vInputDestinations[i]=*(uint160*)lpScriptID;                               
+                    }
+
+                    check_last=0;
+                    if( typeRet == TX_PUBKEY )
+                    {
+                        check_last=1;
+                    }
+
+                                                                                // Find sighash_type
+                    mc_ExtractAddressFromInputScript((unsigned char*)(&pc2[0]),(int)(script2.end()-pc2),&op_addr_offset,&op_addr_size,&is_redeem_script,&sighash_type,check_last);        
+                    if(sighash_type == SIGHASH_ALL)
+                    {
+                        if(mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)&vInputDestinations[i]))
+                        {
+                            vInputCanGrantAdminMine[i]=true;
+                            if(verify_signatures)
+                            {
+                                vInputCanGrantAdminMine[i]=false;
+                                if(VerifyScript(script2, script1, STANDARD_SCRIPT_VERIFY_FLAGS, CachingTransactionSignatureChecker(&tx, i, false)))
+                                {
+                                    vInputCanGrantAdminMine[i]=true;
+                                }
+                                else
+                                {
+                                    reason="Signature verification error";
+                                    fReject=true;
+                                    goto exitlbl;                                                                                                                                                                                                    
+                                }
+                            }
+                            if(vInputCanGrantAdminMine[i])
+                            {
+                                fAdminFound=true;
+                            }
+                        }                                                                
+                    }
+                }
+            }    
+        }        
+    }    
+    
+    if(!fAdminFound)
+    {
+        goto exitlbl;                                                                                                                                                                        
+    }
+    
+    for (unsigned int j = 0; j < tx.vout.size(); j++)
+    {
+        unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
+        mc_EntityDetails entity;
+        uint32_t type,from,to,timestamp,flags;
+            
+        const CScript& script1 = tx.vout[j].scriptPubKey;        
+        CScript::const_iterator pc1 = script1.begin();
+
+
+        mc_gState->m_TmpScript->Clear();
+        mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+        
+        CTxDestination addressRet;
+
+        if(ExtractDestination(script1,addressRet))
+        {            
+            entity.Zero();                                                  
+            for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
+            {
+                mc_gState->m_TmpScript->SetElement(e);
+                if(mc_gState->m_TmpScript->GetEntity(short_txid) == 0)      
+                {
+                    if(entity.GetEntityType())
+                    {
+                        reason="Script rejected - duplicate entity script";
+                        fReject=true;
+                        goto exitlbl;                                                
+                    }
+                }
+                else                                                        
+                {   
+                    if(mc_gState->m_TmpScript->GetPermission(&type,&from,&to,&timestamp) == 0)
+                    {                        
+                        type &= ( MC_PTP_MINE | MC_PTP_ADMIN );                                        
+                        if(entity.GetEntityType())
+                        {
+                            type=0;
+                        }
+                        if(type)
+                        {
+                            CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
+                            CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
+                            if((lpKeyID == NULL) && (lpScriptID == NULL))
+                            {
+                                reason="Permission script rejected - wrong destination type";
+                                fReject=true;
+                                goto exitlbl;
+                            }
+                            unsigned char* ptr=NULL;
+                            flags=MC_PFL_NONE;
+                            if(lpKeyID != NULL)
+                            {
+                                ptr=(unsigned char*)(lpKeyID);
+                            }
+                            else
+                            {
+                                flags=MC_PFL_IS_SCRIPTHASH;
+                                ptr=(unsigned char*)(lpScriptID);
+                            }
+                            fAdminFound=false;
+                            for (unsigned int i = 0; i < tx.vin.size(); i++)
+                            {
+                                if(vInputCanGrantAdminMine[i])
+                                {
+                                    if(mc_gState->m_Permissions->SetPermission(entity.GetTxID(),ptr,type,(unsigned char*)&vInputDestinations[i],from,to,timestamp,flags,1,offset) == 0)
+                                    {
+                                        fAdminFound=true;
+                                    }                                
+                                }
+                            }    
+                            if(!fAdminFound)
+                            {
+                                reason="Inputs don't belong to valid admin";
+                                fReject=true;
+                                goto exitlbl;                                                            
+                            }                                
+                            else
+                            {
+                                if(result)
+                                {
+                                    *result |= MC_PPL_ADMINMINERGRANT;
+                                }                                
+                            }
+                        }
+                        entity.Zero();                                                                                          
+                    }
+                    else                                                   
+                    {
+                        if(entity.GetEntityType())                              
+                        {
+                            reason="Script rejected - entity script should be followed by permission";
+                            fReject=true;
+                            goto exitlbl;                                                
+                        }
+                    }
+                }
+            }                                                                              
+        }
+    }    
+    
+exitlbl:        
+    
+    if(fReject)
+    {
+        LogPrint("mchn","mchn: AcceptAdminMinerPermissions: Tx rejected: %s\n",EncodeHexTx(tx));
+    }
+
+    return !fReject;
+}
+
 
 /**
  * Used only for protocols < 10006
@@ -2355,7 +2660,7 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
 
             txid=tx.GetHash();
             err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_CONNECT,
-                    (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool);
+                    (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
         }
             
         for (unsigned int i = 0; i < issuers.size(); i++)
@@ -2369,7 +2674,7 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
                     if(new_issue)
                     {
                         err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_ADMIN | MC_PTP_ISSUE,
-                                (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool);
+                                (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
                     }
                     stored_issuers.insert(issuers[i]);
                 }
@@ -2745,7 +3050,7 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
                                         {
                                             elem = lpInputScript->GetData(1,&elem_size);
                                             const unsigned char *pubkey_hash=(unsigned char *)Hash160(elem,elem+elem_size).begin();
-                                            if(mc_gState->m_Permissions->SetPermission(NULL,ptr,type,pubkey_hash,from,to,timestamp,flags,1) == 0)
+                                            if(mc_gState->m_Permissions->SetPermission(NULL,ptr,type,pubkey_hash,from,to,timestamp,flags,1,-1) == 0)
                                             {
                                                 admin_found=true;
                                             }

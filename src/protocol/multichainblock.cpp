@@ -19,7 +19,12 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                  int offset,
                                  bool accept,
                                  string& reason,
-                                 bool *replay);
+                                 uint32_t *replay);
+bool AcceptAdminMinerPermissions(const CTransaction& tx,
+                                 int offset,
+                                 bool verify_signatures,
+                                 string& reason,
+                                 uint32_t *result);
 bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs, string& reason);
 bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& reason);
 bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string& reason);
@@ -323,6 +328,199 @@ bool VerifyBlockSignature(CBlock *block,bool force)
 
 /* MCHN END */
 
+bool ReadTxFromDisk(CBlockIndex* pindex,int32_t offset,CTransaction& tx)
+{
+    CAutoFile file(OpenBlockFile(pindex->GetBlockPos(), true), SER_DISK, CLIENT_VERSION);
+    if (file.IsNull())
+    {
+        LogPrintf("VerifyBlockMiner: Could not load block %s (height %d) from disk\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
+        return false;
+    }
+    try 
+    {
+        fseek(file.Get(), offset, SEEK_CUR);
+        file >> tx;
+    } 
+    catch (std::exception &e) 
+    {
+        LogPrintf("VerifyBlockMiner: Could not deserialize tx at offset %d block %s (height %d) from disk\n",offset,pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
+        return false;
+    }
+
+    return true;
+}
+
+bool VerifyBlockMiner(const CBlock& block,CBlockIndex* pindexNew)
+{
+    if( (mc_gState->m_NetworkParams->IsProtocolMultichain() == 0) ||
+        (mc_gState->m_Features->CachedInputScript() == 0) ||
+        (mc_gState->m_NetworkParams->GetInt64Param("supportminerprecheck") == 0) ||
+        (mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine")) )                               
+    {
+        return true;
+    }
+    
+    if(pindexNew->pprev == NULL)
+    {
+        return true;        
+    }
+    bool fReject=false;
+    const CBlockIndex *pindexFork = chainActive.FindFork(pindexNew);
+    CBlockIndex *pindex;
+    const CBlock *pblock;
+    CBlock branch_block;
+    vector <CBlockIndex *> branch;
+    vector <uint160> miners;
+    int pos,branch_size,record,i;
+    uint32_t last_after_fork;
+    bool fVerify;
+    int32_t offsets[MC_PLS_SIZE_OFFSETS_PER_ROW];
+    uint256 block_hash;
+    vector<unsigned char> vchPubKey;
+    
+    branch_size=pindexNew->nHeight-pindexFork->nHeight;
+    branch.resize(branch_size);
+    miners.resize(branch_size);
+        
+    pos=branch_size-1;
+    pindex=pindexNew;
+    vchPubKey=vector<unsigned char> (block.vSigner+1, block.vSigner+1+block.vSigner[0]);
+    CPubKey pubKeyNew(vchPubKey);
+    CKeyID pubKeyHashNew=pubKeyNew.GetID();
+    miners[pos]=*(uint160*)(pubKeyHashNew.begin());      
+    
+    while(pindex != pindexFork)
+    {
+        if(pindex->nStatus & BLOCK_FAILED_MASK)
+        {
+            LogPrintf("VerifyBlockMiner: Invalid block %s (height %d)\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
+            fReject=true;
+            goto exitlbl;            
+        }
+        
+        branch[pos]=pindex;
+        pos--;
+        pindex=pindex->pprev;
+    }
+
+    LogPrint("mchn","VerifyBlockMiner: Block: %d, Fork: %d, Chain: %d\n",pindexNew->nHeight,pindexFork->nHeight,mc_gState->m_Permissions->m_Block);
+    last_after_fork=0;
+    mc_gState->m_Permissions->RollBackBeforeMinerVerification(pindexFork->nHeight);
+    LogPrint("mchn","Rolled back to block %d\n",mc_gState->m_Permissions->m_Block);
+
+    for(pos=0;pos<branch_size;pos++)
+    {
+        LogPrint("mchn","Verifying block %d\n",mc_gState->m_Permissions->m_Block+1);
+        pindex=branch[pos];
+        block_hash=pindex->GetBlockHash();
+        fVerify=false;
+        pblock=NULL;
+        if(pindex == pindexNew)
+        {
+            fVerify=true;
+            pblock=&block;            
+        }
+        if(!fVerify && (mc_gState->m_Permissions->GetBlockMiner(&block_hash,(unsigned char*)&miners[pos]) != MC_ERR_NOERROR) )
+        {
+            LogPrint("mchn","Verified block %s (height %d)\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
+            if(miners[pos] == miners[branch_size - 1])
+            {
+                last_after_fork=pindex->nHeight;
+            }
+            record=1;
+            while(mc_gState->m_Permissions->GetBlockAdminMinerGrants(&block_hash,record,offsets) == MC_ERR_NOERROR)
+            {
+                for(i=0;i<MC_PLS_SIZE_OFFSETS_PER_ROW;i++)
+                {
+                    if(offsets[i])
+                    {
+                        CTransaction tx;
+                        string reason;
+                        if(!ReadTxFromDisk(pindex,offsets[i],tx))
+                        {
+                            fReject=true;
+                            goto exitlbl;                            
+                        }
+                        LogPrint("mchn","Grant tx %s in block %s (height %d)\n",tx.GetHash().ToString().c_str(),reason.c_str(),pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
+                        if(!AcceptAdminMinerPermissions(tx,offsets[i],false,reason,NULL))
+                        {
+                            LogPrintf("VerifyBlockMiner: tx %s: %s\n",tx.GetHash().ToString().c_str(),reason.c_str());
+                            fReject=true;
+                            goto exitlbl;                            
+                        }
+                    }
+                }
+            }
+            mc_gState->m_Permissions->IncrementBlock();
+        }
+        else
+        {
+            if(pblock == NULL)
+            {
+                LogPrint("mchn","Unverified block %s (height %d)\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
+                if (!ReadBlockFromDisk(branch_block, pindex))
+                {
+                    LogPrintf("VerifyBlockMiner: Could not load block %s (height %d) from disk\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
+                    fReject=true;
+                    goto exitlbl;
+                }
+                pblock = &branch_block;                
+                vchPubKey=vector<unsigned char> (branch_block.vSigner+1, branch_block.vSigner+1+branch_block.vSigner[0]);
+                CPubKey pubKey(vchPubKey);
+                CKeyID pubKeyHash=pubKey.GetID();
+                miners[pos]=*(uint160*)(pubKeyHash.begin());      
+                if(miners[pos] == miners[branch_size - 1])
+                {
+                    last_after_fork=pindex->nHeight;
+                }
+            }
+            else
+            {
+                LogPrint("mchn","New block %s (height %d)\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
+                if(mc_gState->m_Permissions->CanMineBlockOnFork(&miners[pos],pindex->nHeight,last_after_fork) == 0)
+                {
+                    LogPrintf("VerifyBlockMiner: Permission denied for miner %s received in block signature\n",CBitcoinAddress(pubKeyHashNew).ToString().c_str());
+                    fReject=true;
+                    goto exitlbl;                    
+                }
+            }
+            int off=GetSizeOfCompactSize(pblock->vtx.size());
+            for (unsigned int i = 0; i < pblock->vtx.size(); i++)
+            {
+                const CTransaction &tx = pblock->vtx[i];
+                string reason;
+                uint32_t result;
+                int mempool_size=mc_gState->m_Permissions->m_MemPool->GetCount();
+                if(!AcceptAdminMinerPermissions(tx,off,fVerify,reason,&result))
+                {
+                    LogPrintf("VerifyBlockMiner: tx %s: %s\n",tx.GetHash().ToString().c_str(),reason.c_str());
+                    fReject=true;
+                    goto exitlbl;                            
+                }
+                if(mempool_size != mc_gState->m_Permissions->m_MemPool->GetCount())
+                {
+                    LogPrint("mchn","Grant tx %s in block %s (height %d)\n",tx.GetHash().ToString().c_str(),pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
+                }
+                
+                off+=tx.GetSerializeSize(SER_NETWORK,tx.nVersion);
+            }
+            mc_gState->m_Permissions->StoreBlockInfo(&miners[pos],&block_hash);
+        }
+    }
+    
+exitlbl:
+                
+    LogPrint("mchn","Restoring chain, block %d\n",mc_gState->m_Permissions->m_Block);
+    mc_gState->m_Permissions->RestoreAfterMinerVerification();
+    LogPrint("mchn","VerifyBlockMiner: Restored on block %d\n",mc_gState->m_Permissions->m_Block);
+
+    if(fReject)
+    {
+        LogPrintf("VerifyBlockMiner: Block %s (height %d) miner verification failed\n",pindexNew->GetBlockHash().ToString().c_str(),pindexNew->nHeight);        
+    }
+
+    return !fReject;
+}
 
 
 bool CheckBlockPermissions(const CBlock& block,CBlockIndex* prev_block,unsigned char *lpMinerAddress)

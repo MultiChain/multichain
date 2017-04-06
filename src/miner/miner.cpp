@@ -1469,7 +1469,8 @@ void static BitcoinMiner(CWallet *pwallet)
                         {
                             if(!ProcessBlockFound(pblock, *pwallet, reservekey))
                             {
-                                __US_Sleep(1000);                                            
+                                __US_Sleep(1000);
+                                boost::this_thread::interruption_point();                                                                    
                             }
                         }
 /* MCHN END */                        

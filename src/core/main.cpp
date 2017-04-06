@@ -52,13 +52,14 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                  int offset,
                                  bool accept,
                                  string& reason,
-                                 bool *replay);
+                                 uint32_t *replay);
 bool ExtractDestinationScriptValid(const CScript& scriptPubKey, CTxDestination& addressRet);
 bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs, string& reason);
 bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& reason);
 bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string& reason);
 bool ReplayMemPool(CTxMemPool& pool, int from,bool accept);
 bool VerifyBlockSignature(CBlock *block,bool force);
+bool VerifyBlockMiner(const CBlock& block,CBlockIndex* pindexNew);
 bool CheckBlockPermissions(const CBlock& block,CBlockIndex* prev_block,unsigned char *lpMinerAddress);
 bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,bool *disconnect_flag);
 bool PushMultiChainVerack(CNode* pfrom, bool fIsVerackack);
@@ -1466,7 +1467,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                 
 /* MCHN START */
         
-        bool replay=true;
+        uint32_t replay=0;
         int permissions_from,permissions_to;
         permissions_from=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
         
@@ -1501,7 +1502,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             }
         }
         permissions_to=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
-        entry.SetReplayNodeParams(replay,permissions_from,permissions_to);
+        entry.SetReplayNodeParams(( (replay & MC_PPL_REPLAY) != 0) ? true : false,permissions_from,permissions_to);
 /* MCHN END */
         // Store transaction in memory
         pool.addUnchecked(hash, entry);
@@ -4352,6 +4353,13 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
             return error("AcceptBlock() : ReceivedBlockTransactions failed");
     } catch(std::runtime_error &e) {
         return state.Abort(std::string("System error: ") + e.what());
+    }
+
+    if(!VerifyBlockMiner(block,pindex))
+    {
+        pindex->nStatus |= BLOCK_FAILED_VALID;
+        setDirtyBlockIndex.insert(pindex);
+        return false;
     }
 
     return true;

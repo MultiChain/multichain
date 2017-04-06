@@ -830,7 +830,7 @@ int mc_AssetDB::InsertEntity(const void* txid, int offset, int entity_type, cons
     {
         if(entity_type == MC_ENT_TYPE_UPGRADE)
         {
-            return mc_gState->m_Permissions->SetApproval((unsigned char*)txid+MC_AST_SHORT_TXID_OFFSET,1,NULL,upgrade_start_block,mc_TimeNowAsUInt(),MC_PFL_ENTITY_GENESIS,update_mempool);
+            return mc_gState->m_Permissions->SetApproval((unsigned char*)txid+MC_AST_SHORT_TXID_OFFSET,1,NULL,upgrade_start_block,mc_TimeNowAsUInt(),MC_PFL_ENTITY_GENESIS,update_mempool,offset);
         }
     }
     

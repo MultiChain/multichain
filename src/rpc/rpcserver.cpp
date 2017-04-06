@@ -1173,7 +1173,7 @@ static Object JSONRPCExecOne(const Value& req)
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
-        LogPrint("mcapi","mcapi: API request failure\n");        
+        LogPrint("mcapi","mcapi: API request failure A\n");        
 /* MCHN END */    
         rpc_result = JSONRPCReplyObj(Value::null, objError, jreq.id);
     }
@@ -1181,7 +1181,7 @@ static Object JSONRPCExecOne(const Value& req)
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
-        LogPrint("mcapi","mcapi: API request failure\n");        
+        LogPrint("mcapi","mcapi: API request failure B\n");        
 /* MCHN END */    
         rpc_result = JSONRPCReplyObj(Value::null,
                                      JSONRPCError(RPC_PARSE_ERROR, e.what()), jreq.id);
@@ -1265,7 +1265,7 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
-        LogPrint("mcapi","mcapi: API request failure\n");        
+        LogPrint("mcapi","mcapi: API request failure C\n");        
 /* MCHN END */    
         ErrorReply(conn->stream(), objError, jreq.id);
         return false;
@@ -1274,7 +1274,7 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
-        LogPrint("mcapi","mcapi: API request failure\n");        
+        LogPrint("mcapi","mcapi: API request failure D\n");        
 /* MCHN END */    
         ErrorReply(conn->stream(), JSONRPCError(RPC_PARSE_ERROR, e.what()), jreq.id);
         return false;
