@@ -258,10 +258,12 @@ bool IsStandardFull(const CScript& scriptPubKey, txnouttype& whichType)
 
 bool ExtractDestinationScriptValid(const CScript& scriptPubKey, CTxDestination& addressRet)
 {
+/*    
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
     {
         return ExtractDestination(scriptPubKey, addressRet);
     }
+ */ 
     CScript::const_iterator pc1 = scriptPubKey.begin();
     unsigned char *ptr;
     int size;

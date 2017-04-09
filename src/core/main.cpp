@@ -4797,9 +4797,13 @@ bool static LoadBlockIndexDB()
                 }
             }
         }
+        if(block_to_rollback < 0)
+        {
+            block_to_rollback=0;
+        }
         if(block_to_rollback < chainActive.Height())
         {
-            LogPrintf("mchn: Permission/Entities/WalletTx DB is behind current chain tip. Shifting chain tip to %d\n",block_to_rollback);        
+            LogPrintf("mchn: Permission/Entities/WalletTx DB is behind current chain tip. Shifting chain tip to %d\n",block_to_rollback);    
             SetLastBlock(chainActive[block_to_rollback]->GetBlockHash());
             SetLastBlock(0);
         }
@@ -4827,7 +4831,7 @@ bool static LoadBlockIndexDB()
         SetLastBlock(chainActive[mc_gState->m_Permissions->m_Block]->GetBlockHash());
     }
 */   
-    
+        
     
     LogPrint("mchn","mchn: Rolling back permission DB to height %d\n",chainActive.Height());
     mc_gState->m_Permissions->RollBack(chainActive.Height());
