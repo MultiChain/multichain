@@ -255,6 +255,14 @@ bool AppInit(int argc, char* argv[])
             delete mc_gState;                
             return false;
     }
+
+    if(!GetBoolArg("-verifyparamsethash", true))
+    {
+        if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_INVALID)
+        {
+            mc_gState->m_NetworkParams->m_Status=MC_PRM_STATUS_VALID;
+        }
+    }
     
     switch(mc_gState->m_NetworkParams->m_Status)
     {
