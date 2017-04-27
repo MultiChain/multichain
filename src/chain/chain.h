@@ -148,6 +148,7 @@ public:
     uint32_t nCanMine;
     double dTimeReceived;
     CPubKey kMiner;
+    bool fPassedMinerPrecheck;
 /* MCHN END */
     
     void SetNull()
@@ -175,6 +176,7 @@ public:
         nHeightMinedByMe=0;
         nCanMine=0;
         dTimeReceived=0.;
+        fPassedMinerPrecheck=false;
 /* MCHN END */
     }
 

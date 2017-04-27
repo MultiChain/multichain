@@ -350,22 +350,32 @@ bool ReadTxFromDisk(CBlockIndex* pindex,int32_t offset,CTransaction& tx)
     return true;
 }
 
-bool VerifyBlockMiner(const CBlock& block,CBlockIndex* pindexNew)
+bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
 {
     if( (mc_gState->m_NetworkParams->IsProtocolMultichain() == 0) ||
         (mc_gState->m_Features->CachedInputScript() == 0) ||
         (mc_gState->m_NetworkParams->GetInt64Param("supportminerprecheck") == 0) ||
         (mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine")) )                               
     {
+        pindexNew->fPassedMinerPrecheck=true;
         return true;
     }
     
     if(pindexNew->pprev == NULL)
     {
+        pindexNew->fPassedMinerPrecheck=true;
         return true;        
     }
+    
     bool fReject=false;
     const CBlockIndex *pindexFork = chainActive.FindFork(pindexNew);
+    
+    if(pindexFork == pindexNew)
+    {        
+        pindexNew->fPassedMinerPrecheck=true;
+        return true;        
+    }
+    
     CBlockIndex *pindex;
     const CBlock *pblock;
     CBlock branch_block;
@@ -384,10 +394,29 @@ bool VerifyBlockMiner(const CBlock& block,CBlockIndex* pindexNew)
         
     pos=branch_size-1;
     pindex=pindexNew;
-    vchPubKey=vector<unsigned char> (block.vSigner+1, block.vSigner+1+block.vSigner[0]);
+
+    CBlock last_block;
+    CBlock *pblock_last;
+    pblock_last=block_in;
+    if(block_in == NULL)
+    {
+        if ( ((pindexNew->nStatus & BLOCK_HAVE_DATA) == 0 ) || !ReadBlockFromDisk(last_block, pindexNew) )
+        {
+            LogPrintf("VerifyBlockMiner: Block %s (height %d) miner verification failed - block not found\n",pindexNew->GetBlockHash().ToString().c_str(),pindexNew->nHeight);        
+            fReject=true;                                              
+        }       
+        pblock_last=&last_block;
+    }
+
+    vchPubKey=vector<unsigned char> (pblock_last->vSigner+1, pblock_last->vSigner+1+pblock_last->vSigner[0]);
     CPubKey pubKeyNew(vchPubKey);
     CKeyID pubKeyHashNew=pubKeyNew.GetID();
     miners[pos]=*(uint160*)(pubKeyHashNew.begin());      
+
+    if(fReject)
+    {
+        goto exitlbl;                    
+    }
     
     while(pindex != pindexFork)
     {
@@ -418,7 +447,7 @@ bool VerifyBlockMiner(const CBlock& block,CBlockIndex* pindexNew)
         if(pindex == pindexNew)
         {
             fVerify=true;
-            pblock=&block;            
+            pblock=pblock_last;            
         }
         if(!fVerify && (mc_gState->m_Permissions->GetBlockMiner(&block_hash,(unsigned char*)&miners[pos]) != MC_ERR_NOERROR) )
         {
@@ -458,11 +487,12 @@ bool VerifyBlockMiner(const CBlock& block,CBlockIndex* pindexNew)
             if(pblock == NULL)
             {
                 LogPrint("mchn","Unverified block %s (height %d)\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
-                if (!ReadBlockFromDisk(branch_block, pindex))
+                if ( ((pindex->nStatus & BLOCK_HAVE_DATA) == 0 ) || !ReadBlockFromDisk(branch_block, pindex) )
                 {
                     LogPrintf("VerifyBlockMiner: Could not load block %s (height %d) from disk\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
-                    fReject=true;
-                    goto exitlbl;
+                    LogPrintf("VerifyBlockMiner: Block %s (height %d) miner verification skipped\n",pindexNew->GetBlockHash().ToString().c_str(),pindexNew->nHeight);        
+                    fReject=false;                                              // We cannot neglect subsequent blocks, but it is unverified
+                    goto exitlbl;                    
                 }
                 pblock = &branch_block;                
                 vchPubKey=vector<unsigned char> (branch_block.vSigner+1, branch_block.vSigner+1+branch_block.vSigner[0]);
@@ -506,6 +536,7 @@ bool VerifyBlockMiner(const CBlock& block,CBlockIndex* pindexNew)
             }
             mc_gState->m_Permissions->StoreBlockInfo(&miners[pos],&block_hash);
         }
+        pindex->fPassedMinerPrecheck=true;
     }
     
 exitlbl:

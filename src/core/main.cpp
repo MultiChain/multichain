@@ -59,7 +59,7 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
 bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string& reason);
 bool ReplayMemPool(CTxMemPool& pool, int from,bool accept);
 bool VerifyBlockSignature(CBlock *block,bool force);
-bool VerifyBlockMiner(const CBlock& block,CBlockIndex* pindexNew);
+bool VerifyBlockMiner(CBlock *block,CBlockIndex* pindexNew);
 bool CheckBlockPermissions(const CBlock& block,CBlockIndex* prev_block,unsigned char *lpMinerAddress);
 bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,bool *disconnect_flag);
 bool PushMultiChainVerack(CNode* pfrom, bool fIsVerackack);
@@ -2965,11 +2965,24 @@ static CBlockIndex* FindMostWorkChain() {
                     }                    
  */ 
                 }
-//                if(!fLocked)
-                if(setTempBlockIndexCandidates.find(pindexCandidate) == setTempBlockIndexCandidates.end())
+                if(!pindexCandidate->fPassedMinerPrecheck)
                 {
-//                    setTempBlockIndexCandidates.insert(*fit);
-                    setTempBlockIndexCandidates.insert(pindexCandidate);
+                    if(!VerifyBlockMiner(NULL,pindexCandidate))
+                    {
+                        pindexCandidate->nStatus |= BLOCK_FAILED_VALID;
+                        setDirtyBlockIndex.insert(pindexCandidate);
+                    }
+                }
+        
+                
+//                if(!fLocked)
+                if(pindexCandidate->fPassedMinerPrecheck)
+                {
+                    if(setTempBlockIndexCandidates.find(pindexCandidate) == setTempBlockIndexCandidates.end())
+                    {
+    //                    setTempBlockIndexCandidates.insert(*fit);
+                        setTempBlockIndexCandidates.insert(pindexCandidate);
+                    }
                 }
             }
             
@@ -4355,7 +4368,7 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
         return state.Abort(std::string("System error: ") + e.what());
     }
 
-    if(!VerifyBlockMiner(block,pindex))
+    if(!VerifyBlockMiner(&block,pindex))
     {
         pindex->nStatus |= BLOCK_FAILED_VALID;
         setDirtyBlockIndex.insert(pindex);
