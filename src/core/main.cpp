@@ -3400,28 +3400,40 @@ string SetLastBlock(uint256 hash,bool *fNotFound)
         
         CBlock block;
         CBlockIndex* pblockindex = mapBlockIndex[hash];
+        const CBlockIndex *pindexFork = chainActive.FindFork(pblockindex);
 
-        if (pblockindex->nStatus & BLOCK_FAILED_MASK)
-        {
-            return "Block is invalid";
-        }
-        if ( (pblockindex->nStatus & BLOCK_HAVE_DATA) == 0 )
-//        if (!pblockindex->IsValid(BLOCK_VALID_SCRIPTS))
-        {
-            if(fNotFound)
-            {
-                *fNotFound=true;
-            }
-            return "Block is invalid, probably we have only header";            
-        }
+        CBlockIndex *pindex;
+        pindex=pblockindex;
         
-        if(!ReadBlockFromDisk(block, pblockindex))
+        while(pindex != pindexFork)
         {
-            if(fNotFound)
+            if (pblockindex->nStatus & BLOCK_FAILED_MASK)
             {
-                *fNotFound=true;
+                return "Block is invalid";
+            }        
+            if ( (pblockindex->nStatus & BLOCK_HAVE_DATA) == 0 )
+    //        if (!pblockindex->IsValid(BLOCK_VALID_SCRIPTS))
+            {
+                if(fNotFound)
+                {
+                    *fNotFound=true;
+                }
+                return "Block is invalid, probably we have only header";            
             }
-            return "Block not found";
+
+            if(pindex == pblockindex)
+            {
+                if(!ReadBlockFromDisk(block, pblockindex))
+                {
+                    if(fNotFound)
+                    {
+                        *fNotFound=true;
+                    }
+                    return "Block not found";
+                }
+            }
+            
+            pindex=pindex->pprev;
         }
         
         if(!ActivateBestChainStep(state,pblockindex,&block))
