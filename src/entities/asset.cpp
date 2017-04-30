@@ -197,7 +197,7 @@ int mc_EntityLedger::GetRow(int64_t pos, mc_EntityLedgerRow* row)
     
     size=row->m_ScriptSize;
 
-    if((size>0) && (size<=MC_ENT_MAX_SCRIPT_SIZE))
+    if((size>0) && (size<=MC_ENT_SCRIPT_ALLOC_SIZE))
     {
         size=mc_AllocSize(size,m_TotalSize,1);
         if(read(m_FileHan,row->m_Script,size) != size)
@@ -245,7 +245,7 @@ int mc_EntityLedger::SetRow(int64_t pos, mc_EntityLedgerRow* row)
        
     size=row->m_ScriptSize;
     
-    if((size>=0) && (size<=MC_ENT_MAX_SCRIPT_SIZE))
+    if((size>=0) && (size<=MC_ENT_SCRIPT_ALLOC_SIZE))
     {
         if(mc_gState->m_Features->FollowOnIssues())
         {
@@ -2025,6 +2025,10 @@ uint32_t mc_AssetDB::MaxEntityType()
     return MC_ENT_TYPE_MAX; 
 }
 
+int mc_AssetDB::MaxStoredIssuers()
+{
+    return MC_ENT_MAX_STORED_ISSUERS; 
+}
 
 mc_Buffer *mc_AssetDB::GetEntityList(mc_Buffer *old_result,const void* txid,uint32_t entity_type)
 {    

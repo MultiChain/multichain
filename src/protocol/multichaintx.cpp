@@ -676,7 +676,10 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                 {
                     memcpy(issuer_buf,issuers[i].begin(),sizeof(uint160));
                     mc_PutLE(issuer_buf+sizeof(uint160),&issuer_flags[i],4);
-                    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,sizeof(issuer_buf));            
+                    if(i < mc_gState->m_Assets->MaxStoredIssuers())
+                    {
+                        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,sizeof(issuer_buf));            
+                    }
                     if(new_issue)
                     {
                         err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_ADMIN | MC_PTP_ISSUE,
@@ -1821,7 +1824,10 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                 {
                     memcpy(opener_buf,openers[i].begin(),sizeof(uint160));
                     mc_PutLE(opener_buf+sizeof(uint160),&opener_flags[i],4);
-                    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,opener_buf,sizeof(opener_buf));            
+                    if(i < mc_gState->m_Assets->MaxStoredIssuers())
+                    {
+                        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,opener_buf,sizeof(opener_buf));            
+                    }
                     if(new_entity_type != MC_ENT_TYPE_UPGRADE)
                     {
                                                                                 // Granting default permissions to openers
@@ -2670,7 +2676,10 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
                 if(stored_issuers.count(issuers[i]) == 0)
                 {
                     memcpy(issuer_buf,issuers[i].begin(),sizeof(uint160));
-                    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,sizeof(issuer_buf));            
+                    if(i < mc_gState->m_Assets->MaxStoredIssuers())
+                    {
+                        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,sizeof(issuer_buf));            
+                    }
                     if(new_issue)
                     {
                         err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_ADMIN | MC_PTP_ISSUE,
