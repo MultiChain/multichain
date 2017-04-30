@@ -2521,6 +2521,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     }
     if(mc_gState->m_Assets->Commit() != 0)
     {
+        mc_gState->m_Permissions->RollBack();
         return state.DoS(100, error("ConnectBlock() : error on asset commit"),
                  REJECT_INVALID, "bad-prm-commit");            
     }
