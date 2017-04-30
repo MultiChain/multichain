@@ -257,8 +257,12 @@ Value issuefromcmd(const Array& params, bool fHelp)
         
         if(mc_gState->m_Features->OpDropDetailsScripts())
         {
-            lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
-
+            err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
+            if(err)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or asset name, too long");                                                        
+            }
+            
             elem = lpDetailsScript->GetData(0,&elem_size);
             scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;                    
         }
@@ -460,6 +464,7 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
         }
     }
     
+    int err;
     size_t bytes;
     const unsigned char *script;
     size_t elem_size;
@@ -474,7 +479,11 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
         if(mc_gState->m_Features->OpDropDetailsScripts())
         {
             lpDetailsScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
-            lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
+            err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
+            if(err)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields, too long");                                                        
+            }
 
             elem = lpDetailsScript->GetData(0,&elem_size);
             scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;

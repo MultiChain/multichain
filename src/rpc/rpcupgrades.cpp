@@ -148,11 +148,16 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
     
     lpDetailsScript=new mc_Script;
 
+    int err;
     size_t elem_size;
     const unsigned char *elem;
     CScript scriptOpReturn=CScript();
     
-    lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_UPGRADE,0,script,bytes);
+    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_UPGRADE,0,script,bytes);
+    if(err)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or upgrade name, too long");                                                        
+    }
 
     elem = lpDetailsScript->GetData(0,&elem_size);
     scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;        

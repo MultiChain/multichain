@@ -435,11 +435,11 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
     LogPrint("mchn","VerifyBlockMiner: Block: %d, Fork: %d, Chain: %d\n",pindexNew->nHeight,pindexFork->nHeight,mc_gState->m_Permissions->m_Block);
     last_after_fork=0;
     mc_gState->m_Permissions->RollBackBeforeMinerVerification(pindexFork->nHeight);
-    LogPrint("mchn","Rolled back to block %d\n",mc_gState->m_Permissions->m_Block);
+    LogPrint("mchn","VerifyBlockMiner: Rolled back to block %d\n",mc_gState->m_Permissions->m_Block);
 
     for(pos=0;pos<branch_size;pos++)
     {
-        LogPrint("mchn","Verifying block %d\n",mc_gState->m_Permissions->m_Block+1);
+        LogPrint("mchn","VerifyBlockMiner: Verifying block %d\n",mc_gState->m_Permissions->m_Block+1);
         pindex=branch[pos];
         block_hash=pindex->GetBlockHash();
         fVerify=false;
@@ -451,7 +451,7 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
         }
         if(!fVerify && (mc_gState->m_Permissions->GetBlockMiner(&block_hash,(unsigned char*)&miners[pos]) != MC_ERR_NOERROR) )
         {
-            LogPrint("mchn","Verified block %s (height %d)\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
+            LogPrint("mchn","VerifyBlockMiner: Verified block %s (height %d)\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
             if(miners[pos] == miners[branch_size - 1])
             {
                 last_after_fork=pindex->nHeight;
@@ -470,7 +470,7 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
                             fReject=true;
                             goto exitlbl;                            
                         }
-                        LogPrint("mchn","Grant tx %s in block %s (height %d)\n",tx.GetHash().ToString().c_str(),reason.c_str(),pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
+                        LogPrint("mchn","VerifyBlockMiner: Grant tx %s in block %s (height %d)\n",tx.GetHash().ToString().c_str(),reason.c_str(),pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
                         if(!AcceptAdminMinerPermissions(tx,offsets[i],false,reason,NULL))
                         {
                             LogPrintf("VerifyBlockMiner: tx %s: %s\n",tx.GetHash().ToString().c_str(),reason.c_str());
@@ -486,7 +486,7 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
         {
             if(pblock == NULL)
             {
-                LogPrint("mchn","Unverified block %s (height %d)\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
+                LogPrint("mchn","VerifyBlockMiner: Unverified block %s (height %d)\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
                 if ( ((pindex->nStatus & BLOCK_HAVE_DATA) == 0 ) || !ReadBlockFromDisk(branch_block, pindex) )
                 {
                     LogPrintf("VerifyBlockMiner: Could not load block %s (height %d) from disk\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
@@ -506,7 +506,7 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
             }
             else
             {
-                LogPrint("mchn","New block %s (height %d)\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
+                LogPrint("mchn","VerifyBlockMiner: New block %s (height %d)\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
                 if(mc_gState->m_Permissions->CanMineBlockOnFork(&miners[pos],pindex->nHeight,last_after_fork) == 0)
                 {
                     LogPrintf("VerifyBlockMiner: Permission denied for miner %s received in block signature\n",CBitcoinAddress(pubKeyHashNew).ToString().c_str());
@@ -529,7 +529,7 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
                 }
                 if(mempool_size != mc_gState->m_Permissions->m_MemPool->GetCount())
                 {
-                    LogPrint("mchn","Grant tx %s in block %s (height %d)\n",tx.GetHash().ToString().c_str(),pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
+                    LogPrint("mchn","VerifyBlockMiner: Grant tx %s in block %s (height %d)\n",tx.GetHash().ToString().c_str(),pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
                 }
                 
                 off+=tx.GetSerializeSize(SER_NETWORK,tx.nVersion);
@@ -541,7 +541,7 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
     
 exitlbl:
                 
-    LogPrint("mchn","Restoring chain, block %d\n",mc_gState->m_Permissions->m_Block);
+    LogPrint("mchn","VerifyBlockMiner: Restoring chain, block %d\n",mc_gState->m_Permissions->m_Block);
     mc_gState->m_Permissions->RestoreAfterMinerVerification();
     LogPrint("mchn","VerifyBlockMiner: Restored on block %d\n",mc_gState->m_Permissions->m_Block);
 

@@ -2336,6 +2336,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
         
         if(strError.size() == 0)
         {
+            int err;
             size_t bytes;
             const unsigned char *script;
             
@@ -2344,10 +2345,16 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                 if(mc_gState->m_Features->OpDropDetailsScripts())
                 {
                     script=lpDetails->GetData(0,&bytes);
-                    lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
-
-                    script = lpDetailsScript->GetData(0,&bytes);
-                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+                    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
+                    if(err)
+                    {
+                        strError=string("Invalid custom fields, too long");                                                            
+                    }
+                    else
+                    {
+                        script = lpDetailsScript->GetData(0,&bytes);
+                        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+                    }
                 }
                 else
                 {
@@ -2365,11 +2372,18 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             {
                 if(mc_gState->m_Features->OpDropDetailsScripts())
                 {
+                    int err;
                     script=lpDetails->GetData(0,&bytes);
-                    lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
-
-                    script = lpDetailsScript->GetData(0,&bytes);
-                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+                    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
+                    if(err)
+                    {
+                        strError=string("Invalid custom fields, too long");                                                            
+                    }
+                    else
+                    {
+                        script = lpDetailsScript->GetData(0,&bytes);
+                        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+                    }
                 }
                 else
                 {
@@ -2393,6 +2407,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             {
                 if(mc_gState->m_Features->OpDropDetailsScripts())
                 {
+                    int err;
                     lpDetailsScript->Clear();
                     lpDetailsScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
                     script = lpDetailsScript->GetData(0,&bytes);
@@ -2400,9 +2415,16 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
 
                     lpDetailsScript->Clear();
                     script=lpDetails->GetData(0,&bytes);
-                    lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
-                    script = lpDetailsScript->GetData(0,&bytes);
-                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+                    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
+                    if(err)
+                    {
+                        strError=string("Invalid custom fields, too long");                                                            
+                    }
+                    else
+                    {
+                        script = lpDetailsScript->GetData(0,&bytes);
+                        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+                    }
                 }
                 else
                 {

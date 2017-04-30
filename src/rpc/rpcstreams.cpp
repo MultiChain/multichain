@@ -383,7 +383,11 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     
     if(mc_gState->m_Features->OpDropDetailsScripts())
     {
-        lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
+        err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
+        if(err)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or stream name, too long");                                                        
+        }
         
         elem = lpDetailsScript->GetData(0,&elem_size);
         scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;        
