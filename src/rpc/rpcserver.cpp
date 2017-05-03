@@ -1265,7 +1265,9 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
-        LogPrint("mcapi","mcapi: API request failure C\n");        
+        LogPrint("mcapi","mcapi: API request failure: %s, code: %d\n",jreq.strMethod.c_str(),find_value(objError, "code").get_int());
+        
+//        LogPrint("mcapi","mcapi: API request failure C\n");        
 /* MCHN END */    
         ErrorReply(conn->stream(), objError, jreq.id);
         return false;
