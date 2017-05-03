@@ -9,6 +9,10 @@
 
 #include <stdint.h>
 
+#include <script/standard.h>
+#include <set>
+
+
 class CBlock;
 class CBlockHeader;
 class CBlockIndex;
@@ -23,7 +27,7 @@ void GenerateBitcoins(bool fGenerate, CWallet* pwallet, int nThreads);
 /** Generate a new block, without valid proof-of-work */
 CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn);
 CBlockTemplate* CreateNewBlockWithKey(CReserveKey& reservekey);
-CBlockTemplate* CreateNewBlockWithDefaultKey(CWallet *pwallet,int *canMine);
+CBlockTemplate* CreateNewBlockWithDefaultKey(CWallet *pwallet,int *canMine, const std::set<CTxDestination>* addresses = NULL);
 /** Modify the extranonce in a block */
 /* MCHN START */
 void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce,CWallet *pwallet);

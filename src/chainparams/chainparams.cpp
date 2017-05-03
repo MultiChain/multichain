@@ -507,13 +507,13 @@ public:
         
         fRequireStandard = (mc_gState->m_NetworkParams->GetInt64Param("onlyacceptstdtxs") != 0);
         fRequireStandard=GetBoolArg("-requirestandard", fRequireStandard);
-        fMineBlocksOnDemand = GetBoolArg("-mineblocksondemand", false);
         fTestnetToBeDeprecatedFieldRPC = (mc_gState->m_NetworkParams->GetInt64Param("chainistestnet") != 0);
 
     }
     
     void SetMultiChainRuntimeParams()
     {
+        fMineBlocksOnDemand = GetBoolArg("-mineblocksondemand", false);
         fMiningRequiresPeers = (mc_gState->m_NetworkParams->GetInt64Param("miningrequirespeers") != 0);
         fMiningRequiresPeers=GetBoolArg("-miningrequirespeers", fMiningRequiresPeers);        
         nLockAdminMineRounds=GetArg("-lockadminminerounds",mc_gState->m_NetworkParams->GetInt64Param("lockadminminerounds"));        

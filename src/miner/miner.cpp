@@ -760,14 +760,14 @@ CBlockTemplate* CreateNewBlockWithKey(CReserveKey& reservekey)
 // Block should be mined for specific keys, not just any from pool
 
 
-CBlockTemplate* CreateNewBlockWithDefaultKey(CWallet *pwallet,int *canMine)
+CBlockTemplate* CreateNewBlockWithDefaultKey(CWallet *pwallet,int *canMine,const set<CTxDestination>* addresses)
 {
     CPubKey pubkey;            
     bool key_found;
     
     {
         LOCK(cs_main);
-        key_found=pwallet->GetKeyFromAddressBook(pubkey,MC_PTP_MINE);
+        key_found=pwallet->GetKeyFromAddressBook(pubkey,MC_PTP_MINE,addresses);
     }
     if(!key_found)
     {

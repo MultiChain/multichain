@@ -296,6 +296,11 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
         fFound=true;
     }
+    if(param_name == "mineblocksondemand")
+    {
+        mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
+        fFound=true;
+    }
     if(param_name == "hideknownopdrops")
     {
         mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";

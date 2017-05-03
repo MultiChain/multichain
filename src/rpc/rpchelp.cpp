@@ -3557,6 +3557,7 @@ void mc_InitRPCHelpMap15()
             "                                                       miningrequirespeers,\n"
             "                                                       mineemptyrounds,\n"
             "                                                       miningturnover,\n"
+            "                                                       mineblocksondemand,\n"
             "                                                       lockadminminerounds,\n"
             "                                                       maxshowndata, \n"
             "                                                       bantx,\n"

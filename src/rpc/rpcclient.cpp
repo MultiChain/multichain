@@ -324,6 +324,7 @@ static const CRPCConvertParamMayBeString vRPCConvertParamsMayBeString[] =
     { "liststreams", 0 },
     { "listupgrades", 0 },
     { "listpermissions", 1 },
+    { "setgenerate", 0 },
 };
 
 class CRPCConvertTableMayBeString
@@ -406,9 +407,16 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
                         }
                         else
                         {
-                            std::string strConverted=convert_string_to_utf8(strVal);
-                            params.push_back(strConverted);
-//                            params.push_back(strVal);                                            
+                            if(jVal.type() == bool_type)
+                            {
+                                params.push_back(jVal);                                            
+                            }
+                            else
+                            {
+                                std::string strConverted=convert_string_to_utf8(strVal);
+                                params.push_back(strConverted);
+    //                            params.push_back(strVal);                                            
+                            }
                         }
                     }
                 }

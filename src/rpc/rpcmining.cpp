@@ -25,6 +25,7 @@
 
 #include "json/json_spirit_utils.h"
 #include "json/json_spirit_value.h"
+#include "rpcwallet.h"
 
 using namespace json_spirit;
 using namespace std;
@@ -97,9 +98,46 @@ Value setgenerate(const Array& params, bool fHelp)
     if (pwalletMain == NULL)
         throw JSONRPCError(RPC_NOT_SUPPORTED, "Method not found (disabled)");
 
+    set<CTxDestination> miner_addresses;
+    set<CTxDestination> *lpMinerAddresses;
+    vector<CTxDestination> addresses;
+    
+    lpMinerAddresses=NULL;
+    
     bool fGenerate = true;
     if (params.size() > 0)
-        fGenerate = params[0].get_bool();
+    {
+        if(params[0].type() == bool_type)
+        {
+            fGenerate = params[0].get_bool();            
+        }
+        else
+        {
+            if(Params().MineBlocksOnDemand())
+            {
+                if(params[0].type() == str_type)
+                {
+                    addresses=ParseAddresses(params[0].get_str(),false,false);
+                    if(addresses.size())
+                    {
+                        for(int i=0;i<(int)addresses.size();i++)
+                        {
+                            miner_addresses.insert(addresses[i]);
+                        }
+                        lpMinerAddresses=&miner_addresses;
+                    }
+                }
+                else
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'generate' field, should be boolean or string");                                                                                
+                }
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'generate' field, should be boolean");                                                                                
+            }
+        }
+    }
 
     int nGenProcLimit = 1;
     if(Params().Interval() > 0)
@@ -133,7 +171,7 @@ Value setgenerate(const Array& params, bool fHelp)
         while (nHeight < nHeightEnd)
         {
             int canMine=0;
-            auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithDefaultKey(pwalletMain,&canMine));
+            auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithDefaultKey(pwalletMain,&canMine,lpMinerAddresses));
 //            auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey));
             if (!pblocktemplate.get())
             {
