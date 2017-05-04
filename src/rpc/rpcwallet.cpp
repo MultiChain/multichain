@@ -691,17 +691,42 @@ Value signmessage(const Array& params, bool fHelp)
     string strAddress = params[0].get_str();
     string strMessage = params[1].get_str();
 
+    CKey key;
     CBitcoinAddress addr(strAddress);
     if (!addr.IsValid())
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+    {
+        CBitcoinSecret vchSecret;
+        bool fGood = vchSecret.SetString(strAddress);
 
-    CKeyID keyID;
-    if (!addr.GetKeyID(keyID))
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Address does not refer to key");
+        if (fGood)
+        {
+            key = vchSecret.GetKey();
+            if (!key.IsValid()) 
+            {
+                fGood=false;
+            }            
+            else
+            {
+                CPubKey pubkey = key.GetPubKey();
+                assert(key.VerifyPubKey(pubkey));
+                
+            }
+        }
+        if(!fGood)
+        {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address or private key");            
+        }
+    }
+    else
+    {
+        CKeyID keyID;
+        if (!addr.GetKeyID(keyID))
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Address does not refer to key");
 
-    CKey key;
-    if (!pwalletMain->GetKey(keyID, key))
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Private key not available");
+        if (!pwalletMain->GetKey(keyID, key))
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Private key not available");        
+    }
+
 
     CHashWriter ss(SER_GETHASH, 0);
     ss << strMessageMagic;

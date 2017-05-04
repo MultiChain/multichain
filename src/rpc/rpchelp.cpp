@@ -3458,6 +3458,8 @@ void mc_InitRPCHelpMap15()
             + HelpRequiringPassphraseWrapper() + 
             "\nArguments:\n"
             "1. \"address\"                        (string, required) The address to use for the private key.\n"
+            " or\n"    
+            "1. \"privkey\"                        (string, required) The private key (see dumpprivkey and createkeypairs)\n"
             "2. \"message\"                        (string, required) The message to create a signature of.\n"
             "\nResult:\n"
             "\"signature\"                         (string) The signature of the message encoded in base 64\n"
