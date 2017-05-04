@@ -40,6 +40,7 @@ using namespace std;
 #include "wallet/wallettxs.h"
 
 bool OutputCanSend(COutput out);
+uint32_t mc_CheckSigScriptForMutableTx(const unsigned char *src,int size);
 
 /* MCHN END */
 
@@ -1102,6 +1103,221 @@ void AddCacheInputScriptIfNeeded(CMutableTransaction& rawTx,Array inputs, bool f
 
 /* MCHN END */
 
+Value appendrawtransaction(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 3 || params.size() > 5) 
+        throw runtime_error("Help message not found\n");
+    
+    RPCTypeCheck(params, list_of(str_type)(array_type)(obj_type));
+    
+    CTransaction source_tx;
+    Array inputs = params[1].get_array();
+    Object sendTo = params[2].get_obj();
+    bool new_outputs=false;
+    if(sendTo.size())
+    {
+        new_outputs=true;
+    }
+    if (params.size() > 3 && params[3].type() == array_type)         
+    {
+        if(params[3].get_array().size())
+        {
+            new_outputs=true;            
+        }
+    }
+
+    if(params[0].get_str().size())
+    {
+        if (!DecodeHexTx(source_tx, params[0].get_str()))
+            throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+        
+        for (unsigned int i = 0; i < source_tx.vin.size(); i++)                        
+        {                                                           
+            const CScript& script2 = source_tx.vin[i].scriptSig;        
+            CScript::const_iterator pc2 = script2.begin();
+            uint32_t disallowed=mc_CheckSigScriptForMutableTx((unsigned char*)(&pc2[0]),(int)(script2.end()-pc2));        
+        
+            if(inputs.size())
+            {
+                if(disallowed & 0x01)
+                {
+                    throw JSONRPCError(RPC_NOT_ALLOWED, "Cannot append inputs without violating existing signatures");                    
+                }
+            }
+            if(new_outputs)
+            {
+                if(disallowed & 0x02)
+                {
+                    throw JSONRPCError(RPC_NOT_ALLOWED, "Cannot append outputs without violating existing signatures");                    
+                }
+                if(disallowed & 0x04)
+                {
+                    if(i > source_tx.vout.size())
+                    {
+                        throw JSONRPCError(RPC_NOT_ALLOWED, "Cannot append outputs without violating existing signatures");                    
+                    }
+                }
+            }
+        }        
+    }
+    
+    Array inputs_for_signature;
+    
+    CMutableTransaction rawTx;
+    for (unsigned int i = 0; i < source_tx.vin.size(); i++)                        
+    {
+        rawTx.vin.push_back(source_tx.vin[i]);
+        if(i < source_tx.vout.size())
+        {
+            rawTx.vout.push_back(source_tx.vout[i]);            
+        }
+    }    
+
+    BOOST_FOREACH(const Value& input, inputs) {
+        const Object& o = input.get_obj();
+
+        uint256 txid = ParseHashO(o, "txid");
+
+        const Value& vout_v = find_value(o, "vout");
+        if (vout_v.type() != int_type)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, missing vout key");
+        int nOutput = vout_v.get_int();
+        if (nOutput < 0)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, vout must be positive");
+
+        CTxIn in(COutPoint(txid, nOutput));
+        rawTx.vin.push_back(in);
+        
+        const Value& scriptPubKey = find_value(o, "scriptPubKey");
+        if(!scriptPubKey.is_null())
+        {
+            inputs_for_signature.push_back(input);
+        }        
+    }
+
+    vector <pair<CScript, CAmount> > vecSend;
+    int required=0;
+    bool fCachedInputScriptRequired=false;
+    vecSend=ParseRawOutputMultiObject(sendTo,&required);
+    BOOST_FOREACH (const PAIRTYPE(CScript, CAmount)& s, vecSend)
+    {
+        CTxOut out(s.second, s.first);
+        rawTx.vout.push_back(out);        
+    }    
+
+    if( required & (MC_PTP_ADMIN | MC_PTP_MINE) )
+    {
+        if(mc_gState->m_Features->CachedInputScript())
+        {
+            if(mc_gState->m_NetworkParams->GetInt64Param("supportminerprecheck"))                                
+            {
+                fCachedInputScriptRequired=true;
+            }
+        }
+    }
+    
+    AddCacheInputScriptIfNeeded(rawTx,inputs,fCachedInputScriptRequired);    
+    
+    mc_EntityDetails entity;
+    mc_gState->m_TmpAssetsOut->Clear();
+    for(int i=0;i<(int)rawTx.vout.size();i++)
+    {
+        FindFollowOnsInScript(rawTx.vout[i].scriptPubKey,mc_gState->m_TmpAssetsOut,mc_gState->m_TmpScript);
+    }
+    entity.Zero();
+    if(mc_gState->m_TmpAssetsOut->GetCount())
+    {
+/*        
+        if(mc_gState->m_TmpAssetsOut->GetCount() > 1)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Follow-on script rejected - follow-on for several assets");                                    
+        }       
+ */  
+        if(!mc_gState->m_Assets->FindEntityByFullRef(&entity,mc_gState->m_TmpAssetsOut->GetRow(0)))
+        {
+            throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Follow-on script rejected - asset not found");                                                
+        }
+    }
+    
+
+    if (params.size() > 3 && params[3].type() != null_type) 
+    {
+        BOOST_FOREACH(const Value& data, params[3].get_array()) 
+        {
+            CScript scriptOpReturn=ParseRawMetadata(data,0xFFFF,&entity,NULL);
+            CTxOut out(0, scriptOpReturn);
+            rawTx.vout.push_back(out);            
+        }
+    }
+
+    for (unsigned int i = source_tx.vin.size(); i < source_tx.vout.size(); i++)                        
+    {
+        rawTx.vout.push_back(source_tx.vout[i]);            
+    }    
+    
+    string action="";
+    string hex=EncodeHexTx(rawTx);
+    Value signedTx;    
+    Value txid;
+    bool sign_it=false;
+    bool lock_it=false;
+    bool send_it=false;
+    if (params.size() > 4 && params[4].type() != null_type) 
+    {
+        ParseRawAction(params[4].get_str(),lock_it,sign_it,send_it);
+    }
+
+    if(sign_it)
+    {
+        Array signrawtransaction_params;
+        signrawtransaction_params.push_back(hex);
+        if(inputs_for_signature.size())
+        {
+            signrawtransaction_params.push_back(inputs_for_signature);            
+        }
+        signedTx=signrawtransaction(signrawtransaction_params,false);
+    }
+    if(lock_it)
+    {
+        BOOST_FOREACH(const CTxIn& txin, rawTx.vin)
+        {
+            COutPoint outpt(txin.prevout.hash, txin.prevout.n);
+            pwalletMain->LockCoin(outpt);
+        }
+    }    
+    if(send_it)
+    {
+        Array sendrawtransaction_params;
+        BOOST_FOREACH(const Pair& s, signedTx.get_obj()) 
+        {        
+            if(s.name_=="complete")
+            {
+                if(!s.value_.get_bool())
+                {
+                    throw JSONRPCError(RPC_TRANSACTION_ERROR, "Transaction was not signed properly");                    
+                }
+            }
+            if(s.name_=="hex")
+            {
+                sendrawtransaction_params.push_back(s.value_.get_str());                
+            }
+        }
+        txid=sendrawtransaction(sendrawtransaction_params,false);
+    }
+    
+    if(send_it)
+    {
+        return txid;
+    }
+    
+    if(sign_it)
+    {
+        return signedTx;
+    }
+    
+    return hex;
+}
+
 Value createrawtransaction(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 4)                                            // MCHN
@@ -1109,6 +1325,15 @@ Value createrawtransaction(const Array& params, bool fHelp)
     
     RPCTypeCheck(params, list_of(array_type)(obj_type));
 
+    Array ext_params;
+    ext_params.push_back("");
+    BOOST_FOREACH(const Value& value, params)
+    {
+        ext_params.push_back(value);
+    }
+    
+    return appendrawtransaction(ext_params,fHelp);       
+    
     Array inputs = params[0].get_array();
     Object sendTo = params[1].get_obj();
     Array inputs_for_signature;

@@ -616,6 +616,74 @@ const unsigned char *mc_ParseOpDropOpReturnScript(const unsigned char *src,int s
     return src;
 }
 
+uint32_t mc_CheckSigScriptForMutableTx(const unsigned char *src,int size)
+{
+// 0x01 - no inputs    
+// 0x02 - no outputs
+// 0x04 - no outputs if no matching output for this input
+    
+    unsigned char *ptr;
+    unsigned char *ptrEnd;
+    int off,len;
+    uint32_t result;
+    
+    ptr=(unsigned char*)src;
+    ptrEnd=ptr+size;
+
+    int sighash_type;
+    result=0;
+    while(ptr<ptrEnd)
+    {
+        if(mc_GetPushDataElement(ptr,ptrEnd-ptr,&off,&len) != MC_ERR_WRONG_SCRIPT)
+        {
+            if( (ptr+off+len != ptrEnd) )
+            {
+                if(len)
+                {
+                    sighash_type=ptr[off+len-1];
+                    if( (sighash_type & 0x1f) == 0 )                            // Not SIGHASH_ANYONECANPAY
+                    {
+                        result |= 0x01;
+                    }
+                    sighash_type &= 0x1f;
+                    if(sighash_type == 1)                                       // SIGHASH_ALL
+                    {
+                        result |= 0x02;
+                    }
+                    else
+                    {
+                        if(sighash_type == 3)                                   // SIGHASH_SINGLE
+                        {
+                            result |= 0x04;                            
+                        }                    
+                        else
+                        {
+                            if(sighash_type != 2)                               // Bad script
+                            {
+                                result |= 0x07;                            
+                            }
+                        }
+                    }
+                }
+                else
+                {                    
+                    if(ptr != src)                                              // Not Multisig
+                    {
+                        result |= 0x07;                                                    
+                    }
+                }
+            }            
+            ptr+=off+len;
+        }
+        else
+        {
+            result |= 0x07;                            
+        }
+    }
+            
+    return result;
+}
+
 const unsigned char *mc_ExtractAddressFromInputScript(const unsigned char *src,int size,int *op_addr_offset,int *op_addr_size,int* is_redeem_script,int* sighash_type,int check_last)
 {
     unsigned char *ptr;
