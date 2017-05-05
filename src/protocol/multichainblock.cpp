@@ -384,10 +384,12 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
     int pos,branch_size,record,i;
     uint32_t last_after_fork;
     bool fVerify;
+    bool fRolledBack;
     int32_t offsets[MC_PLS_SIZE_OFFSETS_PER_ROW];
     uint256 block_hash;
     vector<unsigned char> vchPubKey;
     
+    fRolledBack=false;
     branch_size=pindexNew->nHeight-pindexFork->nHeight;
     branch.resize(branch_size);
     miners.resize(branch_size);
@@ -434,6 +436,7 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
 
     LogPrint("mchn","VerifyBlockMiner: Block: %d, Fork: %d, Chain: %d\n",pindexNew->nHeight,pindexFork->nHeight,mc_gState->m_Permissions->m_Block);
     last_after_fork=0;
+    fRolledBack=true;
     mc_gState->m_Permissions->RollBackBeforeMinerVerification(pindexFork->nHeight);
     LogPrint("mchn","VerifyBlockMiner: Rolled back to block %d\n",mc_gState->m_Permissions->m_Block);
 
@@ -540,10 +543,13 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
     }
     
 exitlbl:
-                
-    LogPrint("mchn","VerifyBlockMiner: Restoring chain, block %d\n",mc_gState->m_Permissions->m_Block);
-    mc_gState->m_Permissions->RestoreAfterMinerVerification();
-    LogPrint("mchn","VerifyBlockMiner: Restored on block %d\n",mc_gState->m_Permissions->m_Block);
+
+    if(fRolledBack)
+    {
+        LogPrint("mchn","VerifyBlockMiner: Restoring chain, block %d\n",mc_gState->m_Permissions->m_Block);
+        mc_gState->m_Permissions->RestoreAfterMinerVerification();
+        LogPrint("mchn","VerifyBlockMiner: Restored on block %d\n",mc_gState->m_Permissions->m_Block);
+    }
 
     if(fReject)
     {
