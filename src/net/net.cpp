@@ -16,6 +16,7 @@
 #include "primitives/transaction.h"
 #include "ui/ui_interface.h"
 
+#include "structs/base58.h"
 #include "keys/key.h"
 #include "keys/pubkey.h"
 #include "wallet/wallet.h"
@@ -1306,6 +1307,7 @@ void ThreadOpenConnections()
     if(mc_gState->GetSeedNode())                                                // MCHN-TODO. Connection to seed node, find later how to disconnect
     {
         CAddress addr;
+        LogPrintf("Seed node is set, trying to connect to %s...\n",mc_gState->GetSeedNode());
         OpenNetworkConnection(addr, NULL, mc_gState->GetSeedNode());
     }
 
@@ -2358,15 +2360,17 @@ int mc_QuerySeed(boost::thread_group& threadGroup,const char *seedAddr)
     while(fCheckDisconnect)
     {
         {
-            LOCK(cs_vNodes);
-            if(vNodes.size() == 0)
             {
-                LogPrint("mchn","mchn: Successfully disconnected from seed node\n");                    
-                fCheckDisconnect=false;
+                LOCK(cs_vNodes);
+                if(vNodes.size() == 0)
+                {
+                    LogPrint("mchn","mchn: Successfully disconnected from seed node\n");                    
+                    fCheckDisconnect=false;
+                }
             }
             if(fCheckDisconnect)
             {
-                __US_Sleep(1);
+                __US_Sleep(50);
                 if(mc_TimeNowAsUInt() - StartTime > 10)
                 {
                     LogPrint("mchn","mchn: Could not disconnect from seed node - timeout\n");                    
