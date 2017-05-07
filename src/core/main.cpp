@@ -4057,6 +4057,34 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     return true;
 }
 
+bool CheckBranchForInvalidBlocks(CBlockIndex * const pindexPrev)
+{
+    if(pindexPrev == NULL)
+    {
+        return true;
+    }
+    
+    const CBlockIndex *pindexFork;
+    pindexFork=chainActive.FindFork(pindexPrev);
+    
+    CBlockIndex *pindexTest;
+    pindexTest=pindexPrev;
+    while(pindexTest != pindexFork)
+    {
+        if(pindexTest->nStatus & BLOCK_FAILED_MASK)
+        {
+            LogPrintf("Block is on branch containing invalid block %s (height %d)\n",pindexTest->GetBlockHash().ToString().c_str(),pindexTest->nHeight);
+            return false;
+        }
+
+        pindexTest=pindexTest->pprev;
+    }
+        
+    return true;
+}
+
+
+
 bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex * const pindexPrev)
 {
     uint256 hash = block.GetHash();
@@ -4098,8 +4126,6 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
             fWaitingForLocked=true;            
         }        
     }
-    const CBlockIndex *pindexFork;
-    pindexFork=chainActive.FindFork(pindexPrev);
 /*    
     const CBlockIndex *pindexFork;
     pindexFork=NULL;
@@ -4158,6 +4184,9 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
  */   
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
+        const CBlockIndex *pindexFork;
+        pindexFork=chainActive.FindFork(pindexPrev);
+        
         if( (Params().Interval() <= 0) && !fWaitingForLocked )
         {
             if(pindexPrev != chainActive.Tip())
@@ -4185,6 +4214,13 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
             }
         }
     }
+    
+    if(!CheckBranchForInvalidBlocks(pindexPrev))
+    {
+        return state.Invalid(error("%s : %s rejected - invalid branch", __func__,block.GetHash().ToString().c_str()),
+                             REJECT_INVALID, "reorg-invalid branch");                                
+    }
+
     
     // Don't accept any forks from the main chain prior to last checkpoint
     CBlockIndex* pcheckpoint = Checkpoints::GetLastCheckpoint();
@@ -4277,6 +4313,11 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
             *ppindex = pindex;
         if (pindex->nStatus & BLOCK_FAILED_MASK)
             return state.Invalid(error("%s : block is marked invalid", __func__), 0, "duplicate");
+        if(!CheckBranchForInvalidBlocks(pindex->pprev))
+        {
+            return state.Invalid(error("%s : %s rejected - invalid branch", __func__,block.GetHash().ToString().c_str()),
+                                 REJECT_INVALID, "reorg-invalid branch");                                
+        }
         return true;
     }
 
