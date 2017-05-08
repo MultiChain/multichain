@@ -99,6 +99,7 @@ bool fTxIndex = false;
 bool fIsBareMultisigStd = true;
 unsigned int nCoinCacheSize = 5000;
 int nLastForkedHeight=0;
+unsigned int DEFAULT_MAX_SUCCESSORS_FROM_ONE_NODE = 5;
 
 /** Fees smaller than this (in satoshi) are considered zero fee (for relaying and mining) */
 /* MCHN START */
@@ -4299,7 +4300,7 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
     return true;
 }
 
-bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex** ppindex)
+bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex** ppindex, int node_id)
 {
     AssertLockHeld(cs_main);
     // Check for duplicate
@@ -4338,6 +4339,44 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
     if (!ContextualCheckBlockHeader(block, state, pindexPrev))
         return false;
 
+    int successor=0;
+    int successors_from_this_node=0;
+    mc_BlockHeaderInfo *lpNext;
+    mc_BlockHeaderInfo new_info;
+    lpNext=NULL;
+    if( (node_id > 0) && (pindexPrev != NULL) )
+    {
+        successor=pindexPrev->nFirstSuccessor;
+        while(successor)
+        {
+            lpNext=(mc_BlockHeaderInfo *)mc_gState->m_BlockHeaderSuccessors->GetRow(successor);
+            if(lpNext->m_NodeId == node_id)
+            {
+                successors_from_this_node++;
+            }
+            successor=lpNext->m_Next;
+        }
+        if(successors_from_this_node >= GetArg("-maxheadersfrompeer", DEFAULT_MAX_SUCCESSORS_FROM_ONE_NODE))
+        {
+            return state.Invalid(error("%s : %s rejected - too many headers from node %d", __func__,block.GetHash().ToString().c_str(),node_id),
+                                 REJECT_INVALID, "too-man-headers");                                            
+        }
+        successor=mc_gState->m_BlockHeaderSuccessors->GetCount();
+        memset(&new_info,0,sizeof(mc_BlockHeaderInfo));
+        memcpy(new_info.m_Hash,&hash,sizeof(uint256));
+        new_info.m_NodeId=node_id;
+        
+        mc_gState->m_BlockHeaderSuccessors->Add(&new_info);
+        if(lpNext)
+        {
+            lpNext->m_Next=successor;
+        }
+        else
+        {
+            pindexPrev->nFirstSuccessor=successor;
+        }
+    }
+        
     if (pindex == NULL)
         pindex = AddToBlockIndex(block);
 
@@ -4370,7 +4409,7 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
 
     CBlockIndex *&pindex = *ppindex;
 
-    if (!AcceptBlockHeader(block, state, &pindex))
+    if (!AcceptBlockHeader(block, state, &pindex, 0))
         return false;
 
     if (pindex->nStatus & BLOCK_HAVE_DATA) {
@@ -6203,7 +6242,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 Misbehaving(pfrom->GetId(), 20);
                 return error("non-continuous headers sequence");
             }
-            if (!AcceptBlockHeader(header, state, &pindexLast)) {
+            if (!AcceptBlockHeader(header, state, &pindexLast, pfrom->GetId())) {
                 int nDoS;
                 if (state.IsInvalid(nDoS)) {
                     if (nDoS > 0)

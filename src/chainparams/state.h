@@ -116,6 +116,14 @@ typedef struct mc_Features
     int FixedIn10008();
 } mc_Features;
 
+typedef struct mc_BlockHeaderInfo
+{    
+    unsigned char m_Hash[32];
+    int32_t m_NodeId;
+    int32_t m_Next;
+    
+} mc_BlockHeaderInfo;
+
 typedef struct mc_State
 {    
     mc_State()
@@ -145,6 +153,7 @@ typedef struct mc_State
     mc_Buffer               *m_TmpAssetsOut;
     mc_Buffer               *m_TmpAssetsIn;
     
+    mc_Buffer               *m_BlockHeaderSuccessors;
     
     void  InitDefaults()
     {
@@ -164,6 +173,13 @@ typedef struct mc_State
         mc_InitABufferMap(m_TmpAssetsOut);
         m_TmpAssetsIn=new mc_Buffer;
         mc_InitABufferMap(m_TmpAssetsIn);
+        
+        m_BlockHeaderSuccessors=new mc_Buffer;
+        m_BlockHeaderSuccessors->Initialize(sizeof(mc_BlockHeaderInfo),sizeof(mc_BlockHeaderInfo),0);            
+        mc_BlockHeaderInfo bhi;
+        memset(&bhi,0,sizeof(mc_BlockHeaderInfo));
+        m_BlockHeaderSuccessors->Add(&bhi);
+        
         m_pSeedNode=NULL;
     }
     
@@ -204,6 +220,10 @@ typedef struct mc_State
         if(m_TmpAssetsIn)
         {
             delete m_TmpAssetsIn;
+        }
+        if(m_BlockHeaderSuccessors)
+        {
+            delete m_BlockHeaderSuccessors;
         }
     }
     

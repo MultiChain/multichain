@@ -149,6 +149,7 @@ public:
     double dTimeReceived;
     CPubKey kMiner;
     bool fPassedMinerPrecheck;
+    int32_t nFirstSuccessor;
 /* MCHN END */
     
     void SetNull()
@@ -177,6 +178,7 @@ public:
         nCanMine=0;
         dTimeReceived=0.;
         fPassedMinerPrecheck=false;
+        nFirstSuccessor=0;
 /* MCHN END */
     }
 
