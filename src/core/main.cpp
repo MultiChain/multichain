@@ -412,7 +412,7 @@ int MultichainNode_ApplyUpgrades()
 
 void MultichainNode_UpdateBlockByHeightList(CBlockIndex *pindex)
 {
-    if(pindex->nHeight <= 0)
+    if(pindex->nHeight < 0)
     {
         return;
     }
@@ -4375,7 +4375,7 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
     mc_BlockHeaderInfo *lpNext;
     mc_BlockHeaderInfo *lpNextForPrev;
     mc_BlockHeaderInfo new_info;
-    lpNext=NULL;
+    lpNext=NULL;    
     if( (node_id > 0) && (pindexPrev != NULL) )
     {
         CBlockIndex *pindexTmp=NULL;
@@ -4423,7 +4423,7 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
             pindexPrev->nFirstSuccessor=successor;
         }
     }
-        
+
     if (pindex == NULL)
         pindex = AddToBlockIndex(block);
 
