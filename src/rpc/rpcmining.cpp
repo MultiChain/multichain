@@ -206,6 +206,8 @@ Value setgenerate(const Array& params, bool fHelp)
                 ++pblock->nNonce;
             }
             CValidationState state;
+            LogPrintf("RPC Miner      : Block Found - %s, prev: %s, height: %d, txs: %d\n",
+                    pblock->GetHash().GetHex(),pblock->hashPrevBlock.ToString().c_str(),nHeight+1,(int)pblock->vtx.size());
             if (!ProcessNewBlock(state, NULL, pblock))
                 throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
             ++nHeight;

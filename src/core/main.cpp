@@ -3302,7 +3302,6 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
 
             if (!ActivateBestChainStep(state, pindexMostWork, pblock && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : NULL))
                 return false;
-
 /* MCHN START */            
             if(pindexMostWork == chainActive.Tip())
             {
@@ -3321,7 +3320,7 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
                             LogPrint("mcblock","mchn-block: Wallet mine permission changed on block: %s (height %d), reactivating best chain\n",
                                     chainActive.Tip()->GetBlockHash().ToString().c_str(), chainActive.Tip()->nHeight);
                             pindexMostWork=NULL;
-                            continue;
+//                            continue;
                         }
                     }
                 }
@@ -3343,7 +3342,7 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
                 BOOST_FOREACH(CNode* pnode, vNodes)
                     if (chainActive.Height() > (pnode->nStartingHeight != -1 ? pnode->nStartingHeight - 2000 : nBlockEstimate))
                         pnode->PushInventory(CInv(MSG_BLOCK, hashNewTip));
-            }
+                }
             // Notify external listeners about the new tip.
             uiInterface.NotifyBlockTip(hashNewTip);
         }

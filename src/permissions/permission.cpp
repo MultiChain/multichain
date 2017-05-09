@@ -2025,9 +2025,17 @@ int mc_Permissions::RollBackBeforeMinerVerification(uint32_t block)
     err=MC_ERR_NOERROR; 
     
     CopyMemPool();
-    ClearMemPool();
+//    ClearMemPool();
 
     Lock(1);
+
+    if(m_MemPool->GetCount())
+    {
+        m_AdminCount=m_ClearedAdminCount;
+        m_MinerCount=m_ClearedMinerCount;
+        m_Row-=m_MemPool->GetCount();    
+        m_MemPool->Clear();
+    }
     
     m_CopiedBlock=m_Block;
     m_CopiedRow=m_Row;
@@ -2093,7 +2101,48 @@ exitlbl:
 
 int mc_Permissions::RestoreAfterMinerVerification()
 {
+    int i,err;
+    unsigned char *ptr;
+    char msg[256];
+    
+    Lock(1);
+    
+    m_MemPool->Clear();
+    
+    m_Block=m_CopiedBlock;
+    m_ForkBlock=0;
+
+    m_Row=m_CopiedRow;
+    m_CopiedRow=0;
+    m_CopiedBlock=0;
+    
+    for(i=0;i<m_CopiedMemPool->GetCount();i++)
+    {
+        ptr=m_CopiedMemPool->GetRow(i);
+        err=m_MemPool->Add(ptr,ptr+m_MemPool->m_KeySize);        
+        if(err)
+        {
+            LogString("Error while restoring mempool");
+            goto exitlbl;
+        }
+    }
+    
+    m_Row+=m_CopiedMemPool->GetCount();
+    m_AdminCount=m_CopiedAdminCount;
+    m_MinerCount=m_CopiedMinerCount;
+            
+    if(m_CopiedMemPool->GetCount())
+    {
+        sprintf(msg,"Mempool ramv: %9d, Admin count: %d, Miner count: %d, Ledger Rows: %ld",m_Block,m_AdminCount,m_MinerCount,m_Row);
+        LogString(msg);
+    }
+    
+exitlbl:
+    UnLock();
+
+/*
     ClearMemPool();
+    
     
     m_Row=m_CopiedRow;
     m_Block=m_CopiedBlock;
@@ -2103,6 +2152,7 @@ int mc_Permissions::RestoreAfterMinerVerification()
     m_CopiedBlock=0;
     
     return RestoreMemPool();
+ */ 
 }
 
 
@@ -3047,8 +3097,11 @@ int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAdd
                 {
                     if(m_MemPool->GetCount() == 0)
                     {
-                        m_ClearedAdminCount=m_AdminCount;
-                        m_ClearedMinerCount=m_MinerCount;
+                        if(m_CopiedRow == 0)
+                        {
+                            m_ClearedAdminCount=m_AdminCount;
+                            m_ClearedMinerCount=m_MinerCount;
+                        }
                     }
                     m_MemPool->Add((unsigned char*)&pldRow+m_Ledger->m_KeyOffset,(unsigned char*)&pldRow+m_Ledger->m_ValueOffset);
                     m_Row++;                
@@ -3703,6 +3756,7 @@ int mc_Permissions::GetBlockAdminMinerGrants(const void* lpHash, int record, int
     pdbAdminMinerGrantRow.m_RecordID=record;
 
     ptr=(unsigned char*)m_Database->m_DB->Read((char*)&pdbAdminMinerGrantRow+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err);
+    
     if(ptr)
     {
         memcpy((char*)&pdbAdminMinerGrantRow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);        
@@ -3742,7 +3796,7 @@ int mc_Permissions::StoreBlockInfo(const void* lpMiner,const void* lpHash)
 
 int mc_Permissions::StoreBlockInfoInternal(const void* lpMiner,const void* lpHash,int update_counts)
 {    
-    int i,err,amg_items,commit_required,last_offset;
+    int i,err,amg_items,last_offset;
     
     mc_PermissionDBRow pdbRow;
     mc_PermissionDBRow pdbAdminMinerRow;
@@ -3767,10 +3821,11 @@ int mc_Permissions::StoreBlockInfoInternal(const void* lpMiner,const void* lpHas
     
     err=MC_ERR_NOERROR;
     
-    commit_required=0;
     amg_items=0;
     last_offset=0;
     pdbAdminMinerRow.Zero();
+    memcpy(pdbAdminMinerRow.m_Entity,adminminerlist_entity,MC_PLS_SIZE_ENTITY);
+    pdbAdminMinerGrantRow.Zero();
     memcpy(pdbAdminMinerGrantRow.m_BlockHash,lpHash,MC_PLS_SIZE_ENTITY);
     pdbAdminMinerGrantRow.m_Type=MC_PTP_BLOCK_MINER;
     
@@ -3780,21 +3835,21 @@ int mc_Permissions::StoreBlockInfoInternal(const void* lpMiner,const void* lpHas
         {
             memcpy((unsigned char*)&pldRow+m_Ledger->m_KeyOffset,m_MemPool->GetRow(i),m_Ledger->m_TotalSize);
 
-            if( (pdbRow.m_Type == MC_PTP_ADMIN) || (pdbRow.m_Type == MC_PTP_MINE))
+            if( (pldRow.m_Type == MC_PTP_ADMIN) || (pldRow.m_Type == MC_PTP_MINE))
             {
-                if(memcmp(pdbRow.m_Entity,null_entity,MC_PLS_SIZE_ENTITY) == 0)
+                if(memcmp(pldRow.m_Entity,null_entity,MC_PLS_SIZE_ENTITY) == 0)
                 {                    
                     if( pldRow.m_BlockReceived == (uint32_t)(m_Block+1) )
-                    {
-                        pdbAdminMinerRow.m_Type=pdbRow.m_Type;
-                        memcpy(pdbAdminMinerRow.m_Address,pdbRow.m_Address,MC_PLS_SIZE_ADDRESS);
+                    {                       
+                        pdbAdminMinerRow.m_Type=pldRow.m_Type;
+                        memcpy(pdbAdminMinerRow.m_Address,pldRow.m_Address,MC_PLS_SIZE_ADDRESS);
                         err=m_Database->m_DB->Write((char*)&pdbAdminMinerRow+m_Database->m_KeyOffset,m_Database->m_KeySize,
                                                     (char*)&pdbAdminMinerRow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
                         if(err)
                         {
                             LogString("Error: StoreBlockInfoInternal: DB write error");                        
                         }
-                        commit_required=1;
+
                         if(pldRow.m_Offset != last_offset)
                         {
                             if( (amg_items > 0) && ((amg_items % MC_PLS_SIZE_OFFSETS_PER_ROW) == 0) )

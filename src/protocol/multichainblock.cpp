@@ -475,7 +475,7 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
                             fReject=true;
                             goto exitlbl;                            
                         }
-                        LogPrint("mchn","VerifyBlockMiner: Grant tx %s in block %s (height %d)\n",tx.GetHash().ToString().c_str(),reason.c_str(),pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
+                        LogPrint("mchn","VerifyBlockMiner: Grant tx %s in block %s (height %d)\n",tx.GetHash().ToString().c_str(),pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
                         if(!AcceptAdminMinerPermissions(tx,offsets[i],false,reason,NULL))
                         {
                             LogPrintf("VerifyBlockMiner: tx %s: %s\n",tx.GetHash().ToString().c_str(),reason.c_str());
@@ -484,6 +484,7 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
                         }
                     }
                 }
+                record++;
             }
             mc_gState->m_Permissions->IncrementBlock();
         }
@@ -508,6 +509,12 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
                 {
                     last_after_fork=pindex->nHeight;
                 }
+                if(mc_gState->m_Permissions->CanMineBlockOnFork(&miners[pos],pindex->nHeight,last_after_fork) == 0)
+                {
+                    LogPrintf("VerifyBlockMiner: Permission denied for miner %s received in block signature\n",CBitcoinAddress(pubKeyHash).ToString().c_str());
+                    fReject=true;
+                    goto exitlbl;                    
+                }
             }
             else
             {
@@ -519,14 +526,14 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
                     goto exitlbl;                    
                 }
             }
-            int off=GetSizeOfCompactSize(pblock->vtx.size());
+            int off=80+GetSizeOfCompactSize(pblock->vtx.size());
             for (unsigned int i = 0; i < pblock->vtx.size(); i++)
             {
                 const CTransaction &tx = pblock->vtx[i];
                 string reason;
                 uint32_t result;
                 int mempool_size=mc_gState->m_Permissions->m_MemPool->GetCount();
-                if(!AcceptAdminMinerPermissions(tx,off,fVerify,reason,&result))
+                if(!AcceptAdminMinerPermissions(tx,off,true,reason,&result))
                 {
                     LogPrintf("VerifyBlockMiner: tx %s: %s\n",tx.GetHash().ToString().c_str(),reason.c_str());
                     fReject=true;
