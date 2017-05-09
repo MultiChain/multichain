@@ -99,7 +99,7 @@ bool fTxIndex = false;
 bool fIsBareMultisigStd = true;
 unsigned int nCoinCacheSize = 5000;
 int nLastForkedHeight=0;
-unsigned int DEFAULT_MAX_SUCCESSORS_FROM_ONE_NODE = 5;
+vector<CBlockIndex*> vFirstOnThisHeight;
 
 /** Fees smaller than this (in satoshi) are considered zero fee (for relaying and mining) */
 /* MCHN START */
@@ -408,6 +408,37 @@ int MultichainNode_ApplyUpgrades()
     }
     
     return MC_ERR_NOERROR;
+}
+
+void MultichainNode_UpdateBlockByHeightList(CBlockIndex *pindex)
+{
+    if(pindex->nHeight <= 0)
+    {
+        return;
+    }
+    unsigned int old_size=vFirstOnThisHeight.size();
+    if(pindex->nHeight + 1 > (int)old_size)
+    {
+        vFirstOnThisHeight.resize(pindex->nHeight + 1);
+        for(unsigned int i=old_size+1;i<(unsigned int)(pindex->nHeight+1);i++)
+        {
+            vFirstOnThisHeight[i]=NULL;
+        }
+    }
+    if(vFirstOnThisHeight[pindex->nHeight])
+    {
+        CBlockIndex *pTmp;
+        pTmp=vFirstOnThisHeight[pindex->nHeight];
+        while(pTmp->pNextOnThisHeight)
+        {
+            pTmp=pTmp->pNextOnThisHeight;
+        }
+        pTmp->pNextOnThisHeight=pindex;
+    }
+    else
+    {
+        vFirstOnThisHeight[pindex->nHeight]=pindex;
+    }    
 }
 
 bool MultichainNode_IsBlockChainSynced(CNode *pnode)
@@ -3765,6 +3796,7 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     if (pindexBestHeader == NULL || pindexBestHeader->nChainWork < pindexNew->nChainWork)
         pindexBestHeader = pindexNew;
 
+    MultichainNode_UpdateBlockByHeightList(pindexNew);
     setDirtyBlockIndex.insert(pindexNew);
 
     return pindexNew;
@@ -4341,19 +4373,35 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
     int successor=0;
     int successors_from_this_node=0;
     mc_BlockHeaderInfo *lpNext;
+    mc_BlockHeaderInfo *lpNextForPrev;
     mc_BlockHeaderInfo new_info;
     lpNext=NULL;
     if( (node_id > 0) && (pindexPrev != NULL) )
     {
-        successor=pindexPrev->nFirstSuccessor;
-        while(successor)
+        CBlockIndex *pindexTmp=NULL;
+        if( ((int)vFirstOnThisHeight.size() <= pindexPrev->nHeight) || (vFirstOnThisHeight[pindexPrev->nHeight] == NULL))
         {
-            lpNext=(mc_BlockHeaderInfo *)mc_gState->m_BlockHeaderSuccessors->GetRow(successor);
-            if(lpNext->m_NodeId == node_id)
-            {
-                successors_from_this_node++;
+            MultichainNode_UpdateBlockByHeightList(pindexPrev);
+        }
+        lpNextForPrev=NULL;
+        pindexTmp=vFirstOnThisHeight[pindexPrev->nHeight];
+        while(pindexTmp)
+        {
+            successor=pindexTmp->nFirstSuccessor;
+            while(successor)
+            {                
+                lpNext=(mc_BlockHeaderInfo *)mc_gState->m_BlockHeaderSuccessors->GetRow(successor);
+                if(lpNext->m_NodeId == node_id)
+                {
+                    successors_from_this_node++;
+                }
+                successor=lpNext->m_Next;
+                if(pindexTmp == pindexPrev)
+                {
+                    lpNextForPrev=lpNext;
+                }
             }
-            successor=lpNext->m_Next;
+            pindexTmp=pindexTmp->pNextOnThisHeight;
         }
         if(successors_from_this_node >= GetArg("-maxheadersfrompeer", DEFAULT_MAX_SUCCESSORS_FROM_ONE_NODE))
         {
@@ -4366,9 +4414,9 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
         new_info.m_NodeId=node_id;
         
         mc_gState->m_BlockHeaderSuccessors->Add(&new_info);
-        if(lpNext)
+        if(lpNextForPrev)
         {
-            lpNext->m_Next=successor;
+            lpNextForPrev->m_Next=successor;
         }
         else
         {
@@ -4402,13 +4450,13 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
     return true;
 }
 
-bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, CDiskBlockPos* dbp)
+bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, CDiskBlockPos* dbp, int node_id)
 {
     AssertLockHeld(cs_main);
 
     CBlockIndex *&pindex = *ppindex;
 
-    if (!AcceptBlockHeader(block, state, &pindex, 0))
+    if (!AcceptBlockHeader(block, state, &pindex, node_id))
         return false;
 
     if (pindex->nStatus & BLOCK_HAVE_DATA) {
@@ -4554,7 +4602,7 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
 
         // Store to disk
         CBlockIndex *pindex = NULL;
-        bool ret = AcceptBlock(*pblock, state, &pindex, dbp);
+        bool ret = AcceptBlock(*pblock, state, &pindex, dbp, pfrom ? pfrom->GetId() : 0);
         if (pindex && pfrom) {
             mapBlockSource[pindex->GetBlockHash()] = pfrom->GetId();
         }
