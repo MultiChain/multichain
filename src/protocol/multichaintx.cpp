@@ -415,7 +415,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                     }
                     if(update_mempool)
                     {
-                        LogPrint("mchn","Found asset issue script in tx %s for %s - (%ld)\n",
+                        if(fDebug)LogPrint("mchn","Found asset issue script in tx %s for %s - (%ld)\n",
                                 tx.GetHash().GetHex().c_str(),
                                 address.ToString().c_str(),quantity);                    
                     }
@@ -439,7 +439,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                         {
                             if(update_mempool)
                             {
-                                LogPrint("mchn","Found asset follow-on script in tx %s\n",
+                                if(fDebug)LogPrint("mchn","Found asset follow-on script in tx %s\n",
                                         tx.GetHash().GetHex().c_str());                    
                             }
                         }
@@ -733,7 +733,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                 }
             }
             
-            LogPrint("mchn","Asset already exists. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
+            if(fDebug)LogPrint("mchn","Asset already exists. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
                     tx.GetHash().GetHex().c_str(),
                     mc_gState->m_Assets->m_Block+1,offset,(int)(*((unsigned char*)&txid+31))+256*(int)(*((unsigned char*)&txid+30)),
                     entity.GetName());                                        
@@ -750,7 +750,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
             {
                 if(new_issue)
                 {
-                    LogPrint("mchn","New asset. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
+                    if(fDebug)LogPrint("mchn","New asset. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
                             tx.GetHash().GetHex().c_str(),
                             mc_gState->m_Assets->m_Block+1,offset,(int)(*((unsigned char*)&txid+0))+256*(int)(*((unsigned char*)&txid+1)),
                             this_entity.GetName());                                        
@@ -759,7 +759,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                 {
                     uint256 otxid;
                     memcpy(&otxid,entity.GetTxID(),32);
-                    LogPrint("mchn","Follow-on issue. TxID: %s,  Original issue txid: %s\n",
+                    if(fDebug)LogPrint("mchn","Follow-on issue. TxID: %s,  Original issue txid: %s\n",
                             tx.GetHash().GetHex().c_str(),otxid.GetHex().c_str());
                 }
             }
@@ -1596,7 +1596,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                     ptr=(unsigned char*)(lpScriptID);
                                 }
                                 
-                                LogPrint("mchn","Found permission script in tx %s for %s - (%08x: %d - %d)\n",
+                                if(fDebug)LogPrint("mchn","Found permission script in tx %s for %s - (%08x: %d - %d)\n",
                                         tx.GetHash().GetHex().c_str(),
                                         address.ToString().c_str(),
                                         type, from, to);
@@ -1936,7 +1936,7 @@ exitlbl:
 
     if(fReject)
     {
-        LogPrint("mchn","mchn: Tx rejected: %s\n",EncodeHexTx(tx));
+        if(fDebug)LogPrint("mchn","mchn: Tx rejected: %s\n",EncodeHexTx(tx));
     }
 
     return !fReject;
@@ -2226,7 +2226,7 @@ exitlbl:
     
     if(fReject)
     {
-        LogPrint("mchn","mchn: AcceptAdminMinerPermissions: Tx rejected: %s\n",EncodeHexTx(tx));
+        if(fDebug)LogPrint("mchn","mchn: AcceptAdminMinerPermissions: Tx rejected: %s\n",EncodeHexTx(tx));
     }
 
     return !fReject;
@@ -2346,7 +2346,7 @@ bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs,
         }
     }
     
-    LogPrint("mchnminor","Found asset transfer script in tx %s, %d assets\n",
+    if(fDebug)LogPrint("mchnminor","Found asset transfer script in tx %s, %d assets\n",
             tx.GetHash().GetHex().c_str(),mc_gState->m_TmpAssetsOut->GetCount());                    
     for(int i=0;i<mc_gState->m_TmpAssetsIn->GetCount();i++)
     {
@@ -2519,7 +2519,7 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
                     }
                     if(update_mempool)
                     {
-                        LogPrint("mchn","Found asset issue script in tx %s for %s - (%ld)\n",
+                        if(fDebug)LogPrint("mchn","Found asset issue script in tx %s for %s - (%ld)\n",
                                 tx.GetHash().GetHex().c_str(),
                                 address.ToString().c_str(),quantity);                    
                     }
@@ -2543,7 +2543,7 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
                         {
                             if(update_mempool)
                             {
-                                LogPrint("mchn","Found asset follow-on script in tx %s\n",
+                                if(fDebug)LogPrint("mchn","Found asset follow-on script in tx %s\n",
                                         tx.GetHash().GetHex().c_str());                    
                             }
                         }
@@ -2733,7 +2733,7 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
                 }
             }
             
-            LogPrint("mchn","Asset already exists. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
+            if(fDebug)LogPrint("mchn","Asset already exists. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
                     tx.GetHash().GetHex().c_str(),
                     mc_gState->m_Assets->m_Block+1,offset,(int)(*((unsigned char*)&txid+31))+256*(int)(*((unsigned char*)&txid+30)),
                     entity.GetName());                                        
@@ -2750,7 +2750,7 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
             {
                 if(new_issue)
                 {
-                    LogPrint("mchn","New asset. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
+                    if(fDebug)LogPrint("mchn","New asset. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
                             tx.GetHash().GetHex().c_str(),
                             mc_gState->m_Assets->m_Block+1,offset,(int)(*((unsigned char*)&txid+0))+256*(int)(*((unsigned char*)&txid+1)),
                             this_entity.GetName());                                        
@@ -2759,7 +2759,7 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
                 {
                     uint256 otxid;
                     memcpy(&otxid,entity.GetTxID(),32);
-                    LogPrint("mchn","Follow-on issue. TxID: %s,  Original issue txid: %s\n",
+                    if(fDebug)LogPrint("mchn","Follow-on issue. TxID: %s,  Original issue txid: %s\n",
                             tx.GetHash().GetHex().c_str(),otxid.GetHex().c_str());
                 }
             }
@@ -3033,7 +3033,7 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
                                 address=CBitcoinAddress(*lpScriptID);
                                 ptr=(unsigned char*)(lpScriptID);
                             }
-                            LogPrint("mchn","Found permission script in tx %s for %s - (%08x: %d - %d)\n",
+                            if(fDebug)LogPrint("mchn","Found permission script in tx %s for %s - (%08x: %d - %d)\n",
                                     tx.GetHash().GetHex().c_str(),
                                     address.ToString().c_str(),
                                     type, from, to);

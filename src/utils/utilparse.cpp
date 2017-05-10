@@ -840,7 +840,7 @@ void LogAssetTxOut(string message,uint256 hash,int index,unsigned char* assetref
     {
         assetref += "0-0-2";
     }
-    LogPrint("mcatxo", "mcatxo: %s: %s-%d %s %ld\n",message.c_str(),txid.c_str(),index,assetref.c_str(),quantity);
+    if(fDebug)LogPrint("mcatxo", "mcatxo: %s: %s-%d %s %ld\n",message.c_str(),txid.c_str(),index,assetref.c_str(),quantity);
 }
 
 bool AddressCanReceive(CTxDestination address)

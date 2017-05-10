@@ -686,7 +686,7 @@ Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp)
                 if(memcmp((&pc1[0]),(&pc0[0]),script_size) == 0)
                 {
                     LOCK(pwalletMain->cs_wallet);
-                    LogPrint("mchn","mchn: New lockunspent (%s,%d), Offer hash: %s\n",wtx.GetHash().GetHex().c_str(),j,offer_hash.GetHex().c_str());
+                    if(fDebug)LogPrint("mchn","mchn: New lockunspent (%s,%d), Offer hash: %s\n",wtx.GetHash().GetHex().c_str(),j,offer_hash.GetHex().c_str());
                     vout=j;                    
                 }
             }
@@ -802,7 +802,7 @@ Value preparelockunspent(const json_spirit::Array& params, bool fHelp)
                 if(memcmp((&pc1[0]),(&pc0[0]),script_size) == 0)
                 {
                     LOCK(pwalletMain->cs_wallet);
-                    LogPrint("mchn","mchn: New lockunspent (%s,%d), Offer hash: %s\n",wtx.GetHash().GetHex().c_str(),j,offer_hash.GetHex().c_str());
+                    if(fDebug)LogPrint("mchn","mchn: New lockunspent (%s,%d), Offer hash: %s\n",wtx.GetHash().GetHex().c_str(),j,offer_hash.GetHex().c_str());
                     vout=j;                    
 //                    pwalletMain->mapExchanges.insert(make_pair(COutPoint(wtx.GetHash(),j),CExchangeStatus(offer_hash,0,mc_TimeNowAsUInt())));                    
                 }

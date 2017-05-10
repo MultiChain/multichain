@@ -783,7 +783,7 @@ bool AddOrphanTx(const CTransaction& tx, NodeId peer)
     unsigned int sz = tx.GetSerializeSize(SER_NETWORK, CTransaction::CURRENT_VERSION);
     if (sz > 5000)
     {
-        LogPrint("mempool", "ignoring large orphan tx (size: %u, hash: %s)\n", sz, hash.ToString());
+        if(fDebug)if(fDebug)LogPrint("mempool", "ignoring large orphan tx (size: %u, hash: %s)\n", sz, hash.ToString());
         return false;
     }
 
@@ -792,7 +792,7 @@ bool AddOrphanTx(const CTransaction& tx, NodeId peer)
     BOOST_FOREACH(const CTxIn& txin, tx.vin)
         mapOrphanTransactionsByPrev[txin.prevout.hash].insert(hash);
 
-    LogPrint("mempool", "stored orphan tx %s (mapsz %u prevsz %u)\n", hash.ToString(),
+    if(fDebug)if(fDebug)LogPrint("mempool", "stored orphan tx %s (mapsz %u prevsz %u)\n", hash.ToString(),
              mapOrphanTransactions.size(), mapOrphanTransactionsByPrev.size());
     return true;
 }
@@ -827,7 +827,7 @@ void EraseOrphansFor(NodeId peer)
             ++nErased;
         }
     }
-    if (nErased > 0) LogPrint("mempool", "Erased %d orphan tx from peer %d\n", nErased, peer);
+    if (nErased > 0) if(fDebug)LogPrint("mempool", "Erased %d orphan tx from peer %d\n", nErased, peer);
 }
 
 
@@ -1299,7 +1299,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         COutPoint outpoint = tx.vin[i].prevout;
         if (pool.mapNextTx.count(outpoint))
         {
-            LogPrint("mchn","Conflicting with in-memory %s\n",tx.vin[i].ToString().c_str());
+            if(fDebug)LogPrint("mchn","Conflicting with in-memory %s\n",tx.vin[i].ToString().c_str());
             // Disable replacement feature for now
             return false;
         }
@@ -1325,7 +1325,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         // only helps filling in pfMissingInputs (to determine missing vs spent).
         BOOST_FOREACH(const CTxIn txin, tx.vin) {
             if (!view.HaveCoins(txin.prevout.hash)) {
-                LogPrint("mchn","Missing tx (%s)\n",txin.prevout.hash.ToString().c_str());
+                if(fDebug)LogPrint("mchn","Missing tx (%s)\n",txin.prevout.hash.ToString().c_str());
                 if (pfMissingInputs)
                     *pfMissingInputs = true;
 /* MCHN START */                
@@ -1347,7 +1347,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                     const COutPoint &prevout = tx.vin[i].prevout;
                     const CCoins* coins = view.AccessCoins(prevout.hash);
                     if (!coins || !coins->IsAvailable(prevout.n)) {
-                        LogPrint("mchn","Missing coin (%s,%d)\n",prevout.hash.ToString().c_str(),prevout.n);
+                        if(fDebug)LogPrint("mchn","Missing coin (%s,%d)\n",prevout.hash.ToString().c_str(),prevout.n);
                         return state.Invalid(error("AcceptToMemoryPool : inputs already spent"),
                                  REJECT_DUPLICATE, "bad-txns-inputs-spent");
                     }
@@ -1430,7 +1430,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             if (dFreeCount >= GetArg("-limitfreerelay", 15)*10*1000)
                 return state.DoS(0, error("AcceptToMemoryPool : free transaction rejected by rate limiter"),
                                  REJECT_INSUFFICIENTFEE, "rate limited free transaction");
-            LogPrint("mempool", "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount+nSize);
+            if(fDebug)LogPrint("mempool", "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount+nSize);
             dFreeCount += nSize;
         }
 
@@ -2208,11 +2208,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     {
         if(pindex->pprev)
         {
-            LogPrint("mchn","mchn: Connecting block %s (height %d) ...\n",block.GetHash().ToString().c_str(),pindex->pprev->nHeight+1);
+            if(fDebug)LogPrint("mchn","mchn: Connecting block %s (height %d) ...\n",block.GetHash().ToString().c_str(),pindex->pprev->nHeight+1);
         }
         else
         {
-            LogPrint("mchn","mchn: Connecting genesis block...\n");        
+            if(fDebug)LogPrint("mchn","mchn: Connecting genesis block...\n");        
         }
         if(!CheckBlockPermissions(block,pindex->pprev,miner_address))
         {
@@ -2239,7 +2239,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     // (its coinbase is unspendable)
 /* MCHN START */        
     if (block.GetHash() == Params().HashGenesisBlock()){        
-        LogPrint("mchn","mchn: Checking block permission transactions for genesis block...\n");
+        if(fDebug)LogPrint("mchn","mchn: Checking block permission transactions for genesis block...\n");
         for (unsigned int i = 0; i < block.vtx.size(); i++)
         {
             const CTransaction &tx = block.vtx[i];
@@ -2385,7 +2385,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                              REJECT_INVALID, "bad-blk-sigops");
 
 /* MCHN START */    
-        LogPrint("mccoin", "COIN: NW Write  %s\n", tx.GetHash().ToString().c_str());
+        if(fDebug)LogPrint("mccoin", "COIN: NW Write  %s\n", tx.GetHash().ToString().c_str());
 /* MCHN END */    
         if (!tx.IsCoinBase())
         {
@@ -2505,7 +2505,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     
     
     int64_t nTime1 = GetTimeMicros(); nTimeConnect += nTime1 - nTimeStart;
-    LogPrint("bench", "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n", (unsigned)block.vtx.size(), 0.001 * (nTime1 - nTimeStart), 0.001 * (nTime1 - nTimeStart) / block.vtx.size(), nInputs <= 1 ? 0 : 0.001 * (nTime1 - nTimeStart) / (nInputs-1), nTimeConnect * 0.000001);
+    if(fDebug)LogPrint("bench", "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n", (unsigned)block.vtx.size(), 0.001 * (nTime1 - nTimeStart), 0.001 * (nTime1 - nTimeStart) / block.vtx.size(), nInputs <= 1 ? 0 : 0.001 * (nTime1 - nTimeStart) / (nInputs-1), nTimeConnect * 0.000001);
 
     if (block.vtx[0].GetValueOut() > GetBlockValue(pindex->nHeight, nFees))
         return state.DoS(100,
@@ -2516,7 +2516,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if (!control.Wait())
         return state.DoS(100, false);
     int64_t nTime2 = GetTimeMicros(); nTimeVerify += nTime2 - nTimeStart;
-    LogPrint("bench", "    - Verify %u txins: %.2fms (%.3fms/txin) [%.2fs]\n", nInputs - 1, 0.001 * (nTime2 - nTimeStart), nInputs <= 1 ? 0 : 0.001 * (nTime2 - nTimeStart) / (nInputs-1), nTimeVerify * 0.000001);
+    if(fDebug)LogPrint("bench", "    - Verify %u txins: %.2fms (%.3fms/txin) [%.2fs]\n", nInputs - 1, 0.001 * (nTime2 - nTimeStart), nInputs <= 1 ? 0 : 0.001 * (nTime2 - nTimeStart) / (nInputs-1), nTimeVerify * 0.000001);
 
     if (fJustCheck)
         return true;
@@ -2545,7 +2545,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             return state.Abort("Failed to write transaction index");
 
 /* MCHN START */        
-    LogPrint("mchn","mchn: Committing permission changes for block %d...\n",mc_gState->m_Permissions->m_Block+1);
+    if(fDebug)LogPrint("mchn","mchn: Committing permission changes for block %d...\n",mc_gState->m_Permissions->m_Block+1);
     if(mc_gState->m_Permissions->Commit(miner_address,&block_hash) != 0)
     {
         return state.DoS(100, error("ConnectBlock() : error on permission commit"),
@@ -2570,7 +2570,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     view.SetBestBlock(pindex->GetBlockHash());
 
     int64_t nTime3 = GetTimeMicros(); nTimeIndex += nTime3 - nTime2;
-    LogPrint("bench", "    - Index writing: %.2fms [%.2fs]\n", 0.001 * (nTime3 - nTime2), nTimeIndex * 0.000001);
+    if(fDebug)LogPrint("bench", "    - Index writing: %.2fms [%.2fs]\n", 0.001 * (nTime3 - nTime2), nTimeIndex * 0.000001);
 
     // Watch for changes to the previous coinbase transaction.
     static uint256 hashPrevBestCoinBase;
@@ -2578,7 +2578,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     hashPrevBestCoinBase = block.vtx[0].GetHash();
 
     int64_t nTime4 = GetTimeMicros(); nTimeCallbacks += nTime4 - nTime3;
-    LogPrint("bench", "    - Callbacks: %.2fms [%.2fs]\n", 0.001 * (nTime4 - nTime3), nTimeCallbacks * 0.000001);
+    if(fDebug)LogPrint("bench", "    - Callbacks: %.2fms [%.2fs]\n", 0.001 * (nTime4 - nTime3), nTimeCallbacks * 0.000001);
 
     return true;
 }
@@ -2665,7 +2665,7 @@ void static UpdateTip(CBlockIndex *pindexNew) {
     if(chainActive.Tip()->kMiner.IsValid())
     {
         CBitcoinAddress addr=CBitcoinAddress(chainActive.Tip()->kMiner.GetID());
-        LogPrint("mcblock","mchn-block: height: %d, miner: %s\n", chainActive.Tip()->nHeight,addr.ToString().c_str());
+        if(fDebug)LogPrint("mcblock","mchn-block: height: %d, miner: %s\n", chainActive.Tip()->nHeight,addr.ToString().c_str());
     }
     cvBlockChange.notify_all();
 
@@ -2700,7 +2700,7 @@ bool static DisconnectTip(CValidationState &state) {
     mempool.check(pcoinsTip);
     // Read block from disk.
     CBlock block;
-    LogPrint("mcblockperf","mchn-block-perf: Disconnecting block %s (height %d), %d transactions in mempool\n",pindexDelete->GetBlockHash().ToString(),pindexDelete->nHeight,(int)mempool.size());
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Disconnecting block %s (height %d), %d transactions in mempool\n",pindexDelete->GetBlockHash().ToString(),pindexDelete->nHeight,(int)mempool.size());
     if (!ReadBlockFromDisk(block, pindexDelete))
         return state.Abort("Failed to read block");
     // Apply the block atomically to the chain state.
@@ -2711,31 +2711,31 @@ bool static DisconnectTip(CValidationState &state) {
             return error("DisconnectTip() : DisconnectBlock %s failed", pindexDelete->GetBlockHash().ToString());
         assert(view.Flush());
     }
-    LogPrint("bench", "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * 0.001);
+    if(fDebug)LogPrint("bench", "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * 0.001);
     // Write the chain state to disk, if necessary.
     if (!FlushStateToDisk(state, FLUSH_STATE_ALWAYS))// MCHN was FLUSH_STATE_IF_NEEDED
         return false;
     
 /* MCHN START */    
-    LogPrint("mcblockperf","mchn-block-perf: Mempool hash list defragmentation\n");
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Mempool hash list defragmentation\n");
     int old_height=pindexDelete->nHeight;
     mempool.defragmentHashList();
     int new_txs=mempool.hashList->m_Count;
-    LogPrint("mchn","mchn: Disconnecting block %s (height %d) from permission DB (%d transactions in mempool)\n",pindexDelete->GetBlockHash().ToString(),old_height,new_txs);
+    if(fDebug)LogPrint("mchn","mchn: Disconnecting block %s (height %d) from permission DB (%d transactions in mempool)\n",pindexDelete->GetBlockHash().ToString(),old_height,new_txs);
     mempool.shiftHashList(block.vtx.size());
     setBlockTransactions[old_height%MC_TXSET_BLOCKS].clear();
-    LogPrint("mcblockperf","mchn-block-perf: Rolling back permission and asset databases\n");
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Rolling back permission and asset databases\n");
     mc_gState->m_Permissions->RollBack(old_height-1);
     mc_gState->m_Assets->RollBack(old_height-1);
     
     MultichainNode_ApplyUpgrades();        
     if(mc_gState->m_WalletMode & MC_WMD_TXS)
     {
-        LogPrint("mcblockperf","mchn-block-perf: Rolling back wallet             (%s)\n",pwalletTxsMain->Summary());
+        if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Rolling back wallet             (%s)\n",pwalletTxsMain->Summary());
         pwalletTxsMain->RollBack(NULL,old_height-1);
-        LogPrint("mcblockperf","mchn-block-perf: Rolling back wallet completed   (%s)\n",pwalletTxsMain->Summary());
+        if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Rolling back wallet completed   (%s)\n",pwalletTxsMain->Summary());
     }
-    LogPrint("mcblockperf","mchn-block-perf: Resurrecting mempool transactions from the disconnected block\n");
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Resurrecting mempool transactions from the disconnected block\n");
 /* MCHN END */    
     
     // Resurrect mempool transactions from the disconnected block.
@@ -2754,10 +2754,10 @@ bool static DisconnectTip(CValidationState &state) {
     mempool.removeCoinbaseSpends(pcoinsTip, pindexDelete->nHeight);
 /* MCHN START */    
 //    mempool.defragmentHashList();
-    LogPrint("mcblockperf","mchn-block-perf: Replaying mempool               (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Replaying mempool               (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
         ReplayMemPool(mempool,new_shift,true);
-    LogPrint("mcblockperf","mchn-block-perf: Replaying mempool completed     (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
-    LogPrint("mcblockperf","mchn-block-perf: Mempool hash list defragmentation\n");
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Replaying mempool completed     (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Mempool hash list defragmentation\n");
     mempool.defragmentHashList();
 /* MCHN END */    
     
@@ -2769,7 +2769,7 @@ bool static DisconnectTip(CValidationState &state) {
     BOOST_FOREACH(const CTransaction &tx, block.vtx) {
         SyncWithWallets(tx, NULL);
     }
-    LogPrint("mcblockperf","mchn-block-perf: Disconnecting block completed, %d transactions in mempool\n",(int)mempool.size());
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Disconnecting block completed, %d transactions in mempool\n",(int)mempool.size());
     return true;
 }
 
@@ -2794,11 +2794,11 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
             return state.Abort("Failed to read block");
         pblock = &block;
     }
-    LogPrint("mcblockperf","mchn-block-perf: Connecting block %s (height %d), %d transactions in mempool\n",pindexNew->GetBlockHash().ToString().c_str(),pindexNew->nHeight,(int)mempool.size());
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Connecting block %s (height %d), %d transactions in mempool\n",pindexNew->GetBlockHash().ToString().c_str(),pindexNew->nHeight,(int)mempool.size());
     // Apply the block atomically to the chain state.
     int64_t nTime2 = GetTimeMicros(); nTimeReadFromDisk += nTime2 - nTime1;
     int64_t nTime3;
-    LogPrint("bench", "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
+    if(fDebug)LogPrint("bench", "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
     {
         CCoinsViewCache view(pcoinsTip);
         CInv inv(MSG_BLOCK, pindexNew->GetBlockHash());
@@ -2811,19 +2811,19 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
         }
         mapBlockSource.erase(inv.hash);
         nTime3 = GetTimeMicros(); nTimeConnectTotal += nTime3 - nTime2;
-        LogPrint("bench", "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
+        if(fDebug)LogPrint("bench", "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
         assert(view.Flush());
     }
     int64_t nTime4 = GetTimeMicros(); nTimeFlush += nTime4 - nTime3;
-    LogPrint("bench", "  - Flush: %.2fms [%.2fs]\n", (nTime4 - nTime3) * 0.001, nTimeFlush * 0.000001);
+    if(fDebug)LogPrint("bench", "  - Flush: %.2fms [%.2fs]\n", (nTime4 - nTime3) * 0.001, nTimeFlush * 0.000001);
     // Write the chain state to disk, if necessary.
     if (!FlushStateToDisk(state, FLUSH_STATE_ALWAYS))// MCHN was FLUSH_STATE_IF_NEEDED
         return false;
     int64_t nTime5 = GetTimeMicros(); nTimeChainState += nTime5 - nTime4;
-    LogPrint("bench", "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
+    if(fDebug)LogPrint("bench", "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
     // Remove conflicting transactions from the mempool.
     list<CTransaction> txConflicted;
-    LogPrint("mcblockperf","mchn-block-perf: Removing block txs from mempool\n");
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Removing block txs from mempool\n");
     mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted);
     mempool.check(pcoinsTip);
 /* MCHN START */    
@@ -2831,18 +2831,18 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
         EraseOrphanTx(tx.GetHash());
     }    
 
-    LogPrint("wallet","wtxs: Committing block %d\n",pindexNew->nHeight);
+    if(fDebug)LogPrint("wallet","wtxs: Committing block %d\n",pindexNew->nHeight);
     
     int err=MC_ERR_NOERROR;
-    LogPrint("mcblockperf","mchn-block-perf: Wallet, before commit           (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, before commit           (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
     err=pwalletTxsMain->BeforeCommit(NULL);
-    LogPrint("mcblockperf","mchn-block-perf: Wallet, before commit completed (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, before commit completed (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
     if(err)
     {
         return error("ConnectTip() : ConnectBlock %s failed, Wtxs BeforeCommit, error: %d", pindexNew->GetBlockHash().ToString(),err);
     }
     CDiskTxPos pos(pindexNew->GetBlockPos(), GetSizeOfCompactSize(pblock->vtx.size()));
-    LogPrint("mcblockperf","mchn-block-perf: Adding block txs to wallet\n");
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Adding block txs to wallet\n");
     for (unsigned int i = 0; i < pblock->vtx.size(); i++)
     {
         const CTransaction &tx = pblock->vtx[i];
@@ -2853,14 +2853,14 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
         }
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
     }
-    LogPrint("mcblockperf","mchn-block-perf: Wallet, commit                  (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, commit                  (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
     err=pwalletTxsMain->Commit(NULL);    
     if(err)
     {
         return error("ConnectTip() : ConnectBlock %s failed, Wtxs Commit, error: %d", pindexNew->GetBlockHash().ToString(),err);
     }    
-    LogPrint("mcblockperf","mchn-block-perf: Wallet, commit completed        (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
-    LogPrint("mcblockperf","mchn-block-perf: Wallet cleanup\n");
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, commit completed        (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet cleanup\n");
     err=pwalletTxsMain->CleanUpAfterBlock(NULL,pindexNew->nHeight,pindexNew->nHeight-1);
     if(err)
     {
@@ -2889,11 +2889,11 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
 //    CTransaction emptyTx;                                                       // Triggering wallet optimization
 //    SyncWithWallets(emptyTx, pblock);
 /* MCHN END */    
-    LogPrint("mcblockperf","mchn-block-perf: Connecting block completed, %d transactions in mempool\n",(int)mempool.size());
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Connecting block completed, %d transactions in mempool\n",(int)mempool.size());
 
     int64_t nTime6 = GetTimeMicros(); nTimePostConnect += nTime6 - nTime5; nTimeTotal += nTime6 - nTime1;
-    LogPrint("bench", "  - Connect postprocess: %.2fms [%.2fs]\n", (nTime6 - nTime5) * 0.001, nTimePostConnect * 0.000001);
-    LogPrint("bench", "- Connect block: %.2fms [%.2fs]\n", (nTime6 - nTime1) * 0.001, nTimeTotal * 0.000001);
+    if(fDebug)LogPrint("bench", "  - Connect postprocess: %.2fms [%.2fs]\n", (nTime6 - nTime5) * 0.001, nTimePostConnect * 0.000001);
+    if(fDebug)LogPrint("bench", "- Connect block: %.2fms [%.2fs]\n", (nTime6 - nTime1) * 0.001, nTimeTotal * 0.000001);
     return true;
 }
 
@@ -2941,12 +2941,12 @@ static CBlockIndex* FindMostWorkChain() {
                 
                 if(take_it)
                 {
-                    LogPrint("mcblock","mchn-block: Choosing chain from %d candidates, current height: %d\n",(int)setBlockIndexCandidates.size(),chainActive.Tip()->nHeight);
+                    if(fDebug)LogPrint("mcblock","mchn-block: Choosing chain from %d candidates, current height: %d\n",(int)setBlockIndexCandidates.size(),chainActive.Tip()->nHeight);
                     for (it = setBlockIndexCandidates.begin(); it != setBlockIndexCandidates.end(); ++it)
                     {
                         CBlockIndex* pindex=*it;
                         work=(uint32_t)mc_GetLE(&(pindex->nChainWork),32);
-                        LogPrint("mcblock","mchn-block: Forked block index: %s, work: %d, height: %d, mined-by-me: %d, can-mine: %d\n",pindex->GetBlockHash().ToString().c_str(),
+                        if(fDebug)LogPrint("mcblock","mchn-block: Forked block index: %s, work: %d, height: %d, mined-by-me: %d, can-mine: %d\n",pindex->GetBlockHash().ToString().c_str(),
                                 work, pindex->nHeight,pindex->nHeightMinedByMe,pindex->nCanMine);                    
                     }                
                 }
@@ -3034,7 +3034,7 @@ static CBlockIndex* FindMostWorkChain() {
             {
                 CBlockIndex* pindex=*it;
                 work=(uint32_t)mc_GetLE(&(pindex->nChainWork),32);
-                LogPrint("mcblock","mchn-block: Selected forked block index: %s, Active chain tip: %s\n",pindex->GetBlockHash().ToString().c_str(),
+                if(fDebug)LogPrint("mcblock","mchn-block: Selected forked block index: %s, Active chain tip: %s\n",pindex->GetBlockHash().ToString().c_str(),
                         chainActive.Tip()->GetBlockHash().ToString().c_str());                    
                 
             }
@@ -3129,7 +3129,7 @@ void UpdateChainMiningStatus(const CBlock &block,CBlockIndex *pindexNew)
         }
         if(pindexNew->pprev)
         {
-            LogPrint("mcblock","mchn-block: New block index:   %s, prev: %s, height: %d, mined-by-me: %d, can-mine: %d\n",pindexNew->GetBlockHash().ToString().c_str(),
+            if(fDebug)LogPrint("mcblock","mchn-block: New block index:   %s, prev: %s, height: %d, mined-by-me: %d, can-mine: %d\n",pindexNew->GetBlockHash().ToString().c_str(),
                     pindexNew->pprev->GetBlockHash().ToString().c_str(),
                     pindexNew->nHeight,pindexNew->nHeightMinedByMe,pindexNew->nCanMine);
         }
@@ -3147,7 +3147,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     const CBlockIndex *pindexOldTip = chainActive.Tip();
     const CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
 
-    LogPrint("mcblockperf","mchn-block-perf: Best chain activation\n");
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Best chain activation\n");
     
     // Disconnect active blocks which are no longer in the best chain.
     while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
@@ -3216,18 +3216,18 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
         mc_gState->m_Permissions->ClearMemPool();
         mc_gState->m_Assets->ClearMemPool();
 
-        LogPrint("mcblockperf","mchn-block-perf: Replaying mempool\n");
+        if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Replaying mempool\n");
         ReplayMemPool(mempool,0,true);
-        LogPrint("mcblockperf","mchn-block-perf: Defragmenting mempool hash list\n");
+        if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Defragmenting mempool hash list\n");
         mempool.defragmentHashList();
         
-        LogPrint("mcblockperf","mchn-block-perf: Reaccepting wallet transactions\n");
+        if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Reaccepting wallet transactions\n");
         if(pwalletMain)
         {
             pwalletMain->ReacceptWalletTransactions();                          // Some wallet transactions may become invalid in reorg            
                                                                                 // Some may become invalid if not confirmed in time
         }
-        LogPrint("mcblockperf","mchn-block-perf: Best chain activation completed\n");
+        if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Best chain activation completed\n");
 
 /* MCHN START */        
         if (!fImporting && !fReindex)
@@ -3320,10 +3320,10 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
             {
                 if(chainActive.Tip())
                 {
-                    LogPrint("mcblock","mchn-block: Possible reorg: %d %d->%d\n",attempt,chainActive.Tip()->nHeight,pindexMostWork->nHeight);
+                    if(fDebug)LogPrint("mcblock","mchn-block: Possible reorg: %d %d->%d\n",attempt,chainActive.Tip()->nHeight,pindexMostWork->nHeight);
                     if(chainActive.Tip()->nHeight == pindexMostWork->nHeight)
                     {
-                        LogPrint("mcblock","mchn-block: Same-height reorg: %d %d(%d)->%d(%d)\n",attempt,chainActive.Tip()->nCanMine,chainActive.Tip()->nHeight-chainActive.Tip()->nHeightMinedByMe,
+                        if(fDebug)LogPrint("mcblock","mchn-block: Same-height reorg: %d %d(%d)->%d(%d)\n",attempt,chainActive.Tip()->nCanMine,chainActive.Tip()->nHeight-chainActive.Tip()->nHeightMinedByMe,
                                 pindexMostWork->nCanMine,pindexMostWork->nHeight-pindexMostWork->nHeightMinedByMe);                        
                     }
                 }
@@ -3341,14 +3341,14 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
                     CPubKey pubkey;            
                     chainActive.Tip()->nCanMine=pwalletMain->GetKeyFromAddressBook(pubkey,MC_PTP_MINE) ? MC_PTP_MINE : 0;
                     
-                    LogPrint("mcblock","mchn-block: Chain activated:   %s (height %d), can-mine: %d\n",
+                    if(fDebug)LogPrint("mcblock","mchn-block: Chain activated:   %s (height %d), can-mine: %d\n",
                             chainActive.Tip()->GetBlockHash().ToString().c_str(), chainActive.Tip()->nHeight,chainActive.Tip()->nCanMine);
                     
                     if(nCanMine != chainActive.Tip()->nCanMine)
                     {
 //                        if(!pwalletMain->GetKeyFromAddressBook(pubkey,MC_PTP_MINE))
                         {
-                            LogPrint("mcblock","mchn-block: Wallet mine permission changed on block: %s (height %d), reactivating best chain\n",
+                            if(fDebug)LogPrint("mcblock","mchn-block: Wallet mine permission changed on block: %s (height %d), reactivating best chain\n",
                                     chainActive.Tip()->GetBlockHash().ToString().c_str(), chainActive.Tip()->nHeight);
                             pindexMostWork=NULL;
 //                            continue;
@@ -3479,7 +3479,7 @@ string SetLastBlock(uint256 hash,bool *fNotFound)
         LogPrintf("Set active chain tip: %s\n",hash.GetHex().c_str());
         if(pblockindex->nHeightMinedByMe == pblockindex->nHeight)
         {
-            LogPrint("mchn","mchn: New block %s is mined by me, relay it anyway\n",hash.GetHex().c_str());
+            if(fDebug)LogPrint("mchn","mchn: New block %s is mined by me, relay it anyway\n",hash.GetHex().c_str());
             {
                 LOCK(cs_vNodes);
                 BOOST_FOREACH(CNode* pnode, vNodes)
@@ -3868,7 +3868,7 @@ bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBl
         }
         if(pindexNew->pprev)
         {
-            LogPrint("mchn","mchn: New block index: %s, prev: %s, height: %d, mined-by-me: %d, can-mine: %d\n",block.GetHash().ToString().c_str(),
+            if(fDebug)LogPrint("mchn","mchn: New block index: %s, prev: %s, height: %d, mined-by-me: %d, can-mine: %d\n",block.GetHash().ToString().c_str(),
                     pindexNew->pprev->GetBlockHash().ToString().c_str(),
                     pindexNew->nHeight,pindexNew->nHeightMinedByMe,pindexNew->nCanMine);
         }
@@ -4168,7 +4168,7 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
         {
             if(pindexFork->nHeight < pindexLockedBlock->nHeight)
             {
-                LogPrint("mcblock","mchn-block: Fork rejected, locked: block %s, tip: %d, height: %d, fork: %d, locked: %d\n",block.GetHash().ToString().c_str(),
+                if(fDebug)LogPrint("mcblock","mchn-block: Fork rejected, locked: block %s, tip: %d, height: %d, fork: %d, locked: %d\n",block.GetHash().ToString().c_str(),
                         chainActive.Height(),nHeight,pindexFork->nHeight,pindexLockedBlock->nHeight);
                 return state.Invalid(error("%s : rejected by lockblock in active chain, fork: %d, locked: %d", __func__,pindexFork->nHeight,pindexLockedBlock->nHeight),
                                      REJECT_INVALID, "locked-block-reorg-in");                                    
@@ -4181,7 +4181,7 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
             {
                 if(block->GetHash() != pindexLockedBlock->GetBlockHash())
                 {
-                    LogPrint("mcblock","mchn-block: Fork rejected, locked on the same height: block %s, height: %d, locked block: %s\n",
+                    if(fDebug)LogPrint("mcblock","mchn-block: Fork rejected, locked on the same height: block %s, height: %d, locked block: %s\n",
                             block.GetHash().ToString().c_str(),nHeight,pindexLockedBlock->GetBlockHash());
                     return state.Invalid(error("%s : rejected by lockblock not in active chain, locked: %d", __func__,pindexLockedBlock->nHeight),
                                          REJECT_INVALID, "locked-block-reorg-out");                                                        
@@ -4199,7 +4199,7 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
             pindexLockedFork=chainActive.FindFork(pindexLockedBlock);
             if(pindexFork->nHeight < pindexLockedFork->nHeight)
             {
-                LogPrint("mcblock","mchn-block: Fork rejected, locked: block %s, tip: %d, height: %d, fork: %d, locked: %d, locked fork: %d\n",block.GetHash().ToString().c_str(),
+                if(fDebug)LogPrint("mcblock","mchn-block: Fork rejected, locked: block %s, tip: %d, height: %d, fork: %d, locked: %d, locked fork: %d\n",block.GetHash().ToString().c_str(),
                         chainActive.Height(),nHeight,pindexFork->nHeight,pindexLockedBlock->nHeight,pindexLockedFork->nHeight);
                 return state.Invalid(error("%s : rejected by lockblock not in active chain, fork: %d, locked: %d", __func__,pindexFork->nHeight,pindexLockedBlock->nHeight),
                                      REJECT_INVALID, "locked-block-reorg-out");                                    
@@ -4234,12 +4234,12 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
                         int nGovernanceModelChangeHeight=mc_gState->m_Permissions->FindGovernanceModelChange(nMinHeight,nMaxHeight);
                         if(nGovernanceModelChangeHeight)
                         {
-                            LogPrint("mcblock","mchn-block: Deep fork rejected: block %s, tip: %d, height: %d, fork: %d, rounds: %d; stop: %d\n",block.GetHash().ToString().c_str(),
+                            if(fDebug)LogPrint("mcblock","mchn-block: Deep fork rejected: block %s, tip: %d, height: %d, fork: %d, rounds: %d; stop: %d\n",block.GetHash().ToString().c_str(),
                                     chainActive.Height(),nHeight,pindexFork->nHeight,Params().LockAdminMineRounds(),nGovernanceModelChangeHeight);
                             return state.Invalid(error("%s : rejected by lockadminrounds, fork: %d, change: %d", __func__,nMinHeight,nGovernanceModelChangeHeight),
                                                  REJECT_INVALID, "reorg-too-deep");                        
                         }
-                        LogPrint("mcblock","mchn-block: Deep fork accepted: block %s, tip: %d, height: %d, fork: %d, rounds: %d\n",block.GetHash().ToString().c_str(),
+                        if(fDebug)LogPrint("mcblock","mchn-block: Deep fork accepted: block %s, tip: %d, height: %d, fork: %d, rounds: %d\n",block.GetHash().ToString().c_str(),
                                 chainActive.Height(),nHeight,pindexFork->nHeight,Params().LockAdminMineRounds());
                     }
                 }                                
@@ -4624,7 +4624,7 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
             {
                 if(chainActive.FindFork(pindex) == chainActive.Tip())
                 {
-                    LogPrint("mcblock","Block %s is not connected, required protocol version upgrade %d -> %d\n",pindex->GetBlockHash().ToString().c_str(),
+                    if(fDebug)LogPrint("mcblock","Block %s is not connected, required protocol version upgrade %d -> %d\n",pindex->GetBlockHash().ToString().c_str(),
                             mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
                     activate=false;
                 }
@@ -4654,7 +4654,7 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
                 if(item.second->pprev->GetBlockHash() == hash)
                 {
                     activate=false;
-                    LogPrint("mcblockperf","mchn-block-perf: Found better block than %s (height %d) - %s\n",
+                    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Found better block than %s (height %d) - %s\n",
                             hash.ToString().c_str(),item.second->pprev->nHeight,item.second->GetBlockHash().ToString().c_str());
                 }
             }
@@ -4673,10 +4673,10 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
     CBlockIndex* pblockindex = mapBlockIndex[pblock->GetHash()];
     if(pblockindex != chainActive.Tip())
     {
-        LogPrint("mchn","mchn: New block rejected as chain tip\n");
+        if(fDebug)LogPrint("mchn","mchn: New block rejected as chain tip\n");
         if(pblockindex->nHeightMinedByMe == pblockindex->nHeight)
         {
-            LogPrint("mchn","mchn: New block is mined by me, relay it anyway\n");
+            if(fDebug)LogPrint("mchn","mchn: New block is mined by me, relay it anyway\n");
             if (!IsInitialBlockDownload()) 
             {
                 {
@@ -4989,13 +4989,13 @@ bool static LoadBlockIndexDB()
 */   
         
     
-    LogPrint("mchn","mchn: Rolling back permission DB to height %d\n",chainActive.Height());
+    if(fDebug)LogPrint("mchn","mchn: Rolling back permission DB to height %d\n",chainActive.Height());
     mc_gState->m_Permissions->RollBack(chainActive.Height());
-    LogPrint("mchn","mchn: Rolling back asset DB to height %d\n",chainActive.Height());
+    if(fDebug)LogPrint("mchn","mchn: Rolling back asset DB to height %d\n",chainActive.Height());
     mc_gState->m_Assets->RollBack(chainActive.Height());
     if(mc_gState->m_WalletMode & MC_WMD_TXS)
     {
-        LogPrint("mchn","mchn: Rolling back wallet txs DB to height %d\n",chainActive.Height());
+        if(fDebug)LogPrint("mchn","mchn: Rolling back wallet txs DB to height %d\n",chainActive.Height());
         pwalletTxsMain->RollBack(NULL,chainActive.Height());
     }
     MultichainNode_ApplyUpgrades();        
@@ -5210,7 +5210,7 @@ bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp)
                 // detect out of order blocks, and store them for later
                 uint256 hash = block.GetHash();
                 if (hash != Params().HashGenesisBlock() && mapBlockIndex.find(block.hashPrevBlock) == mapBlockIndex.end()) {
-                    LogPrint("reindex", "%s: Out of order block %s, parent %s not known\n", __func__, hash.ToString(),
+                    if(fDebug)LogPrint("reindex", "%s: Out of order block %s, parent %s not known\n", __func__, hash.ToString(),
                             block.hashPrevBlock.ToString());
                     if (dbp)
                         mapBlocksUnknownParent.insert(std::make_pair(block.hashPrevBlock, *dbp));
@@ -5407,7 +5407,7 @@ void static ProcessGetData(CNode* pfrom)
                     if (!ReadBlockFromDisk(block, (*mi).second))
                         assert(!"cannot load block from disk");
                     
-                    LogPrint("mcnet","mcnet: Sending block: %s (height %d), to peer=%d\n",inv.hash.ToString().c_str(),mi->second->nHeight,pfrom->id);            
+                    if(fDebug)LogPrint("mcnet","mcnet: Sending block: %s (height %d), to peer=%d\n",inv.hash.ToString().c_str(),mi->second->nHeight,pfrom->id);            
                     if (inv.type == MSG_BLOCK)
                         pfrom->PushMessage("block", block);
                     else // MSG_FILTERED_BLOCK)
@@ -5538,7 +5538,7 @@ void CompleteProcessVersion(CNode* pfrom)
         {
             if(strcmp(mc_gState->GetSeedNode(),pfrom->addr.ToStringIPPort().c_str()) == 0)
             {
-                LogPrint("mchn","Adding seed address %s\n",pfrom->addr.ToStringIPPort().c_str());
+                if(fDebug)LogPrint("mchn","Adding seed address %s\n",pfrom->addr.ToStringIPPort().c_str());
                 addrman.Add(pfrom->addr, CNetAddr("127.0.0.1"));
             }
         }
@@ -5569,7 +5569,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 /* MCHN END */
 
 //    RandAddSeedPerfmon();
-    LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
+    if(fDebug)LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
     if (mapArgs.count("-dropmessagestest") && GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
     {
         LogPrintf("dropmessagestest DROPPING RECV MESSAGE\n");
@@ -5870,7 +5870,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         vector<CAddress> vAddrOk;
         int64_t nNow = GetAdjustedTime();
         int64_t nSince = nNow - 10 * 60;
-        LogPrint("mchn","mchn: received addr: %d\n",vAddr.size());
+        if(fDebug)LogPrint("mchn","mchn: received addr: %d\n",vAddr.size());
         BOOST_FOREACH(CAddress& addr, vAddr)
         {
             boost::this_thread::interruption_point();
@@ -5912,7 +5912,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             if (fReachable)
             {
                 if(fLogIPs)
-                 LogPrint("mchn","mchn: Got new address %s\n",addr.ToStringIPPort().c_str());
+                 if(fDebug)LogPrint("mchn","mchn: Got new address %s\n",addr.ToStringIPPort().c_str());
                 vAddrOk.push_back(addr);
             }
         }
@@ -5946,7 +5946,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             pfrom->AddInventoryKnown(inv);
 
             bool fAlreadyHave = AlreadyHave(inv);
-            LogPrint("net", "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHave ? "have" : "new", pfrom->id);
+            if(fDebug)LogPrint("net", "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHave ? "have" : "new", pfrom->id);
 
             if (!fAlreadyHave && !fImporting && !fReindex && inv.type != MSG_BLOCK)
                 pfrom->AskFor(inv);
@@ -5974,7 +5974,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                             MarkBlockAsInFlight(pfrom->GetId(), inv.hash);
                         }
                     }
-                    LogPrint("net", "getheaders (%d) %s to peer=%d\n", pindexBestHeader->nHeight, inv.hash.ToString(), pfrom->id);
+                    if(fDebug)LogPrint("net", "getheaders (%d) %s to peer=%d\n", pindexBestHeader->nHeight, inv.hash.ToString(), pfrom->id);
                 }
             }
 
@@ -6003,10 +6003,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         }
 
         if (fDebug || (vInv.size() != 1))
-            LogPrint("net", "received getdata (%u invsz) peer=%d\n", vInv.size(), pfrom->id);
+            if(fDebug)LogPrint("net", "received getdata (%u invsz) peer=%d\n", vInv.size(), pfrom->id);
 
         if ((fDebug && vInv.size() > 0) || (vInv.size() == 1))
-            LogPrint("net", "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
+            if(fDebug)LogPrint("net", "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
 
         pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
         ProcessGetData(pfrom);
@@ -6028,12 +6028,12 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         if (pindex)
             pindex = chainActive.Next(pindex);
         int nLimit = 500;
-        LogPrint("net", "getblocks %d to %s limit %d from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop==uint256(0) ? "end" : hashStop.ToString(), nLimit, pfrom->id);
+        if(fDebug)LogPrint("net", "getblocks %d to %s limit %d from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop==uint256(0) ? "end" : hashStop.ToString(), nLimit, pfrom->id);
         for (; pindex; pindex = chainActive.Next(pindex))
         {
             if (pindex->GetBlockHash() == hashStop)
             {
-                LogPrint("net", "  getblocks stopping at %d %s\n", pindex->nHeight, pindex->GetBlockHash().ToString());
+                if(fDebug)LogPrint("net", "  getblocks stopping at %d %s\n", pindex->nHeight, pindex->GetBlockHash().ToString());
                 break;
             }
             pfrom->PushInventory(CInv(MSG_BLOCK, pindex->GetBlockHash()));
@@ -6041,7 +6041,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             {
                 // When this block is requested, we'll send an inv that'll make them
                 // getblocks the next batch of inventory.
-                LogPrint("net", "  getblocks stopping at limit %d %s\n", pindex->nHeight, pindex->GetBlockHash().ToString());
+                if(fDebug)LogPrint("net", "  getblocks stopping at limit %d %s\n", pindex->nHeight, pindex->GetBlockHash().ToString());
                 pfrom->hashContinue = pindex->GetBlockHash();
                 break;
             }
@@ -6081,7 +6081,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         // we must use CBlocks, as CBlockHeaders won't include the 0x00 nTx count at the end
         vector<CBlock> vHeaders;
         int nLimit = MAX_HEADERS_RESULTS;
-        LogPrint("net", "getheaders %d to %s from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop.ToString(), pfrom->id);
+        if(fDebug)LogPrint("net", "getheaders %d to %s from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop.ToString(), pfrom->id);
         for (; pindex; pindex = chainActive.Next(pindex))
         {
             vHeaders.push_back(pindex->GetBlockHeader());
@@ -6126,7 +6126,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             RelayTransaction(tx);
             vWorkQueue.push_back(inv.hash);
 
-            LogPrint("mempool", "AcceptToMemoryPool: peer=%d %s : accepted %s (poolsz %u)\n",
+            if(fDebug)LogPrint("mempool", "AcceptToMemoryPool: peer=%d %s : accepted %s (poolsz %u)\n",
                 pfrom->id, pfrom->cleanSubVer,
                 tx.GetHash().ToString(),
                 mempool.mapTx.size());
@@ -6156,7 +6156,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                         continue;
                     if (AcceptToMemoryPool(mempool, stateDummy, orphanTx, true, &fMissingInputs2))
                     {
-                        LogPrint("mempool", "   accepted orphan tx %s\n", orphanHash.ToString());
+                        if(fDebug)LogPrint("mempool", "   accepted orphan tx %s\n", orphanHash.ToString());
                         RelayTransaction(orphanTx);
                         vWorkQueue.push_back(orphanHash);
                         vEraseQueue.push_back(orphanHash);
@@ -6169,11 +6169,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                             // Punish peer that gave us an invalid orphan tx
                             Misbehaving(fromPeer, nDos);
                             setMisbehaving.insert(fromPeer);
-                            LogPrint("mempool", "   invalid orphan tx %s\n", orphanHash.ToString());
+                            if(fDebug)LogPrint("mempool", "   invalid orphan tx %s\n", orphanHash.ToString());
                         }
                         // Has inputs but not accepted to mempool
                         // Probably non-standard or insufficient fee/priority
-                        LogPrint("mempool", "   removed orphan tx %s\n", orphanHash.ToString());
+                        if(fDebug)LogPrint("mempool", "   removed orphan tx %s\n", orphanHash.ToString());
                         vEraseQueue.push_back(orphanHash);
                     }
                     mempool.check(pcoinsTip);
@@ -6190,7 +6190,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 {
                     if(!pwalletMain->GetKeyFromAddressBook(pubkey,MC_PTP_MINE))
                     {
-                        LogPrint("mchn","mchn: Wallet lost mine permission on tx: %s (height %d) - message, reactivating best chain\n",
+                        if(fDebug)LogPrint("mchn","mchn: Wallet lost mine permission on tx: %s (height %d) - message, reactivating best chain\n",
                                 tx.GetHash().ToString().c_str(), chainActive.Tip()->nHeight);
                         if (!ActivateBestChain(state, NULL))
                             return error("%s : ActivateBestChain failed", __func__);                    
@@ -6228,7 +6228,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             unsigned int nMaxOrphanTx = (unsigned int)std::max((int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
             unsigned int nEvicted = LimitOrphanTxSize(nMaxOrphanTx);
             if (nEvicted > 0)
-                LogPrint("mempool", "mapOrphan overflow, removed %u tx\n", nEvicted);
+                if(fDebug)LogPrint("mempool", "mapOrphan overflow, removed %u tx\n", nEvicted);
 /* MCHN START */            
             }
 /* MCHN END */            
@@ -6241,7 +6241,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         int nDoS = 0;
         if (state.IsInvalid(nDoS))
         {
-            LogPrint("mempool", "%s from peer=%d %s was not accepted into the memory pool: %s\n", tx.GetHash().ToString(),
+            if(fDebug)LogPrint("mempool", "%s from peer=%d %s was not accepted into the memory pool: %s\n", tx.GetHash().ToString(),
                 pfrom->id, pfrom->cleanSubVer,
                 state.GetRejectReason());
             pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
@@ -6307,14 +6307,14 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         }
         if (pindexLast)
         {
-            LogPrint("mcblock","mchn-block: Received headers: %d-%d,  peer=%d\n",first_height,pindexLast->nHeight,pfrom->id);            
+            if(fDebug)LogPrint("mcblock","mchn-block: Received headers: %d-%d,  peer=%d\n",first_height,pindexLast->nHeight,pfrom->id);            
             UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
         }
         if (nCount == MAX_HEADERS_RESULTS && pindexLast) {
             // Headers message had its maximum size; the peer may have more headers.
             // TODO: optimize: if pindexLast is an ancestor of chainActive.Tip or pindexBestHeader, continue
             // from there instead.
-            LogPrint("net", "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id, pfrom->nStartingHeight);
+            if(fDebug)LogPrint("net", "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id, pfrom->nStartingHeight);
             pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256(0));
         }
     }
@@ -6343,8 +6343,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         {
 /* MCHN END */        
             
-        LogPrint("net", "received block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
-        LogPrint("mcblock","mchn-block: Received block:   %s,  peer=%d\n",inv.hash.ToString().c_str(),pfrom->id);
+        if(fDebug)LogPrint("net", "received block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
+        if(fDebug)LogPrint("mcblock","mchn-block: Received block:   %s,  peer=%d\n",inv.hash.ToString().c_str(),pfrom->id);
 
         pfrom->AddInventoryKnown(inv);
         
@@ -6411,7 +6411,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             }
             double block_total_time=end_time-block_start_time;
              
-            LogPrint("mchn","mchn-P: Block %4d (%4d); Txs: %6d; T: %8.3f; TX: %8.3f (%8.3f%%); BL: %8.3f (%8.3f%%);\n",chainActive.Tip()->nHeight,siBlockCount,(int)block.vtx.size(),
+            if(fDebug)LogPrint("mchn","mchn-P: Block %4d (%4d); Txs: %6d; T: %8.3f; TX: %8.3f (%8.3f%%); BL: %8.3f (%8.3f%%);\n",chainActive.Tip()->nHeight,siBlockCount,(int)block.vtx.size(),
                     block_total_time/block_count,
                     tx_lock_time/block_count,100.*tx_lock_time/block_total_time,block_lock_time/block_count,100.*block_lock_time/block_total_time);
 
@@ -6427,7 +6427,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         }
         else
         {
-            LogPrint("net", "ignored block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
+            if(fDebug)LogPrint("net", "ignored block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
             pfrom->AskFor(inv);
         }
 /* MCHN END */        
@@ -6441,7 +6441,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         BOOST_FOREACH(const CAddress &addr, vAddr)
             pfrom->PushAddress(addr);
 /* MCHN START */        
-        LogPrint("mchn","mchn: Sent %d known addresses\n",vAddr.size());
+        if(fDebug)LogPrint("mchn","mchn: Sent %d known addresses\n",vAddr.size());
 /* MCHN END */        
     }
 
@@ -6536,7 +6536,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         }
 
         if (!(sProblem.empty())) {
-            LogPrint("net", "pong peer=%d %s: %s, %x expected, %x received, %u bytes\n",
+            if(fDebug)LogPrint("net", "pong peer=%d %s: %s, %x expected, %x received, %u bytes\n",
                 pfrom->id,
                 pfrom->cleanSubVer,
                 sProblem,
@@ -6645,10 +6645,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                     vRecv >> hash;
                     ss << ": hash " << hash.ToString();
                 }
-                LogPrint("net", "Reject %s\n", SanitizeString(ss.str()));
+                if(fDebug)LogPrint("net", "Reject %s\n", SanitizeString(ss.str()));
             } catch (std::ios_base::failure& e) {
                 // Avoid feedback loops by preventing reject messages from triggering a new reject message.
-                LogPrint("net", "Unparseable reject message received\n");
+                if(fDebug)LogPrint("net", "Unparseable reject message received\n");
             }
         }
     }
@@ -6656,7 +6656,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     else
     {
         // Ignore unknown commands for extensibility
-        LogPrint("net", "Unknown command \"%s\" from peer=%d\n", SanitizeString(strCommand), pfrom->id);
+        if(fDebug)LogPrint("net", "Unknown command \"%s\" from peer=%d\n", SanitizeString(strCommand), pfrom->id);
     }
 
 
@@ -6724,7 +6724,7 @@ bool ProcessMessages(CNode* pfrom)
         {
             if(msg1.hdr.GetCommand() == "block")
             {
-                LogPrint("mcblockperf","mchn-block-perf: New block, peer=%d\n", pfrom->id);
+                if(fDebug)LogPrint("mcblockperf","mchn-block-perf: New block, peer=%d\n", pfrom->id);
             }                
         }
         
@@ -6736,7 +6736,7 @@ bool ProcessMessages(CNode* pfrom)
             {
                 if(msg1.hdr.GetCommand() == "block")
                 {
-                    LogPrint("mcblockperf","mchn-block-perf: Processing block, though send buffer is full (%d), peer=%d\n", (int)pfrom->nSendSize,pfrom->id);
+                    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Processing block, though send buffer is full (%d), peer=%d\n", (int)pfrom->nSendSize,pfrom->id);
                 }                
                 else
                 {
@@ -6762,7 +6762,7 @@ bool ProcessMessages(CNode* pfrom)
 
         if(msg.hdr.GetCommand() == "block")
         {
-            LogPrint("mcblockperf","mchn-block-perf: Processing new block, peer=%d\n",pfrom->id);
+            if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Processing new block, peer=%d\n",pfrom->id);
         }
         // at this point, any failure means we can delete the current message
         it++;
@@ -6801,7 +6801,7 @@ bool ProcessMessages(CNode* pfrom)
         string strCommand = hdr.GetCommand();
         
 /* MCHN START */            
-        LogPrint("mchnminor","mchn: RECV: %s, peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
+        if(fDebug)LogPrint("mchnminor","mchn: RECV: %s, peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
         
         if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY)
         {
@@ -7009,7 +7009,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                 state.fSyncStarted = true;
                 nSyncStarted++;
                 CBlockIndex *pindexStart = pindexBestHeader->pprev ? pindexBestHeader->pprev : pindexBestHeader;
-                LogPrint("net", "initial getheaders (%d) to peer=%d (startheight:%d)\n", pindexStart->nHeight, pto->id, pto->nStartingHeight);
+                if(fDebug)LogPrint("net", "initial getheaders (%d) to peer=%d (startheight:%d)\n", pindexStart->nHeight, pto->id, pto->nStartingHeight);
                 pto->PushMessage("getheaders", chainActive.GetLocator(pindexStart), uint256(0));
             }
         }
@@ -7141,7 +7141,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                 {
                     if(msg1.hdr.GetCommand() == "block")
                     {
-                        LogPrint("mcblockperf","mchn-block-perf: There is still block to process from peer=%d, no timeout\n",pto->id);
+                        if(fDebug)LogPrint("mcblockperf","mchn-block-perf: There is still block to process from peer=%d, no timeout\n",pto->id);
                         fTimeout=false;
                     }
                 }
@@ -7179,15 +7179,15 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             BOOST_FOREACH(CBlockIndex *pindex, vToDownload) {
                 vGetData.push_back(CInv(MSG_BLOCK, pindex->GetBlockHash()));
                 MarkBlockAsInFlight(pto->GetId(), pindex->GetBlockHash(), pindex);
-                LogPrint("net", "Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
+                if(fDebug)LogPrint("net", "Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
                     pindex->nHeight, pto->id);
-                LogPrint("mcblockperf", "mchn-block-perf: Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
+                if(fDebug)LogPrint("mcblockperf", "mchn-block-perf: Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
                     pindex->nHeight, pto->id);
             }
             if (state.nBlocksInFlight == 0 && staller != -1) {
                 if (State(staller)->nStallingSince == 0) {
                     State(staller)->nStallingSince = nNow;
-                    LogPrint("net", "Stall started peer=%d\n", staller);
+                    if(fDebug)LogPrint("net", "Stall started peer=%d\n", staller);
                 }
             }
         }
@@ -7235,7 +7235,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             if (!AlreadyHave(inv) || (inv.type == MSG_BLOCK))                   // MCHN +ignored blocks
             {
                 if (fDebug)
-                    LogPrint("net", "Requesting %s peer=%d\n", inv.ToString(), pto->id);
+                    if(fDebug)LogPrint("net", "Requesting %s peer=%d\n", inv.ToString(), pto->id);
                 vGetData.push_back(inv);
                 if (vGetData.size() >= 1000)
                 {

@@ -3054,7 +3054,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
     {
         LOCK2(cs_main, cs_wallet);
         LogPrintf("CommitTransaction: %s, vin: %d, vout: %d\n",wtxNew.GetHash().ToString().c_str(),(int)wtxNew.vin.size(),(int)wtxNew.vout.size());
-        LogPrint("wallet","CommitTransaction:\n%s", wtxNew.ToString());
+        if(fDebug)LogPrint("wallet","CommitTransaction:\n%s", wtxNew.ToString());
         {
 /* MCHN START */            
             if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))

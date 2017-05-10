@@ -202,14 +202,14 @@ bool RecvLine(SOCKET hSocket, string& strLine)
             if (nBytes == 0)
             {
                 // socket closed
-                LogPrint("net", "socket closed\n");
+                if(fDebug)LogPrint("net", "socket closed\n");
                 return false;
             }
             else
             {
                 // socket error
                 int nErr = WSAGetLastError();
-                LogPrint("net", "recv failed: %s\n", NetworkErrorString(nErr));
+                if(fDebug)LogPrint("net", "recv failed: %s\n", NetworkErrorString(nErr));
                 return false;
             }
         }
@@ -402,7 +402,7 @@ CNode* ConnectNode(CAddress addrConnect, const char *pszDest)
     }
 
     /// debug print
-    LogPrint("net", "net: trying connection %s lastseen=%.1fhrs\n",
+    if(fDebug)LogPrint("net", "net: trying connection %s lastseen=%.1fhrs\n",
         pszDest ? pszDest : addrConnect.ToString(),
         pszDest ? 0.0 : (double)(GetAdjustedTime() - addrConnect.nTime)/3600.0);
 
@@ -429,7 +429,7 @@ CNode* ConnectNode(CAddress addrConnect, const char *pszDest)
                 if(strcmp(pszDest,mc_gState->GetSeedNode()) == 0)
                 {
                     mc_gState->m_pSeedNode=pnode;
-                    LogPrint("mchn","mchn: Connected to seed node %s\n",pszDest);
+                    if(fDebug)LogPrint("mchn","mchn: Connected to seed node %s\n",pszDest);
                 }
             }
         }
@@ -457,7 +457,7 @@ void CNode::CloseSocketDisconnect()
     fDisconnect = true;
     if (hSocket != INVALID_SOCKET)
     {
-        LogPrint("net", "disconnecting peer=%d\n", id);
+        if(fDebug)LogPrint("net", "disconnecting peer=%d\n", id);
         CloseSocket(hSocket);
     }
 
@@ -478,9 +478,9 @@ void CNode::PushVersion()
     GetRandBytes((unsigned char*)&nLocalHostNonce, sizeof(nLocalHostNonce));
     nVersionNonceSent=nLocalHostNonce;                                              // MCHN
     if (fLogIPs)
-        LogPrint("net", "send version message: version %d, blocks=%d, us=%s, them=%s, peer=%d\n", PROTOCOL_VERSION, nBestHeight, addrMe.ToString(), addrYou.ToString(), id);
+        if(fDebug)LogPrint("net", "send version message: version %d, blocks=%d, us=%s, them=%s, peer=%d\n", PROTOCOL_VERSION, nBestHeight, addrMe.ToString(), addrYou.ToString(), id);
     else
-        LogPrint("net", "send version message: version %d, blocks=%d, us=%s, peer=%d\n", PROTOCOL_VERSION, nBestHeight, addrMe.ToString(), id);
+        if(fDebug)LogPrint("net", "send version message: version %d, blocks=%d, us=%s, peer=%d\n", PROTOCOL_VERSION, nBestHeight, addrMe.ToString(), id);
     
 /* MCHN START */
     std::string subver=FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, std::vector<string>());
@@ -622,7 +622,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
         if (msg.complete())
         {
             msg.nTime = GetTimeMicros();
-            LogPrint("mcnet","mcnet: complete message: %s, peer=%d\n", msg.hdr.GetCommand(),id);
+            if(fDebug)LogPrint("mcnet","mcnet: complete message: %s, peer=%d\n", msg.hdr.GetCommand(),id);
         }
     }
 
@@ -656,7 +656,7 @@ int CNetMessage::readHeader(const char *pch, unsigned int nBytes)
     if (hdr.nMessageSize > MAX_SIZE)
             return -1;
 
-    LogPrint("mcnet","mcnet: received header: %s\n", hdr.GetCommand());
+    if(fDebug)LogPrint("mcnet","mcnet: received header: %s\n", hdr.GetCommand());
     
     // switch state to reading message data
     in_data = true;
@@ -765,7 +765,7 @@ void ThreadSocketHandler()
 
                     // close socket and cleanup
 /* MCHN START */                    
-                    LogPrint("net","disconnect flag set\n");
+                    if(fDebug)LogPrint("net","disconnect flag set\n");
 /* MCHN END */                    
                     pnode->CloseSocketDisconnect();
 
@@ -910,7 +910,7 @@ void ThreadSocketHandler()
                     if (!addr.SetSockAddr((const struct sockaddr*)&sockaddr))
                         LogPrintf("Warning: Unknown socket family\n");
                 
-                LogPrint("net","Connection attempt from: %s\n", addr.ToString().c_str());
+                if(fDebug)LogPrint("net","Connection attempt from: %s\n", addr.ToString().c_str());
 
                 bool whitelisted = hListenSocket.whitelisted || CNode::IsWhitelistedRange(addr);
                 {
@@ -982,7 +982,7 @@ void ThreadSocketHandler()
                             if (!pnode->ReceiveMsgBytes(pchBuf, nBytes))
                             {
 /* MCHN START */                    
-                                LogPrint("net","receive error\n");
+                                if(fDebug)LogPrint("net","receive error\n");
 /* MCHN END */                    
                                 pnode->CloseSocketDisconnect();
                             }
@@ -994,10 +994,10 @@ void ThreadSocketHandler()
                         {
                             // socket closed gracefully
                             if (!pnode->fDisconnect)
-                                LogPrint("net", "socket closed\n");
+                                if(fDebug)LogPrint("net", "socket closed\n");
 /* MCHN START */                    
                             else
-                                LogPrint("net","socket closed, disconnect flag is set\n");
+                                if(fDebug)LogPrint("net","socket closed, disconnect flag is set\n");
 /* MCHN END */                    
                             pnode->CloseSocketDisconnect();
                         }
@@ -1040,7 +1040,7 @@ void ThreadSocketHandler()
             {
                 if (pnode->nLastRecv == 0 || pnode->nLastSend == 0)
                 {
-                    LogPrint("net", "socket no message in first 60 seconds, %d %d from %d\n", pnode->nLastRecv != 0, pnode->nLastSend != 0, pnode->id);
+                    if(fDebug)LogPrint("net", "socket no message in first 60 seconds, %d %d from %d\n", pnode->nLastRecv != 0, pnode->nLastSend != 0, pnode->id);
                     pnode->fDisconnect = true;
                 }
                 else if (nTime - pnode->nLastSend > TIMEOUT_INTERVAL)
@@ -1256,7 +1256,7 @@ void DumpAddresses()
     CAddrDB adb;
     adb.Write(addrman);
 
-    LogPrint("net", "Flushed %d addresses to peers.dat  %dms\n",
+    if(fDebug)LogPrint("net", "Flushed %d addresses to peers.dat  %dms\n",
            addrman.size(), GetTimeMillis() - nStart);
 /* MCHN START */
     }
@@ -1563,22 +1563,22 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOu
             (FindNode((CNetAddr)addrConnect) && !IsLocal(addrConnect)) || CNode::IsBanned(addrConnect) ||
             FindNode(addrConnect.ToStringIPPort()))
           {
-            LogPrint("net","net: Node found: %s\n",addrConnect.ToStringIPPort().c_str());
+            if(fDebug)LogPrint("net","net: Node found: %s\n",addrConnect.ToStringIPPort().c_str());
              return false;
           }
     } else if (FindNode(pszDest))
     {
-        LogPrint("net","net: Node found: %s\n",pszDest);
+        if(fDebug)LogPrint("net","net: Node found: %s\n",pszDest);
         return false;
     }
 /* MCHN START */    
     if(pszDest)
     {
-        LogPrint("net","net: Trying to connect to %s (by address)\n",pszDest);
+        if(fDebug)LogPrint("net","net: Trying to connect to %s (by address)\n",pszDest);
     }
     else
     {
-        LogPrint("net","net: Trying to connect to %s\n",addrConnect.ToStringIPPort().c_str());
+        if(fDebug)LogPrint("net","net: Trying to connect to %s\n",addrConnect.ToStringIPPort().c_str());
     }
 /* MCHN END */    
     
@@ -1588,7 +1588,7 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOu
     if (!pnode)
     {
 /* MCHN START */    
-        LogPrint("net","net: Connection not established\n");
+        if(fDebug)LogPrint("net","net: Connection not established\n");
 /* MCHN END */    
         return false;
     }
@@ -1598,7 +1598,7 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOu
     if (fOneShot)
         pnode->fOneShot = true;
 
-    LogPrint("net","net: Connection to %s established\n",addrConnect.ToStringIPPort().c_str());
+    if(fDebug)LogPrint("net","net: Connection to %s established\n",addrConnect.ToStringIPPort().c_str());
     return true;
 }
 
@@ -1637,7 +1637,7 @@ void ThreadMessageHandler()
                     if (!g_signals.ProcessMessages(pnode))
                     {
 /* MCHN START */                    
-                        LogPrint("net","socket closed because of error in message processing\n");
+                        if(fDebug)LogPrint("net","socket closed because of error in message processing\n");
 /* MCHN END */                    
                         pnode->CloseSocketDisconnect();
                     }
@@ -2205,9 +2205,9 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     }
 
     if (fLogIPs)
-        LogPrint("net", "Added connection to %s peer=%d\n", addrName, id);
+        if(fDebug)LogPrint("net", "Added connection to %s peer=%d\n", addrName, id);
     else
-        LogPrint("net", "Added connection peer=%d\n", id);
+        if(fDebug)LogPrint("net", "Added connection peer=%d\n", id);
 
     // Be shy and don't send version until we hear
     if (hSocket != INVALID_SOCKET && !fInbound)
@@ -2247,7 +2247,7 @@ void CNode::AskFor(const CInv& inv)
         nRequestTime = it->second;
     else
         nRequestTime = 0;
-    LogPrint("net", "askfor %s  %d (%s) peer=%d\n", inv.ToString(), nRequestTime, DateTimeStrFormat("%H:%M:%S", nRequestTime/1000000), id);
+    if(fDebug)LogPrint("net", "askfor %s  %d (%s) peer=%d\n", inv.ToString(), nRequestTime, DateTimeStrFormat("%H:%M:%S", nRequestTime/1000000), id);
 
     // Make sure not to reuse time indexes to keep things in the same order
     int64_t nNow = GetTimeMicros() - 1000000;
@@ -2269,8 +2269,8 @@ void CNode::BeginMessage(const char* pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSen
     ENTER_CRITICAL_SECTION(cs_vSend);
     assert(ssSend.size() == 0);
     ssSend << CMessageHeader(pszCommand, 0);
-    LogPrint("net", "sending: %s ", SanitizeString(pszCommand));
-    LogPrint("mchnminor","mchn: SEND: %s\n",SanitizeString(pszCommand));
+    if(fDebug)LogPrint("net", "sending: %s ", SanitizeString(pszCommand));
+    if(fDebug)LogPrint("mchnminor","mchn: SEND: %s\n",SanitizeString(pszCommand));
 }
 
 void CNode::AbortMessage() UNLOCK_FUNCTION(cs_vSend)
@@ -2279,7 +2279,7 @@ void CNode::AbortMessage() UNLOCK_FUNCTION(cs_vSend)
 
     LEAVE_CRITICAL_SECTION(cs_vSend);
 
-    LogPrint("net", "(aborted)\n");
+    if(fDebug)LogPrint("net", "(aborted)\n");
 }
 
 void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
@@ -2289,7 +2289,7 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
     // not intended for end-users.
     if (mapArgs.count("-dropmessagestest") && GetRand(GetArg("-dropmessagestest", 2)) == 0)
     {
-        LogPrint("net", "dropmessages DROPPING SEND MESSAGE\n");
+        if(fDebug)LogPrint("net", "dropmessages DROPPING SEND MESSAGE\n");
         AbortMessage();
         return;
     }
@@ -2310,7 +2310,7 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
     assert(ssSend.size () >= CMessageHeader::CHECKSUM_OFFSET + sizeof(nChecksum));
     memcpy((char*)&ssSend[CMessageHeader::CHECKSUM_OFFSET], &nChecksum, sizeof(nChecksum));
 
-    LogPrint("net", "(%d bytes) peer=%d\n", nSize, id);
+    if(fDebug)LogPrint("net", "(%d bytes) peer=%d\n", nSize, id);
 
     std::deque<CSerializeData>::iterator it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
     ssSend.GetAndClear(*it);
@@ -2333,7 +2333,7 @@ int mc_QuerySeed(boost::thread_group& threadGroup,const char *seedAddr)
 
     unsigned int StartTime=mc_TimeNowAsUInt();
     
-    LogPrint("mchn","mchn: Sending query to seed node %s\n",seedAddr);
+    if(fDebug)LogPrint("mchn","mchn: Sending query to seed node %s\n",seedAddr);
         
     err=MC_ERR_NOERROR;
     
@@ -2353,7 +2353,7 @@ int mc_QuerySeed(boost::thread_group& threadGroup,const char *seedAddr)
         mc_gState->m_NetworkState=MC_NTS_NOT_READY;
     }
     
-    LogPrint("mchn","mchn: Query completed, waiting for seed node to disconnect\n");
+    if(fDebug)LogPrint("mchn","mchn: Query completed, waiting for seed node to disconnect\n");
     
     StartTime=mc_TimeNowAsUInt();
     bool fCheckDisconnect=true;
@@ -2364,7 +2364,7 @@ int mc_QuerySeed(boost::thread_group& threadGroup,const char *seedAddr)
                 LOCK(cs_vNodes);
                 if(vNodes.size() == 0)
                 {
-                    LogPrint("mchn","mchn: Successfully disconnected from seed node\n");                    
+                    if(fDebug)LogPrint("mchn","mchn: Successfully disconnected from seed node\n");                    
                     fCheckDisconnect=false;
                 }
             }
@@ -2373,7 +2373,7 @@ int mc_QuerySeed(boost::thread_group& threadGroup,const char *seedAddr)
                 __US_Sleep(50);
                 if(mc_TimeNowAsUInt() - StartTime > 10)
                 {
-                    LogPrint("mchn","mchn: Could not disconnect from seed node - timeout\n");                    
+                    if(fDebug)LogPrint("mchn","mchn: Could not disconnect from seed node - timeout\n");                    
                     fCheckDisconnect=false;
                     err=MC_ERR_CONNECTION_ERROR;
                 }
