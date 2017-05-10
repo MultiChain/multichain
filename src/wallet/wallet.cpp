@@ -3109,7 +3109,10 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
         else
         {
             pwalletTxsMain->AddTx(NULL,wtxNew,-1,NULL,-1,0);   
-            SyncWithWallets(wtxNew, NULL);            
+            if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
+            {
+                SyncWithWallets(wtxNew, NULL);            
+            }
         }
     
         if(fCanMine)

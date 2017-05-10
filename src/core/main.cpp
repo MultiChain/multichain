@@ -1548,7 +1548,10 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 /* MCHN END */    
     if(fAddToWallet)
     {
-        SyncWithWallets(tx, NULL);
+        if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
+        {
+            SyncWithWallets(tx, NULL);
+        }
     }
 
     return true;
@@ -2767,7 +2770,10 @@ bool static DisconnectTip(CValidationState &state) {
     // Let wallets know transactions went from 1-confirmed to
     // 0-confirmed or conflicted:
     BOOST_FOREACH(const CTransaction &tx, block.vtx) {
-        SyncWithWallets(tx, NULL);
+        if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
+        {
+            SyncWithWallets(tx, NULL);
+        }
     }
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Disconnecting block completed, %d transactions in mempool\n",(int)mempool.size());
     return true;
@@ -2873,7 +2879,10 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     // Tell wallet about transactions that went from mempool
     // to conflicted:
     BOOST_FOREACH(const CTransaction &tx, txConflicted) {
-        SyncWithWallets(tx, NULL);
+        if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
+        {        
+            SyncWithWallets(tx, NULL);
+        }
     }
     // ... and about transactions that got confirmed:
 /* MCHN START */        
@@ -2882,7 +2891,10 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
 /* MCHN END */    
     
     BOOST_FOREACH(const CTransaction &tx, pblock->vtx) {
-        SyncWithWallets(tx, pblock);
+        if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
+        {        
+            SyncWithWallets(tx, pblock);
+        }
     }
     
 /* MCHN START */        
