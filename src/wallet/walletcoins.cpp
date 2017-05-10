@@ -766,7 +766,7 @@ bool FindRelevantCoins(CWallet *lpWallet,                                       
             
             for(int i=0;i<tmp_amounts->GetCount();i++)
             {
-                DebugPrintAssetTxOut(hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
+                if(debug_print)DebugPrintAssetTxOut(hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
             }
             
             is_relevant=true;
@@ -881,7 +881,7 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
                         {
                             for(int i=0;i<tmp_amounts->GetCount();i++)
                             {
-                                DebugPrintAssetTxOut(hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
+                                if(debug_print)DebugPrintAssetTxOut(hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
                             }
                             if(!InsertCoinIntoMatrix(coin_id,hash,out_i,tmp_amounts,NULL,in_amounts,in_map,in_row,in_size,in_special_row,0))
                             {
@@ -990,7 +990,7 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
                             {
                                 for(int i=0;i<tmp_amounts->GetCount();i++)
                                 {
-                                    DebugPrintAssetTxOut(hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
+                                    if(debug_print)DebugPrintAssetTxOut(hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
                                 }
                                 if(!InsertCoinIntoMatrix(coin_id,hash,out_i,tmp_amounts,NULL,in_amounts,in_map,in_row,in_size,in_special_row,0))
                                 {
@@ -1074,8 +1074,8 @@ bool CalculateChangeAmounts(CWallet *lpWallet,                                  
                 {
                     for(int i=0;i<tmp_amounts->GetCount();i++)
                     {
-                        DebugPrintAssetTxOut(hash,out.i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
-                        LogAssetTxOut("Input : ",hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
+                        if(debug_print)DebugPrintAssetTxOut(hash,out.i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
+                        if(fDebug)LogAssetTxOut("Input : ",hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
                     }
                     for(int i=0;i<tmp_amounts->GetCount();i++)                  // Add all assets onto change buffer, not only those from out_amounts
                     {
@@ -1161,7 +1161,7 @@ bool CalculateChangeAmounts(CWallet *lpWallet,                                  
     if(debug_print)printf("debg: Change:\n");
     for(int i=0;i<change_amounts->GetCount();i++)
     {
-        DebugPrintAssetTxOut(0,0,change_amounts->GetRow(i),mc_GetABQuantity(change_amounts->GetRow(i)));
+        if(debug_print)DebugPrintAssetTxOut(0,0,change_amounts->GetRow(i),mc_GetABQuantity(change_amounts->GetRow(i)));
     }
     
     return true;
@@ -1562,8 +1562,8 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
                         if(debug_print)printf("debg: Change output, group %d:\n",g);
                         for(int i=0;i<tmp_amounts->GetCount();i++)
                         {
-                            DebugPrintAssetTxOut(0,0,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
-                            LogAssetTxOut("Change: ",0,0,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
+                            if(debug_print)DebugPrintAssetTxOut(0,0,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
+                            if(fDebug)LogAssetTxOut("Change: ",0,0,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
                         }
                         lpScript->Clear();
                         lpScript->SetAssetQuantities(tmp_amounts,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);
@@ -1625,7 +1625,7 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
             CAmount nAmount=nTotalInValue-nTotalChangeValue-nFeeRet;
             CTxOut txout(nAmount, scriptChange);
             if(debug_print)printf("debg: Native change output: %ld\n",nAmount);
-            LogAssetTxOut("Change: ",0,0,NULL,nAmount);
+            if(fDebug)LogAssetTxOut("Change: ",0,0,NULL,nAmount);
             txNew.vout.push_back(txout);            
         }
 
@@ -1688,7 +1688,7 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
 
                                 CTxOut txout(0, scriptCachedScript);
                                 if(debug_print)printf("debg: Cached Script for input %d\n",(int)txNew.vin.size()-1);
-                                LogAssetTxOut("Cached Script: ",0,0,NULL,0);
+                                if(fDebug)LogAssetTxOut("Cached Script: ",0,0,NULL,0);
                                 txNew.vout.push_back(txout);            
                                 fScriptCached=true;
                             }                            
@@ -1921,8 +1921,8 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
     if(fDebug)LogPrint("mcatxo","mcatxo: ====== New transaction, required %d\n",required);
     for(int i=0;i<out_amounts->GetCount();i++)
     {
-        DebugPrintAssetTxOut(0,0,out_amounts->GetRow(i),mc_GetABQuantity(out_amounts->GetRow(i)));
-        LogAssetTxOut("Output: ",0,0,out_amounts->GetRow(i),mc_GetABQuantity(out_amounts->GetRow(i)));
+        if(debug_print)DebugPrintAssetTxOut(0,0,out_amounts->GetRow(i),mc_GetABQuantity(out_amounts->GetRow(i)));
+        if(fDebug)LogAssetTxOut("Output: ",0,0,out_amounts->GetRow(i),mc_GetABQuantity(out_amounts->GetRow(i)));
     }
 
     this_time=mc_TimeNowAsDouble();
