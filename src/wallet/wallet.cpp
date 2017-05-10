@@ -3051,10 +3051,6 @@ bool CWallet::SelectMultiChainCoins(const CAmount& nTargetValue, vector<COutput>
 
 bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, string& reject_reason)
 {
-    double this_time,last_time;
-    this_time=mc_TimeNowAsDouble();
-    last_time=this_time;
-    
     {
         LOCK2(cs_main, cs_wallet);
         LogPrintf("CommitTransaction: %s, vin: %d, vout: %d\n",wtxNew.GetHash().ToString().c_str(),(int)wtxNew.vin.size(),(int)wtxNew.vout.size());
@@ -3075,9 +3071,6 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
                 // Add tx to wallet, because if it has change it's also ours,
                 // otherwise just for transaction history.
                 AddToWallet(wtxNew);
-    this_time=mc_TimeNowAsDouble();
-//    if(csperf_debug_print)printf("AddToWallet             : %8.6f\n",this_time-last_time);
-    last_time=this_time;
 
                 // Notify that old coins are spent
                 set<CWalletTx*> setCoins;
@@ -3098,14 +3091,15 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
         // Track how many getdata requests our transaction gets
         mapRequestCount[wtxNew.GetHash()] = 0;
 
-    this_time=mc_TimeNowAsDouble();
-//    if(csperf_debug_print)printf("NotifyChanged           : %8.6f\n",this_time-last_time);
-    last_time=this_time;
         // Broadcast
 
-        CPubKey pubkey;            
-        uint32_t fCanMine= GetKeyFromAddressBook(pubkey,MC_PTP_MINE) ? MC_PTP_MINE : 0;
-
+        CPubKey pubkey;  
+        uint32_t fCanMine=0;
+        if(mc_gState->m_Features->UnconfirmedMinersCannotMine() == 0)
+        {
+            fCanMine= GetKeyFromAddressBook(pubkey,MC_PTP_MINE) ? MC_PTP_MINE : 0;
+        }
+        
         if (!wtxNew.AcceptToMemoryPoolReturnReason(false,true,reject_reason))   // MCHN
         {
             // This must not fail. The transaction has already been signed and recorded.
@@ -3120,26 +3114,20 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
     
         if(fCanMine)
         {
-            if(!GetKeyFromAddressBook(pubkey,MC_PTP_MINE))
+            if(mc_gState->m_Features->UnconfirmedMinersCannotMine() == 0)
             {
-                CValidationState state;
-                
-                LogPrint("mchn","mchn: Wallet lost mine permission on tx: %s (height %d) - commit, reactivating best chain\n",
-                        wtxNew.GetHash().ToString().c_str(), chainActive.Tip()->nHeight);
-                if (!::ActivateBestChain(state, NULL))
-                    reject_reason = "ActivateBestChain failed";
+                if(!GetKeyFromAddressBook(pubkey,MC_PTP_MINE))
+                {
+                    CValidationState state;
+
+                    LogPrint("mchn","mchn: Wallet lost mine permission on tx: %s (height %d) - commit, reactivating best chain\n",
+                            wtxNew.GetHash().ToString().c_str(), chainActive.Tip()->nHeight);
+                    if (!::ActivateBestChain(state, NULL))
+                        reject_reason = "ActivateBestChain failed";
+                }
             }
         }
 
-    this_time=mc_TimeNowAsDouble();
-//    if(csperf_debug_print)printf("Accept                  : %8.6f\n",this_time-last_time);
-    LogPrint("mcperf","mcperf: Commit: AcceptToMemoryPool: Time: %8.6f \n", this_time-last_time);
-    last_time=this_time;
-        wtxNew.RelayWalletTransaction();
-    this_time=mc_TimeNowAsDouble();
-//    if(csperf_debug_print)printf("Relay                   : %8.6f\n",this_time-last_time);
-    LogPrint("mcperf","mcperf: Commit: RelayWalletTransaction : Time: %8.6f \n", this_time-last_time);
-    last_time=this_time;
     }
     return true;
 }
