@@ -40,7 +40,10 @@ bool Sign1(const CKeyID& address, const CKeyStore& keystore, uint256 hash, int n
     vector<unsigned char> vchSig;
     if (!key.Sign(hash, vchSig))
         return false;
-    MultichainNode_AddSignatureToCache(vchSig,key.GetPubKey(),hash);
+    if(GetBoolArg("-cachejustsigned",true))
+    {
+        MultichainNode_AddSignatureToCache(vchSig,key.GetPubKey(),hash);
+    }
     vchSig.push_back((unsigned char)nHashType);
     scriptSigRet << vchSig;
     
