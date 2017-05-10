@@ -4583,9 +4583,12 @@ void CBlockIndex::BuildSkip()
 bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDiskBlockPos *dbp)
 {
 /* MCHN START*/    
-    if(!VerifyBlockSignature(pblock,true))
     {
-        return false;
+        LOCK(cs_main);
+        if(!VerifyBlockSignature(pblock,true))
+        {
+            return false;
+        }
     }
 /* MCHN END*/    
     
