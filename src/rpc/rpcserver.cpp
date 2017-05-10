@@ -1350,8 +1350,11 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
     try
     {
         // Execute
-        string strRequest = JSONRPCRequestForLog(strMethod, params, 1);
-        if(fDebug)LogPrint("mcapi","mcapi: API request: %s\n",strRequest.c_str());
+        if(fDebug)
+        {
+            string strRequest = JSONRPCRequestForLog(strMethod, params, 1);
+            LogPrint("mcapi","mcapi: API request: %s\n",strRequest.c_str());
+        }
         
         Value result;
         {
