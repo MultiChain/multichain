@@ -18,6 +18,7 @@
 using namespace std;
 
 typedef vector<unsigned char> valtype;
+void MultichainNode_AddToSignatureCache(const std::vector<unsigned char>& vchSig, const CPubKey& pubkey, const uint256& sighash);
 
 bool Sign1(const CKeyID& address, const CKeyStore& keystore, uint256 hash, int nHashType, CScript& scriptSigRet)
 {
@@ -39,7 +40,9 @@ bool Sign1(const CKeyID& address, const CKeyStore& keystore, uint256 hash, int n
         return false;
     vchSig.push_back((unsigned char)nHashType);
     scriptSigRet << vchSig;
-
+    
+    MultichainNode_AddToSignatureCache(vchSig,key.GetPubKey(),hash);
+    
     return true;
 }
 

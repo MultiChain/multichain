@@ -89,3 +89,10 @@ bool CachingTransactionSignatureChecker::VerifySignature(const std::vector<unsig
         signatureCache.Set(sighash, vchSig, pubkey);
     return true;
 }
+
+void MultichainNode_AddToSignatureCache(const std::vector<unsigned char>& vchSig, const CPubKey& pubkey, const uint256& sighash)
+{
+    static CSignatureCache signatureCache;
+    signatureCache.Set(sighash, vchSig, pubkey);    
+}
+
