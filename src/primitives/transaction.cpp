@@ -96,6 +96,11 @@ CTransaction& CTransaction::operator=(const CTransaction &tx) {
 
 CAmount CTransaction::GetValueOut() const
 {
+    if(MCP_WITH_NATIVE_CURRENCY == 0)
+    {
+        return 0;
+    }
+    
     CAmount nValueOut = 0;
     for (std::vector<CTxOut>::const_iterator it(vout.begin()); it != vout.end(); ++it)
     {

@@ -225,6 +225,11 @@ const CTxOut &CCoinsViewCache::GetOutputFor(const CTxIn& input) const
 
 CAmount CCoinsViewCache::GetValueIn(const CTransaction& tx) const
 {
+    if(MCP_WITH_NATIVE_CURRENCY == 0)
+    {
+        return 0;
+    }
+    
     if (tx.IsCoinBase())
         return 0;
 
@@ -251,6 +256,11 @@ bool CCoinsViewCache::HaveInputs(const CTransaction& tx) const
 
 double CCoinsViewCache::GetPriority(const CTransaction &tx, int nHeight) const
 {
+    if(MCP_WITH_NATIVE_CURRENCY == 0)
+    {
+        return 0.0;
+    }
+
     if (tx.IsCoinBase())
         return 0.0;
     double dResult = 0.0;
