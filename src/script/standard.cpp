@@ -459,7 +459,6 @@ bool IsStandardNullData(const CScript& scriptPubKey)
         {
             return false;
         }
-        return false;
     }
 
     if(mc_gState->m_Features->VerifySizeOfOpDropElements())
