@@ -3115,6 +3115,11 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
             }
         }
     
+        for (unsigned int i = 0; i < wtxNew.vin.size(); i++) 
+        {
+            COutPoint outp=wtxNew.vin[i].prevout;
+            UnlockCoin(outp);
+        }
         if(fCanMine)
         {
             if(mc_gState->m_Features->UnconfirmedMinersCannotMine() == 0)

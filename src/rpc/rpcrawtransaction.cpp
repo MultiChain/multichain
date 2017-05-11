@@ -1914,8 +1914,12 @@ Value sendrawtransaction(const Array& params, bool fHelp)
         // push to local node and sync with wallets
         CValidationState state;
 /* MCHN START */        
-        CPubKey pubkey;            
-        uint32_t fCanMine=((pwalletMain != NULL) && pwalletMain->GetKeyFromAddressBook(pubkey,MC_PTP_MINE)) ? MC_PTP_MINE : 0;
+        CPubKey pubkey;   
+        uint32_t fCanMine=0;
+        if(mc_gState->m_Features->UnconfirmedMinersCannotMine() == 0)
+        {
+            fCanMine=((pwalletMain != NULL) && pwalletMain->GetKeyFromAddressBook(pubkey,MC_PTP_MINE)) ? MC_PTP_MINE : 0;
+        }
 /* MCHN END */        
         if (!AcceptToMemoryPool(mempool, state, tx, false, NULL, !fOverrideFees)) {
             if(state.IsInvalid())
@@ -1940,14 +1944,22 @@ Value sendrawtransaction(const Array& params, bool fHelp)
 /* MCHN START */            
         if(pwalletMain)
         {
+            for (unsigned int i = 0; i < tx.vin.size(); i++) 
+            {
+                COutPoint outp=tx.vin[i].prevout;
+                pwalletMain->UnlockCoin(outp);
+            }
             if(fCanMine)
             {
-                if(!pwalletMain->GetKeyFromAddressBook(pubkey,MC_PTP_MINE))
+                if(mc_gState->m_Features->UnconfirmedMinersCannotMine() == 0)
                 {
-                    LogPrint("mchn","mchn: Wallet lost mine permission on tx: %s (height %d) - sendrawtransaction, reactivating best chain\n",
-                            tx.GetHash().ToString().c_str(), chainActive.Tip()->nHeight);
-                    if (!ActivateBestChain(state, NULL))
-                        throw JSONRPCError(RPC_INTERNAL_ERROR, state.GetRejectReason());
+                    if(!pwalletMain->GetKeyFromAddressBook(pubkey,MC_PTP_MINE))
+                    {
+                        LogPrint("mchn","mchn: Wallet lost mine permission on tx: %s (height %d) - sendrawtransaction, reactivating best chain\n",
+                                tx.GetHash().ToString().c_str(), chainActive.Tip()->nHeight);
+                        if (!ActivateBestChain(state, NULL))
+                            throw JSONRPCError(RPC_INTERNAL_ERROR, state.GetRejectReason());
+                    }
                 }
             }
         }
