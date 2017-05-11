@@ -206,6 +206,7 @@ bool VerifyBlockSignature(CBlock *block,bool force)
     uint32_t original_nonce;
     std::vector<unsigned char> vchSigOut;
     std::vector<unsigned char> vchPubKey;
+    std::vector<uint256> savedMerkleTree;
     
     if(!force)
     {
@@ -275,6 +276,7 @@ bool VerifyBlockSignature(CBlock *block,bool force)
                 original_nonce=block->nNonce;
                 
                 block->nMerkleTreeType=MERKLETREE_NO_COINBASE_OP_RETURN;
+                savedMerkleTree=block->vMerkleTree;
                 block->hashMerkleRoot=block->BuildMerkleTree();
                 block->nNonce=0;
                 hash_to_verify=block->GetHash();
@@ -283,7 +285,14 @@ bool VerifyBlockSignature(CBlock *block,bool force)
                 block->nNonce=original_nonce;
                 
                 block->nMerkleTreeType=MERKLETREE_FULL;                
-                block->BuildMerkleTree();
+                if(savedMerkleTree.size())
+                {
+                    block->vMerkleTree=savedMerkleTree;
+                }
+                else
+                {
+                    block->BuildMerkleTree();
+                }
                 break;
             default:
                 LogPrintf("mchn: Invalid hash type received in block signature\n");

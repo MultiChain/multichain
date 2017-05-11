@@ -2187,8 +2187,12 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 {
     AssertLockHeld(cs_main);
     // Check it again in case a previous version let a bad block in
-    if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
-        return false;
+    // But if pindex->kMiner is set we got this block in this version
+    if(!pindex->kMiner.IsValid())
+    {
+        if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
+            return false;
+    }
 
 /* MCHN START */    
     uint256 block_hash;
@@ -4493,7 +4497,9 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
 /* MCHN END*/    
     
 
-    if ((!CheckBlock(block, state)) || !ContextualCheckBlock(block, state, pindex->pprev)) {
+//    if ((!CheckBlock(block, state)) || !ContextualCheckBlock(block, state, pindex->pprev)) {
+// AcceptBlock is called only in context of ProcessNewBlock. CheckBlock is called before. No reason to call it again
+    if (!ContextualCheckBlock(block, state, pindex->pprev)) {
         if (state.IsInvalid() && !state.CorruptionPossible()) {
             pindex->nStatus |= BLOCK_FAILED_VALID;
             setDirtyBlockIndex.insert(pindex);
