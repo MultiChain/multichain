@@ -414,7 +414,7 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
             dust=-1;
             if(mc_gState->m_NetworkParams->IsProtocolMultichain())
             {
-                dust=mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+                dust=MCP_MINIMUM_PER_OUTPUT;
             }            
             if(dust<0)
             {

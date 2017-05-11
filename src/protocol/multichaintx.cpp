@@ -970,9 +970,9 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
     nNewEntityOutput=-1;
     fSeedNodeInvolved=false;
     fShouldHaveDestination=false;
-    fShouldHaveDestination |= (mc_gState->m_NetworkParams->GetInt64Param("anyonecanreceive") == 0);
-    fShouldHaveDestination |= (mc_gState->m_NetworkParams->GetInt64Param("allowmultisigoutputs") == 0);
-    fShouldHaveDestination |= (mc_gState->m_NetworkParams->GetInt64Param("allowp2shoutputs") == 0);
+    fShouldHaveDestination |= (MCP_ANYONE_CAN_RECEIVE == 0);
+    fShouldHaveDestination |= (MCP_ALLOW_MULTISIG_OUTPUTS == 0);
+    fShouldHaveDestination |= (MCP_ALLOW_P2SH_OUTPUTS == 0);
     
     mc_gState->m_Permissions->SetCheckPoint();
     mc_gState->m_TmpAssetsOut->Clear();
@@ -1407,21 +1407,21 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
 
                 if( (pass == 0) && fShouldHaveDestination )                     // Some setting in the protocol require address can be extracted
                 {
-                    if(fNoDestinationInOutput && (mc_gState->m_NetworkParams->GetInt64Param("anyonecanreceive") == 0))
+                    if(fNoDestinationInOutput && (MCP_ANYONE_CAN_RECEIVE == 0))
                     {
                         reason="Script rejected - destination required ";
                         fReject=true;
                         goto exitlbl;                    
                     }
                     
-                    if((typeRet == TX_MULTISIG) && (mc_gState->m_NetworkParams->GetInt64Param("allowmultisigoutputs") == 0))
+                    if((typeRet == TX_MULTISIG) && (MCP_ALLOW_MULTISIG_OUTPUTS == 0))
                     {
                         reason="Script rejected - multisig is not allowed";
                         fReject=true;
                         goto exitlbl;                    
                     }
 
-                    if((typeRet == TX_SCRIPTHASH) && (mc_gState->m_NetworkParams->GetInt64Param("allowp2shoutputs") == 0))
+                    if((typeRet == TX_SCRIPTHASH) && (MCP_ALLOW_P2SH_OUTPUTS == 0))
                     {
                         reason="Script rejected - P2SH is not allowed";
                         fReject=true;
@@ -2929,14 +2929,14 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
                     goto exitlbl;
                 }            
 
-                if((typeRet == TX_MULTISIG) && (mc_gState->m_NetworkParams->GetInt64Param("allowmultisigoutputs") == 0))
+                if((typeRet == TX_MULTISIG) && (MCP_ALLOW_MULTISIG_OUTPUTS == 0))
                 {
                     reason="Script rejected - multisig is not allowed";
                     reject=true;
                     goto exitlbl;                    
                 }
                 
-                if((typeRet == TX_SCRIPTHASH) && (mc_gState->m_NetworkParams->GetInt64Param("allowp2shoutputs") == 0))
+                if((typeRet == TX_SCRIPTHASH) && (MCP_ALLOW_P2SH_OUTPUTS == 0))
                 {
                     reason="Script rejected - P2SH is not allowed";
                     reject=true;

@@ -789,11 +789,11 @@ Value appendrawchange(const Array& params, bool fHelp)
     
     if(mc_gState->m_Features->VerifySizeOfOpDropElements())
     {
-        int assets_per_opdrop=(mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropsize")-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
+        int assets_per_opdrop=(MCP_STD_OP_DROP_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
         
         if(mc_gState->m_Features->VerifySizeOfOpDropElements())
         {
-            assets_per_opdrop=(mc_gState->m_NetworkParams->GetInt64Param("maxstdelementsize")-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
+            assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
         }
 
         if(amounts->GetCount() > assets_per_opdrop)
@@ -830,7 +830,7 @@ Value appendrawchange(const Array& params, bool fHelp)
     CAmount min_output=-1;                                                              // Calculate minimal output for the change
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-        min_output=mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+        min_output=MCP_MINIMUM_PER_OUTPUT;
     }            
     if(min_output<0)
     {

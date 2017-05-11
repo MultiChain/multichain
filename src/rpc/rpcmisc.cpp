@@ -927,7 +927,7 @@ Value createmultisig(const Array& params, bool fHelp)
 /* MCHN START */    
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("allowp2shoutputs") == 0)
+        if(MCP_ALLOW_P2SH_OUTPUTS == 0)
         {
             throw JSONRPCError(RPC_NOT_ALLOWED, "P2SH outputs are not allowed for this blockchain");
         }

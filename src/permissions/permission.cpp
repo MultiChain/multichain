@@ -1019,7 +1019,7 @@ int mc_Permissions::CanConnect(const void* lpEntity,const void* lpAddress)
 //    if(lpEntity == NULL)
     if(mc_IsNullEntity(lpEntity))
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanconnect"))
+        if(MCP_ANYONE_CAN_CONNECT)
         {
             return MC_PTP_CONNECT;
         }
@@ -1049,7 +1049,7 @@ int mc_Permissions::CanSend(const void* lpEntity,const void* lpAddress)
     
     if(mc_IsNullEntity(lpEntity))
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecansend"))
+        if(MCP_ANYONE_CAN_SEND)
         {
             return MC_PTP_SEND;
         }
@@ -1123,7 +1123,7 @@ int mc_Permissions::CanReceive(const void* lpEntity,const void* lpAddress)
     
     if(mc_IsNullEntity(lpEntity))
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanreceive"))
+        if(MCP_ANYONE_CAN_RECEIVE)
         {
             return MC_PTP_RECEIVE;
         }
@@ -1213,7 +1213,7 @@ int mc_Permissions::CanCreate(const void* lpEntity,const void* lpAddress)
 //    if(lpEntity == NULL)
     if(mc_IsNullEntity(lpEntity))
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecancreate"))
+        if(MCP_ANYONE_CAN_RECEIVE)
         {
             return MC_PTP_CREATE;
         }
@@ -1321,7 +1321,7 @@ int mc_Permissions::CanMine(const void* lpEntity,const void* lpAddress)
     
     if(mc_IsNullEntity(lpEntity))
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine"))
+        if(MCP_ANYONE_CAN_MINE)
         {
              return MC_PTP_MINE;
         }
@@ -1399,7 +1399,7 @@ int mc_Permissions::CanMineBlock(const void* lpAddress,uint32_t block)
         return MC_PTP_MINE;
     }
     
-    if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine"))
+    if(MCP_ANYONE_CAN_MINE)
     {
          return MC_PTP_MINE;
     }
@@ -1524,7 +1524,7 @@ int mc_Permissions::CanMineBlockOnFork(const void* lpAddress,uint32_t block,uint
         return MC_PTP_MINE;
     }
     
-    if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine"))
+    if(MCP_ANYONE_CAN_MINE)
     {
          return MC_PTP_MINE;
     }
@@ -1619,7 +1619,7 @@ int mc_Permissions::CanAdmin(const void* lpEntity,const void* lpAddress)
     
     if(mc_IsNullEntity(lpEntity))
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanadmin"))
+        if(MCP_ANYONE_CAN_ADMIN)
         {
             return MC_PTP_ADMIN;
         }
@@ -1653,7 +1653,7 @@ int mc_Permissions::CanActivate(const void* lpEntity,const void* lpAddress)
     
     if(mc_IsNullEntity(lpEntity))
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanactivate"))
+        if(MCP_ANYONE_CAN_ACTIVATE)
         {
             return MC_PTP_ACTIVATE;
         }
@@ -3814,7 +3814,7 @@ int mc_Permissions::StoreBlockInfoInternal(const void* lpMiner,const void* lpHas
         return MC_ERR_NOERROR;        
     }    
     
-    if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine"))                                
+    if(MCP_ANYONE_CAN_MINE)                                
     {
         return MC_ERR_NOERROR;        
     }    

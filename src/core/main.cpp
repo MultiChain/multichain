@@ -959,7 +959,7 @@ bool IsStandardTx(const CTransaction& tx, string& reason,bool check_for_dust)
     int max_op_returns=1;
     if(mc_gState->m_Features->Streams())
     {
-        max_op_returns=(int)mc_gState->m_NetworkParams->GetInt64Param("maxstdopreturnscount");
+        max_op_returns=MCP_MAX_STD_OP_RETURN_COUNT;
     }
 /* MCHN END */    
     
@@ -1691,12 +1691,12 @@ CAmount GetBlockValue(int nHeight, const CAmount& nFees)
 {
 /* MCHN START */    
 //    CAmount nSubsidy = 50 * COIN;
-    CAmount nSubsidy = mc_gState->m_NetworkParams->GetInt64Param("initialblockreward");// * COIN;
+    CAmount nSubsidy = MCP_INITIAL_BLOCK_REWARD;// * COIN;
     if(nHeight == 1)
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("firstblockreward") >= 0)
+        if(MCP_FIRST_BLOCK_REWARD >= 0)
         {
-            nSubsidy = mc_gState->m_NetworkParams->GetInt64Param("firstblockreward");// * COIN;
+            nSubsidy = MCP_FIRST_BLOCK_REWARD;// * COIN;
         }
     }
 /* MCHN END */    
@@ -1725,7 +1725,7 @@ bool IsInitialBlockDownload()
     bool state = (chainActive.Height() < pindexBestHeader->nHeight - 24 * 6 ||
             pindexBestHeader->GetBlockTime() < GetTime() - 24 * 60 * 60);
  */ 
-    bool state = (chainActive.Height() < pindexBestHeader->nHeight - 86400 / mc_gState->m_NetworkParams->GetInt64Param("targetblocktime") ||
+    bool state = (chainActive.Height() < pindexBestHeader->nHeight - 86400 / MCP_TARGET_BLOCK_TIME ||
             pindexBestHeader->GetBlockTime() < GetTime() - 24 * 60 * 60);
 /* MCHN END */    
     if (!state)
@@ -1749,7 +1749,7 @@ void CheckForkWarningConditions()
     // of our head, drop it
 /* MCHN START */    
 //    if (pindexBestForkTip && chainActive.Height() - pindexBestForkTip->nHeight >= 72)
-    if (pindexBestForkTip && chainActive.Height() - pindexBestForkTip->nHeight >= 43200 / mc_gState->m_NetworkParams->GetInt64Param("targetblocktime"))
+    if (pindexBestForkTip && chainActive.Height() - pindexBestForkTip->nHeight >= 43200 / MCP_TARGET_BLOCK_TIME)
         pindexBestForkTip = NULL;
 /* MCHN END */    
 
@@ -1807,7 +1807,7 @@ void CheckForkWarningConditionsOnNewFork(CBlockIndex* pindexNewForkTip)
             pindexNewForkTip->nChainWork - pfork->nChainWork > (GetBlockProof(*pfork) * 7) &&
 /* MCHN START */    
 //            chainActive.Height() - pindexNewForkTip->nHeight < 72)
-            chainActive.Height() - pindexNewForkTip->nHeight < 43200 / mc_gState->m_NetworkParams->GetInt64Param("targetblocktime"))
+            chainActive.Height() - pindexNewForkTip->nHeight < 43200 / MCP_TARGET_BLOCK_TIME)
 /* MCHN END */    
     {
         pindexBestForkTip = pindexNewForkTip;
@@ -4235,8 +4235,8 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
         {
             if(pindexPrev != chainActive.Tip())
             {
-                if( (mc_gState->m_NetworkParams->GetInt64Param("anyonecanadmin") == 0) && 
-                    (mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine") == 0) )
+                if( (MCP_ANYONE_CAN_ADMIN == 0) && 
+                    (MCP_ANYONE_CAN_MINE == 0) )
                 {
                     int nMinerCount=mc_gState->m_Permissions->GetMinerCount()-mc_gState->m_Permissions->GetActiveMinerCount()+1;
                     int nMaxHeight=chainActive.Height()-Params().LockAdminMineRounds()*nMinerCount;
@@ -5783,7 +5783,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 }
                 else
                 {
-                    if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanconnect") != 0)
+                    if(MCP_ANYONE_CAN_CONNECT != 0)
                     {
                         LogPrintf("mchn: bitcoin-style verack received from peer %d, parameter set NOT VERIFIED, connecting... \n", pfrom->id);
                         pfrom->fParameterSetVerified=true;                    

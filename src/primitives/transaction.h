@@ -143,7 +143,7 @@ public:
     {
         if(mc_gState->m_NetworkParams->IsProtocolMultichain())
         {
-            int64_t minOutput=mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+            int64_t minOutput=MCP_MINIMUM_PER_OUTPUT;
             if(minOutput >= 0)
             {
                 return (nValue < minOutput);                
@@ -168,7 +168,7 @@ public:
 /*        
         if(mc_gState->m_NetworkParams->IsProtocolMultichain())
         {
-            int64_t minOutput=mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+            int64_t minOutput=MCP_MINIMUM_PER_OUTPUT;
             if(minOutput >= 0)
             {
                 return (nValue < minOutput);                

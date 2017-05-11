@@ -100,7 +100,7 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
 //        const CScript& script2 = tplate.second;
         CScript script2 = CScript(tplate.second);
         
-        for(int d=0;d<=mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropscount");d++)
+        for(int d=0;d<=MCP_STD_OP_DROP_COUNT;d++)
         {
 /* MCHN END*/        
             
@@ -672,7 +672,7 @@ bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType)
         }
     }
 
-    max_op_drops=mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropscount");
+    max_op_drops=MCP_STD_OP_DROP_COUNT;
     
     if(mc_gState->m_Features->VerifySizeOfOpDropElements())
     {

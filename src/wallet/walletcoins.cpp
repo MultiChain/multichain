@@ -1529,11 +1529,11 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
             txNew.vout.push_back(txout);
         }
 
-        int assets_per_opdrop=(mc_gState->m_NetworkParams->GetInt64Param("maxstdelementsize")-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
+        int assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
         
         if(mc_gState->m_Features->VerifySizeOfOpDropElements())
         {
-            assets_per_opdrop=(mc_gState->m_NetworkParams->GetInt64Param("maxstdelementsize")-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
+            assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
         }
  
         size_t elem_size;
@@ -2140,8 +2140,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                                             else
                                             {                        
                                                 if(eErrorCode)*eErrorCode=RPC_WALLET_NO_UNSPENT_OUTPUTS;
-                                                if( (mc_gState->m_NetworkParams->GetInt64Param("initialblockreward") != 0) || 
-                                                     (mc_gState->m_NetworkParams->GetInt64Param("firstblockreward") > 0))
+                                                if( MCP_WITH_NATIVE_CURRENCY )
                                                 {
                                                     strFailReason=_("No unspent outputs are available. Please send a transaction to this node or address first and wait for its confirmation."); 
                                                 }
@@ -2215,7 +2214,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
             min_output=-1;                                                      // Calculate minimal output for the change
             if(mc_gState->m_NetworkParams->IsProtocolMultichain())
             {
-                min_output=mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+                min_output=MCP_MINIMUM_PER_OUTPUT;
             }            
                                                                                             // Storing selection before pure-native 
             memcpy(in_amounts->GetRow(in_special_row[2]),in_amounts->GetRow(in_special_row[0]),in_size);
@@ -2425,14 +2424,14 @@ bool CWallet::InitializeUnspentList()
 
     lpAssetGroups=new CAssetGroupTree;
 
-    int assets_per_opdrop=(mc_gState->m_NetworkParams->GetInt64Param("maxstdelementsize")-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
+    int assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
 
     if(mc_gState->m_Features->VerifySizeOfOpDropElements())
     {
-        assets_per_opdrop=(mc_gState->m_NetworkParams->GetInt64Param("maxstdelementsize")-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
+        assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
     }
 
-    int max_assets_per_group=assets_per_opdrop*mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropscount");
+    int max_assets_per_group=assets_per_opdrop*MCP_STD_OP_DROP_COUNT;
 
     lpAssetGroups->Initialize(1,max_assets_per_group,32,1);
 
@@ -2614,7 +2613,7 @@ bool OutputCanSend(COutput out)
 {            
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecansend") == 0)
+        if(MCP_ANYONE_CAN_SEND == 0)
         {
             CTxOut txout;
             out.GetHashAndTxOut(txout);

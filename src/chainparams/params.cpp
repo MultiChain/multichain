@@ -1784,7 +1784,7 @@ int mc_Features::AnyoneCanReceiveEmpty()
     {
         if(protocol >= 10007)
         {
-            if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanreceiveempty"))                                
+            if(MCP_ANYONE_CAN_RECEIVE_EMPTY)                                
             {
                 ret=1;
             }

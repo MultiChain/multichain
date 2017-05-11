@@ -190,7 +190,7 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
         }
     }
     
-    if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanconnect") == 0)
+    if(MCP_ANYONE_CAN_CONNECT == 0)
     {
         CScript scriptSig((unsigned char*)sSigScript.c_str(),(unsigned char*)sSigScript.c_str()+sSigScript.size());
         
@@ -377,7 +377,7 @@ bool PushMultiChainVerack(CNode* pfrom, bool fIsVerackack)
     
     if(!fIsVerackack)
     {
-        if((pfrom->fDefaultMessageStart && (mc_gState->m_NetworkParams->GetInt64Param("anyonecanconnect")!=0) ) || 
+        if((pfrom->fDefaultMessageStart && (MCP_ANYONE_CAN_CONNECT!=0) ) || 
             pfrom->fVerackackReceived)
         {
             vParameterSet=vector<unsigned char>(mc_gState->m_NetworkParams->m_lpData,mc_gState->m_NetworkParams->m_lpData+mc_gState->m_NetworkParams->m_Size);        

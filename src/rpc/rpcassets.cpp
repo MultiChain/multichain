@@ -50,7 +50,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
 
     // Amount
-    CAmount nAmount = mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+    CAmount nAmount = MCP_MINIMUM_PER_OUTPUT;
     if (params.size() > 5 && params[5].type() != null_type)
     {
         nAmount = AmountFromValue(params[5]);
@@ -369,7 +369,7 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
        
     // Amount
-    CAmount nAmount = mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+    CAmount nAmount = MCP_MINIMUM_PER_OUTPUT;
     if (params.size() > 4 && params[4].type() != null_type)
     {
         nAmount = AmountFromValue(params[4]);
@@ -927,7 +927,7 @@ Value getmultibalances(const Array& params, bool fHelp)
                     }
                 }                
             }
-            if((mc_gState->m_NetworkParams->GetInt64Param("initialblockreward") != 0) || (mc_gState->m_NetworkParams->GetInt64Param("firstblockreward") > 0))
+            if(MCP_WITH_NATIVE_CURRENCY)
             {
                 Object asset_entry;
                 asset_entry=AssetEntry(NULL,btc,1);
@@ -1206,7 +1206,7 @@ Value getaddressbalances(const Array& params, bool fHelp)
         assets.push_back(asset_entry);
     }
     
-    if((mc_gState->m_NetworkParams->GetInt64Param("initialblockreward") != 0) || (mc_gState->m_NetworkParams->GetInt64Param("firstblockreward") > 0))
+    if(MCP_WITH_NATIVE_CURRENCY)
     {
         Object asset_entry;
         asset_entry=AssetEntry(NULL,totalBTC,1);

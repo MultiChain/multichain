@@ -842,7 +842,7 @@ set <CTxDestination> LastActiveMiners(CBlockIndex* pindexTip, CPubKey *kLastMine
         return sMiners;
     }
     
-    if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine") == 0)
+    if(MCP_ANYONE_CAN_MINE == 0)
     {
        nDiversityMiners=nTotalMiners-nActiveMiners;
     }
@@ -894,7 +894,7 @@ int GetMaxActiveMinersCount()
 {
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine"))
+        if(MCP_ANYONE_CAN_MINE)
         {
             return 1048576;
         }
@@ -1252,7 +1252,7 @@ void static BitcoinMiner(CWallet *pwallet)
             if (Params().MiningRequiresPeers() 
                     && not_setup_period
                     && ( (mc_gState->m_Permissions->GetMinerCount() > 1)
-                    || (mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine") != 0)
+                    || (MCP_ANYONE_CAN_MINE != 0)
                     || (mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
                     )
                     ) {
@@ -1300,7 +1300,7 @@ void static BitcoinMiner(CWallet *pwallet)
                 nEmptyBlocks=0;
                 if(mc_gState->m_NetworkParams->IsProtocolMultichain())
                 {
-                    if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine"))
+                    if(MCP_ANYONE_CAN_MINE)
                     {
                         fMineEmptyBlocks=true;
                     }
@@ -1520,7 +1520,7 @@ void static BitcoinMiner(CWallet *pwallet)
                 if (vNodes.empty() && Params().MiningRequiresPeers() 
                         && not_setup_period
                         && ( (mc_gState->m_Permissions->GetMinerCount() > 1)
-                        || (mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine") != 0)
+                        || (MCP_ANYONE_CAN_MINE != 0)
                         || (mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
                         )
                         ) 

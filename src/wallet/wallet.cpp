@@ -1676,13 +1676,13 @@ void CWallet::ResendWalletTransactions(bool fForce)
     bool fFirst = (nNextResend == 0);
 /* MCHN START */    
 //    nNextResend = GetTime() + GetRand(30 * 60);
-    nNextResend = GetTime() + GetRand(3 * mc_gState->m_NetworkParams->GetInt64Param("targetblocktime"));
+    nNextResend = GetTime() + GetRand(3 * MCP_TARGET_BLOCK_TIME);
 /* MCHN END */    
     if (!fForce && fFirst)
         return;
 
     // Only do it if there's been a new block since last time
-    if(GetTime() < nNextResend + 3 * mc_gState->m_NetworkParams->GetInt64Param("targetblocktime") )
+    if(GetTime() < nNextResend + 3 * MCP_TARGET_BLOCK_TIME )
     {
         if (!fForce && (nTimeBestReceived < nLastResend))
             return;
@@ -1707,7 +1707,7 @@ void CWallet::ResendWalletTransactions(bool fForce)
                     CWalletTx& wtx = item->second;
                     // Don't rebroadcast until it's had plenty of time that
                     // it should have gotten in already by now.
-                    if (nTimeBestReceived - (int64_t)wtx.nTimeReceived > mc_gState->m_NetworkParams->GetInt64Param("targetblocktime"))
+                    if (nTimeBestReceived - (int64_t)wtx.nTimeReceived > MCP_TARGET_BLOCK_TIME)
                     {
                         LogPrint("wallet","Wallet tx %s resent\n",wtx.GetHash().ToString().c_str());
                         wtx.RelayWalletTransaction();                        
@@ -1728,7 +1728,7 @@ void CWallet::ResendWalletTransactions(bool fForce)
                 // it should have gotten in already by now.
     /* MCHNS START */    
     //            if (nTimeBestReceived - (int64_t)wtx.nTimeReceived > 5 * 60)
-                if (nTimeBestReceived - (int64_t)wtx.nTimeReceived > mc_gState->m_NetworkParams->GetInt64Param("targetblocktime"))
+                if (nTimeBestReceived - (int64_t)wtx.nTimeReceived > MCP_TARGET_BLOCK_TIME)
     /* MCHN END */    
                     mapSorted.insert(make_pair(wtx.nTimeReceived, &wtx));
             }

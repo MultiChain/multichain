@@ -184,7 +184,7 @@ void SendMoneyToSeveralAddresses(const std::vector<CTxDestination> addresses, CA
         if(dropscript)
         {
             if(fDebug)LogPrint("mchnminor","mchn: Sending script with %d OP_DROP element(s)",dropscript->GetNumElements());
-            if(dropscript->GetNumElements() > mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropscount") )
+            if(dropscript->GetNumElements() > MCP_STD_OP_DROP_COUNT )
                 throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid number of elements in script");
 
             for(int element=0;element < dropscript->GetNumElements();element++)

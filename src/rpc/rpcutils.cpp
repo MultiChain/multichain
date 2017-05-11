@@ -1180,7 +1180,7 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
     {        
         if(mc_gState->m_Features->VerifySizeOfOpDropElements())
         {
-            assets_per_opdrop=(mc_gState->m_NetworkParams->GetInt64Param("maxstdelementsize")-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
+            assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
         }
     }
     
@@ -1534,7 +1534,7 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
     {
         if(Params().RequireStandard())
         {
-            if(lpScript->GetNumElements() > mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropscount"))
+            if(lpScript->GetNumElements() > MCP_STD_OP_DROP_COUNT)
             {
                 strError=string("Too many objects in output");
                 goto exitlbl;                                                
@@ -1810,7 +1810,7 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
             }
 
 /*            
-            if(lpScript->GetNumElements() > mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropscount") )
+            if(lpScript->GetNumElements() > MCP_STD_OP_DROP_COUNT )
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid number of elements in script");
 */
             

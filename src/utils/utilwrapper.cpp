@@ -745,6 +745,28 @@ int mc_MultichainParams::SetGlobals()
     {
         m_AssetRefSize=MC_AST_ASSET_REF_SIZE;
     }
+    
+    MCP_MAX_STD_OP_RETURN_COUNT=mc_gState->m_NetworkParams->GetInt64Param("maxstdopreturnscount");
+    MCP_INITIAL_BLOCK_REWARD=mc_gState->m_NetworkParams->GetInt64Param("initialblockreward");
+    MCP_FIRST_BLOCK_REWARD=mc_gState->m_NetworkParams->GetInt64Param("firstblockreward");
+    MCP_TARGET_BLOCK_TIME=mc_gState->m_NetworkParams->GetInt64Param("targetblocktime");
+    MCP_ANYONE_CAN_ADMIN=mc_gState->m_NetworkParams->GetInt64Param("anyonecanadmin");
+    MCP_ANYONE_CAN_MINE=mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine");
+    MCP_ANYONE_CAN_CONNECT=mc_gState->m_NetworkParams->GetInt64Param("anyonecanconnect");
+    MCP_ANYONE_CAN_SEND=mc_gState->m_NetworkParams->GetInt64Param("anyonecansend");
+    MCP_ANYONE_CAN_RECEIVE=mc_gState->m_NetworkParams->GetInt64Param("anyonecanreceive");
+    MCP_ANYONE_CAN_ACTIVATE=mc_gState->m_NetworkParams->GetInt64Param("anyonecanactivate");
+    MCP_MINIMUM_PER_OUTPUT=mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+    MCP_ALLOW_MULTISIG_OUTPUTS=mc_gState->m_NetworkParams->GetInt64Param("allowmultisigoutputs");
+    MCP_ALLOW_P2SH_OUTPUTS=mc_gState->m_NetworkParams->GetInt64Param("allowp2shoutputs");
+    MCP_WITH_NATIVE_CURRENCY=0;
+    if((mc_gState->m_NetworkParams->GetInt64Param("initialblockreward") != 0) || (mc_gState->m_NetworkParams->GetInt64Param("firstblockreward") > 0))
+    {
+        MCP_WITH_NATIVE_CURRENCY=1;
+    }
+    MCP_STD_OP_DROP_COUNT=mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropscount");
+    MCP_STD_OP_DROP_SIZE=mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropsize");
+    MCP_ANYONE_CAN_RECEIVE_EMPTY=mc_gState->m_NetworkParams->GetInt64Param("anyonecanreceiveempty");
     return MC_ERR_NOERROR;
 }
 

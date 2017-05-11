@@ -838,7 +838,7 @@ Value sendassetfrom(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
 
     // Amount    
-    CAmount nAmount = mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+    CAmount nAmount = MCP_MINIMUM_PER_OUTPUT;
     if (params.size() > 4 && params[4].type() != null_type)
     {
         nAmount = AmountFromValue(params[4]);
@@ -976,7 +976,7 @@ Value sendassettoaddress(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
 
     // Amount    
-    CAmount nAmount = mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+    CAmount nAmount = MCP_MINIMUM_PER_OUTPUT;
     if (params.size() > 3 && params[3].type() != null_type)
     {
         nAmount = AmountFromValue(params[3]);
