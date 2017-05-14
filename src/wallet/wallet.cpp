@@ -3135,6 +3135,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
                 }
             }
         }
+        wtxNew.RelayWalletTransaction();
 
     }
     return true;
