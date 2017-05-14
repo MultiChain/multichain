@@ -413,7 +413,6 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
                     }
 /* MCHN END */                    
                     nTotalIn += mempool.mapTx[txin.prevout.hash].GetTx().vout[txin.prevout.n].nValue;
-                    fPreservedMempoolOrder=false;
                     continue;
                 }
                 const CCoins* coins = view.AccessCoins(txin.prevout.hash);
