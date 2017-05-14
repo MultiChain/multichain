@@ -315,6 +315,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
 
     // Collect memory pool transactions into the block
     CAmount nFees = 0;
+    bool fPreservedMempoolOrder=true;
 
     {
         LOCK2(cs_main, mempool.cs);
@@ -353,11 +354,13 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
             if(!mempool.exists(hash))
             {
                 LogPrint("mchn","mchn-miner: Tx not found in the mempool: %s\n",hash.GetHex().c_str());
+                fPreservedMempoolOrder=false;
                 continue;
             }
             if(IsTxBanned(hash))
             {
                 LogPrint("mchn","mchn-miner: Banned Tx: %s\n",hash.GetHex().c_str());
+                fPreservedMempoolOrder=false;
                 continue;                
             }
             
@@ -367,6 +370,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
             if (tx.IsCoinBase() || !IsFinalTx(tx, nHeight))
             {
                 LogPrint("mchn","mchn-miner: Coinbase or not final tx found: %s\n",tx.GetHash().GetHex().c_str());
+                fPreservedMempoolOrder=false;
                 continue;
             }
             
@@ -409,6 +413,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
                     }
 /* MCHN END */                    
                     nTotalIn += mempool.mapTx[txin.prevout.hash].GetTx().vout[txin.prevout.n].nValue;
+                    fPreservedMempoolOrder=false;
                     continue;
                 }
                 const CCoins* coins = view.AccessCoins(txin.prevout.hash);
@@ -424,6 +429,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
             if (fMissingInputs)
             {
                 LogPrint("mchn","mchn-miner: Missing inputs for %s\n",tx.GetHash().GetHex().c_str());
+                fPreservedMempoolOrder=false;
                 continue;
             }
             
@@ -449,6 +455,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
                 LogPrint("mchn","mchn-miner: Orphan %s\n",tx.GetHash().GetHex().c_str());
                 porphan->dPriority = dPriority;
                 porphan->feeRate = feeRate;
+                fPreservedMempoolOrder=false;
             }
             else
 /* MCHN START */            
@@ -521,10 +528,13 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
                 std::make_heap(vecPriority.begin(), vecPriority.end(), comparer);
             }
 */
-            if (!view.HaveInputs(tx))
+            if(!fPreservedMempoolOrder)
             {
-                LogPrint("mchn","mchn-miner: No inputs for %s\n",tx.GetHash().GetHex().c_str());
-                continue;
+                if (!view.HaveInputs(tx))
+                {
+                    LogPrint("mchn","mchn-miner: No inputs for %s\n",tx.GetHash().GetHex().c_str());
+                    continue;
+                }
             }
 
             CAmount nTxFees = view.GetValueIn(tx)-tx.GetValueOut();
@@ -541,17 +551,20 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
             // create only contains transactions that are valid in new blocks.
             CValidationState state;
             
-/* MCHN START */            
-//            if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS, true))// May fail if send permission was lost
-            if (!CheckInputs(tx, state, view, false, 0, true))    
-/* MCHN END */            
+            if(!fPreservedMempoolOrder)
             {
-                LogPrint("mchn","mchn-miner: CheckInput failure %s\n",tx.GetHash().GetHex().c_str());
-                continue;
+/* MCHN START */            
+    //            if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS, true))// May fail if send permission was lost
+                if (!CheckInputs(tx, state, view, false, 0, true))    
+/* MCHN END */            
+                {
+                    LogPrint("mchn","mchn-miner: CheckInput failure %s\n",tx.GetHash().GetHex().c_str());
+                    continue;
+                }
+
+                CTxUndo txundo;
+                UpdateCoins(tx, state, view, txundo, nHeight);
             }
-                       
-            CTxUndo txundo;
-            UpdateCoins(tx, state, view, txundo, nHeight);
 
             // Added
             pblock->vtx.push_back(tx);
