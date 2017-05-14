@@ -527,13 +527,10 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
                 std::make_heap(vecPriority.begin(), vecPriority.end(), comparer);
             }
 */
-            if(!fPreservedMempoolOrder)
+            if (!view.HaveInputs(tx))
             {
-                if (!view.HaveInputs(tx))
-                {
-                    LogPrint("mchn","mchn-miner: No inputs for %s\n",tx.GetHash().GetHex().c_str());
-                    continue;
-                }
+                LogPrint("mchn","mchn-miner: No inputs for %s\n",tx.GetHash().GetHex().c_str());
+                continue;
             }
 
             CAmount nTxFees = view.GetValueIn(tx)-tx.GetValueOut();
@@ -561,9 +558,9 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
                     continue;
                 }
 
-                CTxUndo txundo;
-                UpdateCoins(tx, state, view, txundo, nHeight);
             }
+            CTxUndo txundo;
+            UpdateCoins(tx, state, view, txundo, nHeight);
 
             // Added
             pblock->vtx.push_back(tx);
