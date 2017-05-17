@@ -1160,6 +1160,16 @@ int mc_WalletTxs::GetList(mc_TxEntity *entity,int generation,int from,int count,
     return err;            
 }
 
+int mc_WalletTxs::GetBlockItemIndex(mc_TxEntity *entity, int block)
+{
+    int res;
+    m_Database->Lock(0,0);
+    res=m_Database->GetBlockItemIndex(NULL,entity,block);
+    m_Database->UnLock();
+    return res;            
+}
+
+
 int mc_WalletTxs::GetListSize(mc_TxEntity *entity,int *confirmed)
 {
     int res;
