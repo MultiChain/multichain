@@ -28,6 +28,11 @@ Value createrawsendfrom(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
     }
 
+    if( IsMine(*pwalletMain, fromaddresses[0]) == ISMINE_NO )
+    {
+        throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "from-address is not found in this wallet");                        
+    }
+    
 
     BOOST_FOREACH(const CTxDestination& fromaddress, fromaddresses)
     {
