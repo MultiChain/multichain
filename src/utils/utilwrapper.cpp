@@ -280,29 +280,21 @@ int64_t mc_Params::HasOption(const char* strArg)
 
 boost::filesystem::path mc_GetDefaultDataDir()
 {
-    // Windows < Vista: C:\Documents and Settings\Username\Application Data\Bitcoin
-    // Windows >= Vista: C:\Users\Username\AppData\Roaming\Bitcoin
-    // Mac: ~/Library/Application Support/Bitcoin
-    // Unix: ~/.bitcoin
+    // Windows < Vista: C:\Documents and Settings\Username\Application Data\MultiChain
+    // Windows >= Vista: C:\Users\Username\AppData\Roaming\MultiChain
+    // Mac and Unix: ~/.multichain
 #ifdef WIN32
     // Windows
     return GetSpecialFolderPath(CSIDL_APPDATA) / "MultiChain";
 #else
+    // Mac and Unix
     boost::filesystem::path pathRet;
     char* pszHome = getenv("HOME");
     if (pszHome == NULL || strlen(pszHome) == 0)
         pathRet = boost::filesystem::path("/");
     else
         pathRet = boost::filesystem::path(pszHome);
-#ifdef MAC_OSX
-    // Mac
-    pathRet /= "Library/Application Support";
-    TryCreateDirectory(pathRet);
-    return pathRet / "Bitcoin";
-#else
-    // Unix
     return pathRet / ".multichain";
-#endif
 #endif
 }
 
