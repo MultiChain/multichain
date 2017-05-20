@@ -863,7 +863,28 @@ int mc_FindIPv4ServerAddress(uint32_t *all_ips,int max_ips)
     result=0;
     c=0;
 
-#ifndef WIN32
+#ifdef MAC_OSX
+    struct ifaddrs *ifaddr = NULL;
+    if (getifaddrs(&ifaddr) == -1) {
+	return c;
+    }
+    if (!ifaddr) {
+        return c;
+    }
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock > 0) {
+        for (struct ifaddrs *ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+	    if (ifa->ifa_addr == 0) {
+                continue;
+	    }
+            int family = ifa->ifa_addr->sa_family;
+            if (family != AF_INET) {
+                continue;
+            }
+            uint32_t a = ((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr;
+            ptr=(unsigned char*)&a;
+
+#elif !defined WIN32
     
     int sock;
     struct ifreq ifreqs[20];
@@ -919,6 +940,12 @@ int mc_FindIPv4ServerAddress(uint32_t *all_ips,int max_ips)
             
         }
     }   
+#ifdef MAC_OSX
+    if (sock > 0) {
+	close(sock);
+    }
+    freeifaddrs(ifaddr);
+#endif
     return c;
 }
 
