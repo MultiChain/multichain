@@ -294,7 +294,10 @@ int mc_Permissions::Zero()
     m_CopiedMinerCount=0;
     m_ClearedAdminCount=0;
     m_ClearedMinerCount=0;
-    
+    m_ClearedMinerCountForMinerVerification=0;
+    m_TmpSavedAdminCount=0;
+    m_TmpSavedMinerCount=0;
+
     m_Semaphore=NULL;
     m_LockedBy=0;
     
@@ -505,6 +508,7 @@ int mc_Permissions::Initialize(const char *name,int mode)
     
     m_ClearedAdminCount=m_AdminCount;
     m_ClearedMinerCount=m_MinerCount;
+    m_ClearedMinerCountForMinerVerification=m_MinerCount;
 
     if(m_Ledger->Open() <= 0)
     {
@@ -918,7 +922,7 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
     }
     
     if(checkmempool)
-    {
+    { 
         mprow=0;
         while(mprow>=0)
         {
@@ -1385,6 +1389,8 @@ int mc_Permissions::CanMine(const void* lpEntity,const void* lpAddress)
 
 /** Returns non-zero value if address can mine block with specific height */
 
+// WARNING! Possible bug in this functiom, But function is not used
+
 int mc_Permissions::CanMineBlock(const void* lpAddress,uint32_t block)
 {
     mc_PermissionLedgerRow row;
@@ -1469,7 +1475,7 @@ int mc_Permissions::CanMineBlock(const void* lpAddress,uint32_t block)
                     GetPermission(block_row.m_Address,MC_PTP_BLOCK_INDEX,(mc_PermissionLedgerRow*)&block_row);
                     m_Ledger->GetRow(block_row.m_ThisRow,(mc_PermissionLedgerRow*)&block_row);
                     
-                    miner_count=block_row.m_MinerCount;
+                    miner_count=block_row.m_MinerCount;                         // Probably BUG here, should be cleared miner count, but function  not used
    
                     if(IsBarredByDiversity(block,last,miner_count))
                     {
@@ -1513,6 +1519,63 @@ int mc_Permissions::CanMineBlock(const void* lpAddress,uint32_t block)
     return result;
 }
 
+int mc_Permissions::FindLastAllowedMinerRow(mc_PermissionLedgerRow *row,uint32_t block,int prev_result)
+{
+    mc_PermissionLedgerRow pldRow;
+    int result;
+    
+    if(mc_gState->m_Features->UnconfirmedMinersCannotMine() == 0)
+    {
+        return prev_result;        
+    }
+    
+    if(row->m_ThisRow < m_Row-m_MemPool->GetCount())
+    {
+        return prev_result;
+    }
+    
+    if(row->m_BlockReceived < block)
+    {
+        return prev_result;        
+    }
+    
+    result=prev_result;
+    
+    memcpy(&pldRow,row,sizeof(mc_PermissionLedgerRow));
+    while( (pldRow.m_ThisRow >= m_Row-m_MemPool->GetCount() ) && (pldRow.m_BlockReceived >= block) && (pldRow.m_PrevRow > 0) )
+    {
+        memcpy(&pldRow,m_MemPool->GetRow(pldRow.m_PrevRow),sizeof(mc_PermissionLedgerRow));
+    }
+    
+    if(pldRow.m_PrevRow <=0 )
+    {
+        return 0;
+    }
+
+    if(pldRow.m_ThisRow < m_Row-m_MemPool->GetCount())
+    {
+        if(m_Ledger->Open() <= 0)
+        {
+            LogString("Error: CanMineBlock: couldn't open ledger");
+            return 0;
+        }
+    
+        m_Ledger->GetRow(pldRow.m_ThisRow,&pldRow);
+        m_Ledger->Close();
+    }
+    
+    result=0;
+    if((uint32_t)block >= pldRow.m_BlockFrom)
+    {
+        if((uint32_t)block < pldRow.m_BlockTo)
+        {
+            result=MC_PTP_MINE;
+        }                                
+    }        
+    
+    return result;    
+}
+
 int mc_Permissions::CanMineBlockOnFork(const void* lpAddress,uint32_t block,uint32_t last_after_fork)
 {
     mc_PermissionLedgerRow row;
@@ -1536,10 +1599,19 @@ int mc_Permissions::CanMineBlockOnFork(const void* lpAddress,uint32_t block,uint
     
     Lock(0);
 
+    int miner_count=m_MinerCount;
+    if(mc_gState->m_Features->UnconfirmedMinersCannotMine())
+    {
+        miner_count=m_ClearedMinerCountForMinerVerification;
+    }
+    
     result=GetPermission(NULL,lpAddress,MC_PTP_MINE,&row,1);                
 
+    result=FindLastAllowedMinerRow(&row,block,result);
+    
     if(result)
     {
+        
         last=last_after_fork;
 
         if(last == 0)
@@ -1553,8 +1625,8 @@ int mc_Permissions::CanMineBlockOnFork(const void* lpAddress,uint32_t block,uint
         }
     
         if(last)
-        {
-            if(IsBarredByDiversity(block,last,m_MinerCount))
+        {            
+            if(IsBarredByDiversity(block,last,miner_count))
             {
                 result=0;
             }            
@@ -1685,8 +1757,10 @@ int mc_Permissions::UpdateCounts()
 {
     mc_PermissionDBRow pdbRow;
     mc_PermissionDBRow pdbAdminMinerRow;
+    mc_PermissionLedgerRow row;
+    
     unsigned char *ptr;
-    int dbvalue_len,err;
+    int dbvalue_len,err,result;
     uint32_t type;
     err=MC_ERR_NOERROR;
     
@@ -1719,7 +1793,12 @@ int mc_Permissions::UpdateCounts()
                 }                    
                 if(pdbAdminMinerRow.m_Type == MC_PTP_MINE)
                 {
-                    if(GetPermission(NULL,pdbAdminMinerRow.m_Address,MC_PTP_MINE))
+                    result=GetPermission(NULL,pdbAdminMinerRow.m_Address,MC_PTP_MINE,&row,1);
+                    if(m_CopiedRow > 0)
+                    {
+                        result=FindLastAllowedMinerRow(&row,m_Block+1,result);                        
+                    }
+                    if(result)
                     {
                         m_MinerCount++;
                     }
@@ -1922,6 +2001,7 @@ int mc_Permissions::ClearMemPoolInternal()
     }
     m_ClearedAdminCount=m_AdminCount;
     m_ClearedMinerCount=m_MinerCount;
+    m_ClearedMinerCountForMinerVerification=m_MinerCount;
     
     return MC_ERR_NOERROR;
 }
@@ -2040,6 +2120,7 @@ int mc_Permissions::RollBackBeforeMinerVerification(uint32_t block)
     m_CopiedBlock=m_Block;
     m_CopiedRow=m_Row;
     m_ForkBlock=block;
+    m_ClearedMinerCountForMinerVerification=m_MinerCount;
     
     
     if(block == (uint32_t)m_Block)
@@ -2086,7 +2167,8 @@ int mc_Permissions::RollBackBeforeMinerVerification(uint32_t block)
 
     m_AdminCount=pldBlockRow.m_AdminCount;
     m_MinerCount=pldBlockRow.m_MinerCount;
-
+    m_ClearedMinerCountForMinerVerification=m_MinerCount;
+    
     
 exitlbl:
     
@@ -3101,6 +3183,7 @@ int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAdd
                         {
                             m_ClearedAdminCount=m_AdminCount;
                             m_ClearedMinerCount=m_MinerCount;
+                            m_ClearedMinerCountForMinerVerification=m_MinerCount;
                         }
                     }
                     m_MemPool->Add((unsigned char*)&pldRow+m_Ledger->m_KeyOffset,(unsigned char*)&pldRow+m_Ledger->m_ValueOffset);
@@ -3673,6 +3756,7 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
         m_Block--;
         m_ClearedAdminCount=m_AdminCount;
         m_ClearedMinerCount=m_MinerCount;
+        m_ClearedMinerCountForMinerVerification=m_MinerCount;
         for(i=pld_items;i<m_MemPool->GetCount();i++)
         {
             m_Ledger->GetRow(m_Row-m_MemPool->GetCount()+i,(mc_PermissionLedgerRow*)&pldBlockRow);
@@ -3709,7 +3793,7 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
 
 /** Returns address of the specific block by hash */
 
-int mc_Permissions::GetBlockMiner(const void* lpHash, unsigned char* lpMiner)
+int mc_Permissions::GetBlockMiner(const void* lpHash, unsigned char* lpMiner,uint32_t *lpFlags)
 {
     int err,value_len;
     mc_BlockMinerDBRow pdbBlockMinerRow;
@@ -3728,6 +3812,7 @@ int mc_Permissions::GetBlockMiner(const void* lpHash, unsigned char* lpMiner)
     {
         memcpy((char*)&pdbBlockMinerRow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);        
         memcpy(lpMiner,pdbBlockMinerRow.m_Address,MC_PLS_SIZE_ADDRESS);
+        *lpFlags=pdbBlockMinerRow.m_Flags;
     }
     else
     {
@@ -3772,10 +3857,18 @@ int mc_Permissions::GetBlockAdminMinerGrants(const void* lpHash, int record, int
     return err;    
 }
 
-int mc_Permissions::IncrementBlock()
+int mc_Permissions::IncrementBlock(uint32_t flags)
 {
     Lock(1);
     m_Block++;
+    if(flags & MC_PFB_COUNT_CHANGE)
+    {
+        UpdateCounts();
+        if(m_CopiedRow > 0)
+        {
+            m_ClearedMinerCountForMinerVerification=m_MinerCount;
+        }
+    }
     UnLock();
     return MC_ERR_NOERROR;
 }
@@ -3793,6 +3886,13 @@ int mc_Permissions::StoreBlockInfo(const void* lpMiner,const void* lpHash)
     return result;
 }
 
+void mc_Permissions::SaveTmpCounts()
+{
+    Lock(1);
+    m_TmpSavedAdminCount=m_AdminCount;
+    m_TmpSavedMinerCount=m_MinerCount;
+    UnLock();    
+}
 
 int mc_Permissions::StoreBlockInfoInternal(const void* lpMiner,const void* lpHash,int update_counts)
 {    
@@ -3899,13 +3999,18 @@ int mc_Permissions::StoreBlockInfoInternal(const void* lpMiner,const void* lpHas
     {
         m_Block++;
         UpdateCounts();
+        m_ClearedMinerCountForMinerVerification=m_MinerCount;
         m_Block--;
     }
     
     pdbBlockMinerRow.Zero();
     memcpy(pdbBlockMinerRow.m_BlockHash,lpHash,MC_PLS_SIZE_ENTITY);
     pdbBlockMinerRow.m_Type=MC_PTP_BLOCK_MINER;
-    pdbBlockMinerRow.m_MinerCount=m_MinerCount;
+    pdbBlockMinerRow.m_Flags=0;
+    if( (m_TmpSavedAdminCount != m_AdminCount) || (m_TmpSavedMinerCount != m_MinerCount) )
+    {
+        pdbBlockMinerRow.m_Flags |= MC_PFB_COUNT_CHANGE;
+    }
     memcpy(pdbBlockMinerRow.m_Address,lpMiner,MC_PLS_SIZE_ADDRESS);
     err=m_Database->m_DB->Write((char*)&pdbBlockMinerRow+m_Database->m_KeyOffset,m_Database->m_KeySize,
                                 (char*)&pdbBlockMinerRow+m_Database->m_ValueOffset,m_Database->m_ValueSize,0);
@@ -3923,6 +4028,13 @@ int mc_Permissions::StoreBlockInfoInternal(const void* lpMiner,const void* lpHas
         }
     }
     
+/*    
+    char msg[256];
+
+    sprintf(msg,"Block store: %9d (Hash: %08x, Miner: %08x), Admin count: %d, Miner count: %d, Ledger Rows: %ld",
+            m_Block,*(uint32_t*)lpHash,*(uint32_t*)lpMiner,m_AdminCount,m_MinerCount,m_Row);
+    LogString(msg);
+*/    
     return MC_ERR_NOERROR;
 }
 
