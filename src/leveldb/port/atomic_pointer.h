@@ -52,7 +52,9 @@ namespace port {
 // Mac OS
 #elif defined(OS_MACOSX)
 inline void MemoryBarrier() {
-  OSMemoryBarrier();
+  // OSMemoryBarrier() deprecated in macOS 10.12.
+  // Apply patch from: https://github.com/google/leveldb/pull/422
+  atomic_thread_fence(std::memory_order_seq_cst);
 }
 #define LEVELDB_HAVE_MEMORY_BARRIER
 
