@@ -2169,7 +2169,7 @@ int mc_Permissions::RollBackBeforeMinerVerification(uint32_t block)
     m_MinerCount=pldBlockRow.m_MinerCount;
     m_ClearedMinerCountForMinerVerification=m_MinerCount;
     
-    
+
 exitlbl:
     
     m_Ledger->Close();  
@@ -3793,7 +3793,7 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
 
 /** Returns address of the specific block by hash */
 
-int mc_Permissions::GetBlockMiner(const void* lpHash, unsigned char* lpMiner,uint32_t *lpFlags)
+int mc_Permissions::GetBlockMiner(const void* lpHash, unsigned char* lpMiner,uint32_t *lpAdminMinerCount)
 {
     int err,value_len;
     mc_BlockMinerDBRow pdbBlockMinerRow;
@@ -3812,7 +3812,7 @@ int mc_Permissions::GetBlockMiner(const void* lpHash, unsigned char* lpMiner,uin
     {
         memcpy((char*)&pdbBlockMinerRow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);        
         memcpy(lpMiner,pdbBlockMinerRow.m_Address,MC_PLS_SIZE_ADDRESS);
-        *lpFlags=pdbBlockMinerRow.m_Flags;
+        *lpAdminMinerCount=pdbBlockMinerRow.m_AdminMinerCount;
     }
     else
     {
@@ -3857,17 +3857,22 @@ int mc_Permissions::GetBlockAdminMinerGrants(const void* lpHash, int record, int
     return err;    
 }
 
-int mc_Permissions::IncrementBlock(uint32_t flags)
+int mc_Permissions::IncrementBlock(uint32_t admin_miner_count)
 {
     Lock(1);
     m_Block++;
-    if(flags & MC_PFB_COUNT_CHANGE)
+    if(admin_miner_count)
     {
-        UpdateCounts();
-        if(m_CopiedRow > 0)
-        {
-            m_ClearedMinerCountForMinerVerification=m_MinerCount;
-        }
+        m_AdminCount=(admin_miner_count >> 16) & 0xffff;
+        m_MinerCount=admin_miner_count & 0xffff;
+    }
+    else
+    {
+        UpdateCounts();        
+    }
+    if(m_CopiedRow > 0)
+    {
+        m_ClearedMinerCountForMinerVerification=m_MinerCount;
     }
     UnLock();
     return MC_ERR_NOERROR;
@@ -4006,10 +4011,10 @@ int mc_Permissions::StoreBlockInfoInternal(const void* lpMiner,const void* lpHas
     pdbBlockMinerRow.Zero();
     memcpy(pdbBlockMinerRow.m_BlockHash,lpHash,MC_PLS_SIZE_ENTITY);
     pdbBlockMinerRow.m_Type=MC_PTP_BLOCK_MINER;
-    pdbBlockMinerRow.m_Flags=0;
-    if( (m_TmpSavedAdminCount != m_AdminCount) || (m_TmpSavedMinerCount != m_MinerCount) )
+    pdbBlockMinerRow.m_AdminMinerCount=0;
+    if( (m_AdminCount <= 0xffff) && (m_MinerCount <= 0xffff) )
     {
-        pdbBlockMinerRow.m_Flags |= MC_PFB_COUNT_CHANGE;
+        pdbBlockMinerRow.m_AdminMinerCount = (m_AdminCount << 16) + m_MinerCount;
     }
     memcpy(pdbBlockMinerRow.m_Address,lpMiner,MC_PLS_SIZE_ADDRESS);
     err=m_Database->m_DB->Write((char*)&pdbBlockMinerRow+m_Database->m_KeyOffset,m_Database->m_KeySize,
@@ -4028,13 +4033,13 @@ int mc_Permissions::StoreBlockInfoInternal(const void* lpMiner,const void* lpHas
         }
     }
     
-/*    
+/*
     char msg[256];
 
-    sprintf(msg,"Block store: %9d (Hash: %08x, Miner: %08x), Admin count: %d, Miner count: %d, Ledger Rows: %ld",
-            m_Block,*(uint32_t*)lpHash,*(uint32_t*)lpMiner,m_AdminCount,m_MinerCount,m_Row);
+    sprintf(msg,"Block store: %9d (Hash: %08x, Miner: %08x), Admin count: %d, Miner count: %d, Ledger Rows: %ld, Count(%d, %08X)",
+            m_Block+1,*(uint32_t*)lpHash,*(uint32_t*)lpMiner,m_AdminCount,m_MinerCount,m_Row,pdbBlockMinerRow.m_AdminMinerCount,pdbBlockMinerRow.m_AdminMinerCount);
     LogString(msg);
-*/    
+*/
     return MC_ERR_NOERROR;
 }
 

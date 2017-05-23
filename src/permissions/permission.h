@@ -33,7 +33,6 @@
 #define MC_PFB_NONE               0x00000000
 #define MC_PFB_MINED_BEFORE       0x00000001                                    // Idential with FoundInDB value of normal row
 #define MC_PFB_GOVERNANCE_CHANGE  0x00000002
-#define MC_PFB_COUNT_CHANGE       0x00000004
 
 #define MC_PLS_SIZE_ENTITY            32
 #define MC_PLS_SIZE_ADDRESS           20
@@ -80,7 +79,7 @@ typedef struct mc_BlockMinerDBRow
     unsigned char m_Null[MC_PLS_SIZE_ADDRESS];                                  // Should be Null
     uint32_t m_Type;                                                            // Permission type MC_PTP_ constants, should be MC_PTP_BLOCK_MINER
     unsigned char m_Address[MC_PLS_SIZE_ADDRESS];                               // Miner Address
-    uint32_t m_Flags;                                                           // Flags for incrementing counts
+    uint32_t m_AdminMinerCount;                                                 // Admin and miner counts, if 0 - should be recalculated
     void Zero();
 } mc_BlockMinerDBRow;
 
@@ -330,8 +329,8 @@ typedef struct mc_Permissions
     int RestoreAfterMinerVerification();
     void SaveTmpCounts();    
     int StoreBlockInfo(const void* lpMiner,const void* lpHash);    
-    int IncrementBlock(uint32_t flags);    
-    int GetBlockMiner(const void* lpHash,unsigned char* lpMiner,uint32_t *lpFlags);
+    int IncrementBlock(uint32_t admin_miner_count);    
+    int GetBlockMiner(const void* lpHash,unsigned char* lpMiner,uint32_t *lpAdminMinerCount);
     int GetBlockAdminMinerGrants(const void* lpHash,int record,int32_t *offsets);
     int CanMineBlockOnFork(const void* lpAddress,uint32_t block,uint32_t last_after_fork);
     int IsBarredByDiversity(uint32_t block,uint32_t last,int miner_count);

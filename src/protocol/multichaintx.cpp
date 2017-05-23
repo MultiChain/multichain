@@ -2077,7 +2077,7 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
                     {
                         vInputDestinations[i]=*(uint160*)lpScriptID;                               
                     }
-
+                    
                     check_last=0;
                     if( typeRet == TX_PUBKEY )
                     {

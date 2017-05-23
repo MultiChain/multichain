@@ -394,7 +394,7 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
     uint32_t last_after_fork;
     bool fVerify;
     bool fRolledBack;
-    uint32_t block_flags;
+    uint32_t admin_miner_count;
     int32_t offsets[MC_PLS_SIZE_OFFSETS_PER_ROW];
     uint256 block_hash;
     vector<unsigned char> vchPubKey;
@@ -464,7 +464,7 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
             fVerify=true;
             pblock=pblock_last;            
         }
-        if(!fVerify && (mc_gState->m_Permissions->GetBlockMiner(&block_hash,(unsigned char*)&miners[pos],&block_flags) == MC_ERR_NOERROR) )
+        if(!fVerify && (mc_gState->m_Permissions->GetBlockMiner(&block_hash,(unsigned char*)&miners[pos],&admin_miner_count) == MC_ERR_NOERROR) )
         {
             LogPrint("mchn","VerifyBlockMiner: Verified block %s (height %d)\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
             if(miners[pos] == miners[branch_size - 1])
@@ -496,11 +496,10 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
                 }
                 record++;
             }
-            mc_gState->m_Permissions->IncrementBlock(block_flags);
+            mc_gState->m_Permissions->IncrementBlock(admin_miner_count);
         }
         else
         {
-            mc_gState->m_Permissions->SaveTmpCounts();
             if(pblock == NULL)
             {
                 LogPrint("mchn","VerifyBlockMiner: Unverified block %s (height %d)\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
