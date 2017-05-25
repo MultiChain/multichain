@@ -2016,7 +2016,7 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
                             }
                             vInputPrevOutputScripts[cs_vin]=CScript(cs_script,cs_script+cs_size);                            
                             vInputCanGrantAdminMine[cs_vin]=true;
-                            fAdminFound=true;
+//                            fAdminFound=true;
                         }
                         cs_offset=cs_new_offset;
                     }
@@ -2024,14 +2024,14 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
             }
         }
     }
-
+/*
     if(!fAdminFound)
     {
         goto exitlbl;                                                                                                                                                                        
     }
     
     fAdminFound=false;
-    
+*/    
     for (unsigned int i = 0; i < tx.vin.size(); i++)        
     {                                                                                                                                                                
         if(vInputCanGrantAdminMine[i])
@@ -2105,22 +2105,24 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
                                     goto exitlbl;                                                                                                                                                                                                    
                                 }
                             }
+/*                            
                             if(vInputCanGrantAdminMine[i])
                             {
                                 fAdminFound=true;
                             }
-                        }                                                                
+ */ 
+                        } 
                     }
                 }
             }    
         }        
     }    
-    
+/*    
     if(!fAdminFound)
     {
         goto exitlbl;                                                                                                                                                                        
     }
-    
+*/    
     for (unsigned int j = 0; j < tx.vout.size(); j++)
     {
         unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];

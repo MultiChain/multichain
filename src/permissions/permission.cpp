@@ -900,7 +900,6 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
             
             m_Ledger->Close();
         }        
-        pldRow.m_PrevRow=pldRow.m_ThisRow;        
         
         if(ptr)
         {
@@ -908,6 +907,7 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
             row->m_BlockTo=pldRow.m_BlockTo;
             row->m_ThisRow=pldRow.m_ThisRow;
             row->m_Flags=pldRow.m_Flags;        
+            pldRow.m_PrevRow=pldRow.m_ThisRow;        
         }
 /*        
         row->m_BlockFrom=pdbRow.m_BlockFrom;
@@ -2168,7 +2168,13 @@ int mc_Permissions::RollBackBeforeMinerVerification(uint32_t block)
     m_AdminCount=pldBlockRow.m_AdminCount;
     m_MinerCount=pldBlockRow.m_MinerCount;
     m_ClearedMinerCountForMinerVerification=m_MinerCount;
-    
+
+    /*
+    char msg[256];
+    sprintf(msg,"Verifier Rollback: %9d, Admin count: %d, Miner count: %d, Ledger Rows: %ld",
+            m_Block,m_AdminCount,m_MinerCount,m_Row);
+    LogString(msg);
+    */
 
 exitlbl:
     
@@ -3874,6 +3880,12 @@ int mc_Permissions::IncrementBlock(uint32_t admin_miner_count)
     {
         m_ClearedMinerCountForMinerVerification=m_MinerCount;
     }
+/*    
+    char msg[256];
+    sprintf(msg,"Verifier Increment: %9d, Admin count: %d, Miner count: %d, Ledger Rows: %ld",
+            m_Block,m_AdminCount,m_MinerCount,m_Row);
+    LogString(msg);
+*/    
     UnLock();
     return MC_ERR_NOERROR;
 }
@@ -4033,13 +4045,13 @@ int mc_Permissions::StoreBlockInfoInternal(const void* lpMiner,const void* lpHas
         }
     }
     
-/*
+/*    
     char msg[256];
 
-    sprintf(msg,"Block store: %9d (Hash: %08x, Miner: %08x), Admin count: %d, Miner count: %d, Ledger Rows: %ld, Count(%d, %08X)",
-            m_Block+1,*(uint32_t*)lpHash,*(uint32_t*)lpMiner,m_AdminCount,m_MinerCount,m_Row,pdbBlockMinerRow.m_AdminMinerCount,pdbBlockMinerRow.m_AdminMinerCount);
+    sprintf(msg,"Block store: %9d (Hash: %08x, Miner: %08x), Admin count: %d, Miner count: %d, Ledger Rows: %ld",
+            m_Block+1,*(uint32_t*)lpHash,*(uint32_t*)lpMiner,m_AdminCount,m_MinerCount,m_Row);
     LogString(msg);
-*/
+*/    
     return MC_ERR_NOERROR;
 }
 
