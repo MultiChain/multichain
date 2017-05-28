@@ -3718,13 +3718,19 @@ void mc_InitRPCHelpMap16()
             "listblocks block-set-identifier(s) ( verbose )\n"
             "\nReturns list of block information objects\n"
             "\nArguments:\n"
-            "1. \"block-set-identifier(s)\"        (string, optional) Block set identifiers(s) - comma delimited list of the following: \n"
+            "1. \"block-set-identifier(s)\"        (string, required) Block set identifiers(s) - comma delimited list of the following: \n"
             "                                                       block height,\n"
             "                                                       block hash,\n"
             "                                                       block height range, e.g. <block-from>-<block-to>,\n"
             "                                                       number of last blocks in the active chain (if negative),\n"
             " or\n"
-            "1. block-set-identifier(s)          (array, optional) A json array of block set identifiers \n"                
+            "1. block-set-identifier(s)          (array, required)  A json array of block set identifiers \n"                
+            " or\n"
+            "1. block-set-identifier(s)          (object, required) A json object with time range\n"
+            "    {\n"                
+            "      \"starttime\" : start-time      (numeric,required) Start time.\n"
+            "      \"endtime\" : end-time          (numeric,required) End time.\n"
+            "    }\n"                                
             "2. verbose                          (boolean, optional, default=false) If true, returns more information\n"
             "\nResult:\n"
             "An array containing list of block information objects\n"            
@@ -3732,6 +3738,35 @@ void mc_InitRPCHelpMap16()
             + HelpExampleCli("listblocks", "\"1000,1100-1120\"")
             + HelpExampleCli("listblocks", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\"")
             + HelpExampleRpc("listblocks", "1000")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("liststreamblockitems",
+            "liststreamblockitems \"stream-identifier\" block-set-identifier(s) ( verbose count start )\n"
+            "\nReturns stream items in certain block range.\n"
+            "\nArguments:\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "2. \"block-set-identifier(s)\"        (string, required) Block set identifiers(s) - comma delimited list of the following: \n"
+            "                                                       block height,\n"
+            "                                                       block hash,\n"
+            "                                                       block height range, e.g. <block-from>-<block-to>,\n"
+            "                                                       number of last blocks in the active chain (if negative),\n"
+            " or\n"
+            "2. block-set-identifier(s)          (array, required)  A json array of block set identifiers \n"                
+            " or\n"
+            "2. block-set-identifier(s)          (object, required) A json object with time range\n"
+            "    {\n"                
+            "      \"starttime\" : start-time      (numeric,required) Start time.\n"
+            "      \"endtime\" : end-time          (numeric,required) End time.\n"
+            "    }\n"                                
+            "3. verbose                          (boolean, optional, default=false) If true, returns information about item transaction \n"
+            "4. count                            (number, optional, default==INT_MAX) The number of items to display\n"
+            "5. start                            (number, optional, default=-count - last) Start from specific item, 0 based, if negative - from the end\n"
+            "\nResult:\n"
+            "\"stream-items\"                      (array) List of stream items.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("liststreamblockitems", "\"test-stream\" 1000,1100-1120 ") 
+            + HelpExampleCli("liststreamblockitems", "\"test-stream\" 1000 true 10 100") 
+            + HelpExampleRpc("liststreamblockitems", "\"test-stream\", 1000, false, 20")
         ));
     
 

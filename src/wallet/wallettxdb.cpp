@@ -2190,7 +2190,7 @@ int mc_TxDB::GetBlockItemIndex(mc_TxImport *import,mc_TxEntity *entity,int block
     int row;
     mc_TxEntityStat *stat;
     
-    row=import->FindEntity(entity);
+    row=imp->FindEntity(entity);
     if(row < 0)
     {
         return 0;

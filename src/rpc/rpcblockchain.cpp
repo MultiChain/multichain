@@ -373,10 +373,10 @@ Value listblocks(const Array& params, bool fHelp)
     for(unsigned int i=0;i<heights.size();i++)
     {
         CBlock block;
-        if(!ReadBlockFromDisk(block, chainActive[i]))
+        if(!ReadBlockFromDisk(block, chainActive[heights[i]]))
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
         
-        result.push_back(blockToJSONForListBlocks(block, chainActive[i], verbose));
+        result.push_back(blockToJSONForListBlocks(block, chainActive[heights[i]], verbose));
     }
     
     return result;
