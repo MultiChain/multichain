@@ -987,6 +987,12 @@ Value liststreamitems(const Array& params, bool fHelp)
     return retArray;
 }
 
+Value liststreamblockitems(const Array& params, bool fHelp)
+{
+    return Value::null;
+}
+
+
 void getSubKeyEntityFromKey(string str,mc_TxEntityStat entStat,mc_TxEntity *entity)
 {
     if(str == "*")

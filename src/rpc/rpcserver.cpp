@@ -503,6 +503,7 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "listpermissions",        &listpermissions,        true,      false,      false },
     { "blockchain",         "liststreams",            &liststreams,            true,      false,      false },
     { "blockchain",         "listupgrades",           &listupgrades,           true,      false,      false },
+    { "blockchain",         "listblocks",             &listblocks,             true,      false,      false },
 /* MCHN END */    
     
     /* Mining */
@@ -644,6 +645,7 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "liststreamkeys",         &liststreamkeys,        false,     false,      true },
     { "wallet",             "liststreampublishers",   &liststreampublishers,  false,     false,      true },
     { "wallet",             "gettxoutdata",           &gettxoutdata,           false,     false,      true },
+    { "wallet",             "liststreamblockitems",   &liststreamblockitems,    false,      false,      false },
     
 /* MCHN END */    
     { "wallet",             "setaccount",             &setaccount,             true,      false,      true },

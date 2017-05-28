@@ -2507,7 +2507,16 @@ vector<string> ParseStringList(Value param)
             }
             else
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value, expected array of strings");                                                        
+                if(vtok.type() == int_type)
+                {
+                    string tok=strprintf("%ld",vtok.get_int64());
+                    setStrings.insert(tok);
+                    vStrings.push_back(tok);                    
+                }
+                else
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value, expected array of strings");                                                        
+                }
             }
         }            
     }
@@ -2699,6 +2708,171 @@ bool AssetCompareByRef(Value a,Value b)
     
     return false;
 }
+
+bool StringToInt(string str,int *value)
+{
+    char *endptr;
+    if(str.size())
+    {
+        *value=(int)strtol(str.c_str(),&endptr,0);
+        if(endptr == (str.c_str() + str.size()) )
+        {
+            return true;
+        }
+    }
+    return  false;
+}
+
+bool ParseIntRange(string str,int *from,int *to)
+{
+    size_t mpos;
+    
+    mpos=str.find("-");
+    if( (mpos == string::npos) || (mpos == 0) || (mpos == (str.size()-1)) )
+    {
+        return false;
+    }
+    if(!StringToInt(str.substr(0,mpos),from))
+    {
+        return false;        
+    }
+    if(!StringToInt(str.substr(mpos+1),to))
+    {
+        return false;        
+    }
+    return true;
+}
+
+vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
+{
+    vector<int> block_set;
+    vector<int> result;
+    int last_block;
+    
+    if(blockset_identifier.type() == obj_type)
+    {
+        int64_t starttime=-1; 
+        int64_t endtime=-1; 
+    
+        BOOST_FOREACH(const Pair& d, blockset_identifier.get_obj()) 
+        {              
+            if(d.name_ == "starttime")
+            {
+                if(d.value_.type() != int_type)
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid starttime");            
+                    
+                starttime=d.value_.get_int64();
+                if( (starttime<0) || (starttime > 0xffffffff))
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid starttime");                                
+                }
+            }
+            else
+            {
+                if(d.name_ == "endtime")
+                {
+                    if(d.value_.type() != int_type)
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid endtime");            
+
+                    endtime=d.value_.get_int64();
+                    if( (endtime<0) || (endtime > 0xffffffff))
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid endtime");                                
+                    }
+                }
+                else
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid time range");            
+                }
+            }
+        }
+        
+        if(starttime < 0)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing starttime");            
+        if(endtime < 0)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing starttime");            
+        
+        if(starttime <= endtime)
+        {
+            for(int block=0; block<chainActive.Height();block++)
+            {
+                if( (chainActive[block]->nTime >= starttime) && (chainActive[block]->nTime <= endtime) )
+                {
+                    block_set.push_back(block);                    
+                }
+            }
+        }        
+    }
+    else
+    {
+        vector<string> inputStrings;
+        inputStrings=ParseStringList(blockset_identifier);
+
+        for(unsigned int i=0;i<inputStrings.size();i++)
+        {
+            string str=inputStrings[i];
+            int value,from,to;
+            if(StringToInt(str,&value))
+            {
+                from=value;
+                to=value;
+                if(value < 0)
+                {
+                    to=chainActive.Height();
+                    from=chainActive.Height()+value+1;
+                }
+            }
+            else
+            {
+                if(!ParseIntRange(str,&from,&to))
+                {
+                    uint256 hash = ParseHashV(str, "Block hash");
+                    
+                    if (mapBlockIndex.count(hash) == 0)
+                        throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block " + str + " not found");
+
+                    CBlockIndex* pblockindex = mapBlockIndex[hash];
+                    if(!chainActive.Contains(pblockindex))
+                    {
+                        throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block " + str + " not found in active chain");
+                    }
+                    from=pblockindex->nHeight;
+                    to=from;
+                }
+            }
+            if (from < 0 || from > chainActive.Height())
+                throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range for " + str);
+            if (to < 0 || to > chainActive.Height())
+                throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range for " + str);            
+            if (from > to)
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid range " + str);            
+            
+            for(int block=from;block<=to;block++)
+            {
+                block_set.push_back(block);
+            }
+        }        
+    }
+    
+    if(block_set.size())
+    {
+        sort(block_set.begin(),block_set.end());
+    }
+    
+    last_block=-1;
+    for(unsigned int i=0;i<block_set.size();i++)
+    {
+        if(block_set[i] != last_block)
+        {
+            result.push_back(block_set[i]);
+            last_block=block_set[i];
+        }
+    }
+    
+    return result;
+}
+
+
 
 Array AssetArrayFromAmounts(mc_Buffer *asset_amounts,int issue_asset_id,uint256 hash,int show_type)
 {

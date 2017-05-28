@@ -7,6 +7,7 @@
 #include "chain/checkpoints.h"
 #include "core/main.h"
 #include "rpc/rpcserver.h"
+#include "rpc/rpcserver.h"
 #include "utils/sync.h"
 #include "utils/util.h"
 
@@ -25,11 +26,13 @@ extern void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& en
 
 /* MCHN START */
 bool ParseMultichainTxOutToBuffer(uint256 hash,const CTxOut& txout,mc_Buffer *amounts,mc_Script *lpScript,int *allowed,int *required,string& strFailReason);
+vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
 bool CreateAssetBalanceList(const CTxOut& out,mc_Buffer *amounts,mc_Script *lpScript);
 Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level);
 Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong);
 string EncodeHexTx(const CTransaction& tx);
 int OrphanPoolSize();
+bool paramtobool(Value param);
 /* MCHN END */
 
 void ScriptPubKeyToJSON(const CScript& scriptPubKey, Object& out, bool fIncludeHex);
@@ -64,6 +67,52 @@ double GetDifficulty(const CBlockIndex* blockindex)
 
     return dDiff;
 }
+
+Object blockToJSONForListBlocks(const CBlock& block, const CBlockIndex* blockindex, bool verbose)
+{
+    Object result;
+    result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
+/* MCHN START */    
+    CKeyID keyID;
+    Value miner;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    {
+        if(mc_gState->m_Permissions->GetBlockMiner(blockindex->nHeight,(unsigned char*)&keyID) == MC_ERR_NOERROR)
+        {
+            miner=CBitcoinAddress(keyID).ToString();
+        }
+    }
+    result.push_back(Pair("miner", miner));
+/* MCHN END */        
+    int confirmations = -1;
+    // Only report confirmations if the block is on the main chain
+    if (chainActive.Contains(blockindex))
+        confirmations = chainActive.Height() - blockindex->nHeight + 1;
+    result.push_back(Pair("confirmations", confirmations));
+    result.push_back(Pair("size", (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION)));
+    result.push_back(Pair("height", blockindex->nHeight));
+    result.push_back(Pair("txcount", block.vtx.size()));
+    result.push_back(Pair("time", block.GetBlockTime()));
+    
+    if(verbose)
+    {
+        result.push_back(Pair("version", block.nVersion));
+        result.push_back(Pair("merkleroot", block.hashMerkleRoot.GetHex()));
+        result.push_back(Pair("nonce", (uint64_t)block.nNonce));
+        result.push_back(Pair("bits", strprintf("%08x", block.nBits)));
+        result.push_back(Pair("difficulty", GetDifficulty(blockindex)));
+        result.push_back(Pair("chainwork", blockindex->nChainWork.GetHex()));
+
+        if (blockindex->pprev)
+            result.push_back(Pair("previousblockhash", blockindex->pprev->GetBlockHash().GetHex()));
+        CBlockIndex *pnext = chainActive.Next(blockindex);
+        if (pnext)
+            result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
+    }
+    
+    return result;
+}
+
 
 
 Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDetails = false, int verbose_level = 1)
@@ -305,6 +354,34 @@ Value setlastblock(const Array& params, bool fHelp)
     
     return chainActive.Tip()->GetBlockHash().GetHex();
 }
+
+Value listblocks(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)                        // MCHN
+        throw runtime_error("Help message not found\n");
+    
+    Array result;
+    vector <int> heights=ParseBlockSetIdentifier(params[0]);
+    
+    bool verbose=false;
+    
+    if (params.size() > 1)    
+    {
+        verbose=paramtobool(params[1]);
+    }
+    
+    for(unsigned int i=0;i<heights.size();i++)
+    {
+        CBlock block;
+        if(!ReadBlockFromDisk(block, chainActive[i]))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+        
+        result.push_back(blockToJSONForListBlocks(block, chainActive[i], verbose));
+    }
+    
+    return result;
+}
+
 /* MCHN END */
 
 

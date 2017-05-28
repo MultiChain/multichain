@@ -3714,6 +3714,27 @@ void mc_InitRPCHelpMap16()
             + HelpExampleRpc("appendrawtransaction", "\"hexstring\", \"[{\\\"txid\\\":\\\"myid\\\",\\\"vout\\\":0}]\", \"{\\\"address\\\":0.01}\"")
         ));
     
+    mapHelpStrings.insert(std::make_pair("listblocks",
+            "listblocks block-set-identifier(s) ( verbose )\n"
+            "\nReturns list of block information objects\n"
+            "\nArguments:\n"
+            "1. \"block-set-identifier(s)\"        (string, optional) Block set identifiers(s) - comma delimited list of the following: \n"
+            "                                                       block height,\n"
+            "                                                       block hash,\n"
+            "                                                       block height range, e.g. <block-from>-<block-to>,\n"
+            "                                                       number of last blocks in the active chain (if negative),\n"
+            " or\n"
+            "1. block-set-identifier(s)          (array, optional) A json array of block set identifiers \n"                
+            "2. verbose                          (boolean, optional, default=false) If true, returns more information\n"
+            "\nResult:\n"
+            "An array containing list of block information objects\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("listblocks", "\"1000,1100-1120\"")
+            + HelpExampleCli("listblocks", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\"")
+            + HelpExampleRpc("listblocks", "1000")
+        ));
+    
+
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));

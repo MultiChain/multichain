@@ -195,6 +195,12 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "liststreampublisheritems", 3 },
     { "liststreampublisheritems", 4 },
     { "liststreampublisheritems", 5 },
+    { "liststreamblockitems", 1 },
+    { "liststreamblockitems", 2 },
+    { "liststreamblockitems", 3 },
+    { "liststreamblockitems", 4 },
+    { "listblocks", 0 },
+    { "listblocks", 1 },
 /* MCHN END */    
     { "settxfee", 0 },
     { "getreceivedbyaddress", 1 },
@@ -328,6 +334,8 @@ static const CRPCConvertParamMayBeString vRPCConvertParamsMayBeString[] =
     { "listupgrades", 0 },
     { "listpermissions", 1 },
     { "setgenerate", 0 },
+    { "liststreamblockitems", 1 },
+    { "listblocks", 0 },
 };
 
 class CRPCConvertTableMayBeString
