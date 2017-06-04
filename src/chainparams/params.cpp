@@ -898,7 +898,6 @@ int mc_MultichainParams::CalculateHash(unsigned char *hash)
                 take_it=0;
             }
         }
-
         if((m_lpParams+i)->IsRelevant((int)GetInt64Param("protocolversion")) == 0)
         {
             take_it=0;            
@@ -965,6 +964,7 @@ int mc_MultichainParams::Validate()
     unsigned char hash[32];
     char *ptrData;
     void *stored_hash;
+    void *protocol_name;
     
     m_Status=MC_PRM_STATUS_EMPTY;
 
@@ -1090,7 +1090,8 @@ int mc_MultichainParams::Validate()
         }
         else
         {
-            if(IsProtocolMultichain())
+            protocol_name=GetParam("chainprotocol",NULL);
+            if(strcmp((char*)protocol_name,"multichain") == 0)
             {
                 if(memcmp(hash,stored_hash,32))
                 {
