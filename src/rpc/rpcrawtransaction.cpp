@@ -1105,14 +1105,22 @@ void AddCacheInputScriptIfNeeded(CMutableTransaction& rawTx,Array inputs, bool f
 
 Value appendrawtransaction(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 3 || params.size() > 5) 
+    if (fHelp || params.size() < 2 || params.size() > 5) 
         throw runtime_error("Help message not found\n");
     
-    RPCTypeCheck(params, list_of(str_type)(array_type)(obj_type));
+    RPCTypeCheck(params, list_of(str_type)(array_type));
     
     CTransaction source_tx;
     Array inputs = params[1].get_array();
-    Object sendTo = params[2].get_obj();
+    Object sendTo;
+    
+    if (params.size() > 2)         
+    {    
+        if(params[2].type() != obj_type)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid addresses, should be object");
+            
+        sendTo= params[2].get_obj();
+    }
     bool new_outputs=false;
     if(sendTo.size())
     {

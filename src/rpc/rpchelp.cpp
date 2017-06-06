@@ -3635,12 +3635,12 @@ void mc_InitRPCHelpMap16()
         ));
     
     mapHelpStrings.insert(std::make_pair("appendrawtransaction",
-            "appendrawtransaction \"tx-hex\" [{\"txid\":\"id\",\"vout\":n},...] {\"address\":amount,...} ( [data] \"action\" ) \n"
+            "appendrawtransaction \"tx-hex\" [{\"txid\":\"id\",\"vout\":n},...] ( {\"address\":amount,...} [data] \"action\" ) \n"
             "\nAppend inputs and outputs to raw transaction\n"
 
             "\nArguments:\n"
             "1. \"tx-hex\"                               (string, required) Source transaction hex string\n"
-            "1. transactions                           (array, required) A json array of json objects\n"
+            "2. transactions                           (array, required) A json array of json objects\n"
             "     [\n"
             "       {\n"
             "         \"txid\":\"id\",                     (string, required) The transaction id\n"
@@ -3651,7 +3651,7 @@ void mc_InitRPCHelpMap16()
             "       }\n"
             "       ,...\n"
             "     ]\n"
-            "2. addresses                              (object, required) a json object with addresses as keys and amounts as values\n"
+            "3. addresses                              (object, optional) a json object with addresses as keys and amounts as values\n"
             "    {\n"
             "      \"address\": \n"
             "        x.xxx                             (numeric, required) The key is the address, the value is the native currency amount\n"
@@ -3695,8 +3695,8 @@ void mc_InitRPCHelpMap16()
             "        }\n"                                
             "      ,...\n"
             "    }\n"
-            "3. data                                   (array, optional) Array of hexadecimal strings or data objects, see help appendrawdata for details.\n"
-            "4.\"action\"                                (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
+            "4. data                                   (array, optional) Array of hexadecimal strings or data objects, see help appendrawdata for details.\n"
+            "5.\"action\"                                (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
                 
 
             "\nResult:\n"
