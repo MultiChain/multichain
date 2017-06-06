@@ -446,7 +446,7 @@ Value combineunspent(const Array& params, bool fHelp)
     if (params.size() > 1)
         nMinConf = params[1].get_int();
     
-    int nMinInputs = 10;
+    int nMinInputs = 2;
     if (params.size() > 3)
         nMinInputs = params[3].get_int();
     
@@ -469,13 +469,13 @@ Value combineunspent(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "maxinputs below mininouts.");                
     }
     
-    int nMaxTransactions = 1;
+    int nMaxTransactions = 100;
     if (params.size() > 2)
         nMaxTransactions = params[2].get_int();
 
-    if((nMaxTransactions < 1) || (nMaxTransactions > 20))
+    if((nMaxTransactions < 1) || (nMaxTransactions > 100))
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid maximum-transactions. Valid Range [1 - 20].");        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid maximum-transactions. Valid Range [1 - 100].");        
     }
     
     int nMaxTime = 30;
