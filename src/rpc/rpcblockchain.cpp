@@ -91,10 +91,10 @@ Object blockToJSONForListBlocks(const CBlock& block, const CBlockIndex* blockind
     result.push_back(Pair("confirmations", confirmations));
     result.push_back(Pair("height", blockindex->nHeight));
     result.push_back(Pair("time", (int64_t)blockindex->nTime));
+    result.push_back(Pair("txcount", (int64_t)blockindex->nTx));
     
     if(verbose)
     {
-        result.push_back(Pair("txcount", block.vtx.size()));
         result.push_back(Pair("size", (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION)));
         result.push_back(Pair("version", block.nVersion));
         result.push_back(Pair("merkleroot", block.hashMerkleRoot.GetHex()));
