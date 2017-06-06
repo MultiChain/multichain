@@ -89,13 +89,13 @@ Object blockToJSONForListBlocks(const CBlock& block, const CBlockIndex* blockind
     if (chainActive.Contains(blockindex))
         confirmations = chainActive.Height() - blockindex->nHeight + 1;
     result.push_back(Pair("confirmations", confirmations));
-    result.push_back(Pair("size", (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION)));
     result.push_back(Pair("height", blockindex->nHeight));
-    result.push_back(Pair("txcount", block.vtx.size()));
-    result.push_back(Pair("time", block.GetBlockTime()));
+    result.push_back(Pair("time", (int64_t)blockindex->nTime));
     
     if(verbose)
     {
+        result.push_back(Pair("txcount", block.vtx.size()));
+        result.push_back(Pair("size", (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION)));
         result.push_back(Pair("version", block.nVersion));
         result.push_back(Pair("merkleroot", block.hashMerkleRoot.GetHex()));
         result.push_back(Pair("nonce", (uint64_t)block.nNonce));
@@ -373,8 +373,11 @@ Value listblocks(const Array& params, bool fHelp)
     for(unsigned int i=0;i<heights.size();i++)
     {
         CBlock block;
-        if(!ReadBlockFromDisk(block, chainActive[heights[i]]))
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+        if(verbose)
+        {
+            if(!ReadBlockFromDisk(block, chainActive[heights[i]]))
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+        }
         
         result.push_back(blockToJSONForListBlocks(block, chainActive[heights[i]], verbose));
     }
