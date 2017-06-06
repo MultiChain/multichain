@@ -68,12 +68,21 @@ void CAssetGroupTree::Dump()
                 assetrefbin=(unsigned char*)lpAssets->GetRow(aptr[j]);
                 
                 string assetref="";
-                assetref += itostr((int)mc_GetLE(assetrefbin,4));
-                assetref += "-";
-                assetref += itostr((int)mc_GetLE(assetrefbin+4,4));
-                assetref += "-";
-                assetref += itostr((int)mc_GetLE(assetrefbin+8,2));
-
+                if(mc_GetABRefType(assetrefbin) == MC_AST_ASSET_REF_TYPE_SHORT_TXID)
+                {
+                    for(int i=0;i<8;i++)
+                    {
+                        assetref += strprintf("%02x",assetrefbin[MC_AST_SHORT_TXID_OFFSET+MC_AST_SHORT_TXID_SIZE-i-1]);
+                    }
+                }
+                else
+                {
+                    assetref += itostr((int)mc_GetLE(assetrefbin,4));
+                    assetref += "-";
+                    assetref += itostr((int)mc_GetLE(assetrefbin+4,4));
+                    assetref += "-";
+                    assetref += itostr((int)mc_GetLE(assetrefbin+8,2));
+                }
                 printf("              Asset: %d: %s\n",j+1,assetref.c_str());
             }
         }
@@ -308,7 +317,7 @@ int CAssetGroupTree::GetGroup(mc_Buffer* assets, int addIfNeeded)
             g=GetGroup(assetRef,0);
             if(g>0)
             {
-                if(group_id == -2)
+                if(group_id != -2)
                 {
                     if(g != group_id)
                     {
@@ -508,12 +517,22 @@ void DebugPrintAssetTxOut(uint256 hash,int index,unsigned char* assetrefbin,int6
     else
     {
         string assetref="";
-        assetref += itostr((int)mc_GetLE(assetrefbin,4));
-        assetref += "-";
-        assetref += itostr((int)mc_GetLE(assetrefbin+4,4));
-        assetref += "-";
-        assetref += itostr((int)mc_GetLE(assetrefbin+8,2));
-
+        if(mc_GetABRefType(assetrefbin) == MC_AST_ASSET_REF_TYPE_SHORT_TXID)
+        {
+            for(int i=0;i<8;i++)
+            {
+                assetref += strprintf("%02x",assetrefbin[MC_AST_SHORT_TXID_OFFSET+MC_AST_SHORT_TXID_SIZE-i-1]);
+            }
+        }
+        else
+        {
+            assetref += itostr((int)mc_GetLE(assetrefbin,4));
+            assetref += "-";
+            assetref += itostr((int)mc_GetLE(assetrefbin+4,4));
+            assetref += "-";
+            assetref += itostr((int)mc_GetLE(assetrefbin+8,2));
+        }
+        
         if(debug_print)printf("TxOut: %s-%d %s %ld\n",txid.c_str(),index,assetref.c_str(),quantity);
     }
 }
@@ -876,7 +895,7 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
                     else
                     {   
                         if( (group_id == 0)  ||                                 // We couldn't add new asset into one group
-                            (group_id == -3) )                                  // Assets in this group belongs to different groups
+                            (group_id == -3) )                                  // Assets in this txout belongs to different groups
                                                                                 // Take it
                         {
                             for(int i=0;i<tmp_amounts->GetCount();i++)

@@ -830,11 +830,21 @@ void LogAssetTxOut(string message,uint256 hash,int index,unsigned char* assetref
     string assetref="";
     if(assetrefbin)
     {
-        assetref += itostr((int)mc_GetLE(assetrefbin,4));
-        assetref += "-";
-        assetref += itostr((int)mc_GetLE(assetrefbin+4,4));
-        assetref += "-";
-        assetref += itostr((int)mc_GetLE(assetrefbin+8,2));        
+        if(mc_GetABRefType(assetrefbin) == MC_AST_ASSET_REF_TYPE_SHORT_TXID)
+        {
+            for(int i=0;i<8;i++)
+            {
+                assetref += strprintf("%02x",assetrefbin[MC_AST_SHORT_TXID_OFFSET+MC_AST_SHORT_TXID_SIZE-i-1]);
+            }
+        }
+        else
+        {
+            assetref += itostr((int)mc_GetLE(assetrefbin,4));
+            assetref += "-";
+            assetref += itostr((int)mc_GetLE(assetrefbin+4,4));
+            assetref += "-";
+            assetref += itostr((int)mc_GetLE(assetrefbin+8,2));        
+        }
     }
     else
     {
