@@ -338,15 +338,22 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
                 }
             }
 
-            if(mc_gState->m_NetworkParams->Write(1))
+            if( (pwalletMain != NULL) && !pwalletMain->vchDefaultKey.IsValid() && (mc_gState->m_NetworkParams->GetParam("privatekeyversion",NULL) == NULL) )
             {
-                LogPrintf("mchn: Cannot store parameter set received from %s\n", pfrom->addr.ToString());
-                mc_gState->m_NetworkParams->m_Status=MC_PRM_STATUS_ERROR;
-                return false;                       
+                LogPrintf("mchn: Parameter set received from %s doesn't contain privatekeyversion fields, not stored\n", pfrom->addr.ToString());                
             }
             else
             {
-                LogPrintf("mchn: Successfully stored parameter set received from %s\n", pfrom->addr.ToString());
+                if(mc_gState->m_NetworkParams->Write(1))
+                {
+                    LogPrintf("mchn: Cannot store parameter set received from %s\n", pfrom->addr.ToString());
+                    mc_gState->m_NetworkParams->m_Status=MC_PRM_STATUS_ERROR;
+                    return false;                       
+                }
+                else
+                {
+                    LogPrintf("mchn: Successfully stored parameter set received from %s\n", pfrom->addr.ToString());
+                }
             }
         }
         else
@@ -385,13 +392,13 @@ bool PushMultiChainVerack(CNode* pfrom, bool fIsVerackack)
         }
         else
         {
-            string fields_to_send [] ={"protocolversion","chainname","defaultrpcport","networkmessagestart","addresspubkeyhashversion","addresschecksumvalue"};
+            string fields_to_send [] ={"protocolversion","chainname","defaultrpcport","networkmessagestart","addresspubkeyhashversion","addresschecksumvalue","privatekeyversion"};
             int NumFieldsToSend=1;
             unsigned char *ptr;
             int size;
 //            if(pfrom->fDefaultMessageStart)
             {
-                NumFieldsToSend=6;                
+                NumFieldsToSend=7;                
             }
             LogPrintf("mchn: Sending minimal parameter set to %s\n", pfrom->addr.ToString());
             for(int f=0;f<NumFieldsToSend;f++)

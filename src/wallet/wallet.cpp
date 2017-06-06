@@ -147,6 +147,55 @@ bool CWallet::AddKeyPubKey(const CKey& secret, const CPubKey &pubkey)
     return true;
 }
 
+string CWallet::SetDefaultKeyIfInvalid(std::string init_privkey)
+{
+    if(vchDefaultKey.IsValid())
+    {
+        return "Wallet already has default key";
+    }
+    
+    CBitcoinSecret vchSecret;
+    if(!vchSecret.SetString(init_privkey))
+    {
+        if(mc_gState->m_NetworkParams->GetParam("privatekeyversion",NULL) == NULL)
+        {
+            return "Private key version is not set, please chose seed node running at least MultiChain 1.0 beta 2";            
+        }
+        return "Invalid private key encoding";
+    }
+
+    CKey key = vchSecret.GetKey();
+    if (!key.IsValid())
+    {
+        return "Private key outside allowed range";        
+    }
+
+    CPubKey pubkey = key.GetPubKey();
+    assert(key.VerifyPubKey(pubkey));
+    CKeyID vchAddress = pubkey.GetID();
+
+    if(!HaveKey(vchAddress))
+    {
+        mapKeyMetadata[vchAddress].nCreateTime = 1;
+
+        if (!AddKeyPubKey(key, pubkey))
+        {
+            return "Error adding key to wallet";                    
+        }
+
+        // whenever a key is imported, we need to scan the whole chain
+        nTimeFirstKey = 1; // 0 would be considered 'no value'        
+    }
+    
+    if(!SetDefaultKey(pubkey))
+    {
+        return "Error setting default key";                            
+    }
+    
+    return "";
+}
+
+
 bool CWallet::AddCryptedKey(const CPubKey &vchPubKey,
                             const vector<unsigned char> &vchCryptedSecret)
 {
