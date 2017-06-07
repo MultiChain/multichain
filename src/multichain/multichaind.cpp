@@ -285,7 +285,7 @@ bool AppInit(int argc, char* argv[])
         case MC_PRM_STATUS_ERROR:
             fprintf(stderr,"ERROR: Parameter set for blockchain %s has errors. Please run one of the following:\n\n",mc_gState->m_Params->NetworkName());                        
             fprintf(stderr,"  multichain-util create %s\n",mc_gState->m_Params->NetworkName());
-            fprintf(stderr,"  multichain-util clone <old-blockchain-name>%s\n",mc_gState->m_Params->NetworkName());
+            fprintf(stderr,"  multichain-util clone <old-blockchain-name> %s\n",mc_gState->m_Params->NetworkName());
             fprintf(stderr,"\nAnd rerun multichaind %s\n",mc_gState->m_Params->NetworkName());                        
             delete mc_gState;                
             return false;

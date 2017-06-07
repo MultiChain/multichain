@@ -752,7 +752,7 @@ exitlbl:
                 printf("address-pubkeyhash-version, address-scripthash-version and private-key-version should have identical length \n");
                 return MC_ERR_INVALID_PARAMETER_VALUE;                                                                                    
             }
-        }
+        }               
     }
     
     return err;
@@ -965,6 +965,8 @@ int mc_MultichainParams::Validate()
     char *ptrData;
     void *stored_hash;
     void *protocol_name;
+    double dv;
+    int64_t iv;
     
     m_Status=MC_PRM_STATUS_EMPTY;
 
@@ -1105,6 +1107,23 @@ int mc_MultichainParams::Validate()
         if(isGenerated)
         {
             m_Status=MC_PRM_STATUS_GENERATED;
+            iv=GetInt64Param("targetblocktime");
+            if(iv>0)
+            {
+                dv=2*(double)GetInt64Param("rewardhalvinginterval")/(double)iv;
+                dv*=(double)GetInt64Param("initialblockreward");
+                iv=GetInt64Param("firstblockreward");
+                if(iv<0)
+                {
+                    iv=GetInt64Param("initialblockreward");
+                }
+                dv+=(double)iv;
+                if(dv > 9.e+18)
+                {
+                    printf("Total mining reward over blockchain's history is more than 2^63 raw units. Please reduce initial-block-reward or reward-halving-interval.\n");
+                    return MC_ERR_INVALID_PARAMETER_VALUE;                                                                                    
+                }
+           }
         }
         else
         {

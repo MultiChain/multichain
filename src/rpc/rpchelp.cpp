@@ -3453,7 +3453,7 @@ void mc_InitRPCHelpMap15()
         ));
     
     mapHelpStrings.insert(std::make_pair("signmessage",
-            "signmessage \"address\" \"message\"\n"
+            "signmessage \"address\"|\"privkey\" \"message\"\n"
             "\nSign a message with the private key of an address"
             + HelpRequiringPassphraseWrapper() + 
             "\nArguments:\n"
