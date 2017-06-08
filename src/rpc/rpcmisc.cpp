@@ -355,7 +355,8 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         fFound=true;
     }
     if( (param_name == "lockadminminerounds") ||
-        (param_name == "maxshowndata") )
+        (param_name == "maxshowndata") ||
+        (param_name == "dropmessagestest") )
     {
         if( (params[1].type() == int_type) || (params[1].type() == str_type) )
         {
