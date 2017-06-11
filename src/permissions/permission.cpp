@@ -1301,13 +1301,8 @@ int mc_Permissions::CanMine(const void* lpEntity,const void* lpAddress)
     
     Lock(0);
 
-    int miner_count=m_MinerCount;
-    int check_mempool=1;
-    if(mc_gState->m_Features->UnconfirmedMinersCannotMine())
-    {
-        miner_count=m_ClearedMinerCount;
-        check_mempool=0;        
-    }
+    int miner_count=m_ClearedMinerCount;
+    int check_mempool=0;        
     
     result = GetPermission(lpEntity,lpAddress,MC_PTP_MINE,&row,check_mempool);        
 
@@ -1492,11 +1487,6 @@ int mc_Permissions::FindLastAllowedMinerRow(mc_PermissionLedgerRow *row,uint32_t
     mc_PermissionLedgerRow pldRow;
     int result;
     
-    if(mc_gState->m_Features->UnconfirmedMinersCannotMine() == 0)
-    {
-        return prev_result;        
-    }
-    
     if(row->m_ThisRow < m_Row-m_MemPool->GetCount())
     {
         return prev_result;
@@ -1567,11 +1557,7 @@ int mc_Permissions::CanMineBlockOnFork(const void* lpAddress,uint32_t block,uint
     
     Lock(0);
 
-    int miner_count=m_MinerCount;
-    if(mc_gState->m_Features->UnconfirmedMinersCannotMine())
-    {
-        miner_count=m_ClearedMinerCountForMinerVerification;
-    }
+    int miner_count=m_ClearedMinerCountForMinerVerification;
     
     result=GetPermission(NULL,lpAddress,MC_PTP_MINE,&row,1);                
 

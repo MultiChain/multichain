@@ -599,26 +599,6 @@ bool CheckBlockPermissions(const CBlock& block,CBlockIndex* prev_block,unsigned 
     mc_gState->m_Permissions->CopyMemPool();
     mc_gState->m_Permissions->ClearMemPool();
     
-    if(mc_gState->m_Features->UnconfirmedMinersCannotMine() == 0)
-    {    
-
-        for (unsigned int i = 0; i < block.vtx.size(); i++)
-        {
-            if(checked)
-            {
-                const CTransaction &tx = block.vtx[i];
-                if (!tx.IsCoinBase())
-                {
-                    string reason;
-                    if(!AcceptPermissionsAndCheckForDust(tx,true,reason))
-                    {
-                        checked=false;
-                    }
-                }    
-            }
-        }
-    }
-
     if(checked)
     {
         if(prev_block)

@@ -3142,13 +3142,6 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
 
         // Broadcast
 
-        CPubKey pubkey;  
-        uint32_t fCanMine=0;
-        if(mc_gState->m_Features->UnconfirmedMinersCannotMine() == 0)
-        {
-            fCanMine= GetKeyFromAddressBook(pubkey,MC_PTP_MINE) ? MC_PTP_MINE : 0;
-        }
-        
         if (!wtxNew.AcceptToMemoryPoolReturnReason(false,true,reject_reason))   // MCHN
         {
             // This must not fail. The transaction has already been signed and recorded.
@@ -3168,21 +3161,6 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
         {
             COutPoint outp=wtxNew.vin[i].prevout;
             UnlockCoin(outp);
-        }
-        if(fCanMine)
-        {
-            if(mc_gState->m_Features->UnconfirmedMinersCannotMine() == 0)
-            {
-                if(!GetKeyFromAddressBook(pubkey,MC_PTP_MINE))
-                {
-                    CValidationState state;
-
-                    LogPrint("mchn","mchn: Wallet lost mine permission on tx: %s (height %d) - commit, reactivating best chain\n",
-                            wtxNew.GetHash().ToString().c_str(), chainActive.Tip()->nHeight);
-                    if (!::ActivateBestChain(state, NULL))
-                        reject_reason = "ActivateBestChain failed";
-                }
-            }
         }
         wtxNew.RelayWalletTransaction();
 

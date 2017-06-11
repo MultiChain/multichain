@@ -1917,14 +1917,6 @@ Value sendrawtransaction(const Array& params, bool fHelp)
     if (!fHaveMempool && !fHaveChain) {
         // push to local node and sync with wallets
         CValidationState state;
-/* MCHN START */        
-        CPubKey pubkey;   
-        uint32_t fCanMine=0;
-        if(mc_gState->m_Features->UnconfirmedMinersCannotMine() == 0)
-        {
-            fCanMine=((pwalletMain != NULL) && pwalletMain->GetKeyFromAddressBook(pubkey,MC_PTP_MINE)) ? MC_PTP_MINE : 0;
-        }
-/* MCHN END */        
         if (!AcceptToMemoryPool(mempool, state, tx, false, NULL, !fOverrideFees)) {
             if(state.IsInvalid())
                 throw JSONRPCError(RPC_TRANSACTION_REJECTED, strprintf("%i: %s", state.GetRejectCode(), state.GetRejectReason()));
@@ -1952,19 +1944,6 @@ Value sendrawtransaction(const Array& params, bool fHelp)
             {
                 COutPoint outp=tx.vin[i].prevout;
                 pwalletMain->UnlockCoin(outp);
-            }
-            if(fCanMine)
-            {
-                if(mc_gState->m_Features->UnconfirmedMinersCannotMine() == 0)
-                {
-                    if(!pwalletMain->GetKeyFromAddressBook(pubkey,MC_PTP_MINE))
-                    {
-                        LogPrint("mchn","mchn: Wallet lost mine permission on tx: %s (height %d) - sendrawtransaction, reactivating best chain\n",
-                                tx.GetHash().ToString().c_str(), chainActive.Tip()->nHeight);
-                        if (!ActivateBestChain(state, NULL))
-                            throw JSONRPCError(RPC_INTERNAL_ERROR, state.GetRejectReason());
-                    }
-                }
             }
         }
 /* MCHN END */            
