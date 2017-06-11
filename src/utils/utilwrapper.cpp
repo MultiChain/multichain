@@ -280,29 +280,22 @@ int64_t mc_Params::HasOption(const char* strArg)
 
 boost::filesystem::path mc_GetDefaultDataDir()
 {
-    // Windows < Vista: C:\Documents and Settings\Username\Application Data\Bitcoin
-    // Windows >= Vista: C:\Users\Username\AppData\Roaming\Bitcoin
-    // Mac: ~/Library/Application Support/Bitcoin
-    // Unix: ~/.bitcoin
+    // Windows < Vista: C:\Documents and Settings\Username\Application Data\MultiChain
+    // Windows >= Vista: C:\Users\Username\AppData\Roaming\MultiChain
+    // Mac and Unix: ~/.multichain
 #ifdef WIN32
     // Windows
     return GetSpecialFolderPath(CSIDL_APPDATA) / "MultiChain";
 #else
+    // Mac and Unix
     boost::filesystem::path pathRet;
     char* pszHome = getenv("HOME");
     if (pszHome == NULL || strlen(pszHome) == 0)
         pathRet = boost::filesystem::path("/");
     else
         pathRet = boost::filesystem::path(pszHome);
-#ifdef MAC_OSX
-    // Mac
-    pathRet /= "Library/Application Support";
-    TryCreateDirectory(pathRet);
-    return pathRet / "Bitcoin";
-#else
-    // Unix
+    
     return pathRet / ".multichain";
-#endif
 #endif
 }
 
@@ -893,8 +886,31 @@ int mc_FindIPv4ServerAddress(uint32_t *all_ips,int max_ips)
     result=0;
     c=0;
 
+#ifdef MAC_OSX
+    struct ifaddrs *ifaddr = NULL;
+    if (getifaddrs(&ifaddr) == -1) {
+	return c;
+    }
+    if (!ifaddr) {
+        return c;
+    }
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock > 0) {
+        for (struct ifaddrs *ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+	    if (ifa->ifa_addr == 0) {
+                continue;
+	    }
+            int family = ifa->ifa_addr->sa_family;
+            if (family != AF_INET) {
+                continue;
+            }
+            uint32_t a = ((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr;
+            ptr=(unsigned char*)&a;
+
+#else
+
 #ifndef WIN32
-    
+
     int sock;
     struct ifreq ifreqs[20];
     struct ifconf ic;
@@ -922,6 +938,8 @@ int mc_FindIPv4ServerAddress(uint32_t *all_ips,int max_ips)
             
 #endif    
         
+#endif    
+            
             if ((ptr[0] != 127) && (ptr[0] != 0))
             {
                 ip=((uint32_t)ptr[0]<<24)+((uint32_t)ptr[1]<<16)+((uint32_t)ptr[2]<<8)+(uint32_t)ptr[3];
@@ -949,7 +967,13 @@ int mc_FindIPv4ServerAddress(uint32_t *all_ips,int max_ips)
             
         }
     }   
-    return c;
+#ifdef MAC_OSX
+    if (sock > 0) {
+	close(sock);
+    }
+    freeifaddrs(ifaddr);
+#endif
+     return c;
 }
 
         
