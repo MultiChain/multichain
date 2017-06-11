@@ -427,21 +427,18 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                         reason="Asset issue script rejected - error in script";
                         return false;                                    
                     }
-                    if(mc_gState->m_Features->FollowOnIssues())
+                    err=mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
+                    if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
                     {
-                        err=mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
-                        if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
+                        reason="Asset follow-on script rejected - error in follow-on script";
+                        return false;                                
+                    }
+                    if(err == MC_ERR_NOERROR)
+                    {
+                        if(update_mempool)
                         {
-                            reason="Asset follow-on script rejected - error in follow-on script";
-                            return false;                                
-                        }
-                        if(err == MC_ERR_NOERROR)
-                        {
-                            if(update_mempool)
-                            {
-                                if(fDebug)LogPrint("mchn","Found asset follow-on script in tx %s\n",
-                                        tx.GetHash().GetHex().c_str());                    
-                            }
+                            if(fDebug)LogPrint("mchn","Found asset follow-on script in tx %s\n",
+                                    tx.GetHash().GetHex().c_str());                    
                         }
                     }
                 }                
@@ -466,18 +463,6 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
         follow_on=true;
     }   
     
-    if(new_issue)
-    {
-        if(total == 0)
-        {
-            if(mc_gState->m_Features->FollowOnIssues() == 0)
-            {
-                reason="Asset follow-on script rejected - issue quantity should be positive";
-                return false;                                                
-            }        
-        }
-    }
-
     if(follow_on)
     {
         total=0;
@@ -650,60 +635,57 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
     
     mc_gState->m_TmpScript->Clear();
     mc_gState->m_TmpScript->AddElement();
-    if(mc_gState->m_Features->FollowOnIssues())
-    {
-        unsigned char issuer_buf[24];
-        memset(issuer_buf,0,sizeof(issuer_buf));
-        uint32_t flags=MC_PFL_NONE;        
-        uint32_t timestamp=0;
-        set <uint160> stored_issuers;
-        
-        if(new_issue)
-        {
-            mc_gState->m_Permissions->SetCheckPoint();
-            err=MC_ERR_NOERROR;
+    unsigned char issuer_buf[24];
+    memset(issuer_buf,0,sizeof(issuer_buf));
+    flags=MC_PFL_NONE;        
+    uint32_t timestamp=0;
+    set <uint160> stored_issuers;
 
-            txid=tx.GetHash();
-            err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_CONNECT,
-                    (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
-        }
-            
-        for (unsigned int i = 0; i < issuers.size(); i++)
+    if(new_issue)
+    {
+        mc_gState->m_Permissions->SetCheckPoint();
+        err=MC_ERR_NOERROR;
+
+        txid=tx.GetHash();
+        err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_CONNECT,
+                (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
+    }
+
+    for (unsigned int i = 0; i < issuers.size(); i++)
+    {
+        if(err == MC_ERR_NOERROR)
         {
-            if(err == MC_ERR_NOERROR)
+            if(stored_issuers.count(issuers[i]) == 0)
             {
-                if(stored_issuers.count(issuers[i]) == 0)
+                memcpy(issuer_buf,issuers[i].begin(),sizeof(uint160));
+                mc_PutLE(issuer_buf+sizeof(uint160),&issuer_flags[i],4);
+                if(i < mc_gState->m_Assets->MaxStoredIssuers())
                 {
-                    memcpy(issuer_buf,issuers[i].begin(),sizeof(uint160));
-                    mc_PutLE(issuer_buf+sizeof(uint160),&issuer_flags[i],4);
-                    if(i < mc_gState->m_Assets->MaxStoredIssuers())
-                    {
-                        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,sizeof(issuer_buf));            
-                    }
-                    if(new_issue)
-                    {
-                        err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_ADMIN | MC_PTP_ISSUE,
-                                (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
-                    }
-                    stored_issuers.insert(issuers[i]);
+                    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,sizeof(issuer_buf));            
                 }
-            }
-        }        
-        
-        memset(issuer_buf,0,sizeof(issuer_buf));
-        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,1);                    
-        if(new_issue)
-        {
-            if((err != MC_ERR_NOERROR) || !accept)
-            {
-                mc_gState->m_Permissions->RollBackToCheckPoint();            
+                if(new_issue)
+                {
+                    err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_ADMIN | MC_PTP_ISSUE,
+                            (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
+                }
+                stored_issuers.insert(issuers[i]);
             }
         }
-        if(err)
+    }        
+
+    memset(issuer_buf,0,sizeof(issuer_buf));
+    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,1);                    
+    if(new_issue)
+    {
+        if((err != MC_ERR_NOERROR) || !accept)
         {
-            reason="Cannot update permission database for issued asset";
-            return false;            
+            mc_gState->m_Permissions->RollBackToCheckPoint();            
         }
+    }
+    if(err)
+    {
+        reason="Cannot update permission database for issued asset";
+        return false;            
     }
     
     const unsigned char *special_script;
@@ -2533,21 +2515,18 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
                         reason="Asset issue script rejected - error in script";
                         return false;                                    
                     }
-                    if(mc_gState->m_Features->FollowOnIssues())
+                    err=mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
+                    if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
                     {
-                        err=mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
-                        if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
+                        reason="Asset follow-on script rejected - error in follow-on script";
+                        return false;                                
+                    }
+                    if(err == MC_ERR_NOERROR)
+                    {
+                        if(update_mempool)
                         {
-                            reason="Asset follow-on script rejected - error in follow-on script";
-                            return false;                                
-                        }
-                        if(err == MC_ERR_NOERROR)
-                        {
-                            if(update_mempool)
-                            {
-                                if(fDebug)LogPrint("mchn","Found asset follow-on script in tx %s\n",
-                                        tx.GetHash().GetHex().c_str());                    
-                            }
+                            if(fDebug)LogPrint("mchn","Found asset follow-on script in tx %s\n",
+                                    tx.GetHash().GetHex().c_str());                    
                         }
                     }
                 }                
@@ -2555,18 +2534,6 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
         
         }
     }    
-
-    if(new_issue)
-    {
-        if(total == 0)
-        {
-            if(mc_gState->m_Features->FollowOnIssues() == 0)
-            {
-                reason="Asset follow-on script rejected - issue quantity should be positive";
-                return false;                                                
-            }        
-        }
-    }
 
     if(mc_gState->m_TmpAssetsOut->GetCount())
     {
@@ -2653,59 +2620,56 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
     
     mc_gState->m_TmpScript->Clear();
     mc_gState->m_TmpScript->AddElement();
-    if(mc_gState->m_Features->FollowOnIssues())
-    {
-        unsigned char issuer_buf[20];
-        memset(issuer_buf,0,sizeof(issuer_buf));
-        uint32_t flags=MC_PFL_NONE;        
-        uint32_t timestamp=0;
-        set <uint160> stored_issuers;
-        
-        if(new_issue)
-        {
-            mc_gState->m_Permissions->SetCheckPoint();
-            err=MC_ERR_NOERROR;
+    unsigned char issuer_buf[20];
+    memset(issuer_buf,0,sizeof(issuer_buf));
+    uint32_t flags=MC_PFL_NONE;        
+    uint32_t timestamp=0;
+    set <uint160> stored_issuers;
 
-            txid=tx.GetHash();
-            err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_CONNECT,
-                    (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
-        }
-            
-        for (unsigned int i = 0; i < issuers.size(); i++)
+    if(new_issue)
+    {
+        mc_gState->m_Permissions->SetCheckPoint();
+        err=MC_ERR_NOERROR;
+
+        txid=tx.GetHash();
+        err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_CONNECT,
+                (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
+    }
+
+    for (unsigned int i = 0; i < issuers.size(); i++)
+    {
+        if(err == MC_ERR_NOERROR)
         {
-            if(err == MC_ERR_NOERROR)
+            if(stored_issuers.count(issuers[i]) == 0)
             {
-                if(stored_issuers.count(issuers[i]) == 0)
+                memcpy(issuer_buf,issuers[i].begin(),sizeof(uint160));
+                if(i < mc_gState->m_Assets->MaxStoredIssuers())
                 {
-                    memcpy(issuer_buf,issuers[i].begin(),sizeof(uint160));
-                    if(i < mc_gState->m_Assets->MaxStoredIssuers())
-                    {
-                        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,sizeof(issuer_buf));            
-                    }
-                    if(new_issue)
-                    {
-                        err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_ADMIN | MC_PTP_ISSUE,
-                                (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
-                    }
-                    stored_issuers.insert(issuers[i]);
+                    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,sizeof(issuer_buf));            
                 }
-            }
-        }        
-        
-        memset(issuer_buf,0,sizeof(issuer_buf));
-        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,1);                    
-        if(new_issue)
-        {
-            if((err != MC_ERR_NOERROR) || !accept)
-            {
-                mc_gState->m_Permissions->RollBackToCheckPoint();            
+                if(new_issue)
+                {
+                    err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_ADMIN | MC_PTP_ISSUE,
+                            (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
+                }
+                stored_issuers.insert(issuers[i]);
             }
         }
-        if(err)
+    }        
+
+    memset(issuer_buf,0,sizeof(issuer_buf));
+    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,1);                    
+    if(new_issue)
+    {
+        if((err != MC_ERR_NOERROR) || !accept)
         {
-            reason="Cannot update permission database for issued asset";
-            return false;            
+            mc_gState->m_Permissions->RollBackToCheckPoint();            
         }
+    }
+    if(err)
+    {
+        reason="Cannot update permission database for issued asset";
+        return false;            
     }
     
     const unsigned char *special_script;
@@ -2966,27 +2930,17 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
                     mc_gState->m_TmpScript->SetElement(e);
                     if(mc_gState->m_TmpScript->GetPermission(&type,&from,&to,&timestamp) == 0)
                     {
-                        if(mc_gState->m_Features->FixedGrantsInTheSameTx())
-                        {    
-                            switch(pass)
-                            {
-                                case 0:
-                                    type &= ~( MC_PTP_ACTIVATE | MC_PTP_ADMIN );
-                                    break;
-                                case 1:
-                                    type &= ( MC_PTP_ACTIVATE | MC_PTP_ADMIN );
-                                    break;
-                                case 2:
-                                    type=0;
-                                    break;
-                            }
-                        }
-                        else
+                        switch(pass)
                         {
-                            if(pass)
-                            {
+                            case 0:
+                                type &= ~( MC_PTP_ACTIVATE | MC_PTP_ADMIN );
+                                break;
+                            case 1:
+                                type &= ( MC_PTP_ACTIVATE | MC_PTP_ADMIN );
+                                break;
+                            case 2:
                                 type=0;
-                            }
+                                break;
                         }
                         if(type)
                         {

@@ -80,16 +80,8 @@ void mc_PermissionDB::Zero()
 {
     m_FileName[0]=0;
     m_DB=0;
-    if(mc_gState->m_Features->PerEntityPermissions())
-    {
-        m_KeyOffset=0;
-        m_KeySize=MC_PLS_SIZE_ENTITY+24;                                        // Entity,address,type
-    }
-    else
-    {
-        m_KeyOffset=MC_PLS_SIZE_ENTITY;
-        m_KeySize=24;
-    }
+    m_KeyOffset=0;
+    m_KeySize=MC_PLS_SIZE_ENTITY+24;                                            // Entity,address,type
     m_ValueOffset=56;
     m_ValueSize=24;    
     m_TotalSize=m_KeySize+m_ValueSize;
@@ -134,16 +126,8 @@ void mc_PermissionLedger::Zero()
 {
     m_FileName[0]=0;
     m_FileHan=0;
-    if(mc_gState->m_Features->PerEntityPermissions())
-    {
-        m_KeyOffset=0;
-        m_KeySize=MC_PLS_SIZE_ENTITY+32;                                        // Entity,address,type,prevrow
-    }
-    else
-    {
-        m_KeyOffset=MC_PLS_SIZE_ENTITY;
-        m_KeySize=32;
-    }
+    m_KeyOffset=0;
+    m_KeySize=MC_PLS_SIZE_ENTITY+32;                                            // Entity,address,type,prevrow
     m_ValueOffset=MC_PLS_SIZE_ENTITY+32;
     m_ValueSize=64;    
     m_TotalSize=m_KeySize+m_ValueSize;
@@ -3076,16 +3060,8 @@ int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAdd
     }
     types[num_types]=MC_PTP_ISSUE;num_types++;
     types[num_types]=MC_PTP_MINE;num_types++;
-    if(mc_gState->m_Features->FixedGrantsInTheSameTx())
-    {
-        types[num_types]=MC_PTP_ACTIVATE;num_types++;        
-        types[num_types]=MC_PTP_ADMIN;num_types++;        
-    }
-    else
-    {
-        types[num_types]=MC_PTP_ADMIN;num_types++;        
-        types[num_types]=MC_PTP_ACTIVATE;num_types++;        
-    }
+    types[num_types]=MC_PTP_ACTIVATE;num_types++;        
+    types[num_types]=MC_PTP_ADMIN;num_types++;        
     if(mc_gState->m_Features->Upgrades())
     {
         types[num_types]=MC_PTP_UPGRADE;num_types++;                        

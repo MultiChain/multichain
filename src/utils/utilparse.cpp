@@ -215,18 +215,7 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                 }
             }        
         }
-        
-        if(issue_found)
-        {
-            if(mc_gState->m_Features->FollowOnIssues() == 0)
-            {
-                if(total == 0)
-                {
-                    issue_found=false;
-                }
-            }
-        }
-        
+                
         if(issue_found)                                                         
         {
             if(hash != 0)

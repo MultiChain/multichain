@@ -35,14 +35,7 @@ void mc_EntityDB::Zero()
     m_KeyOffset=0;
     m_KeySize=36;                                   
     m_ValueOffset=36;
-    if(mc_gState->m_Features->FollowOnIssues())
-    {
-        m_ValueSize=28;  
-    }
-    else
-    {
-        m_ValueSize=12;
-    }
+    m_ValueSize=28;  
     m_TotalSize=m_KeySize+m_ValueSize;
 }
 
@@ -50,14 +43,7 @@ void mc_EntityDB::Zero()
 
 void mc_EntityDB::SetName(const char* name)
 {
-    if(mc_gState->m_Features->FollowOnIssues())
-    {
-        mc_GetFullFileName(name,"entities",".db",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,m_FileName);
-    }
-    else
-    {
-        mc_GetFullFileName(name,"assets",".db",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,m_FileName);        
-    }
+    mc_GetFullFileName(name,"entities",".db",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,m_FileName);
 }
 
 /** Open database */
@@ -95,14 +81,7 @@ void mc_EntityLedger::Zero()
     m_KeyOffset=0;
     m_KeySize=36;                                   
     m_ValueOffset=36;
-    if(mc_gState->m_Features->FollowOnIssues())
-    {
-        m_ValueSize=60;  
-    }
-    else
-    {
-        m_ValueSize=28;
-    }
+    m_ValueSize=60;  
     m_TotalSize=m_KeySize+m_ValueSize;
 }
 
@@ -110,14 +89,7 @@ void mc_EntityLedger::Zero()
 
 void mc_EntityLedger::SetName(const char* name)
 {
-    if(mc_gState->m_Features->FollowOnIssues())
-    {
-        mc_GetFullFileName(name,"entities",".dat",MC_FOM_RELATIVE_TO_DATADIR,m_FileName);
-    }
-    else
-    {
-        mc_GetFullFileName(name,"assets",".dat",MC_FOM_RELATIVE_TO_DATADIR,m_FileName);        
-    }
+    mc_GetFullFileName(name,"entities",".dat",MC_FOM_RELATIVE_TO_DATADIR,m_FileName);
 }
 
 /** Open ledger file */
@@ -169,30 +141,9 @@ int mc_EntityLedger::GetRow(int64_t pos, mc_EntityLedgerRow* row)
     
     row->Zero();
 
-    if(mc_gState->m_Features->FollowOnIssues())
+    if(read(m_FileHan,(unsigned char*)row+m_KeyOffset,m_TotalSize) != m_TotalSize)
     {
-        if(read(m_FileHan,(unsigned char*)row+m_KeyOffset,m_TotalSize) != m_TotalSize)
-        {
-            return MC_ERR_FILE_READ_ERROR;
-        }
-    }
-    else
-    {
-        if(read(m_FileHan,buf,m_TotalSize) != m_TotalSize)
-        {
-            return MC_ERR_FILE_READ_ERROR;
-        }        
-        memcpy(row->m_Key,buf+ 0,MC_ENT_KEY_SIZE);
-        row->m_KeyType=mc_GetLE(buf+32,4);
-        row->m_Block=mc_GetLE(buf+36,4);
-        row->m_Offset=mc_GetLE(buf+40,4);
-        row->m_Quantity=mc_GetLE(buf+44,8);
-        row->m_PrevPos=mc_GetLE(buf+52,8);
-        row->m_ScriptSize=mc_GetLE(buf+60,4);
-        row->m_EntityType=MC_ENT_TYPE_ASSET;
-        row->m_FirstPos=pos;
-        row->m_LastPos=0;
-        row->m_ChainPos=pos;
+        return MC_ERR_FILE_READ_ERROR;
     }
     
     size=row->m_ScriptSize;
@@ -247,30 +198,11 @@ int mc_EntityLedger::SetRow(int64_t pos, mc_EntityLedgerRow* row)
     
     if((size>=0) && (size<=MC_ENT_SCRIPT_ALLOC_SIZE))
     {
-        if(mc_gState->m_Features->FollowOnIssues())
+        size=mc_AllocSize(size,m_TotalSize,1);
+        if(write(m_FileHan,row,m_TotalSize) != m_TotalSize)
         {
-            size=mc_AllocSize(size,m_TotalSize,1);
-            if(write(m_FileHan,row,m_TotalSize) != m_TotalSize)
-            {
-                return -1;
-            }        
-        }
-        else
-        {
-            size=mc_AllocSize(size,m_TotalSize,1);
-            memset(buf,0,64);
-            memcpy(buf+ 0,row->m_Key,MC_ENT_KEY_SIZE);
-            mc_PutLE(buf+32,&(row->m_KeyType),4);
-            mc_PutLE(buf+36,&(row->m_Block),4);
-            mc_PutLE(buf+40,&(row->m_Offset),4);
-            mc_PutLE(buf+44,&(row->m_Quantity),8);
-            mc_PutLE(buf+52,&(row->m_PrevPos),8);
-            mc_PutLE(buf+60,&(row->m_ScriptSize),4);
-            if(write(m_FileHan,buf,m_TotalSize) != m_TotalSize)
-            {
-                return -1;
-            }        
-        }
+            return -1;
+        }        
         if(size)
         {
             if(write(m_FileHan,row->m_Script,size) != size)
@@ -888,17 +820,7 @@ int mc_AssetDB::InsertAsset(const void* txid, int offset, uint64_t quantity, con
 
     if(add_param)
     {
-        if(mc_gState->m_Features->SpecialParamsInDetailsScript())    
-        {
-            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,sizeof(multiple));
-        }
-        else
-        {
-            if(multiple != 1)
-            {
-                lpDetails->SetParamValue("multiple",strlen("multiple"),(unsigned char*)&multiple,sizeof(multiple));       
-            }
-        }    
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,sizeof(multiple));
     }
     
     add_param=true;
@@ -921,17 +843,7 @@ int mc_AssetDB::InsertAsset(const void* txid, int offset, uint64_t quantity, con
     {
         if(name && (strlen(name) > 0))
         {
-            if(mc_gState->m_Features->SpecialParamsInDetailsScript())    
-            {
-                lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(unsigned char*)name,strlen(name)+1);            
-            }
-            else
-            {
-                lpDetails->SetParamValue("name",strlen("name"),(unsigned char*)name,strlen(name));
-                strcpy((char*)dname_buf+1,"name");
-                dname_buf[0]=0xff;
-                lpDetails->SetParamValue((char*)dname_buf,5,(unsigned char*)name,strlen(name)+1);
-            }
+            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(unsigned char*)name,strlen(name)+1);            
         }
     }
     
@@ -1802,14 +1714,7 @@ int mc_EntityDetails::GetAssetMultiple()
     multiple=1; 
 
     ptr=NULL;
-    if(mc_gState->m_Features->SpecialParamsInDetailsScript())    
-    {
-        ptr=(void*)GetSpecialParam(MC_ENT_SPRM_ASSET_MULTIPLE,&size);
-    }
-    else
-    {
-        ptr=(void*)GetParam("multiple",&size);
-    }    
+    ptr=(void*)GetSpecialParam(MC_ENT_SPRM_ASSET_MULTIPLE,&size);
     
     if(ptr)
     {
@@ -2069,10 +1974,6 @@ mc_Buffer *mc_AssetDB::GetEntityList(mc_Buffer *old_result,const void* txid,uint
         memcpy((unsigned char*)&adbRow+m_Database->m_ValueOffset,ptr,dbvalue_len);   
         while(ptr)
         {
-            if(mc_gState->m_Features->FollowOnIssues() == 0)
-            {
-                adbRow.m_EntityType=MC_ENT_TYPE_ASSET;
-            }
             if(adbRow.m_KeyType == MC_ENT_KEYTYPE_TXID)
             {
                 if( (entity_type == 0) || (adbRow.m_EntityType == entity_type) )

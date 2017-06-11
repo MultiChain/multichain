@@ -94,10 +94,6 @@ Value issuefromcmd(const Array& params, bool fHelp)
     quantity=(int64_t)(dQuantity*multiple+0.1);
     if(quantity<0)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid quantity or smallest unit. ");
-    if( (quantity == 0) && (mc_gState->m_Features->FollowOnIssues() == 0) )
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset quantity");                
-    }
     if(multiple<=0)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid quantity or smallest unit.");
 
@@ -143,35 +139,28 @@ Value issuefromcmd(const Array& params, bool fHelp)
     {
         if(params[2].type() == obj_type)
         {
-            if(mc_gState->m_Features->FollowOnIssues())
-            {
-                Object objSpecialParams = params[2].get_obj();
-                BOOST_FOREACH(const Pair& s, objSpecialParams) 
-                {  
-                    if(s.name_ == "name")
+            Object objSpecialParams = params[2].get_obj();
+            BOOST_FOREACH(const Pair& s, objSpecialParams) 
+            {  
+                if(s.name_ == "name")
+                {
+                    if(!name_is_found)
                     {
-                        if(!name_is_found)
-                        {
-                            asset_name=s.value_.get_str().c_str();
-                            name_is_found=true;
-                        }
-                    }
-                    if(s.name_ == "open")
-                    {
-                        if(s.value_.type() == bool_type)
-                        {
-                            is_open=s.value_.get_bool();
-                        }
-                        else
-                        {
-                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'open' field, should be boolean");                                                                
-                        }
+                        asset_name=s.value_.get_str().c_str();
+                        name_is_found=true;
                     }
                 }
-            }
-            else
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Asset name should be string");                                                                                
+                if(s.name_ == "open")
+                {
+                    if(s.value_.type() == bool_type)
+                    {
+                        is_open=s.value_.get_bool();
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'open' field, should be boolean");                                                                
+                    }
+                }
             }
         }
         else
@@ -359,11 +348,6 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     if (fHelp || params.size() < 4 || params.size() > 6)
         throw runtime_error("Help message not found\n");
 
-    if(mc_gState->m_Features->FollowOnIssues() == 0 )
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
-    }
-    
     CBitcoinAddress address(params[1].get_str());
     if (!address.IsValid())
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
@@ -409,11 +393,6 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset quantity");        
     }
-    if( (quantity == 0) && (mc_gState->m_Features->FollowOnIssues() == 0) )
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset quantity");                
-    }
-        
         
     mc_SetABQuantity(buf,quantity);
     

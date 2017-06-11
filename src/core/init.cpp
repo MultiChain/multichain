@@ -1277,16 +1277,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
         if(GetBoolArg("-reindex", false))
         {
-            if(mc_gState->m_Features->FollowOnIssues())
-            {
-                mc_RemoveDir(mc_gState->m_Params->NetworkName(),"entities.db");
-                mc_RemoveFile(mc_gState->m_Params->NetworkName(),"entities",".dat",MC_FOM_RELATIVE_TO_DATADIR);
-            }
-            else
-            {
-                mc_RemoveDir(mc_gState->m_Params->NetworkName(),"assets.db");
-                mc_RemoveFile(mc_gState->m_Params->NetworkName(),"assets",".dat",MC_FOM_RELATIVE_TO_DATADIR);                
-            }
+            mc_RemoveDir(mc_gState->m_Params->NetworkName(),"entities.db");
+            mc_RemoveFile(mc_gState->m_Params->NetworkName(),"entities",".dat",MC_FOM_RELATIVE_TO_DATADIR);
         }
         
         mc_gState->m_Assets= new mc_AssetDB;

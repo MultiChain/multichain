@@ -941,20 +941,13 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level)
             {
                 entry.push_back(Pair("multiple", multiple));                                        
                 entry.push_back(Pair("units",units));                              
-                if(mc_gState->m_Features->FollowOnIssues())
+                if(entity.AllowedFollowOns())
                 {
-                    if(entity.AllowedFollowOns())
-                    {
-                        entry.push_back(Pair("open",true));                                
-                    }
-                    else
-                    {
-                        entry.push_back(Pair("open",false));                                            
-                    }
+                    entry.push_back(Pair("open",true));                                
                 }
                 else
                 {
-                    entry.push_back(Pair("open",false));                                                                
+                    entry.push_back(Pair("open",false));                                            
                 }
             }
         }
@@ -972,13 +965,9 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level)
                     {
                         if(ptr[offset] != 0xff)
                         {
-                            if(mc_gState->m_Features->SpecialParamsInDetailsScript() || 
-                                    ((strcmp((char*)ptr+offset,"multiple") != 0) && (strcmp((char*)ptr+offset,"name") != 0) ))    
-                            {
-                                string param_name((char*)ptr+offset);
-                                string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
-                                fields.push_back(Pair(param_name, param_value));                                                                        
-                            }
+                            string param_name((char*)ptr+offset);
+                            string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
+                            fields.push_back(Pair(param_name, param_value));                                                                        
                         }
                     }
                 }
@@ -1026,13 +1015,9 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level)
                                 {
                                     if(ptr[offset] != 0xff)
                                     {
-                                        if(mc_gState->m_Features->SpecialParamsInDetailsScript() || 
-                                                ((strcmp((char*)ptr+offset,"multiple") != 0) && (strcmp((char*)ptr+offset,"name") != 0) ))    
-                                        {
-                                            string param_name((char*)ptr+offset);
-                                            string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
-                                            followon_fields.push_back(Pair(param_name, param_value));                                                                        
-                                        }
+                                        string param_name((char*)ptr+offset);
+                                        string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
+                                        followon_fields.push_back(Pair(param_name, param_value));                                                                        
                                     }                            
                                 }
                                 else
@@ -1124,12 +1109,9 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level)
             }
         }
         
-        if(mc_gState->m_Features->FollowOnIssues())
+        if(output_level == 9)
         {
-            if(output_level == 9)
-            {
-                entry.push_back(Pair("issues",issues));                    
-            }
+            entry.push_back(Pair("issues",issues));                    
         }
     }
     else

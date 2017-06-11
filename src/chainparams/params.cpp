@@ -1586,7 +1586,7 @@ int mc_Features::MinProtocolVersion()
     return 10004;
 }
 
-int mc_Features::ActivatePermission()
+int mc_Features::ActivatePermission()                                           // This test is eliminated from the code as 10002 is not supported
 {
     int ret=0;
     int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
@@ -1607,7 +1607,7 @@ int mc_Features::LastVersionNotSendingProtocolVersionInHandShake()
     return 10002;
 }
 
-int mc_Features::VerifySizeOfOpDropElements()
+int mc_Features::VerifySizeOfOpDropElements()                                   // This test is still in the code to keep protocol!-multichain untouched
 {
     
     int ret=0;        
@@ -1629,7 +1629,7 @@ int mc_Features::VerifySizeOfOpDropElements()
     return ret;
 }
 
-int mc_Features::PerEntityPermissions()
+int mc_Features::PerEntityPermissions()                                         // This test is eliminated from the code as 10002 is not supported
 {
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
     {
@@ -1649,7 +1649,7 @@ int mc_Features::PerEntityPermissions()
     return ret;
 }
 
-int mc_Features::FollowOnIssues()
+int mc_Features::FollowOnIssues()                                               // This test is eliminated from the code as 10002 is not supported
 {
     int ret=0;
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
@@ -1668,7 +1668,7 @@ int mc_Features::FollowOnIssues()
     return ret;
 }
 
-int mc_Features::SpecialParamsInDetailsScript()
+int mc_Features::SpecialParamsInDetailsScript()                                 // This test is eliminated from the code as 10002 is not supported
 {
     int ret=0;
     int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
@@ -1684,7 +1684,7 @@ int mc_Features::SpecialParamsInDetailsScript()
     return ret;    
 }
 
-int mc_Features::FixedGrantsInTheSameTx()
+int mc_Features::FixedGrantsInTheSameTx()                                       // This test is eliminated from the code as 10002 is not supported
 {
     int ret=0;
     int protocol=mc_gState->m_NetworkParams->ProtocolVersion();

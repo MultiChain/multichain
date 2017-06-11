@@ -364,13 +364,9 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                     {
                         if(details_script[offset] != 0xff)
                         {
-                            if(mc_gState->m_Features->SpecialParamsInDetailsScript() || 
-                                    ((strcmp((char*)details_script+offset,"multiple") != 0) && (strcmp((char*)details_script+offset,"name") != 0) ))    
-                            {
-                                string param_name((char*)details_script+offset);
-                                string param_value((char*)details_script+param_value_start,(char*)details_script+param_value_start+param_value_size);
-                                details.push_back(Pair(param_name, param_value));                                                                        
-                            }
+                            string param_name((char*)details_script+offset);
+                            string param_value((char*)details_script+param_value_start,(char*)details_script+param_value_start+param_value_size);
+                            details.push_back(Pair(param_name, param_value));                                                                        
                         }                                                    
                     }
                     else
