@@ -1167,16 +1167,27 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             }
             else
             {                                
-                if(mc_gState->m_NetworkState == MC_NTS_SEED_NO_PARAMS)
+                if( (mc_gState->m_NetworkParams->GetParam("protocolversion",&size) != NULL) &&
+                    (mc_gState->m_Features->MinProtocolVersion() > (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion")) )
                 {
-                    char fileName[MC_DCT_DB_MAX_PATH];
-                    mc_GetFullFileName(mc_gState->m_Params->NetworkName(),"params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
-                    seed_error=strprintf("Couldn't retrieve blockchain parameters from the seed node %s on port %s.\n"
-                                "For bitcoin protocol blockchains, the file %s must be copied manually from an existing node.",                
-                            seed_ip.c_str(),seed_port.c_str(),fileName);
+                    seed_error=strprintf("The protocol version (%d) for blockchain %s has been deprecated and was last supported in MultiChain 1.0 beta 1\n",                
+                            (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion"), mc_gState->m_Params->NetworkName());                    
+                    return InitError(seed_error);            
+                }
+                else
+                {                                
+                    if(mc_gState->m_NetworkState == MC_NTS_SEED_NO_PARAMS)
+                    {
+                        char fileName[MC_DCT_DB_MAX_PATH];
+                        mc_GetFullFileName(mc_gState->m_Params->NetworkName(),"params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
+                        seed_error=strprintf("Couldn't retrieve blockchain parameters from the seed node %s on port %s.\n"
+                                    "For bitcoin protocol blockchains, the file %s must be copied manually from an existing node.",                
+                                seed_ip.c_str(),seed_port.c_str(),fileName);
 
+                    }
                 }
             }
+            
             LogPrintf("mchn: Exited from paramset discovery thread\n");        
 
             if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_VALID)

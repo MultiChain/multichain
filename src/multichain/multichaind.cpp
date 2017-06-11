@@ -256,6 +256,15 @@ bool AppInit(int argc, char* argv[])
             return false;
     }
 
+    if( (mc_gState->m_NetworkParams->GetParam("protocolversion",&size) != NULL) &&
+        (mc_gState->m_Features->MinProtocolVersion() > (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion")) )
+    {
+            fprintf(stderr,"ERROR: The protocol version (%d) for blockchain %s has been deprecated and was last supported in MultiChain 1.0 beta 1\n\n",
+                    (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion"),mc_gState->m_Params->NetworkName());                        
+            delete mc_gState;                
+            return false;
+    }
+
     if(!GetBoolArg("-verifyparamsethash", true))
     {
         if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_INVALID)

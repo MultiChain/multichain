@@ -98,6 +98,7 @@ typedef struct mc_Params
 
 typedef struct mc_Features
 {    
+    int MinProtocolVersion();
     int ActivatePermission();
     int LastVersionNotSendingProtocolVersionInHandShake();
     int VerifySizeOfOpDropElements();
