@@ -955,9 +955,9 @@ void mc_InitRPCHelpMap05()
             "            {\n"
             "              \"type\" : \"permission(s)\"    (string,required) Permission strings, comma delimited. Possible values:\n"
             "                                                              " + AllowedPermissions() + " \n"
-            "              \"startblock\"                (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
-            "              \"endblock\"                  (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
-            "              \"timestamp\"                 (numeric, optional) This helps resolve conflicts between\n"
+            "              \"startblock\" : n            (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
+            "              \"endblock\"  : n             (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
+            "              \"timestamp\" : n             (numeric, optional) This helps resolve conflicts between\n"
             "                                                                permissions assigned by the same administrator. Default - current time\n"
             "              ,...\n"
             "            }\n"                                
@@ -1371,7 +1371,7 @@ void mc_InitRPCHelpMap06()
             "5. maxinputs                        (numeric, optional) Maximal number of txouts to combine in one transaction. Default - 100\n"
             "6. maxtime                          (numeric, optional) Maximal time for creating combining transactions, at least one transaction will be sent. Default - 15s\n"
             "\nResult:\n"
-            "\"transactionids\"                    (Array) Array of transaction ids.\n"
+            "\"transactionids\"                    (array) Array of transaction ids.\n"
             "\nExamples:\n"
             + HelpExampleCli("combineunspent", "\"*\" 1 100 5 20 120")
             + HelpExampleCli("combineunspent", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" ")
@@ -3685,9 +3685,9 @@ void mc_InitRPCHelpMap16()
             "            {\n"
             "              \"type\" : \"permission(s)\"    (string,required) Permission strings, comma delimited. Possible values:\n"
             "                                                              " + AllowedPermissions() + " \n"
-            "              \"startblock\"                (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
-            "              \"endblock\"                  (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
-            "              \"timestamp\"                 (numeric, optional) This helps resolve conflicts between\n"
+            "              \"startblock\" : n            (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
+            "              \"endblock\" : n              (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
+            "              \"timestamp\" : n             (numeric, optional) This helps resolve conflicts between\n"
             "                                                                permissions assigned by the same administrator. Default - current time\n"
             "              ,...\n"
             "            }\n"                                
@@ -3762,7 +3762,7 @@ void mc_InitRPCHelpMap16()
             "4. count                            (number, optional, default==INT_MAX) The number of items to display\n"
             "5. start                            (number, optional, default=-count - last) Start from specific item, 0 based, if negative - from the end\n"
             "\nResult:\n"
-            "\"stream-items\"                      (array) List of stream items.\n"
+            "stream-items                        (array) List of stream items.\n"
             "\nExamples:\n"
             + HelpExampleCli("liststreamblockitems", "\"test-stream\" 1000,1100-1120 ") 
             + HelpExampleCli("liststreamblockitems", "\"test-stream\" 1000 true 10 100") 
