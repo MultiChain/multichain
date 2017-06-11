@@ -10,11 +10,7 @@
 
 string AllowedPermissions()
 {
-    string ret="connect,send,receive,issue,mine,admin";
-    if(mc_gState->m_Features->ActivatePermission())
-    {
-        ret += ",activate";
-    }
+    string ret="connect,send,receive,issue,mine,admin,activate";
     if(mc_gState->m_Features->Streams())
     {
         ret += ",create";
@@ -582,12 +578,7 @@ Value listpermissions(const Array& params, bool fHelp)
             case MC_PTP_ISSUE  :entry.push_back(Pair("type", "issue"));break;
             case MC_PTP_MINE   :entry.push_back(Pair("type", "mine"));break;
             case MC_PTP_ADMIN  :entry.push_back(Pair("type", "admin"));break;
-            case MC_PTP_ACTIVATE  :
-                if(mc_gState->m_Features->ActivatePermission())
-                {
-                    entry.push_back(Pair("type", "activate"));
-                }
-                break;                
+            case MC_PTP_ACTIVATE  :entry.push_back(Pair("type", "activate"));break;                
             default:take_it=false;
         }
         entry.push_back(Pair("startblock", (int64_t)plsRow->m_BlockFrom));

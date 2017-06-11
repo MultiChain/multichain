@@ -1626,12 +1626,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 {
                     LogPrint("mchn","mchn: Default admin    address: %s\n",CBitcoinAddress(pkey.GetID()).ToString().c_str());                
                 }
-                if(mc_gState->m_Features->ActivatePermission())
+                if(pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_ACTIVATE))
                 {
-                    if(pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_ACTIVATE))
-                    {
-                        LogPrint("mchn","mchn: Default activate address: %s\n",CBitcoinAddress(pkey.GetID()).ToString().c_str());                
-                    }
+                    LogPrint("mchn","mchn: Default activate address: %s\n",CBitcoinAddress(pkey.GetID()).ToString().c_str());                
                 }
             }
             else
@@ -1705,16 +1702,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                         {    
                             sprintf(bufOutput,"Blockchain successfully initialized.\n\n");             
                             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                            if(mc_gState->m_Features->ActivatePermission())
-                            {
-                                sprintf(bufOutput,"Please ask blockchain admin or user having activate permission to let you connect and/or transact:\n");
-                                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                            }
-                            else
-                            {
-                                sprintf(bufOutput,"Please ask blockchain admin to let you connect and/or transact:\n");
-                                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                            }
+                            sprintf(bufOutput,"Please ask blockchain admin or user having activate permission to let you connect and/or transact:\n");
+                            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
 
                             sprintf(bufOutput,"multichain-cli %s grant %s connect\n",mc_gState->m_NetworkParams->Name(),
                                  CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());

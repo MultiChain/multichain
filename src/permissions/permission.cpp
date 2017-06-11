@@ -752,13 +752,6 @@ uint32_t mc_Permissions::GetPossiblePermissionTypes(uint32_t entity_type)
             }
             break;
     }
-    if(mc_gState->m_Features->ActivatePermission() == 0)
-    {
-        if(full_type & MC_PTP_ACTIVATE)
-        {
-            full_type-=MC_PTP_ACTIVATE;
-        }
-    }
     return full_type;
 }
 
@@ -799,10 +792,7 @@ uint32_t mc_Permissions::GetPermissionType(const char *str,int entity_type)
                 if(mc_MemcmpCheckSize(start,"issue",    ptr-start) == 0)perm_type = MC_PTP_ISSUE;
                 if(mc_MemcmpCheckSize(start,"mine",     ptr-start) == 0)perm_type = MC_PTP_MINE;
                 if(mc_MemcmpCheckSize(start,"admin",    ptr-start) == 0)perm_type = MC_PTP_ADMIN;
-                if(mc_gState->m_Features->ActivatePermission())
-                {
-                    if(mc_MemcmpCheckSize(start,"activate", ptr-start) == 0)perm_type = MC_PTP_ACTIVATE;
-                }
+                if(mc_MemcmpCheckSize(start,"activate", ptr-start) == 0)perm_type = MC_PTP_ACTIVATE;
                 if(mc_gState->m_Features->Streams())
                 {
                     if(mc_MemcmpCheckSize(start,"create", ptr-start) == 0)perm_type = MC_PTP_CREATE;
@@ -1086,10 +1076,7 @@ int mc_Permissions::CanSend(const void* lpEntity,const void* lpAddress)
     
     if(result == 0)
     {
-        if(mc_gState->m_Features->ActivatePermission())
-        {
-            result |=  GetPermission(lpEntity,lpAddress,MC_PTP_ACTIVATE);    
-        }
+        result |=  GetPermission(lpEntity,lpAddress,MC_PTP_ACTIVATE);    
     }
         
     if(result)
@@ -1144,10 +1131,7 @@ int mc_Permissions::CanReceive(const void* lpEntity,const void* lpAddress)
     
     if(result == 0)
     {
-        if(mc_gState->m_Features->ActivatePermission())
-        {
-            result |=  GetPermission(lpEntity,lpAddress,MC_PTP_ACTIVATE);    
-        }
+        result |=  GetPermission(lpEntity,lpAddress,MC_PTP_ACTIVATE);    
     }
     
     if(result)
@@ -1711,18 +1695,6 @@ int mc_Permissions::CanAdmin(const void* lpEntity,const void* lpAddress)
 
 int mc_Permissions::CanActivate(const void* lpEntity,const void* lpAddress)
 {
-    if(mc_gState->m_Features->ActivatePermission() == 0)
-    {
-        if(CanAdmin(lpEntity,lpAddress))
-        {
-            return MC_PTP_ACTIVATE;
-        }
-        else
-        {
-            return 0;
-        }
-    }
-    
     if(mc_IsNullEntity(lpEntity))
     {
         if(MCP_ANYONE_CAN_ACTIVATE)
@@ -2280,10 +2252,6 @@ int mc_Permissions::AdminConsensus(const void* lpEntity,uint32_t type)
                 }
                 if(type == MC_PTP_ACTIVATE)
                 {
-                    if(mc_gState->m_Features->ActivatePermission() == 0)
-                    {
-                        return GetAdminCount()+1;
-                    }
                     consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensusactivate");
                 }
                 if(type == MC_PTP_ISSUE)
@@ -3016,10 +2984,6 @@ void mc_Permissions::FreePermissionList(mc_Buffer *permissions)
 
 int mc_Permissions::IsActivateEnough(uint32_t type)
 {
-    if(mc_gState->m_Features->ActivatePermission() == 0)
-    {
-        return 0;
-    }
     if(type & ( MC_PTP_ADMIN | MC_PTP_ISSUE | MC_PTP_MINE | MC_PTP_ACTIVATE | MC_PTP_CREATE))
     {
         return 0;
@@ -3112,22 +3076,15 @@ int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAdd
     }
     types[num_types]=MC_PTP_ISSUE;num_types++;
     types[num_types]=MC_PTP_MINE;num_types++;
-    if(mc_gState->m_Features->ActivatePermission())
+    if(mc_gState->m_Features->FixedGrantsInTheSameTx())
     {
-        if(mc_gState->m_Features->FixedGrantsInTheSameTx())
-        {
-            types[num_types]=MC_PTP_ACTIVATE;num_types++;        
-            types[num_types]=MC_PTP_ADMIN;num_types++;        
-        }
-        else
-        {
-            types[num_types]=MC_PTP_ADMIN;num_types++;        
-            types[num_types]=MC_PTP_ACTIVATE;num_types++;        
-        }
+        types[num_types]=MC_PTP_ACTIVATE;num_types++;        
+        types[num_types]=MC_PTP_ADMIN;num_types++;        
     }
     else
     {
-        types[num_types]=MC_PTP_ADMIN;num_types++;                
+        types[num_types]=MC_PTP_ADMIN;num_types++;        
+        types[num_types]=MC_PTP_ACTIVATE;num_types++;        
     }
     if(mc_gState->m_Features->Upgrades())
     {
