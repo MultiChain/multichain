@@ -1838,7 +1838,7 @@ int mc_Script::GetFullRef(unsigned char *ref,uint32_t *script_type)
     new_ref=1;
     shift=0;
     ref_type=MC_AST_ASSET_REF_TYPE_REF;
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef())
+    if(mc_gState->m_Features->ShortTxIDInTx())
     {
         shift=MC_AST_SHORT_TXID_OFFSET;
         ref_type=MC_AST_ASSET_REF_TYPE_SHORT_TXID;
@@ -1925,7 +1925,7 @@ int mc_Script::GetAssetQuantities(mc_Buffer *amounts,uint32_t script_type)
 
     shift=0;
     ref_type=MC_AST_ASSET_REF_TYPE_REF;
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef())
+    if(mc_gState->m_Features->ShortTxIDInTx())
     {
         shift=MC_AST_SHORT_TXID_OFFSET;
         ref_type=MC_AST_ASSET_REF_TYPE_SHORT_TXID;
@@ -2020,7 +2020,7 @@ int mc_Script::SetAssetQuantities(mc_Buffer *amounts,uint32_t script_type)
     }
 
     shift=0;
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef())
+    if(mc_gState->m_Features->ShortTxIDInTx())
     {
         shift=MC_AST_SHORT_TXID_OFFSET;
     }

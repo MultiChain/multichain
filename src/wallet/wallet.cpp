@@ -1418,7 +1418,7 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, int block, int *e
         {     
             bool take_it=false;
             if( ( (vStreamsToImport[i].m_EntityType & MC_TET_TYPE_MASK) == MC_TET_ASSET ) &&
-                ( mc_gState->m_Features->ShortTxIDAsAssetRef() == 0) )    
+                ( mc_gState->m_Features->ShortTxIDInTx() == 0) )    
             {
                 if(mc_gState->m_Assets->FindEntityByRef(&stream_entity,vStreamsToImport[i].m_EntityID))
                 {

@@ -2369,7 +2369,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     if(fNewAsset)
     {
         entity.Zero();
-        if(mc_gState->m_Features->ShortTxIDAsAssetRef())
+        if(mc_gState->m_Features->ShortTxIDInTx())
         {
             entity.m_EntityType=MC_TET_ASSET | MC_TET_CHAINPOS;
             memcpy(entity.m_EntityID,(unsigned char*)&hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
@@ -2414,7 +2414,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     {
         ptrOut=mc_gState->m_TmpAssetsOut->GetRow(i);
         entity.Zero();
-        if(mc_gState->m_Features->ShortTxIDAsAssetRef())
+        if(mc_gState->m_Features->ShortTxIDInTx())
         {
             memcpy(entity.m_EntityID,ptrOut+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
         }

@@ -73,7 +73,7 @@ bool mc_ExtractInputAssetQuantities(const CScript& script1, uint256 hash, string
             memset(buf_amounts,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
             if(mc_gState->m_Assets->FindEntityByTxID(&entity,(unsigned char*)&hash))
             {
-                if(mc_gState->m_Features->ShortTxIDAsAssetRef() == 0)
+                if(mc_gState->m_Features->ShortTxIDInTx() == 0)
                 {
                     if(entity.IsUnconfirmedGenesis())             // Not confirmed genesis has -1 in offset field
                     {
@@ -168,7 +168,7 @@ bool mc_CompareAssetQuantities(string& reason)
         int row=mc_gState->m_TmpAssetsIn->Seek(ptrOut);
         quantity=mc_GetABQuantity(ptrOut);
 
-        if(mc_gState->m_Features->ShortTxIDAsAssetRef())
+        if(mc_gState->m_Features->ShortTxIDInTx())
         {
             if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptrOut) == 0)
             {
@@ -494,7 +494,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                 return false;                                                                        
             }            
         }
-        if(mc_gState->m_Features->ShortTxIDAsAssetRef() == 0)
+        if(mc_gState->m_Features->ShortTxIDInTx() == 0)
         {
             if(entity.IsUnconfirmedGenesis())
             {

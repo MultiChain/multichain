@@ -210,7 +210,7 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
 int ParseAssetKeyToFullAssetRef(const char* asset_key,unsigned char *full_asset_ref,int *multiple,int *type,int entity_type)
 {
     int ret;
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef())
+    if(mc_gState->m_Features->ShortTxIDInTx())
     {
         unsigned char txid[MC_ENT_KEY_SIZE];
         ret=ParseAssetKey(asset_key,txid,NULL,NULL,multiple,type,entity_type);

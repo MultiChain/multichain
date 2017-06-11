@@ -495,7 +495,7 @@ void DebugPrintAssetTxOut(uint256 hash,int index,unsigned char* assetrefbin,int6
     string txid=hash.GetHex();
     
     
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef())
+    if(mc_gState->m_Features->ShortTxIDInTx())
     {
         if(debug_print)
         {

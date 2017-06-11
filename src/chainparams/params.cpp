@@ -1756,7 +1756,7 @@ int mc_Features::OpDropDetailsScripts()
     return ret;    
 }
 
-int mc_Features::ShortTxIDAsAssetRef()
+int mc_Features::ShortTxIDInTx()
 {
     int ret=0;
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)

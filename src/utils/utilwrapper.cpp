@@ -734,7 +734,7 @@ int mc_MultichainParams::SetGlobals()
         MAX_MONEY=0;
     }
     
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef() == 0)
+    if(mc_gState->m_Features->ShortTxIDInTx() == 0)
     {
         m_AssetRefSize=MC_AST_ASSET_REF_SIZE;
     }

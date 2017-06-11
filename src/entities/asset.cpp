@@ -571,7 +571,7 @@ void mc_EntityDetails::Set(mc_EntityLedgerRow* row)
     }
     
     mc_ZeroABRaw(m_FullRef);
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef())
+    if(mc_gState->m_Features->ShortTxIDInTx())
     {
         memcpy(m_FullRef+MC_AST_SHORT_TXID_OFFSET,m_LedgerRow.m_Key+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
         mc_SetABRefType(m_FullRef,MC_AST_ASSET_REF_TYPE_SHORT_TXID);
@@ -959,7 +959,7 @@ int mc_AssetDB::InsertAssetFollowOn(const void* txid, int offset, uint64_t quant
         return MC_ERR_NOT_FOUND;
     }    
     
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef() == 0)
+    if(mc_gState->m_Features->ShortTxIDInTx() == 0)
     {
         if(aldRow.m_PrevPos < 0)                                                // Unconfirmed genesis for protocol < 10007
         {
@@ -1693,7 +1693,7 @@ const unsigned char* mc_EntityDetails::GetFullRef()
 
 const unsigned char* mc_EntityDetails::GetShortRef()
 {
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef())
+    if(mc_gState->m_Features->ShortTxIDInTx())
     {
         return GetTxID()+MC_AST_SHORT_TXID_OFFSET;
     }    

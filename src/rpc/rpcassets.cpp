@@ -9,7 +9,7 @@
 
 void mergeGenesisWithAssets(mc_Buffer *genesis_amounts, mc_Buffer *asset_amounts)
 {
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef() == 0)
+    if(mc_gState->m_Features->ShortTxIDInTx() == 0)
     {
         return; 
     }
@@ -372,7 +372,7 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     {        
         ParseEntityIdentifier(params[2],&entity, MC_ENT_TYPE_ASSET);           
         memcpy(buf,entity.GetFullRef(),MC_AST_ASSET_FULLREF_SIZE);
-        if(mc_gState->m_Features->ShortTxIDAsAssetRef() == 0)
+        if(mc_gState->m_Features->ShortTxIDInTx() == 0)
         {
             if(entity.IsUnconfirmedGenesis())
             {
@@ -1110,7 +1110,7 @@ Value getaddressbalances(const Array& params, bool fHelp)
                     quantity=mc_GetABQuantity(asset_amounts->GetRow(a));
                     if(mc_gState->m_Assets->FindEntityByTxID(&entity,(unsigned char*)&hash))
                     {
-                        if((entity.IsUnconfirmedGenesis() != 0) && (mc_gState->m_Features->ShortTxIDAsAssetRef() == 0) )
+                        if((entity.IsUnconfirmedGenesis() != 0) && (mc_gState->m_Features->ShortTxIDInTx() == 0) )
                         {
                             is_genesis=true;                                
                         }
@@ -1340,7 +1340,7 @@ Value getassetbalances(const Array& params, bool fHelp)
                     quantity=mc_GetABQuantity(asset_amounts->GetRow(a));
                     if(mc_gState->m_Assets->FindEntityByTxID(&entity,(unsigned char*)&hash))
                     {
-                        if((entity.IsUnconfirmedGenesis() != 0) && (mc_gState->m_Features->ShortTxIDAsAssetRef() == 0) )
+                        if((entity.IsUnconfirmedGenesis() != 0) && (mc_gState->m_Features->ShortTxIDInTx() == 0) )
                         {
                             is_genesis=true;
                         }

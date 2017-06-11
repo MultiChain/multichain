@@ -109,7 +109,7 @@ typedef struct mc_Features
     int UnconfirmedMinersCannotMine();
     int Streams();
     int OpDropDetailsScripts();
-    int ShortTxIDAsAssetRef();
+    int ShortTxIDInTx();
     int CachedInputScript();
     int AnyoneCanReceiveEmpty();
     int FixedIn10007();

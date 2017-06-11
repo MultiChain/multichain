@@ -229,7 +229,7 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                         *allowed -= MC_PTP_SEND;                        
                     }
                     
-                    if((mc_gState->m_Features->ShortTxIDAsAssetRef() == 0) && (entity.IsUnconfirmedGenesis() != 0) )
+                    if((mc_gState->m_Features->ShortTxIDInTx() == 0) && (entity.IsUnconfirmedGenesis() != 0) )
                     {
                         if(required)                                            // Unconfirmed genesis in protocol < 10007, cannot be spent
                         {
