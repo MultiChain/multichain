@@ -30,7 +30,7 @@ CScript RemoveOpDropsIfNeeded(const CScript& scriptInput)
     return scriptInput.RemoveOpDrops();   
 }
 
-bool CoinSparkAssetRefDecode(unsigned char *bin, const char* string, const size_t stringLen)
+bool AssetRefDecode(unsigned char *bin, const char* string, const size_t stringLen)
 {
     char buffer[1024];
     int txIDPrefixInteger;
@@ -79,7 +79,7 @@ uint256 mc_GenesisCoinbaseTxID()
 
 int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset_ref,char *name,int *multiple,int *type,int entity_type)
 {
-    int ret=0;
+    int ret=MC_ASSET_KEY_VALID;
     int size=strlen(asset_key);
     unsigned char buf[MC_AST_ASSET_REF_SIZE];
     mc_EntityDetails entity;
@@ -87,7 +87,7 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
         
     if(size == 0)
     {
-        return -5;
+        return MC_ASSET_KEY_INVALID_EMPTY;
     }
     
     uint256 hash=0;
@@ -95,18 +95,18 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
     {
         if(type)
         {
-            *type=1;
+            *type=MC_ENT_KEYTYPE_TXID;
         }
         hash.SetHex(asset_key);
         if(!mc_gState->m_Assets->FindEntityByTxID(&entity,(unsigned char*)&hash))
         {
-            ret=-1;
+            ret=MC_ASSET_KEY_INVALID_TXID;
         }
         else
         {
             if( (entity_type != MC_ENT_TYPE_ANY) && ((int)entity.GetEntityType() != entity_type) )
             {
-                ret=-1;
+                ret=MC_ASSET_KEY_INVALID_TXID;
             }
             else
             {
@@ -117,7 +117,7 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
                 {
                     if(hash == mc_GenesisCoinbaseTxID())
                     {
-                        ret=-1;                            
+                        ret=MC_ASSET_KEY_INVALID_TXID;                            
                     }
                 }
             }
@@ -125,7 +125,7 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
             {
                 if(!mc_gState->m_Assets->FindEntityByFollowOn(&entity,(unsigned char*)&hash))
                 {
-                    ret=-1;
+                    ret=MC_ASSET_KEY_INVALID_TXID;
                 }                
             }
         }
@@ -134,21 +134,21 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
     {
         if(size<=MC_ENT_MAX_NAME_SIZE)
         {
-            if(CoinSparkAssetRefDecode(buf,asset_key,size))
+            if(AssetRefDecode(buf,asset_key,size))
             {
                 if(type)
                 {
-                    *type=2;
+                    *type=MC_ENT_KEYTYPE_REF;
                 }
                 if(!mc_gState->m_Assets->FindEntityByRef(&entity,buf))
                 {
-                    ret=-2;
+                    ret=MC_ASSET_KEY_INVALID_REF;
                 }
                 else
                 {
                     if( (entity_type != MC_ENT_TYPE_ANY) && ((int)entity.GetEntityType() != entity_type) )
                     {
-                        ret=-2;
+                        ret=MC_ASSET_KEY_INVALID_REF;
                     }                    
                 }
             }
@@ -156,28 +156,28 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
             {
                 if(type)
                 {
-                    *type=3;
+                    *type=MC_ENT_KEYTYPE_NAME;
                 }
                 if(!mc_gState->m_Assets->FindEntityByName(&entity,(char*)asset_key))
                 {
-                    ret=-3;
+                    ret=MC_ASSET_KEY_INVALID_NAME;
                 }    
                 else
                 {
                     if( (entity_type != MC_ENT_TYPE_ANY) && ((int)entity.GetEntityType() != entity_type) )
                     {
-                        ret=-3;
+                        ret=MC_ASSET_KEY_INVALID_NAME;
                     }                    
                 }
             }
         }
         else
         {
-            ret=-4;
+            ret=MC_ASSET_KEY_INVALID_SIZE;
         }
     }
 
-    if(ret == 0)
+    if(ret == MC_ASSET_KEY_VALID)
     {
         if(txid)
         {
@@ -187,7 +187,7 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
 //        if((int)mc_GetLE((unsigned char*)ptr+4,4)<=0)
         if(entity.IsUnconfirmedGenesis())
         {
-            ret=1;                            
+            ret=MC_ASSET_KEY_UNCONFIRMED_GENESIS;                            
         }
         if(asset_ref)
         {
@@ -214,7 +214,7 @@ int ParseAssetKeyToFullAssetRef(const char* asset_key,unsigned char *full_asset_
     {
         unsigned char txid[MC_ENT_KEY_SIZE];
         ret=ParseAssetKey(asset_key,txid,NULL,NULL,multiple,type,entity_type);
-        if(ret == 1)
+        if(ret == MC_ASSET_KEY_UNCONFIRMED_GENESIS)
         {
             ret=0;
         }
@@ -1262,7 +1262,6 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                         }
                         if(asset_name.size())
                         {
-//                            asset_error=ParseAssetKey(asset_name.c_str(),NULL,buf,NULL,&multiple,NULL, MC_ENT_TYPE_ASSET);
                             asset_error=ParseAssetKeyToFullAssetRef(asset_name.c_str(),buf,&multiple,NULL, MC_ENT_TYPE_ASSET);
                             if(asset_error)
                             {
@@ -1459,7 +1458,6 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
             if(a.name_.size())
             {
                 asset_name=a.name_;
-//                asset_error=ParseAssetKey(asset_name.c_str(),NULL,buf,NULL,&multiple,NULL, MC_ENT_TYPE_ASSET);
                 asset_error=ParseAssetKeyToFullAssetRef(asset_name.c_str(),buf,&multiple,NULL, MC_ENT_TYPE_ASSET);
                 if(asset_error)
                 {
@@ -1525,31 +1523,31 @@ exitlbl:
                     
     switch(asset_error)
     {
-        case -1:
+        case MC_ASSET_KEY_INVALID_TXID:
             if(eErrorCode)
             {
                 *eErrorCode=RPC_ENTITY_NOT_FOUND;
             }
             strError=string("Issue transaction with this txid not found: ")+asset_name;
             break;
-        case -2:
+        case MC_ASSET_KEY_INVALID_REF:
             if(eErrorCode)
             {
                 *eErrorCode=RPC_ENTITY_NOT_FOUND;
             }
             strError=string("Issue transaction with this asset reference not found: ")+asset_name;
             break;
-        case -3:
+        case MC_ASSET_KEY_INVALID_NAME:
             if(eErrorCode)
             {
                 *eErrorCode=RPC_ENTITY_NOT_FOUND;
             }
             strError=string("Issue transaction with this name not found: ")+asset_name;
             break;
-        case -4:
+        case MC_ASSET_KEY_INVALID_SIZE:
             strError=string("Could not parse asset key: ")+asset_name;
             break;
-        case 1:
+        case MC_ASSET_KEY_UNCONFIRMED_GENESIS:
             if(eErrorCode)
             {
                 *eErrorCode=RPC_UNCONFIRMED_ENTITY;
@@ -2557,7 +2555,7 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
         
         if(entity_type & MC_ENT_TYPE_STREAM)
         {
-            if(CoinSparkAssetRefDecode(buf_a,str.c_str(),str.size()))
+            if(AssetRefDecode(buf_a,str.c_str(),str.size()))
             {
                 memset(buf_n,0,MC_AST_ASSET_REF_SIZE);
                 if(memcmp(buf_a,buf_n,4) == 0)
@@ -2584,16 +2582,16 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
         ret=ParseAssetKey(str.c_str(),buf,NULL,NULL,NULL,NULL,entity_type);
         switch(ret)
         {
-            case -1:
+            case MC_ASSET_KEY_INVALID_TXID:
                 throw JSONRPCError(RPC_ENTITY_NOT_FOUND, entity_nameU+string(" with this txid not found: ")+str);
                 break;
-            case -2:
+            case MC_ASSET_KEY_INVALID_REF:
                 throw JSONRPCError(RPC_ENTITY_NOT_FOUND, entity_nameU+string(" with this reference not found: ")+str);
                 break;
-            case -3:
+            case MC_ASSET_KEY_INVALID_NAME:
                 throw JSONRPCError(RPC_ENTITY_NOT_FOUND, entity_nameU+string(" with this name not found: ")+str);
                 break;
-            case -4:
+            case MC_ASSET_KEY_INVALID_SIZE:
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Could not parse "+entity_nameL+" key: "+str);
                 break;
 /*                
@@ -2665,8 +2663,8 @@ bool AssetCompareByRef(Value a,Value b)
     unsigned char buf_a[MC_AST_ASSET_REF_SIZE];
     unsigned char buf_b[MC_AST_ASSET_REF_SIZE];
     
-    CoinSparkAssetRefDecode(buf_a,assetref_a.get_str().c_str(),assetref_a.get_str().size());
-    CoinSparkAssetRefDecode(buf_b,assetref_b.get_str().c_str(),assetref_b.get_str().size());
+    AssetRefDecode(buf_a,assetref_a.get_str().c_str(),assetref_a.get_str().size());
+    AssetRefDecode(buf_b,assetref_b.get_str().c_str(),assetref_b.get_str().size());
 
     
 //    if(strcmp(assetref_a.get_str().c_str(),assetref_b.get_str().c_str()) < 0)
@@ -2971,3 +2969,23 @@ void ParseRawAction(string action,bool& lock_it, bool& sign_it,bool& send_it)
     }    
 }
 
+int paramtoint(Value param,bool check_for_min,int min_value,string error_message)
+{
+    int result;
+    
+    if(param.type() != int_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, error_message);        
+    }
+    
+    result=param.get_int();
+    if(check_for_min)
+    {
+        if(result < min_value)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, error_message);                    
+        }
+    }
+    
+    return result;
+}

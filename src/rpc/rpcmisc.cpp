@@ -40,6 +40,7 @@ using namespace std;
 
 bool CBitcoinAddressFromTxEntity(CBitcoinAddress &address,mc_TxEntity *lpEntity);
 Object AddressEntry(CBitcoinAddress& address,uint32_t verbose);
+int paramtoint(Value param,bool check_for_min,int min_value,string error_message);
 
 /**
  * @note Do not add or change anything in the information returned by this
@@ -726,18 +727,7 @@ Value createkeypairs(const Array& params, bool fHelp)
     int count=1;
     if (params.size() > 0)    
     {
-        if(params[0].type() == int_type)
-        {
-            count=params[0].get_int();
-            if(count < 0)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
-            }
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
-        }
+        count=paramtoint(params[0],true,0,"Invalid count");
     }
             
     Array retArray;

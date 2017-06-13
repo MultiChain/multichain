@@ -26,6 +26,14 @@ using namespace json_spirit;
 #include <map>
 #include <string>
 
+#define MC_ASSET_KEY_UNCONFIRMED_GENESIS    1
+#define MC_ASSET_KEY_VALID                  0
+#define MC_ASSET_KEY_INVALID_TXID          -1
+#define MC_ASSET_KEY_INVALID_REF           -2
+#define MC_ASSET_KEY_INVALID_NAME          -3
+#define MC_ASSET_KEY_INVALID_SIZE          -4
+#define MC_ASSET_KEY_INVALID_EMPTY         -5
+
 //string HelpRequiringPassphrase();
 string AllowedPermissions();
 string AllowedPausedServices();
@@ -34,7 +42,7 @@ uint32_t GetPausedServices(const char *str);
 
 
 CScript RemoveOpDropsIfNeeded(const CScript& scriptInput);
-bool CoinSparkAssetRefDecode(unsigned char *bin, const char* string, const size_t stringLen);
+bool AssetRefDecode(unsigned char *bin, const char* string, const size_t stringLen);
 int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset_ref,char *name,int *multiple,int *type,int entity_type);
 int ParseAssetKeyToFullAssetRef(const char* asset_key,unsigned char *full_asset_ref,int *multiple,int *type,int entity_type);
 Array AddressEntries(const CTxIn& txin,txnouttype& typeRet,mc_Script *lpScript);
@@ -58,6 +66,7 @@ bool AssetCompareByRef(Value a,Value b);
 Array AssetArrayFromAmounts(mc_Buffer *asset_amounts,int issue_asset_id,uint256 hash,int show_type);
 void ParseRawAction(string action,bool& lock_it, bool& sign_it,bool& send_it);
 bool paramtobool(Value param);
+int paramtoint(Value param,bool check_for_min,int min_value,string error_message);
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
 
 

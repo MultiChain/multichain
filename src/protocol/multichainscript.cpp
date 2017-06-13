@@ -13,7 +13,7 @@
 #define MC_DCT_SCRIPT_OP_RETURN          0x6a
 #define MC_DCT_SCRIPT_OP_DROP            0x75
 
-#define MC_DCT_SCRIPT_COINSPARK_IDENTIFIER     "SPK"
+#define MC_DCT_SCRIPT_FREE_DATA_IDENTIFIER     "SPK"
 #define MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER    "spk"
 #define MC_DCT_SCRIPT_IDENTIFIER_LEN 3
 
@@ -1036,7 +1036,7 @@ int mc_Script::GetBlockSignature(unsigned char* sig,int *sig_size,uint32_t* hash
     
     ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
     
-    if(memcmp(ptr,MC_DCT_SCRIPT_COINSPARK_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
+    if(memcmp(ptr,MC_DCT_SCRIPT_FREE_DATA_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
     {
         return MC_ERR_WRONG_SCRIPT;
     }
@@ -1104,7 +1104,7 @@ int mc_Script::SetBlockSignature(const unsigned char* sig,int sig_size,uint32_t 
         return err;
     }
     
-    memcpy(buf,MC_DCT_SCRIPT_COINSPARK_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
+    memcpy(buf,MC_DCT_SCRIPT_FREE_DATA_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
     buf[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_BLOCK_SIGNATURE_PREFIX;
     
     err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+1);
@@ -1244,7 +1244,7 @@ int mc_Script::GetAssetDetails(char* name,int* multiple,unsigned char* script,in
     ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
     ptrEnd=ptr+m_lpCoord[m_CurrentElement*2+1];
     
-    if(memcmp(ptr,MC_DCT_SCRIPT_COINSPARK_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
+    if(memcmp(ptr,MC_DCT_SCRIPT_FREE_DATA_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
     {
         return MC_ERR_WRONG_SCRIPT;
     }
@@ -1302,7 +1302,7 @@ int mc_Script::SetAssetDetails(const char*name,int multiple,const unsigned char*
         return err;
     }
     
-    memcpy(buf,MC_DCT_SCRIPT_COINSPARK_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
+    memcpy(buf,MC_DCT_SCRIPT_FREE_DATA_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
     buf[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_ASSET_DETAILS_PREFIX;
     
     err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+1);
@@ -1359,7 +1359,7 @@ int mc_Script::GetGeneralDetails(unsigned char* script,int *script_size)
     ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
     ptrEnd=ptr+m_lpCoord[m_CurrentElement*2+1];
     
-    if(memcmp(ptr,MC_DCT_SCRIPT_COINSPARK_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
+    if(memcmp(ptr,MC_DCT_SCRIPT_FREE_DATA_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
     {
         return MC_ERR_WRONG_SCRIPT;
     }
@@ -1397,7 +1397,7 @@ int mc_Script::SetGeneralDetails(const unsigned char* script,int script_size)
         return err;
     }
     
-    memcpy(buf,MC_DCT_SCRIPT_COINSPARK_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
+    memcpy(buf,MC_DCT_SCRIPT_FREE_DATA_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
     buf[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_GENERAL_DETAILS_PREFIX;
     
     err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+1);

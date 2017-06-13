@@ -20,7 +20,7 @@ void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
     {        
         string str=stream_identifier.get_str();
         
-        if(CoinSparkAssetRefDecode(buf_a,str.c_str(),str.size()))
+        if(AssetRefDecode(buf_a,str.c_str(),str.size()))
         {
             memset(buf_n,0,MC_AST_ASSET_REF_SIZE);
             if(memcmp(buf_a,buf_n,4) == 0)
@@ -46,16 +46,16 @@ void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
         ret=ParseAssetKey(str.c_str(),buf,NULL,NULL,NULL,NULL,MC_ENT_TYPE_STREAM);
         switch(ret)
         {
-            case -1:
+            case MC_ASSET_KEY_INVALID_TXID:
                 throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Stream with this txid not found: "+str);
                 break;
-            case -2:
+            case MC_ASSET_KEY_INVALID_REF:
                 throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Stream with this stream reference not found: "+str);
                 break;
-            case -3:
+            case MC_ASSET_KEY_INVALID_NAME:
                 throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Stream with this name not found: "+str);
                 break;
-            case -4:
+            case MC_ASSET_KEY_INVALID_SIZE:
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Could not parse stream key: "+str);
                 break;
 /*                
@@ -96,30 +96,12 @@ Value liststreams(const Array& params, bool fHelp)
     count=2147483647;
     if (params.size() > 2)    
     {
-        if(params[2].type() == int_type)
-        {
-            count=params[2].get_int();
-            if(count < 0)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
-            }
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
-        }
+        count=paramtoint(params[2],true,0,"Invalid count");
     }
     start=-count;
     if (params.size() > 3)    
     {
-        if(params[3].type() == int_type)
-        {
-            start=params[3].get_int();
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
-        }
+        start=paramtoint(params[3],false,0,"Invalid start");
     }
     
     streams=NULL;
@@ -316,7 +298,7 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     }
 
     unsigned char buf_a[MC_AST_ASSET_REF_SIZE];    
-    if(CoinSparkAssetRefDecode(buf_a,stream_name.c_str(),stream_name.size()))
+    if(AssetRefDecode(buf_a,stream_name.c_str(),stream_name.size()))
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid stream name, looks like a stream reference");                                                                                                    
     }
@@ -325,9 +307,9 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     if(stream_name.size())
     {
         ret=ParseAssetKey(stream_name.c_str(),NULL,NULL,NULL,NULL,&type,MC_ENT_TYPE_ANY);
-        if(ret != -3)
+        if(ret != MC_ASSET_KEY_INVALID_NAME)
         {
-            if(type == 3)
+            if(type == MC_ENT_KEYTYPE_NAME)
             {
                 throw JSONRPCError(RPC_DUPLICATE_NAME, "Stream or asset with this name already exists");                                    
             }
@@ -913,30 +895,12 @@ Value liststreamitems(const Array& params, bool fHelp)
     count=10;
     if (params.size() > 2)    
     {
-        if(params[2].type() == int_type)
-        {
-            count=params[2].get_int();
-            if(count < 0)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
-            }
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
-        }
+        count=paramtoint(params[2],true,0,"Invalid count");
     }
     start=-count;
     if (params.size() > 3)    
     {
-        if(params[3].type() == int_type)
-        {
-            start=params[3].get_int();
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
-        }
+        start=paramtoint(params[3],false,0,"Invalid start");
     }
     
     bool fLocalOrdering = false;
@@ -1042,30 +1006,12 @@ Value liststreamblockitems(const Array& params, bool fHelp)
     count=2147483647;
     if (params.size() > 3)    
     {
-        if(params[3].type() == int_type)
-        {
-            count=params[3].get_int();
-            if(count < 0)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
-            }
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
-        }
+        count=paramtoint(params[3],true,0,"Invalid count");
     }
     start=-count;
     if (params.size() > 4)    
     {
-        if(params[4].type() == int_type)
-        {
-            start=params[4].get_int();
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
-        }
+        start=paramtoint(params[4],false,0,"Invalid start");
     }
     
     entStat.Zero();
@@ -1222,32 +1168,14 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
     count=10;
     if (params.size() > 3)    
     {
-        if(params[3].type() == int_type)
-        {
-            count=params[3].get_int();
-            if(count < 0)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
-            }
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
-        }
+        count=paramtoint(params[3],true,0,"Invalid count");
     }
     start=-count;
     if (params.size() > 4)    
     {
-        if(params[4].type() == int_type)
-        {
-            start=params[4].get_int();
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
-        }
+        start=paramtoint(params[4],false,0,"Invalid start");
     }
-    
+        
     bool fLocalOrdering = false;
     if (params.size() > 5)
         fLocalOrdering = params[5].get_bool();
@@ -1348,32 +1276,14 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
     count=10;
     if (params.size() > 3)    
     {
-        if(params[3].type() == int_type)
-        {
-            count=params[3].get_int();
-            if(count < 0)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
-            }
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
-        }
+        count=paramtoint(params[3],true,0,"Invalid count");
     }
     start=-count;
     if (params.size() > 4)    
     {
-        if(params[4].type() == int_type)
-        {
-            start=params[4].get_int();
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
-        }
+        start=paramtoint(params[4],false,0,"Invalid start");
     }
-    
+
     bool fLocalOrdering = false;
     if (params.size() > 5)
         fLocalOrdering = params[5].get_bool();
@@ -1570,30 +1480,12 @@ Value liststreamkeys_or_publishers(const Array& params,bool is_publishers)
     count=2147483647;
     if (params.size() > 3)    
     {
-        if(params[3].type() == int_type)
-        {
-            count=params[3].get_int();
-            if(count < 0)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
-            }
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
-        }
+        count=paramtoint(params[3],true,0,"Invalid count");
     }
     start=-count;
     if (params.size() > 4)    
     {
-        if(params[4].type() == int_type)
-        {
-            start=params[4].get_int();
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
-        }
+        start=paramtoint(params[4],false,0,"Invalid start");
     }
     
     bool fLocalOrdering = false;

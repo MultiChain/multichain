@@ -478,31 +478,12 @@ Value listaddresses(const Array& params, bool fHelp)
     count=entity_count;
     if (params.size() > 2)    
     {
-        if(params[2].type() == int_type)
-        {
-            count=params[2].get_int();
-            if(count < 0)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
-            }
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
-        }
+        count=paramtoint(params[2],true,0,"Invalid count");
     }
-    
     start=-count;
     if (params.size() > 3)    
     {
-        if(params[3].type() == int_type)
-        {
-            start=params[3].get_int();
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
-        }
+        start=paramtoint(params[3],false,0,"Invalid start");
     }
     
     mc_AdjustStartAndCount(&count,&start,address_count);
@@ -604,33 +585,15 @@ Value gettxoutdata(const Array& params, bool fHelp)
     count=elem_size;
     if (params.size() > 2)    
     {
-        if(params[2].type() == int_type)
-        {
-            count=params[2].get_int();
-            if(count < 0)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
-            }
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
-        }
+        count=paramtoint(params[2],true,0,"Invalid count");
     }
-    
     start=0;
     if (params.size() > 3)    
     {
-        if(params[3].type() == int_type)
-        {
-            start=params[3].get_int();
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
-        }
+        start=paramtoint(params[3],false,0,"Invalid start");
     }
-
+    
+    
     if(start < 0)
     {
         start=elem_size+start;
