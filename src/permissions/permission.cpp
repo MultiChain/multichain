@@ -1255,7 +1255,6 @@ int mc_Permissions::GetActiveMinerCount()
             diversity=(int)((miner_count*diversity-1)/MC_PRM_DECIMAL_GRANULARITY);
         }
         diversity++;
-//        diversity=(int)((m_MinerCount*(uint32_t)mc_gState->m_NetworkParams->GetInt64Param("miningdiversity")-1)/MC_PRM_DECIMAL_GRANULARITY)+1;
         miner_count-=diversity-1;
         if(miner_count<1)
         {
@@ -1283,7 +1282,6 @@ int mc_Permissions::CanMine(const void* lpEntity,const void* lpAddress)
     mc_PermissionLedgerRow row;
     
     int result;    
-//    int diversity;
     int32_t last;
         
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
@@ -1318,29 +1316,6 @@ int mc_Permissions::CanMine(const void* lpEntity,const void* lpAddress)
                 {
                     result=0;                    
                 }
-/*                
-                if(!IsSetupPeriod())
-                {
-                    diversity=(int)mc_gState->m_NetworkParams->GetInt64Param("miningdiversity");
-                    if(diversity > 0)
-                    {
-                        diversity=(int)((miner_count*diversity-1)/MC_PRM_DECIMAL_GRANULARITY);
-                    }
-                    diversity++;
-                    if(diversity<1)
-                    {
-                        diversity=1;
-                    }
-                    if(diversity > miner_count)
-                    {
-                        diversity=miner_count;
-                    }
-                    if(m_Block+1-last <= diversity-1)
-                    {
-                        result=0;
-                    }
-                }
- */ 
             }        
         }
     }
@@ -1444,32 +1419,6 @@ int mc_Permissions::CanMineBlock(const void* lpAddress,uint32_t block)
                     {
                         result=0;
                     }
-/*                    
-                    if(miner_count)
-                    {
-                        if(block >= mc_gState->m_NetworkParams->GetInt64Param("setupfirstblocks"))
-                        {                        
-                            diversity=(int)mc_gState->m_NetworkParams->GetInt64Param("miningdiversity");
-                            if(diversity > 0)
-                            {
-                                diversity=(int)((miner_count*diversity-1)/MC_PRM_DECIMAL_GRANULARITY);
-                            }
-                            diversity++;
-                            if(diversity<1)
-                            {
-                                diversity=1;
-                            }
-                            if(diversity > miner_count)
-                            {
-                                diversity=miner_count;
-                            }
-                            if((int)(block-last) <= diversity-1)
-                            {
-                                result=0;
-                            }
-                        }
-                    }
- */ 
                 }
             }
         }
@@ -1812,22 +1761,6 @@ int mc_Permissions::UpdateCounts()
                             m_MinerCount++;
                         }
                     }            
-/*                    
-                    if((uint32_t)(m_Block+1) >= pdbRow.m_BlockFrom)
-                    {
-                        if((uint32_t)(m_Block+1) < pdbRow.m_BlockTo)
-                        {
-                            if(type == MC_PTP_ADMIN)
-                            {
-                                m_AdminCount++;
-                            }
-                            if(type == MC_PTP_MINE)
-                            {
-                                m_MinerCount++;
-                            }
-                        }                                
-                    }            
- */ 
                 }
             }
             ptr=(unsigned char*)m_Database->m_DB->MoveNext(&err);
@@ -2170,19 +2103,6 @@ int mc_Permissions::RestoreAfterMinerVerification()
 exitlbl:
     UnLock();
 
-/*
-    ClearMemPool();
-    
-    
-    m_Row=m_CopiedRow;
-    m_Block=m_CopiedBlock;
-    m_ForkBlock=0;
-
-    m_CopiedRow=0;
-    m_CopiedBlock=0;
-    
-    return RestoreMemPool();
- */ 
 }
 
 
@@ -3621,20 +3541,9 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
     
     if(err == MC_ERR_NOERROR)
     {
-/*        
-        m_Block++;
-        UpdateCounts();        
-        m_Block--;
-        m_ClearedAdminCount=m_AdminCount;
-        m_ClearedMinerCount=m_MinerCount;
- */ 
         for(i=pld_items;i<m_MemPool->GetCount();i++)
         {
             memcpy((unsigned char*)&pldBlockRow+m_Ledger->m_KeyOffset,m_MemPool->GetRow(i),m_Ledger->m_TotalSize);
-/*            
-            pldBlockRow.m_AdminCount=m_AdminCount;
-            pldBlockRow.m_MinerCount=m_MinerCount;
- */ 
             if(i)
             {
                 m_Ledger->WriteRow((mc_PermissionLedgerRow*)&pldBlockRow);
@@ -3702,11 +3611,6 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
         m_MemPool->Clear();
         StoreBlockInfoInternal(lpMiner,lpHash,0);
         m_Block++;
-/*        
-        UpdateCounts();        
-        m_ClearedAdminCount=m_AdminCount;
-        m_ClearedMinerCount=m_MinerCount;
- */ 
     }
 
     
