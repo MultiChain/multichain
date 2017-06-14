@@ -589,10 +589,8 @@ void mc_TxDB::Dump(const char *message)
 int mc_TxDB::FlushDataFile(uint32_t fileid)
 {
     char FileName[MC_DCT_DB_MAX_PATH];         
-    int FileHan,err;
+    int FileHan;
     sprintf(FileName,"%s%05u.dat",m_LobFileNamePrefix,fileid);
-    
-    err=MC_ERR_NOERROR;
     
     FileHan=open(FileName,_O_BINARY | O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
     

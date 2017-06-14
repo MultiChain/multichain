@@ -458,11 +458,9 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
     mc_MapStringString *mapConfig;
     int err;
     int size,offset,i,version,len0,len1,len2;
-    char empty_string[1];
     mc_OneMultichainParam *param;
     char *ptrData;
     const char *ptr;
-    empty_string[0]=0x00;    
     
     if(name == NULL)
     {

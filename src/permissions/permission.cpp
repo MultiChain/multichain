@@ -811,7 +811,7 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
         return GetPermission(null_entity,lpAddress,type,row,checkmempool);
     }
     
-    int err,value_len,mprow,found_in_db;
+    int err,value_len,mprow;
     uint32_t result;
     mc_PermissionLedgerRow pldRow;
     mc_PermissionDBRow pdbRow;
@@ -843,7 +843,6 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
     }
     
     result=0;
-    found_in_db=0;
     if(ptr)
     {
         memcpy((char*)&pdbRow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
@@ -2103,6 +2102,7 @@ int mc_Permissions::RestoreAfterMinerVerification()
 exitlbl:
     UnLock();
 
+    return MC_ERR_NOERROR;
 }
 
 

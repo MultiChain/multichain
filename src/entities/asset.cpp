@@ -128,7 +128,6 @@ int mc_EntityLedger::Close()
 int mc_EntityLedger::GetRow(int64_t pos, mc_EntityLedgerRow* row)
 {
     int size;
-    unsigned char buf[64];
     if(m_FileHan<=0)
     {
         return MC_ERR_INTERNAL_ERROR;
@@ -182,7 +181,6 @@ int64_t mc_EntityLedger::GetSize()
 int mc_EntityLedger::SetRow(int64_t pos, mc_EntityLedgerRow* row)
 {
     int size;
-    unsigned char buf[64];
     
     if(m_FileHan<=0)
     {
@@ -775,7 +773,6 @@ int mc_AssetDB::InsertAsset(const void* txid, int offset, uint64_t quantity, con
     mc_EntityLedgerRow aldRow;
     mc_EntityDetails details;
     
-    unsigned char dname_buf[6];
     int pass;
     uint32_t value_offset;
     size_t value_size;
