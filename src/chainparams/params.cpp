@@ -545,21 +545,6 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
                 ptr=NULL;;
             }
         }        
-/*
-        if(argc == 0)
-        {
-            if((MultichainParamArray+i)->m_Type & MC_PRM_SPECIAL)
-            {
-                if(strcmp((MultichainParamArray+i)->m_Name,"rootstreamname") == 0)
-                {
-                    if(ptr == NULL)
-                    {
-                        ptr=(const char*)&empty_string;
-                    }
-                }                                               
-            }
-        }
-*/
         if(ptr)
         {        
             strcpy(m_lpData+offset,param->m_Name);
@@ -848,8 +833,6 @@ int mc_MultichainParams::Clone(const char* name, mc_MultichainParams* source)
         }
         if(ptr)
         {            
-//            m_lpIndex->Add(param->m_Name,i);
-
             strcpy(m_lpData+offset,param->m_Name);
             offset+=strlen(param->m_Name)+1;
 
