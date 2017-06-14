@@ -1455,19 +1455,6 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
 /* MCHN END */        
         
-/*        
-        if(mc_gState->m_Features->Streams())
-        {
-            if(!AcceptMultiChainTransaction(tx,view,-1,false,reason))
-            {
-                return state.DoS(0,
-                                 error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
-                                 REJECT_NONSTANDARD, reason, NULL);
-            }
-        }
-*/
-        
-/* MCHN END */            
 
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
@@ -2452,20 +2439,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                                          REJECT_INVALID, reason);
                     }
                 }
-/*                
-                if(!AcceptPermissionsAndCheckForDust(tx,true,reason))
-                {
-                    return false;
-                }
-                if(!AcceptAssetGenesis(tx,offset,true,reason))
-                {
-                    return false;                    
-                }
-                if(!AcceptAssetTransfers(tx, view, reason))
-                {
-                    return false;                                
-                }
-*/
             }
 /* MCHN END */                    
         }
@@ -4174,62 +4147,6 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
             fWaitingForLocked=true;            
         }        
     }
-/*    
-    const CBlockIndex *pindexFork;
-    pindexFork=NULL;
-    pindexFork=chainActive.FindFork(pindexPrev);
-    if(pindexLockedBlock)
-    {
-        if(chainActive.Contains(pindexLockedBlock))
-        {
-            if(pindexFork->nHeight < pindexLockedBlock->nHeight)
-            {
-                if(fDebug)LogPrint("mcblock","mchn-block: Fork rejected, locked: block %s, tip: %d, height: %d, fork: %d, locked: %d\n",block.GetHash().ToString().c_str(),
-                        chainActive.Height(),nHeight,pindexFork->nHeight,pindexLockedBlock->nHeight);
-                return state.Invalid(error("%s : rejected by lockblock in active chain, fork: %d, locked: %d", __func__,pindexFork->nHeight,pindexLockedBlock->nHeight),
-                                     REJECT_INVALID, "locked-block-reorg-in");                                    
-            }            
-        }
-        else
-        {
-            fWaitingForLocked=true;
-            if(nHeight == pindexLockedBlock->nHeight)
-            {
-                if(block->GetHash() != pindexLockedBlock->GetBlockHash())
-                {
-                    if(fDebug)LogPrint("mcblock","mchn-block: Fork rejected, locked on the same height: block %s, height: %d, locked block: %s\n",
-                            block.GetHash().ToString().c_str(),nHeight,pindexLockedBlock->GetBlockHash());
-                    return state.Invalid(error("%s : rejected by lockblock not in active chain, locked: %d", __func__,pindexLockedBlock->nHeight),
-                                         REJECT_INVALID, "locked-block-reorg-out");                                                        
-                }
-            }
-            else
-            {
-                if(nHeight > pindexLockedBlock->nHeight)
-                if(pindexPrev->GetAncestor(pindexLockedBlock->nHeight) != pindexLockedBlock)
-                
-                
-            }
-            CBlockIndex *pindexCommonAncestor=LastCommonAncestor(pindexPrev,pindexLockedBlock)
-            const CBlockIndex *pindexLockedFork;
-            pindexLockedFork=chainActive.FindFork(pindexLockedBlock);
-            if(pindexFork->nHeight < pindexLockedFork->nHeight)
-            {
-                if(fDebug)LogPrint("mcblock","mchn-block: Fork rejected, locked: block %s, tip: %d, height: %d, fork: %d, locked: %d, locked fork: %d\n",block.GetHash().ToString().c_str(),
-                        chainActive.Height(),nHeight,pindexFork->nHeight,pindexLockedBlock->nHeight,pindexLockedFork->nHeight);
-                return state.Invalid(error("%s : rejected by lockblock not in active chain, fork: %d, locked: %d", __func__,pindexFork->nHeight,pindexLockedBlock->nHeight),
-                                     REJECT_INVALID, "locked-block-reorg-out");                                    
-            }                        
-        }
-    }
-    else
-    {
-        if(hLockedBlock != 0)
-        {
-            fWaitingForLocked=true;            
-        }
-    }
- */   
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
         const CBlockIndex *pindexFork;
@@ -4315,34 +4232,6 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
         }
     }
 
-/* MCHN START */    
-/*    
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
-    {
-        if(nHeight)
-        {
-            vector<unsigned char> vchPubKey;
-
-            vchPubKey=vector<unsigned char> (block.vSigner+1, block.vSigner+1+block.vSigner[0]);
-
-            CPubKey pubKeyOut(vchPubKey);
-            if (!pubKeyOut.IsValid())
-            {
-                LogPrintf("mchn: ContextualCheckBlock: Invalid pubkey received in block signature\n");
-                return state.DoS(100, error("%s : Invalid key in signature", __func__), REJECT_INVALID, "bad-block-signature");
-            }
-
-            CKeyID pubKeyHash=pubKeyOut.GetID();
-            if(!mc_gState->m_Permissions->CanMineBlock(pubKeyHash.begin(),nHeight))
-            {
-                LogPrintf("mchn: ContextualCheckBlock: Permission denied for miner %s received in block signature for block %d, prev: %s\n",
-                        CBitcoinAddress(pubKeyHash).ToString().c_str(),nHeight,pindexPrev->GetBlockHash().ToString().c_str());
-                return false;
-            }
-        }
-    }
- */ 
-/* MCHN END */    
     
     return true;
 }
@@ -4981,30 +4870,7 @@ bool static LoadBlockIndexDB()
             SetLastBlock(chainActive[block_to_rollback]->GetBlockHash());
             SetLastBlock(0);
         }
-/*        
-        LogPrintf("mchn: Rolling back to height %d\n",block_to_rollback);
-        mc_gState->m_Permissions->RollBack(block_to_rollback);
-        mc_gState->m_Assets->RollBack(block_to_rollback);
-        if(mc_gState->m_Permissions->m_Block != block_to_rollback)
-        {
-            corrupted=true;
-            LogPrintf("mchn: Cannot roll back Permission DB. Height: %d\n",mc_gState->m_Permissions->m_Block);        
-        }
-        if(mc_gState->m_Assets->m_Block != block_to_rollback)
-        {
-            corrupted=true;
-            LogPrintf("mchn: Cannot roll back Entities DB. Height: %d\n",mc_gState->m_Assets->m_Block);        
-            return false;
-        }
- */ 
     }
-/*    
-    if(mc_gState->m_Permissions->m_Block < chainActive.Height())
-    {
-        LogPrintf("mchn: Permission DB is behind current chain tip. Shifting chain tip to %d\n",mc_gState->m_Permissions->m_Block);        
-        SetLastBlock(chainActive[mc_gState->m_Permissions->m_Block]->GetBlockHash());
-    }
-*/   
         
     
     if(fDebug)LogPrint("mchn","mchn: Rolling back permission DB to height %d\n",chainActive.Height());
