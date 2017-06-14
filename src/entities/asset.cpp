@@ -1195,49 +1195,6 @@ int mc_AssetDB::Commit()
                                                 (char*)&adbRow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
                             }
                         }
-/*                        
-                        if(aldRow.m_KeyType == (MC_ENT_KEYTYPE_FOLLOW_ON | MC_ENT_KEYTYPE_TXID))
-                        {
-                            err=m_Ledger->GetRow(aldRow.m_FirstPos,&aldRow);
-                            details.Set(&aldRow);
-
-                            adbRow.Zero();
-
-                            memset(adbRow.m_Key,0,MC_ENT_KEY_SIZE);
-                            memcpy(adbRow.m_Key,details.m_LedgerRow.m_Key,MC_ENT_KEY_SIZE);
-                            adbRow.m_KeyType=MC_ENT_KEYTYPE_TXID;
-
-                            ptr=(unsigned char*)m_Database->m_DB->Read((char*)&adbRow+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err);
-
-                            if(ptr)
-                            {         
-                                memcpy((char*)&adbRow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
-                                adbRow.m_ChainPos=m_Pos;                                
-                                err=m_Database->m_DB->Write((char*)&adbRow+m_Database->m_KeyOffset,m_Database->m_KeySize,
-                                                (char*)&adbRow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
-                                if(details.m_Flags & MC_ENT_FLAG_OFFSET_IS_SET)
-                                {
-                                    memset(adbRow.m_Key,0,MC_ENT_KEY_SIZE);
-                                    memcpy(adbRow.m_Key,details.m_Ref,MC_ENT_REF_SIZE);
-                                    adbRow.m_KeyType=MC_ENT_KEYTYPE_REF;                                    
-                                    err=m_Database->m_DB->Write((char*)&adbRow+m_Database->m_KeyOffset,m_Database->m_KeySize,
-                                                    (char*)&adbRow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
-                                }
-                                if(details.m_Flags & MC_ENT_FLAG_NAME_IS_SET)
-                                {
-                                    memset(adbRow.m_Key,0,MC_ENT_KEY_SIZE);
-                                    memcpy(adbRow.m_Key,details.m_Name,MC_ENT_MAX_NAME_SIZE);
-                                    adbRow.m_KeyType=MC_ENT_KEYTYPE_NAME;                                    
-                                    err=m_Database->m_DB->Write((char*)&adbRow+m_Database->m_KeyOffset,m_Database->m_KeySize,
-                                                    (char*)&adbRow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
-                                }
-                            }
-                            else
-                            {
-                                err=MC_ERR_INTERNAL_ERROR;
-                            }
-                        }
- */
                     }
                 }                       
             }
