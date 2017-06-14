@@ -1477,13 +1477,9 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                             switch(pass)
                             {
                                 case 0:                                         // Not admin or activate
-//                                    if(type & ( MC_PTP_ACTIVATE | MC_PTP_ADMIN ))
-                                    {
-                                        fAdminRequired=fCheckAdminList;                                        
-                                    }
+                                    fAdminRequired=fCheckAdminList;                                        
                                     if(mc_gState->m_Features->CachedInputScript())
                                     {
-//                                        type &= ~( MC_PTP_ACTIVATE | MC_PTP_ADMIN | MC_PTP_MINE);
                                         type &= ( MC_PTP_CONNECT | MC_PTP_SEND | MC_PTP_RECEIVE | MC_PTP_WRITE);
                                     }
                                     else
@@ -1495,7 +1491,6 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                     if(mc_gState->m_Features->CachedInputScript())
                                     {
                                         type &= ( MC_PTP_CREATE | MC_PTP_ISSUE | MC_PTP_ACTIVATE );
-//                                        type &= ( MC_PTP_MINE );
                                     }
                                     else
                                     {
@@ -1588,8 +1583,6 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                 bool fActivateIsEnough=mc_gState->m_Permissions->IsActivateEnough(type);
                                 for (unsigned int i = 0; i < tx.vin.size(); i++)
                                 {
-//                                    if( ((pass < 2) && ( (vInputHashTypes[i] == SIGHASH_ALL) || ( (vInputHashTypes[i] == SIGHASH_SINGLE) && (i == j) ) )) ||
-//                                        ((pass == 2) && (vAllowedAdmins.count(strprintf("%d-%d-%d",i,j,e)) > 0)) ) // Only inputs having admin permission before this tx are tried
                                     if( ( fCheckAdminList && !fActivateIsEnough && (vAllowedAdmins.count(strprintf("%d-%d-%d",i,j,e)) > 0)) ||
                                         ( fCheckAdminList && fActivateIsEnough && (vAllowedActivators.count(strprintf("%d-%d-%d",i,j,e)) > 0)) ||
                                         (!fCheckAdminList && ( (vInputHashTypes[i] == SIGHASH_ALL) || ( (vInputHashTypes[i] == SIGHASH_SINGLE) && (i == j) ) )))    
