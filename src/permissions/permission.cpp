@@ -3738,7 +3738,6 @@ int mc_Permissions::StoreBlockInfoInternal(const void* lpMiner,const void* lpHas
 {    
     int i,err,amg_items,last_offset;
     
-    mc_PermissionDBRow pdbRow;
     mc_PermissionDBRow pdbAdminMinerRow;
     mc_PermissionLedgerRow pldRow;
     mc_BlockMinerDBRow pdbBlockMinerRow;

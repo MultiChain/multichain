@@ -478,9 +478,13 @@ void CNode::PushVersion()
     GetRandBytes((unsigned char*)&nLocalHostNonce, sizeof(nLocalHostNonce));
     nVersionNonceSent=nLocalHostNonce;                                              // MCHN
     if (fLogIPs)
+    {
         if(fDebug)LogPrint("net", "send version message: version %d, blocks=%d, us=%s, them=%s, peer=%d\n", PROTOCOL_VERSION, nBestHeight, addrMe.ToString(), addrYou.ToString(), id);
+    }
     else
+    {
         if(fDebug)LogPrint("net", "send version message: version %d, blocks=%d, us=%s, peer=%d\n", PROTOCOL_VERSION, nBestHeight, addrMe.ToString(), id);
+    }
     
 /* MCHN START */
     std::string subver=FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, std::vector<string>());
@@ -994,11 +998,13 @@ void ThreadSocketHandler()
                         {
                             // socket closed gracefully
                             if (!pnode->fDisconnect)
+                            {
                                 if(fDebug)LogPrint("net", "socket closed\n");
-/* MCHN START */                    
+                            }
                             else
+                            {
                                 if(fDebug)LogPrint("net","socket closed, disconnect flag is set\n");
-/* MCHN END */                    
+                            }
                             pnode->CloseSocketDisconnect();
                         }
                         else if (nBytes < 0)
@@ -2205,9 +2211,13 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     }
 
     if (fLogIPs)
+    {
         if(fDebug)LogPrint("net", "Added connection to %s peer=%d\n", addrName, id);
+    }
     else
+    {
         if(fDebug)LogPrint("net", "Added connection peer=%d\n", id);
+    }
 
     // Be shy and don't send version until we hear
     if (hSocket != INVALID_SOCKET && !fInbound)
