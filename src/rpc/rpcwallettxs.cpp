@@ -312,7 +312,7 @@ Object ListWalletTransactions(const CWalletTx& wtx, bool fLong, const isminefilt
             {
                 total=1;
                 uint256 txid=wtx.GetHash();
-                asset_entry=AssetEntry((unsigned char*)&txid,-total,7);                        
+                asset_entry=AssetEntry((unsigned char*)&txid,-total,0x83);                        
                 txnouttype typeRet;
                 int nRequiredRet;
                 vector<CTxDestination> addressRets;
@@ -425,7 +425,7 @@ Object ListWalletTransactions(const CWalletTx& wtx, bool fLong, const isminefilt
         if(new_entity_type == MC_ENT_TYPE_ASSET)
         {
             uint256 txid=wtx.GetHash();
-            entry.push_back(Pair("issue", AssetEntry((unsigned char*)&txid,-total,7)));
+            entry.push_back(Pair("issue", AssetEntry((unsigned char*)&txid,-total,0x83)));
         }        
     }
     entry.push_back(Pair("items", aItems));

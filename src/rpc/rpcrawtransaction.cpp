@@ -293,7 +293,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                 
                 if(is_valid_asset)
                 {
-                    asset_entry=AssetEntry(txid,mc_GetABQuantity(ptr),3);
+                    asset_entry=AssetEntry(txid,mc_GetABQuantity(ptr),0x05);
                     if(is_genesis)
                     {
                         asset_entry.push_back(Pair("type", "issuefirst"));       
@@ -644,7 +644,7 @@ Value listunspent(const Array& params, bool fHelp)
                     }
                 }                
                 
-                asset_entry=AssetEntry(txid,mc_GetABQuantity(ptr),1);
+                asset_entry=AssetEntry(txid,mc_GetABQuantity(ptr),0x00);
                 assets.push_back(asset_entry);
             }
 

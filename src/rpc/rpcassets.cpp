@@ -883,7 +883,7 @@ Value getmultibalances(const Array& params, bool fHelp)
                     else
                     {
                         Object asset_entry;
-                        asset_entry=AssetEntry(ptr+48,quantity,1);
+                        asset_entry=AssetEntry(ptr+48,quantity,0x00);
                         addr_balances.push_back(asset_entry);  
                         if(setAssets.size())
                         {
@@ -901,7 +901,7 @@ Value getmultibalances(const Array& params, bool fHelp)
                     if(setAssetsWithBalances.count(rem_asset) == 0)
                     {
                         Object asset_entry;
-                        asset_entry=AssetEntry((unsigned char*)&rem_asset,0,1);
+                        asset_entry=AssetEntry((unsigned char*)&rem_asset,0,0x00);
                         addr_balances.push_back(asset_entry);   
                     }
                 }                
@@ -909,7 +909,7 @@ Value getmultibalances(const Array& params, bool fHelp)
             if(MCP_WITH_NATIVE_CURRENCY)
             {
                 Object asset_entry;
-                asset_entry=AssetEntry(NULL,btc,1);
+                asset_entry=AssetEntry(NULL,btc,0x00);
                 addr_balances.push_back(asset_entry);                        
             }
             
@@ -930,7 +930,7 @@ Value getmultibalances(const Array& params, bool fHelp)
                                 BOOST_FOREACH(const uint256& rem_asset, setAssets) 
                                 {
                                     Object asset_entry;
-                                    asset_entry=AssetEntry((unsigned char*)&rem_asset,0,1);
+                                    asset_entry=AssetEntry((unsigned char*)&rem_asset,0,0x00);
                                     empty_balances.push_back(asset_entry);   
                                 }                
                             }
@@ -1171,7 +1171,7 @@ Value getaddressbalances(const Array& params, bool fHelp)
         if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptr))
         {
             txid=entity.GetTxID();
-            asset_entry=AssetEntry(txid,mc_GetABQuantity(ptr),1);
+            asset_entry=AssetEntry(txid,mc_GetABQuantity(ptr),0x00);
             assets.push_back(asset_entry);
         }        
     }
@@ -1181,14 +1181,14 @@ Value getaddressbalances(const Array& params, bool fHelp)
         Object asset_entry;
         ptr=(unsigned char *)genesis_amounts->GetRow(a);
         
-        asset_entry=AssetEntry(ptr,mc_GetLE(ptr+32,MC_AST_ASSET_QUANTITY_SIZE),1);
+        asset_entry=AssetEntry(ptr,mc_GetLE(ptr+32,MC_AST_ASSET_QUANTITY_SIZE),0x00);
         assets.push_back(asset_entry);
     }
     
     if(MCP_WITH_NATIVE_CURRENCY)
     {
         Object asset_entry;
-        asset_entry=AssetEntry(NULL,totalBTC,1);
+        asset_entry=AssetEntry(NULL,totalBTC,0x00);
         assets.push_back(asset_entry);        
     }
     
@@ -1401,7 +1401,7 @@ Value getassetbalances(const Array& params, bool fHelp)
         if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptr))
         {
             txid=entity.GetTxID();
-            asset_entry=AssetEntry(txid,mc_GetABQuantity(ptr),1);
+            asset_entry=AssetEntry(txid,mc_GetABQuantity(ptr),0x00);
             assets.push_back(asset_entry);
         }        
     }
@@ -1411,7 +1411,7 @@ Value getassetbalances(const Array& params, bool fHelp)
         Object asset_entry;
         ptr=(unsigned char *)genesis_amounts->GetRow(a);
         
-        asset_entry=AssetEntry(ptr,mc_GetLE(ptr+32,MC_AST_ASSET_QUANTITY_SIZE),1);
+        asset_entry=AssetEntry(ptr,mc_GetLE(ptr+32,MC_AST_ASSET_QUANTITY_SIZE),0x00);
         assets.push_back(asset_entry);
     }
     
@@ -1449,7 +1449,7 @@ Value listassets(const Array& params, bool fHelp)
 
     mc_Buffer *assets;
     unsigned char *txid;
-    int output_level;
+    uint32_t output_level;
     Array results;
     
     int count,start;
@@ -1510,13 +1510,13 @@ Value listassets(const Array& params, bool fHelp)
     if(assets == NULL)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot open asset database");
 
-    output_level=8;
+    output_level=0x0F;
     
     if (params.size() > 1)    
     {
         if(paramtobool(params[1]))
         {
-            output_level=9;
+            output_level|=0x20;
         }
     }
     

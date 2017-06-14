@@ -182,7 +182,7 @@ Object ExchangeAssetEntry(uint256 hash,const CTxOut txout,mc_Script *lpScript,mc
             if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptr))
             {
                 txid=entity.GetTxID();
-                asset_entry=AssetEntry(txid,quantity,1);
+                asset_entry=AssetEntry(txid,quantity,0x00);
                 assets.push_back(asset_entry);
             }        
         }
@@ -370,13 +370,13 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
                     txid=entity.GetTxID();
                     if(quantity > 0)
                     {
-                        asset_entry=AssetEntry(txid,quantity,1);
+                        asset_entry=AssetEntry(txid,quantity,0x00);
                         offer.push_back(asset_entry);
                     }
                     else
                     {
                         quantity=-quantity;
-                        asset_entry=AssetEntry(txid,quantity,1);
+                        asset_entry=AssetEntry(txid,quantity,0x00);
                         ask.push_back(asset_entry);  
                         uint256 hash;
                         hash=*(uint256*)txid;

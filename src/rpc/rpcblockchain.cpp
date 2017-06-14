@@ -28,7 +28,7 @@ extern void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& en
 bool ParseMultichainTxOutToBuffer(uint256 hash,const CTxOut& txout,mc_Buffer *amounts,mc_Script *lpScript,int *allowed,int *required,string& strFailReason);
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
 bool CreateAssetBalanceList(const CTxOut& out,mc_Buffer *amounts,mc_Script *lpScript);
-Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level);
+Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_level);
 Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong);
 string EncodeHexTx(const CTransaction& tx);
 int OrphanPoolSize();
@@ -546,7 +546,7 @@ Value gettxout(const Array& params, bool fHelp)
                 }
             }                
 
-            asset_entry=AssetEntry(txid,mc_GetABQuantity(ptr),3);
+            asset_entry=AssetEntry(txid,mc_GetABQuantity(ptr),0x05);
             
             if(mc_GetABRefType(ptr) == MC_AST_ASSET_REF_TYPE_GENESIS)
 //            if(mc_GetLE(ptr,4) == 0)
