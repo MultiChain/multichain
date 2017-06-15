@@ -42,7 +42,7 @@ Compile MultiChain for Ubuntu (64-bit)
 Notes
 -----
 
-* This will build `multichaind`, `multichain-cli` and `multitchain-util` in the `src` directory.
+* This will build `multichaind`, `multichain-cli` and `multichain-util` in the `src` directory.
 
 * The release is built with GCC after which `strip multichaind` strings the debug symbols, which reduces the executable size by about 90%.
 
@@ -132,3 +132,6 @@ Notes
 -----
 
 * This will build `multichaind`, `multichain-cli` and `multichain-util` in the `src` directory.
+=======
+* This will build `multichaind.exe`, `multichain-cli.exe` and `multichain-util.exe` in the `src` directory.
+
