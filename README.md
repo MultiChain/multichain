@@ -132,6 +132,4 @@ Notes
 -----
 
 * This will build `multichaind`, `multichain-cli` and `multichain-util` in the `src` directory.
-=======
-* This will build `multichaind.exe`, `multichain-cli.exe` and `multichain-util.exe` in the `src` directory.
 
