@@ -42,13 +42,13 @@ int main(int argc, char* argv[])
                 if(mc_gState->m_Params->m_NumArguments>2)
                 {                    
                     v=atoi(mc_gState->m_Params->m_Arguments[2]);
-                    if( (v>=10002) && (v<=version) )
+                    if( (v>=mc_gState->m_Features->MinProtocolVersion()) && (v<=version) )
                     {
                         version=v;                        
                     }
                     else
                     {
-                        fprintf(stderr,"ERROR: Invalid value for protocol version. Valid range: 10002 - %d\n",mc_gState->GetProtocolVersion());   
+                        fprintf(stderr,"ERROR: Invalid value for protocol version. Valid range: %d - %d\n",mc_gState->m_Features->MinProtocolVersion(), mc_gState->GetProtocolVersion());   
                         err=MC_ERR_INVALID_PARAMETER_VALUE;
                     }
                 }

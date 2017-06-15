@@ -195,6 +195,12 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "liststreampublisheritems", 3 },
     { "liststreampublisheritems", 4 },
     { "liststreampublisheritems", 5 },
+    { "liststreamblockitems", 1 },
+    { "liststreamblockitems", 2 },
+    { "liststreamblockitems", 3 },
+    { "liststreamblockitems", 4 },
+    { "listblocks", 0 },
+    { "listblocks", 1 },
 /* MCHN END */    
     { "settxfee", 0 },
     { "getreceivedbyaddress", 1 },
@@ -235,6 +241,9 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "getblock", 1 },
     { "gettransaction", 1 },
     { "getrawtransaction", 1 },
+    { "appendrawtransaction", 1 },
+    { "appendrawtransaction", 2 },
+    { "appendrawtransaction", 3 },
     { "createrawtransaction", 0 },
     { "createrawtransaction", 1 },
     { "createrawtransaction", 2 },
@@ -324,6 +333,9 @@ static const CRPCConvertParamMayBeString vRPCConvertParamsMayBeString[] =
     { "liststreams", 0 },
     { "listupgrades", 0 },
     { "listpermissions", 1 },
+    { "setgenerate", 0 },
+    { "liststreamblockitems", 1 },
+    { "listblocks", 0 },
 };
 
 class CRPCConvertTableMayBeString
@@ -406,9 +418,16 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
                         }
                         else
                         {
-                            std::string strConverted=convert_string_to_utf8(strVal);
-                            params.push_back(strConverted);
-//                            params.push_back(strVal);                                            
+                            if(jVal.type() == bool_type)
+                            {
+                                params.push_back(jVal);                                            
+                            }
+                            else
+                            {
+                                std::string strConverted=convert_string_to_utf8(strVal);
+                                params.push_back(strConverted);
+    //                            params.push_back(strVal);                                            
+                            }
                         }
                     }
                 }

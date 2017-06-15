@@ -150,7 +150,11 @@ void mc_MemoryDump(void *ptr,                                                   
     
     for(i=0;i<n;i++)
     {
+#ifdef MAC_OSX
+        printf("%4d %08X: ",k,(unsigned int)(size_t)dptr);
+#else        
         printf("%4d %08X: ",k,(unsigned int)(unsigned int64_t)dptr);
+#endif        
         for(j=0;j<4;j++)
         {
             if(k<len)

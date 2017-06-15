@@ -122,7 +122,7 @@ CCoinsModifier CCoinsViewCache::ModifyCoins(const uint256 &txid) {
     // Assume that whenever ModifyCoins is called, the entry will be modified.
     ret.first->second.flags |= CCoinsCacheEntry::DIRTY;
 /* MCHN START */    
-    LogPrint("mccoin","COIN: CH Modify %s\n", txid.ToString().c_str());
+    if(fDebug)LogPrint("mccoin","COIN: CH Modify %s\n", txid.ToString().c_str());
 /* MCHN END */    
     return CCoinsModifier(*this, ret.first);
 }
@@ -171,7 +171,7 @@ bool CCoinsViewCache::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlockIn
                     entry.coins.swap(it->second.coins);
                     entry.flags = CCoinsCacheEntry::DIRTY | CCoinsCacheEntry::FRESH;
 /* MCHN START */    
-                    LogPrint("mccoin","COIN: CH Write  %s\n", it->first.ToString().c_str());
+                    if(fDebug)LogPrint("mccoin","COIN: CH Write  %s\n", it->first.ToString().c_str());
 /* MCHN END */    
                 }
             } else {
@@ -181,14 +181,14 @@ bool CCoinsViewCache::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlockIn
                     // it from the parent.
                     cacheCoins.erase(itUs);
 /* MCHN START */    
-                    LogPrint("mccoin","COIN: CH Erase  %s\n", it->first.ToString().c_str());
+                    if(fDebug)LogPrint("mccoin","COIN: CH Erase  %s\n", it->first.ToString().c_str());
 /* MCHN END */    
                 } else {
                     // A normal modification.
                     itUs->second.coins.swap(it->second.coins);
                     itUs->second.flags |= CCoinsCacheEntry::DIRTY;
 /* MCHN START */    
-                    LogPrint("mccoin","COIN: CH Update %s\n", it->first.ToString().c_str());
+                    if(fDebug)LogPrint("mccoin","COIN: CH Update %s\n", it->first.ToString().c_str());
 /* MCHN END */    
                 }
             }
@@ -196,7 +196,7 @@ bool CCoinsViewCache::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlockIn
         else
         {
 /* MCHN START */    
-            LogPrint("mccoin","COIN: CH Clean! %s\n", it->first.ToString().c_str());            
+            if(fDebug)LogPrint("mccoin","COIN: CH Clean! %s\n", it->first.ToString().c_str());            
 /* MCHN END */    
         }
         CCoinsMap::iterator itOld = it++;
@@ -225,6 +225,11 @@ const CTxOut &CCoinsViewCache::GetOutputFor(const CTxIn& input) const
 
 CAmount CCoinsViewCache::GetValueIn(const CTransaction& tx) const
 {
+    if(MCP_WITH_NATIVE_CURRENCY == 0)
+    {
+        return 0;
+    }
+    
     if (tx.IsCoinBase())
         return 0;
 
@@ -251,6 +256,11 @@ bool CCoinsViewCache::HaveInputs(const CTransaction& tx) const
 
 double CCoinsViewCache::GetPriority(const CTransaction &tx, int nHeight) const
 {
+    if(MCP_WITH_NATIVE_CURRENCY == 0)
+    {
+        return 0.0;
+    }
+
     if (tx.IsCoinBase())
         return 0.0;
     double dResult = 0.0;

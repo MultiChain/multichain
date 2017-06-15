@@ -122,13 +122,33 @@ void* __US_SemCreate()
     
     lpsem=NULL;
     
+#ifdef MAC_OSX
+    // Create a unique name for the named semaphore
+    static const char alphanum[] =
+        "0123456789"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz";
+    int namelen = 20;
+    char name[namelen + 1];
+    for (int i = 0; i < namelen; ++i) {
+        name[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
+    }
+    name[namelen] = 0;
+
+    // Create named semaphore as unnamed semaphores are deprecated on OS X.
+    lpsem = sem_open(name, O_CREAT | O_EXCL, 0666, 1);
+    if (lpsem == SEM_FAILED) {
+        return NULL;
+    }
+#else
+    
     lpsem=new sem_t;
     if(sem_init(lpsem,0666,1))
     {
         delete lpsem;
         return NULL;
     }
-
+#endif
     return (void*)lpsem;
 }
 
@@ -150,12 +170,16 @@ void __US_SemPost(void* sem)
 
 void __US_SemDestroy(void* sem)
 {
+#ifndef MAC_OSX
     sem_t *lpsem;
+#endif    
     if(sem)
     {
         sem_close((sem_t*)sem);
+#ifndef MAC_OSX
         lpsem=(sem_t*)sem;
         delete lpsem;
+#endif    
     }
 }
 

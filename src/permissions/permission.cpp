@@ -5,6 +5,7 @@
 
 unsigned char null_entity[MC_PLS_SIZE_ENTITY];
 unsigned char upgrade_entity[MC_PLS_SIZE_ENTITY];
+unsigned char adminminerlist_entity[MC_PLS_SIZE_ENTITY];
 
 int mc_IsNullEntity(const void* lpEntity)
 {
@@ -34,6 +35,29 @@ void mc_PermissionDBRow::Zero()
     memset(this,0,sizeof(mc_PermissionDBRow));
 }
 
+void mc_BlockMinerDBRow::Zero()
+{
+    memset(this,0,sizeof(mc_BlockMinerDBRow));    
+}
+
+void mc_AdminMinerGrantDBRow::Zero()
+{
+    memset(this,0,sizeof(mc_AdminMinerGrantDBRow));        
+}
+
+int mc_PermissionDBRow::InBlockRange(uint32_t block)
+{
+    if((block+1) >= m_BlockFrom)
+    {
+        if((block+1) < m_BlockTo)
+        {
+            return 1;
+        }        
+    }
+    return 0;
+}
+
+
 void mc_PermissionLedgerRow::Zero()
 {
     memset(this,0,sizeof(mc_PermissionLedgerRow));
@@ -56,16 +80,8 @@ void mc_PermissionDB::Zero()
 {
     m_FileName[0]=0;
     m_DB=0;
-    if(mc_gState->m_Features->PerEntityPermissions())
-    {
-        m_KeyOffset=0;
-        m_KeySize=MC_PLS_SIZE_ENTITY+24;                                        // Entity,address,type
-    }
-    else
-    {
-        m_KeyOffset=MC_PLS_SIZE_ENTITY;
-        m_KeySize=24;
-    }
+    m_KeyOffset=0;
+    m_KeySize=MC_PLS_SIZE_ENTITY+24;                                            // Entity,address,type
     m_ValueOffset=56;
     m_ValueSize=24;    
     m_TotalSize=m_KeySize+m_ValueSize;
@@ -110,16 +126,8 @@ void mc_PermissionLedger::Zero()
 {
     m_FileName[0]=0;
     m_FileHan=0;
-    if(mc_gState->m_Features->PerEntityPermissions())
-    {
-        m_KeyOffset=0;
-        m_KeySize=MC_PLS_SIZE_ENTITY+32;                                        // Entity,address,type,prevrow
-    }
-    else
-    {
-        m_KeyOffset=MC_PLS_SIZE_ENTITY;
-        m_KeySize=32;
-    }
+    m_KeyOffset=0;
+    m_KeySize=MC_PLS_SIZE_ENTITY+32;                                            // Entity,address,type,prevrow
     m_ValueOffset=MC_PLS_SIZE_ENTITY+32;
     m_ValueSize=64;    
     m_TotalSize=m_KeySize+m_ValueSize;
@@ -258,16 +266,22 @@ int mc_Permissions::Zero()
     m_Row=0;
     m_AdminCount=0;
     m_MinerCount=0;
-    m_DBRowCount=0;            
+//    m_DBRowCount=0;            
     m_CheckPointRow=0;
     m_CheckPointAdminCount=0;
     m_CheckPointMinerCount=0;
     m_CheckPointMemPoolSize=0;
+    m_CopiedBlock=0;
+    m_CopiedRow=0;
+    m_ForkBlock=0;
     m_CopiedAdminCount=0;
     m_CopiedMinerCount=0;
     m_ClearedAdminCount=0;
     m_ClearedMinerCount=0;
-    
+    m_ClearedMinerCountForMinerVerification=0;
+    m_TmpSavedAdminCount=0;
+    m_TmpSavedMinerCount=0;
+
     m_Semaphore=NULL;
     m_LockedBy=0;
     
@@ -298,7 +312,9 @@ int mc_Permissions::Initialize(const char *name,int mode)
     strcpy(m_Name,name);
     memset(null_entity,0,MC_PLS_SIZE_ENTITY);
     memset(upgrade_entity,0,MC_PLS_SIZE_ENTITY);
-    upgrade_entity[0]=0x01;
+    upgrade_entity[0]=MC_PSE_UPGRADE;
+    memset(adminminerlist_entity,0,MC_PLS_SIZE_ENTITY);
+    adminminerlist_entity[0]=MC_PSE_ADMINMINERLIST;
     
     err=MC_ERR_NOERROR;
     
@@ -467,9 +483,16 @@ int mc_Permissions::Initialize(const char *name,int mode)
     m_Block=pdbBlock;
     m_Row=pdbLastRow;            
 
-    UpdateCounts();
+    err=UpdateCounts();
+    if(err)
+    {
+        LogString("Error: Cannot initialize AdminMiner list");            
+        return MC_ERR_DBOPEN_ERROR;            
+    }
+    
     m_ClearedAdminCount=m_AdminCount;
     m_ClearedMinerCount=m_MinerCount;
+    m_ClearedMinerCountForMinerVerification=m_MinerCount;
 
     if(m_Ledger->Open() <= 0)
     {
@@ -505,7 +528,7 @@ int mc_Permissions::Initialize(const char *name,int mode)
         return MC_ERR_INTERNAL_ERROR;
     }
 
-    sprintf(msg,"Initialized: Admin count: %d, Miner count: %d, DB rows: %d, ledger rows: %ld",m_AdminCount,m_MinerCount,m_DBRowCount,m_Row);
+    sprintf(msg,"Initialized: Admin count: %d, Miner count: %d, ledger rows: %ld",m_AdminCount,m_MinerCount,m_Row);
     LogString(msg);
     return MC_ERR_NOERROR;
 }
@@ -713,13 +736,6 @@ uint32_t mc_Permissions::GetPossiblePermissionTypes(uint32_t entity_type)
             }
             break;
     }
-    if(mc_gState->m_Features->ActivatePermission() == 0)
-    {
-        if(full_type & MC_PTP_ACTIVATE)
-        {
-            full_type-=MC_PTP_ACTIVATE;
-        }
-    }
     return full_type;
 }
 
@@ -760,10 +776,7 @@ uint32_t mc_Permissions::GetPermissionType(const char *str,int entity_type)
                 if(mc_MemcmpCheckSize(start,"issue",    ptr-start) == 0)perm_type = MC_PTP_ISSUE;
                 if(mc_MemcmpCheckSize(start,"mine",     ptr-start) == 0)perm_type = MC_PTP_MINE;
                 if(mc_MemcmpCheckSize(start,"admin",    ptr-start) == 0)perm_type = MC_PTP_ADMIN;
-                if(mc_gState->m_Features->ActivatePermission())
-                {
-                    if(mc_MemcmpCheckSize(start,"activate", ptr-start) == 0)perm_type = MC_PTP_ACTIVATE;
-                }
+                if(mc_MemcmpCheckSize(start,"activate", ptr-start) == 0)perm_type = MC_PTP_ACTIVATE;
                 if(mc_gState->m_Features->Streams())
                 {
                     if(mc_MemcmpCheckSize(start,"create", ptr-start) == 0)perm_type = MC_PTP_CREATE;
@@ -798,7 +811,7 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
         return GetPermission(null_entity,lpAddress,type,row,checkmempool);
     }
     
-    int err,value_len,mprow,found_in_db;
+    int err,value_len,mprow;
     uint32_t result;
     mc_PermissionLedgerRow pldRow;
     mc_PermissionDBRow pdbRow;
@@ -830,25 +843,59 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
     }
     
     result=0;
-    found_in_db=0;
     if(ptr)
     {
         memcpy((char*)&pdbRow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
         
-        pldRow.m_PrevRow=pdbRow.m_LedgerRow;
+//        pldRow.m_PrevRow=pdbRow.m_LedgerRow;
         pldRow.m_BlockFrom=pdbRow.m_BlockFrom;
         pldRow.m_BlockTo=pdbRow.m_BlockTo;
         pldRow.m_Flags=pdbRow.m_Flags;
+        pldRow.m_ThisRow=pdbRow.m_LedgerRow;
+        
+        if( (m_CopiedRow > 0) && ( (type == MC_PTP_ADMIN) || (type == MC_PTP_MINE) || (type == MC_PTP_BLOCK_MINER) ) )
+        {
+            if(m_Ledger->Open() <= 0)
+            {
+                LogString("GetPermission: couldn't open ledger");
+                return 0;
+            }
+            m_Ledger->GetRow(pdbRow.m_LedgerRow,&pldRow);
+            while( (pldRow.m_PrevRow > 0 ) && (pldRow.m_BlockReceived > (uint32_t)m_ForkBlock) )
+            {
+                m_Ledger->GetRow(pldRow.m_PrevRow,&pldRow);
+            }
+                        
+            if(pldRow.m_BlockReceived > (uint32_t)m_ForkBlock)
+            {
+                ptr=NULL;
+            }
+            
+            m_Ledger->Close();
+        }        
+        
+        if(ptr)
+        {
+            row->m_BlockFrom=pldRow.m_BlockFrom;
+            row->m_BlockTo=pldRow.m_BlockTo;
+            row->m_ThisRow=pldRow.m_ThisRow;
+            row->m_Flags=pldRow.m_Flags;        
+            pldRow.m_PrevRow=pldRow.m_ThisRow;        
+        }
+/*        
         row->m_BlockFrom=pdbRow.m_BlockFrom;
         row->m_BlockTo=pdbRow.m_BlockTo;
         row->m_ThisRow=pdbRow.m_LedgerRow;
         row->m_Flags=pdbRow.m_Flags;
+ */ 
+/*        
         found_in_db=1;
-        row->m_FoundInDB=found_in_db;
+        row->m_FoundInDB=found_in_db;        
+ */ 
     }
     
     if(checkmempool)
-    {
+    { 
         mprow=0;
         while(mprow>=0)
         {
@@ -856,7 +903,7 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
             if(mprow>=0)
             {
                 memcpy((unsigned char*)row+m_Ledger->m_KeyOffset,m_MemPool->GetRow(mprow),m_Ledger->m_TotalSize);
-                row->m_FoundInDB=found_in_db;
+//                row->m_FoundInDB=found_in_db;
                 pldRow.m_PrevRow=row->m_ThisRow;
             }
         }
@@ -949,7 +996,7 @@ int mc_Permissions::CanConnect(const void* lpEntity,const void* lpAddress)
 //    if(lpEntity == NULL)
     if(mc_IsNullEntity(lpEntity))
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanconnect"))
+        if(MCP_ANYONE_CAN_CONNECT)
         {
             return MC_PTP_CONNECT;
         }
@@ -979,7 +1026,7 @@ int mc_Permissions::CanSend(const void* lpEntity,const void* lpAddress)
     
     if(mc_IsNullEntity(lpEntity))
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecansend"))
+        if(MCP_ANYONE_CAN_SEND)
         {
             return MC_PTP_SEND;
         }
@@ -1012,10 +1059,7 @@ int mc_Permissions::CanSend(const void* lpEntity,const void* lpAddress)
     
     if(result == 0)
     {
-        if(mc_gState->m_Features->ActivatePermission())
-        {
-            result |=  GetPermission(lpEntity,lpAddress,MC_PTP_ACTIVATE);    
-        }
+        result |=  GetPermission(lpEntity,lpAddress,MC_PTP_ACTIVATE);    
     }
         
     if(result)
@@ -1053,7 +1097,7 @@ int mc_Permissions::CanReceive(const void* lpEntity,const void* lpAddress)
     
     if(mc_IsNullEntity(lpEntity))
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanreceive"))
+        if(MCP_ANYONE_CAN_RECEIVE)
         {
             return MC_PTP_RECEIVE;
         }
@@ -1070,10 +1114,7 @@ int mc_Permissions::CanReceive(const void* lpEntity,const void* lpAddress)
     
     if(result == 0)
     {
-        if(mc_gState->m_Features->ActivatePermission())
-        {
-            result |=  GetPermission(lpEntity,lpAddress,MC_PTP_ACTIVATE);    
-        }
+        result |=  GetPermission(lpEntity,lpAddress,MC_PTP_ACTIVATE);    
     }
     
     if(result)
@@ -1143,7 +1184,7 @@ int mc_Permissions::CanCreate(const void* lpEntity,const void* lpAddress)
 //    if(lpEntity == NULL)
     if(mc_IsNullEntity(lpEntity))
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecancreate"))
+        if(MCP_ANYONE_CAN_RECEIVE)
         {
             return MC_PTP_CREATE;
         }
@@ -1213,7 +1254,6 @@ int mc_Permissions::GetActiveMinerCount()
             diversity=(int)((miner_count*diversity-1)/MC_PRM_DECIMAL_GRANULARITY);
         }
         diversity++;
-//        diversity=(int)((m_MinerCount*(uint32_t)mc_gState->m_NetworkParams->GetInt64Param("miningdiversity")-1)/MC_PRM_DECIMAL_GRANULARITY)+1;
         miner_count-=diversity-1;
         if(miner_count<1)
         {
@@ -1241,7 +1281,6 @@ int mc_Permissions::CanMine(const void* lpEntity,const void* lpAddress)
     mc_PermissionLedgerRow row;
     
     int result;    
-    int diversity;
     int32_t last;
         
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
@@ -1251,7 +1290,7 @@ int mc_Permissions::CanMine(const void* lpEntity,const void* lpAddress)
     
     if(mc_IsNullEntity(lpEntity))
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine"))
+        if(MCP_ANYONE_CAN_MINE)
         {
              return MC_PTP_MINE;
         }
@@ -1259,13 +1298,8 @@ int mc_Permissions::CanMine(const void* lpEntity,const void* lpAddress)
     
     Lock(0);
 
-    int miner_count=m_MinerCount;
-    int check_mempool=1;
-    if(mc_gState->m_Features->UnconfirmedMinersCannotMine())
-    {
-        miner_count=m_ClearedMinerCount;
-        check_mempool=0;        
-    }
+    int miner_count=m_ClearedMinerCount;
+    int check_mempool=0;        
     
     result = GetPermission(lpEntity,lpAddress,MC_PTP_MINE,&row,check_mempool);        
 
@@ -1277,26 +1311,9 @@ int mc_Permissions::CanMine(const void* lpEntity,const void* lpAddress)
             last=row.m_BlockFrom;
             if(last)
             {
-                if(!IsSetupPeriod())
+                if(IsBarredByDiversity(m_Block+1,last,miner_count))
                 {
-                    diversity=(int)mc_gState->m_NetworkParams->GetInt64Param("miningdiversity");
-                    if(diversity > 0)
-                    {
-                        diversity=(int)((miner_count*diversity-1)/MC_PRM_DECIMAL_GRANULARITY);
-                    }
-                    diversity++;
-                    if(diversity<1)
-                    {
-                        diversity=1;
-                    }
-                    if(diversity > miner_count)
-                    {
-                        diversity=miner_count;
-                    }
-                    if(m_Block+1-last <= diversity-1)
-                    {
-                        result=0;
-                    }
+                    result=0;                    
                 }
             }        
         }
@@ -1307,7 +1324,9 @@ int mc_Permissions::CanMine(const void* lpEntity,const void* lpAddress)
     return result;
 }
 
-/** Returns non-zero value if address can mine block with soecific height */
+/** Returns non-zero value if address can mine block with specific height */
+
+// WARNING! Possible bug in this functiom, But function is not used
 
 int mc_Permissions::CanMineBlock(const void* lpAddress,uint32_t block)
 {
@@ -1315,7 +1334,7 @@ int mc_Permissions::CanMineBlock(const void* lpAddress,uint32_t block)
     mc_BlockLedgerRow block_row;
     int result;    
     int miner_count;
-    int diversity;
+//    int diversity;
     uint32_t last;
     
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
@@ -1323,7 +1342,7 @@ int mc_Permissions::CanMineBlock(const void* lpAddress,uint32_t block)
         return MC_PTP_MINE;
     }
     
-    if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine"))
+    if(MCP_ANYONE_CAN_MINE)
     {
          return MC_PTP_MINE;
     }
@@ -1362,7 +1381,6 @@ int mc_Permissions::CanMineBlock(const void* lpAddress,uint32_t block)
         {
             result=0;
         }
-
     }
     
     if(result)
@@ -1386,39 +1404,19 @@ int mc_Permissions::CanMineBlock(const void* lpAddress,uint32_t block)
             }
             if(row.m_BlockReceived < block)
             {
-                last=row.m_BlockFrom;
-                if(last)
+                last=row.m_BlockFrom;                                           // block #1 is mined by genesis admin, no false negative here
+                if(last)                                                         
                 {
                     block_row.Zero();
                     sprintf((char*)block_row.m_Address,"Block %08X row",block-1);
                     GetPermission(block_row.m_Address,MC_PTP_BLOCK_INDEX,(mc_PermissionLedgerRow*)&block_row);
                     m_Ledger->GetRow(block_row.m_ThisRow,(mc_PermissionLedgerRow*)&block_row);
                     
-                    miner_count=block_row.m_MinerCount;
-                    
-                    if(miner_count)
+                    miner_count=block_row.m_MinerCount;                         // Probably BUG here, should be cleared miner count, but function  not used
+   
+                    if(IsBarredByDiversity(block,last,miner_count))
                     {
-                        if(block >= mc_gState->m_NetworkParams->GetInt64Param("setupfirstblocks"))
-                        {                        
-                            diversity=(int)mc_gState->m_NetworkParams->GetInt64Param("miningdiversity");
-                            if(diversity > 0)
-                            {
-                                diversity=(int)((miner_count*diversity-1)/MC_PRM_DECIMAL_GRANULARITY);
-                            }
-                            diversity++;
-                            if(diversity<1)
-                            {
-                                diversity=1;
-                            }
-                            if(diversity > miner_count)
-                            {
-                                diversity=miner_count;
-                            }
-                            if((int)(block-last) <= diversity-1)
-                            {
-                                result=0;
-                            }
-                        }
+                        result=0;
                     }
                 }
             }
@@ -1431,6 +1429,148 @@ int mc_Permissions::CanMineBlock(const void* lpAddress,uint32_t block)
     
     return result;
 }
+
+int mc_Permissions::FindLastAllowedMinerRow(mc_PermissionLedgerRow *row,uint32_t block,int prev_result)
+{
+    mc_PermissionLedgerRow pldRow;
+    int result;
+    
+    if(row->m_ThisRow < m_Row-m_MemPool->GetCount())
+    {
+        return prev_result;
+    }
+    
+    if(row->m_BlockReceived < block)
+    {
+        return prev_result;        
+    }
+    
+    result=prev_result;
+    
+    memcpy(&pldRow,row,sizeof(mc_PermissionLedgerRow));
+    while( (pldRow.m_ThisRow >= m_Row-m_MemPool->GetCount() ) && (pldRow.m_BlockReceived >= block) && (pldRow.m_PrevRow > 0) )
+    {
+        memcpy(&pldRow,m_MemPool->GetRow(pldRow.m_PrevRow),sizeof(mc_PermissionLedgerRow));
+    }
+    
+    if(pldRow.m_PrevRow <=0 )
+    {
+        return 0;
+    }
+
+    if(pldRow.m_ThisRow < m_Row-m_MemPool->GetCount())
+    {
+        if(m_Ledger->Open() <= 0)
+        {
+            LogString("Error: CanMineBlock: couldn't open ledger");
+            return 0;
+        }
+    
+        m_Ledger->GetRow(pldRow.m_ThisRow,&pldRow);
+        m_Ledger->Close();
+    }
+    
+    result=0;
+    if((uint32_t)block >= pldRow.m_BlockFrom)
+    {
+        if((uint32_t)block < pldRow.m_BlockTo)
+        {
+            result=MC_PTP_MINE;
+        }                                
+    }        
+    
+    return result;    
+}
+
+int mc_Permissions::CanMineBlockOnFork(const void* lpAddress,uint32_t block,uint32_t last_after_fork)
+{
+    mc_PermissionLedgerRow row;
+    uint32_t last;
+    int result;
+    
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return MC_PTP_MINE;
+    }
+    
+    if(MCP_ANYONE_CAN_MINE)
+    {
+         return MC_PTP_MINE;
+    }
+    
+    if(block == 0)                                                              
+    {
+        return 0;
+    }
+    
+    Lock(0);
+
+    int miner_count=m_ClearedMinerCountForMinerVerification;
+    
+    result=GetPermission(NULL,lpAddress,MC_PTP_MINE,&row,1);                
+
+    result=FindLastAllowedMinerRow(&row,block,result);
+    
+    if(result)
+    {
+        
+        last=last_after_fork;
+
+        if(last == 0)
+        {
+            GetPermission(NULL,lpAddress,MC_PTP_BLOCK_MINER,&row,0);    
+
+            if(row.m_ThisRow)
+            {
+                last=row.m_BlockFrom;
+            }    
+        }
+    
+        if(last)
+        {            
+            if(IsBarredByDiversity(block,last,miner_count))
+            {
+                result=0;
+            }            
+        }
+    }
+    
+    UnLock();
+    return result;
+    
+}
+
+int mc_Permissions::IsBarredByDiversity(uint32_t block,uint32_t last,int miner_count)
+{
+    int diversity;
+    if(miner_count)
+    {
+        if(block >= mc_gState->m_NetworkParams->GetInt64Param("setupfirstblocks"))
+        {                        
+            diversity=(int)mc_gState->m_NetworkParams->GetInt64Param("miningdiversity");
+            if(diversity > 0)
+            {
+                diversity=(int)((miner_count*diversity-1)/MC_PRM_DECIMAL_GRANULARITY);
+            }
+            diversity++;
+            if(diversity<1)
+            {
+                diversity=1;
+            }
+            if(diversity > miner_count)
+            {
+                diversity=miner_count;
+            }
+            if((int)(block-last) <= diversity-1)
+            {
+                return 1;
+            }
+        }
+    }
+
+    return 0;
+}
+
 
 /** Returns non-zero value if (entity,address) can admin */
 
@@ -1453,7 +1593,7 @@ int mc_Permissions::CanAdmin(const void* lpEntity,const void* lpAddress)
     
     if(mc_IsNullEntity(lpEntity))
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanadmin"))
+        if(MCP_ANYONE_CAN_ADMIN)
         {
             return MC_PTP_ADMIN;
         }
@@ -1473,21 +1613,9 @@ int mc_Permissions::CanAdmin(const void* lpEntity,const void* lpAddress)
 
 int mc_Permissions::CanActivate(const void* lpEntity,const void* lpAddress)
 {
-    if(mc_gState->m_Features->ActivatePermission() == 0)
-    {
-        if(CanAdmin(lpEntity,lpAddress))
-        {
-            return MC_PTP_ACTIVATE;
-        }
-        else
-        {
-            return 0;
-        }
-    }
-    
     if(mc_IsNullEntity(lpEntity))
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanactivate"))
+        if(MCP_ANYONE_CAN_ACTIVATE)
         {
             return MC_PTP_ACTIVATE;
         }
@@ -1518,40 +1646,110 @@ int mc_Permissions::CanActivate(const void* lpEntity,const void* lpAddress)
 int mc_Permissions::UpdateCounts()
 {
     mc_PermissionDBRow pdbRow;
+    mc_PermissionDBRow pdbAdminMinerRow;
+    mc_PermissionLedgerRow row;
+    
     unsigned char *ptr;
-    int dbvalue_len,err;
+    int dbvalue_len,err,result;
     uint32_t type;
     err=MC_ERR_NOERROR;
     
-    pdbRow.Zero();
+    pdbAdminMinerRow.Zero();
     
     m_AdminCount=0;
     m_MinerCount=0;
     
-    m_DBRowCount=0;
-    ptr=(unsigned char*)m_Database->m_DB->Read((char*)&pdbRow+m_Database->m_KeyOffset,m_Database->m_KeySize,&dbvalue_len,MC_OPT_DB_DATABASE_SEEK_ON_READ,&err);
-    if(err)
-    {
-        return err;
-    }
-    if(ptr == NULL)
-    {
-        return MC_ERR_NOERROR;
-    }
+//    m_DBRowCount=0;
+
+    memcpy(pdbAdminMinerRow.m_Entity,adminminerlist_entity,MC_PLS_SIZE_ENTITY);
+    pdbAdminMinerRow.m_Type=MC_PTP_CONNECT;
+
+    ptr=(unsigned char*)m_Database->m_DB->Read((char*)&pdbAdminMinerRow+m_Database->m_KeyOffset,m_Database->m_KeySize,&dbvalue_len,MC_OPT_DB_DATABASE_SEEK_ON_READ,&err);
     
-    memcpy((char*)&pdbRow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
-    
-    while(ptr)
+    if(ptr)
     {
-        m_DBRowCount++;
-        type=pdbRow.m_Type;
-        if( (type == MC_PTP_ADMIN) || (type == MC_PTP_MINE))
+        ptr=(unsigned char*)m_Database->m_DB->MoveNext(&err);
+        while(ptr)
         {
-            if(memcmp(pdbRow.m_Entity,null_entity,MC_PLS_SIZE_ENTITY) == 0)
-            {
-                if((uint32_t)(m_Block+1) >= pdbRow.m_BlockFrom)
+            memcpy((char*)&pdbAdminMinerRow+m_Database->m_KeyOffset,ptr,m_Database->m_TotalSize);            
+            if(memcmp(pdbAdminMinerRow.m_Entity,adminminerlist_entity,MC_PLS_SIZE_ENTITY) == 0)
+            {                   
+                if(pdbAdminMinerRow.m_Type == MC_PTP_ADMIN)
                 {
-                    if((uint32_t)(m_Block+1) < pdbRow.m_BlockTo)
+                    if(GetPermission(NULL,pdbAdminMinerRow.m_Address,MC_PTP_ADMIN))
+                    {
+                        m_AdminCount++;                        
+                    }
+                }                    
+                if(pdbAdminMinerRow.m_Type == MC_PTP_MINE)
+                {
+                    result=GetPermission(NULL,pdbAdminMinerRow.m_Address,MC_PTP_MINE,&row,1);
+                    if(m_CopiedRow > 0)
+                    {
+                        result=FindLastAllowedMinerRow(&row,m_Block+1,result);                        
+                    }
+                    if(result)
+                    {
+                        m_MinerCount++;
+                    }
+                }                    
+            }
+            else
+            {
+                ptr=NULL;
+            }
+                    
+            if(ptr)
+            {
+                ptr=(unsigned char*)m_Database->m_DB->MoveNext(&err);
+            }
+        }        
+    }
+    else
+    {        
+        pdbAdminMinerRow.Zero();
+        memcpy(pdbAdminMinerRow.m_Entity,adminminerlist_entity,MC_PLS_SIZE_ENTITY);
+        pdbAdminMinerRow.m_Type=MC_PTP_CONNECT;
+        
+        err=m_Database->m_DB->Write((char*)&pdbAdminMinerRow+m_Database->m_KeyOffset,m_Database->m_KeySize,
+                                    (char*)&pdbAdminMinerRow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+        if(err)
+        {
+            return err;
+        }
+        
+        pdbRow.Zero();
+
+        ptr=(unsigned char*)m_Database->m_DB->Read((char*)&pdbRow+m_Database->m_KeyOffset,m_Database->m_KeySize,&dbvalue_len,MC_OPT_DB_DATABASE_SEEK_ON_READ,&err);
+        if(err)
+        {
+            return err;
+        }
+        if(ptr == NULL)
+        {
+            return MC_ERR_NOERROR;
+        }
+
+        memcpy((char*)&pdbRow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
+
+        while(ptr)
+        {
+//            m_DBRowCount++;
+            type=pdbRow.m_Type;
+            if( (type == MC_PTP_ADMIN) || (type == MC_PTP_MINE))
+            {
+                if(memcmp(pdbRow.m_Entity,null_entity,MC_PLS_SIZE_ENTITY) == 0)
+                {                    
+                    pdbAdminMinerRow.m_Type=type;
+                    memcpy(pdbAdminMinerRow.m_Address,pdbRow.m_Address,MC_PLS_SIZE_ADDRESS);
+                    err=m_Database->m_DB->Write((char*)&pdbAdminMinerRow+m_Database->m_KeyOffset,m_Database->m_KeySize,
+                                                (char*)&pdbAdminMinerRow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+                    if(err)
+                    {
+                        return err;
+                    }
+                    
+                    if(pdbRow.InBlockRange(m_Block))
                     {
                         if(type == MC_PTP_ADMIN)
                         {
@@ -1561,18 +1759,24 @@ int mc_Permissions::UpdateCounts()
                         {
                             m_MinerCount++;
                         }
-                    }                                
-                }            
+                    }            
+                }
+            }
+            ptr=(unsigned char*)m_Database->m_DB->MoveNext(&err);
+            if(err)
+            {
+                LogString("Error on MoveNext");            
+            }
+            if(ptr)
+            {
+                memcpy((char*)&pdbRow+m_Database->m_KeyOffset,ptr,m_Database->m_TotalSize);            
             }
         }
-        ptr=(unsigned char*)m_Database->m_DB->MoveNext(&err);
+        
+        err=m_Database->m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
         if(err)
         {
-            LogString("Error on MoveNext");            
-        }
-        if(ptr)
-        {
-            memcpy((char*)&pdbRow+m_Database->m_KeyOffset,ptr,m_Database->m_TotalSize);            
+            return err;
         }
     }
     
@@ -1666,11 +1870,12 @@ int mc_Permissions::ClearMemPoolInternal()
         m_AdminCount=m_ClearedAdminCount;
         m_MinerCount=m_ClearedMinerCount;
         UpdateCounts();
-        sprintf(msg,"Mempool clr : %9d, Admin count: %d, Miner count: %d, DB rows: %d, Ledger Rows: %ld",m_Block,m_AdminCount,m_MinerCount,m_DBRowCount,m_Row);
+        sprintf(msg,"Mempool clr : %9d, Admin count: %d, Miner count: %d, Ledger Rows: %ld",m_Block,m_AdminCount,m_MinerCount,m_Row);
         LogString(msg);
     }
     m_ClearedAdminCount=m_AdminCount;
     m_ClearedMinerCount=m_MinerCount;
+    m_ClearedMinerCountForMinerVerification=m_MinerCount;
     
     return MC_ERR_NOERROR;
 }
@@ -1704,7 +1909,7 @@ int mc_Permissions::CopyMemPool()
     if(m_MemPool->GetCount())
     {
 //        UpdateCounts();
-        sprintf(msg,"Mempool copy: %9d, Admin count: %d, Miner count: %d, DB rows: %d, Ledger Rows: %ld",m_Block,m_AdminCount,m_MinerCount,m_DBRowCount,m_Row);
+        sprintf(msg,"Mempool copy: %9d, Admin count: %d, Miner count: %d, Ledger Rows: %ld",m_Block,m_AdminCount,m_MinerCount,m_Row);
         LogString(msg);
     }
 
@@ -1746,7 +1951,7 @@ int mc_Permissions::RestoreMemPool()
     if(m_MemPool->GetCount())
     {
 //        UpdateCounts();
-        sprintf(msg,"Mempool rstr: %9d, Admin count: %d, Miner count: %d, DB rows: %d, Ledger Rows: %ld",m_Block,m_AdminCount,m_MinerCount,m_DBRowCount,m_Row);
+        sprintf(msg,"Mempool rstr: %9d, Admin count: %d, Miner count: %d, Ledger Rows: %ld",m_Block,m_AdminCount,m_MinerCount,m_Row);
         LogString(msg);
     }
     
@@ -1755,6 +1960,149 @@ exitlbl:
     UnLock();
 
     return err;    
+}
+
+/** Sets back database pointer to point in the past, no real rollback is made */
+
+int mc_Permissions::RollBackBeforeMinerVerification(uint32_t block)
+{
+    int err,take_it;
+    uint64_t this_row;
+    mc_PermissionLedgerRow pldRow;
+    mc_BlockLedgerRow pldBlockRow;
+    
+    if(block > (uint32_t)m_Block)
+    {
+        return MC_ERR_INTERNAL_ERROR;
+    }
+    
+    err=MC_ERR_NOERROR; 
+    
+    CopyMemPool();
+//    ClearMemPool();
+
+    Lock(1);
+
+    if(m_MemPool->GetCount())
+    {
+        m_AdminCount=m_ClearedAdminCount;
+        m_MinerCount=m_ClearedMinerCount;
+        m_Row-=m_MemPool->GetCount();    
+        m_MemPool->Clear();
+    }
+    
+    m_CopiedBlock=m_Block;
+    m_CopiedRow=m_Row;
+    m_ForkBlock=block;
+    m_ClearedMinerCountForMinerVerification=m_MinerCount;
+    
+    
+    if(block == (uint32_t)m_Block)
+    {
+        goto exitlbl;
+    }
+
+    if(m_Ledger->Open() <= 0)
+    {
+        LogString("Error: RollBackBeforeMinerVerification: couldn't open ledger");
+        return MC_ERR_DBOPEN_ERROR;
+    }
+    
+    this_row=m_Row-1;
+    take_it=1;
+    if(this_row == 0)
+    {
+        take_it=0;
+    }
+    
+    while(take_it && (this_row>0))
+    {
+        m_Ledger->GetRow(this_row,&pldRow);
+        
+        if(pldRow.m_BlockReceived > block)
+        {
+            this_row--;
+        }
+        else
+        {
+            take_it=0;
+        }
+    }
+        
+    this_row++;
+
+    m_Row=this_row;
+    m_Block=block;
+    
+    pldBlockRow.Zero();
+    sprintf((char*)pldBlockRow.m_Address,"Block %08X row",block);
+    GetPermission(pldBlockRow.m_Address,MC_PTP_BLOCK_INDEX,(mc_PermissionLedgerRow*)&pldBlockRow);
+    m_Ledger->GetRow(pldBlockRow.m_ThisRow,(mc_PermissionLedgerRow*)&pldBlockRow);
+
+    m_AdminCount=pldBlockRow.m_AdminCount;
+    m_MinerCount=pldBlockRow.m_MinerCount;
+    m_ClearedMinerCountForMinerVerification=m_MinerCount;
+
+    /*
+    char msg[256];
+    sprintf(msg,"Verifier Rollback: %9d, Admin count: %d, Miner count: %d, Ledger Rows: %ld",
+            m_Block,m_AdminCount,m_MinerCount,m_Row);
+    LogString(msg);
+    */
+
+exitlbl:
+    
+    m_Ledger->Close();  
+            
+    UnLock();
+
+    return err;    
+}
+
+/** Restores chain pointers and mempool after miner verification*/
+
+int mc_Permissions::RestoreAfterMinerVerification()
+{
+    int i,err;
+    unsigned char *ptr;
+    char msg[256];
+    
+    Lock(1);
+    
+    m_MemPool->Clear();
+    
+    m_Block=m_CopiedBlock;
+    m_ForkBlock=0;
+
+    m_Row=m_CopiedRow;
+    m_CopiedRow=0;
+    m_CopiedBlock=0;
+    
+    for(i=0;i<m_CopiedMemPool->GetCount();i++)
+    {
+        ptr=m_CopiedMemPool->GetRow(i);
+        err=m_MemPool->Add(ptr,ptr+m_MemPool->m_KeySize);        
+        if(err)
+        {
+            LogString("Error while restoring mempool");
+            goto exitlbl;
+        }
+    }
+    
+    m_Row+=m_CopiedMemPool->GetCount();
+    m_AdminCount=m_CopiedAdminCount;
+    m_MinerCount=m_CopiedMinerCount;
+            
+    if(m_CopiedMemPool->GetCount())
+    {
+        sprintf(msg,"Mempool ramv: %9d, Admin count: %d, Miner count: %d, Ledger Rows: %ld",m_Block,m_AdminCount,m_MinerCount,m_Row);
+        LogString(msg);
+    }
+    
+exitlbl:
+    UnLock();
+
+    return MC_ERR_NOERROR;
 }
 
 
@@ -1794,10 +2142,6 @@ int mc_Permissions::AdminConsensus(const void* lpEntity,uint32_t type)
                 }
                 if(type == MC_PTP_ACTIVATE)
                 {
-                    if(mc_gState->m_Features->ActivatePermission() == 0)
-                    {
-                        return GetAdminCount()+1;
-                    }
                     consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensusactivate");
                 }
                 if(type == MC_PTP_ISSUE)
@@ -2251,7 +2595,7 @@ int mc_Permissions::RequiredForConsensus(const void* lpEntity,const void* lpAddr
                 pldRow.m_ThisRow=m_Row;
                 pldRow.m_Timestamp=mc_TimeNowAsUInt();
                 pldRow.m_Flags=0;
-                pldRow.m_FoundInDB=pldLast.m_FoundInDB;
+//                pldRow.m_FoundInDB=pldLast.m_FoundInDB;
                 
                 if(VerifyConsensus(&pldRow,&pldLast,&required))
                 {
@@ -2530,10 +2874,6 @@ void mc_Permissions::FreePermissionList(mc_Buffer *permissions)
 
 int mc_Permissions::IsActivateEnough(uint32_t type)
 {
-    if(mc_gState->m_Features->ActivatePermission() == 0)
-    {
-        return 0;
-    }
     if(type & ( MC_PTP_ADMIN | MC_PTP_ISSUE | MC_PTP_MINE | MC_PTP_ACTIVATE | MC_PTP_CREATE))
     {
         return 0;
@@ -2543,7 +2883,8 @@ int mc_Permissions::IsActivateEnough(uint32_t type)
 
 /** Sets permission record, external, locks */
 
-int mc_Permissions::SetPermission(const void* lpEntity,const void* lpAddress,uint32_t type,const void* lpAdmin,uint32_t from,uint32_t to,uint32_t timestamp,uint32_t flags,int update_mempool)
+int mc_Permissions::SetPermission(const void* lpEntity,const void* lpAddress,uint32_t type,const void* lpAdmin,
+                                  uint32_t from,uint32_t to,uint32_t timestamp,uint32_t flags,int update_mempool,int offset)
 {
     int result;
     
@@ -2566,14 +2907,14 @@ int mc_Permissions::SetPermission(const void* lpEntity,const void* lpAddress,uin
     }
     
     Lock(1);
-    result=SetPermissionInternal(lpEntity,lpAddress,type,lpAdmin,from,to,timestamp,flags,update_mempool);
+    result=SetPermissionInternal(lpEntity,lpAddress,type,lpAdmin,from,to,timestamp,flags,update_mempool,offset);
     UnLock();
     return result;
 }
 
 /** Sets approval record, external, locks */
 
-int mc_Permissions::SetApproval(const void* lpUpgrade,uint32_t approval,const void* lpAdmin,uint32_t from,uint32_t timestamp,uint32_t flags,int update_mempool)
+int mc_Permissions::SetApproval(const void* lpUpgrade,uint32_t approval,const void* lpAdmin,uint32_t from,uint32_t timestamp,uint32_t flags,int update_mempool,int offset)
 {
     int result=MC_ERR_NOERROR;
     mc_PermissionLedgerRow row;
@@ -2583,7 +2924,7 @@ int mc_Permissions::SetApproval(const void* lpUpgrade,uint32_t approval,const vo
     
     if(GetPermission(upgrade_entity,address,MC_PTP_CONNECT,&row,1) == 0)
     {
-        result=SetPermissionInternal(upgrade_entity,address,MC_PTP_CONNECT,address,0,(uint32_t)(-1),timestamp, MC_PFL_ENTITY_GENESIS ,update_mempool);        
+        result=SetPermissionInternal(upgrade_entity,address,MC_PTP_CONNECT,address,0,(uint32_t)(-1),timestamp, MC_PFL_ENTITY_GENESIS ,update_mempool,offset);        
     }
     
     
@@ -2592,11 +2933,11 @@ int mc_Permissions::SetApproval(const void* lpUpgrade,uint32_t approval,const vo
         memcpy(address,lpUpgrade,MC_PLS_SIZE_UPGRADE);
         if(lpAdmin == NULL)
         {
-            result=SetPermissionInternal(upgrade_entity,address,MC_PTP_CONNECT,address,from,approval ? (uint32_t)(-1) : 0,timestamp, flags,update_mempool);                
+            result=SetPermissionInternal(upgrade_entity,address,MC_PTP_CONNECT,address,from,approval ? (uint32_t)(-1) : 0,timestamp, flags,update_mempool,offset);                
         }
         else
         {
-            result=SetPermissionInternal(upgrade_entity,address,MC_PTP_UPGRADE,lpAdmin,from,approval ? (uint32_t)(-1) : 0,timestamp, flags,update_mempool);                            
+            result=SetPermissionInternal(upgrade_entity,address,MC_PTP_UPGRADE,lpAdmin,from,approval ? (uint32_t)(-1) : 0,timestamp, flags,update_mempool,offset);                            
         }
     }
 
@@ -2606,7 +2947,7 @@ int mc_Permissions::SetApproval(const void* lpUpgrade,uint32_t approval,const vo
 
 /** Sets permission record, internal */
 
-int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAddress,uint32_t type,const void* lpAdmin,uint32_t from,uint32_t to,uint32_t timestamp,uint32_t flags,int update_mempool)
+int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAddress,uint32_t type,const void* lpAdmin,uint32_t from,uint32_t to,uint32_t timestamp,uint32_t flags,int update_mempool,int offset)
 {
     mc_PermissionLedgerRow pldRow;
     mc_PermissionLedgerRow pldLast;
@@ -2625,23 +2966,8 @@ int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAdd
     }
     types[num_types]=MC_PTP_ISSUE;num_types++;
     types[num_types]=MC_PTP_MINE;num_types++;
-    if(mc_gState->m_Features->ActivatePermission())
-    {
-        if(mc_gState->m_Features->FixedGrantsInTheSameTx())
-        {
-            types[num_types]=MC_PTP_ACTIVATE;num_types++;        
-            types[num_types]=MC_PTP_ADMIN;num_types++;        
-        }
-        else
-        {
-            types[num_types]=MC_PTP_ADMIN;num_types++;        
-            types[num_types]=MC_PTP_ACTIVATE;num_types++;        
-        }
-    }
-    else
-    {
-        types[num_types]=MC_PTP_ADMIN;num_types++;                
-    }
+    types[num_types]=MC_PTP_ACTIVATE;num_types++;        
+    types[num_types]=MC_PTP_ADMIN;num_types++;        
     if(mc_gState->m_Features->Upgrades())
     {
         types[num_types]=MC_PTP_UPGRADE;num_types++;                        
@@ -2684,7 +3010,8 @@ int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAdd
                 pldRow.m_ThisRow=m_Row;
                 pldRow.m_Timestamp=timestamp;
                 pldRow.m_Flags=flags;
-                pldRow.m_FoundInDB=pldLast.m_FoundInDB;
+                pldRow.m_Offset=offset;
+//                pldRow.m_FoundInDB=pldLast.m_FoundInDB;
                 
                 err=VerifyConsensus(&pldRow,&pldLast,NULL);
                 
@@ -2697,8 +3024,12 @@ int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAdd
                 {
                     if(m_MemPool->GetCount() == 0)
                     {
-                        m_ClearedAdminCount=m_AdminCount;
-                        m_ClearedMinerCount=m_MinerCount;
+                        if(m_CopiedRow == 0)
+                        {
+                            m_ClearedAdminCount=m_AdminCount;
+                            m_ClearedMinerCount=m_MinerCount;
+                            m_ClearedMinerCountForMinerVerification=m_MinerCount;
+                        }
                     }
                     m_MemPool->Add((unsigned char*)&pldRow+m_Ledger->m_KeyOffset,(unsigned char*)&pldRow+m_Ledger->m_ValueOffset);
                     m_Row++;                
@@ -2755,7 +3086,7 @@ int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAdd
             }
             else
             {
-                err=SetPermissionInternal(lpEntity,lpAddress,types[i],lpAdmin,from,to,timestamp,flags,update_mempool);
+                err=SetPermissionInternal(lpEntity,lpAddress,types[i],lpAdmin,from,to,timestamp,flags,update_mempool,offset);
                 if(err)
                 {
                     return err;
@@ -2799,7 +3130,8 @@ int mc_Permissions::RollBackToCheckPoint()
     return MC_ERR_NOERROR;
 }
 
-/** Returns address of the specific block miner */
+
+/** Returns address of the specific block miner by height*/
 
 int mc_Permissions::GetBlockMiner(uint32_t block,unsigned char* lpMiner)
 {
@@ -2810,7 +3142,6 @@ int mc_Permissions::GetBlockMiner(uint32_t block,unsigned char* lpMiner)
     uint32_t type;
             
     Lock(0);
-    
     type=MC_PTP_BLOCK_INDEX;        
 
     pldLast.Zero();
@@ -3066,6 +3397,7 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
     char msg[256];
     
     mc_PermissionDBRow pdbRow;
+    mc_PermissionDBRow pdbAdminMinerRow;
     mc_PermissionLedgerRow pldRow;
     mc_BlockLedgerRow pldBlockRow;
     mc_BlockLedgerRow pldBlockLast;
@@ -3073,6 +3405,9 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
     unsigned char *ptr;
     
     err=MC_ERR_NOERROR;
+    
+    pdbAdminMinerRow.Zero();
+    memcpy(pdbAdminMinerRow.m_Entity,adminminerlist_entity,MC_PLS_SIZE_ENTITY);
     
     block_flags=CalculateBlockFlags();
     pld_items=m_MemPool->GetCount();
@@ -3151,15 +3486,28 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
                     pdbRow.m_LedgerRow=pldRow.m_ThisRow;
                     pdbRow.m_Flags=pldRow.m_Flags;
 
+/*                    
                     if(pldRow.m_FoundInDB == 0 )
                     {
                         m_DBRowCount++;
                     }
+ */ 
                     err=m_Database->m_DB->Write((char*)&pdbRow+m_Database->m_KeyOffset,m_Database->m_KeySize,
                                                 (char*)&pdbRow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
                     if(err)
                     {
                         LogString("Error: Commit: DB write error");                        
+                    }
+                    
+                    if( (pdbRow.m_Type == MC_PTP_ADMIN) || (pdbRow.m_Type == MC_PTP_MINE))
+                    {
+                        if(memcmp(pdbRow.m_Entity,null_entity,MC_PLS_SIZE_ENTITY) == 0)
+                        {                    
+                            pdbAdminMinerRow.m_Type=pdbRow.m_Type;
+                            memcpy(pdbAdminMinerRow.m_Address,pdbRow.m_Address,MC_PLS_SIZE_ADDRESS);
+                            err=m_Database->m_DB->Write((char*)&pdbAdminMinerRow+m_Database->m_KeyOffset,m_Database->m_KeySize,
+                                                        (char*)&pdbAdminMinerRow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+                        }
                     }
                 }                
             }
@@ -3175,11 +3523,12 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
         {
             memcpy((char*)&pdbRow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
         }
+/*        
         else
         {
             m_DBRowCount++;            
         }
-
+*/
         pdbRow.m_BlockTo=thisBlock;
         pdbRow.m_LedgerRow=m_Row;
         err=m_Database->m_DB->Write((char*)&pdbRow+m_Database->m_KeyOffset,m_Database->m_KeySize,
@@ -3192,20 +3541,9 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
     
     if(err == MC_ERR_NOERROR)
     {
-/*        
-        m_Block++;
-        UpdateCounts();        
-        m_Block--;
-        m_ClearedAdminCount=m_AdminCount;
-        m_ClearedMinerCount=m_MinerCount;
- */ 
         for(i=pld_items;i<m_MemPool->GetCount();i++)
         {
             memcpy((unsigned char*)&pldBlockRow+m_Ledger->m_KeyOffset,m_MemPool->GetRow(i),m_Ledger->m_TotalSize);
-/*            
-            pldBlockRow.m_AdminCount=m_AdminCount;
-            pldBlockRow.m_MinerCount=m_MinerCount;
- */ 
             if(i)
             {
                 m_Ledger->WriteRow((mc_PermissionLedgerRow*)&pldBlockRow);
@@ -3252,6 +3590,7 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
         m_Block--;
         m_ClearedAdminCount=m_AdminCount;
         m_ClearedMinerCount=m_MinerCount;
+        m_ClearedMinerCountForMinerVerification=m_MinerCount;
         for(i=pld_items;i<m_MemPool->GetCount();i++)
         {
             m_Ledger->GetRow(m_Row-m_MemPool->GetCount()+i,(mc_PermissionLedgerRow*)&pldBlockRow);
@@ -3270,19 +3609,272 @@ int mc_Permissions::CommitInternal(const void* lpMiner,const void* lpHash)
     else
     {
         m_MemPool->Clear();
+        StoreBlockInfoInternal(lpMiner,lpHash,0);
         m_Block++;
-/*        
-        UpdateCounts();        
-        m_ClearedAdminCount=m_AdminCount;
-        m_ClearedMinerCount=m_MinerCount;
- */ 
     }
 
     
-    sprintf(msg,"Block commit: %9d (Hash: %08x, Miner: %08x), Admin count: %d, Miner count: %d, DB rows: %d, Ledger Rows: %ld",
-            m_Block,*(uint32_t*)lpHash,*(uint32_t*)lpMiner,m_AdminCount,m_MinerCount,m_DBRowCount,m_Row);
+    sprintf(msg,"Block commit: %9d (Hash: %08x, Miner: %08x), Admin count: %d, Miner count: %d, Ledger Rows: %ld",
+            m_Block,*(uint32_t*)lpHash,*(uint32_t*)lpMiner,m_AdminCount,m_MinerCount,m_Row);
     LogString(msg);
     return err;
+}
+
+/** Returns address of the specific block by hash */
+
+int mc_Permissions::GetBlockMiner(const void* lpHash, unsigned char* lpMiner,uint32_t *lpAdminMinerCount)
+{
+    int err,value_len;
+    mc_BlockMinerDBRow pdbBlockMinerRow;
+    
+    unsigned char *ptr;
+    
+    Lock(0);
+    
+    err=MC_ERR_NOERROR;
+    pdbBlockMinerRow.Zero();
+    memcpy(pdbBlockMinerRow.m_BlockHash,lpHash,MC_PLS_SIZE_ENTITY);
+    pdbBlockMinerRow.m_Type=MC_PTP_BLOCK_MINER;
+
+    ptr=(unsigned char*)m_Database->m_DB->Read((char*)&pdbBlockMinerRow+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err);
+    if(ptr)
+    {
+        memcpy((char*)&pdbBlockMinerRow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);        
+        memcpy(lpMiner,pdbBlockMinerRow.m_Address,MC_PLS_SIZE_ADDRESS);
+        *lpAdminMinerCount=pdbBlockMinerRow.m_AdminMinerCount;
+    }
+    else
+    {
+        err=MC_ERR_NOT_FOUND;
+    }
+    
+    UnLock();
+
+    return err;
+}
+
+int mc_Permissions::GetBlockAdminMinerGrants(const void* lpHash, int record, int32_t* offsets)
+{
+    int err,value_len;
+    mc_AdminMinerGrantDBRow pdbAdminMinerGrantRow;
+    
+    unsigned char *ptr;
+    
+    Lock(0);
+    
+    err=MC_ERR_NOERROR;
+    
+    pdbAdminMinerGrantRow.Zero();
+    memcpy(pdbAdminMinerGrantRow.m_BlockHash,lpHash,MC_PLS_SIZE_ENTITY);
+    pdbAdminMinerGrantRow.m_Type=MC_PTP_BLOCK_MINER;
+    pdbAdminMinerGrantRow.m_RecordID=record;
+
+    ptr=(unsigned char*)m_Database->m_DB->Read((char*)&pdbAdminMinerGrantRow+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err);
+    
+    if(ptr)
+    {
+        memcpy((char*)&pdbAdminMinerGrantRow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);        
+        memcpy(offsets,pdbAdminMinerGrantRow.m_Offsets,MC_PLS_SIZE_OFFSETS_PER_ROW*sizeof(int32_t));
+    }
+    else
+    {
+        err=MC_ERR_NOT_FOUND;
+    }
+    
+    UnLock();
+
+    return err;    
+}
+
+int mc_Permissions::IncrementBlock(uint32_t admin_miner_count)
+{
+    Lock(1);
+    m_Block++;
+    if(admin_miner_count)
+    {
+        m_AdminCount=(admin_miner_count >> 16) & 0xffff;
+        m_MinerCount=admin_miner_count & 0xffff;
+    }
+    else
+    {
+        UpdateCounts();        
+    }
+    if(m_CopiedRow > 0)
+    {
+        m_ClearedMinerCountForMinerVerification=m_MinerCount;
+    }
+/*    
+    char msg[256];
+    sprintf(msg,"Verifier Increment: %9d, Admin count: %d, Miner count: %d, Ledger Rows: %ld",
+            m_Block,m_AdminCount,m_MinerCount,m_Row);
+    LogString(msg);
+*/    
+    UnLock();
+    return MC_ERR_NOERROR;
+}
+
+
+/** Stores info about block miner and admin/miner grant transactions */
+
+int mc_Permissions::StoreBlockInfo(const void* lpMiner,const void* lpHash)
+{    
+    int result;
+    Lock(1);
+    result=StoreBlockInfoInternal(lpMiner,lpHash,1);
+    m_Block++;
+    UnLock();
+    return result;
+}
+
+void mc_Permissions::SaveTmpCounts()
+{
+    Lock(1);
+    m_TmpSavedAdminCount=m_AdminCount;
+    m_TmpSavedMinerCount=m_MinerCount;
+    UnLock();    
+}
+
+int mc_Permissions::StoreBlockInfoInternal(const void* lpMiner,const void* lpHash,int update_counts)
+{    
+    int i,err,amg_items,last_offset;
+    
+    mc_PermissionDBRow pdbAdminMinerRow;
+    mc_PermissionLedgerRow pldRow;
+    mc_BlockMinerDBRow pdbBlockMinerRow;
+    mc_AdminMinerGrantDBRow pdbAdminMinerGrantRow;
+    
+    if(mc_gState->m_Features->CachedInputScript() == 0)
+    {
+        return MC_ERR_NOERROR;
+    }
+    
+    if(mc_gState->m_NetworkParams->GetInt64Param("supportminerprecheck") == 0)                                
+    {
+        return MC_ERR_NOERROR;        
+    }    
+    
+    if(MCP_ANYONE_CAN_MINE)                                
+    {
+        return MC_ERR_NOERROR;        
+    }    
+    
+    err=MC_ERR_NOERROR;
+    
+    amg_items=0;
+    last_offset=0;
+    pdbAdminMinerRow.Zero();
+    memcpy(pdbAdminMinerRow.m_Entity,adminminerlist_entity,MC_PLS_SIZE_ENTITY);
+    pdbAdminMinerGrantRow.Zero();
+    memcpy(pdbAdminMinerGrantRow.m_BlockHash,lpHash,MC_PLS_SIZE_ENTITY);
+    pdbAdminMinerGrantRow.m_Type=MC_PTP_BLOCK_MINER;
+    
+    for(i=0;i<m_MemPool->GetCount();i++)
+    {
+        if(err == MC_ERR_NOERROR)
+        {
+            memcpy((unsigned char*)&pldRow+m_Ledger->m_KeyOffset,m_MemPool->GetRow(i),m_Ledger->m_TotalSize);
+
+            if( (pldRow.m_Type == MC_PTP_ADMIN) || (pldRow.m_Type == MC_PTP_MINE))
+            {
+                if(memcmp(pldRow.m_Entity,null_entity,MC_PLS_SIZE_ENTITY) == 0)
+                {                    
+                    if( pldRow.m_BlockReceived == (uint32_t)(m_Block+1) )
+                    {                       
+                        pdbAdminMinerRow.m_Type=pldRow.m_Type;
+                        memcpy(pdbAdminMinerRow.m_Address,pldRow.m_Address,MC_PLS_SIZE_ADDRESS);
+                        err=m_Database->m_DB->Write((char*)&pdbAdminMinerRow+m_Database->m_KeyOffset,m_Database->m_KeySize,
+                                                    (char*)&pdbAdminMinerRow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+                        if(err)
+                        {
+                            LogString("Error: StoreBlockInfoInternal: DB write error");                        
+                        }
+
+                        if(pldRow.m_Offset != last_offset)
+                        {
+                            if( (amg_items > 0) && ((amg_items % MC_PLS_SIZE_OFFSETS_PER_ROW) == 0) )
+                            {
+                                err=m_Database->m_DB->Write((char*)&pdbAdminMinerGrantRow+m_Database->m_KeyOffset,m_Database->m_KeySize,
+                                                            (char*)&pdbAdminMinerGrantRow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+                                if(err)
+                                {
+                                    LogString("Error: StoreBlockInfoInternal: DB write error");                        
+                                }
+                                memset(pdbAdminMinerGrantRow.m_Offsets,0,MC_PLS_SIZE_OFFSETS_PER_ROW*sizeof(int32_t));
+                            }                    
+                            pdbAdminMinerGrantRow.m_RecordID=(amg_items / MC_PLS_SIZE_OFFSETS_PER_ROW) + 1;
+                            pdbAdminMinerGrantRow.m_Offsets[amg_items % MC_PLS_SIZE_OFFSETS_PER_ROW]=pldRow.m_Offset;
+                            last_offset=pldRow.m_Offset;
+                            amg_items++;
+                        }
+                    }
+                }                
+            }
+        }                
+    }
+    
+    if(err == MC_ERR_NOERROR)
+    {
+        if(amg_items > 0)
+        {
+            err=m_Database->m_DB->Write((char*)&pdbAdminMinerGrantRow+m_Database->m_KeyOffset,m_Database->m_KeySize,
+                                        (char*)&pdbAdminMinerGrantRow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+            if(err)
+            {
+                LogString("Error: StoreBlockInfoInternal: DB write error");                        
+            }
+        }                            
+    }
+    
+    if(err == MC_ERR_NOERROR)
+    {
+        err=m_Database->m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
+        if(err)
+        {
+            LogString("Error: StoreBlockInfoInternal: DB commit error");                                    
+        }
+    }
+    
+    if(update_counts)
+    {
+        m_Block++;
+        UpdateCounts();
+        m_ClearedMinerCountForMinerVerification=m_MinerCount;
+        m_Block--;
+    }
+    
+    pdbBlockMinerRow.Zero();
+    memcpy(pdbBlockMinerRow.m_BlockHash,lpHash,MC_PLS_SIZE_ENTITY);
+    pdbBlockMinerRow.m_Type=MC_PTP_BLOCK_MINER;
+    pdbBlockMinerRow.m_AdminMinerCount=0;
+    if( (m_AdminCount <= 0xffff) && (m_MinerCount <= 0xffff) )
+    {
+        pdbBlockMinerRow.m_AdminMinerCount = (m_AdminCount << 16) + m_MinerCount;
+    }
+    memcpy(pdbBlockMinerRow.m_Address,lpMiner,MC_PLS_SIZE_ADDRESS);
+    err=m_Database->m_DB->Write((char*)&pdbBlockMinerRow+m_Database->m_KeyOffset,m_Database->m_KeySize,
+                                (char*)&pdbBlockMinerRow+m_Database->m_ValueOffset,m_Database->m_ValueSize,0);
+    if(err)
+    {
+        LogString("Error: StoreBlockInfoInternal: DB write error");                        
+    }
+    
+    if(err == MC_ERR_NOERROR)
+    {
+        err=m_Database->m_DB->Commit(0);
+        if(err)
+        {
+            LogString("Error: StoreBlockInfoInternal: DB commit error");                                    
+        }
+    }
+    
+/*    
+    char msg[256];
+
+    sprintf(msg,"Block store: %9d (Hash: %08x, Miner: %08x), Admin count: %d, Miner count: %d, Ledger Rows: %ld",
+            m_Block+1,*(uint32_t*)lpHash,*(uint32_t*)lpMiner,m_AdminCount,m_MinerCount,m_Row);
+    LogString(msg);
+*/    
+    return MC_ERR_NOERROR;
 }
 
 /** Rolls one block back */
@@ -3359,7 +3951,7 @@ int mc_Permissions::RollBackInternal(int block)
             }
             else
             {
-                m_DBRowCount--;
+//                m_DBRowCount--;
                 err=m_Database->m_DB->Delete((char*)&pdbRow+m_Database->m_KeyOffset,m_Database->m_KeySize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
                 if(err)
                 {
@@ -3392,11 +3984,12 @@ int mc_Permissions::RollBackInternal(int block)
         {
             memcpy((char*)&pdbRow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
         }
+/*        
         else
         {
             m_DBRowCount++;            
         }
-
+*/
         pdbRow.m_BlockTo=block;
         pdbRow.m_LedgerRow=this_row;
         err=m_Database->m_DB->Write((char*)&pdbRow+m_Database->m_KeyOffset,m_Database->m_KeySize,
@@ -3432,7 +4025,7 @@ int mc_Permissions::RollBackInternal(int block)
         m_ClearedMinerCount=m_MinerCount;
     }
     
-    sprintf(msg,"Block rollback: %9d, Admin count: %d, Miner count: %d, DB rows: %d, Ledger Rows: %ld",m_Block,m_AdminCount,m_MinerCount,m_DBRowCount,m_Row);
+    sprintf(msg,"Block rollback: %9d, Admin count: %d, Miner count: %d, Ledger Rows: %ld",m_Block,m_AdminCount,m_MinerCount,m_Row);
     LogString(msg);
     return err;   
 }

@@ -26,11 +26,14 @@
 #define MC_AST_ASSET_REF_TYPE_SPECIAL      512
 
 
-#define MC_ENT_REF_SIZE              10
-#define MC_ENT_REF_PREFIX_SIZE        2
-#define MC_ENT_MAX_NAME_SIZE         32
-#define MC_ENT_MAX_ITEM_KEY_SIZE    256
-#define MC_ENT_MAX_SCRIPT_SIZE     4096
+#define MC_ENT_REF_SIZE                 10
+#define MC_ENT_REF_PREFIX_SIZE           2
+#define MC_ENT_MAX_NAME_SIZE            32
+#define MC_ENT_MAX_ITEM_KEY_SIZE       256
+#define MC_ENT_MAX_SCRIPT_SIZE        4096
+#define MC_ENT_MAX_FIXED_FIELDS_SIZE   128 
+#define MC_ENT_MAX_STORED_ISSUERS      128 
+#define MC_ENT_SCRIPT_ALLOC_SIZE      8192 // > MC_ENT_MAX_SCRIPT_SIZE + MC_ENT_MAX_FIXED_FIELDS_SIZE + 27*MC_ENT_MAX_STORED_ISSUERS
 
 #define MC_ENT_KEY_SIZE              32
 #define MC_ENT_KEYTYPE_TXID           0x00000001
@@ -118,7 +121,7 @@ typedef struct mc_EntityLedgerRow
     int64_t m_FirstPos;                                                         // Position in the ledger corresponding to first object in the chain
     int64_t m_LastPos;                                                          // Position in the ledger corresponding to last object in the chain before this object
     int64_t m_ChainPos;                                                         // Position in the ledger corresponding to last object in the chain
-    unsigned char m_Script[4224];                                               // Script
+    unsigned char m_Script[MC_ENT_SCRIPT_ALLOC_SIZE];                           // Script > MC_ENT_MAX_SCRIPT_SIZE + MC_ENT_MAX_FIXED_FIELDS_SIZE + 27*MC_ENT_MAX_STORED_ISSUERS
     
     void Zero();
 } mc_EntityLedgerRow;
@@ -245,6 +248,7 @@ typedef struct mc_AssetDB
     
     void RemoveFiles();
     uint32_t MaxEntityType();
+    int MaxStoredIssuers();
     
 //Internal functions    
     int Zero();

@@ -8,6 +8,10 @@
 #include <time.h>
 #include <sys/time.h>
 
+#ifdef MAC_OSX
+#define lseek64 lseek
+#endif
+
 #ifndef WIN32
 
 #include <unistd.h>

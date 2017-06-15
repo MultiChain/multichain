@@ -13,7 +13,7 @@
 #define MC_DCT_SCRIPT_OP_RETURN          0x6a
 #define MC_DCT_SCRIPT_OP_DROP            0x75
 
-#define MC_DCT_SCRIPT_COINSPARK_IDENTIFIER     "SPK"
+#define MC_DCT_SCRIPT_FREE_DATA_IDENTIFIER     "SPK"
 #define MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER    "spk"
 #define MC_DCT_SCRIPT_IDENTIFIER_LEN 3
 
@@ -294,12 +294,9 @@ uint32_t mc_GetParamFromDetailsScript(const unsigned char *ptr,uint32_t total,ui
     }
     
     name_size=0;
-    if(mc_gState->m_Features->SpecialParamsInDetailsScript())
+    if(ptr[offset] == 0x00)
     {
-        if(ptr[offset] == 0x00)
-        {
-            name_size=2;
-        }
+        name_size=2;
     }
     
     if(name_size == 0)
@@ -344,12 +341,7 @@ uint32_t mc_FindSpecialParamInDetailsScript(const unsigned char *ptr,uint32_t to
     uint32_t offset,new_offset;
     uint32_t value_offset;
     size_t value_size;
-    
-    if(mc_gState->m_Features->SpecialParamsInDetailsScript() == 0)
-    {
-        return total;
-    }
-    
+        
     offset=0;
     while(offset<total)
     {
@@ -383,7 +375,7 @@ uint32_t mc_FindNamedParamInDetailsScript(const unsigned char *ptr,uint32_t tota
         new_offset=mc_GetParamFromDetailsScript(ptr,total,offset,&value_offset,&value_size);
         if(value_offset > 0)
         {
-            if((ptr[offset] != 0x00) || (mc_gState->m_Features->SpecialParamsInDetailsScript() == 0) )
+            if( ptr[offset] != 0x00 )
             {
                 if( strlen(param) == strlen((char*)ptr+offset) )
                 {
@@ -614,6 +606,74 @@ const unsigned char *mc_ParseOpDropOpReturnScript(const unsigned char *src,int s
     }
     
     return src;
+}
+
+uint32_t mc_CheckSigScriptForMutableTx(const unsigned char *src,int size)
+{
+// 0x01 - no inputs    
+// 0x02 - no outputs
+// 0x04 - no outputs if no matching output for this input
+    
+    unsigned char *ptr;
+    unsigned char *ptrEnd;
+    int off,len;
+    uint32_t result;
+    
+    ptr=(unsigned char*)src;
+    ptrEnd=ptr+size;
+
+    int sighash_type;
+    result=0;
+    while(ptr<ptrEnd)
+    {
+        if(mc_GetPushDataElement(ptr,ptrEnd-ptr,&off,&len) != MC_ERR_WRONG_SCRIPT)
+        {
+            if( (ptr+off+len != ptrEnd) )
+            {
+                if(len)
+                {
+                    sighash_type=ptr[off+len-1];
+                    if( (sighash_type & 0x1f) == 0 )                            // Not SIGHASH_ANYONECANPAY
+                    {
+                        result |= 0x01;
+                    }
+                    sighash_type &= 0x1f;
+                    if(sighash_type == 1)                                       // SIGHASH_ALL
+                    {
+                        result |= 0x02;
+                    }
+                    else
+                    {
+                        if(sighash_type == 3)                                   // SIGHASH_SINGLE
+                        {
+                            result |= 0x04;                            
+                        }                    
+                        else
+                        {
+                            if(sighash_type != 2)                               // Bad script
+                            {
+                                result |= 0x07;                            
+                            }
+                        }
+                    }
+                }
+                else
+                {                    
+                    if(ptr != src)                                              // Not Multisig
+                    {
+                        result |= 0x07;                                                    
+                    }
+                }
+            }            
+            ptr+=off+len;
+        }
+        else
+        {
+            result |= 0x07;                            
+        }
+    }
+            
+    return result;
 }
 
 const unsigned char *mc_ExtractAddressFromInputScript(const unsigned char *src,int size,int *op_addr_offset,int *op_addr_size,int* is_redeem_script,int* sighash_type,int check_last)
@@ -976,7 +1036,7 @@ int mc_Script::GetBlockSignature(unsigned char* sig,int *sig_size,uint32_t* hash
     
     ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
     
-    if(memcmp(ptr,MC_DCT_SCRIPT_COINSPARK_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
+    if(memcmp(ptr,MC_DCT_SCRIPT_FREE_DATA_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
     {
         return MC_ERR_WRONG_SCRIPT;
     }
@@ -1044,7 +1104,7 @@ int mc_Script::SetBlockSignature(const unsigned char* sig,int sig_size,uint32_t 
         return err;
     }
     
-    memcpy(buf,MC_DCT_SCRIPT_COINSPARK_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
+    memcpy(buf,MC_DCT_SCRIPT_FREE_DATA_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
     buf[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_BLOCK_SIGNATURE_PREFIX;
     
     err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+1);
@@ -1164,14 +1224,11 @@ int mc_Script::GetAssetDetails(char* name,int* multiple,unsigned char* script,in
         return MC_ERR_INVALID_PARAMETER_VALUE;
     }
     
-    if(mc_gState->m_Features->SpecialParamsInDetailsScript())
+    if(GetGeneralDetails(script,script_size) == MC_ERR_NOERROR)
     {
-        if(GetGeneralDetails(script,script_size) == MC_ERR_NOERROR)
-        {
-            name[0]=0;
-            *multiple=1;
-            return MC_ERR_NOERROR;
-        }
+        name[0]=0;
+        *multiple=1;
+        return MC_ERR_NOERROR;
     }
     
     if(m_lpCoord[m_CurrentElement*2+1] < MC_DCT_SCRIPT_IDENTIFIER_LEN+1 + 4 + 1)
@@ -1187,7 +1244,7 @@ int mc_Script::GetAssetDetails(char* name,int* multiple,unsigned char* script,in
     ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
     ptrEnd=ptr+m_lpCoord[m_CurrentElement*2+1];
     
-    if(memcmp(ptr,MC_DCT_SCRIPT_COINSPARK_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
+    if(memcmp(ptr,MC_DCT_SCRIPT_FREE_DATA_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
     {
         return MC_ERR_WRONG_SCRIPT;
     }
@@ -1245,7 +1302,7 @@ int mc_Script::SetAssetDetails(const char*name,int multiple,const unsigned char*
         return err;
     }
     
-    memcpy(buf,MC_DCT_SCRIPT_COINSPARK_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
+    memcpy(buf,MC_DCT_SCRIPT_FREE_DATA_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
     buf[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_ASSET_DETAILS_PREFIX;
     
     err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+1);
@@ -1302,7 +1359,7 @@ int mc_Script::GetGeneralDetails(unsigned char* script,int *script_size)
     ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
     ptrEnd=ptr+m_lpCoord[m_CurrentElement*2+1];
     
-    if(memcmp(ptr,MC_DCT_SCRIPT_COINSPARK_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
+    if(memcmp(ptr,MC_DCT_SCRIPT_FREE_DATA_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
     {
         return MC_ERR_WRONG_SCRIPT;
     }
@@ -1340,7 +1397,7 @@ int mc_Script::SetGeneralDetails(const unsigned char* script,int script_size)
         return err;
     }
     
-    memcpy(buf,MC_DCT_SCRIPT_COINSPARK_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
+    memcpy(buf,MC_DCT_SCRIPT_FREE_DATA_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
     buf[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_GENERAL_DETAILS_PREFIX;
     
     err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+1);
@@ -1759,13 +1816,10 @@ int mc_Script::GetFullRef(unsigned char *ref,uint32_t *script_type)
 
     *script_type=0;
     
-    if(mc_gState->m_Features->FollowOnIssues())
+    if(ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN] == MC_DCT_SCRIPT_MULTICHAIN_ASSET_FOLLOWON_PREFIX)
     {
-        if(ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN] == MC_DCT_SCRIPT_MULTICHAIN_ASSET_FOLLOWON_PREFIX)
-        {
-            *script_type=MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON;
-        }
-    }    
+        *script_type=MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON;
+    }
     
     if(*script_type == 0)
     {
@@ -1784,7 +1838,7 @@ int mc_Script::GetFullRef(unsigned char *ref,uint32_t *script_type)
     new_ref=1;
     shift=0;
     ref_type=MC_AST_ASSET_REF_TYPE_REF;
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef())
+    if(mc_gState->m_Features->ShortTxIDInTx())
     {
         shift=MC_AST_SHORT_TXID_OFFSET;
         ref_type=MC_AST_ASSET_REF_TYPE_SHORT_TXID;
@@ -1853,17 +1907,14 @@ int mc_Script::GetAssetQuantities(mc_Buffer *amounts,uint32_t script_type)
         }
     }
     
-    if(mc_gState->m_Features->FollowOnIssues())
+    if(script_type & MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON)
     {
-        if(script_type & MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON)
+        if(ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN] == MC_DCT_SCRIPT_MULTICHAIN_ASSET_FOLLOWON_PREFIX)
         {
-            if(ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN] == MC_DCT_SCRIPT_MULTICHAIN_ASSET_FOLLOWON_PREFIX)
-            {
-                valid_identitfier=1;
-                found_script_type=MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON;
-            }
+            valid_identitfier=1;
+            found_script_type=MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON;
         }
-    }    
+    }
     
     if(valid_identitfier == 0)
     {
@@ -1874,7 +1925,7 @@ int mc_Script::GetAssetQuantities(mc_Buffer *amounts,uint32_t script_type)
 
     shift=0;
     ref_type=MC_AST_ASSET_REF_TYPE_REF;
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef())
+    if(mc_gState->m_Features->ShortTxIDInTx())
     {
         shift=MC_AST_SHORT_TXID_OFFSET;
         ref_type=MC_AST_ASSET_REF_TYPE_SHORT_TXID;
@@ -1956,14 +2007,7 @@ int mc_Script::SetAssetQuantities(mc_Buffer *amounts,uint32_t script_type)
             ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_ASSET_QUANTITY_PREFIX;
             break;
         case MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON:
-            if(mc_gState->m_Features->FollowOnIssues())
-            {
-                ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_ASSET_FOLLOWON_PREFIX;
-            }
-            else
-            {
-                return MC_ERR_INVALID_PARAMETER_VALUE;
-            }
+            ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_ASSET_FOLLOWON_PREFIX;
             break;
         default:
             return MC_ERR_INVALID_PARAMETER_VALUE;
@@ -1976,7 +2020,7 @@ int mc_Script::SetAssetQuantities(mc_Buffer *amounts,uint32_t script_type)
     }
 
     shift=0;
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef())
+    if(mc_gState->m_Features->ShortTxIDInTx())
     {
         shift=MC_AST_SHORT_TXID_OFFSET;
     }

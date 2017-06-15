@@ -101,7 +101,7 @@ Value getpeerinfo(const Array& params, bool fHelp)
 /* MCHN START */        
         if(mc_gState->m_NetworkParams->IsProtocolMultichain())
         {
-            if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanconnect"))
+            if(MCP_ANYONE_CAN_CONNECT)
             {
                 Value null_value;
                 obj.push_back(Pair("handshakelocal", null_value));                

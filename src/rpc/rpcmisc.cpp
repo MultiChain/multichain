@@ -40,6 +40,7 @@ using namespace std;
 
 bool CBitcoinAddressFromTxEntity(CBitcoinAddress &address,mc_TxEntity *lpEntity);
 Object AddressEntry(CBitcoinAddress& address,uint32_t verbose);
+int paramtoint(Value param,bool check_for_min,int min_value,string error_message);
 
 /**
  * @note Do not add or change anything in the information returned by this
@@ -228,7 +229,6 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     obj.push_back(Pair("lockadminminerounds",Params().LockAdminMineRounds()));                    
     obj.push_back(Pair("gen",GetBoolArg("-gen", true)));                    
     obj.push_back(Pair("genproclimit",GetArg("-genproclimit", 1)));                    
-    obj.push_back(Pair("mineblocksondemand",Params().MineBlocksOnDemand()));  
 /*
     obj.push_back(Pair("shortoutput",GetBoolArg("-shortoutput",false)));                    
     obj.push_back(Pair("walletdbversion", mc_gState->GetWalletDBVersion()));                
@@ -296,6 +296,11 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
         fFound=true;
     }
+    if(param_name == "mineblocksondemand")
+    {
+        mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
+        fFound=true;
+    }
     if(param_name == "hideknownopdrops")
     {
         mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
@@ -351,7 +356,8 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         fFound=true;
     }
     if( (param_name == "lockadminminerounds") ||
-        (param_name == "maxshowndata") )
+        (param_name == "maxshowndata") ||
+        (param_name == "dropmessagestest") )
     {
         if( (params[1].type() == int_type) || (params[1].type() == str_type) )
         {
@@ -721,18 +727,7 @@ Value createkeypairs(const Array& params, bool fHelp)
     int count=1;
     if (params.size() > 0)    
     {
-        if(params[0].type() == int_type)
-        {
-            count=params[0].get_int();
-            if(count < 0)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
-            }
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
-        }
+        count=paramtoint(params[0],true,0,"Invalid count");
     }
             
     Array retArray;
@@ -923,7 +918,7 @@ Value createmultisig(const Array& params, bool fHelp)
 /* MCHN START */    
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("allowp2shoutputs") == 0)
+        if(MCP_ALLOW_P2SH_OUTPUTS == 0)
         {
             throw JSONRPCError(RPC_NOT_ALLOWED, "P2SH outputs are not allowed for this blockchain");
         }

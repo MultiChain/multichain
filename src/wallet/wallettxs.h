@@ -103,6 +103,11 @@ typedef struct mc_WalletTxs
     
     CWalletTx GetInternalWalletTx(uint256 hash,mc_TxDefRow *txdef,int *errOut);   
     
+    int GetBlockItemIndex(                                                      // Returns item id for the last item confirmed in this block or before
+                    mc_TxEntity *entity,                                        // Entity to return info for
+                    int block);                                                 // Block to find item for
+    
+    
     int GetList(mc_TxEntity *entity,                                            // Returns Txs in range for specific entity
                     int from,                                                   // If positive - from this tx, if not positive - this number from the end
                     int count,                                                  // Number of txs to return

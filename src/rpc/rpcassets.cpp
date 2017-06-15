@@ -9,7 +9,7 @@
 
 void mergeGenesisWithAssets(mc_Buffer *genesis_amounts, mc_Buffer *asset_amounts)
 {
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef() == 0)
+    if(mc_gState->m_Features->ShortTxIDInTx() == 0)
     {
         return; 
     }
@@ -50,7 +50,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
 
     // Amount
-    CAmount nAmount = mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+    CAmount nAmount = MCP_MINIMUM_PER_OUTPUT;
     if (params.size() > 5 && params[5].type() != null_type)
     {
         nAmount = AmountFromValue(params[5]);
@@ -94,10 +94,6 @@ Value issuefromcmd(const Array& params, bool fHelp)
     quantity=(int64_t)(dQuantity*multiple+0.1);
     if(quantity<0)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid quantity or smallest unit. ");
-    if( (quantity == 0) && (mc_gState->m_Features->FollowOnIssues() == 0) )
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset quantity");                
-    }
     if(multiple<=0)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid quantity or smallest unit.");
 
@@ -143,35 +139,28 @@ Value issuefromcmd(const Array& params, bool fHelp)
     {
         if(params[2].type() == obj_type)
         {
-            if(mc_gState->m_Features->FollowOnIssues())
-            {
-                Object objSpecialParams = params[2].get_obj();
-                BOOST_FOREACH(const Pair& s, objSpecialParams) 
-                {  
-                    if(s.name_ == "name")
+            Object objSpecialParams = params[2].get_obj();
+            BOOST_FOREACH(const Pair& s, objSpecialParams) 
+            {  
+                if(s.name_ == "name")
+                {
+                    if(!name_is_found)
                     {
-                        if(!name_is_found)
-                        {
-                            asset_name=s.value_.get_str().c_str();
-                            name_is_found=true;
-                        }
-                    }
-                    if(s.name_ == "open")
-                    {
-                        if(s.value_.type() == bool_type)
-                        {
-                            is_open=s.value_.get_bool();
-                        }
-                        else
-                        {
-                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'open' field, should be boolean");                                                                
-                        }
+                        asset_name=s.value_.get_str().c_str();
+                        name_is_found=true;
                     }
                 }
-            }
-            else
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Asset name should be string");                                                                                
+                if(s.name_ == "open")
+                {
+                    if(s.value_.type() == bool_type)
+                    {
+                        is_open=s.value_.get_bool();
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'open' field, should be boolean");                                                                
+                    }
+                }
             }
         }
         else
@@ -192,7 +181,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
     }
     
     unsigned char buf_a[MC_AST_ASSET_REF_SIZE];    
-    if(CoinSparkAssetRefDecode(buf_a,asset_name.c_str(),asset_name.size()))
+    if(AssetRefDecode(buf_a,asset_name.c_str(),asset_name.size()))
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset name, looks like an asset reference");                                                                                                    
     }
@@ -200,9 +189,9 @@ Value issuefromcmd(const Array& params, bool fHelp)
     if(asset_name.size())
     {
         ret=ParseAssetKey(asset_name.c_str(),NULL,NULL,NULL,NULL,&type,MC_ENT_TYPE_ANY);
-        if(ret != -3)
+        if(ret != MC_ASSET_KEY_INVALID_NAME)
         {
-            if(type == 3)
+            if(type == MC_ENT_KEYTYPE_NAME)
             {
                 throw JSONRPCError(RPC_DUPLICATE_NAME, "Asset or stream with this name already exists");                                    
             }
@@ -257,8 +246,12 @@ Value issuefromcmd(const Array& params, bool fHelp)
         
         if(mc_gState->m_Features->OpDropDetailsScripts())
         {
-            lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
-
+            err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
+            if(err)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or asset name, too long");                                                        
+            }
+            
             elem = lpDetailsScript->GetData(0,&elem_size);
             scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;                    
         }
@@ -355,17 +348,12 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     if (fHelp || params.size() < 4 || params.size() > 6)
         throw runtime_error("Help message not found\n");
 
-    if(mc_gState->m_Features->FollowOnIssues() == 0 )
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, string("API is not supported for this protocol version"));        
-    }
-    
     CBitcoinAddress address(params[1].get_str());
     if (!address.IsValid())
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
        
     // Amount
-    CAmount nAmount = mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+    CAmount nAmount = MCP_MINIMUM_PER_OUTPUT;
     if (params.size() > 4 && params[4].type() != null_type)
     {
         nAmount = AmountFromValue(params[4]);
@@ -384,7 +372,7 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     {        
         ParseEntityIdentifier(params[2],&entity, MC_ENT_TYPE_ASSET);           
         memcpy(buf,entity.GetFullRef(),MC_AST_ASSET_FULLREF_SIZE);
-        if(mc_gState->m_Features->ShortTxIDAsAssetRef() == 0)
+        if(mc_gState->m_Features->ShortTxIDInTx() == 0)
         {
             if(entity.IsUnconfirmedGenesis())
             {
@@ -405,11 +393,6 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset quantity");        
     }
-    if( (quantity == 0) && (mc_gState->m_Features->FollowOnIssues() == 0) )
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset quantity");                
-    }
-        
         
     mc_SetABQuantity(buf,quantity);
     
@@ -460,6 +443,7 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
         }
     }
     
+    int err;
     size_t bytes;
     const unsigned char *script;
     size_t elem_size;
@@ -474,7 +458,11 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
         if(mc_gState->m_Features->OpDropDetailsScripts())
         {
             lpDetailsScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
-            lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
+            err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
+            if(err)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields, too long");                                                        
+            }
 
             elem = lpDetailsScript->GetData(0,&elem_size);
             scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
@@ -895,7 +883,7 @@ Value getmultibalances(const Array& params, bool fHelp)
                     else
                     {
                         Object asset_entry;
-                        asset_entry=AssetEntry(ptr+48,quantity,1);
+                        asset_entry=AssetEntry(ptr+48,quantity,0x00);
                         addr_balances.push_back(asset_entry);  
                         if(setAssets.size())
                         {
@@ -913,15 +901,15 @@ Value getmultibalances(const Array& params, bool fHelp)
                     if(setAssetsWithBalances.count(rem_asset) == 0)
                     {
                         Object asset_entry;
-                        asset_entry=AssetEntry((unsigned char*)&rem_asset,0,1);
+                        asset_entry=AssetEntry((unsigned char*)&rem_asset,0,0x00);
                         addr_balances.push_back(asset_entry);   
                     }
                 }                
             }
-            if((mc_gState->m_NetworkParams->GetInt64Param("initialblockreward") != 0) || (mc_gState->m_NetworkParams->GetInt64Param("firstblockreward") > 0))
+            if(MCP_WITH_NATIVE_CURRENCY)
             {
                 Object asset_entry;
-                asset_entry=AssetEntry(NULL,btc,1);
+                asset_entry=AssetEntry(NULL,btc,0x00);
                 addr_balances.push_back(asset_entry);                        
             }
             
@@ -942,7 +930,7 @@ Value getmultibalances(const Array& params, bool fHelp)
                                 BOOST_FOREACH(const uint256& rem_asset, setAssets) 
                                 {
                                     Object asset_entry;
-                                    asset_entry=AssetEntry((unsigned char*)&rem_asset,0,1);
+                                    asset_entry=AssetEntry((unsigned char*)&rem_asset,0,0x00);
                                     empty_balances.push_back(asset_entry);   
                                 }                
                             }
@@ -1122,7 +1110,7 @@ Value getaddressbalances(const Array& params, bool fHelp)
                     quantity=mc_GetABQuantity(asset_amounts->GetRow(a));
                     if(mc_gState->m_Assets->FindEntityByTxID(&entity,(unsigned char*)&hash))
                     {
-                        if((entity.IsUnconfirmedGenesis() != 0) && (mc_gState->m_Features->ShortTxIDAsAssetRef() == 0) )
+                        if((entity.IsUnconfirmedGenesis() != 0) && (mc_gState->m_Features->ShortTxIDInTx() == 0) )
                         {
                             is_genesis=true;                                
                         }
@@ -1183,7 +1171,7 @@ Value getaddressbalances(const Array& params, bool fHelp)
         if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptr))
         {
             txid=entity.GetTxID();
-            asset_entry=AssetEntry(txid,mc_GetABQuantity(ptr),1);
+            asset_entry=AssetEntry(txid,mc_GetABQuantity(ptr),0x00);
             assets.push_back(asset_entry);
         }        
     }
@@ -1193,14 +1181,14 @@ Value getaddressbalances(const Array& params, bool fHelp)
         Object asset_entry;
         ptr=(unsigned char *)genesis_amounts->GetRow(a);
         
-        asset_entry=AssetEntry(ptr,mc_GetLE(ptr+32,MC_AST_ASSET_QUANTITY_SIZE),1);
+        asset_entry=AssetEntry(ptr,mc_GetLE(ptr+32,MC_AST_ASSET_QUANTITY_SIZE),0x00);
         assets.push_back(asset_entry);
     }
     
-    if((mc_gState->m_NetworkParams->GetInt64Param("initialblockreward") != 0) || (mc_gState->m_NetworkParams->GetInt64Param("firstblockreward") > 0))
+    if(MCP_WITH_NATIVE_CURRENCY)
     {
         Object asset_entry;
-        asset_entry=AssetEntry(NULL,totalBTC,1);
+        asset_entry=AssetEntry(NULL,totalBTC,0x00);
         assets.push_back(asset_entry);        
     }
     
@@ -1352,7 +1340,7 @@ Value getassetbalances(const Array& params, bool fHelp)
                     quantity=mc_GetABQuantity(asset_amounts->GetRow(a));
                     if(mc_gState->m_Assets->FindEntityByTxID(&entity,(unsigned char*)&hash))
                     {
-                        if((entity.IsUnconfirmedGenesis() != 0) && (mc_gState->m_Features->ShortTxIDAsAssetRef() == 0) )
+                        if((entity.IsUnconfirmedGenesis() != 0) && (mc_gState->m_Features->ShortTxIDInTx() == 0) )
                         {
                             is_genesis=true;
                         }
@@ -1413,7 +1401,7 @@ Value getassetbalances(const Array& params, bool fHelp)
         if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptr))
         {
             txid=entity.GetTxID();
-            asset_entry=AssetEntry(txid,mc_GetABQuantity(ptr),1);
+            asset_entry=AssetEntry(txid,mc_GetABQuantity(ptr),0x00);
             assets.push_back(asset_entry);
         }        
     }
@@ -1423,7 +1411,7 @@ Value getassetbalances(const Array& params, bool fHelp)
         Object asset_entry;
         ptr=(unsigned char *)genesis_amounts->GetRow(a);
         
-        asset_entry=AssetEntry(ptr,mc_GetLE(ptr+32,MC_AST_ASSET_QUANTITY_SIZE),1);
+        asset_entry=AssetEntry(ptr,mc_GetLE(ptr+32,MC_AST_ASSET_QUANTITY_SIZE),0x00);
         assets.push_back(asset_entry);
     }
     
@@ -1461,37 +1449,19 @@ Value listassets(const Array& params, bool fHelp)
 
     mc_Buffer *assets;
     unsigned char *txid;
-    int output_level;
+    uint32_t output_level;
     Array results;
     
     int count,start;
     count=2147483647;
     if (params.size() > 2)    
     {
-        if(params[2].type() == int_type)
-        {
-            count=params[2].get_int();
-            if(count < 0)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
-            }
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
-        }
+        count=paramtoint(params[2],true,0,"Invalid count");
     }
     start=-count;
     if (params.size() > 3)    
     {
-        if(params[3].type() == int_type)
-        {
-            start=params[3].get_int();
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
-        }
+        start=paramtoint(params[3],false,0,"Invalid start");
     }
     
     assets=NULL;
@@ -1540,13 +1510,13 @@ Value listassets(const Array& params, bool fHelp)
     if(assets == NULL)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot open asset database");
 
-    output_level=8;
+    output_level=0x0F;
     
     if (params.size() > 1)    
     {
         if(paramtobool(params[1]))
         {
-            output_level=9;
+            output_level|=0x20;
         }
     }
     
@@ -1672,7 +1642,8 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
                         {
                             if(memcmp(entity->GetTxID(),&(txin.prevout.hash),sizeof(uint256)) == 0)
                             {
-                                if(memcmp(bufEmptyAssetRef,amounts->GetRow(i),MC_AST_ASSET_QUANTITY_OFFSET) == 0)
+                                if( mc_GetABRefType(amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_GENESIS )                    
+//                                if(memcmp(bufEmptyAssetRef,amounts->GetRow(i),MC_AST_ASSET_QUANTITY_OFFSET) == 0)
                                 {
                                     quantity=mc_GetABQuantity(amounts->GetRow(i));
                                 }                            
@@ -1722,7 +1693,8 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
                     {
                         if(memcmp(entity->GetTxID(),&hash,sizeof(uint256)) == 0)
                         {
-                            if(memcmp(bufEmptyAssetRef,amounts->GetRow(i),MC_AST_ASSET_QUANTITY_OFFSET) == 0)
+                            if( mc_GetABRefType(amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_GENESIS )                    
+//                            if(memcmp(bufEmptyAssetRef,amounts->GetRow(i),MC_AST_ASSET_QUANTITY_OFFSET) == 0)
                             {
                                 quantity=mc_GetABQuantity(amounts->GetRow(i));
                             }                            
@@ -1939,30 +1911,12 @@ Value listassettransactions(const Array& params, bool fHelp)
     count=10;
     if (params.size() > 2)    
     {
-        if(params[2].type() == int_type)
-        {
-            count=params[2].get_int();
-            if(count < 0)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");                            
-            }
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count");            
-        }
+        count=paramtoint(params[2],true,0,"Invalid count");
     }
     start=-count;
     if (params.size() > 3)    
     {
-        if(params[3].type() == int_type)
-        {
-            start=params[3].get_int();
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start");            
-        }
+        start=paramtoint(params[3],false,0,"Invalid start");
     }
     
     bool fLocalOrdering = false;

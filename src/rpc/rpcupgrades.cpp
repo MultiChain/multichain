@@ -49,7 +49,7 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
     }
 
     unsigned char buf_a[MC_AST_ASSET_REF_SIZE];    
-    if(CoinSparkAssetRefDecode(buf_a,upgrade_name.c_str(),upgrade_name.size()))
+    if(AssetRefDecode(buf_a,upgrade_name.c_str(),upgrade_name.size()))
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid upgrade name, looks like a upgrade reference");                                                                                                    
     }
@@ -58,9 +58,9 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
     if(upgrade_name.size())
     {
         ret=ParseAssetKey(upgrade_name.c_str(),NULL,NULL,NULL,NULL,&type,MC_ENT_TYPE_ANY);
-        if(ret != -3)
+        if(ret != MC_ASSET_KEY_INVALID_NAME)
         {
-            if(type == 3)
+            if(type == MC_ENT_KEYTYPE_NAME)
             {
                 throw JSONRPCError(RPC_DUPLICATE_NAME, "Upgrade, stream or asset with this name already exists");                                    
             }
@@ -148,11 +148,16 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
     
     lpDetailsScript=new mc_Script;
 
+    int err;
     size_t elem_size;
     const unsigned char *elem;
     CScript scriptOpReturn=CScript();
     
-    lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_UPGRADE,0,script,bytes);
+    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_UPGRADE,0,script,bytes);
+    if(err)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or upgrade name, too long");                                                        
+    }
 
     elem = lpDetailsScript->GetData(0,&elem_size);
     scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;        

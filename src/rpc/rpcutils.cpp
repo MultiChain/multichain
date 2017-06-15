@@ -30,7 +30,7 @@ CScript RemoveOpDropsIfNeeded(const CScript& scriptInput)
     return scriptInput.RemoveOpDrops();   
 }
 
-bool CoinSparkAssetRefDecode(unsigned char *bin, const char* string, const size_t stringLen)
+bool AssetRefDecode(unsigned char *bin, const char* string, const size_t stringLen)
 {
     char buffer[1024];
     int txIDPrefixInteger;
@@ -79,7 +79,7 @@ uint256 mc_GenesisCoinbaseTxID()
 
 int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset_ref,char *name,int *multiple,int *type,int entity_type)
 {
-    int ret=0;
+    int ret=MC_ASSET_KEY_VALID;
     int size=strlen(asset_key);
     unsigned char buf[MC_AST_ASSET_REF_SIZE];
     mc_EntityDetails entity;
@@ -87,7 +87,7 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
         
     if(size == 0)
     {
-        return -5;
+        return MC_ASSET_KEY_INVALID_EMPTY;
     }
     
     uint256 hash=0;
@@ -95,18 +95,18 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
     {
         if(type)
         {
-            *type=1;
+            *type=MC_ENT_KEYTYPE_TXID;
         }
         hash.SetHex(asset_key);
         if(!mc_gState->m_Assets->FindEntityByTxID(&entity,(unsigned char*)&hash))
         {
-            ret=-1;
+            ret=MC_ASSET_KEY_INVALID_TXID;
         }
         else
         {
             if( (entity_type != MC_ENT_TYPE_ANY) && ((int)entity.GetEntityType() != entity_type) )
             {
-                ret=-1;
+                ret=MC_ASSET_KEY_INVALID_TXID;
             }
             else
             {
@@ -117,7 +117,7 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
                 {
                     if(hash == mc_GenesisCoinbaseTxID())
                     {
-                        ret=-1;                            
+                        ret=MC_ASSET_KEY_INVALID_TXID;                            
                     }
                 }
             }
@@ -125,7 +125,7 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
             {
                 if(!mc_gState->m_Assets->FindEntityByFollowOn(&entity,(unsigned char*)&hash))
                 {
-                    ret=-1;
+                    ret=MC_ASSET_KEY_INVALID_TXID;
                 }                
             }
         }
@@ -134,21 +134,21 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
     {
         if(size<=MC_ENT_MAX_NAME_SIZE)
         {
-            if(CoinSparkAssetRefDecode(buf,asset_key,size))
+            if(AssetRefDecode(buf,asset_key,size))
             {
                 if(type)
                 {
-                    *type=2;
+                    *type=MC_ENT_KEYTYPE_REF;
                 }
                 if(!mc_gState->m_Assets->FindEntityByRef(&entity,buf))
                 {
-                    ret=-2;
+                    ret=MC_ASSET_KEY_INVALID_REF;
                 }
                 else
                 {
                     if( (entity_type != MC_ENT_TYPE_ANY) && ((int)entity.GetEntityType() != entity_type) )
                     {
-                        ret=-2;
+                        ret=MC_ASSET_KEY_INVALID_REF;
                     }                    
                 }
             }
@@ -156,38 +156,37 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
             {
                 if(type)
                 {
-                    *type=3;
+                    *type=MC_ENT_KEYTYPE_NAME;
                 }
                 if(!mc_gState->m_Assets->FindEntityByName(&entity,(char*)asset_key))
                 {
-                    ret=-3;
+                    ret=MC_ASSET_KEY_INVALID_NAME;
                 }    
                 else
                 {
                     if( (entity_type != MC_ENT_TYPE_ANY) && ((int)entity.GetEntityType() != entity_type) )
                     {
-                        ret=-3;
+                        ret=MC_ASSET_KEY_INVALID_NAME;
                     }                    
                 }
             }
         }
         else
         {
-            ret=-4;
+            ret=MC_ASSET_KEY_INVALID_SIZE;
         }
     }
 
-    if(ret == 0)
+    if(ret == MC_ASSET_KEY_VALID)
     {
         if(txid)
         {
             memcpy(txid,entity.GetTxID(),32);
         }
         ptr=entity.GetRef();
-//        if((int)mc_GetLE((unsigned char*)ptr+4,4)<=0)
         if(entity.IsUnconfirmedGenesis())
         {
-            ret=1;                            
+            ret=MC_ASSET_KEY_UNCONFIRMED_GENESIS;                            
         }
         if(asset_ref)
         {
@@ -210,11 +209,11 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
 int ParseAssetKeyToFullAssetRef(const char* asset_key,unsigned char *full_asset_ref,int *multiple,int *type,int entity_type)
 {
     int ret;
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef())
+    if(mc_gState->m_Features->ShortTxIDInTx())
     {
         unsigned char txid[MC_ENT_KEY_SIZE];
         ret=ParseAssetKey(asset_key,txid,NULL,NULL,multiple,type,entity_type);
-        if(ret == 1)
+        if(ret == MC_ASSET_KEY_UNCONFIRMED_GENESIS)
         {
             ret=0;
         }
@@ -433,10 +432,7 @@ Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong)
                 if(full_type & MC_PTP_ISSUE)entry.push_back(Pair("issue", (type & MC_PTP_ISSUE) ? true : false));
                 if(full_type & MC_PTP_MINE)entry.push_back(Pair("mine", (type & MC_PTP_MINE) ? true : false));
                 if(full_type & MC_PTP_ADMIN)entry.push_back(Pair("admin", (type & MC_PTP_ADMIN) ? true : false));
-                if(mc_gState->m_Features->ActivatePermission())
-                {
-                    if(full_type & MC_PTP_ACTIVATE)entry.push_back(Pair("activate", (type & MC_PTP_ACTIVATE) ? true : false));                
-                }
+                if(full_type & MC_PTP_ACTIVATE)entry.push_back(Pair("activate", (type & MC_PTP_ACTIVATE) ? true : false));                
                 entry.push_back(Pair("startblock",(int64_t)from));
                 entry.push_back(Pair("endblock",(int64_t)to));
                 entry.push_back(Pair("timestamp",(int64_t)timestamp));        
@@ -868,13 +864,17 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
 }
 
 
-// output level
-// 1 - minimal - name, asset-ref, qty
-// 3 - txout - name, asset-ref, geneis txid, qty,raw
-// 9 - full - all fields
-
-Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level)
+Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_level)
 {
+// output_level constants
+// 0x0000 minimal: name, assetref, non-negative qty, negative actual issueqty    
+// 0x0001 raw 
+// 0x0002 multiple, units, open, details
+// 0x0004 issuetxid,     
+// 0x0008 subscribed/synchronized    
+// 0x0020 issuers
+// 0x0040 put given quantity into qty field, even negative
+// 0x0080 put issueqty into qty field
     Object entry;
     mc_EntityDetails entity;
     mc_EntityDetails genesis_entity;
@@ -907,7 +907,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level)
         {
             entry.push_back(Pair("name", string((char*)ptr)));            
         }
-        if((output_level >= 3) && (output_level != 7) )
+        if(output_level & 0x0004)
         {
             entry.push_back(Pair("issuetxid", hash.GetHex()));
         }
@@ -930,6 +930,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level)
 
         size_t value_size;
         int64_t offset,new_offset;
+        int64_t raw_output;
         uint32_t value_offset;
         uint64_t multiple=1;
         const unsigned char *ptr;
@@ -938,32 +939,25 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level)
         ptr=entity.GetScript();
         multiple=genesis_entity.GetAssetMultiple();
         units= 1./(double)multiple;
-        if(output_level >= 5)
+        if(output_level & 0x0002)
         {
             if(!entity.IsFollowOn())
             {
                 entry.push_back(Pair("multiple", multiple));                                        
                 entry.push_back(Pair("units",units));                              
-                if(mc_gState->m_Features->FollowOnIssues())
+                if(entity.AllowedFollowOns())
                 {
-                    if(entity.AllowedFollowOns())
-                    {
-                        entry.push_back(Pair("open",true));                                
-                    }
-                    else
-                    {
-                        entry.push_back(Pair("open",false));                                            
-                    }
+                    entry.push_back(Pair("open",true));                                
                 }
                 else
                 {
-                    entry.push_back(Pair("open",false));                                                                
+                    entry.push_back(Pair("open",false));                                            
                 }
             }
         }
         
         Object fields;
-        if(output_level >= 5)
+        if(output_level & 0x0002)
         {
             offset=0;
             while(offset>=0)
@@ -975,13 +969,9 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level)
                     {
                         if(ptr[offset] != 0xff)
                         {
-                            if(mc_gState->m_Features->SpecialParamsInDetailsScript() || 
-                                    ((strcmp((char*)ptr+offset,"multiple") != 0) && (strcmp((char*)ptr+offset,"name") != 0) ))    
-                            {
-                                string param_name((char*)ptr+offset);
-                                string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
-                                fields.push_back(Pair(param_name, param_value));                                                                        
-                            }
+                            string param_name((char*)ptr+offset);
+                            string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
+                            fields.push_back(Pair(param_name, param_value));                                                                        
                         }
                     }
                 }
@@ -989,14 +979,14 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level)
             }      
     
         }
-        if(output_level >= 5)
+        if(output_level & 0x0002)
         {
             entry.push_back(Pair("details",fields));                    
         }
 
         Array issues;
         int64_t total=0;
-        if((output_level == 9) || mc_gState->m_Assets->HasFollowOns(txid))
+        if(( (output_level & 0x0020) !=0 )|| mc_gState->m_Assets->HasFollowOns(txid))
         {
             int64_t qty;
             mc_Buffer *followons;
@@ -1009,7 +999,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level)
                 {
                     qty=followon.GetQuantity();
                     total+=qty;
-                    if(output_level == 9)
+                    if(output_level & 0x0020)
                     {
                         issue.push_back(Pair("txid", ((uint256*)(followon.GetTxID()))->ToString().c_str()));    
                         issue.push_back(Pair("qty", (double)qty*units));
@@ -1029,13 +1019,9 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level)
                                 {
                                     if(ptr[offset] != 0xff)
                                     {
-                                        if(mc_gState->m_Features->SpecialParamsInDetailsScript() || 
-                                                ((strcmp((char*)ptr+offset,"multiple") != 0) && (strcmp((char*)ptr+offset,"name") != 0) ))    
-                                        {
-                                            string param_name((char*)ptr+offset);
-                                            string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
-                                            followon_fields.push_back(Pair(param_name, param_value));                                                                        
-                                        }
+                                        string param_name((char*)ptr+offset);
+                                        string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
+                                        followon_fields.push_back(Pair(param_name, param_value));                                                                        
                                     }                            
                                 }
                                 else
@@ -1078,31 +1064,33 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level)
             total=entity.GetQuantity();
         }
         
-        
-        if( ((quantity < 0) && (output_level != 2)) || (output_level == 7) )
+        raw_output=quantity;
+        if(output_level & 0x0080)
         {
-//            quantity=entity.GetQuantity();
-            if(output_level == 7)            
-            {
-                entry.push_back(Pair("qty", (double)entity.GetQuantity()*units));
-                entry.push_back(Pair("raw", entity.GetQuantity()));                                    
-            }
-            else
-            {
-                entry.push_back(Pair("issueqty", (double)total*units));
-                entry.push_back(Pair("issueraw", total));                    
-            }
+            raw_output=entity.GetQuantity();
+            entry.push_back(Pair("qty", (double)raw_output*units));
+            entry.push_back(Pair("raw", raw_output));                                    
         }
         else
         {
-            entry.push_back(Pair("qty", (double)quantity*units));
-            if(output_level >= 3)
+            if( (raw_output < 0) && ( (output_level & 0x0040) == 0) )
             {
-                entry.push_back(Pair("raw", quantity));                    
+                raw_output=total;
+                entry.push_back(Pair("issueqty", (double)raw_output*units));
+                entry.push_back(Pair("issueraw", raw_output));                                    
+            }
+            else
+            {
+                entry.push_back(Pair("qty", (double)raw_output*units));
+                if(output_level & 0x0001)
+                {
+                    entry.push_back(Pair("raw", raw_output));                                    
+                }
             }
         }
-
-        if( (output_level >= 8) && ((mc_gState->m_WalletMode & MC_WMD_TXS) != 0) )
+        
+        
+        if( ((output_level & 0x0008) != 0) && ((mc_gState->m_WalletMode & MC_WMD_TXS) != 0) )
         {
             entStat.Zero();
             memcpy(&entStat,genesis_entity.GetShortRef(),mc_gState->m_NetworkParams->m_AssetRefSize);
@@ -1127,12 +1115,9 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,int output_level)
             }
         }
         
-        if(mc_gState->m_Features->FollowOnIssues())
+        if(output_level & 0x0020)
         {
-            if(output_level == 9)
-            {
-                entry.push_back(Pair("issues",issues));                    
-            }
+            entry.push_back(Pair("issues",issues));                    
         }
     }
     else
@@ -1180,7 +1165,7 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
     {        
         if(mc_gState->m_Features->VerifySizeOfOpDropElements())
         {
-            assets_per_opdrop=(mc_gState->m_NetworkParams->GetInt64Param("maxstdelementsize")-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
+            assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
         }
     }
     
@@ -1283,7 +1268,6 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                         }
                         if(asset_name.size())
                         {
-//                            asset_error=ParseAssetKey(asset_name.c_str(),NULL,buf,NULL,&multiple,NULL, MC_ENT_TYPE_ASSET);
                             asset_error=ParseAssetKeyToFullAssetRef(asset_name.c_str(),buf,&multiple,NULL, MC_ENT_TYPE_ASSET);
                             if(asset_error)
                             {
@@ -1480,7 +1464,6 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
             if(a.name_.size())
             {
                 asset_name=a.name_;
-//                asset_error=ParseAssetKey(asset_name.c_str(),NULL,buf,NULL,&multiple,NULL, MC_ENT_TYPE_ASSET);
                 asset_error=ParseAssetKeyToFullAssetRef(asset_name.c_str(),buf,&multiple,NULL, MC_ENT_TYPE_ASSET);
                 if(asset_error)
                 {
@@ -1534,7 +1517,7 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
     {
         if(Params().RequireStandard())
         {
-            if(lpScript->GetNumElements() > mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropscount"))
+            if(lpScript->GetNumElements() > MCP_STD_OP_DROP_COUNT)
             {
                 strError=string("Too many objects in output");
                 goto exitlbl;                                                
@@ -1546,31 +1529,31 @@ exitlbl:
                     
     switch(asset_error)
     {
-        case -1:
+        case MC_ASSET_KEY_INVALID_TXID:
             if(eErrorCode)
             {
                 *eErrorCode=RPC_ENTITY_NOT_FOUND;
             }
             strError=string("Issue transaction with this txid not found: ")+asset_name;
             break;
-        case -2:
+        case MC_ASSET_KEY_INVALID_REF:
             if(eErrorCode)
             {
                 *eErrorCode=RPC_ENTITY_NOT_FOUND;
             }
             strError=string("Issue transaction with this asset reference not found: ")+asset_name;
             break;
-        case -3:
+        case MC_ASSET_KEY_INVALID_NAME:
             if(eErrorCode)
             {
                 *eErrorCode=RPC_ENTITY_NOT_FOUND;
             }
             strError=string("Issue transaction with this name not found: ")+asset_name;
             break;
-        case -4:
+        case MC_ASSET_KEY_INVALID_SIZE:
             strError=string("Could not parse asset key: ")+asset_name;
             break;
-        case 1:
+        case MC_ASSET_KEY_UNCONFIRMED_GENESIS:
             if(eErrorCode)
             {
                 *eErrorCode=RPC_UNCONFIRMED_ENTITY;
@@ -1810,7 +1793,7 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
             }
 
 /*            
-            if(lpScript->GetNumElements() > mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropscount") )
+            if(lpScript->GetNumElements() > MCP_STD_OP_DROP_COUNT )
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid number of elements in script");
 */
             
@@ -2336,6 +2319,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
         
         if(strError.size() == 0)
         {
+            int err;
             size_t bytes;
             const unsigned char *script;
             
@@ -2344,10 +2328,16 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                 if(mc_gState->m_Features->OpDropDetailsScripts())
                 {
                     script=lpDetails->GetData(0,&bytes);
-                    lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
-
-                    script = lpDetailsScript->GetData(0,&bytes);
-                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+                    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
+                    if(err)
+                    {
+                        strError=string("Invalid custom fields, too long");                                                            
+                    }
+                    else
+                    {
+                        script = lpDetailsScript->GetData(0,&bytes);
+                        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+                    }
                 }
                 else
                 {
@@ -2365,11 +2355,18 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             {
                 if(mc_gState->m_Features->OpDropDetailsScripts())
                 {
+                    int err;
                     script=lpDetails->GetData(0,&bytes);
-                    lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
-
-                    script = lpDetailsScript->GetData(0,&bytes);
-                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+                    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
+                    if(err)
+                    {
+                        strError=string("Invalid custom fields, too long");                                                            
+                    }
+                    else
+                    {
+                        script = lpDetailsScript->GetData(0,&bytes);
+                        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+                    }
                 }
                 else
                 {
@@ -2393,6 +2390,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             {
                 if(mc_gState->m_Features->OpDropDetailsScripts())
                 {
+                    int err;
                     lpDetailsScript->Clear();
                     lpDetailsScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
                     script = lpDetailsScript->GetData(0,&bytes);
@@ -2400,9 +2398,16 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
 
                     lpDetailsScript->Clear();
                     script=lpDetails->GetData(0,&bytes);
-                    lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
-                    script = lpDetailsScript->GetData(0,&bytes);
-                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+                    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
+                    if(err)
+                    {
+                        strError=string("Invalid custom fields, too long");                                                            
+                    }
+                    else
+                    {
+                        script = lpDetailsScript->GetData(0,&bytes);
+                        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+                    }
                 }
                 else
                 {
@@ -2485,7 +2490,16 @@ vector<string> ParseStringList(Value param)
             }
             else
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value, expected array of strings");                                                        
+                if(vtok.type() == int_type)
+                {
+                    string tok=strprintf("%ld",vtok.get_int64());
+                    setStrings.insert(tok);
+                    vStrings.push_back(tok);                    
+                }
+                else
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value, expected array of strings");                                                        
+                }
             }
         }            
     }
@@ -2547,7 +2561,7 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
         
         if(entity_type & MC_ENT_TYPE_STREAM)
         {
-            if(CoinSparkAssetRefDecode(buf_a,str.c_str(),str.size()))
+            if(AssetRefDecode(buf_a,str.c_str(),str.size()))
             {
                 memset(buf_n,0,MC_AST_ASSET_REF_SIZE);
                 if(memcmp(buf_a,buf_n,4) == 0)
@@ -2574,16 +2588,16 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
         ret=ParseAssetKey(str.c_str(),buf,NULL,NULL,NULL,NULL,entity_type);
         switch(ret)
         {
-            case -1:
+            case MC_ASSET_KEY_INVALID_TXID:
                 throw JSONRPCError(RPC_ENTITY_NOT_FOUND, entity_nameU+string(" with this txid not found: ")+str);
                 break;
-            case -2:
+            case MC_ASSET_KEY_INVALID_REF:
                 throw JSONRPCError(RPC_ENTITY_NOT_FOUND, entity_nameU+string(" with this reference not found: ")+str);
                 break;
-            case -3:
+            case MC_ASSET_KEY_INVALID_NAME:
                 throw JSONRPCError(RPC_ENTITY_NOT_FOUND, entity_nameU+string(" with this name not found: ")+str);
                 break;
-            case -4:
+            case MC_ASSET_KEY_INVALID_SIZE:
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Could not parse "+entity_nameL+" key: "+str);
                 break;
 /*                
@@ -2655,8 +2669,8 @@ bool AssetCompareByRef(Value a,Value b)
     unsigned char buf_a[MC_AST_ASSET_REF_SIZE];
     unsigned char buf_b[MC_AST_ASSET_REF_SIZE];
     
-    CoinSparkAssetRefDecode(buf_a,assetref_a.get_str().c_str(),assetref_a.get_str().size());
-    CoinSparkAssetRefDecode(buf_b,assetref_b.get_str().c_str(),assetref_b.get_str().size());
+    AssetRefDecode(buf_a,assetref_a.get_str().c_str(),assetref_a.get_str().size());
+    AssetRefDecode(buf_b,assetref_b.get_str().c_str(),assetref_b.get_str().size());
 
     
 //    if(strcmp(assetref_a.get_str().c_str(),assetref_b.get_str().c_str()) < 0)
@@ -2677,6 +2691,171 @@ bool AssetCompareByRef(Value a,Value b)
     
     return false;
 }
+
+bool StringToInt(string str,int *value)
+{
+    char *endptr;
+    if(str.size())
+    {
+        *value=(int)strtol(str.c_str(),&endptr,0);
+        if(endptr == (str.c_str() + str.size()) )
+        {
+            return true;
+        }
+    }
+    return  false;
+}
+
+bool ParseIntRange(string str,int *from,int *to)
+{
+    size_t mpos;
+    
+    mpos=str.find("-");
+    if( (mpos == string::npos) || (mpos == 0) || (mpos == (str.size()-1)) )
+    {
+        return false;
+    }
+    if(!StringToInt(str.substr(0,mpos),from))
+    {
+        return false;        
+    }
+    if(!StringToInt(str.substr(mpos+1),to))
+    {
+        return false;        
+    }
+    return true;
+}
+
+vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
+{
+    vector<int> block_set;
+    vector<int> result;
+    int last_block;
+    
+    if(blockset_identifier.type() == obj_type)
+    {
+        int64_t starttime=-1; 
+        int64_t endtime=-1; 
+    
+        BOOST_FOREACH(const Pair& d, blockset_identifier.get_obj()) 
+        {              
+            if(d.name_ == "starttime")
+            {
+                if(d.value_.type() != int_type)
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid starttime");            
+                    
+                starttime=d.value_.get_int64();
+                if( (starttime<0) || (starttime > 0xffffffff))
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid starttime");                                
+                }
+            }
+            else
+            {
+                if(d.name_ == "endtime")
+                {
+                    if(d.value_.type() != int_type)
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid endtime");            
+
+                    endtime=d.value_.get_int64();
+                    if( (endtime<0) || (endtime > 0xffffffff))
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid endtime");                                
+                    }
+                }
+                else
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid time range");            
+                }
+            }
+        }
+        
+        if(starttime < 0)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing starttime");            
+        if(endtime < 0)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing starttime");            
+        
+        if(starttime <= endtime)
+        {
+            for(int block=0; block<chainActive.Height();block++)
+            {
+                if( (chainActive[block]->nTime >= starttime) && (chainActive[block]->nTime <= endtime) )
+                {
+                    block_set.push_back(block);                    
+                }
+            }
+        }        
+    }
+    else
+    {
+        vector<string> inputStrings;
+        inputStrings=ParseStringList(blockset_identifier);
+
+        for(unsigned int i=0;i<inputStrings.size();i++)
+        {
+            string str=inputStrings[i];
+            int value,from,to;
+            if(StringToInt(str,&value))
+            {
+                from=value;
+                to=value;
+                if(value < 0)
+                {
+                    to=chainActive.Height();
+                    from=chainActive.Height()+value+1;
+                }
+            }
+            else
+            {
+                if(!ParseIntRange(str,&from,&to))
+                {
+                    uint256 hash = ParseHashV(str, "Block hash");
+                    
+                    if (mapBlockIndex.count(hash) == 0)
+                        throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block " + str + " not found");
+
+                    CBlockIndex* pblockindex = mapBlockIndex[hash];
+                    if(!chainActive.Contains(pblockindex))
+                    {
+                        throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block " + str + " not found in active chain");
+                    }
+                    from=pblockindex->nHeight;
+                    to=from;
+                }
+            }
+            if (from < 0 || from > chainActive.Height())
+                throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range for " + str);
+            if (to < 0 || to > chainActive.Height())
+                throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range for " + str);            
+            if (from > to)
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid range " + str);            
+            
+            for(int block=from;block<=to;block++)
+            {
+                block_set.push_back(block);
+            }
+        }        
+    }
+    
+    if(block_set.size())
+    {
+        sort(block_set.begin(),block_set.end());
+    }
+    
+    last_block=-1;
+    for(unsigned int i=0;i<block_set.size();i++)
+    {
+        if(block_set[i] != last_block)
+        {
+            result.push_back(block_set[i]);
+            last_block=block_set[i];
+        }
+    }
+    
+    return result;
+}
+
+
 
 Array AssetArrayFromAmounts(mc_Buffer *asset_amounts,int issue_asset_id,uint256 hash,int show_type)
 {
@@ -2702,11 +2881,11 @@ Array AssetArrayFromAmounts(mc_Buffer *asset_amounts,int issue_asset_id,uint256 
                     txid=entity.GetTxID();
                     if(a == issue_asset_id)
                     {
-                        asset_entry=AssetEntry(txid,-quantity,8);                        
+                        asset_entry=AssetEntry(txid,-quantity,0x0F);                        
                     }
                     else
                     {
-                        asset_entry=AssetEntry(txid,quantity,2);
+                        asset_entry=AssetEntry(txid,quantity,0x40);
                     }
                     if(show_type)
                     {
@@ -2743,7 +2922,7 @@ Array AssetArrayFromAmounts(mc_Buffer *asset_amounts,int issue_asset_id,uint256 
                         if(quantity != 0)
                         {
                             txid=(unsigned char*)&hash;
-                            asset_entry=AssetEntry(txid,quantity,2);
+                            asset_entry=AssetEntry(txid,quantity,0x40);
                             if(show_type)
                             {
                                 asset_entry.push_back(Pair("type", "issuefirst"));                                            
@@ -2796,3 +2975,23 @@ void ParseRawAction(string action,bool& lock_it, bool& sign_it,bool& send_it)
     }    
 }
 
+int paramtoint(Value param,bool check_for_min,int min_value,string error_message)
+{
+    int result;
+    
+    if(param.type() != int_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, error_message);        
+    }
+    
+    result=param.get_int();
+    if(check_for_min)
+    {
+        if(result < min_value)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, error_message);                    
+        }
+    }
+    
+    return result;
+}

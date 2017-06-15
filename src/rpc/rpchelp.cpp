@@ -955,9 +955,9 @@ void mc_InitRPCHelpMap05()
             "            {\n"
             "              \"type\" : \"permission(s)\"    (string,required) Permission strings, comma delimited. Possible values:\n"
             "                                                              " + AllowedPermissions() + " \n"
-            "              \"startblock\"                (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
-            "              \"endblock\"                  (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
-            "              \"timestamp\"                 (numeric, optional) This helps resolve conflicts between\n"
+            "              \"startblock\" : n            (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
+            "              \"endblock\"  : n             (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
+            "              \"timestamp\" : n             (numeric, optional) This helps resolve conflicts between\n"
             "                                                                permissions assigned by the same administrator. Default - current time\n"
             "              ,...\n"
             "            }\n"                                
@@ -1366,12 +1366,12 @@ void mc_InitRPCHelpMap06()
             "\nArguments:\n"
             "1. \"address(es)\"                    (string, optional) Addresses to optimize (comma delimited). Default - \"*\", all.\n"
             "2. minconf                          (numeric, optional) The minimum confirmations to filter. Default - 1\n"
-            "3. maxcombines                      (numeric, optional) Maximal number of transactions to send. Default - 1\n"
-            "4. mininputs                        (numeric, optional) Minimal number of txouts to combine in one transaction. Default - 10\n"
+            "3. maxcombines                      (numeric, optional) Maximal number of transactions to send. Default - 100\n"
+            "4. mininputs                        (numeric, optional) Minimal number of txouts to combine in one transaction. Default - 2\n"
             "5. maxinputs                        (numeric, optional) Maximal number of txouts to combine in one transaction. Default - 100\n"
             "6. maxtime                          (numeric, optional) Maximal time for creating combining transactions, at least one transaction will be sent. Default - 15s\n"
             "\nResult:\n"
-            "\"transactionids\"                    (Array) Array of transaction ids.\n"
+            "\"transactionids\"                    (array) Array of transaction ids.\n"
             "\nExamples:\n"
             + HelpExampleCli("combineunspent", "\"*\" 1 100 5 20 120")
             + HelpExampleCli("combineunspent", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" ")
@@ -3453,11 +3453,13 @@ void mc_InitRPCHelpMap15()
         ));
     
     mapHelpStrings.insert(std::make_pair("signmessage",
-            "signmessage \"address\" \"message\"\n"
+            "signmessage \"address\"|\"privkey\" \"message\"\n"
             "\nSign a message with the private key of an address"
             + HelpRequiringPassphraseWrapper() + 
             "\nArguments:\n"
             "1. \"address\"                        (string, required) The address to use for the private key.\n"
+            " or\n"    
+            "1. \"privkey\"                        (string, required) The private key (see dumpprivkey and createkeypairs)\n"
             "2. \"message\"                        (string, required) The message to create a signature of.\n"
             "\nResult:\n"
             "\"signature\"                         (string) The signature of the message encoded in base 64\n"
@@ -3632,6 +3634,142 @@ void mc_InitRPCHelpMap16()
             + HelpExampleRpc("listupgrades", "")
         ));
     
+    mapHelpStrings.insert(std::make_pair("appendrawtransaction",
+            "appendrawtransaction \"tx-hex\" [{\"txid\":\"id\",\"vout\":n},...] ( {\"address\":amount,...} [data] \"action\" ) \n"
+            "\nAppend inputs and outputs to raw transaction\n"
+
+            "\nArguments:\n"
+            "1. \"tx-hex\"                               (string, required) Source transaction hex string\n"
+            "2. transactions                           (array, required) A json array of json objects\n"
+            "     [\n"
+            "       {\n"
+            "         \"txid\":\"id\",                     (string, required) The transaction id\n"
+            "         \"vout\":n                         (numeric, required) The output number\n"
+            "         \"scriptPubKey\": \"hex\",           (string, optional) script key, used if cache=true or action=sign\n"
+            "         \"redeemScript\": \"hex\"            (string, optional) redeem script, used if action=sign\n"
+            "         \"cache\":true|false               (boolean, optional) If true - add cached script to tx, if omitted - add automatically if needed\n"    
+            "       }\n"
+            "       ,...\n"
+            "     ]\n"
+            "3. addresses                              (object, optional) a json object with addresses as keys and amounts as values\n"
+            "    {\n"
+            "      \"address\": \n"
+            "        x.xxx                             (numeric, required) The key is the address, the value is the native currency amount\n"
+            "          or \n"
+            "        {                                 (object) A json object of assets to send\n"
+            "          \"asset-identifier\" : asset-quantity \n"
+            "          ,...\n"
+            "        }\n"                                
+            "          or \n"
+            "        {                                 (object) A json object describing new asset issue\n"
+            "          \"issue\" : \n"
+            "            {\n"
+            "              \"raw\" : n                   (numeric, required) The asset total amount in raw units \n"
+            "              ,...\n"
+            "            }\n"                                
+            "          ,...\n"
+            "        }\n"                                
+            "          or \n"
+            "        {                                 (object) A json object describing follow-on asset issue\n"
+            "          \"issuemore\" : \n"
+            "            {\n"
+            "              \"asset\" : \"asset-identifier\"(string, required) Asset identifier - one of the following: issue txid. asset reference, asset name.\n"
+            "              \"raw\" : n                   (numeric, required) The asset total amount in raw units \n"
+            "              ,...\n"
+            "            }\n"                                
+            "          ,...\n"
+            "        }\n"                                
+            "          or \n"
+            "        {                                 (object) A json object describing permission change\n"
+            "          \"permissions\" : \n"
+            "            {\n"
+            "              \"type\" : \"permission(s)\"    (string,required) Permission strings, comma delimited. Possible values:\n"
+            "                                                              " + AllowedPermissions() + " \n"
+            "              \"startblock\" : n            (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
+            "              \"endblock\" : n              (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
+            "              \"timestamp\" : n             (numeric, optional) This helps resolve conflicts between\n"
+            "                                                                permissions assigned by the same administrator. Default - current time\n"
+            "              ,...\n"
+            "            }\n"                                
+            "          ,...\n"
+            "        }\n"                                
+            "      ,...\n"
+            "    }\n"
+            "4. data                                   (array, optional) Array of hexadecimal strings or data objects, see help appendrawdata for details.\n"
+            "5.\"action\"                                (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
+                
+
+            "\nResult:\n"
+            "\"transaction\"                             (string) hex string of the transaction (if action= \"\" or \"lock\")\n"
+            "  or \n"
+            "{                                         (object) A json object (if action= \"sign\" or \"lock,sign\" or \"sign,lock\")\n"
+            "  \"hex\": \"value\",                         (string) The raw transaction with signature(s) (hex-encoded string)\n"
+            "  \"complete\": true|false                  (boolean) if transaction has a complete set of signature (0 if not)\n"
+            "}\n"
+            "  or \n"
+            "\"hex\"                                     (string) The transaction hash in hex (if action= \"send\")\n"
+
+            "\nExamples\n"
+            + HelpExampleCli("appendrawtransaction", "\"hexstring\" \"[{\\\"txid\\\":\\\"myid\\\",\\\"vout\\\":0}]\" \"{\\\"address\\\":0.01}\"")
+            + HelpExampleRpc("appendrawtransaction", "\"hexstring\", \"[{\\\"txid\\\":\\\"myid\\\",\\\"vout\\\":0}]\", \"{\\\"address\\\":0.01}\"")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("listblocks",
+            "listblocks block-set-identifier ( verbose )\n"
+            "\nReturns list of block information objects\n"
+            "\nArguments:\n"
+            "1. \"block-set-identifier\"           (string, required) Comma delimited list of block identifiers: \n"
+            "                                                       block height,\n"
+            "                                                       block hash,\n"
+            "                                                       block height range, e.g. <block-from>-<block-to>,\n"
+            "                                                       number of last blocks in the active chain (if negative),\n"
+            " or\n"
+            "1. block-set-identifier             (array, required)  A json array of block identifiers \n"                
+            " or\n"
+            "1. block-set-identifier             (object, required) A json object with time range\n"
+            "    {\n"                
+            "      \"starttime\" : start-time      (numeric,required) Start time.\n"
+            "      \"endtime\" : end-time          (numeric,required) End time.\n"
+            "    }\n"                                
+            "2. verbose                          (boolean, optional, default=false) If true, returns more information\n"
+            "\nResult:\n"
+            "An array containing list of block information objects\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("listblocks", "\"1000,1100-1120\"")
+            + HelpExampleCli("listblocks", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\"")
+            + HelpExampleRpc("listblocks", "1000")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("liststreamblockitems",
+            "liststreamblockitems \"stream-identifier\" block-set-identifier ( verbose count start )\n"
+            "\nReturns stream items in certain block range.\n"
+            "\nArguments:\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "2. \"block-set-identifier\"           (string, required) Comma delimited list of block identifiers: \n"
+            "                                                       block height,\n"
+            "                                                       block hash,\n"
+            "                                                       block height range, e.g. <block-from>-<block-to>,\n"
+            "                                                       number of last blocks in the active chain (if negative),\n"
+            " or\n"
+            "2. block-set-identifier             (array, required)  A json array of block identifiers \n"                
+            " or\n"
+            "2. block-set-identifier             (object, required) A json object with time range\n"
+            "    {\n"                
+            "      \"starttime\" : start-time      (numeric,required) Start time.\n"
+            "      \"endtime\" : end-time          (numeric,required) End time.\n"
+            "    }\n"                                
+            "3. verbose                          (boolean, optional, default=false) If true, returns information about item transaction \n"
+            "4. count                            (number, optional, default==INT_MAX) The number of items to display\n"
+            "5. start                            (number, optional, default=-count - last) Start from specific item, 0 based, if negative - from the end\n"
+            "\nResult:\n"
+            "stream-items                        (array) List of stream items.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("liststreamblockitems", "\"test-stream\" 1000,1100-1120 ") 
+            + HelpExampleCli("liststreamblockitems", "\"test-stream\" 1000 true 10 100") 
+            + HelpExampleRpc("liststreamblockitems", "\"test-stream\", 1000, false, 20")
+        ));
+    
+
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));

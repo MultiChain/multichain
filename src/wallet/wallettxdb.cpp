@@ -589,10 +589,8 @@ void mc_TxDB::Dump(const char *message)
 int mc_TxDB::FlushDataFile(uint32_t fileid)
 {
     char FileName[MC_DCT_DB_MAX_PATH];         
-    int FileHan,err;
+    int FileHan;
     sprintf(FileName,"%s%05u.dat",m_LobFileNamePrefix,fileid);
-    
-    err=MC_ERR_NOERROR;
     
     FileHan=open(FileName,_O_BINARY | O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
     
@@ -2174,6 +2172,74 @@ int mc_TxDB::GetList(
     
     return MC_ERR_NOERROR;
 }
+
+int mc_TxDB::GetBlockItemIndex(mc_TxImport *import,mc_TxEntity *entity,int block)
+{
+    mc_TxImport *imp;
+    int first,last,next;
+   
+    imp=m_Imports;
+    if(import)
+    {
+        imp=import;
+    }
+    
+    mc_TxEntityRow erow;
+    int row;
+    mc_TxEntityStat *stat;
+    
+    row=imp->FindEntity(entity);
+    if(row < 0)
+    {
+        return 0;
+    }
+    
+    stat=(mc_TxEntityStat*)imp->m_Entities->GetRow(row);
+    
+    first=1;
+    GetListSize(entity,stat->m_Generation,&last);
+        
+    if(last <= 0)
+    {
+        return 0;
+    }
+    
+    erow.Zero();
+    memcpy(&erow.m_Entity,&(stat->m_Entity),sizeof(mc_TxEntity));
+    erow.m_Generation=stat->m_Generation;
+    
+    erow.m_Pos=first;
+    GetRow(&erow);
+    if(erow.m_Block > block)
+    {
+        return 0;
+    }
+    
+    erow.m_Pos=last;
+    GetRow(&erow);
+    if(erow.m_Block <= block)
+    {
+        return last;        
+    }
+    
+    while(last-first > 1)
+    {
+        next=(last+first)/2;
+        erow.m_Pos=next;
+        GetRow(&erow);
+        if(erow.m_Block > block)
+        {
+            last=next;
+        }
+        else
+        {
+            first=next;
+        }
+    }
+    
+    return first;
+}
+    
 
 int mc_TxDB::GetListSize(mc_TxEntity *entity,int generation,int *confirmed)
 {

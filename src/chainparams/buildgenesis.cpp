@@ -164,9 +164,6 @@ int mc_MultichainParams::Build(const unsigned char* pubkey, int pubkey_size)
             txNew.vout[0].scriptPubKey = CScript() << vector<unsigned char>(pubkey, pubkey + pubkey_size) << OP_CHECKSIG;       
         }
         
-//        txNew.vout[0].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << vector<unsigned char>(pubkey_hash, pubkey_hash + 20) << OP_EQUALVERIFY << OP_CHECKSIG;
-    
-//        if(GetInt64Param("anyonecanmine") == 0)
         if(IsProtocolMultichain())
         {
             mc_Script *lpScript;
