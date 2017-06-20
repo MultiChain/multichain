@@ -46,6 +46,23 @@
 #define MC_PRM_STATUS_INVALID            4
 #define MC_PRM_STATUS_VALID              5
 
+extern int MCP_MAX_STD_OP_RETURN_COUNT;
+extern int64_t MCP_INITIAL_BLOCK_REWARD;
+extern int64_t MCP_FIRST_BLOCK_REWARD;
+extern int MCP_TARGET_BLOCK_TIME;
+extern int MCP_ANYONE_CAN_ADMIN;
+extern int MCP_ANYONE_CAN_MINE;
+extern int MCP_ANYONE_CAN_CONNECT;
+extern int MCP_ANYONE_CAN_SEND;
+extern int MCP_ANYONE_CAN_RECEIVE;
+extern int MCP_ANYONE_CAN_ACTIVATE;
+extern int64_t MCP_MINIMUM_PER_OUTPUT;
+extern int MCP_ALLOW_MULTISIG_OUTPUTS;
+extern int MCP_ALLOW_P2SH_OUTPUTS;
+extern int MCP_WITH_NATIVE_CURRENCY;
+extern int MCP_STD_OP_DROP_COUNT;
+extern int MCP_STD_OP_DROP_SIZE;
+extern int MCP_ANYONE_CAN_RECEIVE_EMPTY;
 
 typedef struct mc_OneMultichainParam
 {    

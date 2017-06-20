@@ -12,8 +12,11 @@
 #include "wallet/keystore.h"
 #include "script/standard.h"
 #include "structs/uint256.h"
+#include "sigcache.h"
 
 #include <boost/foreach.hpp>
+
+void MultichainNode_AddSignatureToCache(const std::vector<unsigned char>& vchSig, const CPubKey& pubkey, const uint256& sighash);
 
 using namespace std;
 
@@ -37,9 +40,14 @@ bool Sign1(const CKeyID& address, const CKeyStore& keystore, uint256 hash, int n
     vector<unsigned char> vchSig;
     if (!key.Sign(hash, vchSig))
         return false;
+    if(GetBoolArg("-cachejustsigned",true))
+    {
+        MultichainNode_AddSignatureToCache(vchSig,key.GetPubKey(),hash);
+    }
     vchSig.push_back((unsigned char)nHashType);
     scriptSigRet << vchSig;
-
+    
+    
     return true;
 }
 

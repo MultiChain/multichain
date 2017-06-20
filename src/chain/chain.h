@@ -148,6 +148,9 @@ public:
     uint32_t nCanMine;
     double dTimeReceived;
     CPubKey kMiner;
+    bool fPassedMinerPrecheck;
+    int32_t nFirstSuccessor;
+    CBlockIndex *pNextOnThisHeight;
 /* MCHN END */
     
     void SetNull()
@@ -175,6 +178,9 @@ public:
         nHeightMinedByMe=0;
         nCanMine=0;
         dTimeReceived=0.;
+        fPassedMinerPrecheck=false;
+        nFirstSuccessor=0;
+        pNextOnThisHeight=NULL;
 /* MCHN END */
     }
 

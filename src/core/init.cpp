@@ -464,6 +464,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -rpcsslciphers=<ciphers>                 " + strprintf(_("Acceptable ciphers (default: %s)"), "TLSv1.2+HIGH:TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!3DES:@STRENGTH") + "\n";
 
     strUsage += "\n" + _("MultiChain runtime parameters") + "\n";    
+    strUsage += "  -initprivkey=<privkey>                   " + _("Manually set the wallet default address and private key when running multichaind for the first time.") + "\n";
     strUsage += "  -handshakelocal=<address>                " + _("Manually override the wallet address which is used for handshaking with other peers in a MultiChain blockchain.") + "\n";
     strUsage += "  -hideknownopdrops=<n>                    " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON_RPC calls (default: %u)"), 0) + "\n";
     strUsage += "  -lockadminminerounds=<n>                 " + _("If set overrides lock-admin-mine-rounds blockchain setting.") + "\n";
@@ -1009,6 +1010,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     RegisterNodeSignals(GetNodeSignals());
 
     bool fFirstRunForBuild;
+    string init_privkey=GetArg("-initprivkey","");
     
     pwalletMain=NULL;
     if(mc_gState->m_NetworkParams->m_Status != MC_PRM_STATUS_VALID)
@@ -1023,15 +1025,35 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
         if(!pwalletMain->vchDefaultKey.IsValid())
         {
-            LogPrintf("mchn: Default key is not found - creating new... \n");
-            // Create new keyUser and set as default key
-//            RandAddSeedPerfmon();
-
-            pwalletMain->SetMinVersion(FEATURE_LATEST); // permanently upgrade the wallet immediately
-            CPubKey newDefaultKey;
-            if (pwalletMain->GetKeyFromPool(newDefaultKey)) {
-                pwalletMain->SetDefaultKey(newDefaultKey);
+            if(init_privkey.size())
+            {
+                LogPrintf("mchn: Default key is specified using -initprivkey - not created\n");                
             }
+            else
+            {
+                LogPrintf("mchn: Default key is not found - creating new... \n");
+                // Create new keyUser and set as default key
+    //            RandAddSeedPerfmon();
+
+                pwalletMain->SetMinVersion(FEATURE_LATEST); // permanently upgrade the wallet immediately
+                CPubKey newDefaultKey;
+                if (pwalletMain->GetKeyFromPool(newDefaultKey)) {
+                    pwalletMain->SetDefaultKey(newDefaultKey);
+                }
+            }
+        }
+        else
+        {
+            if(init_privkey.size())
+            {
+                LogPrintf("mchn: Wallet already has default key, -initprivkey is ignored\n");                
+                if(!GetBoolArg("-shortoutput", false))
+                {    
+                    sprintf(bufOutput,"Wallet already has default key, -initprivkey is ignored\n\n");
+                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                }
+                init_privkey="";
+            }            
         }
     }
     
@@ -1043,155 +1065,189 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     bool new_wallet_txs=false;
     seed_node=mc_gState->GetSeedNode();
     
-    if((mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY) 
-       || (mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL))
+    int seed_attempt=1;
+    if(init_privkey.size())
     {
-        if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL)
+        if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY) 
         {
-            InitializeMultiChainParams();                    
+            seed_attempt=2;            
         }
+    }
+    
+    while(seed_attempt)
+    {        
         
-        if(seed_node)
+        if((mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY) 
+           || (mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL))
         {
-            if(!GetBoolArg("-shortoutput", false))
-            {    
-                sprintf(bufOutput,"Retrieving blockchain parameters from the seed node %s ...\n",seed_node);
-                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+            if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL)
+            {
+                InitializeMultiChainParams();                    
+                if(init_privkey.size())
+                {
+                    if(seed_attempt == 1)
+                    {
+                        if(mc_gState->m_NetworkParams->GetParam("privatekeyversion",NULL) == NULL)
+                        {
+                            return InitError(_("The initprivkey runtime parameter can only be used when connecting to MultiChain 1.0 beta 2 or later"));                                                        
+                        }
+                        string init_privkey_error=pwalletMain->SetDefaultKeyIfInvalid(init_privkey);
+                        if(init_privkey_error.size())
+                        {
+                            return InitError(strprintf("Cannot set initial private key: %s",init_privkey_error));                            
+                        }
+                        init_privkey="";
+                    }
+                }
             }
-        }
-        
-        LogPrintf("mchn: Parameter set is not complete - starting paramset discovery thread...\n");
-        boost::thread_group seedThreadGroup;
-        
-        mc_gState->m_NetworkState=MC_NTS_WAITING_FOR_SEED;
-        
-        string seed_ip=seed_node;
-        string seed_port="";
-        stringstream ss(seed_ip); 
-        string tok;
-        int size;
-        
-        if(getline(ss, tok, ':'))
-        {
-            seed_ip=tok;
+
+            if(seed_node)
+            {
+                if(seed_attempt == 1)
+                {
+                    if(!GetBoolArg("-shortoutput", false))
+                    {    
+                        sprintf(bufOutput,"Retrieving blockchain parameters from the seed node %s ...\n",seed_node);
+                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                    }
+                }
+            }
+
+            LogPrintf("mchn: Parameter set is not complete - starting paramset discovery thread...\n");
+            boost::thread_group seedThreadGroup;
+
+            mc_gState->m_NetworkState=MC_NTS_WAITING_FOR_SEED;
+
+            string seed_ip=seed_node;
+            string seed_port="";
+            stringstream ss(seed_ip); 
+            string tok;
+            int size;
+
             if(getline(ss, tok, ':'))
             {
-                seed_port=tok;
-            }
-        }            
-        
-        if(mc_QuerySeed(seedThreadGroup,seed_node))
-        {
-            if((mc_gState->m_NetworkState == MC_NTS_SEED_READY) || (mc_gState->m_NetworkState == MC_NTS_SEED_NO_PARAMS) )
-            {
-                seed_error="Couldn't disconnect from the seed node, please restart multichaind";
-//                return InitError(_("Couldn't disconnect from the seed node, please restart multichaind"));            
-            }
-            else
-            {
-            
-//            seed_error="Couldn't connect to the seed node";
-                if(seed_port.size() == 0)
+                seed_ip=tok;
+                if(getline(ss, tok, ':'))
                 {
-                    seed_error=strprintf("Couldn't connect to the seed node %s - please specify port number explicitly.",seed_node);                
+                    seed_port=tok;
+                }
+            }            
+
+            if(mc_QuerySeed(seedThreadGroup,seed_node))
+            {
+                if((mc_gState->m_NetworkState == MC_NTS_SEED_READY) || (mc_gState->m_NetworkState == MC_NTS_SEED_NO_PARAMS) )
+                {
+                    seed_error="Couldn't disconnect from the seed node, please restart multichaind";
                 }
                 else
                 {
-                    seed_error=strprintf("Couldn't connect to the seed node %s on port %s - please check multichaind is running at that address and that your firewall settings allow incoming connections.",                
-                        seed_ip.c_str(),seed_port.c_str());
+                    if(seed_port.size() == 0)
+                    {
+                        seed_error=strprintf("Couldn't connect to the seed node %s - please specify port number explicitly.",seed_node);                
+                    }
+                    else
+                    {
+                        seed_error=strprintf("Couldn't connect to the seed node %s on port %s - please check multichaind is running at that address and that your firewall settings allow incoming connections.",                
+                            seed_ip.c_str(),seed_port.c_str());
+                    }
                 }
             }
-//            return InitError(_("Couldn't connect to the seed node"));            
-        }
-        
-        if( (mc_gState->m_NetworkParams->GetParam("protocolversion",&size) != NULL) &&
-            (mc_gState->GetProtocolVersion() < (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion")) )
-        {
-            seed_error=strprintf("Couldn't connect to the seed node %s on port %s.\n"
-                        "Blockchain was created by multichaind with newer protocol version (%d)\n"                
-                        "Please upgrade to the latest version of MultiChain or connect only to blockchains using protocol version %d or earlier.\n",                
-                    seed_ip.c_str(),seed_port.c_str(),(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion"), mc_gState->GetProtocolVersion());
-        }
-        else
-        {                                
-            if(mc_gState->m_NetworkState == MC_NTS_SEED_NO_PARAMS)
-            {
-                char fileName[MC_DCT_DB_MAX_PATH];
-                mc_GetFullFileName(mc_gState->m_Params->NetworkName(),"params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
-                seed_error=strprintf("Couldn't retrieve blockchain parameters from the seed node %s on port %s.\n"
-                            "For bitcoin protocol blockchains, the file %s must be copied manually from an existing node.",                
-                        seed_ip.c_str(),seed_port.c_str(),fileName);
 
-            }
-        }
-        LogPrintf("mchn: Exited from paramset discovery thread\n");        
-        
-        if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_VALID)
-        {
-            SelectMultiChainParams(mc_gState->m_Params->NetworkName());
-            delete mc_gState->m_Permissions;
-            mc_gState->m_Permissions= new mc_Permissions;
-/*            
-            mc_gState->m_Assets->RemoveFiles();
-            delete mc_gState->m_Assets;
-            mc_gState->m_Assets= new mc_AssetDB();
- */ 
-            if(mc_gState->m_Permissions->Initialize(mc_gState->m_Params->NetworkName(),0))                                
+            if( (mc_gState->m_NetworkParams->GetParam("protocolversion",&size) != NULL) &&
+                (mc_gState->GetProtocolVersion() < (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion")) )
             {
-                seed_error="Couldn't initialize permission database with retrieved parameters\n";
-            }            
-        }
-
-    }
-    else
-    {
-        if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_GENERATED)
-        {
-            const unsigned char *pubKey=pwalletMain->vchDefaultKey.begin();
-            int pubKeySize=pwalletMain->vchDefaultKey.size();
-
-            LogPrintf("mchn: Parameter set is new, THIS IS GENESIS NODE - looking for genesis block...\n");
-            if(!GetBoolArg("-shortoutput", false))
-            {    
-                sprintf(bufOutput,"Looking for genesis block...\n");
-                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                
+                seed_error=strprintf("Couldn't connect to the seed node %s on port %s.\n"
+                            "Blockchain was created by multichaind with newer protocol version (%d)\n"                
+                            "Please upgrade to the latest version of MultiChain or connect only to blockchains using protocol version %d or earlier.\n",                
+                        seed_ip.c_str(),seed_port.c_str(),(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion"), mc_gState->GetProtocolVersion());
             }
-            mc_gState->m_NetworkParams->SetGlobals();                           // Needed to update IsProtocolMultichain flag in case of bitcoin
-            if(mc_gState->m_NetworkParams->Build(pubKey,pubKeySize))
+            else
+            {                                
+                if( (mc_gState->m_NetworkParams->GetParam("protocolversion",&size) != NULL) &&
+                    (mc_gState->m_Features->MinProtocolVersion() > (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion")) )
+                {
+                    seed_error=strprintf("The protocol version (%d) for blockchain %s has been deprecated and was last supported in MultiChain 1.0 beta 1\n",                
+                            (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion"), mc_gState->m_Params->NetworkName());                    
+                    return InitError(seed_error);            
+                }
+                else
+                {                                
+                    if(mc_gState->m_NetworkState == MC_NTS_SEED_NO_PARAMS)
+                    {
+                        char fileName[MC_DCT_DB_MAX_PATH];
+                        mc_GetFullFileName(mc_gState->m_Params->NetworkName(),"params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
+                        seed_error=strprintf("Couldn't retrieve blockchain parameters from the seed node %s on port %s.\n"
+                                    "For bitcoin protocol blockchains, the file %s must be copied manually from an existing node.",                
+                                seed_ip.c_str(),seed_port.c_str(),fileName);
+
+                    }
+                }
+            }
+            
+            LogPrintf("mchn: Exited from paramset discovery thread\n");        
+
+            if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_VALID)
             {
-/*                
-                delete pwalletMain;
-                pwalletMain=NULL;
- */ 
-                return InitError(_("Cannot build new blockchain"));
-            }
-            LogPrintf("mchn: Genesis block found\n");
-            if(!GetBoolArg("-shortoutput", false))
-            {    
-                sprintf(bufOutput,"Genesis block found\n\n");
-                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                
+                SelectMultiChainParams(mc_gState->m_Params->NetworkName());
+                delete mc_gState->m_Permissions;
+                mc_gState->m_Permissions= new mc_Permissions;
+                if(mc_gState->m_Permissions->Initialize(mc_gState->m_Params->NetworkName(),0))                                
+                {
+                    seed_error="Couldn't initialize permission database with retrieved parameters\n";
+                }            
             }
 
-            mc_gState->m_NetworkParams->Validate();        
-
-            if(mc_gState->m_NetworkParams->m_Status != MC_PRM_STATUS_VALID)
-            {
-/*                
-                delete pwalletMain;
-                pwalletMain=NULL;
- */ 
-                return InitError(_("Invalid parameter set"));
-            }                        
         }
         else
         {
-            if(seed_node)
+            if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_GENERATED)
             {
+                const unsigned char *pubKey=pwalletMain->vchDefaultKey.begin();
+                int pubKeySize=pwalletMain->vchDefaultKey.size();
+
+                LogPrintf("mchn: Parameter set is new, THIS IS GENESIS NODE - looking for genesis block...\n");
                 if(!GetBoolArg("-shortoutput", false))
                 {    
-                    sprintf(bufOutput,"Chain %s already exists, adding %s to list of peers\n\n",mc_gState->m_NetworkParams->Name(),seed_node);
-                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                }                    
+                    sprintf(bufOutput,"Looking for genesis block...\n");
+                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                
+                }
+                mc_gState->m_NetworkParams->SetGlobals();                           // Needed to update IsProtocolMultichain flag in case of bitcoin
+                if(mc_gState->m_NetworkParams->Build(pubKey,pubKeySize))
+                {
+                    return InitError(_("Cannot build new blockchain"));
+                }
+                LogPrintf("mchn: Genesis block found\n");
+                if(!GetBoolArg("-shortoutput", false))
+                {    
+                    sprintf(bufOutput,"Genesis block found\n\n");
+                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                
+                }
+
+                mc_gState->m_NetworkParams->Validate();        
+
+                if(mc_gState->m_NetworkParams->m_Status != MC_PRM_STATUS_VALID)
+                {
+                    return InitError(_("Invalid parameter set"));
+                }                        
+            }
+            else
+            {
+                if(seed_node)
+                {
+                    if(!GetBoolArg("-shortoutput", false))
+                    {    
+                        sprintf(bufOutput,"Chain %s already exists, adding %s to list of peers\n\n",mc_gState->m_NetworkParams->Name(),seed_node);
+                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                    }                    
+                }
+            }
+        }
+        seed_attempt--;
+        if(seed_attempt)
+        {
+            if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY)            
+            {
+                seed_attempt--;                
             }
         }
     }
@@ -1204,16 +1260,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
         if(GetBoolArg("-reindex", false))
         {
-            if(mc_gState->m_Features->FollowOnIssues())
-            {
-                mc_RemoveDir(mc_gState->m_Params->NetworkName(),"entities.db");
-                mc_RemoveFile(mc_gState->m_Params->NetworkName(),"entities",".dat",MC_FOM_RELATIVE_TO_DATADIR);
-            }
-            else
-            {
-                mc_RemoveDir(mc_gState->m_Params->NetworkName(),"assets.db");
-                mc_RemoveFile(mc_gState->m_Params->NetworkName(),"assets",".dat",MC_FOM_RELATIVE_TO_DATADIR);                
-            }
+            mc_RemoveDir(mc_gState->m_Params->NetworkName(),"entities.db");
+            mc_RemoveFile(mc_gState->m_Params->NetworkName(),"entities",".dat",MC_FOM_RELATIVE_TO_DATADIR);
         }
         
         mc_gState->m_Assets= new mc_AssetDB;
@@ -1384,28 +1432,6 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 return InitError(_("-zapwallettxes is not supported with scalable wallet.\n"));                                        
             }
         }
-//        int addr_status=mc_FindIPv4ServerAddress();
-
-/*        
-        if(!GetBoolArg("-shortoutput", false))
-        {    
-            printf("New users can connect to this node using\n");
-            printf("multichaind %s:%d\n\n",MultichainServerAddress().c_str(),GetListenPort());
-        }
-        else
-        {
-            printf("%s:%d\n",MultichainServerAddress().c_str(),GetListenPort());                
-        }
-        
-        int version=mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
-        if(version != mc_gState->GetProtocolVersion())
-        {
-            if(!GetBoolArg("-shortoutput", false))
-            {    
-                printf("Protocol version %d\n\n",version);            
-            }
-        }
- */ 
 
         if(pwalletMain == NULL)                                                 // Opening wallet only after multichain parameters were initizalized
         {
@@ -1419,20 +1445,50 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
             if(!pwalletMain->vchDefaultKey.IsValid())
             {
-                LogPrintf("mchn: Default key is not found - creating new... \n");
-                // Create new keyUser and set as default key
-//                RandAddSeedPerfmon();
-
-                pwalletMain->SetMinVersion(FEATURE_LATEST); // permanently upgrade the wallet immediately
-                CPubKey newDefaultKey;
-                if (pwalletMain->GetKeyFromPool(newDefaultKey)) {
-                    pwalletMain->SetDefaultKey(newDefaultKey);
+                if(init_privkey.size())
+                {
+                    LogPrintf("mchn: Default key is specified using -initprivkey - not created\n");                
                 }
+                else
+                {
+                    LogPrintf("mchn: Default key is not found - creating new... \n");
+                    // Create new keyUser and set as default key
+        //            RandAddSeedPerfmon();
+
+                    pwalletMain->SetMinVersion(FEATURE_LATEST); // permanently upgrade the wallet immediately
+                    CPubKey newDefaultKey;
+                    if (pwalletMain->GetKeyFromPool(newDefaultKey)) {
+                        pwalletMain->SetDefaultKey(newDefaultKey);
+                    }
+                }
+            }
+            else
+            {
+                if(init_privkey.size())
+                {
+                    LogPrintf("mchn: Wallet already has default key, -initprivkey is ignored\n");                
+                    if(!GetBoolArg("-shortoutput", false))
+                    {    
+                        sprintf(bufOutput,"Wallet already has default key, -initprivkey is ignored\n\n");
+                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                    }
+                    init_privkey="";
+                }            
             }            
         }
         
         if(pwalletMain)
         {
+            if(init_privkey.size())
+            {
+                string init_privkey_error=pwalletMain->SetDefaultKeyIfInvalid(init_privkey);
+                if(init_privkey_error.size())
+                {
+                    return InitError(strprintf("Cannot set initial private key: %s",init_privkey_error));                            
+                }
+                init_privkey="";
+            }
+            
             if(fFirstRunForBuild || (pwalletMain->mapAddressBook.size() == 0))
             {
                 if (!pwalletMain->SetAddressBook(pwalletMain->vchDefaultKey.GetID(), "", "receive"))
@@ -1523,12 +1579,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 {
                     LogPrint("mchn","mchn: Default admin    address: %s\n",CBitcoinAddress(pkey.GetID()).ToString().c_str());                
                 }
-                if(mc_gState->m_Features->ActivatePermission())
+                if(pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_ACTIVATE))
                 {
-                    if(pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_ACTIVATE))
-                    {
-                        LogPrint("mchn","mchn: Default activate address: %s\n",CBitcoinAddress(pkey.GetID()).ToString().c_str());                
-                    }
+                    LogPrint("mchn","mchn: Default activate address: %s\n",CBitcoinAddress(pkey.GetID()).ToString().c_str());                
                 }
             }
             else
@@ -1565,11 +1618,18 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     mc_CloseFile(fileHan);                    
                 }
                                 
-//                mc_gState->m_NetworkParams->SetParam("seednode",seed_node,strlen(seed_node)+1);
-//                mc_gState->m_NetworkParams->Write(1);
             }
             if(pwalletMain)
             {
+                if(init_privkey.size())
+                {
+                    string init_privkey_error=pwalletMain->SetDefaultKeyIfInvalid(init_privkey);
+                    if(init_privkey_error.size())
+                    {
+                        return InitError(strprintf("Cannot set initial private key: %s",init_privkey_error));                            
+                    }
+                    init_privkey="";
+                }
                 if(pwalletMain->vchDefaultKey.IsValid())
                 {
                     LogPrintf("mchn: Minimal blockchain parameter set is created, default address: %s\n",
@@ -1580,56 +1640,29 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                             strErrors << _("Cannot write default address") << "\n";
                     }
                     
-/*                    
-                    if(seed_error.size())
-                    {
-                        sprintf(bufOutput,"\nError: %s\n\n",seed_error.c_str());
-                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                        
+                    if(!GetBoolArg("-shortoutput", false))
+                    {    
+                        sprintf(bufOutput,"Blockchain successfully initialized.\n\n");             
+                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                        sprintf(bufOutput,"Please ask blockchain admin or user having activate permission to let you connect and/or transact:\n");
+                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+
+                        sprintf(bufOutput,"multichain-cli %s grant %s connect\n",mc_gState->m_NetworkParams->Name(),
+                             CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());
+                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                        sprintf(bufOutput,"multichain-cli %s grant %s connect,send,receive\n\n",mc_gState->m_NetworkParams->Name(),
+                             CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());
+                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                     }
                     else
                     {
- */ 
-                        if(!GetBoolArg("-shortoutput", false))
-                        {    
-                            sprintf(bufOutput,"Blockchain successfully initialized.\n\n");             
-                            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                            if(mc_gState->m_Features->ActivatePermission())
-                            {
-                                sprintf(bufOutput,"Please ask blockchain admin or user having activate permission to let you connect and/or transact:\n");
-                                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                            }
-                            else
-                            {
-                                sprintf(bufOutput,"Please ask blockchain admin to let you connect and/or transact:\n");
-                                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                            }
-
-                            sprintf(bufOutput,"multichain-cli %s grant %s connect\n",mc_gState->m_NetworkParams->Name(),
-                                 CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());
-                            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                            sprintf(bufOutput,"multichain-cli %s grant %s connect,send,receive\n\n",mc_gState->m_NetworkParams->Name(),
-                                 CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());
-                            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                        }
-                        else
-                        {
-                            sprintf(bufOutput,"%s\n",CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());                            
-                            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                        }
-/*                    
+                        sprintf(bufOutput,"%s\n",CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());                            
+                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                     }
-*/                    
                     return false;
                 }
             }
         }    
-/*
-        if(pwalletMain)
-        {
-            delete pwalletMain;
-            pwalletMain=NULL;
-        }
-*/
         if(seed_error.size())
         {
             return InitError(_(seed_error.c_str()));        
@@ -1997,11 +2030,6 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     strLoadError + ".\n\n" + _("Please restart multichaind with reindex=1."),
                     "", CClientUIInterface::BTN_ABORT);
                 
-/*                
-                bool fRet = uiInterface.ThreadSafeMessageBox(
-                    strLoadError + ".\n\n" + _("Do you want to rebuild the block database now?"),
-                    "", CClientUIInterface::MSG_ERROR | CClientUIInterface::BTN_ABORT);
- */ 
 /* MCHN END */                
                 if (fRet) {
                     fReindex = true;
@@ -2242,13 +2270,6 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     else
     {
         LogPrintf("mapWallet.size() = %u\n",       pwalletMain ? pwalletMain->mapWallet.size() : 0);
-/*        
-        BOOST_FOREACH(PAIRTYPE(const uint256, CWalletTx)& item, pwalletMain->mapWallet)
-        {
-            printf("%s\n",item.first.ToString().c_str());
-            printf("%s\n",item.second.ToString().c_str());
-        }       
- */  
     }
     LogPrintf("mapAddressBook.size() = %u\n",  pwalletMain ? pwalletMain->mapAddressBook.size() : 0);
 #endif

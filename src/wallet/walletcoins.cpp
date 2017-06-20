@@ -55,7 +55,7 @@ void CAssetGroupTree::Dump()
     int i,j;
     
     if(debug_print)printf("Asset Grouping. Group Size: %d. Group Count: %d\n",nAssetsPerGroup,lpAssetGroups->GetCount()-1);
-    LogPrint("mchn","mchn: Asset Grouping. Group Size: %d. Group Count: %d\n",nAssetsPerGroup,lpAssetGroups->GetCount()-1);
+    if(fDebug)LogPrint("mchn","mchn: Asset Grouping. Group Size: %d. Group Count: %d\n",nAssetsPerGroup,lpAssetGroups->GetCount()-1);
     for(i=1;i<lpAssetGroups->GetCount();i++)                                    
     {    
         thisGroup=(CAssetGroup*)lpAssetGroups->GetRow(i);
@@ -68,12 +68,21 @@ void CAssetGroupTree::Dump()
                 assetrefbin=(unsigned char*)lpAssets->GetRow(aptr[j]);
                 
                 string assetref="";
-                assetref += itostr((int)mc_GetLE(assetrefbin,4));
-                assetref += "-";
-                assetref += itostr((int)mc_GetLE(assetrefbin+4,4));
-                assetref += "-";
-                assetref += itostr((int)mc_GetLE(assetrefbin+8,2));
-
+                if(mc_GetABRefType(assetrefbin) == MC_AST_ASSET_REF_TYPE_SHORT_TXID)
+                {
+                    for(int i=0;i<8;i++)
+                    {
+                        assetref += strprintf("%02x",assetrefbin[MC_AST_SHORT_TXID_OFFSET+MC_AST_SHORT_TXID_SIZE-i-1]);
+                    }
+                }
+                else
+                {
+                    assetref += itostr((int)mc_GetLE(assetrefbin,4));
+                    assetref += "-";
+                    assetref += itostr((int)mc_GetLE(assetrefbin+4,4));
+                    assetref += "-";
+                    assetref += itostr((int)mc_GetLE(assetrefbin+8,2));
+                }
                 printf("              Asset: %d: %s\n",j+1,assetref.c_str());
             }
         }
@@ -109,7 +118,7 @@ int CAssetGroupTree::Resize(int newAssets)
     }
 
     if(debug_print)printf("Asset grouping resize %d -> %d\n",nAssetsPerGroup,n);
-    LogPrint("mchn","Asset grouping resize %d -> %d\n",nAssetsPerGroup,n);
+    if(fDebug)LogPrint("mchn","Asset grouping resize %d -> %d\n",nAssetsPerGroup,n);
     
     mc_Buffer *new_asset_groups_buffer;
     
@@ -308,7 +317,7 @@ int CAssetGroupTree::GetGroup(mc_Buffer* assets, int addIfNeeded)
             g=GetGroup(assetRef,0);
             if(g>0)
             {
-                if(group_id == -2)
+                if(group_id != -2)
                 {
                     if(g != group_id)
                     {
@@ -486,7 +495,7 @@ void DebugPrintAssetTxOut(uint256 hash,int index,unsigned char* assetrefbin,int6
     string txid=hash.GetHex();
     
     
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef())
+    if(mc_gState->m_Features->ShortTxIDInTx())
     {
         if(debug_print)
         {
@@ -508,12 +517,22 @@ void DebugPrintAssetTxOut(uint256 hash,int index,unsigned char* assetrefbin,int6
     else
     {
         string assetref="";
-        assetref += itostr((int)mc_GetLE(assetrefbin,4));
-        assetref += "-";
-        assetref += itostr((int)mc_GetLE(assetrefbin+4,4));
-        assetref += "-";
-        assetref += itostr((int)mc_GetLE(assetrefbin+8,2));
-
+        if(mc_GetABRefType(assetrefbin) == MC_AST_ASSET_REF_TYPE_SHORT_TXID)
+        {
+            for(int i=0;i<8;i++)
+            {
+                assetref += strprintf("%02x",assetrefbin[MC_AST_SHORT_TXID_OFFSET+MC_AST_SHORT_TXID_SIZE-i-1]);
+            }
+        }
+        else
+        {
+            assetref += itostr((int)mc_GetLE(assetrefbin,4));
+            assetref += "-";
+            assetref += itostr((int)mc_GetLE(assetrefbin+4,4));
+            assetref += "-";
+            assetref += itostr((int)mc_GetLE(assetrefbin+8,2));
+        }
+        
         if(debug_print)printf("TxOut: %s-%d %s %ld\n",txid.c_str(),index,assetref.c_str(),quantity);
     }
 }
@@ -588,7 +607,7 @@ void AvalableCoinsForAddress(CWallet *lpWallet,vector<COutput>& vCoins, const CC
     
     lpWallet->AvailableCoins(vCoins, true, coinControl,true,true,addr,flags);
     this_time=mc_TimeNowAsDouble();    
-    LogPrint("mcperf","mcperf: AvailableCoins: Time: %8.6f \n", this_time-last_time);
+    if(fDebug)LogPrint("mcperf","mcperf: AvailableCoins: Time: %8.6f \n", this_time-last_time);
     last_time=this_time;
     
     if(addresses == NULL)
@@ -634,7 +653,7 @@ void AvalableCoinsForAddress(CWallet *lpWallet,vector<COutput>& vCoins, const CC
     
     vCoins=vFilteredCoins;
     this_time=mc_TimeNowAsDouble();    
-    LogPrint("mcperf","mcperf: Address Filtering: Time: %8.6f \n", this_time-last_time);
+    if(fDebug)LogPrint("mcperf","mcperf: Address Filtering: Time: %8.6f \n", this_time-last_time);
     last_time=this_time;
 }
 
@@ -766,7 +785,7 @@ bool FindRelevantCoins(CWallet *lpWallet,                                       
             
             for(int i=0;i<tmp_amounts->GetCount();i++)
             {
-                DebugPrintAssetTxOut(hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
+                if(debug_print)DebugPrintAssetTxOut(hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
             }
             
             is_relevant=true;
@@ -876,12 +895,12 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
                     else
                     {   
                         if( (group_id == 0)  ||                                 // We couldn't add new asset into one group
-                            (group_id == -3) )                                  // Assets in this group belongs to different groups
+                            (group_id == -3) )                                  // Assets in this txout belongs to different groups
                                                                                 // Take it
                         {
                             for(int i=0;i<tmp_amounts->GetCount();i++)
                             {
-                                DebugPrintAssetTxOut(hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
+                                if(debug_print)DebugPrintAssetTxOut(hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
                             }
                             if(!InsertCoinIntoMatrix(coin_id,hash,out_i,tmp_amounts,NULL,in_amounts,in_map,in_row,in_size,in_special_row,0))
                             {
@@ -990,7 +1009,7 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
                             {
                                 for(int i=0;i<tmp_amounts->GetCount();i++)
                                 {
-                                    DebugPrintAssetTxOut(hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
+                                    if(debug_print)DebugPrintAssetTxOut(hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
                                 }
                                 if(!InsertCoinIntoMatrix(coin_id,hash,out_i,tmp_amounts,NULL,in_amounts,in_map,in_row,in_size,in_special_row,0))
                                 {
@@ -1074,8 +1093,8 @@ bool CalculateChangeAmounts(CWallet *lpWallet,                                  
                 {
                     for(int i=0;i<tmp_amounts->GetCount();i++)
                     {
-                        DebugPrintAssetTxOut(hash,out.i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
-                        LogAssetTxOut("Input : ",hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
+                        if(debug_print)DebugPrintAssetTxOut(hash,out.i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
+                        if(fDebug)LogAssetTxOut("Input : ",hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
                     }
                     for(int i=0;i<tmp_amounts->GetCount();i++)                  // Add all assets onto change buffer, not only those from out_amounts
                     {
@@ -1161,7 +1180,7 @@ bool CalculateChangeAmounts(CWallet *lpWallet,                                  
     if(debug_print)printf("debg: Change:\n");
     for(int i=0;i<change_amounts->GetCount();i++)
     {
-        DebugPrintAssetTxOut(0,0,change_amounts->GetRow(i),mc_GetABQuantity(change_amounts->GetRow(i)));
+        if(debug_print)DebugPrintAssetTxOut(0,0,change_amounts->GetRow(i),mc_GetABQuantity(change_amounts->GetRow(i)));
     }
     
     return true;
@@ -1508,7 +1527,7 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
     missing_amount=nFeeRet+(change_count+extra_change_count)*default_change_output-nTotalInValue;
     if(missing_amount > 0)                                                  // Inputs don't carry enough native currency, go out and select additional coins 
     {
-        LogPrint("mcatxo","mcatxo: Missing amount: %ld. Fee: %ld, Change: %ld, Inputs: %ld\n",missing_amount,nFeeRet,change_count*min_output,nTotalInValue);
+        if(fDebug)LogPrint("mcatxo","mcatxo: Missing amount: %ld. Fee: %ld, Change: %ld, Inputs: %ld\n",missing_amount,nFeeRet,change_count*min_output,nTotalInValue);
         if(debug_print)printf("Missing amount: %ld. Fee: %ld, Change: %ld, Inputs: %ld\n",missing_amount,nFeeRet,change_count*min_output,nTotalInValue);
         return missing_amount;
     }
@@ -1529,11 +1548,11 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
             txNew.vout.push_back(txout);
         }
 
-        int assets_per_opdrop=(mc_gState->m_NetworkParams->GetInt64Param("maxstdelementsize")-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
+        int assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
         
         if(mc_gState->m_Features->VerifySizeOfOpDropElements())
         {
-            assets_per_opdrop=(mc_gState->m_NetworkParams->GetInt64Param("maxstdelementsize")-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
+            assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
         }
  
         size_t elem_size;
@@ -1562,8 +1581,8 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
                         if(debug_print)printf("debg: Change output, group %d:\n",g);
                         for(int i=0;i<tmp_amounts->GetCount();i++)
                         {
-                            DebugPrintAssetTxOut(0,0,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
-                            LogAssetTxOut("Change: ",0,0,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
+                            if(debug_print)DebugPrintAssetTxOut(0,0,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
+                            if(fDebug)LogAssetTxOut("Change: ",0,0,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
                         }
                         lpScript->Clear();
                         lpScript->SetAssetQuantities(tmp_amounts,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);
@@ -1625,7 +1644,7 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
             CAmount nAmount=nTotalInValue-nTotalChangeValue-nFeeRet;
             CTxOut txout(nAmount, scriptChange);
             if(debug_print)printf("debg: Native change output: %ld\n",nAmount);
-            LogAssetTxOut("Change: ",0,0,NULL,nAmount);
+            if(fDebug)LogAssetTxOut("Change: ",0,0,NULL,nAmount);
             txNew.vout.push_back(txout);            
         }
 
@@ -1688,7 +1707,7 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
 
                                 CTxOut txout(0, scriptCachedScript);
                                 if(debug_print)printf("debg: Cached Script for input %d\n",(int)txNew.vin.size()-1);
-                                LogAssetTxOut("Cached Script: ",0,0,NULL,0);
+                                if(fDebug)LogAssetTxOut("Cached Script: ",0,0,NULL,0);
                                 txNew.vout.push_back(txout);            
                                 fScriptCached=true;
                             }                            
@@ -1722,7 +1741,7 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
                         if (!SignSignature(*lpWallet, txout.scriptPubKey, txNew, nIn++))
                         {
                             CTransaction printableTx=CTransaction(txNew);
-                            LogPrint("mchn","Cannot sign transaction input %d: (%s,%d), scriptPubKey %s \n",
+                            if(fDebug)LogPrint("mchn","Cannot sign transaction input %d: (%s,%d), scriptPubKey %s \n",
                                     nIn-1,txNew.vin[nIn-1].prevout.hash.ToString().c_str(),txNew.vin[nIn-1].prevout.n,txout.scriptPubKey.ToString().c_str());
 
                             strFailReason = _("Signing transaction failed");
@@ -1918,11 +1937,11 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
     }
 
     if(debug_print)printf("debg: Outputs: (required %d)\n",required);
-    LogPrint("mcatxo","mcatxo: ====== New transaction, required %d\n",required);
+    if(fDebug)LogPrint("mcatxo","mcatxo: ====== New transaction, required %d\n",required);
     for(int i=0;i<out_amounts->GetCount();i++)
     {
-        DebugPrintAssetTxOut(0,0,out_amounts->GetRow(i),mc_GetABQuantity(out_amounts->GetRow(i)));
-        LogAssetTxOut("Output: ",0,0,out_amounts->GetRow(i),mc_GetABQuantity(out_amounts->GetRow(i)));
+        if(debug_print)DebugPrintAssetTxOut(0,0,out_amounts->GetRow(i),mc_GetABQuantity(out_amounts->GetRow(i)));
+        if(fDebug)LogAssetTxOut("Output: ",0,0,out_amounts->GetRow(i),mc_GetABQuantity(out_amounts->GetRow(i)));
     }
 
     this_time=mc_TimeNowAsDouble();
@@ -1934,7 +1953,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
 
     this_time=mc_TimeNowAsDouble();
     if(csperf_debug_print)if(vecSend.size())printf("Available               : %8.6f\n",this_time-last_time);
-    LogPrint("mcperf","Coin Selection, available coins time: %8.6f\n",this_time-last_time);
+    if(fDebug)LogPrint("mcperf","Coin Selection, available coins time: %8.6f\n",this_time-last_time);
     last_time=this_time;
     
     int in_special_row[10];
@@ -2085,7 +2104,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                 
                 this_time=mc_TimeNowAsDouble();
                 if(csperf_debug_print)if(vecSend.size())printf("Inputs                  : %8.6f\n",this_time-last_time);
-                LogPrint("mcperf","mcperf: CS: Input Parsing: Time: %8.6f \n", this_time-last_time);
+                if(fDebug)LogPrint("mcperf","mcperf: CS: Input Parsing: Time: %8.6f \n", this_time-last_time);
                 last_time=this_time;
     
                 for(int asset=0;asset<out_amounts->GetCount();asset++)
@@ -2140,8 +2159,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                                             else
                                             {                        
                                                 if(eErrorCode)*eErrorCode=RPC_WALLET_NO_UNSPENT_OUTPUTS;
-                                                if( (mc_gState->m_NetworkParams->GetInt64Param("initialblockreward") != 0) || 
-                                                     (mc_gState->m_NetworkParams->GetInt64Param("firstblockreward") > 0))
+                                                if( MCP_WITH_NATIVE_CURRENCY )
                                                 {
                                                     strFailReason=_("No unspent outputs are available. Please send a transaction to this node or address first and wait for its confirmation."); 
                                                 }
@@ -2187,7 +2205,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
     
                 this_time=mc_TimeNowAsDouble();
                 if(csperf_debug_print)if(vecSend.size())printf("Select                  : %8.6f\n",this_time-last_time);
-                LogPrint("mcperf","mcperf: CS: Coin Selection: Time: %8.6f \n", this_time-last_time);
+                if(fDebug)LogPrint("mcperf","mcperf: CS: Coin Selection: Time: %8.6f \n", this_time-last_time);
                 last_time=this_time;                
             }
             else
@@ -2215,7 +2233,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
             min_output=-1;                                                      // Calculate minimal output for the change
             if(mc_gState->m_NetworkParams->IsProtocolMultichain())
             {
-                min_output=mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+                min_output=MCP_MINIMUM_PER_OUTPUT;
             }            
                                                                                             // Storing selection before pure-native 
             memcpy(in_amounts->GetRow(in_special_row[2]),in_amounts->GetRow(in_special_row[0]),in_size);
@@ -2233,7 +2251,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
             
             this_time=mc_TimeNowAsDouble();
             if(csperf_debug_print)if(vecSend.size())printf("Build                   : %8.6f\n",this_time-last_time);
-            LogPrint("mcperf","mcperf: Transaction Building: Time: %8.6f \n", this_time-last_time);
+            if(fDebug)LogPrint("mcperf","mcperf: Transaction Building: Time: %8.6f \n", this_time-last_time);
             last_time=this_time;
             
             
@@ -2304,7 +2322,7 @@ exitlbl:
     
     if(strFailReason.size())
     {
-        LogPrint("mcatxo","mcatxo: ====== Error: %s\n",strFailReason.c_str());
+        if(fDebug)LogPrint("mcatxo","mcatxo: ====== Error: %s\n",strFailReason.c_str());
         if(!skip_error_message)
         {
             LogPrintf("mchn: Coin selection: %s\n",strFailReason.c_str());
@@ -2316,7 +2334,7 @@ exitlbl:
     if(csperf_debug_print)if(vecSend.size())printf("CS Exit                 : %8.6f\n",this_time-last_time);
     last_time=this_time;
     
-    LogPrint("mcatxo","mcatxo: ====== Created: %s\n",wtxNew.GetHash().ToString().c_str());
+    if(fDebug)LogPrint("mcatxo","mcatxo: ====== Created: %s\n",wtxNew.GetHash().ToString().c_str());
     return true;
 }
 
@@ -2425,14 +2443,14 @@ bool CWallet::InitializeUnspentList()
 
     lpAssetGroups=new CAssetGroupTree;
 
-    int assets_per_opdrop=(mc_gState->m_NetworkParams->GetInt64Param("maxstdelementsize")-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
+    int assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
 
     if(mc_gState->m_Features->VerifySizeOfOpDropElements())
     {
-        assets_per_opdrop=(mc_gState->m_NetworkParams->GetInt64Param("maxstdelementsize")-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
+        assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
     }
 
-    int max_assets_per_group=assets_per_opdrop*mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropscount");
+    int max_assets_per_group=assets_per_opdrop*MCP_STD_OP_DROP_COUNT;
 
     lpAssetGroups->Initialize(1,max_assets_per_group,32,1);
 
@@ -2474,7 +2492,7 @@ bool CWallet::InitializeUnspentList()
             ParseMultichainTxOutToBuffer(hash,txout,tmp_amounts,lpScript,NULL,NULL,strError);
             lpAssetGroups->GetGroup(tmp_amounts,1);
         }
-        LogPrint("mchn","mchn: Found %d assets in %d groups\n",asset_count,lpAssetGroups->GroupCount()-1);
+        if(fDebug)LogPrint("mchn","mchn: Found %d assets in %d groups\n",asset_count,lpAssetGroups->GroupCount()-1);
         lpAssetGroups->Dump();
     }        
 
@@ -2489,7 +2507,7 @@ bool CWallet::InitializeUnspentList()
     }
 
 
-    LogPrint("mchn","mchn: Unspent list initialized: Total: %d, Unspent: %d\n",mapWallet.size(),mapUnspent.size());
+    if(fDebug)LogPrint("mchn","mchn: Unspent list initialized: Total: %d, Unspent: %d\n",mapWallet.size(),mapUnspent.size());
 
     return true;        
 }
@@ -2586,7 +2604,7 @@ exitlbl:
     }
         
     this_time=mc_TimeNowAsDouble();
-    LogPrint("mchn","mchn: Wallet coins: Total: %d, Unspent: %d, Kept: %d, Purged: %d, Skipped: %d, Time: %8.6f\n",total,mapUnspent.size(),should_keep.size(),count,skipped,this_time-last_time);
+    if(fDebug)LogPrint("mchn","mchn: Wallet coins: Total: %d, Unspent: %d, Kept: %d, Purged: %d, Skipped: %d, Time: %8.6f\n",total,mapUnspent.size(),should_keep.size(),count,skipped,this_time-last_time);
 }
     
 
@@ -2614,7 +2632,7 @@ bool OutputCanSend(COutput out)
 {            
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecansend") == 0)
+        if(MCP_ANYONE_CAN_SEND == 0)
         {
             CTxOut txout;
             out.GetHashAndTxOut(txout);
@@ -2665,11 +2683,11 @@ bool CWallet::CreateAndCommitOptimizeTransaction(CWalletTx& wtx,std::string& str
     }
     else
     {    
-        LogPrint("mchn","Committing wallet optimization tx. Inputs: %ld, Outputs: %ld\n",wtx.vin.size(),wtx.vout.size());
+        if(fDebug)LogPrint("mchn","Committing wallet optimization tx. Inputs: %ld, Outputs: %ld\n",wtx.vin.size(),wtx.vout.size());
         
         if (CommitTransaction(wtx, reservekey, strFailReason))
         {
-            LogPrint("mchn","Committing wallet optimization tx completed\n");
+            if(fDebug)LogPrint("mchn","Committing wallet optimization tx completed\n");
             return true;
         }
     }    
@@ -2689,7 +2707,7 @@ bool CWallet::OptimizeUnspentList()
         return false;
     }
 
-    LogPrint("mchn","mchn: Wallet optimization\n");
+    if(fDebug)LogPrint("mchn","mchn: Wallet optimization\n");
     
     double start_time=mc_TimeNowAsDouble();
     

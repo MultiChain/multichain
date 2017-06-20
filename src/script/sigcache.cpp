@@ -14,6 +14,7 @@
 #include <boost/thread.hpp>
 #include <boost/tuple/tuple_comparison.hpp>
 
+
 namespace {
 
 /**
@@ -75,10 +76,10 @@ public:
 
 }
 
+static CSignatureCache signatureCache;
+
 bool CachingTransactionSignatureChecker::VerifySignature(const std::vector<unsigned char>& vchSig, const CPubKey& pubkey, const uint256& sighash) const
 {
-    static CSignatureCache signatureCache;
-
     if (signatureCache.Get(sighash, vchSig, pubkey))
         return true;
 
@@ -89,3 +90,9 @@ bool CachingTransactionSignatureChecker::VerifySignature(const std::vector<unsig
         signatureCache.Set(sighash, vchSig, pubkey);
     return true;
 }
+
+void MultichainNode_AddSignatureToCache(const std::vector<unsigned char>& vchSig, const CPubKey& pubkey, const uint256& sighash)
+{
+    signatureCache.Set(sighash, vchSig, pubkey);    
+}
+

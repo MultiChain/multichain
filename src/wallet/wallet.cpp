@@ -147,6 +147,55 @@ bool CWallet::AddKeyPubKey(const CKey& secret, const CPubKey &pubkey)
     return true;
 }
 
+string CWallet::SetDefaultKeyIfInvalid(std::string init_privkey)
+{
+    if(vchDefaultKey.IsValid())
+    {
+        return "Wallet already has default key";
+    }
+    
+    CBitcoinSecret vchSecret;
+    if(!vchSecret.SetString(init_privkey))
+    {
+        if(mc_gState->m_NetworkParams->GetParam("privatekeyversion",NULL) == NULL)
+        {
+            return "Private key version is not set, please chose seed node running at least MultiChain 1.0 beta 2";            
+        }
+        return "Invalid private key encoding";
+    }
+
+    CKey key = vchSecret.GetKey();
+    if (!key.IsValid())
+    {
+        return "Private key outside allowed range";        
+    }
+
+    CPubKey pubkey = key.GetPubKey();
+    assert(key.VerifyPubKey(pubkey));
+    CKeyID vchAddress = pubkey.GetID();
+
+    if(!HaveKey(vchAddress))
+    {
+        mapKeyMetadata[vchAddress].nCreateTime = 1;
+
+        if (!AddKeyPubKey(key, pubkey))
+        {
+            return "Error adding key to wallet";                    
+        }
+
+        // whenever a key is imported, we need to scan the whole chain
+        nTimeFirstKey = 1; // 0 would be considered 'no value'        
+    }
+    
+    if(!SetDefaultKey(pubkey))
+    {
+        return "Error setting default key";                            
+    }
+    
+    return "";
+}
+
+
 bool CWallet::AddCryptedKey(const CPubKey &vchPubKey,
                             const vector<unsigned char> &vchCryptedSecret)
 {
@@ -1369,7 +1418,7 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, int block, int *e
         {     
             bool take_it=false;
             if( ( (vStreamsToImport[i].m_EntityType & MC_TET_TYPE_MASK) == MC_TET_ASSET ) &&
-                ( mc_gState->m_Features->ShortTxIDAsAssetRef() == 0) )    
+                ( mc_gState->m_Features->ShortTxIDInTx() == 0) )    
             {
                 if(mc_gState->m_Assets->FindEntityByRef(&stream_entity,vStreamsToImport[i].m_EntityID))
                 {
@@ -1676,13 +1725,13 @@ void CWallet::ResendWalletTransactions(bool fForce)
     bool fFirst = (nNextResend == 0);
 /* MCHN START */    
 //    nNextResend = GetTime() + GetRand(30 * 60);
-    nNextResend = GetTime() + GetRand(3 * mc_gState->m_NetworkParams->GetInt64Param("targetblocktime"));
+    nNextResend = GetTime() + GetRand(3 * MCP_TARGET_BLOCK_TIME);
 /* MCHN END */    
     if (!fForce && fFirst)
         return;
 
     // Only do it if there's been a new block since last time
-    if(GetTime() < nNextResend + 3 * mc_gState->m_NetworkParams->GetInt64Param("targetblocktime") )
+    if(GetTime() < nNextResend + 3 * MCP_TARGET_BLOCK_TIME )
     {
         if (!fForce && (nTimeBestReceived < nLastResend))
             return;
@@ -1707,7 +1756,7 @@ void CWallet::ResendWalletTransactions(bool fForce)
                     CWalletTx& wtx = item->second;
                     // Don't rebroadcast until it's had plenty of time that
                     // it should have gotten in already by now.
-                    if (nTimeBestReceived - (int64_t)wtx.nTimeReceived > mc_gState->m_NetworkParams->GetInt64Param("targetblocktime"))
+                    if (nTimeBestReceived - (int64_t)wtx.nTimeReceived > MCP_TARGET_BLOCK_TIME)
                     {
                         LogPrint("wallet","Wallet tx %s resent\n",wtx.GetHash().ToString().c_str());
                         wtx.RelayWalletTransaction();                        
@@ -1728,7 +1777,7 @@ void CWallet::ResendWalletTransactions(bool fForce)
                 // it should have gotten in already by now.
     /* MCHNS START */    
     //            if (nTimeBestReceived - (int64_t)wtx.nTimeReceived > 5 * 60)
-                if (nTimeBestReceived - (int64_t)wtx.nTimeReceived > mc_gState->m_NetworkParams->GetInt64Param("targetblocktime"))
+                if (nTimeBestReceived - (int64_t)wtx.nTimeReceived > MCP_TARGET_BLOCK_TIME)
     /* MCHN END */    
                     mapSorted.insert(make_pair(wtx.nTimeReceived, &wtx));
             }
@@ -3051,14 +3100,10 @@ bool CWallet::SelectMultiChainCoins(const CAmount& nTargetValue, vector<COutput>
 
 bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, string& reject_reason)
 {
-    double this_time,last_time;
-    this_time=mc_TimeNowAsDouble();
-    last_time=this_time;
-    
     {
         LOCK2(cs_main, cs_wallet);
         LogPrintf("CommitTransaction: %s, vin: %d, vout: %d\n",wtxNew.GetHash().ToString().c_str(),(int)wtxNew.vin.size(),(int)wtxNew.vout.size());
-        LogPrint("wallet","CommitTransaction:\n%s", wtxNew.ToString());
+        if(fDebug)LogPrint("wallet","CommitTransaction:\n%s", wtxNew.ToString());
         {
 /* MCHN START */            
             if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
@@ -3075,9 +3120,6 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
                 // Add tx to wallet, because if it has change it's also ours,
                 // otherwise just for transaction history.
                 AddToWallet(wtxNew);
-    this_time=mc_TimeNowAsDouble();
-//    if(csperf_debug_print)printf("AddToWallet             : %8.6f\n",this_time-last_time);
-    last_time=this_time;
 
                 // Notify that old coins are spent
                 set<CWalletTx*> setCoins;
@@ -3098,13 +3140,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
         // Track how many getdata requests our transaction gets
         mapRequestCount[wtxNew.GetHash()] = 0;
 
-    this_time=mc_TimeNowAsDouble();
-//    if(csperf_debug_print)printf("NotifyChanged           : %8.6f\n",this_time-last_time);
-    last_time=this_time;
         // Broadcast
-
-        CPubKey pubkey;            
-        uint32_t fCanMine= GetKeyFromAddressBook(pubkey,MC_PTP_MINE) ? MC_PTP_MINE : 0;
 
         if (!wtxNew.AcceptToMemoryPoolReturnReason(false,true,reject_reason))   // MCHN
         {
@@ -3115,37 +3151,29 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
         else
         {
             pwalletTxsMain->AddTx(NULL,wtxNew,-1,NULL,-1,0);   
-            SyncWithWallets(wtxNew, NULL);            
-        }
-    
-        if(fCanMine)
-        {
-            if(!GetKeyFromAddressBook(pubkey,MC_PTP_MINE))
+            if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
             {
-                CValidationState state;
-                
-                LogPrint("mchn","mchn: Wallet lost mine permission on tx: %s (height %d) - commit, reactivating best chain\n",
-                        wtxNew.GetHash().ToString().c_str(), chainActive.Tip()->nHeight);
-                if (!::ActivateBestChain(state, NULL))
-                    reject_reason = "ActivateBestChain failed";
+                SyncWithWallets(wtxNew, NULL);            
             }
         }
-
-    this_time=mc_TimeNowAsDouble();
-//    if(csperf_debug_print)printf("Accept                  : %8.6f\n",this_time-last_time);
-    LogPrint("mcperf","mcperf: Commit: AcceptToMemoryPool: Time: %8.6f \n", this_time-last_time);
-    last_time=this_time;
+    
+        for (unsigned int i = 0; i < wtxNew.vin.size(); i++) 
+        {
+            COutPoint outp=wtxNew.vin[i].prevout;
+            UnlockCoin(outp);
+        }
         wtxNew.RelayWalletTransaction();
-    this_time=mc_TimeNowAsDouble();
-//    if(csperf_debug_print)printf("Relay                   : %8.6f\n",this_time-last_time);
-    LogPrint("mcperf","mcperf: Commit: RelayWalletTransaction : Time: %8.6f \n", this_time-last_time);
-    last_time=this_time;
+
     }
     return true;
 }
 
 CAmount CWallet::GetMinimumFee(unsigned int nTxBytes, unsigned int nConfirmTarget, const CTxMemPool& pool)
 {
+    if(MCP_WITH_NATIVE_CURRENCY == 0)
+    {
+        return 0;
+    }
     // payTxFee is user-set "I want to pay this much"
     CAmount nFeeNeeded = payTxFee.GetFee(nTxBytes);
     // user selected total at least (default=true)

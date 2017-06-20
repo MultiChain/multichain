@@ -73,7 +73,7 @@ bool mc_ExtractInputAssetQuantities(const CScript& script1, uint256 hash, string
             memset(buf_amounts,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
             if(mc_gState->m_Assets->FindEntityByTxID(&entity,(unsigned char*)&hash))
             {
-                if(mc_gState->m_Features->ShortTxIDAsAssetRef() == 0)
+                if(mc_gState->m_Features->ShortTxIDInTx() == 0)
                 {
                     if(entity.IsUnconfirmedGenesis())             // Not confirmed genesis has -1 in offset field
                     {
@@ -168,7 +168,7 @@ bool mc_CompareAssetQuantities(string& reason)
         int row=mc_gState->m_TmpAssetsIn->Seek(ptrOut);
         quantity=mc_GetABQuantity(ptrOut);
 
-        if(mc_gState->m_Features->ShortTxIDAsAssetRef())
+        if(mc_gState->m_Features->ShortTxIDInTx())
         {
             if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptrOut) == 0)
             {
@@ -415,7 +415,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                     }
                     if(update_mempool)
                     {
-                        LogPrint("mchn","Found asset issue script in tx %s for %s - (%ld)\n",
+                        if(fDebug)LogPrint("mchn","Found asset issue script in tx %s for %s - (%ld)\n",
                                 tx.GetHash().GetHex().c_str(),
                                 address.ToString().c_str(),quantity);                    
                     }
@@ -427,21 +427,18 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                         reason="Asset issue script rejected - error in script";
                         return false;                                    
                     }
-                    if(mc_gState->m_Features->FollowOnIssues())
+                    err=mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
+                    if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
                     {
-                        err=mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
-                        if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
+                        reason="Asset follow-on script rejected - error in follow-on script";
+                        return false;                                
+                    }
+                    if(err == MC_ERR_NOERROR)
+                    {
+                        if(update_mempool)
                         {
-                            reason="Asset follow-on script rejected - error in follow-on script";
-                            return false;                                
-                        }
-                        if(err == MC_ERR_NOERROR)
-                        {
-                            if(update_mempool)
-                            {
-                                LogPrint("mchn","Found asset follow-on script in tx %s\n",
-                                        tx.GetHash().GetHex().c_str());                    
-                            }
+                            if(fDebug)LogPrint("mchn","Found asset follow-on script in tx %s\n",
+                                    tx.GetHash().GetHex().c_str());                    
                         }
                     }
                 }                
@@ -466,18 +463,6 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
         follow_on=true;
     }   
     
-    if(new_issue)
-    {
-        if(total == 0)
-        {
-            if(mc_gState->m_Features->FollowOnIssues() == 0)
-            {
-                reason="Asset follow-on script rejected - issue quantity should be positive";
-                return false;                                                
-            }        
-        }
-    }
-
     if(follow_on)
     {
         total=0;
@@ -509,7 +494,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                 return false;                                                                        
             }            
         }
-        if(mc_gState->m_Features->ShortTxIDAsAssetRef() == 0)
+        if(mc_gState->m_Features->ShortTxIDInTx() == 0)
         {
             if(entity.IsUnconfirmedGenesis())
             {
@@ -650,57 +635,57 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
     
     mc_gState->m_TmpScript->Clear();
     mc_gState->m_TmpScript->AddElement();
-    if(mc_gState->m_Features->FollowOnIssues())
-    {
-        unsigned char issuer_buf[24];
-        memset(issuer_buf,0,sizeof(issuer_buf));
-        uint32_t flags=MC_PFL_NONE;        
-        uint32_t timestamp=0;
-        set <uint160> stored_issuers;
-        
-        if(new_issue)
-        {
-            mc_gState->m_Permissions->SetCheckPoint();
-            err=MC_ERR_NOERROR;
+    unsigned char issuer_buf[24];
+    memset(issuer_buf,0,sizeof(issuer_buf));
+    flags=MC_PFL_NONE;        
+    uint32_t timestamp=0;
+    set <uint160> stored_issuers;
 
-            txid=tx.GetHash();
-            err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_CONNECT,
-                    (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool);
-        }
-            
-        for (unsigned int i = 0; i < issuers.size(); i++)
+    if(new_issue)
+    {
+        mc_gState->m_Permissions->SetCheckPoint();
+        err=MC_ERR_NOERROR;
+
+        txid=tx.GetHash();
+        err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_CONNECT,
+                (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
+    }
+
+    for (unsigned int i = 0; i < issuers.size(); i++)
+    {
+        if(err == MC_ERR_NOERROR)
         {
-            if(err == MC_ERR_NOERROR)
+            if(stored_issuers.count(issuers[i]) == 0)
             {
-                if(stored_issuers.count(issuers[i]) == 0)
+                memcpy(issuer_buf,issuers[i].begin(),sizeof(uint160));
+                mc_PutLE(issuer_buf+sizeof(uint160),&issuer_flags[i],4);
+                if((int)i < mc_gState->m_Assets->MaxStoredIssuers())
                 {
-                    memcpy(issuer_buf,issuers[i].begin(),sizeof(uint160));
-                    mc_PutLE(issuer_buf+sizeof(uint160),&issuer_flags[i],4);
                     mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,sizeof(issuer_buf));            
-                    if(new_issue)
-                    {
-                        err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_ADMIN | MC_PTP_ISSUE,
-                                (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool);
-                    }
-                    stored_issuers.insert(issuers[i]);
                 }
-            }
-        }        
-        
-        memset(issuer_buf,0,sizeof(issuer_buf));
-        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,1);                    
-        if(new_issue)
-        {
-            if((err != MC_ERR_NOERROR) || !accept)
-            {
-                mc_gState->m_Permissions->RollBackToCheckPoint();            
+                if(new_issue)
+                {
+                    err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_ADMIN | MC_PTP_ISSUE,
+                            (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
+                }
+                stored_issuers.insert(issuers[i]);
             }
         }
-        if(err)
+    }        
+
+    memset(issuer_buf,0,sizeof(issuer_buf));
+    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,1);                    
+    if(new_issue)
+    {
+        if((err != MC_ERR_NOERROR) || !accept)
         {
-            reason="Cannot update permission database for issued asset";
-            return false;            
+            mc_gState->m_Permissions->RollBackToCheckPoint();            
         }
+    }
+    if(err)
+    {
+        reason="Cannot update permission database for issued asset";
+        return false;            
     }
     
     const unsigned char *special_script;
@@ -730,7 +715,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                 }
             }
             
-            LogPrint("mchn","Asset already exists. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
+            if(fDebug)LogPrint("mchn","Asset already exists. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
                     tx.GetHash().GetHex().c_str(),
                     mc_gState->m_Assets->m_Block+1,offset,(int)(*((unsigned char*)&txid+31))+256*(int)(*((unsigned char*)&txid+30)),
                     entity.GetName());                                        
@@ -747,7 +732,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
             {
                 if(new_issue)
                 {
-                    LogPrint("mchn","New asset. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
+                    if(fDebug)LogPrint("mchn","New asset. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
                             tx.GetHash().GetHex().c_str(),
                             mc_gState->m_Assets->m_Block+1,offset,(int)(*((unsigned char*)&txid+0))+256*(int)(*((unsigned char*)&txid+1)),
                             this_entity.GetName());                                        
@@ -756,7 +741,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                 {
                     uint256 otxid;
                     memcpy(&otxid,entity.GetTxID(),32);
-                    LogPrint("mchn","Follow-on issue. TxID: %s,  Original issue txid: %s\n",
+                    if(fDebug)LogPrint("mchn","Follow-on issue. TxID: %s,  Original issue txid: %s\n",
                             tx.GetHash().GetHex().c_str(),otxid.GetHex().c_str());
                 }
             }
@@ -777,7 +762,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                  int offset,
                                  bool accept,
                                  string& reason,
-                                 bool *replay)
+                                 uint32_t *replay)
 {
     bool fScriptHashAllFound;
     bool fSeedNodeInvolved;
@@ -786,6 +771,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
     bool fRejectIfOpDropOpReturn;
     bool fCheckCachedScript;
     bool fFullReplayCheckRequired;
+    bool fAdminMinerGrant;
     int nNewEntityOutput;
     unsigned char details_script[MC_ENT_MAX_SCRIPT_SIZE];
     int details_script_size;
@@ -818,6 +804,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
     }
     
     fFullReplayCheckRequired=false;
+    fAdminMinerGrant=false;
     fScriptHashAllFound=false;     
     fRejectIfOpDropOpReturn=false;
     mc_gState->m_TmpAssetsIn->Clear();
@@ -965,9 +952,9 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
     nNewEntityOutput=-1;
     fSeedNodeInvolved=false;
     fShouldHaveDestination=false;
-    fShouldHaveDestination |= (mc_gState->m_NetworkParams->GetInt64Param("anyonecanreceive") == 0);
-    fShouldHaveDestination |= (mc_gState->m_NetworkParams->GetInt64Param("allowmultisigoutputs") == 0);
-    fShouldHaveDestination |= (mc_gState->m_NetworkParams->GetInt64Param("allowp2shoutputs") == 0);
+    fShouldHaveDestination |= (MCP_ANYONE_CAN_RECEIVE == 0);
+    fShouldHaveDestination |= (MCP_ALLOW_MULTISIG_OUTPUTS == 0);
+    fShouldHaveDestination |= (MCP_ALLOW_P2SH_OUTPUTS == 0);
     
     mc_gState->m_Permissions->SetCheckPoint();
     mc_gState->m_TmpAssetsOut->Clear();
@@ -1300,7 +1287,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                         if( (vInputHashTypes[i] == SIGHASH_ALL) || ( (vInputHashTypes[i] == SIGHASH_SINGLE) && (i == j) ) )
                                         {
                                             if(mc_gState->m_Permissions->SetApproval(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,approval,
-                                                                                     (unsigned char*)&vInputDestinations[i],entity.UpgradeStartBlock(),timestamp,MC_PFL_NONE,1) == 0)
+                                                                                     (unsigned char*)&vInputDestinations[i],entity.UpgradeStartBlock(),timestamp,MC_PFL_NONE,1,offset) == 0)
                                             {
                                                 fAdminFound=true;
                                             }                                                                                    
@@ -1402,21 +1389,21 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
 
                 if( (pass == 0) && fShouldHaveDestination )                     // Some setting in the protocol require address can be extracted
                 {
-                    if(fNoDestinationInOutput && (mc_gState->m_NetworkParams->GetInt64Param("anyonecanreceive") == 0))
+                    if(fNoDestinationInOutput && (MCP_ANYONE_CAN_RECEIVE == 0))
                     {
                         reason="Script rejected - destination required ";
                         fReject=true;
                         goto exitlbl;                    
                     }
                     
-                    if((typeRet == TX_MULTISIG) && (mc_gState->m_NetworkParams->GetInt64Param("allowmultisigoutputs") == 0))
+                    if((typeRet == TX_MULTISIG) && (MCP_ALLOW_MULTISIG_OUTPUTS == 0))
                     {
                         reason="Script rejected - multisig is not allowed";
                         fReject=true;
                         goto exitlbl;                    
                     }
 
-                    if((typeRet == TX_SCRIPTHASH) && (mc_gState->m_NetworkParams->GetInt64Param("allowp2shoutputs") == 0))
+                    if((typeRet == TX_SCRIPTHASH) && (MCP_ALLOW_P2SH_OUTPUTS == 0))
                     {
                         reason="Script rejected - P2SH is not allowed";
                         fReject=true;
@@ -1490,13 +1477,9 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                             switch(pass)
                             {
                                 case 0:                                         // Not admin or activate
-//                                    if(type & ( MC_PTP_ACTIVATE | MC_PTP_ADMIN ))
-                                    {
-                                        fAdminRequired=fCheckAdminList;                                        
-                                    }
+                                    fAdminRequired=fCheckAdminList;                                        
                                     if(mc_gState->m_Features->CachedInputScript())
                                     {
-//                                        type &= ~( MC_PTP_ACTIVATE | MC_PTP_ADMIN | MC_PTP_MINE);
                                         type &= ( MC_PTP_CONNECT | MC_PTP_SEND | MC_PTP_RECEIVE | MC_PTP_WRITE);
                                     }
                                     else
@@ -1508,7 +1491,6 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                     if(mc_gState->m_Features->CachedInputScript())
                                     {
                                         type &= ( MC_PTP_CREATE | MC_PTP_ISSUE | MC_PTP_ACTIVATE );
-//                                        type &= ( MC_PTP_MINE );
                                     }
                                     else
                                     {
@@ -1519,6 +1501,10 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                     if(mc_gState->m_Features->CachedInputScript())
                                     {
                                         type &= ( MC_PTP_MINE | MC_PTP_ADMIN );                                        
+                                        if(type)
+                                        {
+                                            fAdminMinerGrant=true;                                            
+                                        }
                                     }
                                     else                                        
                                     {
@@ -1587,7 +1573,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                     ptr=(unsigned char*)(lpScriptID);
                                 }
                                 
-                                LogPrint("mchn","Found permission script in tx %s for %s - (%08x: %d - %d)\n",
+                                if(fDebug)LogPrint("mchn","Found permission script in tx %s for %s - (%08x: %d - %d)\n",
                                         tx.GetHash().GetHex().c_str(),
                                         address.ToString().c_str(),
                                         type, from, to);
@@ -1597,8 +1583,6 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                 bool fActivateIsEnough=mc_gState->m_Permissions->IsActivateEnough(type);
                                 for (unsigned int i = 0; i < tx.vin.size(); i++)
                                 {
-//                                    if( ((pass < 2) && ( (vInputHashTypes[i] == SIGHASH_ALL) || ( (vInputHashTypes[i] == SIGHASH_SINGLE) && (i == j) ) )) ||
-//                                        ((pass == 2) && (vAllowedAdmins.count(strprintf("%d-%d-%d",i,j,e)) > 0)) ) // Only inputs having admin permission before this tx are tried
                                     if( ( fCheckAdminList && !fActivateIsEnough && (vAllowedAdmins.count(strprintf("%d-%d-%d",i,j,e)) > 0)) ||
                                         ( fCheckAdminList && fActivateIsEnough && (vAllowedActivators.count(strprintf("%d-%d-%d",i,j,e)) > 0)) ||
                                         (!fCheckAdminList && ( (vInputHashTypes[i] == SIGHASH_ALL) || ( (vInputHashTypes[i] == SIGHASH_SINGLE) && (i == j) ) )))    
@@ -1608,7 +1592,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                             if( ( (type & (MC_PTP_ADMIN | MC_PTP_MINE)) == 0) || vInputCanGrantAdminMine[i] || (entity.GetEntityType() > 0) )
                                             {
                                                 fFullReplayCheckRequired=true;
-                                                if(mc_gState->m_Permissions->SetPermission(entity.GetTxID(),ptr,type,(unsigned char*)&vInputDestinations[i],from,to,timestamp,flags,1) == 0)
+                                                if(mc_gState->m_Permissions->SetPermission(entity.GetTxID(),ptr,type,(unsigned char*)&vInputDestinations[i],from,to,timestamp,flags,1,offset) == 0)
                                                 {
                                                     fAdminFound=true;
                                                 }
@@ -1805,7 +1789,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
         {
             memset(opener_buf,0,sizeof(opener_buf));
             err=mc_gState->m_Permissions->SetPermission(&txid,opener_buf,MC_PTP_CONNECT,
-                    (unsigned char*)openers[0].begin(),0,(uint32_t)(-1),timestamp, MC_PFL_ENTITY_GENESIS ,update_mempool);
+                    (unsigned char*)openers[0].begin(),0,(uint32_t)(-1),timestamp, MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
         }
         for (unsigned int i = 0; i < openers.size(); i++)
         {
@@ -1815,12 +1799,15 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                 {
                     memcpy(opener_buf,openers[i].begin(),sizeof(uint160));
                     mc_PutLE(opener_buf+sizeof(uint160),&opener_flags[i],4);
-                    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,opener_buf,sizeof(opener_buf));            
+                    if((int)i < mc_gState->m_Assets->MaxStoredIssuers())
+                    {
+                        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,opener_buf,sizeof(opener_buf));            
+                    }
                     if(new_entity_type != MC_ENT_TYPE_UPGRADE)
                     {
                                                                                 // Granting default permissions to openers
                         err=mc_gState->m_Permissions->SetPermission(&txid,opener_buf,MC_PTP_ADMIN | MC_PTP_ACTIVATE | MC_PTP_WRITE,
-                                (unsigned char*)openers[i].begin(),0,(uint32_t)(-1),timestamp,opener_flags[i] | MC_PFL_ENTITY_GENESIS ,update_mempool);
+                                (unsigned char*)openers[i].begin(),0,(uint32_t)(-1),timestamp,opener_flags[i] | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
                     }
                     stored_openers.insert(openers[i]);
                 }
@@ -1911,16 +1898,317 @@ exitlbl:
 
     if(replay)
     {
-        *replay=fFullReplayCheckRequired;
+        *replay=0;
+        if(fFullReplayCheckRequired)
+        {
+            *replay |= MC_PPL_REPLAY;
+        }
+        if(fAdminMinerGrant)
+        {
+            *replay |= MC_PPL_ADMINMINERGRANT;
+        }
     }
 
     if(fReject)
     {
-        LogPrint("mchn","mchn: Tx rejected: %s\n",EncodeHexTx(tx));
+        if(fDebug)LogPrint("mchn","mchn: Tx rejected: %s\n",EncodeHexTx(tx));
     }
 
     return !fReject;
 }
+
+bool AcceptAdminMinerPermissions(const CTransaction& tx,
+                                 int offset,
+                                 bool verify_signatures,
+                                 string& reason,
+                                 uint32_t *result)
+{
+    vector <txnouttype> vInputScriptTypes;
+    vector <uint160> vInputDestinations;
+    vector <int> vInputHashTypes;
+    vector <bool> vInputCanGrantAdminMine;
+    vector <bool> vInputHadAdminPermissionBeforeThisTx;
+    vector <CScript> vInputPrevOutputScripts;
+    bool fReject;    
+    bool fAdminFound;
+    int err;
+
+    if(result)
+    {
+        *result=0;
+    }
+    
+    if(tx.IsCoinBase())
+    {
+        return true;
+    }
+    
+    for (unsigned int i = 0; i < tx.vin.size(); i++)                            
+    {                                                                                                                                                                
+        vInputCanGrantAdminMine.push_back(false);
+        vInputPrevOutputScripts.push_back(CScript());
+        vInputDestinations.push_back(0);
+    }
+    
+    fReject=false;
+    fAdminFound=false;
+    for (unsigned int j = 0; j < tx.vout.size(); j++)
+    {
+        int cs_offset,cs_new_offset,cs_size,cs_vin;
+        unsigned char *cs_script;
+            
+        const CScript& script1 = tx.vout[j].scriptPubKey;        
+        CScript::const_iterator pc1 = script1.begin();
+
+
+        mc_gState->m_TmpScript->Clear();
+        mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+                       
+        if(mc_gState->m_TmpScript->IsOpReturnScript())                      
+        {                
+            if( mc_gState->m_TmpScript->GetNumElements() == 2 ) 
+            {
+                mc_gState->m_TmpScript->SetElement(0);
+                                                  
+                if(mc_gState->m_Features->CachedInputScript())
+                {
+                    cs_offset=0;
+                    while( (err=mc_gState->m_TmpScript->GetCachedScript(cs_offset,&cs_new_offset,&cs_vin,&cs_script,&cs_size)) != MC_ERR_WRONG_SCRIPT )
+                    {
+                        if(err != MC_ERR_NOERROR)
+                        {
+                            reason="Metadata script rejected - error in cached script";
+                            fReject=true;
+                            goto exitlbl;                                                                                                                            
+                        }
+                        if(cs_offset)
+                        {
+                            if( cs_vin >= (int)tx.vin.size() )
+                            {
+                                reason="Metadata script rejected - invalid input in cached script";
+                                fReject=true;
+                                goto exitlbl;                                                                                                                                                                
+                            }
+                            vInputPrevOutputScripts[cs_vin]=CScript(cs_script,cs_script+cs_size);                            
+                            vInputCanGrantAdminMine[cs_vin]=true;
+//                            fAdminFound=true;
+                        }
+                        cs_offset=cs_new_offset;
+                    }
+                }
+            }
+        }
+    }
+/*
+    if(!fAdminFound)
+    {
+        goto exitlbl;                                                                                                                                                                        
+    }
+    
+    fAdminFound=false;
+*/    
+    for (unsigned int i = 0; i < tx.vin.size(); i++)        
+    {                                                                                                                                                                
+        if(vInputCanGrantAdminMine[i])
+        {
+            vInputCanGrantAdminMine[i]=false;
+            const CScript& script2 = tx.vin[i].scriptSig;        
+            CScript::const_iterator pc2 = script2.begin();
+            if(mc_gState->m_Features->FixedIn10007())
+            {
+                if (!script2.IsPushOnly())
+                {
+                    reason="sigScript should be push-only";
+                    fReject=true;
+                    goto exitlbl;                                                                                                                                                                
+                }
+            }
+
+            const CScript& script1 = vInputPrevOutputScripts[i];        
+            CScript::const_iterator pc1 = script1.begin();
+
+            txnouttype typeRet;
+            int nRequiredRet;
+            vector<CTxDestination> addressRets;
+            int op_addr_offset,op_addr_size,is_redeem_script,sighash_type,check_last;
+
+            sighash_type=SIGHASH_NONE;
+            if(ExtractDestinations(script1,typeRet,addressRets,nRequiredRet)) 
+            {
+                if ( (typeRet != TX_NULL_DATA) && (typeRet != TX_MULTISIG) )                                  
+                {
+                    CKeyID *lpKeyID=boost::get<CKeyID> (&addressRets[0]);
+                    CScriptID *lpScriptID=boost::get<CScriptID> (&addressRets[0]);
+                    if( (lpKeyID == NULL) && (lpScriptID == NULL) )
+                    {
+                        fReject=true;
+                        goto exitlbl;                                                                                                                                                                
+                    }
+                    if(lpKeyID)
+                    {
+                        vInputDestinations[i]=*(uint160*)lpKeyID;                               
+                    }
+                    if(lpScriptID)
+                    {
+                        vInputDestinations[i]=*(uint160*)lpScriptID;                               
+                    }
+                    
+                    check_last=0;
+                    if( typeRet == TX_PUBKEY )
+                    {
+                        check_last=1;
+                    }
+
+                                                                                // Find sighash_type
+                    mc_ExtractAddressFromInputScript((unsigned char*)(&pc2[0]),(int)(script2.end()-pc2),&op_addr_offset,&op_addr_size,&is_redeem_script,&sighash_type,check_last);        
+                    if(sighash_type == SIGHASH_ALL)
+                    {
+                        if(mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)&vInputDestinations[i]))
+                        {
+                            vInputCanGrantAdminMine[i]=true;
+                            if(verify_signatures)
+                            {
+                                vInputCanGrantAdminMine[i]=false;
+                                if(VerifyScript(script2, script1, STANDARD_SCRIPT_VERIFY_FLAGS, CachingTransactionSignatureChecker(&tx, i, false)))
+                                {
+                                    vInputCanGrantAdminMine[i]=true;
+                                }
+                                else
+                                {
+                                    reason="Signature verification error";
+                                    fReject=true;
+                                    goto exitlbl;                                                                                                                                                                                                    
+                                }
+                            }
+/*                            
+                            if(vInputCanGrantAdminMine[i])
+                            {
+                                fAdminFound=true;
+                            }
+ */ 
+                        } 
+                    }
+                }
+            }    
+        }        
+    }    
+/*    
+    if(!fAdminFound)
+    {
+        goto exitlbl;                                                                                                                                                                        
+    }
+*/    
+    for (unsigned int j = 0; j < tx.vout.size(); j++)
+    {
+        unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
+        mc_EntityDetails entity;
+        uint32_t type,from,to,timestamp,flags;
+            
+        const CScript& script1 = tx.vout[j].scriptPubKey;        
+        CScript::const_iterator pc1 = script1.begin();
+
+
+        mc_gState->m_TmpScript->Clear();
+        mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+        
+        CTxDestination addressRet;
+
+        if(ExtractDestination(script1,addressRet))
+        {            
+            entity.Zero();                                                  
+            for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
+            {
+                mc_gState->m_TmpScript->SetElement(e);
+                if(mc_gState->m_TmpScript->GetEntity(short_txid) == 0)      
+                {
+                    if(entity.GetEntityType())
+                    {
+                        reason="Script rejected - duplicate entity script";
+                        fReject=true;
+                        goto exitlbl;                                                
+                    }
+                }
+                else                                                        
+                {   
+                    if(mc_gState->m_TmpScript->GetPermission(&type,&from,&to,&timestamp) == 0)
+                    {                        
+                        type &= ( MC_PTP_MINE | MC_PTP_ADMIN );                                        
+                        if(entity.GetEntityType())
+                        {
+                            type=0;
+                        }
+                        if(type)
+                        {
+                            CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
+                            CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
+                            if((lpKeyID == NULL) && (lpScriptID == NULL))
+                            {
+                                reason="Permission script rejected - wrong destination type";
+                                fReject=true;
+                                goto exitlbl;
+                            }
+                            unsigned char* ptr=NULL;
+                            flags=MC_PFL_NONE;
+                            if(lpKeyID != NULL)
+                            {
+                                ptr=(unsigned char*)(lpKeyID);
+                            }
+                            else
+                            {
+                                flags=MC_PFL_IS_SCRIPTHASH;
+                                ptr=(unsigned char*)(lpScriptID);
+                            }
+                            fAdminFound=false;
+                            for (unsigned int i = 0; i < tx.vin.size(); i++)
+                            {
+                                if(vInputCanGrantAdminMine[i])
+                                {
+                                    if(mc_gState->m_Permissions->SetPermission(entity.GetTxID(),ptr,type,(unsigned char*)&vInputDestinations[i],from,to,timestamp,flags,1,offset) == 0)
+                                    {
+                                        fAdminFound=true;
+                                    }                                
+                                }
+                            }    
+                            if(!fAdminFound)
+                            {
+                                reason="Inputs don't belong to valid admin";
+                                fReject=true;
+                                goto exitlbl;                                                            
+                            }                                
+                            else
+                            {
+                                if(result)
+                                {
+                                    *result |= MC_PPL_ADMINMINERGRANT;
+                                }                                
+                            }
+                        }
+                        entity.Zero();                                                                                          
+                    }
+                    else                                                   
+                    {
+                        if(entity.GetEntityType())                              
+                        {
+                            reason="Script rejected - entity script should be followed by permission";
+                            fReject=true;
+                            goto exitlbl;                                                
+                        }
+                    }
+                }
+            }                                                                              
+        }
+    }    
+    
+exitlbl:        
+    
+    if(fReject)
+    {
+        if(fDebug)LogPrint("mchn","mchn: AcceptAdminMinerPermissions: Tx rejected: %s\n",EncodeHexTx(tx));
+    }
+
+    return !fReject;
+}
+
 
 /**
  * Used only for protocols < 10006
@@ -2035,7 +2323,7 @@ bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs,
         }
     }
     
-    LogPrint("mchnminor","Found asset transfer script in tx %s, %d assets\n",
+    if(fDebug)LogPrint("mchnminor","Found asset transfer script in tx %s, %d assets\n",
             tx.GetHash().GetHex().c_str(),mc_gState->m_TmpAssetsOut->GetCount());                    
     for(int i=0;i<mc_gState->m_TmpAssetsIn->GetCount();i++)
     {
@@ -2208,7 +2496,7 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
                     }
                     if(update_mempool)
                     {
-                        LogPrint("mchn","Found asset issue script in tx %s for %s - (%ld)\n",
+                        if(fDebug)LogPrint("mchn","Found asset issue script in tx %s for %s - (%ld)\n",
                                 tx.GetHash().GetHex().c_str(),
                                 address.ToString().c_str(),quantity);                    
                     }
@@ -2220,21 +2508,18 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
                         reason="Asset issue script rejected - error in script";
                         return false;                                    
                     }
-                    if(mc_gState->m_Features->FollowOnIssues())
+                    err=mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
+                    if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
                     {
-                        err=mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
-                        if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
+                        reason="Asset follow-on script rejected - error in follow-on script";
+                        return false;                                
+                    }
+                    if(err == MC_ERR_NOERROR)
+                    {
+                        if(update_mempool)
                         {
-                            reason="Asset follow-on script rejected - error in follow-on script";
-                            return false;                                
-                        }
-                        if(err == MC_ERR_NOERROR)
-                        {
-                            if(update_mempool)
-                            {
-                                LogPrint("mchn","Found asset follow-on script in tx %s\n",
-                                        tx.GetHash().GetHex().c_str());                    
-                            }
+                            if(fDebug)LogPrint("mchn","Found asset follow-on script in tx %s\n",
+                                    tx.GetHash().GetHex().c_str());                    
                         }
                     }
                 }                
@@ -2242,18 +2527,6 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
         
         }
     }    
-
-    if(new_issue)
-    {
-        if(total == 0)
-        {
-            if(mc_gState->m_Features->FollowOnIssues() == 0)
-            {
-                reason="Asset follow-on script rejected - issue quantity should be positive";
-                return false;                                                
-            }        
-        }
-    }
 
     if(mc_gState->m_TmpAssetsOut->GetCount())
     {
@@ -2340,56 +2613,56 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
     
     mc_gState->m_TmpScript->Clear();
     mc_gState->m_TmpScript->AddElement();
-    if(mc_gState->m_Features->FollowOnIssues())
-    {
-        unsigned char issuer_buf[20];
-        memset(issuer_buf,0,sizeof(issuer_buf));
-        uint32_t flags=MC_PFL_NONE;        
-        uint32_t timestamp=0;
-        set <uint160> stored_issuers;
-        
-        if(new_issue)
-        {
-            mc_gState->m_Permissions->SetCheckPoint();
-            err=MC_ERR_NOERROR;
+    unsigned char issuer_buf[20];
+    memset(issuer_buf,0,sizeof(issuer_buf));
+    uint32_t flags=MC_PFL_NONE;        
+    uint32_t timestamp=0;
+    set <uint160> stored_issuers;
 
-            txid=tx.GetHash();
-            err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_CONNECT,
-                    (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool);
-        }
-            
-        for (unsigned int i = 0; i < issuers.size(); i++)
+    if(new_issue)
+    {
+        mc_gState->m_Permissions->SetCheckPoint();
+        err=MC_ERR_NOERROR;
+
+        txid=tx.GetHash();
+        err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_CONNECT,
+                (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
+    }
+
+    for (unsigned int i = 0; i < issuers.size(); i++)
+    {
+        if(err == MC_ERR_NOERROR)
         {
-            if(err == MC_ERR_NOERROR)
+            if(stored_issuers.count(issuers[i]) == 0)
             {
-                if(stored_issuers.count(issuers[i]) == 0)
+                memcpy(issuer_buf,issuers[i].begin(),sizeof(uint160));
+                if((int)i < mc_gState->m_Assets->MaxStoredIssuers())
                 {
-                    memcpy(issuer_buf,issuers[i].begin(),sizeof(uint160));
                     mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,sizeof(issuer_buf));            
-                    if(new_issue)
-                    {
-                        err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_ADMIN | MC_PTP_ISSUE,
-                                (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool);
-                    }
-                    stored_issuers.insert(issuers[i]);
                 }
-            }
-        }        
-        
-        memset(issuer_buf,0,sizeof(issuer_buf));
-        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,1);                    
-        if(new_issue)
-        {
-            if((err != MC_ERR_NOERROR) || !accept)
-            {
-                mc_gState->m_Permissions->RollBackToCheckPoint();            
+                if(new_issue)
+                {
+                    err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_ADMIN | MC_PTP_ISSUE,
+                            (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
+                }
+                stored_issuers.insert(issuers[i]);
             }
         }
-        if(err)
+    }        
+
+    memset(issuer_buf,0,sizeof(issuer_buf));
+    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,1);                    
+    if(new_issue)
+    {
+        if((err != MC_ERR_NOERROR) || !accept)
         {
-            reason="Cannot update permission database for issued asset";
-            return false;            
+            mc_gState->m_Permissions->RollBackToCheckPoint();            
         }
+    }
+    if(err)
+    {
+        reason="Cannot update permission database for issued asset";
+        return false;            
     }
     
     const unsigned char *special_script;
@@ -2419,7 +2692,7 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
                 }
             }
             
-            LogPrint("mchn","Asset already exists. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
+            if(fDebug)LogPrint("mchn","Asset already exists. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
                     tx.GetHash().GetHex().c_str(),
                     mc_gState->m_Assets->m_Block+1,offset,(int)(*((unsigned char*)&txid+31))+256*(int)(*((unsigned char*)&txid+30)),
                     entity.GetName());                                        
@@ -2436,7 +2709,7 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
             {
                 if(new_issue)
                 {
-                    LogPrint("mchn","New asset. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
+                    if(fDebug)LogPrint("mchn","New asset. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
                             tx.GetHash().GetHex().c_str(),
                             mc_gState->m_Assets->m_Block+1,offset,(int)(*((unsigned char*)&txid+0))+256*(int)(*((unsigned char*)&txid+1)),
                             this_entity.GetName());                                        
@@ -2445,7 +2718,7 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
                 {
                     uint256 otxid;
                     memcpy(&otxid,entity.GetTxID(),32);
-                    LogPrint("mchn","Follow-on issue. TxID: %s,  Original issue txid: %s\n",
+                    if(fDebug)LogPrint("mchn","Follow-on issue. TxID: %s,  Original issue txid: %s\n",
                             tx.GetHash().GetHex().c_str(),otxid.GetHex().c_str());
                 }
             }
@@ -2615,14 +2888,14 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
                     goto exitlbl;
                 }            
 
-                if((typeRet == TX_MULTISIG) && (mc_gState->m_NetworkParams->GetInt64Param("allowmultisigoutputs") == 0))
+                if((typeRet == TX_MULTISIG) && (MCP_ALLOW_MULTISIG_OUTPUTS == 0))
                 {
                     reason="Script rejected - multisig is not allowed";
                     reject=true;
                     goto exitlbl;                    
                 }
                 
-                if((typeRet == TX_SCRIPTHASH) && (mc_gState->m_NetworkParams->GetInt64Param("allowp2shoutputs") == 0))
+                if((typeRet == TX_SCRIPTHASH) && (MCP_ALLOW_P2SH_OUTPUTS == 0))
                 {
                     reason="Script rejected - P2SH is not allowed";
                     reject=true;
@@ -2650,27 +2923,17 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
                     mc_gState->m_TmpScript->SetElement(e);
                     if(mc_gState->m_TmpScript->GetPermission(&type,&from,&to,&timestamp) == 0)
                     {
-                        if(mc_gState->m_Features->FixedGrantsInTheSameTx())
-                        {    
-                            switch(pass)
-                            {
-                                case 0:
-                                    type &= ~( MC_PTP_ACTIVATE | MC_PTP_ADMIN );
-                                    break;
-                                case 1:
-                                    type &= ( MC_PTP_ACTIVATE | MC_PTP_ADMIN );
-                                    break;
-                                case 2:
-                                    type=0;
-                                    break;
-                            }
-                        }
-                        else
+                        switch(pass)
                         {
-                            if(pass)
-                            {
+                            case 0:
+                                type &= ~( MC_PTP_ACTIVATE | MC_PTP_ADMIN );
+                                break;
+                            case 1:
+                                type &= ( MC_PTP_ACTIVATE | MC_PTP_ADMIN );
+                                break;
+                            case 2:
                                 type=0;
-                            }
+                                break;
                         }
                         if(type)
                         {
@@ -2719,7 +2982,7 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
                                 address=CBitcoinAddress(*lpScriptID);
                                 ptr=(unsigned char*)(lpScriptID);
                             }
-                            LogPrint("mchn","Found permission script in tx %s for %s - (%08x: %d - %d)\n",
+                            if(fDebug)LogPrint("mchn","Found permission script in tx %s for %s - (%08x: %d - %d)\n",
                                     tx.GetHash().GetHex().c_str(),
                                     address.ToString().c_str(),
                                     type, from, to);
@@ -2745,7 +3008,7 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
                                         {
                                             elem = lpInputScript->GetData(1,&elem_size);
                                             const unsigned char *pubkey_hash=(unsigned char *)Hash160(elem,elem+elem_size).begin();
-                                            if(mc_gState->m_Permissions->SetPermission(NULL,ptr,type,pubkey_hash,from,to,timestamp,flags,1) == 0)
+                                            if(mc_gState->m_Permissions->SetPermission(NULL,ptr,type,pubkey_hash,from,to,timestamp,flags,1,-1) == 0)
                                             {
                                                 admin_found=true;
                                             }

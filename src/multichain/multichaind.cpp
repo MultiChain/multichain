@@ -255,6 +255,23 @@ bool AppInit(int argc, char* argv[])
             delete mc_gState;                
             return false;
     }
+
+    if( (mc_gState->m_NetworkParams->GetParam("protocolversion",&size) != NULL) &&
+        (mc_gState->m_Features->MinProtocolVersion() > (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion")) )
+    {
+            fprintf(stderr,"ERROR: The protocol version (%d) for blockchain %s has been deprecated and was last supported in MultiChain 1.0 beta 1\n\n",
+                    (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion"),mc_gState->m_Params->NetworkName());                        
+            delete mc_gState;                
+            return false;
+    }
+
+    if(!GetBoolArg("-verifyparamsethash", true))
+    {
+        if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_INVALID)
+        {
+            mc_gState->m_NetworkParams->m_Status=MC_PRM_STATUS_VALID;
+        }
+    }
     
     switch(mc_gState->m_NetworkParams->m_Status)
     {
@@ -277,7 +294,7 @@ bool AppInit(int argc, char* argv[])
         case MC_PRM_STATUS_ERROR:
             fprintf(stderr,"ERROR: Parameter set for blockchain %s has errors. Please run one of the following:\n\n",mc_gState->m_Params->NetworkName());                        
             fprintf(stderr,"  multichain-util create %s\n",mc_gState->m_Params->NetworkName());
-            fprintf(stderr,"  multichain-util clone <old-blockchain-name>%s\n",mc_gState->m_Params->NetworkName());
+            fprintf(stderr,"  multichain-util clone <old-blockchain-name> %s\n",mc_gState->m_Params->NetworkName());
             fprintf(stderr,"\nAnd rerun multichaind %s\n",mc_gState->m_Params->NetworkName());                        
             delete mc_gState;                
             return false;

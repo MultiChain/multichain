@@ -357,6 +357,7 @@ public:
     CAssetGroupTree *lpAssetGroups;
     mc_WalletTxs *lpWalletTxs;
     void DestroyWalletTxs();
+    std::string SetDefaultKeyIfInvalid(std::string init_privkey);
     
 //    std::map<COutPoint, CExchangeStatus> mapExchanges;
     

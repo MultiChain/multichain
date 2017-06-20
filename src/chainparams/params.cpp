@@ -458,11 +458,9 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
     mc_MapStringString *mapConfig;
     int err;
     int size,offset,i,version,len0,len1,len2;
-    char empty_string[1];
     mc_OneMultichainParam *param;
     char *ptrData;
     const char *ptr;
-    empty_string[0]=0x00;    
     
     if(name == NULL)
     {
@@ -545,21 +543,6 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
                 ptr=NULL;;
             }
         }        
-/*
-        if(argc == 0)
-        {
-            if((MultichainParamArray+i)->m_Type & MC_PRM_SPECIAL)
-            {
-                if(strcmp((MultichainParamArray+i)->m_Name,"rootstreamname") == 0)
-                {
-                    if(ptr == NULL)
-                    {
-                        ptr=(const char*)&empty_string;
-                    }
-                }                                               
-            }
-        }
-*/
         if(ptr)
         {        
             strcpy(m_lpData+offset,param->m_Name);
@@ -752,7 +735,7 @@ exitlbl:
                 printf("address-pubkeyhash-version, address-scripthash-version and private-key-version should have identical length \n");
                 return MC_ERR_INVALID_PARAMETER_VALUE;                                                                                    
             }
-        }
+        }               
     }
     
     return err;
@@ -848,8 +831,6 @@ int mc_MultichainParams::Clone(const char* name, mc_MultichainParams* source)
         }
         if(ptr)
         {            
-//            m_lpIndex->Add(param->m_Name,i);
-
             strcpy(m_lpData+offset,param->m_Name);
             offset+=strlen(param->m_Name)+1;
 
@@ -898,7 +879,6 @@ int mc_MultichainParams::CalculateHash(unsigned char *hash)
                 take_it=0;
             }
         }
-
         if((m_lpParams+i)->IsRelevant((int)GetInt64Param("protocolversion")) == 0)
         {
             take_it=0;            
@@ -965,6 +945,9 @@ int mc_MultichainParams::Validate()
     unsigned char hash[32];
     char *ptrData;
     void *stored_hash;
+    void *protocol_name;
+    double dv;
+    int64_t iv;
     
     m_Status=MC_PRM_STATUS_EMPTY;
 
@@ -1090,7 +1073,8 @@ int mc_MultichainParams::Validate()
         }
         else
         {
-            if(IsProtocolMultichain())
+            protocol_name=GetParam("chainprotocol",NULL);
+            if(strcmp((char*)protocol_name,"multichain") == 0)
             {
                 if(memcmp(hash,stored_hash,32))
                 {
@@ -1104,6 +1088,23 @@ int mc_MultichainParams::Validate()
         if(isGenerated)
         {
             m_Status=MC_PRM_STATUS_GENERATED;
+            iv=GetInt64Param("targetblocktime");
+            if(iv>0)
+            {
+                dv=2*(double)GetInt64Param("rewardhalvinginterval")/(double)iv;
+                dv*=(double)GetInt64Param("initialblockreward");
+                iv=GetInt64Param("firstblockreward");
+                if(iv<0)
+                {
+                    iv=GetInt64Param("initialblockreward");
+                }
+                dv+=(double)iv;
+                if(dv > 9.e+18)
+                {
+                    printf("Total mining reward over blockchain's history is more than 2^63 raw units. Please reduce initial-block-reward or reward-halving-interval.\n");
+                    return MC_ERR_INVALID_PARAMETER_VALUE;                                                                                    
+                }
+           }
         }
         else
         {
@@ -1561,7 +1562,12 @@ int mc_MultichainParams::IsProtocolMultichain()
 }
 
 
-int mc_Features::ActivatePermission()
+int mc_Features::MinProtocolVersion()
+{
+    return 10004;
+}
+
+int mc_Features::ActivatePermission()                                           // This test is eliminated from the code as 10002 is not supported
 {
     int ret=0;
     int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
@@ -1582,7 +1588,7 @@ int mc_Features::LastVersionNotSendingProtocolVersionInHandShake()
     return 10002;
 }
 
-int mc_Features::VerifySizeOfOpDropElements()
+int mc_Features::VerifySizeOfOpDropElements()                                   // This test is still in the code to keep protocol!-multichain untouched
 {
     
     int ret=0;        
@@ -1604,7 +1610,7 @@ int mc_Features::VerifySizeOfOpDropElements()
     return ret;
 }
 
-int mc_Features::PerEntityPermissions()
+int mc_Features::PerEntityPermissions()                                         // This test is eliminated from the code as 10002 is not supported
 {
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
     {
@@ -1624,7 +1630,7 @@ int mc_Features::PerEntityPermissions()
     return ret;
 }
 
-int mc_Features::FollowOnIssues()
+int mc_Features::FollowOnIssues()                                               // This test is eliminated from the code as 10002 is not supported
 {
     int ret=0;
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
@@ -1643,7 +1649,7 @@ int mc_Features::FollowOnIssues()
     return ret;
 }
 
-int mc_Features::SpecialParamsInDetailsScript()
+int mc_Features::SpecialParamsInDetailsScript()                                 // This test is eliminated from the code as 10002 is not supported
 {
     int ret=0;
     int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
@@ -1659,7 +1665,7 @@ int mc_Features::SpecialParamsInDetailsScript()
     return ret;    
 }
 
-int mc_Features::FixedGrantsInTheSameTx()
+int mc_Features::FixedGrantsInTheSameTx()                                       // This test is eliminated from the code as 10002 is not supported
 {
     int ret=0;
     int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
@@ -1731,7 +1737,7 @@ int mc_Features::OpDropDetailsScripts()
     return ret;    
 }
 
-int mc_Features::ShortTxIDAsAssetRef()
+int mc_Features::ShortTxIDInTx()
 {
     int ret=0;
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
@@ -1784,7 +1790,7 @@ int mc_Features::AnyoneCanReceiveEmpty()
     {
         if(protocol >= 10007)
         {
-            if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanreceiveempty"))                                
+            if(MCP_ANYONE_CAN_RECEIVE_EMPTY)                                
             {
                 ret=1;
             }

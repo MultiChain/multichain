@@ -463,14 +463,6 @@ public:
         nTargetTimespan = (int)mc_gState->m_NetworkParams->GetInt64Param("targetadjustfreq"); 
         nTargetSpacing = (int)mc_gState->m_NetworkParams->GetInt64Param("targetblocktime");
 
-        //! Modify the testnet genesis block so the timestamp is valid for a later start.
-/*        
-        genesis.nTime = 1296688602;
-        genesis.nNonce = 414098458;
-        hashGenesisBlock = genesis.GetHash();
-        assert(hashGenesisBlock == uint256("0x000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"));
-*/
-
         vFixedSeeds.clear();
         vSeeds.clear();
 
@@ -507,13 +499,13 @@ public:
         
         fRequireStandard = (mc_gState->m_NetworkParams->GetInt64Param("onlyacceptstdtxs") != 0);
         fRequireStandard=GetBoolArg("-requirestandard", fRequireStandard);
-        fMineBlocksOnDemand = GetBoolArg("-mineblocksondemand", false);
         fTestnetToBeDeprecatedFieldRPC = (mc_gState->m_NetworkParams->GetInt64Param("chainistestnet") != 0);
 
     }
     
     void SetMultiChainRuntimeParams()
     {
+        fMineBlocksOnDemand = GetBoolArg("-mineblocksondemand", false);
         fMiningRequiresPeers = (mc_gState->m_NetworkParams->GetInt64Param("miningrequirespeers") != 0);
         fMiningRequiresPeers=GetBoolArg("-miningrequirespeers", fMiningRequiresPeers);        
         nLockAdminMineRounds=GetArg("-lockadminminerounds",mc_gState->m_NetworkParams->GetInt64Param("lockadminminerounds"));        
@@ -557,14 +549,6 @@ public:
         CMutableTransaction txNew;
         txNew.vin.resize(1);
 
-/*        
-        ptrOpReturnScript=NULL;
-        
-        if(mc_gState->m_Features->Streams() == 0)
-        {
-            ptrOpReturnScript=(unsigned char*)mc_gState->m_NetworkParams->GetParam("genesisopreturnscript",&sizeOpReturn);        
-        }
-*/         
         root_stream_name_size=0;
         root_stream_name=NULL;
         if(mc_gState->m_Features->Streams())
@@ -575,7 +559,6 @@ public:
                 root_stream_name_size=0;
             }    
         }
-//        if((sizeOpReturn > 0) && (ptrOpReturnScript[0] == OP_RETURN))
         if(root_stream_name_size > ( (mc_gState->m_Features->FixedIn10008() != 0) ? 1 : 0 ) )
         {
             txNew.vout.resize(2);                        
@@ -603,7 +586,6 @@ public:
             txNew.vout[0].scriptPubKey = CScript() << vector<unsigned char>(ptrPubKeyHash, ptrPubKeyHash + size) << OP_CHECKSIG;       
         }
         
-//        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine") == 0)
         if(mc_gState->m_NetworkParams->IsProtocolMultichain())
         {
             mc_Script *lpScript;
@@ -697,13 +679,6 @@ public:
             delete lpDetailsScript;
         }        
         
-/*        
-        if(ptrOpReturnScript[0] == OP_RETURN)
-        {
-            txNew.vout[1].nValue = 0;
-            txNew.vout[1].scriptPubKey = CScript() << vector<unsigned char>(ptrOpReturnScript+1, ptrOpReturnScript + sizeOpReturn - 1);                    
-        }
-*/       
         
         genesis.vtx.push_back(txNew);
         genesis.hashPrevBlock = 0;

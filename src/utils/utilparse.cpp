@@ -215,18 +215,7 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                 }
             }        
         }
-        
-        if(issue_found)
-        {
-            if(mc_gState->m_Features->FollowOnIssues() == 0)
-            {
-                if(total == 0)
-                {
-                    issue_found=false;
-                }
-            }
-        }
-        
+                
         if(issue_found)                                                         
         {
             if(hash != 0)
@@ -240,7 +229,7 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                         *allowed -= MC_PTP_SEND;                        
                     }
                     
-                    if((mc_gState->m_Features->ShortTxIDAsAssetRef() == 0) && (entity.IsUnconfirmedGenesis() != 0) )
+                    if((mc_gState->m_Features->ShortTxIDInTx() == 0) && (entity.IsUnconfirmedGenesis() != 0) )
                     {
                         if(required)                                            // Unconfirmed genesis in protocol < 10007, cannot be spent
                         {
@@ -830,17 +819,27 @@ void LogAssetTxOut(string message,uint256 hash,int index,unsigned char* assetref
     string assetref="";
     if(assetrefbin)
     {
-        assetref += itostr((int)mc_GetLE(assetrefbin,4));
-        assetref += "-";
-        assetref += itostr((int)mc_GetLE(assetrefbin+4,4));
-        assetref += "-";
-        assetref += itostr((int)mc_GetLE(assetrefbin+8,2));        
+        if(mc_GetABRefType(assetrefbin) == MC_AST_ASSET_REF_TYPE_SHORT_TXID)
+        {
+            for(int i=0;i<8;i++)
+            {
+                assetref += strprintf("%02x",assetrefbin[MC_AST_SHORT_TXID_OFFSET+MC_AST_SHORT_TXID_SIZE-i-1]);
+            }
+        }
+        else
+        {
+            assetref += itostr((int)mc_GetLE(assetrefbin,4));
+            assetref += "-";
+            assetref += itostr((int)mc_GetLE(assetrefbin+4,4));
+            assetref += "-";
+            assetref += itostr((int)mc_GetLE(assetrefbin+8,2));        
+        }
     }
     else
     {
         assetref += "0-0-2";
     }
-    LogPrint("mcatxo", "mcatxo: %s: %s-%d %s %ld\n",message.c_str(),txid.c_str(),index,assetref.c_str(),quantity);
+    if(fDebug)LogPrint("mcatxo", "mcatxo: %s: %s-%d %s %ld\n",message.c_str(),txid.c_str(),index,assetref.c_str(),quantity);
 }
 
 bool AddressCanReceive(CTxDestination address)

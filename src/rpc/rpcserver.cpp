@@ -503,6 +503,7 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "listpermissions",        &listpermissions,        true,      false,      false },
     { "blockchain",         "liststreams",            &liststreams,            true,      false,      false },
     { "blockchain",         "listupgrades",           &listupgrades,           true,      false,      false },
+    { "blockchain",         "listblocks",             &listblocks,             true,      false,      false },
 /* MCHN END */    
     
     /* Mining */
@@ -520,6 +521,7 @@ static const CRPCCommand vRPCCommands[] =
 #endif
 
     /* Raw transactions */
+    { "rawtransactions",    "appendrawtransaction",   &appendrawtransaction,   true,      false,      false },
     { "rawtransactions",    "createrawtransaction",   &createrawtransaction,   true,      false,      false },
     { "rawtransactions",    "decoderawtransaction",   &decoderawtransaction,   true,      false,      false },
     { "rawtransactions",    "decodescript",           &decodescript,           true,      false,      false },
@@ -643,6 +645,7 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "liststreamkeys",         &liststreamkeys,        false,     false,      true },
     { "wallet",             "liststreampublishers",   &liststreampublishers,  false,     false,      true },
     { "wallet",             "gettxoutdata",           &gettxoutdata,           false,     false,      true },
+    { "wallet",             "liststreamblockitems",   &liststreamblockitems,    false,      false,      false },
     
 /* MCHN END */    
     { "wallet",             "setaccount",             &setaccount,             true,      false,      true },
@@ -874,7 +877,7 @@ void StartRPCThreads()
     std::string strAllowed;
     BOOST_FOREACH(const CSubNet &subnet, rpc_allow_subnets)
         strAllowed += subnet.ToString() + " ";
-    LogPrint("rpc", "Allowing RPC connections from: %s\n", strAllowed);
+    if(fDebug)LogPrint("rpc", "Allowing RPC connections from: %s\n", strAllowed);
 
     strRPCUserColonPass = mapArgs["-rpcuser"] + ":" + mapArgs["-rpcpassword"];
     if (((mapArgs["-rpcpassword"] == "") ||
@@ -1132,7 +1135,7 @@ void JSONRequest::parse(const Value& valRequest)
         throw JSONRPCError(RPC_INVALID_REQUEST, "Method must be a string");
     strMethod = valMethod.get_str();
     if (strMethod != "getblocktemplate")
-        LogPrint("rpc", "ThreadRPCServer method=%s\n", SanitizeString(strMethod));
+        if(fDebug)LogPrint("rpc", "ThreadRPCServer method=%s\n", SanitizeString(strMethod));
 
 /* MCHN START */    
     Value valChainName = find_value(request, "chain_name");
@@ -1173,7 +1176,7 @@ static Object JSONRPCExecOne(const Value& req)
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
-        LogPrint("mcapi","mcapi: API request failure\n");        
+        if(fDebug)LogPrint("mcapi","mcapi: API request failure A\n");        
 /* MCHN END */    
         rpc_result = JSONRPCReplyObj(Value::null, objError, jreq.id);
     }
@@ -1181,7 +1184,7 @@ static Object JSONRPCExecOne(const Value& req)
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
-        LogPrint("mcapi","mcapi: API request failure\n");        
+        if(fDebug)LogPrint("mcapi","mcapi: API request failure B\n");        
 /* MCHN END */    
         rpc_result = JSONRPCReplyObj(Value::null,
                                      JSONRPCError(RPC_PARSE_ERROR, e.what()), jreq.id);
@@ -1226,7 +1229,7 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
     JSONRequest jreq;
 /* MCHN START */    
     uint32_t wallet_mode=mc_gState->m_WalletMode;
-    LogPrint("mcapi","mcapi: API request from %s\n",conn->peer_address_to_string().c_str());
+    if(fDebug)LogPrint("mcapi","mcapi: API request from %s\n",conn->peer_address_to_string().c_str());
 /* MCHN END */    
     try
     {
@@ -1265,7 +1268,9 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
-        LogPrint("mcapi","mcapi: API request failure\n");        
+        if(fDebug)LogPrint("mcapi","mcapi: API request failure: %s, code: %d\n",jreq.strMethod.c_str(),find_value(objError, "code").get_int());
+        
+//        if(fDebug)LogPrint("mcapi","mcapi: API request failure C\n");        
 /* MCHN END */    
         ErrorReply(conn->stream(), objError, jreq.id);
         return false;
@@ -1274,7 +1279,7 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
-        LogPrint("mcapi","mcapi: API request failure\n");        
+        if(fDebug)LogPrint("mcapi","mcapi: API request failure D\n");        
 /* MCHN END */    
         ErrorReply(conn->stream(), JSONRPCError(RPC_PARSE_ERROR, e.what()), jreq.id);
         return false;
@@ -1347,8 +1352,11 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
     try
     {
         // Execute
-        string strRequest = JSONRPCRequestForLog(strMethod, params, 1);
-        LogPrint("mcapi","mcapi: API request: %s\n",strRequest.c_str());
+        if(fDebug)
+        {
+            string strRequest = JSONRPCRequestForLog(strMethod, params, 1);
+            LogPrint("mcapi","mcapi: API request: %s\n",strRequest.c_str());
+        }
         
         Value result;
         {
@@ -1390,13 +1398,13 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
                             if(strcmp(strResultNone.c_str(),strResult.c_str()))
                             {
                                 string strRequestBad = JSONRPCRequestForLog(strMethod, params, 1);
-                                LogPrint("walletcompare","walletcompare: ERROR: Result mismatch on API request: %s\n",strRequestBad.c_str());
-                                LogPrint("walletcompare","walletcompare: %s\n",strResultNone.c_str());
-                                LogPrint("walletcompare","walletcompare: %s\n",strResult.c_str());
+                                if(fDebug)LogPrint("walletcompare","walletcompare: ERROR: Result mismatch on API request: %s\n",strRequestBad.c_str());
+                                if(fDebug)LogPrint("walletcompare","walletcompare: %s\n",strResultNone.c_str());
+                                if(fDebug)LogPrint("walletcompare","walletcompare: %s\n",strResult.c_str());
                             }
                             else
                             {
-                                LogPrint("walletcompare","walletcompare: match: %s \n",strMethod.c_str());                                
+                                if(fDebug)LogPrint("walletcompare","walletcompare: match: %s \n",strMethod.c_str());                                
                             }
                         }
                     }
@@ -1412,13 +1420,13 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
 #endif // !ENABLE_WALLET
         }
 /* MCHN START */        
-        LogPrint("mcapi","mcapi: API request successful: %s\n",strMethod.c_str());
+        if(fDebug)LogPrint("mcapi","mcapi: API request successful: %s\n",strMethod.c_str());
 /* MCHN END */        
         return result;
     }
     catch (std::exception& e)
     {
-        LogPrint("mcapi","mcapi: API request failure: %s\n",strMethod.c_str());
+        if(fDebug)LogPrint("mcapi","mcapi: API request failure: %s\n",strMethod.c_str());
         if(strcmp(e.what(),"Help message not found\n") == 0)
         {
             throw JSONRPCError(RPC_MISC_ERROR, mc_RPCHelpString(strMethod).c_str());

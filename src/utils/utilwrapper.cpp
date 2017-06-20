@@ -280,29 +280,22 @@ int64_t mc_Params::HasOption(const char* strArg)
 
 boost::filesystem::path mc_GetDefaultDataDir()
 {
-    // Windows < Vista: C:\Documents and Settings\Username\Application Data\Bitcoin
-    // Windows >= Vista: C:\Users\Username\AppData\Roaming\Bitcoin
-    // Mac: ~/Library/Application Support/Bitcoin
-    // Unix: ~/.bitcoin
+    // Windows < Vista: C:\Documents and Settings\Username\Application Data\MultiChain
+    // Windows >= Vista: C:\Users\Username\AppData\Roaming\MultiChain
+    // Mac and Unix: ~/.multichain
 #ifdef WIN32
     // Windows
     return GetSpecialFolderPath(CSIDL_APPDATA) / "MultiChain";
 #else
+    // Mac and Unix
     boost::filesystem::path pathRet;
     char* pszHome = getenv("HOME");
     if (pszHome == NULL || strlen(pszHome) == 0)
         pathRet = boost::filesystem::path("/");
     else
         pathRet = boost::filesystem::path(pszHome);
-#ifdef MAC_OSX
-    // Mac
-    pathRet /= "Library/Application Support";
-    TryCreateDirectory(pathRet);
-    return pathRet / "Bitcoin";
-#else
-    // Unix
+    
     return pathRet / ".multichain";
-#endif
 #endif
 }
 
@@ -741,10 +734,32 @@ int mc_MultichainParams::SetGlobals()
         MAX_MONEY=0;
     }
     
-    if(mc_gState->m_Features->ShortTxIDAsAssetRef() == 0)
+    if(mc_gState->m_Features->ShortTxIDInTx() == 0)
     {
         m_AssetRefSize=MC_AST_ASSET_REF_SIZE;
     }
+    
+    MCP_MAX_STD_OP_RETURN_COUNT=mc_gState->m_NetworkParams->GetInt64Param("maxstdopreturnscount");
+    MCP_INITIAL_BLOCK_REWARD=mc_gState->m_NetworkParams->GetInt64Param("initialblockreward");
+    MCP_FIRST_BLOCK_REWARD=mc_gState->m_NetworkParams->GetInt64Param("firstblockreward");
+    MCP_TARGET_BLOCK_TIME=mc_gState->m_NetworkParams->GetInt64Param("targetblocktime");
+    MCP_ANYONE_CAN_ADMIN=mc_gState->m_NetworkParams->GetInt64Param("anyonecanadmin");
+    MCP_ANYONE_CAN_MINE=mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine");
+    MCP_ANYONE_CAN_CONNECT=mc_gState->m_NetworkParams->GetInt64Param("anyonecanconnect");
+    MCP_ANYONE_CAN_SEND=mc_gState->m_NetworkParams->GetInt64Param("anyonecansend");
+    MCP_ANYONE_CAN_RECEIVE=mc_gState->m_NetworkParams->GetInt64Param("anyonecanreceive");
+    MCP_ANYONE_CAN_ACTIVATE=mc_gState->m_NetworkParams->GetInt64Param("anyonecanactivate");
+    MCP_MINIMUM_PER_OUTPUT=mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+    MCP_ALLOW_MULTISIG_OUTPUTS=mc_gState->m_NetworkParams->GetInt64Param("allowmultisigoutputs");
+    MCP_ALLOW_P2SH_OUTPUTS=mc_gState->m_NetworkParams->GetInt64Param("allowp2shoutputs");
+    MCP_WITH_NATIVE_CURRENCY=0;
+    if((mc_gState->m_NetworkParams->GetInt64Param("initialblockreward") != 0) || (mc_gState->m_NetworkParams->GetInt64Param("firstblockreward") > 0))
+    {
+        MCP_WITH_NATIVE_CURRENCY=1;
+    }
+    MCP_STD_OP_DROP_COUNT=mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropscount");
+    MCP_STD_OP_DROP_SIZE=mc_gState->m_NetworkParams->GetInt64Param("maxstdopdropsize");
+    MCP_ANYONE_CAN_RECEIVE_EMPTY=mc_gState->m_NetworkParams->GetInt64Param("anyonecanreceiveempty");
     return MC_ERR_NOERROR;
 }
 
@@ -871,8 +886,31 @@ int mc_FindIPv4ServerAddress(uint32_t *all_ips,int max_ips)
     result=0;
     c=0;
 
+#ifdef MAC_OSX
+    struct ifaddrs *ifaddr = NULL;
+    if (getifaddrs(&ifaddr) == -1) {
+	return c;
+    }
+    if (!ifaddr) {
+        return c;
+    }
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock > 0) {
+        for (struct ifaddrs *ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+	    if (ifa->ifa_addr == 0) {
+                continue;
+	    }
+            int family = ifa->ifa_addr->sa_family;
+            if (family != AF_INET) {
+                continue;
+            }
+            uint32_t a = ((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr;
+            ptr=(unsigned char*)&a;
+
+#else
+
 #ifndef WIN32
-    
+
     int sock;
     struct ifreq ifreqs[20];
     struct ifconf ic;
@@ -900,6 +938,8 @@ int mc_FindIPv4ServerAddress(uint32_t *all_ips,int max_ips)
             
 #endif    
         
+#endif    
+            
             if ((ptr[0] != 127) && (ptr[0] != 0))
             {
                 ip=((uint32_t)ptr[0]<<24)+((uint32_t)ptr[1]<<16)+((uint32_t)ptr[2]<<8)+(uint32_t)ptr[3];
@@ -927,7 +967,13 @@ int mc_FindIPv4ServerAddress(uint32_t *all_ips,int max_ips)
             
         }
     }   
-    return c;
+#ifdef MAC_OSX
+    if (sock > 0) {
+	close(sock);
+    }
+    freeifaddrs(ifaddr);
+#endif
+     return c;
 }
 
         

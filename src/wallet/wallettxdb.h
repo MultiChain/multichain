@@ -333,6 +333,11 @@ typedef struct mc_TxDB
                     int generation,                                             // Entity generation
                     int *confirmed);                                            // Out: number of confirmed items    
     
+    int GetBlockItemIndex(                                                      // Returns item id for the last item confirmed in this block or before
+                    mc_TxImport *import,                                        // Import object, if NULL - chain
+                    mc_TxEntity *entity,                                        // Entity to return info for
+                    int block);                                                 // Block to find item for
+    
     int BeforeCommit(mc_TxImport *import);                                      // Should be called before re-adding tx while processing block
     int Commit(mc_TxImport *import);                                            // Commit when block was processed
     int RollBack(mc_TxImport *import,int block);                                // Rollback to specific block

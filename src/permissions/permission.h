@@ -38,6 +38,13 @@
 #define MC_PLS_SIZE_ADDRESS           20
 #define MC_PLS_SIZE_HASH              32
 #define MC_PLS_SIZE_UPGRADE           16
+#define MC_PLS_SIZE_OFFSETS_PER_ROW    6
+
+#define MC_PPL_REPLAY             0x00000001    
+#define MC_PPL_ADMINMINERGRANT    0x00000002    
+
+#define MC_PSE_UPGRADE                0x01                                      
+#define MC_PSE_ADMINMINERLIST         0x02                                      
 
 
 
@@ -61,7 +68,34 @@ typedef struct mc_PermissionDBRow
     uint32_t m_Flags;                                                           // Flags MC_PFL_ constants
     uint32_t m_Reserved1;                                                       // Reserved to align to 80 bytes
     void Zero();
+    int InBlockRange(uint32_t block);
 } mc_PermissionDBRow;
+
+/** Database block miner record structure */
+
+typedef struct mc_BlockMinerDBRow
+{    
+    unsigned char m_BlockHash[MC_PLS_SIZE_ENTITY];                              // BlockHash
+    unsigned char m_Null[MC_PLS_SIZE_ADDRESS];                                  // Should be Null
+    uint32_t m_Type;                                                            // Permission type MC_PTP_ constants, should be MC_PTP_BLOCK_MINER
+    unsigned char m_Address[MC_PLS_SIZE_ADDRESS];                               // Miner Address
+    uint32_t m_AdminMinerCount;                                                 // Admin and miner counts, if 0 - should be recalculated
+    void Zero();
+} mc_BlockMinerDBRow;
+
+/** Database admin/miner grants record structure */
+
+typedef struct mc_AdminMinerGrantDBRow
+{    
+    unsigned char m_BlockHash[MC_PLS_SIZE_ENTITY];                              // BlockHash
+    uint64_t m_Reserved1;                                                       // Reserved, should be 0
+    uint64_t m_Reserved2;                                                       // Reserved, should be 0
+    uint32_t m_RecordID;                                                        // ID for the record containing up to 6 tx offsets
+    uint32_t m_Type;                                                            // Permission type MC_PTP_ constants, should be MC_PTP_BLOCK_MINER
+    uint32_t m_Offsets[MC_PLS_SIZE_OFFSETS_PER_ROW];                            // Offsets of transactions with admin/miner grant
+    void Zero();
+} mc_AdminMinerGrantDBRow;
+
 
 /** Database */
 
@@ -105,7 +139,8 @@ typedef struct mc_PermissionLedgerRow
     uint32_t m_GrantFrom;                                                       // Permission block-from specified in this row
     uint32_t m_GrantTo;                                                         // Permission block-to specified in this row
     uint32_t m_Timestamp;                                                       // Timestamp of this row
-    uint32_t m_FoundInDB;                                                       // Row is found in database
+//    uint32_t m_FoundInDB;                                                     // Row is found in database
+    int32_t m_Offset;                                                           // Tx offset in the block, -1 if in mempool
     uint32_t m_BlockReceived;                                                   // Block this transaction was confirmed
     uint64_t m_ThisRow;                                                         // Row in the ledger    
     
@@ -199,17 +234,23 @@ typedef struct mc_Permissions
     uint64_t m_Row;
     int m_AdminCount;
     int m_MinerCount;
-    int m_DBRowCount;
+//    int m_DBRowCount;
 
     uint64_t m_CheckPointRow;
     int m_CheckPointAdminCount;
     int m_CheckPointMinerCount;
     uint64_t m_CheckPointMemPoolSize;
     
+    int m_CopiedBlock;
+    int m_ForkBlock;
+    uint64_t m_CopiedRow;
     int m_CopiedAdminCount;
     int m_CopiedMinerCount;
     int m_ClearedAdminCount;
     int m_ClearedMinerCount;
+    int m_ClearedMinerCountForMinerVerification;
+    int m_TmpSavedAdminCount;
+    int m_TmpSavedMinerCount;
     
     mc_Buffer   *m_CopiedMemPool;
 
@@ -234,8 +275,9 @@ typedef struct mc_Permissions
 // External functions    
     int Initialize(const char *name,int mode);
 
-    int SetPermission(const void* lpEntity,const void* lpAddress,uint32_t type,const void* lpAdmin,uint32_t from,uint32_t to,uint32_t timestamp,uint32_t flags,int update_mempool);
-    int SetApproval(const void* lpUpgrade,uint32_t approval,const void* lpAdmin,uint32_t from,uint32_t timestamp,uint32_t flags,int update_mempool);
+    int SetPermission(const void* lpEntity,const void* lpAddress,uint32_t type,const void* lpAdmin,uint32_t from,uint32_t to,uint32_t timestamp,
+                                                                                                   uint32_t flags,int update_mempool,int offset);
+    int SetApproval(const void* lpUpgrade,uint32_t approval,const void* lpAdmin,uint32_t from,uint32_t timestamp,uint32_t flags,int update_mempool,int offset);
     int Commit(const void* lpMiner,const void* lpHash);
     int RollBack(int block);
     int RollBack();
@@ -282,6 +324,17 @@ typedef struct mc_Permissions
     
     void MempoolPermissionsCopy();
     int MempoolPermissionsCheck(int from, int to);
+
+    int RollBackBeforeMinerVerification(uint32_t block);
+    int RestoreAfterMinerVerification();
+    void SaveTmpCounts();    
+    int StoreBlockInfo(const void* lpMiner,const void* lpHash);    
+    int IncrementBlock(uint32_t admin_miner_count);    
+    int GetBlockMiner(const void* lpHash,unsigned char* lpMiner,uint32_t *lpAdminMinerCount);
+    int GetBlockAdminMinerGrants(const void* lpHash,int record,int32_t *offsets);
+    int CanMineBlockOnFork(const void* lpAddress,uint32_t block,uint32_t last_after_fork);
+    int IsBarredByDiversity(uint32_t block,uint32_t last,int miner_count);
+    
     
     
 // Internal functions    
@@ -291,10 +344,14 @@ typedef struct mc_Permissions
     void Lock(int write_mode);
     void UnLock();
     
-    int SetPermissionInternal(const void* lpEntity,const void* lpAddress,uint32_t type,const void* lpAdmin,uint32_t from,uint32_t to,uint32_t timestamp,uint32_t flags,int update_mempool);
+    int SetPermissionInternal(const void* lpEntity,const void* lpAddress,uint32_t type,const void* lpAdmin,uint32_t from,uint32_t to,uint32_t timestamp,
+                                                                                                           uint32_t flags,int update_mempool,int offset);
     int CommitInternal(const void* lpMiner,const void* lpHash);
+    int StoreBlockInfoInternal(const void* lpMiner,const void* lpHash,int update_counts);    
     int RollBackInternal(int block);
     uint32_t CalculateBlockFlags();
+    int FindLastAllowedMinerRow(mc_PermissionLedgerRow *row,uint32_t block,int prev_result);
+    
     
     int UpdateCounts();
     int AdminConsensus(const void* lpEntity,uint32_t type);

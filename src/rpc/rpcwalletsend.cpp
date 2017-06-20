@@ -28,6 +28,11 @@ Value createrawsendfrom(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
     }
 
+    if( IsMine(*pwalletMain, fromaddresses[0]) == ISMINE_NO )
+    {
+        throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "from-address is not found in this wallet");                        
+    }
+    
 
     BOOST_FOREACH(const CTxDestination& fromaddress, fromaddresses)
     {
@@ -441,7 +446,7 @@ Value combineunspent(const Array& params, bool fHelp)
     if (params.size() > 1)
         nMinConf = params[1].get_int();
     
-    int nMinInputs = 10;
+    int nMinInputs = 2;
     if (params.size() > 3)
         nMinInputs = params[3].get_int();
     
@@ -464,13 +469,13 @@ Value combineunspent(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "maxinputs below mininouts.");                
     }
     
-    int nMaxTransactions = 1;
+    int nMaxTransactions = 100;
     if (params.size() > 2)
         nMaxTransactions = params[2].get_int();
 
-    if((nMaxTransactions < 1) || (nMaxTransactions > 20))
+    if((nMaxTransactions < 1) || (nMaxTransactions > 100))
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid maximum-transactions. Valid Range [1 - 20].");        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid maximum-transactions. Valid Range [1 - 100].");        
     }
     
     int nMaxTime = 30;
@@ -686,7 +691,7 @@ Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp)
                 if(memcmp((&pc1[0]),(&pc0[0]),script_size) == 0)
                 {
                     LOCK(pwalletMain->cs_wallet);
-                    LogPrint("mchn","mchn: New lockunspent (%s,%d), Offer hash: %s\n",wtx.GetHash().GetHex().c_str(),j,offer_hash.GetHex().c_str());
+                    if(fDebug)LogPrint("mchn","mchn: New lockunspent (%s,%d), Offer hash: %s\n",wtx.GetHash().GetHex().c_str(),j,offer_hash.GetHex().c_str());
                     vout=j;                    
                 }
             }
@@ -802,7 +807,7 @@ Value preparelockunspent(const json_spirit::Array& params, bool fHelp)
                 if(memcmp((&pc1[0]),(&pc0[0]),script_size) == 0)
                 {
                     LOCK(pwalletMain->cs_wallet);
-                    LogPrint("mchn","mchn: New lockunspent (%s,%d), Offer hash: %s\n",wtx.GetHash().GetHex().c_str(),j,offer_hash.GetHex().c_str());
+                    if(fDebug)LogPrint("mchn","mchn: New lockunspent (%s,%d), Offer hash: %s\n",wtx.GetHash().GetHex().c_str(),j,offer_hash.GetHex().c_str());
                     vout=j;                    
 //                    pwalletMain->mapExchanges.insert(make_pair(COutPoint(wtx.GetHash(),j),CExchangeStatus(offer_hash,0,mc_TimeNowAsUInt())));                    
                 }
@@ -838,7 +843,7 @@ Value sendassetfrom(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
 
     // Amount    
-    CAmount nAmount = mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+    CAmount nAmount = MCP_MINIMUM_PER_OUTPUT;
     if (params.size() > 4 && params[4].type() != null_type)
     {
         nAmount = AmountFromValue(params[4]);
@@ -868,7 +873,7 @@ Value sendassetfrom(const Array& params, bool fHelp)
         mc_EntityDetails entity;
         ParseEntityIdentifier(params[2],&entity, MC_ENT_TYPE_ASSET);           
         memcpy(buf,entity.GetFullRef(),MC_AST_ASSET_FULLREF_SIZE);
-        if(mc_gState->m_Features->ShortTxIDAsAssetRef() == 0)
+        if(mc_gState->m_Features->ShortTxIDInTx() == 0)
         {
             if(entity.IsUnconfirmedGenesis())
             {
@@ -976,7 +981,7 @@ Value sendassettoaddress(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
 
     // Amount    
-    CAmount nAmount = mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+    CAmount nAmount = MCP_MINIMUM_PER_OUTPUT;
     if (params.size() > 3 && params[3].type() != null_type)
     {
         nAmount = AmountFromValue(params[3]);
@@ -1006,7 +1011,7 @@ Value sendassettoaddress(const Array& params, bool fHelp)
         mc_EntityDetails entity;
         ParseEntityIdentifier(params[1],&entity, MC_ENT_TYPE_ASSET);           
         memcpy(buf,entity.GetFullRef(),MC_AST_ASSET_FULLREF_SIZE);
-        if(mc_gState->m_Features->ShortTxIDAsAssetRef() == 0)
+        if(mc_gState->m_Features->ShortTxIDInTx() == 0)
         {
             if(entity.IsUnconfirmedGenesis())
             {
