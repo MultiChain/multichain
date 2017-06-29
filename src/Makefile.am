@@ -157,7 +157,8 @@ JSON_H = \
   json/json_spirit_utils.h \
   json/json_spirit_value.h \
   json/json_spirit_writer.h \
-  json/json_spirit_writer_template.h
+  json/json_spirit_writer_template.h \
+  json_spirit_ubjson.h
 
 obj/build.h: FORCE
 	@$(MKDIR_P) $(builddir)/obj
@@ -186,6 +187,7 @@ libbitcoin_server_a_SOURCES = \
   chain/pow.cpp \
   net/rest.cpp \
   utils/utilparse.cpp \
+  json/json_spirit_ubjson.cpp \
   rpc/rpcutils.cpp \
   rpc/rpchelp.cpp \
   rpc/rpcblockchain.cpp \

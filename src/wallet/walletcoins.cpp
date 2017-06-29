@@ -1522,6 +1522,10 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
     else
     {
         default_change_output=182;   // 34 + 148 (see CTxOut.IsDust for explanation)
+        if(MCP_WITH_NATIVE_CURRENCY == 0)
+        {
+            default_change_output=0;
+        }
     }
     
     missing_amount=nFeeRet+(change_count+extra_change_count)*default_change_output-nTotalInValue;
