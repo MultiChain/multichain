@@ -2042,12 +2042,9 @@ mc_Buffer *mc_AssetDB::GetFollowOns(const void* txid)
             memcpy(&aldRow,m_MemPool->GetRow(i),sizeof(mc_EntityLedgerRow));            
             if( (aldRow.m_KeyType  & MC_ENT_KEYTYPE_MASK) == MC_ENT_KEYTYPE_TXID)
             {
-                if(aldRow.m_FirstPos != (-i-1))
+                if(aldRow.m_FirstPos == first_pos)
                 {
-                    if(aldRow.m_FirstPos == first_pos)
-                    {
-                        result->Add(aldRow.m_Key,NULL);                
-                    }
+                    result->Add(aldRow.m_Key,NULL);                
                 }
             }
         }
@@ -2076,10 +2073,6 @@ mc_Buffer *mc_AssetDB::GetFollowOns(const void* txid)
                 }
             }
             m_Ledger->Close();
-        }
-        else
-        {
-            result->Add(aldRow.m_Key,NULL);                            
         }
     }
     
