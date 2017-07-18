@@ -1309,36 +1309,33 @@ void static BitcoinMiner(CWallet *pwallet)
                 nEmptyBlocks=0;
                 if(mc_gState->m_NetworkParams->IsProtocolMultichain())
                 {
-                    if(MCP_ANYONE_CAN_MINE)
-                    {
-                        fMineEmptyBlocks=true;
-                    }
-                    else
+                    nMinerCount=1;
+                    if(MCP_ANYONE_CAN_MINE == 0)
                     {
                         nMinerCount=mc_gState->m_Permissions->GetMinerCount()-mc_gState->m_Permissions->GetActiveMinerCount()+1;
-                        double d=Params().MineEmptyRounds()*nMinerCount-mc_gState->m_NetworkParams->ParamAccuracy();
-                        if(d >= 0)
-                        {
-                            nMaxEmptyBlocks=(int)d+1;
-                        }
-                        
-                        fMineEmptyBlocks=false;
-                        while(!fMineEmptyBlocks && (pindex != NULL) && (nEmptyBlocks < nMaxEmptyBlocks))
-                        {
-                            if(pindex->nTx > 1)
-                            {
-                                fMineEmptyBlocks=true;
-                            }
-                            else
-                            {
-                                nEmptyBlocks++;
-                                pindex=pindex->pprev;
-                            }
-                        }
-                        if(pindex == NULL)
+                    }
+                    double d=Params().MineEmptyRounds()*nMinerCount-mc_gState->m_NetworkParams->ParamAccuracy();
+                    if(d >= 0)
+                    {
+                        nMaxEmptyBlocks=(int)d+1;
+                    }
+
+                    fMineEmptyBlocks=false;
+                    while(!fMineEmptyBlocks && (pindex != NULL) && (nEmptyBlocks < nMaxEmptyBlocks))
+                    {
+                        if(pindex->nTx > 1)
                         {
                             fMineEmptyBlocks=true;
                         }
+                        else
+                        {
+                            nEmptyBlocks++;
+                            pindex=pindex->pprev;
+                        }
+                    }
+                    if(pindex == NULL)
+                    {
+                        fMineEmptyBlocks=true;
                     }
                 }
                 else
