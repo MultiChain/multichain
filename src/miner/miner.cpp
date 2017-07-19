@@ -1250,10 +1250,17 @@ void static BitcoinMiner(CWallet *pwallet)
             {
                 if((canMine & MC_PTP_MINE) == 0)
                 {
-                    __US_Sleep(1000);
+                    if(mc_gState->m_Permissions->m_Block > 1)
+                    {
+                        __US_Sleep(1000);
+                    }
                     boost::this_thread::interruption_point();                    
                 }
                 if(mc_gState->m_Permissions->IsSetupPeriod())
+                {
+                    not_setup_period=false;
+                }
+                if(mc_gState->m_Permissions->m_Block <= 1)
                 {
                     not_setup_period=false;
                 }
@@ -1569,7 +1576,10 @@ void static BitcoinMiner(CWallet *pwallet)
             } 
             else
             {
-                __US_Sleep(100);                
+                if(mc_gState->m_Permissions->m_Block > 1)
+                {
+                    __US_Sleep(100);                
+                }
             }
 /* MCHN END */    
         }
