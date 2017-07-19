@@ -1708,16 +1708,17 @@ bool IsInitialBlockDownload()
     if (lockIBDState)
         return false;
 /* MCHN START */    
-/*    
+/* We cannot make these checks for private network when chain/nodes can go down for weeks  
     bool state = (chainActive.Height() < pindexBestHeader->nHeight - 24 * 6 ||
             pindexBestHeader->GetBlockTime() < GetTime() - 24 * 60 * 60);
- */ 
     bool state = (chainActive.Height() < pindexBestHeader->nHeight - 86400 / MCP_TARGET_BLOCK_TIME ||
             pindexBestHeader->GetBlockTime() < GetTime() - 24 * 60 * 60);
-/* MCHN END */    
     if (!state)
         lockIBDState = true;
     return state;
+ */ 
+/* MCHN END */    
+    return true;
 }
 
 bool fLargeWorkForkFound = false;
