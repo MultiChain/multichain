@@ -106,7 +106,7 @@ bool AppInit(int argc, char* argv[])
         mc_gState->m_Params->HasOption("-version") || 
         (mc_gState->m_Params->NetworkName() == NULL))
     {
-        fprintf(stdout,"\nMultiChain Core Daemon %s\n\n",mc_gState->GetFullVersion());
+        fprintf(stdout,"\nMultiChain %s Daemon (protocol %d-%d)\n\n",mc_gState->GetVersion(),mc_gState->m_Features->MinProtocolVersion(),mc_gState->GetProtocolVersion());
         std::string strUsage = "";
         if (mc_gState->m_Params->HasOption("-version"))
         {
@@ -128,7 +128,7 @@ bool AppInit(int argc, char* argv[])
 
     if(!GetBoolArg("-shortoutput", false))
     {
-        fprintf(stdout,"\nMultiChain Core Daemon %s\n\n",mc_gState->GetFullVersion());
+        fprintf(stdout,"\nMultiChain %s Daemon (protocol %d)\n\n",mc_gState->GetVersion(),mc_gState->GetProtocolVersion());
     }
     
     pipes[1]=STDOUT_FILENO;
