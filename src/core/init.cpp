@@ -243,6 +243,17 @@ string mc_ParseIPPort(string strAddr,int *port)
 {
     *port=0;
     string s_ip=strAddr;
+    size_t last_bracket=strAddr.find_last_of(']');
+    size_t last=strAddr.find_last_of(':');
+    string s_port;
+    
+    if( (last != string::npos) && ( (last_bracket == string::npos) || (last_bracket < last) ) )
+    {
+        s_ip=strAddr.substr(0,last);
+        s_port=strAddr.substr(last+1);
+        *port=atoi(s_port);
+    }
+/*    
     stringstream ss(s_ip); 
     string tok;
     if(getline(ss, tok, ':'))
@@ -253,6 +264,7 @@ string mc_ParseIPPort(string strAddr,int *port)
             *port=atoi(tok);
         }
     }            
+ */ 
     return s_ip;
 }
 
@@ -1119,11 +1131,19 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             mc_gState->m_NetworkState=MC_NTS_WAITING_FOR_SEED;
 
             string seed_ip=seed_node;
-            string seed_port="";
+            int seed_port=0;
             stringstream ss(seed_ip); 
             string tok;
             int size;
 
+            seed_ip=mc_ParseIPPort(seed_ip,&seed_port);
+/*            
+            if(seed_port<=0)
+            {
+                seed_port=GetListenPort();
+            }
+*/            
+/*            
             if(getline(ss, tok, ':'))
             {
                 seed_ip=tok;
@@ -1132,7 +1152,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     seed_port=tok;
                 }
             }            
-
+*/
+            
             if(mc_QuerySeed(seedThreadGroup,seed_node))
             {
                 if((mc_gState->m_NetworkState == MC_NTS_SEED_READY) || (mc_gState->m_NetworkState == MC_NTS_SEED_NO_PARAMS) )
@@ -1141,14 +1162,15 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 }
                 else
                 {
-                    if(seed_port.size() == 0)
+//                    if(seed_port.size() == 0)
+                    if(seed_port == 0)
                     {
                         seed_error=strprintf("Couldn't connect to the seed node %s - please specify port number explicitly.",seed_node);                
                     }
                     else
                     {
-                        seed_error=strprintf("Couldn't connect to the seed node %s on port %s - please check multichaind is running at that address and that your firewall settings allow incoming connections.",                
-                            seed_ip.c_str(),seed_port.c_str());
+                        seed_error=strprintf("Couldn't connect to the seed node %s on port %d - please check multichaind is running at that address and that your firewall settings allow incoming connections.",                
+                            seed_ip.c_str(),seed_port);
                     }
                 }
             }
@@ -1156,10 +1178,10 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             if( (mc_gState->m_NetworkParams->GetParam("protocolversion",&size) != NULL) &&
                 (mc_gState->GetProtocolVersion() < (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion")) )
             {
-                seed_error=strprintf("Couldn't connect to the seed node %s on port %s.\n"
+                seed_error=strprintf("Couldn't connect to the seed node %s on port %d.\n"
                             "Blockchain was created by multichaind with newer protocol version (%d)\n"                
                             "Please upgrade to the latest version of MultiChain or connect only to blockchains using protocol version %d or earlier.\n",                
-                        seed_ip.c_str(),seed_port.c_str(),(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion"), mc_gState->GetProtocolVersion());
+                        seed_ip.c_str(),seed_port,(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion"), mc_gState->GetProtocolVersion());
             }
             else
             {                                
@@ -1176,9 +1198,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     {
                         char fileName[MC_DCT_DB_MAX_PATH];
                         mc_GetFullFileName(mc_gState->m_Params->NetworkName(),"params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
-                        seed_error=strprintf("Couldn't retrieve blockchain parameters from the seed node %s on port %s.\n"
+                        seed_error=strprintf("Couldn't retrieve blockchain parameters from the seed node %s on port %d.\n"
                                     "For bitcoin protocol blockchains, the file %s must be copied manually from an existing node.",                
-                                seed_ip.c_str(),seed_port.c_str(),fileName);
+                                seed_ip.c_str(),seed_port,fileName);
 
                     }
                 }
