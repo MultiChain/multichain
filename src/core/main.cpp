@@ -1718,7 +1718,7 @@ bool IsInitialBlockDownload()
     return state;
  */ 
 /* MCHN END */    
-    return true;
+    return false;
 }
 
 bool fLargeWorkForkFound = false;
