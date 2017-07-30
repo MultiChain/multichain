@@ -2343,6 +2343,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                 {
                                     fNewStream=true;
                                 }
+/*                                
                                 else
                                 {
                                     int chain_row=m_Database->m_Imports->FindEntity(&entity);
@@ -2358,6 +2359,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                         }
                                     }
                                 }
+ */ 
                             }
                         }
                     }
@@ -2401,10 +2403,18 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
             {
                 if(m_Mode & MC_WMD_AUTOSUBSCRIBE_ASSETS)
                 {
-                    m_Database->AddEntity(imp,&entity,0);
-                    imp->m_TmpEntities->Add(&entity,NULL);
-                    entity.m_EntityType=MC_TET_ASSET | MC_TET_TIMERECEIVED;
-                    m_Database->AddEntity(imp,&entity,0);
+                    fNewAsset=false;
+                    if(imp->m_ImportID == 0)
+                    {
+                        fNewAsset=true;
+                    }
+                    if(fNewAsset)
+                    {
+                        m_Database->AddEntity(imp,&entity,0);
+                        imp->m_TmpEntities->Add(&entity,NULL);
+                        entity.m_EntityType=MC_TET_ASSET | MC_TET_TIMERECEIVED;
+                        m_Database->AddEntity(imp,&entity,0);
+                    }
                 }
             }
         }
