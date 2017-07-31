@@ -67,7 +67,9 @@ Value getinfo(const Array& params, bool fHelp)
 /* MCHN START */    
 //    obj.push_back(Pair("version", CLIENT_VERSION));
 //    obj.push_back(Pair("protocolversion", PROTOCOL_VERSION));
-    obj.push_back(Pair("version", mc_gState->GetVersion()));
+    
+    char build_desc[32];
+    obj.push_back(Pair("version", mc_BuildDescription(mc_gState->GetNumericVersion())));
     obj.push_back(Pair("nodeversion", mc_gState->GetNumericVersion()));
     obj.push_back(Pair("protocolversion", mc_gState->m_NetworkParams->ProtocolVersion()));
     obj.push_back(Pair("chainname", string(mc_gState->m_NetworkParams->Name())));

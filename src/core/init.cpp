@@ -929,7 +929,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 /* MCHN START */    
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-        LogPrintf("MultiChain version %s (%s)\n", mc_gState->GetFullVersion(), CLIENT_DATE);
+        LogPrintf("MultiChain version build %s protocol %s (%s)\n", mc_BuildDescription(mc_gState->GetNumericVersion()), mc_gState->GetProtocolVersion(), CLIENT_DATE);
     }
 
 /* MCHN END */    
@@ -1871,6 +1871,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     }
 
     int version=mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
+    LogPrintf("MultiChain protocol version: %d\n",version);
     if(version != mc_gState->GetProtocolVersion())
     {
         if(!GetBoolArg("-shortoutput", false))

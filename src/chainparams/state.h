@@ -228,11 +228,11 @@ typedef struct mc_State
         }
     }
     
-    const char* GetVersion();
-    const char* GetFullVersion();
+    int VersionInfo(int version);
     int GetNumericVersion();
     int GetWalletDBVersion();
     int GetProtocolVersion();
+    int MinProtocolVersion();
     const char* GetSeedNode();
 } cs_State;
 

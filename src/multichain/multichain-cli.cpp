@@ -117,7 +117,7 @@ static int AppInitRPC(int argc, char* argv[])
         (mc_gState->m_Params->NetworkName() == NULL) ||
         mc_gState->m_Params->m_NumArguments<minargs)
       {
-        fprintf(stdout,"\nMultiChain %s RPC client\n\n",mc_gState->GetVersion());
+        fprintf(stdout,"\nMultiChain %s RPC client\n\n",mc_BuildDescription(mc_gState->GetNumericVersion()).c_str());
         
         std::string strUsage = "";
         if (mc_gState->m_Params->HasOption("-version"))
@@ -397,7 +397,7 @@ int main(int argc, char* argv[])
  #ifndef WIN32   
     if(mc_gState->m_Params->m_NumArguments == 1)                                // Interactive mode
     {
-        fprintf(stdout,"\nMultiChain %s RPC client\n\n",mc_gState->GetVersion());
+        fprintf(stdout,"\nMultiChain %s RPC client\n\n",mc_BuildDescription(mc_gState->GetNumericVersion()).c_str());
         if (mapArgs["-rpcuser"] == "" && mapArgs["-rpcpassword"] == "")
         {
             string str=strprintf(

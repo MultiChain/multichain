@@ -694,6 +694,45 @@ int mc_ReadGeneralConfigFile(mc_MapStringString *mapConfig,const char *network_n
     return mc_ReadConfigFile(mc_GetConfigFile(network_name,file_name,extension),(std::map<string, string>*)mapConfig->mapObject, NULL,"");
 }
 
+int mc_BuildDescription(int build, char *desc)
+{
+    int v,i;
+    int c[5];
+    
+    v=build;
+    
+    c[4]=v%100;v/=100;
+    c[3]=v%10 ;v/=10 ;
+    c[2]=v%100;v/=100;
+    c[1]=v%100;v/=100;
+    c[0]=v%100;v/=100;
+    if(c[0] < 1)return MC_ERR_INVALID_PARAMETER_VALUE;
+    sprintf(desc,"%d.%d",c[0],c[1]);
+    if(c[2])
+    {
+        sprintf(desc+strlen(desc),".%d",c[2]);
+    }
+    switch(c[3])
+    {
+        case 1:
+            sprintf(desc+strlen(desc)," alpha ");
+            break;
+        case 2:
+            sprintf(desc+strlen(desc)," beta ");
+            break;
+        case 9:
+            if(c[4] != 1)return MC_ERR_INVALID_PARAMETER_VALUE;
+            break;
+        default:
+            return MC_ERR_INVALID_PARAMETER_VALUE;
+    }
+    if(c[3] != 9)
+    {
+        sprintf(desc+strlen(desc),"%d",c[4]);        
+    }
+    
+    return MC_ERR_NOERROR;
+}
 
 int mc_MultichainParams::SetGlobals()
 {

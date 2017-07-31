@@ -2,24 +2,56 @@
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "multichain/multichain.h"
-
-
 #include "version/version.h"
 
-const char* mc_State::GetVersion()
+
+int mc_State::VersionInfo(int version)
 {
-    return MULTICHAIN_BUILD_DESC;
+    int this_build=20000101;
+    int this_protocol=20001;
+    if(version < 0)
+    {
+        return 0;
+    }
+    if(version < MULTICHAIN_VERSION_CODE_MIN_VALID)
+    {
+        switch(version)
+        {
+            case MULTICHAIN_VERSION_CODE_BUILD:                                 // last version
+                return -this_build;                                               
+            case MULTICHAIN_VERSION_CODE_PROTOCOL_THIS:                         // last protocol version
+                return this_protocol;
+            case MULTICHAIN_VERSION_CODE_PROTOCOL_MIN:
+                return 10004;                                                   // first supported version
+        }
+        return 0;        
+    }
+    if(version < 10002)return 10002;                                            // first version
+    if(version < 10004)return -10000201;                                        // last build supporting this version (negative)
+    if(version < 10009)return -this_build;                                      // supported by this version    
+    if(version < 20001)return 20001;                                            // next version
+    if(version < 20002)return -this_build;                                      // supported by this version    
+        
+    return VersionInfo(MULTICHAIN_VERSION_CODE_BUILD)-1;                        // Created by the following builds
 }
 
-const char* mc_State::GetFullVersion()
-{
-    return MULTICHAIN_FULL_VERSION;
-}
 
 int mc_State::GetNumericVersion()
 {
-    return MULTICHAIN_BUILD_DESC_NUMERIC;
+    return -VersionInfo(MULTICHAIN_VERSION_CODE_BUILD);
 }
+
+int mc_State::GetProtocolVersion()
+{
+    return VersionInfo(MULTICHAIN_VERSION_CODE_PROTOCOL_THIS);
+}
+
+int mc_State::MinProtocolVersion()
+{
+    return VersionInfo(MULTICHAIN_VERSION_CODE_PROTOCOL_MIN);
+}
+
+
 
 int mc_State::GetWalletDBVersion()
 {
@@ -38,7 +70,3 @@ int mc_State::GetWalletDBVersion()
     return 1;
 }
 
-int mc_State::GetProtocolVersion()
-{
-    return MULTICHAIN_PROTOCOL_VERSION;
-}
