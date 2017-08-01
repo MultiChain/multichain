@@ -35,6 +35,28 @@ int mc_State::VersionInfo(int version)
     return VersionInfo(MULTICHAIN_VERSION_CODE_BUILD)-1;                        // Created by the following builds
 }
 
+int mc_State::IsSupported(int version)
+{
+    if(-VersionInfo(version) == GetNumericVersion())
+    {
+        return 1;
+    }
+    return 0;
+}
+
+int mc_State::IsDeprecated(int version)
+{
+    int build=-VersionInfo(version);
+    
+    if(build > 0)
+    {
+        if(build < GetNumericVersion())
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
 
 int mc_State::GetNumericVersion()
 {

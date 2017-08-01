@@ -921,6 +921,6 @@ std::string mc_SupportedProtocols()
 std::string mc_BuildDescription(int build)
 {
     char build_desc[32];
-    mc_BuildDescription(mc_gState->GetNumericVersion(),build_desc);
+    mc_BuildDescription(build,build_desc);
     return std::string(build_desc);
 }

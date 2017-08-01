@@ -43,8 +43,8 @@ int main(int argc, char* argv[])
                 if(mc_gState->m_Params->m_NumArguments>2)
                 {                    
                     v=atoi(mc_gState->m_Params->m_Arguments[2]);
-                    if( -mc_gState->VersionInfo(v) == mc_gState->GetNumericVersion() )
 //                    if( (v>=mc_gState->m_Features->MinProtocolVersion()) && (v<=version) )
+                    if(mc_gState->IsSupported(v))
                     {
                         version=v;                        
                     }

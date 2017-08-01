@@ -233,6 +233,8 @@ typedef struct mc_State
     int GetWalletDBVersion();
     int GetProtocolVersion();
     int MinProtocolVersion();
+    int IsSupported(int version);
+    int IsDeprecated(int version);
     const char* GetSeedNode();
 } cs_State;
 

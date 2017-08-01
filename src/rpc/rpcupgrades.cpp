@@ -103,13 +103,10 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
                 }
                 protocol_version_found=true;
                 protocol_version=s.value_.get_int();
-                if(protocol_version < 0)
+                if( (protocol_version < mc_gState->MinProtocolVersion()) || 
+                    ( -mc_gState->VersionInfo(protocol_version) != mc_gState->GetNumericVersion() ) )
                 {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid protocol version, should be non-negative");                                                                                    
-                }
-                if(protocol_version > mc_gState->GetProtocolVersion())
-                {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid protocol version, cannot upgrade to future version");                                                                                    
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid value for protocol version. Valid range: %s\n",mc_SupportedProtocols().c_str()));                                                                                    
                 }
                 lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,(unsigned char*)&protocol_version,4);        
             }
