@@ -23,6 +23,8 @@ int mc_State::VersionInfo(int version)
                 return this_protocol;
             case MULTICHAIN_VERSION_CODE_PROTOCOL_MIN:
                 return 10004;                                                   // first supported version
+            case MULTICHAIN_VERSION_CODE_PROTOCOL_MIN_DOWNGRADE:
+                return 10008;                                                   // cannot downgrade below this version
         }
         return 0;        
     }
@@ -71,6 +73,11 @@ int mc_State::GetProtocolVersion()
 int mc_State::MinProtocolVersion()
 {
     return VersionInfo(MULTICHAIN_VERSION_CODE_PROTOCOL_MIN);
+}
+
+int mc_State::MinProtocolDowngradeVersion()
+{
+    return VersionInfo(MULTICHAIN_VERSION_CODE_PROTOCOL_MIN_DOWNGRADE);
 }
 
 

@@ -115,6 +115,7 @@ typedef struct mc_Features
     int FixedIn10007();
     int Upgrades();
     int FixedIn10008();
+    int FormattedData();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo
@@ -233,6 +234,7 @@ typedef struct mc_State
     int GetWalletDBVersion();
     int GetProtocolVersion();
     int MinProtocolVersion();
+    int MinProtocolDowngradeVersion();
     int IsSupported(int version);
     int IsDeprecated(int version);
     const char* GetSeedNode();

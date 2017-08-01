@@ -756,7 +756,6 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
     return true;
 }
 
-
 bool AcceptMultiChainTransaction(const CTransaction& tx, 
                                  const CCoinsViewCache &inputs,
                                  int offset,
@@ -992,6 +991,8 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                        
             if(mc_gState->m_TmpScript->IsOpReturnScript())                      // OP_RETURN
             {
+                mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);
+                
                 if( (pass == 0) && !fScriptHashAllFound)             
                 {
                     if(mc_gState->m_Features->FixedIn10007())
