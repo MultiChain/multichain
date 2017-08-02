@@ -1250,10 +1250,17 @@ void static BitcoinMiner(CWallet *pwallet)
             {
                 if((canMine & MC_PTP_MINE) == 0)
                 {
-                    __US_Sleep(1000);
+                    if(mc_gState->m_Permissions->m_Block > 1)
+                    {
+                        __US_Sleep(1000);
+                    }
                     boost::this_thread::interruption_point();                    
                 }
                 if(mc_gState->m_Permissions->IsSetupPeriod())
+                {
+                    not_setup_period=false;
+                }
+                if(mc_gState->m_Permissions->m_Block <= 1)
                 {
                     not_setup_period=false;
                 }
@@ -1309,36 +1316,33 @@ void static BitcoinMiner(CWallet *pwallet)
                 nEmptyBlocks=0;
                 if(mc_gState->m_NetworkParams->IsProtocolMultichain())
                 {
-                    if(MCP_ANYONE_CAN_MINE)
-                    {
-                        fMineEmptyBlocks=true;
-                    }
-                    else
+                    nMinerCount=1;
+                    if(MCP_ANYONE_CAN_MINE == 0)
                     {
                         nMinerCount=mc_gState->m_Permissions->GetMinerCount()-mc_gState->m_Permissions->GetActiveMinerCount()+1;
-                        double d=Params().MineEmptyRounds()*nMinerCount-mc_gState->m_NetworkParams->ParamAccuracy();
-                        if(d >= 0)
-                        {
-                            nMaxEmptyBlocks=(int)d+1;
-                        }
-                        
-                        fMineEmptyBlocks=false;
-                        while(!fMineEmptyBlocks && (pindex != NULL) && (nEmptyBlocks < nMaxEmptyBlocks))
-                        {
-                            if(pindex->nTx > 1)
-                            {
-                                fMineEmptyBlocks=true;
-                            }
-                            else
-                            {
-                                nEmptyBlocks++;
-                                pindex=pindex->pprev;
-                            }
-                        }
-                        if(pindex == NULL)
+                    }
+                    double d=Params().MineEmptyRounds()*nMinerCount-mc_gState->m_NetworkParams->ParamAccuracy();
+                    if(d >= 0)
+                    {
+                        nMaxEmptyBlocks=(int)d+1;
+                    }
+
+                    fMineEmptyBlocks=false;
+                    while(!fMineEmptyBlocks && (pindex != NULL) && (nEmptyBlocks < nMaxEmptyBlocks))
+                    {
+                        if(pindex->nTx > 1)
                         {
                             fMineEmptyBlocks=true;
                         }
+                        else
+                        {
+                            nEmptyBlocks++;
+                            pindex=pindex->pprev;
+                        }
+                    }
+                    if(pindex == NULL)
+                    {
+                        fMineEmptyBlocks=true;
                     }
                 }
                 else
@@ -1572,7 +1576,10 @@ void static BitcoinMiner(CWallet *pwallet)
             } 
             else
             {
-                __US_Sleep(100);                
+                if(mc_gState->m_Permissions->m_Block > 1)
+                {
+                    __US_Sleep(100);                
+                }
             }
 /* MCHN END */    
         }

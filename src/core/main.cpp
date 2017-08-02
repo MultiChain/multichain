@@ -1455,15 +1455,18 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
 /* MCHN END */        
         
-
+        unsigned int scriptVerifyFlags = STANDARD_SCRIPT_VERIFY_FLAGS;
+        if (!Params().RequireStandard()) 
+        {
+            scriptVerifyFlags = GetArg("-promiscuousmempoolflags", scriptVerifyFlags);
+        }
+        
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
-        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS, true))
+        if (!CheckInputs(tx, state, view, true, scriptVerifyFlags, true))
         {
-/* MCHN START */            
 //            return error("AcceptToMemoryPool: : ConnectInputs failed %s", hash.ToString());            
             return state.DoS(0,error("AcceptToMemoryPool: : ConnectInputs failed %s", hash.ToString()),REJECT_INVALID,"ConnectInputs failed");
-/* MCHN END */            
         }
         
 
@@ -1708,16 +1711,17 @@ bool IsInitialBlockDownload()
     if (lockIBDState)
         return false;
 /* MCHN START */    
-/*    
+/* We cannot make these checks for private network when chain/nodes can go down for weeks  
     bool state = (chainActive.Height() < pindexBestHeader->nHeight - 24 * 6 ||
             pindexBestHeader->GetBlockTime() < GetTime() - 24 * 60 * 60);
- */ 
     bool state = (chainActive.Height() < pindexBestHeader->nHeight - 86400 / MCP_TARGET_BLOCK_TIME ||
             pindexBestHeader->GetBlockTime() < GetTime() - 24 * 60 * 60);
-/* MCHN END */    
     if (!state)
         lockIBDState = true;
     return state;
+ */ 
+/* MCHN END */    
+    return false;
 }
 
 bool fLargeWorkForkFound = false;
@@ -2175,7 +2179,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     AssertLockHeld(cs_main);
     // Check it again in case a previous version let a bad block in
     // But if pindex->kMiner is set we got this block in this version
-    if(!pindex->kMiner.IsValid())
+    if(!pindex->kMiner.IsValid() || (setBannedTxs.size() != 0) )
     {
         if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
             return false;
@@ -6889,7 +6893,9 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         // Start block sync
         if (pindexBestHeader == NULL)
             pindexBestHeader = chainActive.Tip();
-        bool fFetch = state.fPreferredDownload || (nPreferredDownload == 0 && !pto->fClient && !pto->fOneShot); // Download if this is a nice peer, or we have no nice peers and this one might do.
+//        bool fFetch = state.fPreferredDownload || (nPreferredDownload == 0 && !pto->fClient && !pto->fOneShot); // Download if this is a nice peer, or we have no nice peers and this one might do.
+        
+        bool fFetch = true;                                                     // fPreferredDownload is too dangerous in small chains
         if (!state.fSyncStarted && !pto->fClient && fFetch && !fImporting && !fReindex) {
             // Only actively request headers from a single peer, unless we're close to today.
             if (nSyncStarted == 0 || pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) {

@@ -1756,7 +1756,7 @@ void CWallet::ResendWalletTransactions(bool fForce)
                     CWalletTx& wtx = item->second;
                     // Don't rebroadcast until it's had plenty of time that
                     // it should have gotten in already by now.
-                    if (nTimeBestReceived - (int64_t)wtx.nTimeReceived > MCP_TARGET_BLOCK_TIME)
+                    if ( fForce || (nTimeBestReceived - (int64_t)wtx.nTimeReceived > MCP_TARGET_BLOCK_TIME) )
                     {
                         LogPrint("wallet","Wallet tx %s resent\n",wtx.GetHash().ToString().c_str());
                         wtx.RelayWalletTransaction();                        

@@ -2823,12 +2823,17 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
                     to=from;
                 }
             }
-            if (from < 0 || from > chainActive.Height())
-                throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range for " + str);
-            if (to < 0 || to > chainActive.Height())
-                throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range for " + str);            
             if (from > to)
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid range " + str);            
+   
+            if(from<0)
+            {
+                from=0;
+            }
+            if(to>chainActive.Height())
+            {
+                to=chainActive.Height();
+            }
             
             for(int block=from;block<=to;block++)
             {
