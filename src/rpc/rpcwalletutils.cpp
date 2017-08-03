@@ -441,6 +441,9 @@ Object StreamItemEntry(const CWalletTx& wtx,const unsigned char *stream_id, bool
     unsigned char item_key[MC_ENT_MAX_ITEM_KEY_SIZE+1];
     int item_key_size;
     Value item_value;
+    uint32_t format;
+    Value format_item_value;
+    string format_text_str;
     
     stream_output=-1;
     for (int j = 0; j < (int)wtx.vout.size(); ++j)
@@ -457,6 +460,8 @@ Object StreamItemEntry(const CWalletTx& wtx,const unsigned char *stream_id, bool
             {
                 if(mc_gState->m_TmpScript->GetNumElements()) // 2 OP_DROPs + OP_RETURN - item key
                 {
+                    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+                    
                     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
                     mc_gState->m_TmpScript->SetElement(0);
 
@@ -478,6 +483,7 @@ Object StreamItemEntry(const CWalletTx& wtx,const unsigned char *stream_id, bool
 
                             elem = mc_gState->m_TmpScript->GetData(2,&elem_size);
                             item_value=OpReturnEntry(elem,elem_size,wtx.GetHash(),j);
+                            format_item_value=OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),j,format,&format_text_str);
                         }
                     }
                 }                        
@@ -522,7 +528,12 @@ Object StreamItemEntry(const CWalletTx& wtx,const unsigned char *stream_id, bool
     
     entry.push_back(Pair("publishers", publishers));
     entry.push_back(Pair("key", strprintf("%s",item_key)));
-    entry.push_back(Pair("data", item_value));        
+    if(mc_gState->m_Compatibility & MC_VCM_1_0)
+    {
+        entry.push_back(Pair("data", item_value));        
+    }
+    entry.push_back(Pair("format", format_text_str));        
+    entry.push_back(Pair("formatdata", format_item_value));        
     
     if(verbose)
     {

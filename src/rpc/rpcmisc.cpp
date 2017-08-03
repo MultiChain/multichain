@@ -387,6 +387,27 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         }
         fFound=true;
     }
+    if( (param_name == "compatibility") )
+    {
+        if( (params[1].type() == int_type) || (params[1].type() == str_type) )
+        {
+            int nValue;
+            if(params[1].type() == int_type)
+            {
+                nValue=params[1].get_int();
+            }
+            else
+            {
+                nValue=atoi(params[1].get_str().c_str());
+            }
+            mc_gState->m_Compatibility=(uint32_t)nValue;
+        }        
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value type");                                            
+        }
+        fFound=true;
+    }
     if(param_name == "bantx")
     {
         if(params[1].type() == str_type)

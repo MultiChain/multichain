@@ -758,7 +758,69 @@ Value OpReturnEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int
     return metadata_object;    
 }
 
+string OpReturnFormatToText(int format)
+{
+    switch(format)
+    {
+        case MC_SCR_DATA_FORMAT_RAW:
+            return "hex";
+        case MC_SCR_DATA_FORMAT_UTF8:
+            return "text";
+        case MC_SCR_DATA_FORMAT_UBJSON:
+            return "json";            
+    }
+    return "unknown";
+}
 
+Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out)
+{
+    string metadata="";
+    Object metadata_object;
+    if( ((int)elem_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)) || (txid == 0) )
+    {
+        if(format_text_out)
+        {
+            *format_text_out=OpReturnFormatToText(format);
+        }
+        switch(format)
+        {
+            case MC_SCR_DATA_FORMAT_UTF8:
+            case MC_SCR_DATA_FORMAT_UBJSON:
+                if(format_text_out)
+                {
+                    *format_text_out="not supported yet";
+                }
+                metadata=HexStr(elem,elem+elem_size);
+                return metadata;
+            default:                                                            // including MC_SCR_DATA_FORMAT_RAW and unknown
+                metadata=HexStr(elem,elem+elem_size);
+                return metadata;
+        }
+    }    
+    if(format_text_out)
+    {
+        *format_text_out="getdata";
+    }
+    metadata_object.push_back(Pair("format", OpReturnFormatToText(format)));
+    metadata_object.push_back(Pair("txid", txid.ToString()));
+    metadata_object.push_back(Pair("vout", vout));
+    metadata_object.push_back(Pair("size", (int)elem_size));
+    return metadata_object;    
+}
+
+Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format)
+{
+    Value format_item_value;
+    string format_text_str;
+    Object result;
+
+    format_item_value=OpReturnFormatEntry(elem,elem_size,txid,vout,format,&format_text_str);
+    
+    result.push_back(Pair("format", format_text_str));
+    result.push_back(Pair("formatdata", format_item_value));
+    
+    return result;
+}
 
 Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uint32_t stream_output_level)
 {
@@ -770,6 +832,10 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     unsigned char item_key[MC_ENT_MAX_ITEM_KEY_SIZE+1];
     int item_key_size;
     Value item_value;
+    uint32_t format;
+    Value format_item_value;
+    string format_text_str;
+    
     mc_EntityDetails entity;
     uint256 hash;
     
@@ -779,6 +845,7 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     mc_gState->m_TmpScript->Clear();
     mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
 
+    
     if(mc_gState->m_TmpScript->IsOpReturnScript() == 0)                      
     {
         return Value::null;
@@ -788,6 +855,8 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     {
         return Value::null;
     }
+    
+    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
     
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     mc_gState->m_TmpScript->SetElement(0);
@@ -822,6 +891,7 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
 
     elem = mc_gState->m_TmpScript->GetData(2,&elem_size);
     item_value=OpReturnEntry(elem,elem_size,tx.GetHash(),n);
+	format_item_value=OpReturnFormatEntry(elem,elem_size,tx.GetHash(),n,format,&format_text_str);
     
     already_seen.insert(hash);
     
@@ -858,7 +928,12 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     entry=StreamEntry((unsigned char*)&hash,stream_output_level);
     entry.push_back(Pair("publishers", publishers));
     entry.push_back(Pair("key", strprintf("%s",item_key)));
-    entry.push_back(Pair("data", item_value));        
+    if(mc_gState->m_Compatibility & MC_VCM_1_0)
+    {
+        entry.push_back(Pair("data", item_value));        
+    }
+    entry.push_back(Pair("format", format_text_str));        
+    entry.push_back(Pair("formatdata", format_item_value));        
     
     return entry;
 }

@@ -1601,6 +1601,9 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
     set<uint256> streams_already_seen;
     Array aMetaData;
     Array aItems;
+    uint32_t format;
+    Array aFormatMetaData;
+    string format_text_str;
     
     double units=1.;
     units= 1./(double)(entity->GetAssetMultiple());
@@ -1724,6 +1727,8 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
             lpScript->Clear();
             lpScript->SetScript((unsigned char*)(&pc2[0]),(size_t)(script2.end()-pc2),MC_SCR_TYPE_SCRIPTPUBKEY);
             
+            lpScript->ExtractAndDeleteDataFormat(&format);
+            
             size_t elem_size;
             const unsigned char *elem;
 
@@ -1733,6 +1738,7 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
                 {
                     elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
                     aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
+                    aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),i,format));
                 }                        
             }
             else
@@ -1741,6 +1747,7 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
                 if(elem_size)
                 {
                     aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
+                    aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),i,format));
                 }
                 
                 lpScript->SetElement(0);
@@ -1810,7 +1817,11 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
     
     entry.push_back(Pair("addresses", oBalance));
     entry.push_back(Pair("items", aItems));
-    entry.push_back(Pair("data", aMetaData));
+    if(mc_gState->m_Compatibility & MC_VCM_1_0)
+    {
+        entry.push_back(Pair("data", aMetaData));
+    }
+    entry.push_back(Pair("txdata", aFormatMetaData));
     
     WalletTxToJSON(wtx, entry, true);
 

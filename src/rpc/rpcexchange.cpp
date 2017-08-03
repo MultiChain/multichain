@@ -209,6 +209,7 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
     strError="";
     native_balance=0;
     bool can_disable=false;
+    uint32_t format;
     
     vector <CTxOut> input_txouts;
     vector <string> input_errors;
@@ -307,6 +308,8 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
 
                 lpScript->Clear();
                 lpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);                
+                
+                lpScript->ExtractAndDeleteDataFormat(&format);
                 
                 if(lpScript->GetNumElements()<=1)
                 {

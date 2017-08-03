@@ -1021,6 +1021,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     uiInterface.InitMessage(_("Initializing multichain..."));
     RegisterNodeSignals(GetNodeSignals());
 
+    mc_gState->m_Compatibility=(uint32_t)GetArg("-compatibility",mc_gState->m_Compatibility);
+    
     bool fFirstRunForBuild;
     string init_privkey=GetArg("-initprivkey","");
     

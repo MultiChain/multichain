@@ -578,41 +578,61 @@ Value gettxoutdata(const Array& params, bool fHelp)
     }
     size_t elem_size;
     const unsigned char *elem;
+    
+    uint32_t format;
 
+    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+    
     elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
 
     int count,start;
     count=elem_size;
-    if (params.size() > 2)    
-    {
-        count=paramtoint(params[2],true,0,"Invalid count");
-    }
     start=0;
-    if (params.size() > 3)    
-    {
-        start=paramtoint(params[3],false,0,"Invalid start");
-    }
     
-    
-    if(start < 0)
+    switch(format)
     {
-        start=elem_size+start;
-        if(start<0)
-        {
-            start=0;
-        }        
-    }
-    
-    if(start > (int)elem_size)
-    {
-        start=elem_size;
-    }
-    if(start+count > (int)elem_size)
-    {
-        count=elem_size-start;
+        case MC_SCR_DATA_FORMAT_UBJSON:
+            break;
+        default:
+            if (params.size() > 2)    
+            {
+                count=paramtoint(params[2],true,0,"Invalid count");
+            }
+            if (params.size() > 3)    
+            {
+                start=paramtoint(params[3],false,0,"Invalid start");
+            }
+
+
+            if(start < 0)
+            {
+                start=elem_size+start;
+                if(start<0)
+                {
+                    start=0;
+                }        
+            }
+
+            if(start > (int)elem_size)
+            {
+                start=elem_size;
+            }
+            if(start+count > (int)elem_size)
+            {
+                count=elem_size-start;
+            }
+            break;
     }
 
-    return HexStr(elem+start,elem+start+count);
+    if(mc_gState->m_Compatibility & MC_VCM_1_0)
+    {
+        if(format == MC_SCR_DATA_FORMAT_RAW)
+        {
+            return HexStr(elem+start,elem+start+count);
+        }
+    }
+    
+    return OpReturnFormatEntry(elem+start,count,0,0,format);        
 }
 
 /* MCHN END */

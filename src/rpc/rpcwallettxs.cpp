@@ -176,6 +176,8 @@ Object ListWalletTransactions(const CWalletTx& wtx, bool fLong, const isminefilt
     Array aPermissions;
     Array aMetaData;
     Array aItems;
+    uint32_t format;
+    Array aFormatMetaData;
 
     nIsFromMeCount=GetInputOffer(wtx,addresses,filter,nAmount,amounts,lpScript,&from_addresses,&my_addresses);
     nIsToMeCount=0;
@@ -243,6 +245,8 @@ Object ListWalletTransactions(const CWalletTx& wtx, bool fLong, const isminefilt
             lpScript->Clear();
             lpScript->SetScript((unsigned char*)(&pc2[0]),(size_t)(script2.end()-pc2),MC_SCR_TYPE_SCRIPTPUBKEY);
             
+        	lpScript->ExtractAndDeleteDataFormat(&format);
+            
             size_t elem_size;
             const unsigned char *elem;
 
@@ -252,6 +256,7 @@ Object ListWalletTransactions(const CWalletTx& wtx, bool fLong, const isminefilt
                 {
                     elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
                     aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
+                    aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),i,format));
                 }                        
             }
             else
@@ -260,6 +265,7 @@ Object ListWalletTransactions(const CWalletTx& wtx, bool fLong, const isminefilt
                 if(elem_size)
                 {
                     aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
+                    aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),i,format));
                 }
                 
                 lpScript->SetElement(0);
@@ -429,7 +435,12 @@ Object ListWalletTransactions(const CWalletTx& wtx, bool fLong, const isminefilt
         }        
     }
     entry.push_back(Pair("items", aItems));
-    entry.push_back(Pair("data", aMetaData));
+        
+    if(mc_gState->m_Compatibility & MC_VCM_1_0)
+    {
+        entry.push_back(Pair("data", aMetaData));
+    }
+    entry.push_back(Pair("txdata", aFormatMetaData));
     
     WalletTxToJSON(wtx, entry, true);
 

@@ -125,6 +125,8 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     uint32_t new_entity_type;
     new_entity_type=MC_ENT_TYPE_NONE;
     set<uint256> streams_already_seen;
+    uint32_t format;
+    Array aFormatMetaData;
     
     Array vout;
     for (unsigned int i = 0; i < tx.vout.size(); i++) {
@@ -153,10 +155,12 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         if(lpScript->IsOpReturnScript())
         {
 //            int e=mc_gState->m_TmpScript->GetNumElements()-1;
+            lpScript->ExtractAndDeleteDataFormat(&format);
             int e=lpScript->GetNumElements()-1;
             {
                 if(mc_gState->m_Features->OpDropDetailsScripts())
                 {
+            
                     lpScript->SetElement(0);
                     err=lpScript->GetNewEntityType(&new_entity_type,&asset_update,details_script,&details_script_size);                
                     if((err == 0) && (new_entity_type == MC_ENT_TYPE_ASSET))
@@ -220,6 +224,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                 {
                     elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
                     vdata.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
+                    aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,tx.GetHash(),i,format));
                 }                        
             }
             else
@@ -228,6 +233,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                 if(elem_size)
                 {
                     vdata.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
+                    aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,tx.GetHash(),i,format));
                 }
                 
                 lpScript->SetElement(0);
@@ -440,7 +446,11 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         entry.push_back(Pair("create", StreamEntry((unsigned char*)&txid,0x05)));
     }
     
-    entry.push_back(Pair("data", vdata));
+    if(mc_gState->m_Compatibility & MC_VCM_1_0)
+    {
+        entry.push_back(Pair("data", vdata));
+    }
+    entry.push_back(Pair("txdata", aFormatMetaData));
     
 /* MCHN START */        
 

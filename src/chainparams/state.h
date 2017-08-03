@@ -37,6 +37,9 @@
 #define MC_WMD_AUTOSUBSCRIBE_ASSETS  0x04000000
 #define MC_WMD_AUTO                  0x10000000
 
+#define MC_VCM_NONE                  0x00000000
+#define MC_VCM_1_0                   0x00000001
+
 
 #ifdef	__cplusplus
 extern "C" {
@@ -149,6 +152,7 @@ typedef struct mc_State
     uint32_t m_WalletMode;
     int m_ProtocolVersionToUpgrade;
     void *m_pSeedNode;
+    uint32_t m_Compatibility;
     
     mc_Script               *m_TmpScript;
     mc_Script               *m_TmpScript1;
@@ -175,6 +179,7 @@ typedef struct mc_State
         mc_InitABufferMap(m_TmpAssetsOut);
         m_TmpAssetsIn=new mc_Buffer;
         mc_InitABufferMap(m_TmpAssetsIn);
+        m_Compatibility=MC_VCM_NONE;
         
         m_BlockHeaderSuccessors=new mc_Buffer;
         m_BlockHeaderSuccessors->Initialize(sizeof(mc_BlockHeaderInfo),sizeof(mc_BlockHeaderInfo),0);            
