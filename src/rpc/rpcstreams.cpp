@@ -6,6 +6,7 @@
 
 
 #include "rpc/rpcwallet.h"
+#include "json/json_spirit_ubjson.h"
 
 Value createupgradefromcmd(const Array& params, bool fHelp);
 
@@ -507,7 +508,7 @@ Value createcmd(const Array& params, bool fHelp)
 
 Value publish(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() != 3)
+    if (fHelp || params.size() < 3 || params.size() > 4)
         throw runtime_error("Help message not found\n");
     
     if(mc_gState->m_Features->Streams() == 0)
@@ -527,7 +528,7 @@ Value publish(const Array& params, bool fHelp)
 
 Value publishfrom(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() != 4)
+    if (fHelp || params.size() < 4 || params.size() > 5)
         throw runtime_error("Help message not found\n");
 
     if(mc_gState->m_Features->Streams() == 0)
@@ -576,18 +577,96 @@ Value publishfrom(const Array& params, bool fHelp)
     mc_Script *lpDetailsScript;
     lpDetailsScript=NULL;
         
+    uint32_t data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
 
+    if( params.size() > 4 )
+    {
+        if(params[4].get_str() == "hex")
+        {
+            data_format=MC_SCR_DATA_FORMAT_RAW;
+        }
+        if(params[4].get_str() == "text")
+        {
+            data_format=MC_SCR_DATA_FORMAT_UTF8;
+        }
+        if(params[4].get_str() == "hex")
+        {
+            data_format=MC_SCR_DATA_FORMAT_UBJSON;
+        }
+        if(data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid format");                                                                                                                
+        }
+    }
+    else
+    {            
+        if(params[3].type() != str_type)
+        {
+            data_format=MC_SCR_DATA_FORMAT_UTF8;
+        }
+    }
+    
     bool fIsHex;
+    vector<unsigned char> dataData;
+    
+    switch(data_format)
+    {
+        case MC_SCR_DATA_FORMAT_UTF8:
+            if(params[3].type() != str_type)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Item data should be string");                                                                                                                                
+            }
+            dataData=vector<unsigned char> (params[3].get_str().begin(),params[3].get_str().end());                
+            break;
+        case MC_SCR_DATA_FORMAT_UBJSON:                                         // do it after script allocation
+            break;
+        default:
+            if(params[3].type() != str_type)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Item data should be hexadecimal string");                                                                                                                                
+            }
+            bool fIsHex;
+            dataData=ParseHex(params[3].get_str().c_str(),fIsHex);    
+            if(!fIsHex)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Item data should be hexadecimal string");                                                                                                    
+            }
+            
+            break;
+    }
+/*    
     vector<unsigned char> dataData(ParseHex(params[3].get_str().c_str(),fIsHex));    
     if(!fIsHex)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Item data should be hexadecimal string");                                                                                                    
     }
+*/
+    
     
     lpDetailsScript=new mc_Script;
+    
+    if( data_format == MC_SCR_DATA_FORMAT_UBJSON )
+    {
+        size_t bytes;
+        const unsigned char *script;
+        lpDetailsScript->Clear();
+        if(ubjson_write(params[3],lpDetailsScript))
+        {
+            delete lpDetailsScript;
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Couldn't transfer JSON object to internal UBJSON format");    
+        }
+        script = lpDetailsScript->GetData(0,&bytes);
+        dataData=vector<unsigned char> (script,script+bytes);                                            
+    }
+    
+    lpDetailsScript->Clear();
     lpDetailsScript->SetEntity(stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
     lpDetailsScript->SetItemKey((unsigned char*)params[2].get_str().c_str(),params[2].get_str().size());
-
+    if( data_format != MC_SCR_DATA_FORMAT_UNKNOWN )
+    {
+        lpDetailsScript->SetDataFormat(data_format);
+    }
+    
     lpDetailsScript->AddElement();
     if(dataData.size())
     {

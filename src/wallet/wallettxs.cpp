@@ -2212,6 +2212,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
         }
         else
         {
+            mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);
             if(mc_gState->m_TmpScript->GetNumElements() == 3) // 2 OP_DROPs + OP_RETURN - item key
             {
                 unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
