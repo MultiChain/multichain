@@ -12,6 +12,7 @@
 #include "utils/util.h"
 #include "utils/utilmoneystr.h"
 #include "wallet/wallettxs.h"
+#include "json/json_spirit_ubjson.h"
 
 #include <boost/assign/list_of.hpp>
 
@@ -784,18 +785,22 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
         }
         switch(format)
         {
-            case MC_SCR_DATA_FORMAT_UTF8:
             case MC_SCR_DATA_FORMAT_UBJSON:
                 if(format_text_out)
                 {
                     *format_text_out="not supported yet";
                 }
                 metadata=HexStr(elem,elem+elem_size);
-                return metadata;
+                break;
+            case MC_SCR_DATA_FORMAT_UTF8:
+                metadata=string(elem,elem+elem_size);
+//                metadata.push_back(0x00);
+                break;
             default:                                                            // including MC_SCR_DATA_FORMAT_RAW and unknown
                 metadata=HexStr(elem,elem+elem_size);
-                return metadata;
+                break;
         }
+        return metadata;
     }    
     if(format_text_out)
     {
@@ -1926,6 +1931,8 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
         mc_EntityDetails entity;
         vector<unsigned char> vKey;
         vector<unsigned char> vValue;
+        uint32_t data_format;
+        Value formatted_data=Value::null;
 //        bool key_is_set=false;
 //        bool value_is_set=false;
 
@@ -2045,11 +2052,40 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                 parsed=true;
             }
             
+            if(d.name_ == "format")
+            {
+                data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
+                if(d.value_.type() != null_type && !d.value_.get_str().empty())
+                {
+                    if(d.value_.get_str() == "hex")
+                    {
+                        data_format=MC_SCR_DATA_FORMAT_RAW;                        
+                    }
+                    if(d.value_.get_str() == "text")
+                    {
+                        data_format=MC_SCR_DATA_FORMAT_UTF8;                        
+                    }
+                    if(d.value_.get_str() == "json")
+                    {
+                        data_format=MC_SCR_DATA_FORMAT_UBJSON;                        
+                    }
+                    if(data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
+                    {
+                        strError=string("Invalid format");                                                    
+                    }
+                }
+                else
+                {
+                    strError=string("Invalid format");                            
+                }
+                parsed=true;
+            }
+            
             if(d.name_ == "create")
             {
                 if(new_type != 0)
                 {
-                    strError=string("Only one of the following keywords can appear in the object: create, update, for");                                                                        
+                    strError=string("Only one of the following keywords can appear in the object: create, update, for, format");                                                                        
                 }
                 if(d.value_.type() != null_type && !d.value_.get_str().empty())
                 {
@@ -2088,7 +2124,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             {                 
                 if(new_type != 0)
                 {
-                    strError=string("Only one of the following keywords can appear in the object: create, update, for");                                                                        
+                    strError=string("Only one of the following keywords can appear in the object: create, update, for, format");                                                                        
                 }
                 if(d.value_.type() != null_type && !d.value_.get_str().empty())
                 {
@@ -2117,7 +2153,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             {                 
                 if(new_type != 0)
                 {
-                    strError=string("Only one of the following keywords can appear in the object: create, update, for");                                                                        
+                    strError=string("Only one of the following keywords can appear in the object: create, update, for, format");                                                                        
                 }
                 if(d.value_.type() != null_type && !d.value_.get_str().empty())
                 {
@@ -2182,6 +2218,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             }
             if(d.name_ == "data")
             {
+/*                
                 if(d.value_.type() != null_type && (d.value_.type()==str_type))
                 {
                     bool fIsHex;
@@ -2196,6 +2233,8 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                 {
                     strError=string("Invalid value");                            
                 }
+ */ 
+                formatted_data=d.value_;
                 if((allowed_objects & 0x0002) == 0)
                 {
                     strError=string("Keyword not allowed in this API");                                                
@@ -2278,18 +2317,70 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             if(new_type == 0)
             {
 //                strError=string("One of the following keywords can appear in the object: create, update, for");                                                                        
-                if(given_entity && given_entity->GetEntityType())
+                if(data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
                 {
-                    memcpy(&entity,given_entity,sizeof(mc_EntityDetails));
-                    new_type=-2;
+                    if(given_entity && given_entity->GetEntityType())
+                    {
+                        memcpy(&entity,given_entity,sizeof(mc_EntityDetails));
+                        new_type=-2;
+                    }
+                    else
+                    {
+                        new_type=MC_ENT_TYPE_ASSET; 
+                    }
                 }
                 else
                 {
-                    new_type=MC_ENT_TYPE_ASSET; 
+                    new_type=-4;
                 }
             }
         }
 
+        if( (data_format != MC_SCR_DATA_FORMAT_UNKNOWN) || (new_type == -1) )
+        {
+            switch(data_format)
+            {
+                case MC_SCR_DATA_FORMAT_RAW:
+                case MC_SCR_DATA_FORMAT_UNKNOWN:
+                    if(formatted_data.type() != null_type && (formatted_data.type()==str_type))
+                    {
+                        bool fIsHex;
+                        vValue=ParseHex(formatted_data.get_str().c_str(),fIsHex);    
+                        if(!fIsHex)
+                        {
+                            strError=string("value should be hexadecimal string");                            
+                        }
+    //                    value_is_set=true;
+                    }
+                    else
+                    {
+                        strError=string("Invalid value");                            
+                    }
+                    break;
+                case MC_SCR_DATA_FORMAT_UTF8:
+                    if(formatted_data.type() != null_type && (formatted_data.type()==str_type))
+                    {
+                        vValue=vector<unsigned char> (formatted_data.get_str().begin(),formatted_data.get_str().end());    
+                    }
+                    else
+                    {
+                        strError=string("Invalid value");                            
+                    }
+                    break;
+                case MC_SCR_DATA_FORMAT_UBJSON:
+                    size_t bytes;
+                    const unsigned char *script;
+                    lpDetailsScript->Clear();
+                    if(ubjson_write(formatted_data,lpDetailsScript))
+                    {
+                        strError=string("Couldn't transfer JSON object to internal UBJSON format");    
+                    }
+                    script = lpDetailsScript->GetData(0,&bytes);
+                    vValue=vector<unsigned char> (script,script+bytes);                                            
+                    break;
+            }
+        }
+        
         if(strError.size() == 0)
         {
             if(new_type == -2)
@@ -2511,9 +2602,27 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                     scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
                 }
 
+                if(data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
+                {
+                    lpDetailsScript->Clear();
+                    lpDetailsScript->SetDataFormat(data_format);
+                    script = lpDetailsScript->GetData(0,&bytes);
+                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;                    
+                }
+                
                 scriptOpReturn << OP_RETURN << vValue;                    
             }
                 
+            if(new_type == -4)
+            {
+                lpDetailsScript->Clear();
+                lpDetailsScript->SetDataFormat(data_format);
+                script = lpDetailsScript->GetData(0,&bytes);
+                scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;                    
+                
+                scriptOpReturn << OP_RETURN << vValue;                    
+            }
+            
             if(new_type == -3)
             {
                 script=lpDetails->GetData(0,&bytes);

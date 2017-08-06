@@ -385,13 +385,20 @@ bool IsStandardNullData(const CScript& scriptPubKey)
     vector<unsigned char> vch;
     bool recheck=false;
     int op_drop_count=0;
-    unsigned int sizes[2];
+    int max_op_drop_count=2;
+    unsigned int sizes[3];
     sizes[0]=0;
     sizes[1]=0;
+    sizes[2]=0;
+    
+    if(mc_gState->m_Features->FormattedData())
+    {
+        max_op_drop_count=3;
+    }
     
     CScript::const_iterator pc = scriptPubKey.begin();
     
-    while( op_drop_count < 3 )
+    while( op_drop_count < max_op_drop_count+1 )
     {
         if(!scriptPubKey.GetOp(pc, opcode))
         {
@@ -399,11 +406,11 @@ bool IsStandardNullData(const CScript& scriptPubKey)
         }
         if(opcode == OP_RETURN)
         {
-            op_drop_count=3;
+            op_drop_count=max_op_drop_count+1;
         }
         else
         {
-            if(op_drop_count == 2)
+            if(op_drop_count == max_op_drop_count)
             {
                 return false;
             }
@@ -419,7 +426,7 @@ bool IsStandardNullData(const CScript& scriptPubKey)
                 recheck=true;
             }            
         }
-        if(op_drop_count < 3)
+        if(op_drop_count < max_op_drop_count+1)
         {
             if(!scriptPubKey.GetOp(pc, opcode))
             {
@@ -468,12 +475,12 @@ bool IsStandardNullData(const CScript& scriptPubKey)
             pc = scriptPubKey.begin();
 
             op_drop_count=0;
-            while( op_drop_count < 3 )
+            while( op_drop_count < max_op_drop_count+1 )
             {
                 scriptPubKey.GetOp(pc, opcode, vch);
                 if(opcode == OP_RETURN)
                 {
-                    op_drop_count=3;
+                    op_drop_count=max_op_drop_count+1;
                 }
                 if( opcode >= OP_PUSHDATA1 )
                 {
@@ -482,17 +489,28 @@ bool IsStandardNullData(const CScript& scriptPubKey)
                         sizes[op_drop_count]=(unsigned int)vch.size();
                     }            
                 }
-                if(op_drop_count < 3)
+                if(op_drop_count < max_op_drop_count+1)
                 {
                     scriptPubKey.GetOp(pc, opcode);
                     op_drop_count++;
                 }        
-            }
+            }                       
         }
+        
+        for(op_drop_count=0;op_drop_count<max_op_drop_count;op_drop_count++)
+        {
+            if( sizes[op_drop_count] > MAX_SCRIPT_ELEMENT_SIZE )
+            {
+                return false;
+            }            
+        }
+/*        
         if( (sizes[0] > MAX_SCRIPT_ELEMENT_SIZE) || (sizes[1] > MAX_SCRIPT_ELEMENT_SIZE) )
         {
             return false;
         }
+*/        
+        
     }
     
     return true;
