@@ -777,6 +777,8 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
 {
     string metadata="";
     Object metadata_object;
+    Value metadata_value;
+    int err;
     if( ((int)elem_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)) || (txid == 0) )
     {
         if(format_text_out)
@@ -786,11 +788,16 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
         switch(format)
         {
             case MC_SCR_DATA_FORMAT_UBJSON:
+                metadata_value=ubjson_read(elem,elem_size,&err);
+                if(err == MC_ERR_NOERROR)
+                {
+                    return metadata_value;
+                }
                 if(format_text_out)
                 {
-                    *format_text_out="not supported yet";
+                    *format_text_out=OpReturnFormatToText(MC_SCR_DATA_FORMAT_UNKNOWN);
                 }
-                metadata=HexStr(elem,elem+elem_size);
+                metadata=HexStr(elem,elem+elem_size);                    
                 break;
             case MC_SCR_DATA_FORMAT_UTF8:
                 metadata=string(elem,elem+elem_size);
@@ -2371,6 +2378,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                     size_t bytes;
                     const unsigned char *script;
                     lpDetailsScript->Clear();
+                    lpDetailsScript->AddElement();
                     if(ubjson_write(formatted_data,lpDetailsScript))
                     {
                         strError=string("Couldn't transfer JSON object to internal UBJSON format");    

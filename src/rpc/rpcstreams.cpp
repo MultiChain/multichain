@@ -650,6 +650,7 @@ Value publishfrom(const Array& params, bool fHelp)
         size_t bytes;
         const unsigned char *script;
         lpDetailsScript->Clear();
+        lpDetailsScript->AddElement();
         if(ubjson_write(params[3],lpDetailsScript))
         {
             delete lpDetailsScript;

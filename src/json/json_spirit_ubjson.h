@@ -16,7 +16,7 @@ extern "C" {
 #endif
 
 int ubjson_write(Value json_value,mc_Script *lpScript);
-Value ubjson_read(mc_Script *lpScript,int offset,int *err);
+Value ubjson_read(const unsigned char *elem,size_t elem_size,int *err);
 
 
 #ifdef __cplusplus
