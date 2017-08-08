@@ -25,7 +25,7 @@
 
 
 char UBJ_TYPE[19] ={'?','Z','N','T','F','C','S','H','i','U','I','l','L','d','D','[','{','$','#'};
-int  UBJ_SIZE[19] ={   0,  0,  0,  0,  0,  0, -1, -1,  1,  1,  2,  4,  8,  4,  8, -2, -3, -4, -5};
+int  UBJ_SIZE[19] ={   0,  0,  0,  0,  0,  1, -1, -1,  1,  1,  2,  4,  8,  4,  8, -2, -3, -4, -5};
 char UBJ_ISINT[19]={   0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1,  0,  0,  0,  0,  0,  0};
 int UBJ_INTERNAL_TYPE[256]=
 {
@@ -667,7 +667,14 @@ Value ubjson_read_internal(const unsigned char *ptrStart,size_t bytes,int known_
                     *err=MC_ERR_ERROR_IN_SCRIPT;
                     goto exitlbl;                            
                 }                
-                result= string((char*)ptr,size);
+                if(size)
+                {
+                    result= string((char*)ptr,size);
+                }
+                else
+                {
+                    result="";
+                }
                 ptr+=size;                
                 break;
             case UBJ_ARRAY:
