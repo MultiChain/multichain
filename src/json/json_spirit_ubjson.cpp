@@ -242,10 +242,10 @@ int ubjson_int64_write(int64_t int64_value,int known_type,mc_Script *lpScript)
     return MC_ERR_NOERROR;
 }
 
-int ubjson_write_internal(Value json_value,int known_type,mc_Script *lpScript)
+int ubjson_write_internal(Value json_value,int known_type,mc_Script *lpScript,int max_depth)
 {
     char type;
-    int ubj_type,last_type;
+    int ubj_type,last_type,err;
     int optimized;
     double double_value;
     string string_value;
@@ -256,6 +256,13 @@ int ubjson_write_internal(Value json_value,int known_type,mc_Script *lpScript)
     int64_t usize,ssize;
     unsigned int i;
 
+    err=MC_ERR_NOERROR;
+
+    if(max_depth == 0)
+    {
+        return MC_ERR_NOT_SUPPORTED;
+    }
+    
     ubj_type=known_type;
     if(ubj_type == UBJ_UNDEFINED)
     {
@@ -289,6 +296,11 @@ int ubjson_write_internal(Value json_value,int known_type,mc_Script *lpScript)
                 lpScript->SetData((unsigned char*)string_value.c_str(),string_value.size());
                 break;
             case UBJ_ARRAY:
+                if(max_depth <= 1)
+                {
+                    err= MC_ERR_NOT_SUPPORTED;
+                    goto exitlbl;
+                }
                 optimized=1;
                 last_type=UBJ_UNDEFINED;
                 not_uint8=0;
@@ -357,7 +369,11 @@ int ubjson_write_internal(Value json_value,int known_type,mc_Script *lpScript)
                     }
                     else
                     {
-                        ubjson_write_internal(array_value[i],last_type,lpScript);
+                        err=ubjson_write_internal(array_value[i],last_type,lpScript,max_depth-1);
+                        if(err)
+                        {
+                            goto exitlbl;
+                        }                            
                     }
                     i++;
                 }                
@@ -368,6 +384,11 @@ int ubjson_write_internal(Value json_value,int known_type,mc_Script *lpScript)
                 }
                 break;
             case UBJ_OBJECT:
+                if(max_depth <= 1)
+                {
+                    err= MC_ERR_NOT_SUPPORTED;
+                    goto exitlbl;
+                }
                 optimized=1;
                 last_type=UBJ_UNDEFINED;
                 not_uint8=0;
@@ -430,14 +451,22 @@ int ubjson_write_internal(Value json_value,int known_type,mc_Script *lpScript)
                 }
                 while(i<obj_value.size())
                 {
-                    ubjson_write_internal(obj_value[i].name_,UBJ_STRING,lpScript);
+                    err=ubjson_write_internal(obj_value[i].name_,UBJ_STRING,lpScript,max_depth-1);
+                    if(err)
+                    {
+                        goto exitlbl;
+                    }                            
                     if(optimized && UBJ_ISINT[last_type])
                     {
                         ubjson_int64_write(obj_value[i].value_.get_int64(),last_type,lpScript);                                
                     }
                     else
                     {
-                        ubjson_write_internal(obj_value[i].value_,last_type,lpScript);
+                        err=ubjson_write_internal(obj_value[i].value_,last_type,lpScript,max_depth-1);
+                        if(err)
+                        {
+                            goto exitlbl;
+                        }                            
                     }
                     i++;
                 }                
@@ -452,12 +481,14 @@ int ubjson_write_internal(Value json_value,int known_type,mc_Script *lpScript)
         }
     }            
             
-    return MC_ERR_NOERROR;
+exitlbl:
+                
+    return err;
 }
 
-int ubjson_write(Value json_value,mc_Script *lpScript)
+int ubjson_write(Value json_value,mc_Script *lpScript,int max_depth)
 {
-    return ubjson_write_internal(json_value,0,lpScript);
+    return ubjson_write_internal(json_value,0,lpScript,max_depth);
 }
 
 int64_t ubjson_int64_read(unsigned char *ptrStart,unsigned char *ptrEnd,int known_type,int *shift,int *err)
@@ -528,7 +559,7 @@ exitlbl:
 
 
 
-Value ubjson_read_internal(const unsigned char *ptrStart,size_t bytes,int known_type,int *shift,int *err)
+Value ubjson_read_internal(const unsigned char *ptrStart,size_t bytes,int known_type,int max_depth,int *shift,int *err)
 {
     Value result;
     
@@ -539,10 +570,16 @@ Value ubjson_read_internal(const unsigned char *ptrStart,size_t bytes,int known_
     Array array_value;
     Object obj_value;
     Value string_value;
-    
+        
     
     result=Value::null;
     *err=MC_ERR_NOERROR;
+    
+    if(max_depth == 0)
+    {
+        *err=MC_ERR_NOT_SUPPORTED;    
+        goto exitlbl;
+    }
     
     ptr=(unsigned char *)ptrStart;
     if(ptr == NULL)
@@ -635,6 +672,12 @@ Value ubjson_read_internal(const unsigned char *ptrStart,size_t bytes,int known_
                 break;
             case UBJ_ARRAY:
                 
+                if(max_depth <= 1)
+                {
+                    *err=MC_ERR_NOT_SUPPORTED;    
+                    goto exitlbl;
+                }
+                
                 ubj_type=UBJ_UNDEFINED;
                 if(ptr+1 > ptrEnd)
                 {
@@ -685,7 +728,7 @@ Value ubjson_read_internal(const unsigned char *ptrStart,size_t bytes,int known_
                     i=0;
                     while(i<size)
                     {
-                        array_value.push_back(ubjson_read_internal(ptr,ptrEnd-ptr,ubj_type,&sh,err));
+                        array_value.push_back(ubjson_read_internal(ptr,ptrEnd-ptr,ubj_type,max_depth-1,&sh,err));
                         if(*err)
                         {
                             goto exitlbl;
@@ -703,7 +746,7 @@ Value ubjson_read_internal(const unsigned char *ptrStart,size_t bytes,int known_
                     }  
                     while(*ptr != ']')
                     {
-                        array_value.push_back(ubjson_read_internal(ptr,ptrEnd-ptr,ubj_type,&sh,err));
+                        array_value.push_back(ubjson_read_internal(ptr,ptrEnd-ptr,ubj_type,max_depth-1,&sh,err));
                         if(*err)
                         {
                             goto exitlbl;
@@ -721,6 +764,12 @@ Value ubjson_read_internal(const unsigned char *ptrStart,size_t bytes,int known_
                 break;
                 
             case UBJ_OBJECT:
+                
+                if(max_depth <= 1)
+                {
+                    *err=MC_ERR_NOT_SUPPORTED;    
+                    goto exitlbl;
+                }
                 
                 ubj_type=UBJ_UNDEFINED;
                 if(ptr+1 > ptrEnd)
@@ -772,14 +821,14 @@ Value ubjson_read_internal(const unsigned char *ptrStart,size_t bytes,int known_
                     i=0;
                     while(i<size)
                     {
-                        string_value=ubjson_read_internal(ptr,ptrEnd-ptr,UBJ_STRING,&sh,err);
+                        string_value=ubjson_read_internal(ptr,ptrEnd-ptr,UBJ_STRING,max_depth-1,&sh,err);
                         if(*err)
                         {
                             goto exitlbl;
                         }                    
                         ptr+=sh;
 
-                        obj_value.push_back(Pair(string_value.get_str(),ubjson_read_internal(ptr,ptrEnd-ptr,ubj_type,&sh,err)));
+                        obj_value.push_back(Pair(string_value.get_str(),ubjson_read_internal(ptr,ptrEnd-ptr,ubj_type,max_depth-1,&sh,err)));
                         if(*err)
                         {
                             goto exitlbl;
@@ -798,14 +847,14 @@ Value ubjson_read_internal(const unsigned char *ptrStart,size_t bytes,int known_
                     }  
                     while(*ptr != '}')
                     {
-                        string_value=ubjson_read_internal(ptr,ptrEnd-ptr,UBJ_STRING,&sh,err);
+                        string_value=ubjson_read_internal(ptr,ptrEnd-ptr,UBJ_STRING,max_depth-1,&sh,err);
                         if(*err)
                         {
                             goto exitlbl;
                         }                    
                         ptr+=sh;
 
-                        obj_value.push_back(Pair(string_value.get_str(),ubjson_read_internal(ptr,ptrEnd-ptr,ubj_type,&sh,err)));
+                        obj_value.push_back(Pair(string_value.get_str(),ubjson_read_internal(ptr,ptrEnd-ptr,ubj_type,max_depth-1,&sh,err)));
                         if(*err)
                         {
                             goto exitlbl;
@@ -842,7 +891,7 @@ exitlbl:
     return result;    
 }
 
-Value ubjson_read(const unsigned char *elem,size_t elem_size,int *err)
+Value ubjson_read(const unsigned char *elem,size_t elem_size,int max_depth,int *err)
 {
-    return ubjson_read_internal(elem,elem_size,UBJ_UNDEFINED,NULL,err);
+    return ubjson_read_internal(elem,elem_size,UBJ_UNDEFINED,max_depth,NULL,err);
 }

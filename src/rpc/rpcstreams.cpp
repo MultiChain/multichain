@@ -649,9 +649,10 @@ Value publishfrom(const Array& params, bool fHelp)
     {
         size_t bytes;
         const unsigned char *script;
+        int err;
         lpDetailsScript->Clear();
         lpDetailsScript->AddElement();
-        if(ubjson_write(params[3],lpDetailsScript))
+        if((err = ubjson_write(params[3],lpDetailsScript,GetArg("-maxformatteddatadepth",MAX_FORMATTED_DATA_DEPTH))) != MC_ERR_NOERROR)
         {
             delete lpDetailsScript;
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Couldn't transfer JSON object to internal UBJSON format");    

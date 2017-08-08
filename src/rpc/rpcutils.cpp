@@ -788,7 +788,7 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
         switch(format)
         {
             case MC_SCR_DATA_FORMAT_UBJSON:
-                metadata_value=ubjson_read(elem,elem_size,&err);
+                metadata_value=ubjson_read(elem,elem_size,GetArg("-maxformatteddatadepth",MAX_FORMATTED_DATA_DEPTH),&err);
                 if(err == MC_ERR_NOERROR)
                 {
                     return metadata_value;
@@ -2376,10 +2376,11 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                     break;
                 case MC_SCR_DATA_FORMAT_UBJSON:
                     size_t bytes;
+                    int err;
                     const unsigned char *script;
                     lpDetailsScript->Clear();
                     lpDetailsScript->AddElement();
-                    if(ubjson_write(formatted_data,lpDetailsScript))
+                    if((err = ubjson_write(formatted_data,lpDetailsScript,GetArg("-maxformatteddatadepth",MAX_FORMATTED_DATA_DEPTH))) != MC_ERR_NOERROR)
                     {
                         strError=string("Couldn't transfer JSON object to internal UBJSON format");    
                     }

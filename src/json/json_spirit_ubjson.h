@@ -15,8 +15,8 @@ using namespace json_spirit;
 extern "C" {
 #endif
 
-int ubjson_write(Value json_value,mc_Script *lpScript);
-Value ubjson_read(const unsigned char *elem,size_t elem_size,int *err);
+int ubjson_write(Value json_value,mc_Script *lpScript,int max_depth);
+Value ubjson_read(const unsigned char *elem,size_t elem_size,int max_depth,int *err);
 
 
 #ifdef __cplusplus
