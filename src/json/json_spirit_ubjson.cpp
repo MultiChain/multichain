@@ -47,6 +47,21 @@ int UBJ_INTERNAL_TYPE[256]=
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
 };
 
+void swap_bytes(void *ptrDst,void *ptrSrc, int size)
+{
+    int i;
+    unsigned char *pDst;
+    unsigned char *pSrc;
+    pDst=(unsigned char *)ptrDst;
+    pSrc=(unsigned char *)ptrSrc+size-1;
+    for(i=0;i<size;i++)
+    {
+        *pDst=*pSrc;
+        pDst++;
+        pSrc--;
+    }
+}
+
 int ubjson_best_negative_int_type(int64_t int64_value)
 {
     char type;
@@ -254,6 +269,7 @@ int ubjson_write_internal(Value json_value,int known_type,mc_Script *lpScript,in
     Object obj_value;
     int not_uint8;
     int64_t usize,ssize;
+    int64_t int64_value;
     unsigned int i;
 
     err=MC_ERR_NOERROR;
@@ -284,7 +300,8 @@ int ubjson_write_internal(Value json_value,int known_type,mc_Script *lpScript,in
                 break;
             case UBJ_FLOAT64:
                 double_value=json_value.get_real();
-                lpScript->SetData((unsigned char*)&double_value,sizeof(double));
+                swap_bytes(&int64_value,&double_value,sizeof(double));
+                lpScript->SetData((unsigned char*)&int64_value,sizeof(double));
                 break;
             case UBJ_CHAR:
                 string_value=json_value.get_str();
@@ -570,6 +587,7 @@ Value ubjson_read_internal(const unsigned char *ptrStart,size_t bytes,int known_
     Array array_value;
     Object obj_value;
     Value string_value;
+    int64_t int64_value;
         
     
     result=Value::null;
@@ -632,8 +650,9 @@ Value ubjson_read_internal(const unsigned char *ptrStart,size_t bytes,int known_
                 {
                     *err=MC_ERR_ERROR_IN_SCRIPT;
                     goto exitlbl;                            
-                }                
-                result=(double)(*(float*)ptr);
+                }       
+                swap_bytes(&int64_value,ptr,sizeof(float));
+                result=(double)(*(float*)(&int64_value));
                 ptr+=UBJ_SIZE[ubj_type];
                 break;
             case UBJ_FLOAT64:
@@ -641,8 +660,9 @@ Value ubjson_read_internal(const unsigned char *ptrStart,size_t bytes,int known_
                 {
                     *err=MC_ERR_ERROR_IN_SCRIPT;
                     goto exitlbl;                            
-                }                
-                result=*(double*)ptr;
+                }         
+                swap_bytes(&int64_value,ptr,sizeof(double));
+                result=*(double*)(&int64_value);
                 ptr+=UBJ_SIZE[ubj_type];
                 break;
             case UBJ_CHAR:
