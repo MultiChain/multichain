@@ -1986,11 +1986,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                 int nRequiredRet;
                 std::vector<CTxDestination> addressRets;
 
-                if(!ExtractDestinations(script1,typeRet,addressRets,nRequiredRet))
-                {
-                    err=MC_ERR_CORRUPTED;                
-                    goto exitlbl;
-                }            
+                ExtractDestinations(script1,typeRet,addressRets,nRequiredRet);
 
                 BOOST_FOREACH(const CTxDestination& dest, addressRets)
                 {
@@ -2121,11 +2117,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
             utxo.m_EntityID=0;
             utxo.m_EntityType=MC_TET_NONE;
             utxo.m_LockTime=tx.nLockTime;
-            if(!ExtractDestinations(script1,typeRet,addressRets,nRequiredRet))
-            {
-                err=MC_ERR_CORRUPTED;                
-                goto exitlbl;
-            }            
+            ExtractDestinations(script1,typeRet,addressRets,nRequiredRet);
 
             for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
             {

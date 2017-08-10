@@ -1530,19 +1530,27 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                                  REJECT_INVALID, reason);
             }
         }
+        
+        if(fAddToWallet)
+        {
+            int err=pwalletTxsMain->AddTx(NULL,tx,-1,NULL,-1,0);
+            if(err)
+            {
+                reason=strprintf("Wallet error %d",err);
+                return state.DoS(0,
+                                 error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
+                                 REJECT_INVALID, reason);            
+            }
+        }
+        
         permissions_to=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
         entry.SetReplayNodeParams(( (replay & MC_PPL_REPLAY) != 0) ? true : false,permissions_from,permissions_to);
-/* MCHN END */
+        
+/* MCHN END */    
         // Store transaction in memory
         pool.addUnchecked(hash, entry);
     }
 
-/* MCHN START */    
-    if(fAddToWallet)
-    {
-        pwalletTxsMain->AddTx(NULL,tx,-1,NULL,-1,0);
-    }
-/* MCHN END */    
     if(fAddToWallet)
     {
         if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
