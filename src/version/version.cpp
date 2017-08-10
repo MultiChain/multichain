@@ -39,6 +39,15 @@ int mc_State::VersionInfo(int version)
 
 int mc_State::IsSupported(int version)
 {
+    void *ptr=mc_gState->m_NetworkParams->GetParam("chainprotocol",NULL);
+    if(ptr)
+    {
+        if(strcmp((char*)ptr,"multichain"))
+        {
+            return 1;
+        }
+    }
+    
     if(-VersionInfo(version) == GetNumericVersion())
     {
         return 1;
@@ -49,12 +58,25 @@ int mc_State::IsSupported(int version)
 int mc_State::IsDeprecated(int version)
 {
     int build=-VersionInfo(version);
+    int is_protocol_multichain=1;
     
-    if(build > 0)
+    void *ptr=mc_gState->m_NetworkParams->GetParam("chainprotocol",NULL);
+    if(ptr)
     {
-        if(build < GetNumericVersion())
+        if(strcmp((char*)ptr,"multichain"))
         {
-            return 1;
+            is_protocol_multichain=0;
+        }
+    }
+    
+    if(is_protocol_multichain)
+    {
+        if(build > 0)
+        {
+            if(build < GetNumericVersion())
+            {
+                return 1;
+            }
         }
     }
     return 0;
