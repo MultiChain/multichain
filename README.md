@@ -116,6 +116,7 @@ Compile MultiChain for Mac (64-bit)
 
     export LDFLAGS=-L/usr/local/opt/openssl/lib
     export CPPFLAGS=-I/usr/local/opt/openssl/include
+    ./autogen.sh
     ./configure --with-gui=no --with-libs=no --with-miniupnpc=no
     make
 
