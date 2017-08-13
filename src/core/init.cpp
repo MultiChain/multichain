@@ -1186,7 +1186,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             else
             {                                
                 if( (mc_gState->m_NetworkParams->GetParam("protocolversion",&size) != NULL) &&
-                    (mc_gState->m_Features->MinProtocolVersion() > (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion")) )
+                    (mc_gState->m_Features->MinProtocolVersion() > (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion")) && 
+                    (mc_gState->m_NetworkParams->GetParam("chainprotocol",NULL) != NULL) && 
+                    (strcmp((char*)mc_gState->m_NetworkParams->GetParam("chainprotocol",NULL),"multichain") == 0) )
                 {
                     seed_error=strprintf("The protocol version (%d) for blockchain %s has been deprecated and was last supported in MultiChain 1.0 beta 1\n",                
                             (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion"), mc_gState->m_Params->NetworkName());                    
