@@ -15,6 +15,10 @@
 #define MC_FAT_NETWORK     3
 #define MC_FAT_NETWORKSEED 4
 
+#define MC_ETP_DAEMON      1
+#define MC_ETP_UTIL        2
+#define MC_ETP_CLI         3
+
 #define MC_NTS_UNCONNECTED             0
 #define MC_NTS_WAITING_FOR_SEED        1
 #define MC_NTS_SEED_READY              2     
@@ -85,7 +89,7 @@ typedef struct mc_Params
         }
     }
     
-    void Parse(int argc, const char* const argv[]);
+    void Parse(int argc, const char* const argv[], int exe_type);
     int ReadConfig(const char *network_name);
     const char* GetOption(const char* strArg,const char* strDefault);
     int64_t GetOption(const char* strArg,int64_t nDefault);

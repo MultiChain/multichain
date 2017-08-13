@@ -71,10 +71,9 @@ using namespace std;
 
 const boost::filesystem::path mc_GetDataDir(const char *network_name,int create);
 
-void mc_Params::Parse(int argc, const char* const argv[])
+void mc_Params::Parse(int argc, const char* const argv[],int exe_type)
 {
     int i,length;
-    const char* exe_name;
     ParseParameters(argc,argv);
     mc_ExpandDataDirParam();
     
@@ -112,25 +111,13 @@ void mc_Params::Parse(int argc, const char* const argv[])
     
     if(m_NumArguments)
     {
-        exe_name=argv[0];
-        for(i=0;i<(int)strlen(argv[0]);i++)
-        {
-            if((argv[0][i]=='/') || (argv[0][i]=='\\'))
-            {
-                exe_name=argv[0]+i+1;
-            }
-        }
-        
-        if((strcmp(exe_name,"multichain-util") == 0) || (strcmp(exe_name,"multichain-util.exe") == 0))
+        if( exe_type == MC_ETP_UTIL )
         {
             m_FirstArgumentType=MC_FAT_COMMAND;
         }
         else
         {
-            if((strcmp(exe_name,"multichain-cli") == 0) || 
-               (strcmp(exe_name,"multichain-cli.exe") == 0) ||                     
-               (strcmp(exe_name,"multichaind") == 0) ||                     
-               (strcmp(exe_name,"multichaind.exe") == 0))
+            if( (exe_type == MC_ETP_CLI) || (exe_type == MC_ETP_DAEMON) ) 
             {
                 m_FirstArgumentType=MC_FAT_NETWORK;                
                 for(i=0;i<(int)strlen(m_Arguments[0]);i++)
@@ -144,7 +131,7 @@ void mc_Params::Parse(int argc, const char* const argv[])
                         }
                     }
                 }
-                if((m_FirstArgumentType == MC_FAT_NETWORK) && ((strcmp(exe_name,"multichaind") == 0) || (strcmp(exe_name,"multichaind.exe") == 0)))
+                if((m_FirstArgumentType == MC_FAT_NETWORK) && (exe_type == MC_ETP_DAEMON) )
                 {
                     m_Arguments[m_NumArguments]=m_Arguments[0]+length;
                     m_Arguments[m_NumArguments][0]=0x00;

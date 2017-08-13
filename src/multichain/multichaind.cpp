@@ -77,7 +77,7 @@ bool AppInit(int argc, char* argv[])
         
     mc_gState=new mc_State;
     
-    mc_gState->m_Params->Parse(argc, argv);
+    mc_gState->m_Params->Parse(argc, argv, MC_ETP_DAEMON);
     mc_CheckDataDirInConfFile();
     
     if(mc_gState->m_Params->NetworkName())
@@ -192,7 +192,7 @@ bool AppInit(int argc, char* argv[])
             
             mc_gState=new mc_State;
 
-            mc_gState->m_Params->Parse(argc, argv);
+            mc_gState->m_Params->Parse(argc, argv, MC_ETP_DAEMON);
         }
 #endif
         
