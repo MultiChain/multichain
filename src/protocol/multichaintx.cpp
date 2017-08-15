@@ -1390,7 +1390,8 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
 
                 if( (pass == 0) && fShouldHaveDestination )                     // Some setting in the protocol require address can be extracted
                 {
-                    if(fNoDestinationInOutput && (MCP_ANYONE_CAN_RECEIVE == 0))
+                    if(fNoDestinationInOutput && 
+                      ( (MCP_ANYONE_CAN_RECEIVE == 0) || (mc_gState->m_Features->FixedDestinationExtraction() != 0) ) )
                     {
                         reason="Script rejected - destination required ";
                         fReject=true;
