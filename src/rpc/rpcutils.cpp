@@ -1940,6 +1940,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
         vector<unsigned char> vValue;
         uint32_t data_format;
         Value formatted_data=Value::null;
+        data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
 //        bool key_is_set=false;
 //        bool value_is_set=false;
 
