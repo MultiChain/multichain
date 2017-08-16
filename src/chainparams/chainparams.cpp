@@ -173,12 +173,28 @@ public:
         vSeeds.push_back(CDNSSeedData("bitcoinstats.com", "seed.bitcoinstats.com"));
         vSeeds.push_back(CDNSSeedData("xf2.org", "bitseed.xf2.org"));
 
+/*        
         base58Prefixes[PUBKEY_ADDRESS] = list_of(0);
         base58Prefixes[SCRIPT_ADDRESS] = list_of(5);
         base58Prefixes[SECRET_KEY] =     list_of(128);
         base58Prefixes[EXT_PUBLIC_KEY] = list_of(0x04)(0x88)(0xB2)(0x1E);
         base58Prefixes[EXT_SECRET_KEY] = list_of(0x04)(0x88)(0xAD)(0xE4);
-
+*/
+        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,0);
+        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,5);
+        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,128);
+        base58Prefixes[EXT_PUBLIC_KEY].clear();
+        base58Prefixes[EXT_PUBLIC_KEY].push_back(0x04);
+        base58Prefixes[EXT_PUBLIC_KEY].push_back(0x88);
+        base58Prefixes[EXT_PUBLIC_KEY].push_back(0xB2);
+        base58Prefixes[EXT_PUBLIC_KEY].push_back(0x1E);
+        base58Prefixes[EXT_SECRET_KEY].clear();
+        base58Prefixes[EXT_SECRET_KEY].push_back(0x04);
+        base58Prefixes[EXT_SECRET_KEY].push_back(0x88);
+        base58Prefixes[EXT_SECRET_KEY].push_back(0xAD);
+        base58Prefixes[EXT_SECRET_KEY].push_back(0xE4);
+                
+        
         convertSeed6(vFixedSeeds, pnSeed6_main, ARRAYLEN(pnSeed6_main));
 
         fRequireRPCPassword = true;
@@ -234,11 +250,28 @@ public:
         vSeeds.push_back(CDNSSeedData("bluematt.me", "testnet-seed.bluematt.me"));
         vSeeds.push_back(CDNSSeedData("bitcoin.schildbach.de", "testnet-seed.bitcoin.schildbach.de"));
 
+/*        
         base58Prefixes[PUBKEY_ADDRESS] = list_of(111);
         base58Prefixes[SCRIPT_ADDRESS] = list_of(196);
         base58Prefixes[SECRET_KEY]     = list_of(239);
         base58Prefixes[EXT_PUBLIC_KEY] = list_of(0x04)(0x35)(0x87)(0xCF);
         base58Prefixes[EXT_SECRET_KEY] = list_of(0x04)(0x35)(0x83)(0x94);
+*/
+        
+        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
+        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,196);
+        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,239);
+        base58Prefixes[EXT_PUBLIC_KEY].clear();
+        base58Prefixes[EXT_PUBLIC_KEY].push_back(0x04);
+        base58Prefixes[EXT_PUBLIC_KEY].push_back(0x35);
+        base58Prefixes[EXT_PUBLIC_KEY].push_back(0x87);
+        base58Prefixes[EXT_PUBLIC_KEY].push_back(0xCF);
+        base58Prefixes[EXT_SECRET_KEY].clear();
+        base58Prefixes[EXT_SECRET_KEY].push_back(0x04);
+        base58Prefixes[EXT_SECRET_KEY].push_back(0x35);
+        base58Prefixes[EXT_SECRET_KEY].push_back(0x83);
+        base58Prefixes[EXT_SECRET_KEY].push_back(0x94);
+        
 
         convertSeed6(vFixedSeeds, pnSeed6_test, ARRAYLEN(pnSeed6_test));
 
@@ -470,23 +503,32 @@ public:
         ucPtr=(const unsigned char*)mc_gState->m_NetworkParams->GetParam("addresspubkeyhashversion",&size);        
         if(ucPtr)
         {
-            base58Prefixes[PUBKEY_ADDRESS] = list_of(ucPtr[0])(ucPtr[1])(ucPtr[2])(ucPtr[3]);
+            base58Prefixes[PUBKEY_ADDRESS].clear();
+            for(int i=0;i<size;i++)
+            {
+                base58Prefixes[PUBKEY_ADDRESS].push_back(ucPtr[i]);
+            }
         }
-        base58Prefixes[PUBKEY_ADDRESS].resize(size);
                 
         ucPtr=(const unsigned char*)mc_gState->m_NetworkParams->GetParam("addressscripthashversion",&size);        
         if(ucPtr)
         {
-            base58Prefixes[SCRIPT_ADDRESS] = list_of(ucPtr[0])(ucPtr[1])(ucPtr[2])(ucPtr[3]);
+            base58Prefixes[SCRIPT_ADDRESS].clear();
+            for(int i=0;i<size;i++)
+            {
+                base58Prefixes[SCRIPT_ADDRESS].push_back(ucPtr[i]);
+            }
         }
-        base58Prefixes[SCRIPT_ADDRESS].resize(size);
 
         ucPtr=(const unsigned char*)mc_gState->m_NetworkParams->GetParam("privatekeyversion",&size);        
         if(ucPtr)
         {
-            base58Prefixes[SECRET_KEY] = list_of(ucPtr[0])(ucPtr[1])(ucPtr[2])(ucPtr[3]);
+            base58Prefixes[SECRET_KEY].clear();
+            for(int i=0;i<size;i++)
+            {
+                base58Prefixes[SECRET_KEY].push_back(ucPtr[i]);
+            }
         }
-        base58Prefixes[SECRET_KEY].resize(size);
 
 /*  // MCHN-TODO currently copied from main, decide what to do with it later.
         base58Prefixes[EXT_PUBLIC_KEY] = list_of(0x04)(0x35)(0x87)(0xCF);
@@ -703,10 +745,12 @@ public:
                
         assert(strcmp(storedHash,hashGenesisBlock.GetHex().c_str()) == 0);
         
+/*        
         mapCheckpointsMultichain =
         boost::assign::map_list_of
         ( 0, uint256(storedHash))
         ;        
+ */ 
 //        assert(hashGenesisBlock == uint256("0x0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"));
         
     }
