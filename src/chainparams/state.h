@@ -124,6 +124,7 @@ typedef struct mc_Features
     int FixedIn10008();
     int FormattedData();
     int FixedDestinationExtraction();
+    int FixedIn1000920001();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo

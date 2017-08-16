@@ -1836,7 +1836,15 @@ void mc_Permissions::Dump()
 /** Returns number of admins (NULL entity only) */
 
 int mc_Permissions::GetAdminCount()
-{
+{    
+    if(MCP_ANYONE_CAN_ADMIN)
+    {
+        if(mc_gState->m_Features->FixedIn1000920001())
+        {
+            return 1;
+        }
+    }
+    
     return m_AdminCount;
 }
 
