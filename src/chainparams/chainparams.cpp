@@ -495,12 +495,21 @@ public:
         
 //        convertSeed6(vFixedSeeds, pnSeed6_test, ARRAYLEN(pnSeed6_test));
 
+        SetMultiChainParams();
         SetMultiChainRuntimeParams();
         
         fRequireStandard = (mc_gState->m_NetworkParams->GetInt64Param("onlyacceptstdtxs") != 0);
         fRequireStandard=GetBoolArg("-requirestandard", fRequireStandard);
         fTestnetToBeDeprecatedFieldRPC = (mc_gState->m_NetworkParams->GetInt64Param("chainistestnet") != 0);
-
+    }
+    
+    void SetMultiChainParams()
+    {
+        fAllowMinDifficultyBlocks=false;
+        if(mc_gState->m_Features->FixedIn1000920001())
+        {
+            fAllowMinDifficultyBlocks = (mc_gState->m_NetworkParams->GetInt64Param("allowmindifficultyblocks") != 0);            
+        }
     }
     
     void SetMultiChainRuntimeParams()
@@ -721,6 +730,11 @@ bool SelectMultiChainParams(const char *NetworkName)
     pCurrentParams = &multiChainParams;
     
     return true;
+}
+
+void SetMultiChainParams()
+{
+    multiChainParams.SetMultiChainParams();
 }
 
 void SetMultiChainRuntimeParams()
