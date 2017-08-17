@@ -175,6 +175,8 @@ int mc_Script::DeleteElement(int element)
     }
     m_NumElements--;
     m_CurrentElement=-1;
+    
+    return MC_ERR_NOERROR;
 }
 
 int mc_Script::GetElement()

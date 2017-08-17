@@ -683,7 +683,7 @@ int mc_ReadGeneralConfigFile(mc_MapStringString *mapConfig,const char *network_n
 
 int mc_BuildDescription(int build, char *desc)
 {
-    int v,i;
+    int v;
     int c[5];
     
     v=build;

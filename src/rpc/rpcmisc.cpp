@@ -68,7 +68,6 @@ Value getinfo(const Array& params, bool fHelp)
 //    obj.push_back(Pair("version", CLIENT_VERSION));
 //    obj.push_back(Pair("protocolversion", PROTOCOL_VERSION));
     
-    char build_desc[32];
     obj.push_back(Pair("version", mc_BuildDescription(mc_gState->GetNumericVersion())));
     obj.push_back(Pair("nodeversion", mc_gState->GetNumericVersion()));
     obj.push_back(Pair("protocolversion", mc_gState->m_NetworkParams->ProtocolVersion()));

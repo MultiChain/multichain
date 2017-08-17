@@ -606,7 +606,6 @@ Value publishfrom(const Array& params, bool fHelp)
         }
     }
     
-    bool fIsHex;
     vector<unsigned char> dataData;
     
     switch(data_format)

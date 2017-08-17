@@ -142,10 +142,9 @@ int ubjson_best_int_type(int64_t int64_value,int *not_uint8)
 
 int ubjson_best_type(Value json_value,int last_type,int *not_uint8,int64_t *usize,int64_t *ssize)
 {
-    char type;
+    int type;
     string string_value;
     int64_t int64_value;
-    uint64_t uint64_value;
     int size;
 
     type=UBJ_UNDEFINED;
@@ -652,7 +651,7 @@ Value ubjson_read_internal(const unsigned char *ptrStart,size_t bytes,int known_
                     goto exitlbl;                            
                 }       
                 swap_bytes(&int64_value,ptr,sizeof(float));
-                result=(double)(*(float*)(&int64_value));
+                result=(double)(*(float*)(void*)(&int64_value));
                 ptr+=UBJ_SIZE[ubj_type];
                 break;
             case UBJ_FLOAT64:
@@ -662,7 +661,7 @@ Value ubjson_read_internal(const unsigned char *ptrStart,size_t bytes,int known_
                     goto exitlbl;                            
                 }         
                 swap_bytes(&int64_value,ptr,sizeof(double));
-                result=*(double*)(&int64_value);
+                result=*(double*)(void*)(&int64_value);
                 ptr+=UBJ_SIZE[ubj_type];
                 break;
             case UBJ_CHAR:
