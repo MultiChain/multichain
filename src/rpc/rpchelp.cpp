@@ -3628,7 +3628,7 @@ void mc_InitRPCHelpMap16()
             "                                                                                upgrade txid, upgrade reference, upgrade name.\n"
             " or\n"
             "1. upgrade-identifier(s)            (array, optional) A json array of upgrade identifiers \n"                
-            "\nReturns list of defined streams\n"
+            "\nReturns list of defined upgrades\n"
             "\nExamples:\n"
             + HelpExampleCli("listupgrades", "")
             + HelpExampleRpc("listupgrades", "")
