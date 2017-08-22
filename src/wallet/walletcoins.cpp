@@ -1895,6 +1895,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
     
     unsigned char *in_row;
     int required;
+    int special_required=MC_PTP_ADMIN | MC_PTP_ACTIVATE | MC_PTP_ISSUE | MC_PTP_CREATE | MC_PTP_WRITE;
     uint256 hash;
     int32_t type;
     bool no_send_coins;
@@ -1914,21 +1915,48 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
     hash=0;
     
     required=0;
-    
     if(vecSend.size())
     {
         required=0;
-
-        BOOST_FOREACH (const PAIRTYPE(CScript, CAmount)& s, vecSend)            // Filling buffer with output amounts
+        if( (addresses == NULL) || (addresses->size() != 1) )
         {
-            CTxOut txout(s.second, s.first);
-            int this_required=MC_PTP_ALL;
-            if(!ParseMultichainTxOutToBuffer(hash,txout,out_amounts,lpScript,NULL,&this_required,&mapSpecialEntity,strFailReason))
+            BOOST_FOREACH (const PAIRTYPE(CScript, CAmount)& s, vecSend)            // Filling buffer with output amounts
             {
-                goto exitlbl;
+                CTxOut txout(s.second, s.first);
+                int this_required=MC_PTP_ALL;
+                if(!ParseMultichainTxOutToBuffer(hash,txout,out_amounts,lpScript,NULL,&this_required,&mapSpecialEntity,strFailReason))
+                {
+                    goto exitlbl;
+                }
+                required |= this_required;
             }
-            required |= this_required;
         }    
+        else
+        {
+            set<CTxDestination>::const_iterator it = addresses->begin();
+            CTxDestination address_from=*it;        
+            BOOST_FOREACH (const PAIRTYPE(CScript, CAmount)& s, vecSend)            // Filling buffer with output amounts
+            {
+                CTxOut txout(s.second, s.first);
+                int this_required=MC_PTP_SEND | MC_PTP_RECEIVE;
+                if(!ParseMultichainTxOutToBuffer(hash,txout,out_amounts,lpScript,NULL,&this_required,&mapSpecialEntity,strFailReason))
+                {
+                    goto exitlbl;
+                }                
+                if(this_required & special_required)
+                {
+                    int this_allowed=CheckRequiredPermissions(address_from,this_required & special_required,&mapSpecialEntity,&strFailReason);
+                    this_allowed &= (this_required & special_required);
+                    if( this_allowed   != (this_required & special_required) )
+                    {                        
+                        goto exitlbl;                        
+                    }
+                    this_required -= (this_required & special_required);
+                    mapSpecialEntity.clear();
+                }
+                required |= this_required;
+            }
+        }
     }
     else
     {

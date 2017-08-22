@@ -27,6 +27,7 @@ const unsigned char* GetAddressIDPtr(const CTxDestination& address)
     return aptr;
 }
 
+
 /* 
  * Parses txout script into asset-quantity buffer
  * Use it only with unspent or not yet created outputs
@@ -77,113 +78,32 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
         lpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
         if(allowed)                                                             // Checking permissions this output address have
         {
-            *allowed=0;
             CTxDestination addressRet;        
+
+            *allowed=0;
             if(ExtractDestinationScriptValid(script1, addressRet))
             {
-                const unsigned char *aptr;
-                
-                aptr=GetAddressIDPtr(addressRet);
-                if(aptr)
+                *allowed=CheckRequiredPermissions(addressRet,expected_allowed,mapSpecialEntity,NULL);
+                if(expected_allowed & MC_PTP_SEND)                
                 {
-                    if(expected_allowed & MC_PTP_SEND)
+                    if(*allowed & MC_PTP_SEND)
                     {
-                        if(mc_gState->m_Permissions->CanSend(NULL,aptr))
+                        if(*allowed & MC_PTP_RECEIVE)
                         {
-                            if(mc_gState->m_Permissions->CanReceive(NULL,aptr)) 
+                            *allowed -= MC_PTP_RECEIVE;
+                        }
+                        else
+                        {
+                            *allowed -= MC_PTP_SEND;
+                            if(mc_gState->m_Features->AnyoneCanReceiveEmpty())                                
                             {
-                                *allowed |= MC_PTP_SEND;
-                            }
-                            else
-                            {
-                                if(mc_gState->m_Features->AnyoneCanReceiveEmpty())                                
+                                if(txout.nValue == 0)
                                 {
-                                    if(txout.nValue == 0)
-                                    {
-                                        disallow_if_assets_found=1;
-                                        *allowed |= MC_PTP_SEND;
-                                    }
+                                    disallow_if_assets_found=1;
+                                    *allowed |= MC_PTP_SEND;
                                 }
                             }
-                        }                         
-                    }
-                    if(expected_allowed & MC_PTP_WRITE)
-                    {
-                        unsigned char *lpEntity=NULL;
-                        if(mapSpecialEntity)
-                        {
-                            std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_WRITE);
-                            if (it != mapSpecialEntity->end())
-                            {
-                                lpEntity=(unsigned char*)(&(it->second));
-                            }
                         }
-
-                        if(mc_gState->m_Permissions->CanWrite(lpEntity,aptr))
-                        {
-                            *allowed |= MC_PTP_WRITE;
-                        }                                                 
-                    }
-                    if(expected_allowed & MC_PTP_ISSUE)
-                    {
-                        unsigned char *lpEntity=NULL;
-
-                        if(mapSpecialEntity)
-                        {
-                            std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_ISSUE);
-                            if (it != mapSpecialEntity->end())
-                            {
-                                lpEntity=(unsigned char*)(&(it->second));
-                            }
-                        }
-
-                        if(mc_gState->m_Permissions->CanIssue(lpEntity,aptr))
-                        {
-                            *allowed |= MC_PTP_ISSUE;
-                        }                                                 
-                    }
-                    if(expected_allowed & MC_PTP_CREATE)
-                    {
-                        if(mc_gState->m_Permissions->CanCreate(NULL,aptr))
-                        {
-                            *allowed |= MC_PTP_CREATE;
-                        }                         
-                    }
-                    if(expected_allowed & MC_PTP_ADMIN)
-                    {
-                        unsigned char *lpEntity=NULL;
-
-                        if(mapSpecialEntity)
-                        {
-                            std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_ADMIN);
-                            if (it != mapSpecialEntity->end())
-                            {
-                                lpEntity=(unsigned char*)(&(it->second));
-                            }
-                        }
-
-                        if(mc_gState->m_Permissions->CanAdmin(lpEntity,aptr))
-                        {
-                            *allowed |= MC_PTP_ADMIN;
-                        }                                                 
-                    }
-                    if(expected_allowed & MC_PTP_ACTIVATE)
-                    {
-                        unsigned char *lpEntity=NULL;
-
-                        if(mapSpecialEntity)
-                        {
-                            std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_ACTIVATE);
-                            if (it != mapSpecialEntity->end())
-                            {
-                                lpEntity=(unsigned char*)(&(it->second));
-                            }
-                        }
-                        
-                        if(mc_gState->m_Permissions->CanActivate(lpEntity,aptr))
-                        {
-                            *allowed |= MC_PTP_ACTIVATE;
-                        }                                                 
                     }
                 }
             }
@@ -878,3 +798,175 @@ bool AddressCanReceive(CTxDestination address)
     return true;
 }
 
+int CheckRequiredPermissions(const CTxDestination& addressRet,int expected_allowed,map<uint32_t, uint256>* mapSpecialEntity, string *strFailReason)
+{
+    int allowed=0;
+    const unsigned char *aptr;
+
+    aptr=GetAddressIDPtr(addressRet);
+    if(aptr)
+    {
+        if(expected_allowed & MC_PTP_SEND)
+        {
+            if(mc_gState->m_Permissions->CanSend(NULL,aptr))
+            {
+                allowed |= MC_PTP_SEND;
+                if(mc_gState->m_Permissions->CanReceive(NULL,aptr)) 
+                {
+                    allowed |= MC_PTP_RECEIVE;
+                }            
+            }    
+            if(strFailReason)
+            {
+                if( (allowed & MC_PTP_SEND) == 0 )
+                {
+                    *strFailReason="from-address doesn't have send or receive permission";
+                }
+            }
+        }
+        if(expected_allowed & MC_PTP_WRITE)
+        {
+            unsigned char *lpEntity=NULL;
+            if(mapSpecialEntity)
+            {
+                std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_WRITE);
+                if (it != mapSpecialEntity->end())
+                {
+                    lpEntity=(unsigned char*)(&(it->second));
+                }
+            }
+
+            if(mc_gState->m_Permissions->CanWrite(lpEntity,aptr))
+            {
+                allowed |= MC_PTP_WRITE;
+            }                                                 
+            if(strFailReason)
+            {
+                if( (allowed & MC_PTP_WRITE) == 0 )
+                {
+                    *strFailReason="Publishing in this stream is not allowed from this address";
+                }
+            }
+        }
+        if(expected_allowed & MC_PTP_ISSUE)
+        {
+            unsigned char *lpEntity=NULL;
+
+            if(mapSpecialEntity)
+            {
+                std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_ISSUE);
+                if (it != mapSpecialEntity->end())
+                {
+                    lpEntity=(unsigned char*)(&(it->second));
+                }
+            }
+
+            if(mc_gState->m_Permissions->CanIssue(lpEntity,aptr))
+            {
+                allowed |= MC_PTP_ISSUE;
+            }                 
+            
+            if(strFailReason)
+            {
+                if( (allowed & MC_PTP_ISSUE) == 0 )
+                {
+                    if(lpEntity)
+                    {
+                        *strFailReason="Issuing more units for this asset is not allowed from this address";                        
+                    }
+                    else
+                    {
+                        *strFailReason="from-address doesn't have issue permission";
+                    }
+                }
+            }            
+        }
+        if(expected_allowed & MC_PTP_CREATE)
+        {
+            if(mc_gState->m_Permissions->CanCreate(NULL,aptr))
+            {
+                allowed |= MC_PTP_CREATE;
+            }                         
+            if(strFailReason)
+            {
+                if( (allowed & MC_PTP_CREATE) == 0 )
+                {
+                    *strFailReason="from-address doesn't have create permission";
+                }
+            }
+        }
+        if(expected_allowed & MC_PTP_ADMIN)
+        {
+            unsigned char *lpEntity=NULL;
+
+            if(mapSpecialEntity)
+            {
+                std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_ADMIN);
+                if (it != mapSpecialEntity->end())
+                {
+                    lpEntity=(unsigned char*)(&(it->second));
+                }
+            }
+
+            if(mc_gState->m_Permissions->CanAdmin(lpEntity,aptr))
+            {
+                allowed |= MC_PTP_ADMIN;
+            }                                                 
+            if(strFailReason)
+            {
+                if( (allowed & MC_PTP_ADMIN) == 0 )
+                {
+                    if(lpEntity)
+                    {
+                        *strFailReason="from-address doesn't have admin permission for this entity";                        
+                    }
+                    else
+                    {
+                        *strFailReason="from-address doesn't have admin permission";
+                    }
+                }
+            }            
+        }
+        if(expected_allowed & MC_PTP_ACTIVATE)
+        {
+            unsigned char *lpEntity=NULL;
+            printf("B\n");
+            if(mapSpecialEntity)
+            {
+                std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_ACTIVATE);
+                if (it != mapSpecialEntity->end())
+                {
+                    lpEntity=(unsigned char*)(&(it->second));
+            printf("C\n");
+                }
+            }
+
+            printf("D\n");
+            if(mc_gState->m_Permissions->CanActivate(lpEntity,aptr))
+            {
+            printf("E\n");
+                allowed |= MC_PTP_ACTIVATE;
+            }                                                 
+            if(strFailReason)
+            {
+            printf("F\n");
+                if( (allowed & MC_PTP_ACTIVATE) == 0 )
+                {
+            printf("G\n");
+                    if(lpEntity)
+                    {
+            printf("H\n");
+                        *strFailReason="from-address doesn't have activate or admin permission for this entity";                        
+                    }
+                    else
+                    {
+            printf("I\n");
+                        *strFailReason="from-address doesn't have admin or activate permission";
+                    }
+                }
+            }            
+        }
+    }
+    
+    return allowed;
+}
