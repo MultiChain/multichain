@@ -1931,6 +1931,7 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
     vector <bool> vInputCanGrantAdminMine;
     vector <bool> vInputHadAdminPermissionBeforeThisTx;
     vector <CScript> vInputPrevOutputScripts;
+    bool fIsEntity;
     bool fReject;    
     bool fAdminFound;
     int err;
@@ -2117,17 +2118,22 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
 
         if(ExtractDestination(script1,addressRet))
         {            
-            entity.Zero();                                                  
+            fIsEntity=false;
+
             for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
             {
                 mc_gState->m_TmpScript->SetElement(e);
                 if(mc_gState->m_TmpScript->GetEntity(short_txid) == 0)      
                 {
-                    if(entity.GetEntityType())
+                    if(fIsEntity)
                     {
                         reason="Script rejected - duplicate entity script";
                         fReject=true;
                         goto exitlbl;                                                
+                    }
+                    if(mc_gState->m_Features->FixedIn1000920001())
+                    {
+                        fIsEntity=true;
                     }
                 }
                 else                                                        
@@ -2135,7 +2141,7 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
                     if(mc_gState->m_TmpScript->GetPermission(&type,&from,&to,&timestamp) == 0)
                     {                        
                         type &= ( MC_PTP_MINE | MC_PTP_ADMIN );                                        
-                        if(entity.GetEntityType())
+                        if(fIsEntity)
                         {
                             type=0;
                         }
@@ -2165,7 +2171,7 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
                             {
                                 if(vInputCanGrantAdminMine[i])
                                 {
-                                    if(mc_gState->m_Permissions->SetPermission(entity.GetTxID(),ptr,type,(unsigned char*)&vInputDestinations[i],from,to,timestamp,flags,1,offset) == 0)
+                                    if(mc_gState->m_Permissions->SetPermission(NULL,ptr,type,(unsigned char*)&vInputDestinations[i],from,to,timestamp,flags,1,offset) == 0)
                                     {
                                         fAdminFound=true;
                                     }                                
@@ -2185,11 +2191,11 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
                                 }                                
                             }
                         }
-                        entity.Zero();                                                                                          
+                        fIsEntity=false;
                     }
                     else                                                   
                     {
-                        if(entity.GetEntityType())                              
+                        if(fIsEntity)                              
                         {
                             reason="Script rejected - entity script should be followed by permission";
                             fReject=true;
