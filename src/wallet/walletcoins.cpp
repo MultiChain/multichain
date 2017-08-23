@@ -1684,7 +1684,8 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
                     {
                         if(!fScriptCached)
                         {
-                            if(mc_GetABCoinQuantity(in_amounts->GetRow(in_special_row[6]),coin_id))
+                            if( (mc_GetABCoinQuantity(in_amounts->GetRow(in_special_row[6]),coin_id) != 0) || 
+                                ( ( required & (MC_PTP_ADMIN | MC_PTP_MINE) ) == 0 ) )
                             {
                                 int cs_offset;
                                 CScript script3;        
