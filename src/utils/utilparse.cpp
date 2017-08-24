@@ -930,37 +930,29 @@ int CheckRequiredPermissions(const CTxDestination& addressRet,int expected_allow
         if(expected_allowed & MC_PTP_ACTIVATE)
         {
             unsigned char *lpEntity=NULL;
-            printf("B\n");
             if(mapSpecialEntity)
             {
                 std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_ACTIVATE);
                 if (it != mapSpecialEntity->end())
                 {
                     lpEntity=(unsigned char*)(&(it->second));
-            printf("C\n");
                 }
             }
 
-            printf("D\n");
             if(mc_gState->m_Permissions->CanActivate(lpEntity,aptr))
             {
-            printf("E\n");
                 allowed |= MC_PTP_ACTIVATE;
             }                                                 
             if(strFailReason)
             {
-            printf("F\n");
                 if( (allowed & MC_PTP_ACTIVATE) == 0 )
                 {
-            printf("G\n");
                     if(lpEntity)
                     {
-            printf("H\n");
                         *strFailReason="from-address doesn't have activate or admin permission for this entity";                        
                     }
                     else
                     {
-            printf("I\n");
                         *strFailReason="from-address doesn't have admin or activate permission";
                     }
                 }

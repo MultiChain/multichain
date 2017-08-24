@@ -288,14 +288,10 @@ std::string BurnAddress(const std::vector<unsigned char>& vchVersion)
         {
             if(vch[p] != vchVersion[p / (shift+1)])
             {
-//                printf("%d B %s\n",p,res);
-//                mc_DumpSize("B",&vch[0],vch.size(),vch.size());
                 memset(&vch[p+2],0x00,vch.size()-p-2);
                 vch[p] = vchVersion[p / (shift+1)];
                 vch[p+1] = 0x80;
                 strcpy(test,EncodeBase58(vch).c_str());
-//                printf("%d C %s %d\n",p,test,vch[p]);
-//                mc_DumpSize("C",&vch[0],vch.size(),vch.size());
                 if(strlen(test) != strlen(res))
                 {
                     if(strlen(test) > strlen(res))
