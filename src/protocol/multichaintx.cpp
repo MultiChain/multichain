@@ -2473,7 +2473,6 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
                     if(quantity+total<0)
                     {
                         reason="Asset issue script rejected - negative total amount";
-//                        printf("%s\n",reason.c_str());
                         return false;                                        
                     }
                                         
@@ -2808,7 +2807,6 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
                         else
                         {                        
                             reason="Permission script rejected - invalid signature hash type";
-    //                        printf("%s\n",reason.c_str());
                             return false;
                         }
                     }                
@@ -3062,7 +3060,6 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
                         if((lpKeyID == NULL) && (lpScriptID == NULL))
                         {
                             reason="Script rejected - wrong destination type";
-//                            printf("%s\n",reason.c_str());
                             reject=true;
                             goto exitlbl;                                                            
                         }
