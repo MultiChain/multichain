@@ -1018,8 +1018,8 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
         txnouttype whichType;
         const CScript& prevScript = prev.scriptPubKey;
         
-/*        
         vector<vector<unsigned char> > vSolutions;
+/*        
         // get the scriptPubKey corresponding to this input:
         if (!Solver(prevScript, whichType, vSolutions))
             return false;
@@ -1027,7 +1027,7 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
 */
         vector<CTxDestination> addressRets;
         int nRequiredRet;
-        if(!ExtractDestinations(prevScript,whichType,addressRets,nRequiredRet))
+        if(!IsStandard(prevScript,whichType))
         {
             return false; 
         }
@@ -1045,7 +1045,9 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
                 nArgsExpected=1;
                 break;
             case TX_MULTISIG:
-                nArgsExpected=nRequiredRet+1;
+                Solver(prevScript, whichType, vSolutions);
+                nArgsExpected = ScriptSigArgsExpected(whichType, vSolutions);
+//                nArgsExpected=nRequiredRet+1;
                 break;
             case TX_NONSTANDARD:
             case TX_NULL_DATA:

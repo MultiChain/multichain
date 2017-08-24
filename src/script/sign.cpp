@@ -93,7 +93,7 @@ bool Solver(const CKeyStore& keystore, const CScript& scriptPubKey, uint256 hash
     scriptSigRet.clear();
 
     vector<valtype> vSolutions;
-    if (!Solver(scriptPubKey, whichTypeRet, vSolutions))
+    if (!TemplateSolver(scriptPubKey, whichTypeRet, vSolutions))
         return false;
 
     CKeyID keyID;
@@ -274,7 +274,7 @@ static CScript CombineSignatures(const CScript& scriptPubKey, const CTransaction
 
             txnouttype txType2;
             vector<vector<unsigned char> > vSolutions2;
-            Solver(pubKey2, txType2, vSolutions2);
+            TemplateSolver(pubKey2, txType2, vSolutions2);
             sigs1.pop_back();
             sigs2.pop_back();
             CScript result = CombineSignatures(pubKey2, txTo, nIn, txType2, vSolutions2, sigs1, sigs2);
@@ -293,7 +293,7 @@ CScript CombineSignatures(const CScript& scriptPubKey, const CTransaction& txTo,
 {
     txnouttype txType;
     vector<vector<unsigned char> > vSolutions;
-    Solver(scriptPubKey, txType, vSolutions);
+    TemplateSolver(scriptPubKey, txType, vSolutions);
 
     vector<valtype> stack1;
     EvalScript(stack1, scriptSig1, SCRIPT_VERIFY_STRICTENC, BaseSignatureChecker());
