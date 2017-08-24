@@ -61,7 +61,7 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
 {
     vector<valtype> vSolutions;
     txnouttype whichType;
-    if (!Solver(scriptPubKey, whichType, vSolutions)) {
+    if (!TemplateSolver(scriptPubKey, whichType, vSolutions)) {
 /* MCHN START */        
 //        if (keystore.HaveWatchOnly(scriptPubKey))
         if (keystore.HaveWatchOnly(scriptPubKey.RemoveOpDrops()))

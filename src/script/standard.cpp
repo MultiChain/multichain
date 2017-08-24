@@ -342,7 +342,6 @@ bool ExtractDestinationsFull(const CScript& scriptPubKey, txnouttype& typeRet, v
 /* MCHN START */    
     const CScript& scriptPubKeyDestinationOnly=scriptPubKey.RemoveOpDrops();
     if (!Solver(scriptPubKeyDestinationOnly, typeRet, vSolutions))
-//    if (!Solver(scriptPubKey, typeRet, vSolutions))
         return false;
 /* MCHN END */        
     if (typeRet == TX_NULL_DATA){
@@ -648,7 +647,7 @@ CTxDestination VectorToAddress(vector<unsigned char>& vch)
     return addressRet;
 }
 
-bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet)
+bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet,vector<vector<unsigned char> >* lpvSolutionsRet)
 {
     if(mc_gState->m_Features->FixedDestinationExtraction() == 0)
     {
@@ -679,6 +678,10 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
                 return false;
             }
             addressRet.push_back(CKeyID(uint160(vch)));
+            if(lpvSolutionsRet)
+            {
+                lpvSolutionsRet->push_back(vch);
+            }
             if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_EQUALVERIFY) )
             {
                 return false;
@@ -698,6 +701,10 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
                     return false;
                 }
                 addressRet.push_back(CScriptID(uint160(vch)));
+                if(lpvSolutionsRet)
+                {
+                    lpvSolutionsRet->push_back(vch);
+                }
                 if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_EQUAL) )
                 {
                     return false;
@@ -727,6 +734,10 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
                             return false;
                         }
                         addressRet.push_back(pkAddress);                        
+                        if(lpvSolutionsRet)
+                        {
+                            lpvSolutionsRet->push_back(vch);
+                        }
                         typeRet = TX_PUBKEY;
                     }
                     else
@@ -734,6 +745,11 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
                         if ( (opcode >= OP_1 && opcode <= OP_16) )              // bare multisig
                         {
                             nRequiredRet=CScript::DecodeOP_N(opcode);
+                            if(lpvSolutionsRet)
+                            {
+                                lpvSolutionsRet->push_back(valtype(1, (char)nRequiredRet));
+                            }
+
                             n=-1;
                             while(n != (int)addressRet.size())
                             {
@@ -755,6 +771,10 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
                                     if( boost::get<CKeyID> (&pkAddress) )
                                     {
                                         addressRet.push_back(pkAddress);                        
+                                        if(lpvSolutionsRet)
+                                        {
+                                            lpvSolutionsRet->push_back(vch);
+                                        }
                                     }
                                     else
                                     {
@@ -762,6 +782,11 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
                                     }
                                 }
                             }
+                            if(lpvSolutionsRet)
+                            {
+                                lpvSolutionsRet->push_back(valtype(1, (char)n));
+                            }
+                            
                             
                             if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_CHECKMULTISIG) )
                             {
@@ -795,6 +820,19 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
     
     return true;   
 }
+
+bool TemplateSolver(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<std::vector<unsigned char> >& vSolutionsRet)
+{
+    vector<CTxDestination> addressRet;
+    int nRequiredRet;
+    
+    if(mc_gState->m_Features->FixedDestinationExtraction() == 0)
+    {
+        return Solver(scriptPubKey,typeRet,vSolutionsRet);
+    }
+    return ExtractDestinations(scriptPubKey,typeRet,addressRet,nRequiredRet,&vSolutionsRet);
+}
+
 
 bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
 {
