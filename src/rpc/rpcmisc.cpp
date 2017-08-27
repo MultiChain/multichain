@@ -940,9 +940,12 @@ Value createmultisig(const Array& params, bool fHelp)
 /* MCHN START */    
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-        if(MCP_ALLOW_P2SH_OUTPUTS == 0)
+        if(MCP_ALLOW_ARBITRARY_OUTPUTS == 0)
         {
-            throw JSONRPCError(RPC_NOT_ALLOWED, "P2SH outputs are not allowed for this blockchain");
+            if(MCP_ALLOW_P2SH_OUTPUTS == 0)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "P2SH outputs are not allowed for this blockchain");
+            }
         }
     }
 /* MCHN END */    

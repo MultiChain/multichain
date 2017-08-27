@@ -951,6 +951,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
     nNewEntityOutput=-1;
     fSeedNodeInvolved=false;
     fShouldHaveDestination=false;
+    fShouldHaveDestination |= (MCP_ALLOW_ARBITRARY_OUTPUTS == 0);
     fShouldHaveDestination |= (MCP_ANYONE_CAN_RECEIVE == 0);
     fShouldHaveDestination |= (MCP_ALLOW_MULTISIG_OUTPUTS == 0);
     fShouldHaveDestination |= (MCP_ALLOW_P2SH_OUTPUTS == 0);
@@ -1391,25 +1392,28 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                 if( (pass == 0) && fShouldHaveDestination )                     // Some setting in the protocol require address can be extracted
                 {
                     if(fNoDestinationInOutput && 
-                      ( (MCP_ANYONE_CAN_RECEIVE == 0) || (mc_gState->m_Features->FixedDestinationExtraction() != 0) ) )
+                      ( (MCP_ANYONE_CAN_RECEIVE == 0) || (MCP_ALLOW_ARBITRARY_OUTPUTS == 0) ) )
                     {
                         reason="Script rejected - destination required ";
                         fReject=true;
                         goto exitlbl;                    
                     }
                     
-                    if((typeRet == TX_MULTISIG) && (MCP_ALLOW_MULTISIG_OUTPUTS == 0))
+                    if(MCP_ALLOW_ARBITRARY_OUTPUTS == 0)
                     {
-                        reason="Script rejected - multisig is not allowed";
-                        fReject=true;
-                        goto exitlbl;                    
-                    }
+                        if((typeRet == TX_MULTISIG) && (MCP_ALLOW_MULTISIG_OUTPUTS == 0))
+                        {
+                            reason="Script rejected - multisig is not allowed";
+                            fReject=true;
+                            goto exitlbl;                    
+                        }
 
-                    if((typeRet == TX_SCRIPTHASH) && (MCP_ALLOW_P2SH_OUTPUTS == 0))
-                    {
-                        reason="Script rejected - P2SH is not allowed";
-                        fReject=true;
-                        goto exitlbl;                    
+                        if((typeRet == TX_SCRIPTHASH) && (MCP_ALLOW_P2SH_OUTPUTS == 0))
+                        {
+                            reason="Script rejected - P2SH is not allowed";
+                            fReject=true;
+                            goto exitlbl;                    
+                        }
                     }
                 }                
                 

@@ -776,6 +776,15 @@ int mc_MultichainParams::SetGlobals()
     MCP_ANYONE_CAN_RECEIVE=mc_gState->m_NetworkParams->GetInt64Param("anyonecanreceive");
     MCP_ANYONE_CAN_ACTIVATE=mc_gState->m_NetworkParams->GetInt64Param("anyonecanactivate");
     MCP_MINIMUM_PER_OUTPUT=mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+    MCP_ALLOW_ARBITRARY_OUTPUTS=1; 
+    if(mc_gState->m_Features->FixedDestinationExtraction() != 0)
+    {
+        int aao=mc_gState->m_NetworkParams->GetInt64Param("allowarbitraryoutputs");
+        if(aao>=0)
+        {
+            MCP_ALLOW_ARBITRARY_OUTPUTS=aao;
+        }
+    }
     MCP_ALLOW_MULTISIG_OUTPUTS=mc_gState->m_NetworkParams->GetInt64Param("allowmultisigoutputs");
     MCP_ALLOW_P2SH_OUTPUTS=mc_gState->m_NetworkParams->GetInt64Param("allowp2shoutputs");
     MCP_WITH_NATIVE_CURRENCY=0;

@@ -86,7 +86,6 @@ int64_t mc_MultichainParams::GetInt64Param(const char *param)
         int index=m_lpIndex->Get(param);
         if(index<0)
         {
-            printf("Parameter not found: %s\n",param);
             return -1;
         }   
         
