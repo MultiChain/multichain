@@ -84,7 +84,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
                    "allowarbitraryoutputs","",
                    "Require special metadata output with cached scriptPubKey for input, to support advanced miner checks."},
     { "allowarbitraryoutputs"                         , "allow-arbitrary-outputs"                         ,
-                   MC_PRM_BOOLEAN | MC_PRM_USER | MC_PRM_CLONE                  , -1,         0,          0,         0, 0.0, 20001, 0, "-mc-allowarbitraryoutputs",
+                   MC_PRM_BOOLEAN | MC_PRM_USER | MC_PRM_CLONE                  , -1,         0,          0,         0, 0.0, 10009, 0, "-mc-allowarbitraryoutputs",
                    "allowp2shoutputs","",
                    "Allow arbitrary (without clear destination) scripts."},
     { "allowp2shoutputs"                         , "allow-p2sh-outputs"                         ,
