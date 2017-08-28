@@ -122,6 +122,7 @@ extern const CRPCTable tableRPC;
 extern std::map<std::string, std::string> mapHelpStrings;
 extern std::map<std::string, int> mapLogParamCounts;
 extern std::set<std::string> setAllowedWhenWaitingForUpgrade;
+extern std::set<std::string> setAllowedWhenOffline;
 void mc_InitRPCHelpMap();
 std::string mc_RPCHelpString(std::string strMethod);
 /* MCHN END */

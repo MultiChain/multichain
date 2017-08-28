@@ -1343,6 +1343,14 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         }
     }
     
+    if(GetBoolArg("-offline",false))
+    {
+        if( setAllowedWhenOffline.count(strMethod) == 0 )
+        {
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported in offline mode");
+        }        
+    }
+    
     // Observe safe mode
     string strWarning = GetWarnings("rpc");
     if (strWarning != "" && !GetBoolArg("-disablesafemode", false) &&
@@ -1449,3 +1457,4 @@ const CRPCTable tableRPC;
 std::map<std::string, std::string> mapHelpStrings;
 std::map<std::string, int> mapLogParamCounts;
 std::set<std::string> setAllowedWhenWaitingForUpgrade;
+std::set<std::string> setAllowedWhenOffline;
