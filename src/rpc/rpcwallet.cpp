@@ -702,6 +702,11 @@ Value signmessage(const Array& params, bool fHelp)
     }
     else
     {
+        if(GetBoolArg("-offline",false))
+        {
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "API is supported only with privkey in offline mode");            
+        }
+        
         CKeyID keyID;
         if (!addr.GetKeyID(keyID))
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Address does not refer to key");

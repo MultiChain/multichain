@@ -3818,6 +3818,20 @@ void mc_InitRPCAllowedWhenWaitingForUpgradeSet()
     setAllowedWhenWaitingForUpgrade.insert("verifymessage");    
 }
 
+void mc_InitRPCAllowedWhenOffline()
+{
+    setAllowedWhenOffline.insert("getblockchainparams");    
+    setAllowedWhenOffline.insert("getinfo");    
+    setAllowedWhenOffline.insert("help");    
+    setAllowedWhenOffline.insert("stop");    
+    setAllowedWhenOffline.insert("getpeerinfo");    
+    setAllowedWhenOffline.insert("decodescript");    
+    setAllowedWhenOffline.insert("signrawtransaction");    
+    setAllowedWhenOffline.insert("createkeypairs");    
+    setAllowedWhenOffline.insert("verifymessage");    
+    setAllowedWhenOffline.insert("signmessage");    
+}
+
 void mc_InitRPCHelpMap()
 {
     mc_InitRPCHelpMap01();
@@ -3839,5 +3853,6 @@ void mc_InitRPCHelpMap()
     
     mc_InitRPCLogParamCountMap();
     mc_InitRPCAllowedWhenWaitingForUpgradeSet();    
+    mc_InitRPCAllowedWhenOffline();    
 }
 

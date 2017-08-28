@@ -476,6 +476,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -rpcsslciphers=<ciphers>                 " + strprintf(_("Acceptable ciphers (default: %s)"), "TLSv1.2+HIGH:TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!3DES:@STRENGTH") + "\n";
 
     strUsage += "\n" + _("MultiChain runtime parameters") + "\n";    
+    strUsage += "  -offline                                 " + _("Start multichaind in offline mode, no connections to other nodes.") + "\n";
     strUsage += "  -initprivkey=<privkey>                   " + _("Manually set the wallet default address and private key when running multichaind for the first time.") + "\n";
     strUsage += "  -handshakelocal=<address>                " + _("Manually override the wallet address which is used for handshaking with other peers in a MultiChain blockchain.") + "\n";
     strUsage += "  -hideknownopdrops=<n>                    " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON_RPC calls (default: %u)"), 0) + "\n";
@@ -946,9 +947,13 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     std::ostringstream strErrors;
 
     LogPrintf("Using %u threads for script verification\n", nScriptCheckThreads);
-    if (nScriptCheckThreads) {
-        for (int i=0; i<nScriptCheckThreads-1; i++)
-            threadGroup.create_thread(&ThreadScriptCheck);
+    
+    if(!GetBoolArg("-offline",false))
+    {    
+        if (nScriptCheckThreads) {
+            for (int i=0; i<nScriptCheckThreads-1; i++)
+                threadGroup.create_thread(&ThreadScriptCheck);
+        }
     }
 
     /* Start the RPC server already.  It will be started in "warmup" mode
@@ -2267,11 +2272,14 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         BOOST_FOREACH(string strFile, mapMultiArgs["-loadblock"])
             vImportFiles.push_back(strFile);
     }
-    threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
-    if (chainActive.Tip() == NULL) {
-        LogPrintf("Waiting for genesis block to be imported...\n");
-        while (!fRequestShutdown && chainActive.Tip() == NULL)
-            MilliSleep(10);
+    if(!GetBoolArg("-offline",false))
+    {    
+        threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
+        if (chainActive.Tip() == NULL) {
+            LogPrintf("Waiting for genesis block to be imported...\n");
+            while (!fRequestShutdown && chainActive.Tip() == NULL)
+                MilliSleep(10);
+        }
     }
 
     // ********************************************************* Step 10: start node
@@ -2301,15 +2309,14 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     LogPrintf("mapAddressBook.size() = %u\n",  pwalletMain ? pwalletMain->mapAddressBook.size() : 0);
 #endif
 
-    StartNode(threadGroup);
+    if(!GetBoolArg("-offline",false))
+    {
+        StartNode(threadGroup);
 
 #ifdef ENABLE_WALLET
     // Generate coins in the background
-    if (pwalletMain)
-/* MCHN START */        
-//        GenerateBitcoins(GetBoolArg("-gen", false), pwalletMain, GetArg("-genproclimit", 1));
-        GenerateBitcoins(GetBoolArg("-gen", true), pwalletMain, GetArg("-genproclimit", 1));
-/* MCHN END */        
+        if (pwalletMain)
+            GenerateBitcoins(GetBoolArg("-gen", true), pwalletMain, GetArg("-genproclimit", 1));
 #endif
 
     // ********************************************************* Step 11: finished
@@ -2318,12 +2325,13 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     uiInterface.InitMessage(_("Done loading"));
 */    
 #ifdef ENABLE_WALLET
-    if (pwalletMain) {
-        // Add wallet transactions that aren't already in a block to mapTransactions
-        pwalletMain->ReacceptWalletTransactions();
+        if (pwalletMain) {
+            // Add wallet transactions that aren't already in a block to mapTransactions
+            pwalletMain->ReacceptWalletTransactions();
 
-        // Run a thread to flush wallet periodically
-        threadGroup.create_thread(boost::bind(&ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile)));
+            // Run a thread to flush wallet periodically
+            threadGroup.create_thread(boost::bind(&ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile)));
+        }
     }
 #endif
 
