@@ -2108,7 +2108,6 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
     for (unsigned int j = 0; j < tx.vout.size(); j++)
     {
         unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
-        mc_EntityDetails entity;
         uint32_t type,from,to,timestamp,flags;
             
         const CScript& script1 = tx.vout[j].scriptPubKey;        

@@ -1032,7 +1032,6 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
         int nArgsExpected = ScriptSigArgsExpected(whichType, vSolutions);
 */
         vector<CTxDestination> addressRets;
-        int nRequiredRet;
         if(!IsStandard(prevScript,whichType))
         {
             return false; 
@@ -1053,7 +1052,6 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
             case TX_MULTISIG:
                 Solver(prevScript, whichType, vSolutions);
                 nArgsExpected = ScriptSigArgsExpected(whichType, vSolutions);
-//                nArgsExpected=nRequiredRet+1;
                 break;
             case TX_NONSTANDARD:
             case TX_NULL_DATA:
