@@ -111,9 +111,8 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
             }
             else
             {
-                unsigned char *root_stream_name;
                 int root_stream_name_size;
-                root_stream_name=(unsigned char *)mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
+                mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
                 if(root_stream_name_size <= 1)
                 {
                     if(hash == mc_GenesisCoinbaseTxID())
