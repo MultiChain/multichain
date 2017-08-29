@@ -177,7 +177,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
     { "minimumrelayfee"                     , "minimum-relay-fee"                     ,
                    MC_PRM_INT64   | MC_PRM_USER | MC_PRM_CLONE                  , -1,         0,          0,1000000000, 0.0, 10001, 0, "-mc-minimumrelayfee",
                    "nativecurrencymultiple","",
-                   "Minimum transaction fee, in raw units of native currency."},
+                   "Minimum transaction fee, per 1000 bytes, in raw units of native currency."},
     { "nativecurrencymultiple"            , "native-currency-multiple"                     ,
                    MC_PRM_INT64   | MC_PRM_USER | MC_PRM_CLONE                  , -1,         100000000,          0,1000000000, 0.0, 10001, 0, "-mc-nativecurrencymultiple",
                    "skippowcheck","",
