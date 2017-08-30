@@ -1026,6 +1026,20 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     uiInterface.InitMessage(_("Initializing multichain..."));
     RegisterNodeSignals(GetNodeSignals());
 
+    if(GetBoolArg("-offline",false))
+    {
+        if(mc_gState->m_NetworkParams->m_Status != MC_PRM_STATUS_VALID)
+        {
+            char fileName[MC_DCT_DB_MAX_PATH];
+            mc_GetFullFileName(mc_gState->m_Params->NetworkName(),"params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
+            string seed_error=strprintf("Couldn't retrieve blockchain parameters from the seed node in offline mode.\n"
+                        "The file %s must be copied manually from an existing node.\n",                
+                    fileName);
+            return InitError(seed_error);                        
+        }        
+    }    
+
+    
     bool fFirstRunForBuild;
     string init_privkey=GetArg("-initprivkey","");
     
