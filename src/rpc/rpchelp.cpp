@@ -3830,6 +3830,25 @@ void mc_InitRPCAllowedWhenOffline()
     setAllowedWhenOffline.insert("createkeypairs");    
     setAllowedWhenOffline.insert("verifymessage");    
     setAllowedWhenOffline.insert("signmessage");    
+    
+    
+    setAllowedWhenOffline.insert("addmultisigaddress");    
+    setAllowedWhenOffline.insert("getaddresses");    
+    setAllowedWhenOffline.insert("getnewaddress");    
+    setAllowedWhenOffline.insert("importaddress");    
+    setAllowedWhenOffline.insert("listaddresses");    
+    setAllowedWhenOffline.insert("validateaddress");    
+    setAllowedWhenOffline.insert("createmultisig");    
+    setAllowedWhenOffline.insert("backupwallet");    
+    setAllowedWhenOffline.insert("dumpprivkey");    
+    setAllowedWhenOffline.insert("dumpwallet");    
+    setAllowedWhenOffline.insert("encryptwallet");    
+    setAllowedWhenOffline.insert("getwalletinfo");    
+    setAllowedWhenOffline.insert("importprivkey");    
+    setAllowedWhenOffline.insert("importwallet");    
+    setAllowedWhenOffline.insert("walletlock");    
+    setAllowedWhenOffline.insert("walletpassphrase");    
+    setAllowedWhenOffline.insert("walletpassphrasechange");    
 }
 
 void mc_InitRPCHelpMap()
