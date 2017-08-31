@@ -3824,7 +3824,6 @@ void mc_InitRPCAllowedWhenOffline()
     setAllowedWhenOffline.insert("getinfo");    
     setAllowedWhenOffline.insert("help");    
     setAllowedWhenOffline.insert("stop");    
-    setAllowedWhenOffline.insert("getpeerinfo");    
     setAllowedWhenOffline.insert("decodescript");    
     setAllowedWhenOffline.insert("signrawtransaction");    
     setAllowedWhenOffline.insert("createkeypairs");    
@@ -3843,7 +3842,6 @@ void mc_InitRPCAllowedWhenOffline()
     setAllowedWhenOffline.insert("dumpprivkey");    
     setAllowedWhenOffline.insert("dumpwallet");    
     setAllowedWhenOffline.insert("encryptwallet");    
-    setAllowedWhenOffline.insert("getwalletinfo");    
     setAllowedWhenOffline.insert("importprivkey");    
     setAllowedWhenOffline.insert("importwallet");    
     setAllowedWhenOffline.insert("walletlock");    
