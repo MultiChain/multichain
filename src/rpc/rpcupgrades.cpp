@@ -261,6 +261,11 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
     mc_EntityDetails entity;
     entity.Zero();
     ParseEntityIdentifier(entity_identifier,&entity, MC_ENT_TYPE_UPGRADE);           
+    
+    if(mc_gState->m_Permissions->IsApproved(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,0))
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Upgrade already approved");                                
+    }
 
     vector<CTxDestination> fromaddresses;       
     fromaddresses=ParseAddresses(params[0].get_str(),false,false);
