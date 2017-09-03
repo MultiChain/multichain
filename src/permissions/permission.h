@@ -300,7 +300,7 @@ typedef struct mc_Permissions
     int GetBlockMiner(uint32_t block,unsigned char* lpMiner);
     uint32_t FindGovernanceModelChange(uint32_t from,uint32_t to);
 
-    int IsApproved(const void* lpUpgrade);
+    int IsApproved(const void* lpUpgrade, int check_current_block);
     
     int CanConnect(const void* lpEntity,const void* lpAddress);
     int CanSend(const void* lpEntity,const void* lpAddress);
@@ -352,6 +352,7 @@ typedef struct mc_Permissions
     uint32_t CalculateBlockFlags();
     int FindLastAllowedMinerRow(mc_PermissionLedgerRow *row,uint32_t block,int prev_result);
     
+    int IsApprovedInternal(const void* lpUpgrade, int check_current_block);
     
     int UpdateCounts();
     int AdminConsensus(const void* lpEntity,uint32_t type);

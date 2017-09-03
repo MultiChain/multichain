@@ -967,22 +967,42 @@ uint32_t mc_Permissions::GetAllPermissions(const void* lpEntity,const void* lpAd
 
 /** Returns non-zero value if upgrade is approved */
 
-int mc_Permissions::IsApproved(const void* lpUpgrade)
+int mc_Permissions::IsApproved(const void* lpUpgrade, int check_current_block)
 {
-    unsigned char address[MC_PLS_SIZE_ADDRESS];
     int result;
-    
-    memset(address,0,MC_PLS_SIZE_ADDRESS);
-    memcpy(address,lpUpgrade,MC_PLS_SIZE_UPGRADE);
     
     Lock(0);
             
-    result=GetPermission(upgrade_entity,address,MC_PTP_UPGRADE);
+    result=IsApprovedInternal(lpUpgrade,check_current_block);
     
     UnLock();
     
     return result;    
 }
+
+
+int mc_Permissions::IsApprovedInternal(const void* lpUpgrade, int check_current_block)
+{
+    unsigned char address[MC_PLS_SIZE_ADDRESS];
+    mc_PermissionLedgerRow row;
+    int result;
+    
+    memset(address,0,MC_PLS_SIZE_ADDRESS);
+    memcpy(address,lpUpgrade,MC_PLS_SIZE_UPGRADE);
+    
+    result=GetPermission(upgrade_entity,address,MC_PTP_UPGRADE,&row,1);
+    if(check_current_block == 0)
+    {
+        result=0;
+        if(row.m_BlockTo > row.m_BlockFrom)
+        {
+            result=MC_PTP_UPGRADE;
+        }
+    }
+    
+    return result;    
+}
+
 
 /** Returns non-zero value if (entity,address) can connect */
 
@@ -2945,7 +2965,10 @@ int mc_Permissions::SetApproval(const void* lpUpgrade,uint32_t approval,const vo
         }
         else
         {
-            result=SetPermissionInternal(upgrade_entity,address,MC_PTP_UPGRADE,lpAdmin,from,approval ? (uint32_t)(-1) : 0,timestamp, flags,update_mempool,offset);                            
+            if(IsApprovedInternal(lpUpgrade,0) == 0)
+            {
+                result=SetPermissionInternal(upgrade_entity,address,MC_PTP_UPGRADE,lpAdmin,from,approval ? (uint32_t)(-1) : 0,timestamp, flags,update_mempool,offset);                            
+            }
         }
     }
 
