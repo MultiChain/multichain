@@ -686,7 +686,7 @@ Object UpgradeEntry(const unsigned char *txid)
         }
 */
         entry.push_back(Pair("protocol-version",entity.UpgradeProtocolVersion()));                    
-        entry.push_back(Pair("start-block",(int64_t)entity.UpgradeStartBlock()));                    
+        entry.push_back(Pair("startblock",(int64_t)entity.UpgradeStartBlock()));                    
 /*        
         size_t value_size;
         int64_t offset,new_offset;

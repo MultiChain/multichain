@@ -1401,8 +1401,8 @@ void mc_InitRPCHelpMap06()
             "4  custom-fields                    (object, required)  a json object with custom fields\n"
             "    {\n"
             "      \"protocol-version\": version   (numeric, required) Protocol version to upgrade to\n"
-            "      \"start-block\": block          (numeric, optional, default 0) Block to apply from \n"
-            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
+            "      \"startblock\": block           (numeric, optional, default 0) Block to apply from \n"
+//            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
             "      ,...\n"
             "    }\n"
 

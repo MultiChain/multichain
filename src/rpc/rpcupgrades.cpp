@@ -112,7 +112,7 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
             }
             else
             {
-                if(s.name_ == "start-block")
+                if(s.name_ == "startblock")
                 {
                     if(s.value_.type() != int_type)
                     {
@@ -450,7 +450,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
             approved=false;  
             entry.push_back(Pair("approved", false));            
             Value null_value;
-            entry.push_back(Pair("applied-block",null_value));            
+            entry.push_back(Pair("appliedblock",null_value));            
         }
         else
         {
@@ -463,12 +463,12 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
             }
             if(current_height >=applied_height)
             {
-                entry.push_back(Pair("applied-block",(int64_t)applied_height));                            
+                entry.push_back(Pair("appliedblock",(int64_t)applied_height));                            
             }
             else
             {
                 Value null_value;
-                entry.push_back(Pair("applied-block",null_value));                            
+                entry.push_back(Pair("appliedblock",null_value));                            
             }
         }
         
