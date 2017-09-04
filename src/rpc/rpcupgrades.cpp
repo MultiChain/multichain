@@ -6,6 +6,7 @@
 
 
 #include "rpc/rpcwallet.h"
+#include "version/version.h"
 
 Value createupgradefromcmd(const Array& params, bool fHelp)
 {

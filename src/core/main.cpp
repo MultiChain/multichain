@@ -5,6 +5,7 @@
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "core/main.h"
+#include "version/version.h"
 
 #include "storage/addrman.h"
 #include "structs/alert.h"
