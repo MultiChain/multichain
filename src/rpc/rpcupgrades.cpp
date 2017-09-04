@@ -108,6 +108,11 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
                 {
                     throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid value for protocol version. Valid range: %s\n",mc_SupportedProtocols().c_str()));                                                                                    
                 }
+                
+                if( protocol_version < mc_gState->MinProtocolDowngradeVersion() )
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid protocol version, cannot downgrade to this version");                                                                                                        
+                }
                 lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,(unsigned char*)&protocol_version,4);        
             }
             else
