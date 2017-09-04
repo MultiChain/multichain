@@ -356,6 +356,7 @@ int MultichainNode_ApplyUpgrades()
 
     int OldProtocolVersion=mc_gState->m_ProtocolVersionToUpgrade;
     int NewProtocolVersion=0;
+    int version;
     
     permissions=mc_gState->m_Permissions->GetUpgradeList(NULL,NULL);
 
@@ -381,7 +382,20 @@ int MultichainNode_ApplyUpgrades()
             {
                 if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,plsRow->m_Address))
                 {
-                    NewProtocolVersion=entity.UpgradeProtocolVersion();
+                    int current_height=chainActive.Height();     
+                    int applied_height=entity.UpgradeStartBlock();
+                    if(plsRow->m_BlockReceived > applied_height)
+                    {
+                        applied_height=plsRow->m_BlockReceived;
+                    }
+                    if(current_height >=applied_height)
+                    {
+                        version=entity.UpgradeProtocolVersion();
+                        if(version >= mc_gState->MinProtocolDowngradeVersion())
+                        {
+                            NewProtocolVersion=version;
+                        }
+                    }
                 }
             }            
         }

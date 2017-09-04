@@ -85,6 +85,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "sendasset", 2 },
     { "sendasset", 3 },
     { "getblockchainparams", 0 },
+    { "getblockchainparams", 1 },
     { "preparelockunspent", 0 },
     { "preparelockunspent", 1 },
     { "createrawexchange", 1 },

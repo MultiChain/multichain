@@ -339,10 +339,13 @@ void mc_InitRPCHelpMap02()
         ));
     
     mapHelpStrings.insert(std::make_pair("getblockchainparams",
-            "getblockchainparams ( displaynames )\n"    
+            "getblockchainparams ( displaynames with-upgrades )\n"    
             "\nReturns a list of values of this blockchain’s parameters\n"
             "\nArguments:\n"
             "1. displaynames                     (boolean, optional, default=true) use display names instead of internal\n"
+//            "2. height                           (numeric or boolean, optional, default true) The block height in active chain or height before current tip (if negative)\n"
+//            "                                    false - original configuration (height=0), true - current configuration\n"
+            "2. with-upgrades                    (boolean, optional, default=true) Take upgrades into account \n"
             "\nResult:\n"
             "An object containing various blockchain parameters.\n"
             "\nExamples:\n"
@@ -3625,7 +3628,7 @@ void mc_InitRPCHelpMap16()
     mapHelpStrings.insert(std::make_pair("listupgrades",
             "listupgrades (upgrade-identifier(s))\n"
             "1. \"upgrade-identifier(s)\"          (string, optional, default=*, all upgrades) Upgrade identifier - one of the following:\n"
-            "                                                                                upgrade txid, upgrade reference, upgrade name.\n"
+            "                                                                                upgrade txid, upgrade name.\n"
             " or\n"
             "1. upgrade-identifier(s)            (array, optional) A json array of upgrade identifiers \n"                
             "\nReturns list of defined upgrades\n"
