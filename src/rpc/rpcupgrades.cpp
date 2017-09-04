@@ -447,15 +447,29 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
         approved=true;
         if(plsRow->m_BlockFrom >= plsRow->m_BlockTo)
         {
-            Value null_value;
-            entry.push_back(Pair("approved-block",null_value));            
             approved=false;  
             entry.push_back(Pair("approved", false));            
+            Value null_value;
+            entry.push_back(Pair("applied-block",null_value));            
         }
         else
         {
-            entry.push_back(Pair("approved-block",(int64_t)plsRow->m_BlockReceived));            
-            entry.push_back(Pair("approved", true));                        
+            entry.push_back(Pair("approved", true));
+            int current_height=chainActive.Height();     
+            int applied_height=upgrade_entity.UpgradeStartBlock();
+            if(plsRow->m_BlockReceived > applied_height)
+            {
+                applied_height=plsRow->m_BlockReceived;
+            }
+            if(current_height >=applied_height)
+            {
+                entry.push_back(Pair("applied-block",(int64_t)applied_height));                            
+            }
+            else
+            {
+                Value null_value;
+                entry.push_back(Pair("applied-block",null_value));                            
+            }
         }
         
         take_it=true;

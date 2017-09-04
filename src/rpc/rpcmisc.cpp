@@ -512,13 +512,44 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
 
 Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
 {
-    if (fHelp || params.size() > 1)                                            // MCHN
+    if (fHelp || params.size() > 2)                                            // MCHN
         throw runtime_error("Help message not found\n");
 
     
     bool fDisplay = true;
     if (params.size() > 0)
         fDisplay = params[0].get_bool();
+    
+    int nHeight=chainActive.Height();
+    if (params.size() > 1)
+    {
+        if(params[1].type() == bool_type)
+        {
+            if(!params[1].get_bool())
+            {
+                nHeight=0;
+            }
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "with-upgrades should be boolean");                
+/*            
+            if(params[1].type() == int_type)
+            {
+                nHeight=params[1].get_int();
+            }            
+ */ 
+        }
+    }
+    
+    if (nHeight < 0 || nHeight > chainActive.Height())
+    {
+        nHeight+=chainActive.Height();
+        if (nHeight <= 0 || nHeight > chainActive.Height())
+        {
+            throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range");
+        }
+    }
     
     Object obj;
     int protocol_version=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
@@ -618,6 +649,14 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                     case MC_PRM_DOUBLE:
                         param_value=*(double*)ptr;                                                                
                         break;
+                }
+            }
+            
+            if(strcmp("protocolversion",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+            {
+                if(nHeight)
+                {
+                    param_value=mc_gState->m_NetworkParams->m_ProtocolVersion;
                 }
             }
 

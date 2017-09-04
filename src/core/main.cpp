@@ -382,10 +382,19 @@ int MultichainNode_ApplyUpgrades()
             {
                 if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,plsRow->m_Address))
                 {
-                    version=entity.UpgradeProtocolVersion();
-                    if(version >= mc_gState->MinProtocolDowngradeVersion())
+                    int current_height=chainActive.Height();     
+                    int applied_height=entity.UpgradeStartBlock();
+                    if(plsRow->m_BlockReceived > applied_height)
                     {
-                        NewProtocolVersion=version;
+                        applied_height=plsRow->m_BlockReceived;
+                    }
+                    if(current_height >=applied_height)
+                    {
+                        version=entity.UpgradeProtocolVersion();
+                        if(version >= mc_gState->MinProtocolDowngradeVersion())
+                        {
+                            NewProtocolVersion=version;
+                        }
                     }
                 }
             }            
