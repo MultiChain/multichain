@@ -1380,7 +1380,7 @@ void mc_InitRPCHelpMap06()
     
     mapHelpStrings.insert(std::make_pair("create",
             "create \"entity-type\" \"entity-name\" open ( custom-fields )\n"
-            "\nCreates stream\n"
+            "\nCreates stream or upgrade\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"entity-type\"                    (string, required) stream\n"
@@ -1434,7 +1434,7 @@ void mc_InitRPCHelpMap06()
             "    {\n"
             "      \"protocol-version\": version   (numeric, required) Protocol version to upgrade to \n"
             "      \"start-block\": block          (numeric, optional, default 0) Block to apply from \n"
-            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
+//            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
             "      ,...\n"
             "    }\n"
             "\nResult:\n"
@@ -3612,8 +3612,8 @@ void mc_InitRPCHelpMap16()
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"from-address\"                   (string, required) Address used for approval.\n"
-            "2. \"upgrade-identifier\"             (string, required) Upgrade identifier - one of the following: upgrade txid, upgrade reference, upgrade name.\n"
-            "3. approve                          (boolean, optional)  Approve or disapprove, default true\n"
+            "2. \"upgrade-identifier\"             (string, required) Upgrade identifier - one of the following: upgrade txid, upgrade name.\n"
+            "3. approve                          (boolean, required)  Approve or disapprove\n"
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -3803,7 +3803,6 @@ void mc_InitRPCAllowedWhenWaitingForUpgradeSet()
     setAllowedWhenWaitingForUpgrade.insert("getblockhash");    
     setAllowedWhenWaitingForUpgrade.insert("getmempoolinfo");    
     setAllowedWhenWaitingForUpgrade.insert("listupgrades");    
-    setAllowedWhenWaitingForUpgrade.insert("listpermissions");    
     setAllowedWhenWaitingForUpgrade.insert("decoderawtransaction");    
     setAllowedWhenWaitingForUpgrade.insert("getrawtransaction");    
     setAllowedWhenWaitingForUpgrade.insert("dumpprivkey");    

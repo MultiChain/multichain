@@ -879,7 +879,7 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
             row->m_BlockFrom=pldRow.m_BlockFrom;
             row->m_BlockTo=pldRow.m_BlockTo;
             row->m_ThisRow=pldRow.m_ThisRow;
-            row->m_Flags=pldRow.m_Flags;        
+            row->m_Flags=pldRow.m_Flags;     
             pldRow.m_PrevRow=pldRow.m_ThisRow;        
         }
 /*        
@@ -2440,6 +2440,7 @@ int mc_Permissions::FillPermissionDetails(mc_PermissionDetails *plsRow,mc_Buffer
                 plsRow->m_Flags |= MC_PFL_HAVE_PENDING;
                 phase=1;                                                        // There are pending records
             }
+            plsRow->m_BlockReceived=pldRow.m_BlockReceived;
             if(plsDetailsBuffer == NULL)                                              // We have details, but they are not required
             {
                 return MC_ERR_NOERROR;
@@ -2741,6 +2742,7 @@ mc_Buffer *mc_Permissions::GetPermissionList(const void* lpEntity,const void* lp
                     plsRow.m_BlockTo=pldRow.m_BlockTo;
                     plsRow.m_Flags=pldRow.m_Flags;
                     plsRow.m_LastRow=pldRow.m_ThisRow;
+                    plsRow.m_BlockReceived=pldRow.m_BlockReceived;
                     result->Add(&plsRow,(unsigned char*)&plsRow+m_Database->m_ValueOffset);
                 }
             }
@@ -2784,6 +2786,7 @@ mc_Buffer *mc_Permissions::GetPermissionList(const void* lpEntity,const void* lp
                         plsRow.m_BlockTo=pdbRow.m_BlockTo;
                         plsRow.m_Flags=pdbRow.m_Flags;
                         plsRow.m_LastRow=pdbRow.m_LedgerRow;
+                        plsRow.m_BlockReceived=pldRow.m_BlockReceived;
                         result->Add(&plsRow,(unsigned char*)&plsRow+m_Database->m_ValueOffset);
                     }
                 }
@@ -2855,6 +2858,7 @@ mc_Buffer *mc_Permissions::GetPermissionList(const void* lpEntity,const void* lp
                             plsRow.m_BlockTo=pldRow.m_BlockTo;
                             plsRow.m_Flags=pldRow.m_Flags;
                             plsRow.m_LastRow=pldRow.m_ThisRow;
+                            plsRow.m_BlockReceived=pldRow.m_BlockReceived;
                             result->Add(&plsRow,(unsigned char*)&plsRow+m_Database->m_ValueOffset);                    
                         }
                         first=0;

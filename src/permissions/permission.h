@@ -214,7 +214,7 @@ typedef struct mc_PermissionDetails
     uint32_t m_Flags;                                                           // Flags MC_PFL_ constants
     int32_t m_RequiredAdmins;                                                   // Number of admins required for consensus                                                  
     unsigned char m_LastAdmin[MC_PLS_SIZE_ADDRESS];                             // Last admin address 
-    uint32_t m_Reserved1;                                                       // Reserved for alignment
+    uint32_t m_BlockReceived;                                                   // BlockHeight
     uint64_t m_LastRow;                                                         // Last row in the ledger        
     void Zero();
 } mc_PermissionDetails;
