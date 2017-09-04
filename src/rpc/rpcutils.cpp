@@ -650,7 +650,10 @@ Object UpgradeEntry(const unsigned char *txid)
 
     if(txid == NULL)
     {
-        entry.push_back(Pair("upgraderef", ""));
+        Value null_value;
+        entry.push_back(Pair("name",null_value));
+        entry.push_back(Pair("createtxid",null_value));
+//        entry.push_back(Pair("upgraderef", null_value));
         return entry;
     }
     
@@ -664,7 +667,8 @@ Object UpgradeEntry(const unsigned char *txid)
             entry.push_back(Pair("name", string((char*)ptr)));            
         }
         entry.push_back(Pair("createtxid", hash.GetHex()));
-        ptr=(unsigned char *)entity.GetRef();
+/*        
+        ptr=(unsigned char *)entity.GetRef();        
         string streamref="";
         if(entity.IsUnconfirmedGenesis())
         {
@@ -680,10 +684,10 @@ Object UpgradeEntry(const unsigned char *txid)
             streamref += itostr((int)mc_GetLE(ptr+8,2));
             entry.push_back(Pair("upgraderef", streamref));
         }
-
+*/
         entry.push_back(Pair("protocol-version",entity.UpgradeProtocolVersion()));                    
         entry.push_back(Pair("start-block",(int64_t)entity.UpgradeStartBlock()));                    
-        
+/*        
         size_t value_size;
         int64_t offset,new_offset;
         uint32_t value_offset;
@@ -727,7 +731,8 @@ Object UpgradeEntry(const unsigned char *txid)
             }
             offset=new_offset;
         }      
-        entry.push_back(Pair("params",fields));                    
+        entry.push_back(Pair("params",fields));      
+ */               
 //        entry.push_back(Pair("creators",openers));                    
         
     }
@@ -736,7 +741,7 @@ Object UpgradeEntry(const unsigned char *txid)
         Value null_value;
         entry.push_back(Pair("name",null_value));
         entry.push_back(Pair("createtxid",null_value));
-        entry.push_back(Pair("upgraderef", null_value));
+//        entry.push_back(Pair("upgraderef", null_value));
     }
     
     return entry;
