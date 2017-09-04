@@ -391,7 +391,7 @@ int MultichainNode_ApplyUpgrades()
                     if(current_height >=applied_height)
                     {
                         version=entity.UpgradeProtocolVersion();
-                        if(version >= mc_gState->MinProtocolDowngradeVersion())
+                        if(version >= MULTICHAIN_MIN_DOWNGRADE_PROTOCOL_VERSION)
                         {
                             NewProtocolVersion=version;
                         }

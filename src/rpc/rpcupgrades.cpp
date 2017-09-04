@@ -111,6 +111,11 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
                 {
                     throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid protocol version, cannot upgrade to future version");                                                                                    
                 }
+
+                if(protocol_version < MULTICHAIN_MIN_DOWNGRADE_PROTOCOL_VERSION)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid protocol version, cannot downgrade to this version");                                                                                    
+                }
                 lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,(unsigned char*)&protocol_version,4);        
             }
             else
