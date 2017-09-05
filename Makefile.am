@@ -12,6 +12,7 @@ BITCOIN_WIN_INSTALLER=$(PACKAGE)-$(PACKAGE_VERSION)-win$(WINDOWS_BITS)-setup$(EX
 # MCHN START
 
 MULTICHAIND_BIN=$(top_builddir)/src/multichaind$(EXEEXT)
+MULTICHAIND_COLD_BIN=$(top_builddir)/src/multichaind-cold$(EXEEXT)
 MULTICHAIN_CLI_BIN=$(top_builddir)/src/multichain-cli$(EXEEXT)
 MULTICHAIN_UTIL_BIN=$(top_builddir)/src/multichain-util$(EXEEXT)
 
@@ -62,6 +63,7 @@ $(BITCOIN_WIN_INSTALLER): all-recursive
 	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM) $(BITCOIN_QT_BIN) $(top_builddir)/release
 	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM) $(BITCOIN_CLI_BIN) $(top_builddir)/release
 	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM) $(MULTICHAIND_BIN) $(top_builddir)/release    # MCHN
+	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM) $(MULTICHAIND_COLD_BIN) $(top_builddir)/release    # MCHN
 	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM) $(MULTICHAI_CLI_BIN) $(top_builddir)/release  # MCHN
 	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM) $(MULTICHAI_UTIL_BIN) $(top_builddir)/release # MCHN
 	@test -f $(MAKENSIS) && $(MAKENSIS) $(top_builddir)/share/setup.nsi || \
@@ -144,6 +146,9 @@ $(BITCOIN_CLI_BIN): FORCE
 # MCHN START
 
 $(MULTICHAIND_BIN): FORCE
+	$(MAKE) -C src $(@F)
+
+$(MULTICHAIND_COLD_BIN): FORCE
 	$(MAKE) -C src $(@F)
 
 $(MULTICHAIN_CLI_BIN): FORCE
