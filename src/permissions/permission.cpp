@@ -2374,10 +2374,16 @@ int mc_Permissions::FillPermissionDetails(mc_PermissionDetails *plsRow,mc_Buffer
     
     countLedgerRows=m_Row-m_MemPool->GetCount();
     consensus=AdminConsensus(plsRow->m_Entity,plsRow->m_Type);
+    
+    if(mc_IsUpgradeEntity(plsRow->m_Entity))
+    {
+        consensus=AdminConsensus(plsRow->m_Entity,MC_PTP_UPGRADE);
+    }
+    
     required=consensus;
     
     plsRow->m_RequiredAdmins=consensus;
-
+    
     prevRow=plsRow->m_LastRow;
 
     phase=0;
