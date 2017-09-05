@@ -8,6 +8,7 @@ src/bitcoin-tx
 src/multichain-cli
 src/multichain-util
 src/multichaind
+src/multichaind-cold
 src/test/test_bitcoin
 src/qt/test/test_bitcoin-qt
 
