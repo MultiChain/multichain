@@ -289,7 +289,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
 /* MCHN START */    
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-        LogPrintf("MultiChain offline version build %s protocol %s (%s)\n", mc_BuildDescription(mc_gState->GetNumericVersion()), mc_gState->GetProtocolVersion(), CLIENT_DATE);
+        LogPrintf("MultiChain offline version %s (%s)\n", mc_gState->GetFullVersion(), CLIENT_DATE);
     }
 
 /* MCHN END */    
