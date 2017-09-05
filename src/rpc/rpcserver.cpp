@@ -423,6 +423,28 @@ Value resumecmd(const Array& params, bool fHelp)
 
 /* END */
 
+CRPCTable::CRPCTable()
+{
+}
+
+void CRPCTable::initialize()
+{
+    unsigned int vcidx;
+    for (vcidx = 0; vcidx < (int)vStaticRPCCommands.size(); vcidx++)
+    {
+        const CRPCCommand *pcmd;
+
+        pcmd = &vStaticRPCCommands[vcidx];
+        mapCommands[pcmd->name] = pcmd;
+    }
+    for (vcidx = 0; vcidx < (int)vStaticRPCWalletReadCommands .size(); vcidx++)
+    {
+        const CRPCCommand *pcmd;
+
+        pcmd = &vStaticRPCWalletReadCommands[vcidx];
+        mapWalletReadCommands[pcmd->name] = pcmd;
+    }
+}
 
 const CRPCCommand *CRPCTable::operator[](string name) const
 {
@@ -602,6 +624,9 @@ static ip::tcp::endpoint ParseEndpoint(const std::string &strEndpoint, int defau
 
 void StartRPCThreads()
 {
+    mc_InitRPCList(vStaticRPCCommands,vStaticRPCWalletReadCommands);
+    tableRPC.initialize();
+
     rpc_allow_subnets.clear();
     rpc_allow_subnets.push_back(CSubNet("127.0.0.0/8")); // always allow IPv4 local subnet
     rpc_allow_subnets.push_back(CSubNet("::1")); // always allow IPv6 localhost
@@ -1202,8 +1227,12 @@ std::string HelpExampleRpc(string methodname, string args){
             strprintf("%d",(int)mc_gState->m_NetworkParams->GetInt64Param("defaultrpcport")) + "\n";// MCHN was hard-coded 8332 before
 }
 
-const CRPCTable tableRPC;
+CRPCTable tableRPC;
 std::map<std::string, std::string> mapHelpStrings;
 std::map<std::string, int> mapLogParamCounts;
 std::set<std::string> setAllowedWhenWaitingForUpgrade;
 std::set<std::string> setAllowedWhenOffline;
+
+std::vector<CRPCCommand> vStaticRPCCommands;
+std::vector<CRPCCommand> vStaticRPCWalletReadCommands;
+

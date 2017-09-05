@@ -246,21 +246,17 @@ static const CRPCCommand vRPCCommands[] =
 #endif // ENABLE_WALLET
 };
 
-CRPCTable::CRPCTable()
+void mc_InitRPCList(std::vector<CRPCCommand>& vStaticRPCCommands,std::vector<CRPCCommand>& vStaticRPCWalletReadCommands)
 {
     unsigned int vcidx;
+    vStaticRPCCommands.clear();
+    vStaticRPCWalletReadCommands.clear();
     for (vcidx = 0; vcidx < (sizeof(vRPCCommands) / sizeof(vRPCCommands[0])); vcidx++)
     {
-        const CRPCCommand *pcmd;
-
-        pcmd = &vRPCCommands[vcidx];
-        mapCommands[pcmd->name] = pcmd;
-    }
+        vStaticRPCCommands.push_back(vRPCCommands[vcidx]);
+    }    
     for (vcidx = 0; vcidx < (sizeof(vRPCWalletReadCommands) / sizeof(vRPCWalletReadCommands[0])); vcidx++)
     {
-        const CRPCCommand *pcmd;
-
-        pcmd = &vRPCWalletReadCommands[vcidx];
-        mapWalletReadCommands[pcmd->name] = pcmd;
-    }
+        vStaticRPCWalletReadCommands.push_back(vRPCCommands[vcidx]);
+    }    
 }
