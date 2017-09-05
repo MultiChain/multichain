@@ -21,6 +21,7 @@
 static bool fDaemon;
 
 void DebugPrintClose();
+std::string HelpMessage_Cold();
 bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe=STDOUT_FILENO);
 void Shutdown_Cold();
 
@@ -119,7 +120,7 @@ bool AppInit(int argc, char* argv[])
             strUsage += "\n" + _("Usage:") + "\n" +
                   "  multichaind-cold <blockchain-name> [options]                     " + _("Start MultiChain Offline Daemon") + "\n";
 
-            strUsage += "\n" + HelpMessage(HMM_BITCOIND);                       // MCHN-TODO edit help message
+            strUsage += "\n" + HelpMessage_Cold();  
         }
 
         fprintf(stdout, "%s", strUsage.c_str());
