@@ -430,14 +430,14 @@ CRPCTable::CRPCTable()
 void CRPCTable::initialize()
 {
     unsigned int vcidx;
-    for (vcidx = 0; vcidx < (int)vStaticRPCCommands.size(); vcidx++)
+    for (vcidx = 0; vcidx < vStaticRPCCommands.size(); vcidx++)
     {
         const CRPCCommand *pcmd;
 
         pcmd = &vStaticRPCCommands[vcidx];
         mapCommands[pcmd->name] = pcmd;
     }
-    for (vcidx = 0; vcidx < (int)vStaticRPCWalletReadCommands .size(); vcidx++)
+    for (vcidx = 0; vcidx < vStaticRPCWalletReadCommands.size(); vcidx++)
     {
         const CRPCCommand *pcmd;
 

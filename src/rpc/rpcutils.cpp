@@ -685,8 +685,8 @@ Object UpgradeEntry(const unsigned char *txid)
             entry.push_back(Pair("upgraderef", streamref));
         }
 */
-        entry.push_back(Pair("protocol-version",entity.UpgradeProtocolVersion()));                    
-        entry.push_back(Pair("startblock",(int64_t)entity.UpgradeStartBlock()));                    
+        Object fields;
+        fields.push_back(Pair("protocol-version",entity.UpgradeProtocolVersion()));                    
 /*        
         size_t value_size;
         int64_t offset,new_offset;
@@ -695,7 +695,6 @@ Object UpgradeEntry(const unsigned char *txid)
 
         ptr=entity.GetScript();
         
-        Object fields;
         Array openers;
         offset=0;
         while(offset>=0)
@@ -731,9 +730,10 @@ Object UpgradeEntry(const unsigned char *txid)
             }
             offset=new_offset;
         }      
-        entry.push_back(Pair("params",fields));      
  */               
 //        entry.push_back(Pair("creators",openers));                    
+        entry.push_back(Pair("params",fields));      
+        entry.push_back(Pair("startblock",(int64_t)entity.UpgradeStartBlock()));                    
         
     }
     else

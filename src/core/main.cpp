@@ -384,7 +384,7 @@ int MultichainNode_ApplyUpgrades()
                 {
                     int current_height=chainActive.Height();     
                     int applied_height=entity.UpgradeStartBlock();
-                    if(plsRow->m_BlockReceived > applied_height)
+                    if((int)plsRow->m_BlockReceived > applied_height)
                     {
                         applied_height=plsRow->m_BlockReceived;
                     }

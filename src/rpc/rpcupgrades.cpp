@@ -351,7 +351,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
     }
 */
     
-    int verbose=1;
+//    int verbose=1;
     
     vector<string> inputStrings;
     if (params.size() > 0 && params[0].type() != null_type && ((params[0].type() != str_type) || (params[0].get_str() !="*" ) ) )
@@ -439,7 +439,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
         Object entry;
         mc_PermissionDetails *plsRow;
         mc_PermissionDetails *plsDet;
-        mc_PermissionDetails *plsPend;
+//        mc_PermissionDetails *plsPend;
         mc_EntityDetails upgrade_entity;
         bool take_it,approved;
         int flags,consensus,remaining;
@@ -462,7 +462,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
             entry.push_back(Pair("approved", true));
             int current_height=chainActive.Height();     
             int applied_height=upgrade_entity.UpgradeStartBlock();
-            if(plsRow->m_BlockReceived > applied_height)
+            if((int)plsRow->m_BlockReceived > applied_height)
             {
                 applied_height=plsRow->m_BlockReceived;
             }
