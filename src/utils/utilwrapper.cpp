@@ -272,6 +272,10 @@ boost::filesystem::path mc_GetDefaultDataDir()
     // Mac and Unix: ~/.multichain
 #ifdef WIN32
     // Windows
+    if(mc_gState->m_SessionFlags & MC_SSF_COLD)
+    {
+        return GetSpecialFolderPath(CSIDL_APPDATA) / "MultiChainCold";
+    }
     return GetSpecialFolderPath(CSIDL_APPDATA) / "MultiChain";
 #else
     // Mac and Unix
@@ -282,6 +286,10 @@ boost::filesystem::path mc_GetDefaultDataDir()
     else
         pathRet = boost::filesystem::path(pszHome);
     
+    if(mc_gState->m_SessionFlags & MC_SSF_COLD)
+    {
+        return pathRet / ".multichain-cold";        
+    }
     return pathRet / ".multichain";
 #endif
 }

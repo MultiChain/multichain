@@ -19,6 +19,9 @@
 #define MC_ETP_UTIL        2
 #define MC_ETP_CLI         3
 
+#define MC_SSF_DEFAULT        0x00000000
+#define MC_SSF_COLD           0x00000001
+
 #define MC_NTS_UNCONNECTED             0
 #define MC_NTS_WAITING_FOR_SEED        1
 #define MC_NTS_SEED_READY              2     
@@ -159,6 +162,7 @@ typedef struct mc_State
     int m_ProtocolVersionToUpgrade;
     void *m_pSeedNode;
     uint32_t m_Compatibility;
+    uint32_t m_SessionFlags;
     
     mc_Script               *m_TmpScript;
     mc_Script               *m_TmpScript1;
@@ -179,6 +183,8 @@ typedef struct mc_State
         m_NetworkState=MC_NTS_UNCONNECTED;
         m_NodePausedState=MC_NPS_NONE;
         m_ProtocolVersionToUpgrade=0;
+        m_SessionFlags=MC_SSF_DEFAULT;
+        
         m_IPv4Address=0;
         m_WalletMode=0;
         m_TmpAssetsOut=new mc_Buffer;

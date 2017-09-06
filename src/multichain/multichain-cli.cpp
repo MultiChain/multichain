@@ -35,6 +35,7 @@ std::string HelpMessageCli()
     strUsage += "  -?                       " + _("This help message") + "\n";
     strUsage += "  -conf=<file>             " + strprintf(_("Specify configuration file (default: %s)"), "multichain.conf") + "\n";
     strUsage += "  -datadir=<dir>           " + _("Specify data directory") + "\n";
+    strUsage += "  -cold=<dir>              " + _("Connect to multichaind-cold: use multichaind-cold default directory if -datadir is not set") + "\n";
 /* MCHN START */    
     strUsage += "  -requestout=<requestout> " + _("Send request to stderr, stdout or null (not print it at all), default stderr") + "\n"; 
     strUsage += "  -saveclilog=<n>          " + _("If <n>=0 multichain-cli history is not saved, default 1") + "\n";
@@ -99,6 +100,13 @@ static int AppInitRPC(int argc, char* argv[])
     mc_gState=new mc_State;
     
     mc_gState->m_Params->Parse(argc, argv, MC_ETP_CLI);
+
+    if(GetBoolArg("-cold",false))
+    {
+        mc_gState->m_SessionFlags |= MC_SSF_COLD;
+    }
+    
+    
     mc_CheckDataDirInConfFile();
    
     if(mc_gState->m_Params->NetworkName())
