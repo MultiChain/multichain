@@ -881,7 +881,7 @@ Value getbalance(const Array& params, bool fHelp)
             for (map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end(); ++it)
             {
                 const CWalletTx& wtx = (*it).second;
-                if (!wtx.IsTrustedNoDepth() || wtx.GetBlocksToMaturity() > 0)
+                if (!IsFinalTx(wtx) || wtx.GetBlocksToMaturity() > 0 || wtx.GetDepthInMainChain() < 0)
                     continue;
 
                 CAmount allFee;
