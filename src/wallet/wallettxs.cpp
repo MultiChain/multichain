@@ -156,6 +156,23 @@ bool mc_Coin::IsTrusted() const
     return (m_Flags & MC_TFL_ALL_INPUTS_FROM_ME) > 0;
 }
 
+bool mc_Coin::IsTrustedNoDepth() const
+{
+    if (!IsFinal())
+    {
+        return false;
+    }
+    
+    int nDepth=GetDepthInMainChain();
+
+    if (nDepth < 0)
+    {
+        return false;
+    }
+
+    return (m_Flags & MC_TFL_ALL_INPUTS_FROM_ME) > 0;
+}
+
 int mc_Coin::GetDepthInMainChain() const
 {
     int nDepth=0;
