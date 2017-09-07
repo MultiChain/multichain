@@ -870,7 +870,7 @@ Value getbalance(const Array& params, bool fHelp)
             {
                 CTxOut txout;
                 out.GetHashAndTxOut(txout);
-                if(out.IsTrusted() || (out.nDepth >= nMinDepth))
+                if(out.IsTrustedNoDepth() || (out.nDepth >= nMinDepth))
                 {
                     nBalance+=txout.nValue;
                 }
@@ -881,7 +881,7 @@ Value getbalance(const Array& params, bool fHelp)
             for (map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end(); ++it)
             {
                 const CWalletTx& wtx = (*it).second;
-                if (!wtx.IsTrusted() || wtx.GetBlocksToMaturity() > 0)
+                if (!wtx.IsTrustedNoDepth() || wtx.GetBlocksToMaturity() > 0)
                     continue;
 
                 CAmount allFee;

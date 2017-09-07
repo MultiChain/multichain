@@ -717,7 +717,7 @@ Value getmultibalances(const Array& params, bool fHelp)
         pwalletMain->AvailableCoins(vecOutputs, false, NULL, fUnlockedOnly,true);
         BOOST_FOREACH(const COutput& out, vecOutputs) 
         {        
-            if(!out.IsTrusted())
+            if(!out.IsTrustedNoDepth())
             {
                 if (out.nDepth < nMinDepth)
                 {
@@ -1055,7 +1055,7 @@ Value getaddressbalances(const Array& params, bool fHelp)
         else
         {
  */ 
-        if(!out.IsTrusted())
+        if(!out.IsTrustedNoDepth())
         {
             if (out.nDepth < nMinDepth)
             {
@@ -1284,7 +1284,7 @@ Value getassetbalances(const Array& params, bool fHelp)
         else
         {
  */ 
-            if(!out.IsTrusted())
+            if(!out.IsTrustedNoDepth())
             {
                 if (out.nDepth < nMinDepth)
                 {

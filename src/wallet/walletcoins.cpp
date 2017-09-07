@@ -2661,6 +2661,16 @@ bool COutput::IsTrusted() const
     return coin.IsTrusted();
 }
 
+bool COutput::IsTrustedNoDepth() const
+{
+    if(tx)
+    {                
+        return tx->IsTrusted((nDepth >= 0) ? 0 : -1);
+    }
+    return coin.IsTrustedNoDepth();
+}
+
+
 bool OutputCanSend(COutput out)
 {            
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
