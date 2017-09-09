@@ -347,15 +347,16 @@ map<NodeId, CNodeState> mapNodeState;
 
 /* MCHN START */
 
-int MultichainNode_ApplyUpgrades()
+int MultichainNode_ApplyUpgrades(int current_height)
 {
     mc_EntityDetails entity;
     mc_Buffer *permissions;
     permissions=NULL;
     map <uint64_t,int> map_sorted;
 
-    int OldProtocolVersion=mc_gState->m_ProtocolVersionToUpgrade;
-    int NewProtocolVersion=0;
+    int OriginalProtocolVersion=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
+    int CurrentProtocolVersion=mc_gState->m_NetworkParams->ProtocolVersion();//mc_gState->m_ProtocolVersionToUpgrade;
+    int NewProtocolVersion=OriginalProtocolVersion;
     int version;
     
     permissions=mc_gState->m_Permissions->GetUpgradeList(NULL,NULL);
@@ -382,7 +383,6 @@ int MultichainNode_ApplyUpgrades()
             {
                 if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,plsRow->m_Address))
                 {
-                    int current_height=chainActive.Height();     
                     int applied_height=entity.UpgradeStartBlock();
                     if((int)plsRow->m_BlockReceived > applied_height)
                     {
@@ -404,9 +404,9 @@ int MultichainNode_ApplyUpgrades()
     mc_gState->m_Permissions->FreePermissionList(permissions);
     mc_gState->m_ProtocolVersionToUpgrade=NewProtocolVersion;
     
-    if(mc_gState->m_ProtocolVersionToUpgrade != OldProtocolVersion)
+    if(mc_gState->m_ProtocolVersionToUpgrade != CurrentProtocolVersion)
     {
-        LogPrintf("New protocol upgrade version: %d (was %d)\n",mc_gState->m_ProtocolVersionToUpgrade,OldProtocolVersion);
+        LogPrintf("New protocol upgrade version: %d (was %d)\n",mc_gState->m_ProtocolVersionToUpgrade,CurrentProtocolVersion);
 //        if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->GetProtocolVersion())
         if( (mc_gState->m_ProtocolVersionToUpgrade > 0) && (mc_gState->IsSupported(mc_gState->m_ProtocolVersionToUpgrade) == 0) )
         {
@@ -421,6 +421,10 @@ int MultichainNode_ApplyUpgrades()
                 SetMultiChainParams();
             }        
         }
+    }
+    else
+    {
+        mc_gState->m_ProtocolVersionToUpgrade=0;        
     }
     
     return MC_ERR_NOERROR;
@@ -2738,7 +2742,7 @@ bool static DisconnectTip(CValidationState &state) {
     mc_gState->m_Permissions->RollBack(old_height-1);
     mc_gState->m_Assets->RollBack(old_height-1);
     
-    MultichainNode_ApplyUpgrades();        
+    MultichainNode_ApplyUpgrades(old_height-1);        
     if(mc_gState->m_WalletMode & MC_WMD_TXS)
     {
         if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Rolling back wallet             (%s)\n",pwalletTxsMain->Summary());
@@ -2894,7 +2898,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     // ... and about transactions that got confirmed:
 /* MCHN START */        
     VerifyBlockSignature(pblock,false);
-    MultichainNode_ApplyUpgrades();    
+    MultichainNode_ApplyUpgrades(chainActive.Height());    
 /* MCHN END */    
     
     BOOST_FOREACH(const CTransaction &tx, pblock->vtx) {
@@ -4915,7 +4919,7 @@ bool static LoadBlockIndexDB()
         if(fDebug)LogPrint("mchn","mchn: Rolling back wallet txs DB to height %d\n",chainActive.Height());
         pwalletTxsMain->RollBack(NULL,chainActive.Height());
     }
-    MultichainNode_ApplyUpgrades();        
+    MultichainNode_ApplyUpgrades(chainActive.Height());        
     
 /* MCHN END */
     LogPrintf("LoadBlockIndexDB(): hashBestChain=%s height=%d date=%s progress=%f\n",

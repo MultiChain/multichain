@@ -47,7 +47,7 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
     int err,row,disallow_if_assets_found;
     int64_t quantity,total,last;
     int expected_allowed,expected_required;
-    uint32_t type,from,to,timestamp,type_ored;
+    uint32_t type,from,to,timestamp,type_ored,approval;
     bool issue_found;
     uint32_t new_entity_type;
     
@@ -305,8 +305,23 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                             {
                                 *required |= MC_PTP_CREATE;                    
                             }
+                            if(new_entity_type == MC_ENT_TYPE_UPGRADE)
+                            {
+                                *required |= MC_PTP_CREATE | MC_PTP_ADMIN;                    
+                            }
                         }
                     }
+                    
+                    if(lpScript->GetNumElements() == 3) 
+                    {
+                        lpScript->SetElement(1);
+
+                        if(lpScript->GetApproval(&approval,&timestamp) == 0)
+                        {
+                            *required |= MC_PTP_ADMIN;                    
+                        }
+                    }
+                    
                     if(lpScript->GetNumElements() == 3)                         // Publish
                     {
                         unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
