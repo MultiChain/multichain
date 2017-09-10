@@ -1837,54 +1837,62 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         found_ips=mc_FindIPv4ServerAddress(all_ips,max_ips);
     }
     if(!GetBoolArg("-shortoutput", false))
-    {    
-        sprintf(bufOutput,"Other nodes can connect to this node using:\n");
-        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-        sprintf(bufOutput,"multichaind %s:%d\n\n",MultichainServerAddress().c_str(),GetListenPort());
-        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-        if(found_ips > 1)
+    {
+        if(fListen)
         {
-            sprintf(bufOutput,"\nThis host has multiple IP addresses, so from some networks:\n\n");
+            sprintf(bufOutput,"Other nodes can connect to this node using:\n");
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-            for(int i_ips=0;i_ips<found_ips;i_ips++)
+            sprintf(bufOutput,"multichaind %s:%d\n\n",MultichainServerAddress().c_str(),GetListenPort());
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+            if(found_ips > 1)
             {
-                if(all_ips[i_ips] != mc_gState->m_IPv4Address)
+                sprintf(bufOutput,"\nThis host has multiple IP addresses, so from some networks:\n\n");
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                for(int i_ips=0;i_ips<found_ips;i_ips++)
                 {
-                    unsigned char *ptr;
-                    ptr=(unsigned char *)(all_ips+i_ips);
-                    sprintf(bufOutput,"multichaind %s@%u.%u.%u.%u:%d\n",mc_gState->m_NetworkParams->Name(),ptr[3],ptr[2],ptr[1],ptr[0],GetListenPort());
-                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                    if(bytes_written != strlen(bufOutput))
+                    if(all_ips[i_ips] != mc_gState->m_IPv4Address)
                     {
-                        found_ips=0;
-                    }
-                }                
-            }        
-            sprintf(bufOutput,"\n");
-            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-        }
-        if (mapArgs.count("-externalip")) 
-        {            
-            sprintf(bufOutput,"\nBased on the -externalip setting, this node is reachable at:\n\n");
-            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-            BOOST_FOREACH(string strAddr, mapMultiArgs["-externalip"]) 
-            {
-                int port;
-                string s_ip=mc_ParseIPPort(strAddr,&port);
-                if(port>0)
-                {
-                    sprintf(bufOutput,"multichaind %s@%s\n",mc_gState->m_NetworkParams->Name(),strAddr.c_str());
-                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                    port=GetListenPort();
-                }
-                else
-                {
-                    sprintf(bufOutput,"multichaind %s@%s:%d\n",mc_gState->m_NetworkParams->Name(),strAddr.c_str(),GetListenPort());
-                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                    
-                }
+                        unsigned char *ptr;
+                        ptr=(unsigned char *)(all_ips+i_ips);
+                        sprintf(bufOutput,"multichaind %s@%u.%u.%u.%u:%d\n",mc_gState->m_NetworkParams->Name(),ptr[3],ptr[2],ptr[1],ptr[0],GetListenPort());
+                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                        if(bytes_written != strlen(bufOutput))
+                        {
+                            found_ips=0;
+                        }
+                    }                
+                }        
+                sprintf(bufOutput,"\n");
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
             }
-            sprintf(bufOutput,"\n");
-            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+            if (mapArgs.count("-externalip")) 
+            {            
+                sprintf(bufOutput,"\nBased on the -externalip setting, this node is reachable at:\n\n");
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                BOOST_FOREACH(string strAddr, mapMultiArgs["-externalip"]) 
+                {
+                    int port;
+                    string s_ip=mc_ParseIPPort(strAddr,&port);
+                    if(port>0)
+                    {
+                        sprintf(bufOutput,"multichaind %s@%s\n",mc_gState->m_NetworkParams->Name(),strAddr.c_str());
+                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                        port=GetListenPort();
+                    }
+                    else
+                    {
+                        sprintf(bufOutput,"multichaind %s@%s:%d\n",mc_gState->m_NetworkParams->Name(),strAddr.c_str(),GetListenPort());
+                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                    
+                    }
+                }
+                sprintf(bufOutput,"\n");
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+            }
+        }
+        else
+        {
+            sprintf(bufOutput,"Other nodes cannot connect to this node because the runtime parameter listen=0\n\n");
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));            
         }
     }
     else
