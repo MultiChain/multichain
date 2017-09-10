@@ -1102,7 +1102,16 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
     // Find method
     const CRPCCommand *pcmd = tableRPC[strMethod];
     if (!pcmd)
-        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Method not found");
+    {
+        if( ((mc_gState->m_SessionFlags & MC_SSF_COLD) == 0) || (mapHelpStrings.count(strMethod) == 0) )
+        {
+            throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Method not found");
+        }
+        else
+        {
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Method not available in cold version of MultiChain");            
+        }
+    }
 #ifdef ENABLE_WALLET
     if (pcmd->reqWallet && !pwalletMain)
         throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Method not found (disabled)");
@@ -1121,7 +1130,7 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
     {
         if( setAllowedWhenOffline.count(strMethod) == 0 )
         {
-            throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported in offline mode");
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Method not available with -offline runtime parameter");                
         }        
     }
     
