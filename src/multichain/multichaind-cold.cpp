@@ -194,8 +194,10 @@ bool AppInit(int argc, char* argv[])
                 fprintf(stderr, "ERROR: setsid() returned %d errno %d\n", sid, errno);
             
             mc_gState=new mc_State;
+            mc_gState->m_SessionFlags |= MC_SSF_COLD;
 
             mc_gState->m_Params->Parse(argc, argv, MC_ETP_DAEMON);
+            mc_CheckDataDirInConfFile();
         }
 #endif
         
