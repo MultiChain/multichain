@@ -1838,7 +1838,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     }
     if(!GetBoolArg("-shortoutput", false))
     {
-        if(fListen)
+        if(fListen && !GetBoolArg("-offline",false))
         {
             sprintf(bufOutput,"Other nodes can connect to this node using:\n");
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
@@ -1891,8 +1891,16 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         }
         else
         {
-            sprintf(bufOutput,"Other nodes cannot connect to this node because the runtime parameter listen=0\n\n");
-            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));            
+            if(GetBoolArg("-offline",false))
+            {                
+                sprintf(bufOutput,"MultiChain started in offline mode, other nodes cannot connect.\n\n");
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));            
+            }
+            else
+            {
+                sprintf(bufOutput,"Other nodes cannot connect to this node because the runtime parameter listen=0\n\n");
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));            
+            }
         }
     }
     else
@@ -1901,16 +1909,6 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
     }
 
-    int version=mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
-    LogPrintf("MultiChain protocol version: %d\n",version);
-    if(version != mc_gState->GetProtocolVersion())
-    {
-        if(!GetBoolArg("-shortoutput", false))
-        {    
-            sprintf(bufOutput,"Protocol version %d\n\n",version);            
-            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-        }
-    }
     
 /* MCHN END */    
 
@@ -2116,6 +2114,19 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
 
+//    int version=mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
+    int version=mc_gState->m_NetworkParams->ProtocolVersion();
+    LogPrintf("MultiChain protocol version: %d\n",version);
+    if(version != mc_gState->GetProtocolVersion())
+    {
+        if(!GetBoolArg("-shortoutput", false))
+        {    
+            sprintf(bufOutput,"Protocol version %d\n\n",version);            
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+        }
+    }
+    
+    
     // ********************************************************* Step 8: load wallet
 #ifdef ENABLE_WALLET
     if (fDisableWallet) {

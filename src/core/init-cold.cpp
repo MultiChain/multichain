@@ -839,7 +839,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
 
 #endif // ENABLE_WALLET
     // ********************************************************* Step 6: network initialization
-
+/*
     int version=mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
     LogPrintf("MultiChain protocol version: %d\n",version);
     if(version != mc_gState->GetProtocolVersion())
@@ -850,7 +850,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
         }
     }
-    
+*/    
 /* MCHN END */    
 
     // ********************************************************* Step 7: load block chain
@@ -1014,6 +1014,17 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     }
     LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
 
+    int version=mc_gState->m_NetworkParams->ProtocolVersion();
+    LogPrintf("MultiChain protocol version: %d\n",version);
+    if(version != mc_gState->GetProtocolVersion())
+    {
+        if(!GetBoolArg("-shortoutput", false))
+        {    
+            sprintf(bufOutput,"Protocol version %d\n\n",version);            
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+        }
+    }
+    
     // ********************************************************* Step 8: load wallet
 #ifdef ENABLE_WALLET
     if (fDisableWallet) {
