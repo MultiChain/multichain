@@ -653,7 +653,6 @@ Object UpgradeEntry(const unsigned char *txid)
         Value null_value;
         entry.push_back(Pair("name",null_value));
         entry.push_back(Pair("createtxid",null_value));
-//        entry.push_back(Pair("upgraderef", null_value));
         return entry;
     }
     
@@ -667,71 +666,8 @@ Object UpgradeEntry(const unsigned char *txid)
             entry.push_back(Pair("name", string((char*)ptr)));            
         }
         entry.push_back(Pair("createtxid", hash.GetHex()));
-/*        
-        ptr=(unsigned char *)entity.GetRef();        
-        string streamref="";
-        if(entity.IsUnconfirmedGenesis())
-        {
-            Value null_value;
-            entry.push_back(Pair("upgraderef",null_value));
-        }
-        else
-        {
-            streamref += itostr((int)mc_GetLE(ptr,4));
-            streamref += "-";
-            streamref += itostr((int)mc_GetLE(ptr+4,4));
-            streamref += "-";
-            streamref += itostr((int)mc_GetLE(ptr+8,2));
-            entry.push_back(Pair("upgraderef", streamref));
-        }
-*/
         Object fields;
         fields.push_back(Pair("protocol-version",entity.UpgradeProtocolVersion()));                    
-/*        
-        size_t value_size;
-        int64_t offset,new_offset;
-        uint32_t value_offset;
-        const unsigned char *ptr;
-
-        ptr=entity.GetScript();
-        
-        Array openers;
-        offset=0;
-        while(offset>=0)
-        {
-            new_offset=entity.NextParam(offset,&value_offset,&value_size);
-            if(value_offset > 0)
-            {
-                if(ptr[offset])
-                {
-                    string param_name((char*)ptr+offset);
-                    string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
-                    fields.push_back(Pair(param_name, param_value));                                                                        
-                }
-                else
-                {
-                    if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
-                    {
-                        if(value_size == 24)
-                        {
-                            unsigned char tptr[4];
-                            memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
-                            if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
-                            {
-                                openers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
-                            }
-                            else
-                            {
-                                openers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
-                            }
-                        }
-                    }                        
-                }
-            }
-            offset=new_offset;
-        }      
- */               
-//        entry.push_back(Pair("creators",openers));                    
         entry.push_back(Pair("params",fields));      
         entry.push_back(Pair("startblock",(int64_t)entity.UpgradeStartBlock()));                    
         
@@ -741,7 +677,6 @@ Object UpgradeEntry(const unsigned char *txid)
         Value null_value;
         entry.push_back(Pair("name",null_value));
         entry.push_back(Pair("createtxid",null_value));
-//        entry.push_back(Pair("upgraderef", null_value));
     }
     
     return entry;

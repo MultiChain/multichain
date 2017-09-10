@@ -340,19 +340,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
     
     upgrades=NULL;
     
-/*    
-    int verbose=0;
-    if (params.size() > 1)    
-    {
-        if(paramtobool(params[1]))
-        {
-            verbose=1;
-        }        
-    }
-*/
-    
-//    int verbose=1;
-    
+   
     vector<string> inputStrings;
     if (params.size() > 0 && params[0].type() != null_type && ((params[0].type() != str_type) || (params[0].get_str() !="*" ) ) )
     {        
@@ -433,13 +421,11 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
     }    
     
     BOOST_FOREACH(PAIRTYPE(const uint64_t, int)& item, map_sorted)
-//    for(int i=0;i<upgrades->GetCount();i++)
     {
         int i=item.second;
         Object entry;
         mc_PermissionDetails *plsRow;
         mc_PermissionDetails *plsDet;
-//        mc_PermissionDetails *plsPend;
         mc_EntityDetails upgrade_entity;
         bool take_it,approved;
         int flags,consensus,remaining;
@@ -481,33 +467,12 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
         flags=plsRow->m_Flags;
         consensus=plsRow->m_RequiredAdmins;
 
-//        entry.push_back(Pair("startblock", (int64_t)upgrade_entity->UpgradeStartBlock()));
-/*        
-        if(plsRow->m_Type != MC_PTP_UPGRADE)
-        {
-            take_it=false;
-        }
- */ 
-        /*
-        if(take_it)
-        {
-            if( ( (plsRow->m_BlockFrom >= plsRow->m_BlockTo) && (inputStrings.size() == 0)) && 
-                    (((flags & MC_PFL_HAVE_PENDING) == 0) || !verbose) )
-            {
-                if(verbose)
-                {
-                    results.push_back(entry);                    
-                }
-                take_it=false;
-            }
-        }*/
         if(take_it)
         {
             Array admins;
             Array pending;
             mc_Buffer *details;
 
-//            if((flags & MC_PFL_HAVE_PENDING) || (consensus>1))
             if(plsRow->m_Type == MC_PTP_UPGRADE)
             {
                 details=mc_gState->m_Permissions->GetPermissionDetails(plsRow);                            
@@ -523,7 +488,6 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
                 {
                     plsDet=(mc_PermissionDetails *)(details->GetRow(j));
                     remaining=plsDet->m_RequiredAdmins;
-//                    if(remaining > 0)
                     if(plsDet->m_BlockFrom < plsDet->m_BlockTo)
                     {
                         uint160 addr;
@@ -536,81 +500,6 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
             }
             entry.push_back(Pair("admins", admins));
             entry.push_back(Pair("required", (int64_t)(consensus-admins.size())));
-/*                
-                for(int j=0;j<details->GetCount();j++)
-                {
-                    plsDet=(mc_PermissionDetails *)(details->GetRow(j));
-                    remaining=plsDet->m_RequiredAdmins;
-                    if(remaining == 0)
-                    {
-                        Object pend_obj;
-                        Array pend_admins;
-                        bool take_pend=true;
-                        uint32_t block_from=plsDet->m_BlockFrom;
-                        uint32_t block_to=plsDet->m_BlockTo;
-                        for(int k=j;k<details->GetCount();k++)
-                        {
-                            plsPend=(mc_PermissionDetails *)(details->GetRow(k));
-                            remaining=plsPend->m_RequiredAdmins;
-
-                            if(remaining == 0)
-                            {
-                                if(block_from == plsPend->m_BlockFrom)
-                                {
-                                    if(block_to == plsPend->m_BlockTo)
-                                    {
-                                        uint160 addr;
-                                        memcpy(&addr,plsPend->m_LastAdmin,sizeof(uint160));
-                                        CKeyID lpKeyID=CKeyID(addr);
-//                                        CKeyID lpKeyID=CKeyID(*(uint160*)((void*)(plsPend->m_LastAdmin)));
-                                        pend_admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
-                                        plsPend->m_RequiredAdmins=0x01010101;
-                                    }                                    
-                                }
-                            }
-                        }          
-                        if(block_from >= block_to)
-                        {
-                            if(!approved)
-                            {
-                                take_pend=false;
-                            }
-                            pend_obj.push_back(Pair("approve", false));                            
-                        }
-                        else
-                        {
-                            if(!approved)
-                            {
-                                take_pend=true;
-                            }
-                            pend_obj.push_back(Pair("approve", true));                                                        
-                        }
-//                        pend_obj.push_back(Pair("startblock", (int64_t)block_from));
-//                        pend_obj.push_back(Pair("endblock", (int64_t)block_to));                        
-                        pend_obj.push_back(Pair("admins", pend_admins));
-                        pend_obj.push_back(Pair("required", (int64_t)(consensus-pend_admins.size())));
-                        if(take_pend)
-                        {
-                            pending.push_back(pend_obj);                            
-                        }
-                    }
-                }                    
-                mc_gState->m_Permissions->FreePermissionList(details);                    
-            }
-            else
-            {
-                uint160 addr;
-                memcpy(&addr,plsRow->m_LastAdmin,sizeof(uint160));
-                CKeyID lpKeyID=CKeyID(addr);
-                admins.push_back(CBitcoinAddress(lpKeyID).ToString());                    
-            }
-            if(verbose)
-            {
-                entry.push_back(Pair("admins", admins));
-                entry.push_back(Pair("pending", pending));                        
-            }
-            }
- */ 
             results.push_back(entry);
         }
     }
