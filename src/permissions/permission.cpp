@@ -22,6 +22,10 @@ int mc_IsNullEntity(const void* lpEntity)
 
 int mc_IsUpgradeEntity(const void* lpEntity)
 {
+    if(lpEntity == NULL)
+    {
+        return 0;
+    }
     if(memcmp(lpEntity,upgrade_entity,MC_PLS_SIZE_ENTITY) == 0)
     {
         return 1;        
