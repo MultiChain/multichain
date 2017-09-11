@@ -553,6 +553,12 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
     
     Object obj;
     int protocol_version=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
+    
+    if(nHeight)
+    {
+        protocol_version=mc_gState->m_NetworkParams->ProtocolVersion();
+    }
+
     for(int i=0;i<mc_gState->m_NetworkParams->m_Count;i++)
     {
         if((mc_gState->m_NetworkParams->m_lpParams+i)->IsRelevant(protocol_version))
@@ -651,7 +657,10 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                         break;
                 }
             }
-            
+            else
+            {
+                param_value=Value::null;
+            }
             if(strcmp("protocolversion",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
             {
                 if(nHeight)

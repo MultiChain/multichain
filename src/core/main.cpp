@@ -418,6 +418,7 @@ int MultichainNode_ApplyUpgrades(int current_height)
             {
                 LogPrintf("NODE IS UPGRADED FROM %d TO %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
                 mc_gState->m_NetworkParams->m_ProtocolVersion=mc_gState->m_ProtocolVersionToUpgrade;// UPGRADE CODE HERE
+                mc_gState->m_NetworkParams->SetGlobals();
                 SetMultiChainParams();
             }        
         }
