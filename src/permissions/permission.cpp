@@ -853,6 +853,17 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
         pldRow.m_Flags=pdbRow.m_Flags;
         pldRow.m_ThisRow=pdbRow.m_LedgerRow;
         
+        if(mc_IsUpgradeEntity(lpEntity))
+        {
+            if(m_Ledger->Open() <= 0)
+            {
+                LogString("GetPermission: couldn't open ledger");
+                return 0;
+            }
+            m_Ledger->GetRow(pldRow.m_ThisRow,&pldRow);
+            m_Ledger->Close();                
+        }                
+        
         if( (m_CopiedRow > 0) && ( (type == MC_PTP_ADMIN) || (type == MC_PTP_MINE) || (type == MC_PTP_BLOCK_MINER) ) )
         {
             if(m_Ledger->Open() <= 0)
@@ -873,13 +884,14 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
             
             m_Ledger->Close();
         }        
-        
+               
         if(ptr)
         {
             row->m_BlockFrom=pldRow.m_BlockFrom;
             row->m_BlockTo=pldRow.m_BlockTo;
             row->m_ThisRow=pldRow.m_ThisRow;
             row->m_Flags=pldRow.m_Flags;     
+            row->m_BlockReceived=pldRow.m_BlockReceived;
             pldRow.m_PrevRow=pldRow.m_ThisRow;        
         }
 /*        
@@ -2757,6 +2769,11 @@ mc_Buffer *mc_Permissions::GetPermissionList(const void* lpEntity,const void* lp
     }
     else
     {    
+        if(mc_IsUpgradeEntity(lpEntity))
+        {
+            m_Ledger->Open();
+        }
+    
         pdbRow.Zero();
 
         if(lpEntity)
@@ -2792,6 +2809,10 @@ mc_Buffer *mc_Permissions::GetPermissionList(const void* lpEntity,const void* lp
                         plsRow.m_BlockTo=pdbRow.m_BlockTo;
                         plsRow.m_Flags=pdbRow.m_Flags;
                         plsRow.m_LastRow=pdbRow.m_LedgerRow;
+                        if(mc_IsUpgradeEntity(lpEntity))
+                        {
+                            m_Ledger->GetRow(pdbRow.m_LedgerRow,&pldRow);                            
+                        }
                         plsRow.m_BlockReceived=pldRow.m_BlockReceived;
                         result->Add(&plsRow,(unsigned char*)&plsRow+m_Database->m_ValueOffset);
                     }
