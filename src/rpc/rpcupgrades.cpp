@@ -402,7 +402,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
         mc_PermissionDetails *plsRow;
         plsRow=(mc_PermissionDetails *)(upgrades->GetRow(i));
         if(plsRow->m_Type == MC_PTP_UPGRADE)
-        {
+        {            
             memcpy(&hash,plsRow->m_Address,sizeof(uint160));
             stored_upgrades.insert(hash);
             map_sorted.insert(std::make_pair(plsRow->m_LastRow,i));
@@ -437,7 +437,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
         
         upgrade_entity.Zero();
         mc_gState->m_Assets->FindEntityByShortTxID(&upgrade_entity,plsRow->m_Address);
-        
+
         entry=UpgradeEntry(upgrade_entity.GetTxID());
         approved=true;
         if(plsRow->m_BlockFrom >= plsRow->m_BlockTo)
@@ -487,7 +487,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
             }
 
             if(details)
-            {
+            {             
                 for(int j=0;j<details->GetCount();j++)
                 {
                     plsDet=(mc_PermissionDetails *)(details->GetRow(j));
@@ -502,6 +502,17 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
                 }                    
                 consensus=plsRow->m_RequiredAdmins;
             }
+            if(admins.size() == 0)
+            {
+                if(plsRow->m_BlockFrom < plsRow->m_BlockTo)
+                {
+                    uint160 addr;
+                    memcpy(&addr,plsRow->m_LastAdmin,sizeof(uint160));
+                    CKeyID lpKeyID=CKeyID(addr);
+                    admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                                    
+                }                
+            }
+            
             entry.push_back(Pair("admins", admins));
             entry.push_back(Pair("required", (int64_t)(consensus-admins.size())));
             results.push_back(entry);
