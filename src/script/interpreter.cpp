@@ -885,7 +885,7 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                     i += nSigsCount;
                     if ((int)stack.size() < i)
                         return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-
+                    
                     // Subset of script starting at the most recent codeseparator
                     CScript scriptCode(pbegincodehash, pend);
 
@@ -899,6 +899,10 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
 /* MCHN START */                    
                     bool cannot_send=true;
                     if(flags & SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK)
+                    {
+                        cannot_send=false;
+                    }
+                    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
                     {
                         cannot_send=false;
                     }
