@@ -148,7 +148,13 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
             }
             else
             {
-                pwalletTxsMain->AddTx(NULL,tx,-1,NULL,-1,0);            
+                if(pwalletTxsMain->AddTx(NULL,tx,-1,NULL,-1,0))
+                {
+                    removed_type="error";
+                    reason="wallet";
+                    LogPrintf("mchn: Tx %s removed from the mempool (%s), reason: %s\n",tx.GetHash().ToString().c_str(),removed_type.c_str(),reason.c_str());
+                    pool.remove(tx, removed, true, "replay");                                        
+                }
             }
         }
     }

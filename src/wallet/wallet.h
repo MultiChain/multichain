@@ -111,6 +111,7 @@ public:
     bool IsFinal() const;
     int BlocksToMaturity() const;
     bool IsTrusted() const;
+    bool IsTrustedNoDepth() const;
     int GetDepthInMainChain() const;
     
     std::string ToString() const;    
@@ -1198,6 +1199,7 @@ public:
     
     uint256 GetHashAndTxOut(CTxOut& txout) const;
     bool IsTrusted() const;
+    bool IsTrustedNoDepth() const;
 };
 
 

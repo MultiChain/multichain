@@ -490,7 +490,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
 
 Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
 {
-    if (fHelp || params.size() > 1)                                            // MCHN
+    if (fHelp || params.size() > 2)                                            // MCHN
         throw runtime_error("Help message not found\n");
 
     
@@ -498,8 +498,45 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
     if (params.size() > 0)
         fDisplay = params[0].get_bool();
     
+    int nHeight=chainActive.Height();
+    if (params.size() > 1)
+    {
+        if(params[1].type() == bool_type)
+        {
+            if(!params[1].get_bool())
+            {
+                nHeight=0;
+            }
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "with-upgrades should be boolean");                
+/*            
+            if(params[1].type() == int_type)
+            {
+                nHeight=params[1].get_int();
+            }            
+ */ 
+        }
+    }
+    
+    if (nHeight < 0 || nHeight > chainActive.Height())
+    {
+        nHeight+=chainActive.Height();
+        if (nHeight <= 0 || nHeight > chainActive.Height())
+        {
+            throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range");
+        }
+    }
+    
     Object obj;
     int protocol_version=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
+    
+    if(nHeight)
+    {
+        protocol_version=mc_gState->m_NetworkParams->ProtocolVersion();
+    }
+
     for(int i=0;i<mc_gState->m_NetworkParams->m_Count;i++)
     {
         if((mc_gState->m_NetworkParams->m_lpParams+i)->IsRelevant(protocol_version))
@@ -596,6 +633,17 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                     case MC_PRM_DOUBLE:
                         param_value=*(double*)ptr;                                                                
                         break;
+                }
+            }
+            else
+            {
+                param_value=Value::null;
+            }
+            if(strcmp("protocolversion",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+            {
+                if(nHeight)
+                {
+                    param_value=mc_gState->m_NetworkParams->m_ProtocolVersion;
                 }
             }
 
@@ -918,9 +966,12 @@ Value createmultisig(const Array& params, bool fHelp)
 /* MCHN START */    
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-        if(MCP_ALLOW_P2SH_OUTPUTS == 0)
+        if(MCP_ALLOW_ARBITRARY_OUTPUTS == 0)
         {
-            throw JSONRPCError(RPC_NOT_ALLOWED, "P2SH outputs are not allowed for this blockchain");
+            if(MCP_ALLOW_P2SH_OUTPUTS == 0)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "P2SH outputs are not allowed for this blockchain");
+            }
         }
     }
 /* MCHN END */    

@@ -305,8 +305,8 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
 
     // How much of the block should be dedicated to high-priority transactions,
     // included regardless of the fees they pay
-    unsigned int nBlockPrioritySize = GetArg("-blockprioritysize", DEFAULT_BLOCK_PRIORITY_SIZE);
-    nBlockPrioritySize = std::min(nBlockMaxSize, nBlockPrioritySize);
+    // unsigned int nBlockPrioritySize = GetArg("-blockprioritysize", DEFAULT_BLOCK_PRIORITY_SIZE);
+    // nBlockPrioritySize = std::min(nBlockMaxSize, nBlockPrioritySize);
 
     // Minimum block size you want to create; block will be filled with free transactions
     // until there are no more or the block reaches this size:
@@ -1265,6 +1265,7 @@ void static BitcoinMiner(CWallet *pwallet)
                     not_setup_period=false;
                 }
             }
+            
             if (Params().MiningRequiresPeers() 
                     && not_setup_period
                     && ( (mc_gState->m_Permissions->GetMinerCount() > 1)
@@ -1280,8 +1281,11 @@ void static BitcoinMiner(CWallet *pwallet)
                 if(wait_for_peers)
                 {
                     int active_nodes=0;
-                    
-                    while ((active_nodes == 0) && (mc_gState->m_Permissions->GetMinerCount() > 1) && Params().MiningRequiresPeers())
+                    while ((active_nodes == 0) && 
+                           ( (mc_gState->m_Permissions->GetMinerCount() > 1)
+                          || (MCP_ANYONE_CAN_MINE != 0)
+                          || (mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+                           ) && Params().MiningRequiresPeers())
                     {
                         vector<CNode*> vNodesCopy = vNodes;
                         BOOST_FOREACH(CNode* pnode, vNodesCopy)

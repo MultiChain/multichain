@@ -86,7 +86,6 @@ int64_t mc_MultichainParams::GetInt64Param(const char *param)
         int index=m_lpIndex->Get(param);
         if(index<0)
         {
-            printf("Parameter not found: %s\n",param);
             return -1;
         }   
         
@@ -1859,5 +1858,49 @@ int mc_Features::FixedIn10008()
     
     return ret;    
 }
+
+int mc_Features::FixedDestinationExtraction()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 1;
+    }
+    
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 10009)
+        {
+            ret=1;
+        }
+    }
+    
+    return ret;    
+}
+
+int mc_Features::FixedIn1000920001()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 1;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 10009)
+        {
+            ret=1;
+        }
+    }
+    
+    return ret;    
+}
+
+
+
 
 

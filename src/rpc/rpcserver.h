@@ -113,17 +113,24 @@ public:
      * @returns Result of the call.
      * @throws an exception (json_spirit::Value) when an error happens.
      */
+    void initialize();
     json_spirit::Value execute(const std::string &method, const json_spirit::Array &params) const;
 };
 
-extern const CRPCTable tableRPC;
+extern CRPCTable tableRPC;
 
 /* MCHN START */
 extern std::map<std::string, std::string> mapHelpStrings;
 extern std::map<std::string, int> mapLogParamCounts;
 extern std::set<std::string> setAllowedWhenWaitingForUpgrade;
+extern std::set<std::string> setAllowedWhenOffline;
+extern std::vector<CRPCCommand> vStaticRPCCommands;
+extern std::vector<CRPCCommand> vStaticRPCWalletReadCommands;
 void mc_InitRPCHelpMap();
 std::string mc_RPCHelpString(std::string strMethod);
+void mc_InitRPCList(std::vector<CRPCCommand>& vStaticRPCCommands,std::vector<CRPCCommand>& vStaticRPCWalletReadCommands);
+
+
 /* MCHN END */
 
 /**
@@ -147,6 +154,10 @@ extern std::string HelpExampleCli(std::string methodname, std::string args);
 extern std::string HelpExampleRpc(std::string methodname, std::string args);
 
 extern void EnsureWalletIsUnlocked();
+
+extern json_spirit::Value help(const json_spirit::Array& params, bool fHelp); 
+extern json_spirit::Value stop(const json_spirit::Array& params, bool fHelp); 
+
 
 extern json_spirit::Value getconnectioncount(const json_spirit::Array& params, bool fHelp); // in rpcnet.cpp
 extern json_spirit::Value getpeerinfo(const json_spirit::Array& params, bool fHelp);

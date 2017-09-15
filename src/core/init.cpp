@@ -421,9 +421,9 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -help-debug            " + _("Show all debugging options (usage: --help -help-debug)") + "\n";
     strUsage += "  -logips                " + strprintf(_("Include IP addresses in debug output (default: %u)"), 0) + "\n";
     strUsage += "  -logtimestamps         " + strprintf(_("Prepend debug output with timestamp (default: %u)"), 1) + "\n";
+    strUsage += "  -limitfreerelay=<n>    " + strprintf(_("Continuously rate-limit free transactions to <n>*1000 bytes per minute (default:%u)"), 0) + "\n";
     if (GetBoolArg("-help-debug", false))
     {
-        strUsage += "  -limitfreerelay=<n>    " + strprintf(_("Continuously rate-limit free transactions to <n>*1000 bytes per minute (default:%u)"), 15) + "\n";
         strUsage += "  -relaypriority         " + strprintf(_("Require high priority for relaying free or low-fee transactions (default:%u)"), 1) + "\n";
         strUsage += "  -maxsigcachesize=<n>   " + strprintf(_("Limit size of signature cache to <n> entries (default: %u)"), 50000) + "\n";
     }
@@ -455,7 +455,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "\n" + _("Block creation options:") + "\n";
     strUsage += "  -blockminsize=<n>      " + strprintf(_("Set minimum block size in bytes (default: %u)"), 0) + "\n";
     strUsage += "  -blockmaxsize=<n>      " + strprintf(_("Set maximum block size in bytes (default: %d)"), DEFAULT_BLOCK_MAX_SIZE) + "\n";
-    strUsage += "  -blockprioritysize=<n> " + strprintf(_("Set maximum size of high-priority/low-fee transactions in bytes (default: %d)"), DEFAULT_BLOCK_PRIORITY_SIZE) + "\n";
+//    strUsage += "  -blockprioritysize=<n> " + strprintf(_("Set maximum size of high-priority/low-fee transactions in bytes (default: %d)"), DEFAULT_BLOCK_PRIORITY_SIZE) + "\n";
 
     strUsage += "\n" + _("RPC server options:") + "\n";
     strUsage += "  -server                " + _("Accept command line and JSON-RPC commands") + "\n";
@@ -476,6 +476,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -rpcsslciphers=<ciphers>                 " + strprintf(_("Acceptable ciphers (default: %s)"), "TLSv1.2+HIGH:TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!3DES:@STRENGTH") + "\n";
 
     strUsage += "\n" + _("MultiChain runtime parameters") + "\n";    
+    strUsage += "  -offline                                 " + _("Start multichaind in offline mode, no connections to other nodes.") + "\n";
     strUsage += "  -initprivkey=<privkey>                   " + _("Manually set the wallet default address and private key when running multichaind for the first time.") + "\n";
     strUsage += "  -handshakelocal=<address>                " + _("Manually override the wallet address which is used for handshaking with other peers in a MultiChain blockchain.") + "\n";
     strUsage += "  -hideknownopdrops=<n>                    " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON_RPC calls (default: %u)"), 0) + "\n";
@@ -946,9 +947,13 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     std::ostringstream strErrors;
 
     LogPrintf("Using %u threads for script verification\n", nScriptCheckThreads);
-    if (nScriptCheckThreads) {
-        for (int i=0; i<nScriptCheckThreads-1; i++)
-            threadGroup.create_thread(&ThreadScriptCheck);
+    
+    if(!GetBoolArg("-offline",false))
+    {    
+        if (nScriptCheckThreads) {
+            for (int i=0; i<nScriptCheckThreads-1; i++)
+                threadGroup.create_thread(&ThreadScriptCheck);
+        }
     }
 
     /* Start the RPC server already.  It will be started in "warmup" mode
@@ -1021,6 +1026,20 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     uiInterface.InitMessage(_("Initializing multichain..."));
     RegisterNodeSignals(GetNodeSignals());
 
+    if(GetBoolArg("-offline",false))
+    {
+        if(mc_gState->m_NetworkParams->m_Status != MC_PRM_STATUS_VALID)
+        {
+            char fileName[MC_DCT_DB_MAX_PATH];
+            mc_GetFullFileName(mc_gState->m_Params->NetworkName(),"params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
+            string seed_error=strprintf("Couldn't retrieve blockchain parameters from the seed node in offline mode.\n"
+                        "The file %s must be copied manually from an existing node.\n",                
+                    fileName);
+            return InitError(seed_error);                        
+        }        
+    }    
+
+    
     bool fFirstRunForBuild;
     string init_privkey=GetArg("-initprivkey","");
     
@@ -1186,7 +1205,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             else
             {                                
                 if( (mc_gState->m_NetworkParams->GetParam("protocolversion",&size) != NULL) &&
-                    (mc_gState->m_Features->MinProtocolVersion() > (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion")) )
+                    (mc_gState->m_Features->MinProtocolVersion() > (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion")) && 
+                    (mc_gState->m_NetworkParams->GetParam("chainprotocol",NULL) != NULL) && 
+                    (strcmp((char*)mc_gState->m_NetworkParams->GetParam("chainprotocol",NULL),"multichain") == 0) )
                 {
                     seed_error=strprintf("The protocol version (%d) for blockchain %s has been deprecated and was last supported in MultiChain 1.0 beta 1\n",                
                             (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion"), mc_gState->m_Params->NetworkName());                    
@@ -1814,54 +1835,70 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         found_ips=mc_FindIPv4ServerAddress(all_ips,max_ips);
     }
     if(!GetBoolArg("-shortoutput", false))
-    {    
-        sprintf(bufOutput,"Other nodes can connect to this node using:\n");
-        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-        sprintf(bufOutput,"multichaind %s:%d\n\n",MultichainServerAddress().c_str(),GetListenPort());
-        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-        if(found_ips > 1)
+    {
+        if(fListen && !GetBoolArg("-offline",false))
         {
-            sprintf(bufOutput,"\nThis host has multiple IP addresses, so from some networks:\n\n");
+            sprintf(bufOutput,"Other nodes can connect to this node using:\n");
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-            for(int i_ips=0;i_ips<found_ips;i_ips++)
+            sprintf(bufOutput,"multichaind %s:%d\n\n",MultichainServerAddress().c_str(),GetListenPort());
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+            if(found_ips > 1)
             {
-                if(all_ips[i_ips] != mc_gState->m_IPv4Address)
+                sprintf(bufOutput,"\nThis host has multiple IP addresses, so from some networks:\n\n");
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                for(int i_ips=0;i_ips<found_ips;i_ips++)
                 {
-                    unsigned char *ptr;
-                    ptr=(unsigned char *)(all_ips+i_ips);
-                    sprintf(bufOutput,"multichaind %s@%u.%u.%u.%u:%d\n",mc_gState->m_NetworkParams->Name(),ptr[3],ptr[2],ptr[1],ptr[0],GetListenPort());
-                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                    if(bytes_written != strlen(bufOutput))
+                    if(all_ips[i_ips] != mc_gState->m_IPv4Address)
                     {
-                        found_ips=0;
-                    }
-                }                
-            }        
-            sprintf(bufOutput,"\n");
-            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-        }
-        if (mapArgs.count("-externalip")) 
-        {            
-            sprintf(bufOutput,"\nBased on the -externalip setting, this node is reachable at:\n\n");
-            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-            BOOST_FOREACH(string strAddr, mapMultiArgs["-externalip"]) 
-            {
-                int port;
-                string s_ip=mc_ParseIPPort(strAddr,&port);
-                if(port>0)
-                {
-                    sprintf(bufOutput,"multichaind %s@%s\n",mc_gState->m_NetworkParams->Name(),strAddr.c_str());
-                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                    port=GetListenPort();
-                }
-                else
-                {
-                    sprintf(bufOutput,"multichaind %s@%s:%d\n",mc_gState->m_NetworkParams->Name(),strAddr.c_str(),GetListenPort());
-                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                    
-                }
+                        unsigned char *ptr;
+                        ptr=(unsigned char *)(all_ips+i_ips);
+                        sprintf(bufOutput,"multichaind %s@%u.%u.%u.%u:%d\n",mc_gState->m_NetworkParams->Name(),ptr[3],ptr[2],ptr[1],ptr[0],GetListenPort());
+                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                        if(bytes_written != strlen(bufOutput))
+                        {
+                            found_ips=0;
+                        }
+                    }                
+                }        
+                sprintf(bufOutput,"\n");
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
             }
-            sprintf(bufOutput,"\n");
-            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+            if (mapArgs.count("-externalip")) 
+            {            
+                sprintf(bufOutput,"\nBased on the -externalip setting, this node is reachable at:\n\n");
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                BOOST_FOREACH(string strAddr, mapMultiArgs["-externalip"]) 
+                {
+                    int port;
+                    string s_ip=mc_ParseIPPort(strAddr,&port);
+                    if(port>0)
+                    {
+                        sprintf(bufOutput,"multichaind %s@%s\n",mc_gState->m_NetworkParams->Name(),strAddr.c_str());
+                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                        port=GetListenPort();
+                    }
+                    else
+                    {
+                        sprintf(bufOutput,"multichaind %s@%s:%d\n",mc_gState->m_NetworkParams->Name(),strAddr.c_str(),GetListenPort());
+                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                    
+                    }
+                }
+                sprintf(bufOutput,"\n");
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+            }
+        }
+        else
+        {
+            if(GetBoolArg("-offline",false))
+            {                
+                sprintf(bufOutput,"MultiChain started in offline mode, other nodes cannot connect.\n\n");
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));            
+            }
+            else
+            {
+                sprintf(bufOutput,"Other nodes cannot connect to this node because the runtime parameter listen=0\n\n");
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));            
+            }
         }
     }
     else
@@ -1870,15 +1907,6 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
     }
 
-    int version=mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
-    if(version != mc_gState->GetProtocolVersion())
-    {
-        if(!GetBoolArg("-shortoutput", false))
-        {    
-            sprintf(bufOutput,"Protocol version %d\n\n",version);            
-            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-        }
-    }
     
 /* MCHN END */    
 
@@ -2084,6 +2112,19 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
 
+//    int version=mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
+    int version=mc_gState->m_NetworkParams->ProtocolVersion();
+    LogPrintf("MultiChain protocol version: %d\n",version);
+    if(version != mc_gState->GetProtocolVersion())
+    {
+        if(!GetBoolArg("-shortoutput", false))
+        {    
+            sprintf(bufOutput,"Protocol version %d\n\n",version);            
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+        }
+    }
+    
+    
     // ********************************************************* Step 8: load wallet
 #ifdef ENABLE_WALLET
     if (fDisableWallet) {
@@ -2262,11 +2303,14 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         BOOST_FOREACH(string strFile, mapMultiArgs["-loadblock"])
             vImportFiles.push_back(strFile);
     }
-    threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
-    if (chainActive.Tip() == NULL) {
-        LogPrintf("Waiting for genesis block to be imported...\n");
-        while (!fRequestShutdown && chainActive.Tip() == NULL)
-            MilliSleep(10);
+    if(!GetBoolArg("-offline",false))
+    {    
+        threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
+        if (chainActive.Tip() == NULL) {
+            LogPrintf("Waiting for genesis block to be imported...\n");
+            while (!fRequestShutdown && chainActive.Tip() == NULL)
+                MilliSleep(10);
+        }
     }
 
     // ********************************************************* Step 10: start node
@@ -2296,15 +2340,14 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     LogPrintf("mapAddressBook.size() = %u\n",  pwalletMain ? pwalletMain->mapAddressBook.size() : 0);
 #endif
 
-    StartNode(threadGroup);
+    if(!GetBoolArg("-offline",false))
+    {
+        StartNode(threadGroup);
 
 #ifdef ENABLE_WALLET
     // Generate coins in the background
-    if (pwalletMain)
-/* MCHN START */        
-//        GenerateBitcoins(GetBoolArg("-gen", false), pwalletMain, GetArg("-genproclimit", 1));
-        GenerateBitcoins(GetBoolArg("-gen", true), pwalletMain, GetArg("-genproclimit", 1));
-/* MCHN END */        
+        if (pwalletMain)
+            GenerateBitcoins(GetBoolArg("-gen", true), pwalletMain, GetArg("-genproclimit", 1));
 #endif
 
     // ********************************************************* Step 11: finished
@@ -2313,10 +2356,15 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     uiInterface.InitMessage(_("Done loading"));
 */    
 #ifdef ENABLE_WALLET
+        if (pwalletMain) {
+            // Add wallet transactions that aren't already in a block to mapTransactions
+            pwalletMain->ReacceptWalletTransactions();
+        }
+#endif
+    }
+    
+#ifdef ENABLE_WALLET
     if (pwalletMain) {
-        // Add wallet transactions that aren't already in a block to mapTransactions
-        pwalletMain->ReacceptWalletTransactions();
-
         // Run a thread to flush wallet periodically
         threadGroup.create_thread(boost::bind(&ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile)));
     }

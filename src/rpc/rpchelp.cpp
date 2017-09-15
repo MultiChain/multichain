@@ -339,10 +339,13 @@ void mc_InitRPCHelpMap02()
         ));
     
     mapHelpStrings.insert(std::make_pair("getblockchainparams",
-            "getblockchainparams ( displaynames )\n"    
+            "getblockchainparams ( displaynames with-upgrades )\n"    
             "\nReturns a list of values of this blockchain’s parameters\n"
             "\nArguments:\n"
             "1. displaynames                     (boolean, optional, default=true) use display names instead of internal\n"
+//            "2. height                           (numeric or boolean, optional, default true) The block height in active chain or height before current tip (if negative)\n"
+//            "                                    false - original configuration (height=0), true - current configuration\n"
+            "2. with-upgrades                    (boolean, optional, default=true) Take upgrades into account \n"
             "\nResult:\n"
             "An object containing various blockchain parameters.\n"
             "\nExamples:\n"
@@ -883,7 +886,7 @@ void mc_InitRPCHelpMap05()
             "      \"create\" : stream               (string,required) stream\n"
             "      \"name\" : stream-name            (string,optional) Stream name\n"
             "      \"open\" : true|false             (string,optional, default: false) If true, anyone can publish\n"
-            "      \"details\" :                     (object, optional)  a json object with custom fields\n"           
+            "      \"details\" :                     (object,optional) a json object with custom fields\n"           
             "        {\n"
             "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
             "          ,...\n"
@@ -895,6 +898,23 @@ void mc_InitRPCHelpMap05()
             "      \"for\" : stream-identifier       (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
             "      \"key\" : key                     (string,optional, default: \"\") Item key\n"
             "      \"data\" : data-hex               (string,optional, default: \"\") Data hex string\n"
+            "    }\n"                                
+            " or\n"
+            "2. create-new-upgrade                 (object, required) A json object with new upgrade details\n"
+            "    {\n"                
+            "      \"create\" : upgrade              (string,required) upgrade\n"
+            "      \"name\" : upgrade-name           (string,optional) Upgrade name\n"
+            "      \"startblock\" : n                (numeric,optional, default: 0) Block to apply upgrade from (inclusive).\n"
+            "      \"details\" :                     (object,optional) a json object with custom fields\n"           
+            "        {\n"
+            "          \"protocol-version\": version (numeric, required) Protocol version to upgrade to \n"
+            "        }\n"
+            "    }\n"                                
+            " or\n"
+            "2. approve-upgrade                    (object, required) A json object with approval details\n"
+            "    {\n"                
+            "      \"approve\" : approve             (boolean,required) Approve or disapprove\n"
+            "      \"for\" : upgrade-identifier      (string,required)  Upgrade identifier - one of the following: upgrade txid, upgrade name.\n"
             "    }\n"                                
             "\nResult:\n"
             "{\n"
@@ -1380,7 +1400,7 @@ void mc_InitRPCHelpMap06()
     
     mapHelpStrings.insert(std::make_pair("create",
             "create \"entity-type\" \"entity-name\" open ( custom-fields )\n"
-            "\nCreates stream\n"
+            "\nCreates stream or upgrade\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"entity-type\"                    (string, required) stream\n"
@@ -1398,8 +1418,8 @@ void mc_InitRPCHelpMap06()
             "4  custom-fields                    (object, required)  a json object with custom fields\n"
             "    {\n"
             "      \"protocol-version\": version   (numeric, required) Protocol version to upgrade to\n"
-            "      \"start-block\": block          (numeric, optional, default 0) Block to apply from \n"
-            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
+            "      \"startblock\": block           (numeric, optional, default 0) Block to apply from \n"
+//            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
             "      ,...\n"
             "    }\n"
 
@@ -1434,7 +1454,7 @@ void mc_InitRPCHelpMap06()
             "    {\n"
             "      \"protocol-version\": version   (numeric, required) Protocol version to upgrade to \n"
             "      \"start-block\": block          (numeric, optional, default 0) Block to apply from \n"
-            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
+//            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
             "      ,...\n"
             "    }\n"
             "\nResult:\n"
@@ -2436,9 +2456,9 @@ void mc_InitRPCHelpMap11()
             "listaddresses ( address(es) verbose count start ) \n"
             "\nReturns asset balances for specified address\n"
             "\nArguments:\n"
-            "1. \"address(es)\"                    (string, optional, default *) Address(es) to return balance for, comma delimited. Default - all\n"
+            "1. \"address(es)\"                    (string, optional, default *) Address(es) to return information for, comma delimited. Default - all\n"
             " or\n"
-            "1. address(es)                      (array, optional) A json array of addresses to return balance for\n"                
+            "1. address(es)                      (array, optional) A json array of addresses to return information for\n"                
             "2. verbose                          (boolean, optional, default=false) If true return more information about address.\n"
             "3. count                            (number, optional, default=INT_MAX - all) The number of addresses to display\n"
             "4. start                            (number, optional, default=-count - last) Start from specific address, 0 based, if negative - from the end\n"
@@ -3612,8 +3632,8 @@ void mc_InitRPCHelpMap16()
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"from-address\"                   (string, required) Address used for approval.\n"
-            "2. \"upgrade-identifier\"             (string, required) Upgrade identifier - one of the following: upgrade txid, upgrade reference, upgrade name.\n"
-            "3. approve                          (boolean, optional)  Approve or disapprove, default true\n"
+            "2. \"upgrade-identifier\"             (string, required) Upgrade identifier - one of the following: upgrade txid, upgrade name.\n"
+            "3. approve                          (boolean, required)  Approve or disapprove\n"
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -3625,10 +3645,10 @@ void mc_InitRPCHelpMap16()
     mapHelpStrings.insert(std::make_pair("listupgrades",
             "listupgrades (upgrade-identifier(s))\n"
             "1. \"upgrade-identifier(s)\"          (string, optional, default=*, all upgrades) Upgrade identifier - one of the following:\n"
-            "                                                                                upgrade txid, upgrade reference, upgrade name.\n"
+            "                                                                                upgrade txid, upgrade name.\n"
             " or\n"
             "1. upgrade-identifier(s)            (array, optional) A json array of upgrade identifiers \n"                
-            "\nReturns list of defined streams\n"
+            "\nReturns list of defined upgrades\n"
             "\nExamples:\n"
             + HelpExampleCli("listupgrades", "")
             + HelpExampleRpc("listupgrades", "")
@@ -3803,7 +3823,6 @@ void mc_InitRPCAllowedWhenWaitingForUpgradeSet()
     setAllowedWhenWaitingForUpgrade.insert("getblockhash");    
     setAllowedWhenWaitingForUpgrade.insert("getmempoolinfo");    
     setAllowedWhenWaitingForUpgrade.insert("listupgrades");    
-    setAllowedWhenWaitingForUpgrade.insert("listpermissions");    
     setAllowedWhenWaitingForUpgrade.insert("decoderawtransaction");    
     setAllowedWhenWaitingForUpgrade.insert("getrawtransaction");    
     setAllowedWhenWaitingForUpgrade.insert("dumpprivkey");    
@@ -3816,6 +3835,37 @@ void mc_InitRPCAllowedWhenWaitingForUpgradeSet()
     setAllowedWhenWaitingForUpgrade.insert("getpeerinfo");    
     setAllowedWhenWaitingForUpgrade.insert("signmessage");    
     setAllowedWhenWaitingForUpgrade.insert("verifymessage");    
+}
+
+void mc_InitRPCAllowedWhenOffline()
+{
+    setAllowedWhenOffline.insert("getblockchainparams");    
+    setAllowedWhenOffline.insert("getinfo");    
+    setAllowedWhenOffline.insert("help");    
+    setAllowedWhenOffline.insert("stop");    
+    setAllowedWhenOffline.insert("decodescript");    
+    setAllowedWhenOffline.insert("signrawtransaction");    
+    setAllowedWhenOffline.insert("createkeypairs");    
+    setAllowedWhenOffline.insert("verifymessage");    
+    setAllowedWhenOffline.insert("signmessage");    
+    
+    
+    setAllowedWhenOffline.insert("addmultisigaddress");    
+    setAllowedWhenOffline.insert("getaddresses");    
+    setAllowedWhenOffline.insert("getnewaddress");    
+    setAllowedWhenOffline.insert("importaddress");    
+    setAllowedWhenOffline.insert("listaddresses");    
+    setAllowedWhenOffline.insert("validateaddress");    
+    setAllowedWhenOffline.insert("createmultisig");    
+    setAllowedWhenOffline.insert("backupwallet");    
+    setAllowedWhenOffline.insert("dumpprivkey");    
+    setAllowedWhenOffline.insert("dumpwallet");    
+    setAllowedWhenOffline.insert("encryptwallet");    
+    setAllowedWhenOffline.insert("importprivkey");    
+    setAllowedWhenOffline.insert("importwallet");    
+    setAllowedWhenOffline.insert("walletlock");    
+    setAllowedWhenOffline.insert("walletpassphrase");    
+    setAllowedWhenOffline.insert("walletpassphrasechange");    
 }
 
 void mc_InitRPCHelpMap()
@@ -3839,5 +3889,6 @@ void mc_InitRPCHelpMap()
     
     mc_InitRPCLogParamCountMap();
     mc_InitRPCAllowedWhenWaitingForUpgradeSet();    
+    mc_InitRPCAllowedWhenOffline();    
 }
 

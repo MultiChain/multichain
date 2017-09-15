@@ -156,6 +156,23 @@ bool mc_Coin::IsTrusted() const
     return (m_Flags & MC_TFL_ALL_INPUTS_FROM_ME) > 0;
 }
 
+bool mc_Coin::IsTrustedNoDepth() const
+{
+    if (!IsFinal())
+    {
+        return false;
+    }
+    
+    int nDepth=GetDepthInMainChain();
+
+    if (nDepth < 0)
+    {
+        return false;
+    }
+
+    return (m_Flags & MC_TFL_ALL_INPUTS_FROM_ME) > 0;
+}
+
 int mc_Coin::GetDepthInMainChain() const
 {
     int nDepth=0;
@@ -1986,11 +2003,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                 int nRequiredRet;
                 std::vector<CTxDestination> addressRets;
 
-                if(!ExtractDestinations(script1,typeRet,addressRets,nRequiredRet))
-                {
-                    err=MC_ERR_CORRUPTED;                
-                    goto exitlbl;
-                }            
+                ExtractDestinations(script1,typeRet,addressRets,nRequiredRet);
 
                 BOOST_FOREACH(const CTxDestination& dest, addressRets)
                 {
@@ -2121,11 +2134,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
             utxo.m_EntityID=0;
             utxo.m_EntityType=MC_TET_NONE;
             utxo.m_LockTime=tx.nLockTime;
-            if(!ExtractDestinations(script1,typeRet,addressRets,nRequiredRet))
-            {
-                err=MC_ERR_CORRUPTED;                
-                goto exitlbl;
-            }            
+            ExtractDestinations(script1,typeRet,addressRets,nRequiredRet);
 
             for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
             {

@@ -110,9 +110,8 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
             }
             else
             {
-                unsigned char *root_stream_name;
                 int root_stream_name_size;
-                root_stream_name=(unsigned char *)mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
+                mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
                 if(root_stream_name_size <= 1)
                 {
                     if(hash == mc_GenesisCoinbaseTxID())
@@ -650,7 +649,9 @@ Object UpgradeEntry(const unsigned char *txid)
 
     if(txid == NULL)
     {
-        entry.push_back(Pair("upgraderef", ""));
+        Value null_value;
+        entry.push_back(Pair("name",null_value));
+        entry.push_back(Pair("createtxid",null_value));
         return entry;
     }
     
@@ -664,71 +665,10 @@ Object UpgradeEntry(const unsigned char *txid)
             entry.push_back(Pair("name", string((char*)ptr)));            
         }
         entry.push_back(Pair("createtxid", hash.GetHex()));
-        ptr=(unsigned char *)entity.GetRef();
-        string streamref="";
-        if(entity.IsUnconfirmedGenesis())
-        {
-            Value null_value;
-            entry.push_back(Pair("upgraderef",null_value));
-        }
-        else
-        {
-            streamref += itostr((int)mc_GetLE(ptr,4));
-            streamref += "-";
-            streamref += itostr((int)mc_GetLE(ptr+4,4));
-            streamref += "-";
-            streamref += itostr((int)mc_GetLE(ptr+8,2));
-            entry.push_back(Pair("upgraderef", streamref));
-        }
-
-        entry.push_back(Pair("protocol-version",entity.UpgradeProtocolVersion()));                    
-        entry.push_back(Pair("start-block",(int64_t)entity.UpgradeStartBlock()));                    
-        
-        size_t value_size;
-        int64_t offset,new_offset;
-        uint32_t value_offset;
-        const unsigned char *ptr;
-
-        ptr=entity.GetScript();
-        
         Object fields;
-        Array openers;
-        offset=0;
-        while(offset>=0)
-        {
-            new_offset=entity.NextParam(offset,&value_offset,&value_size);
-            if(value_offset > 0)
-            {
-                if(ptr[offset])
-                {
-                    string param_name((char*)ptr+offset);
-                    string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
-                    fields.push_back(Pair(param_name, param_value));                                                                        
-                }
-                else
-                {
-                    if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
-                    {
-                        if(value_size == 24)
-                        {
-                            unsigned char tptr[4];
-                            memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
-                            if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
-                            {
-                                openers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
-                            }
-                            else
-                            {
-                                openers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
-                            }
-                        }
-                    }                        
-                }
-            }
-            offset=new_offset;
-        }      
-        entry.push_back(Pair("params",fields));                    
-//        entry.push_back(Pair("creators",openers));                    
+        fields.push_back(Pair("protocol-version",entity.UpgradeProtocolVersion()));                    
+        entry.push_back(Pair("params",fields));      
+        entry.push_back(Pair("startblock",(int64_t)entity.UpgradeStartBlock()));                    
         
     }
     else
@@ -736,7 +676,6 @@ Object UpgradeEntry(const unsigned char *txid)
         Value null_value;
         entry.push_back(Pair("name",null_value));
         entry.push_back(Pair("createtxid",null_value));
-        entry.push_back(Pair("upgraderef", null_value));
     }
     
     return entry;
@@ -1825,6 +1764,8 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
 // 0x0004 - issue
 // 0x0008 - follow-on
 // 0x0010 - pure details
+// 0x0020 - approval
+// 0x0040 - create upgrade
 // 0x0100 - encode empty hex
 // 0x0200 - cache input script
     
@@ -1847,10 +1788,15 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
         int multiple=1;
         int is_open=0;
         bool multiple_is_set=false;
+        bool open_is_set=false;
         string strError="";
         mc_EntityDetails entity;
         vector<unsigned char> vKey;
         vector<unsigned char> vValue;
+        int protocol_version=-1;
+        uint32_t startblock=0;
+        int approve=-1;
+        bool startblock_is_set=false;
 //        bool key_is_set=false;
 //        bool value_is_set=false;
 
@@ -1990,15 +1936,26 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                     {
                         if(d.value_.get_str() == "asset")
                         {
-                        if((allowed_objects & 0x0004) == 0)
-                        {
-                            strError=string("Keyword not allowed in this API");                                                
-                        }
+                            if((allowed_objects & 0x0004) == 0)
+                            {
+                                strError=string("Keyword not allowed in this API");                                                
+                            }
                             new_type=MC_ENT_TYPE_ASSET;
                         }
                         else
                         {
-                            strError=string("Invalid new entity type");                                                    
+                            if(d.value_.get_str() == "upgrade")
+                            {
+                                if((allowed_objects & 0x0040) == 0)
+                                {
+                                    strError=string("Keyword not allowed in this API");                                                
+                                }
+                                new_type=MC_ENT_TYPE_UPGRADE;
+                            }
+                            else
+                            {
+                                strError=string("Invalid new entity type");                                                    
+                            }
                         }
                     }
                 }
@@ -2017,22 +1974,33 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                 }
                 if(d.value_.type() != null_type && !d.value_.get_str().empty())
                 {
-                    ParseEntityIdentifier(d.value_,&entity, MC_ENT_TYPE_STREAM);       
+                    ParseEntityIdentifier(d.value_,&entity, MC_ENT_TYPE_ANY);       
                     if(found_entity)
                     {
                         memcpy(found_entity,&entity,sizeof(mc_EntityDetails));
                     }                        
                 }                
-                new_type=-1;
-                if((allowed_objects & 0x0002) == 0)
+                if(entity.GetEntityType() == MC_ENT_TYPE_STREAM)
                 {
-                    strError=string("Keyword not allowed in this API");                                                
+                    new_type=-1;
+                    if((allowed_objects & 0x0002) == 0)
+                    {
+                        strError=string("Keyword not allowed in this API");                                                
+                    }                        
                 }
                 else
                 {
-                    if(entity.GetEntityType() != MC_ENT_TYPE_STREAM)
+                    if(entity.GetEntityType() == MC_ENT_TYPE_UPGRADE)
                     {
-                        strError=string("Stream with this identifier not found");                                                                        
+                        new_type=-5;
+                        if((allowed_objects & 0x0020) == 0)
+                        {
+                            strError=string("Keyword not allowed in this API");                                                
+                        }                        
+                    }
+                    else
+                    {
+                        strError=string("Entity with this identifier not found");                                                                                                
                     }
                 }
                 parsed=true;
@@ -2161,6 +2129,30 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                 }
                 parsed=true;
             }
+            if(d.name_ == "startblock")
+            {
+                if(d.value_.type() == int_type)
+                {
+                    if( (d.value_.get_int64() >= 0) && (d.value_.get_int64() <= 0xFFFFFFFF) )
+                    {
+                        startblock=(uint32_t)(d.value_.get_int64());
+                        startblock_is_set=true;
+                    }
+                    else
+                    {
+                        strError=string("Invalid startblock");                                                    
+                    }
+                }
+                else
+                {
+                    strError=string("Invalid startblock");                            
+                }
+                if((allowed_objects & 0x0040) == 0)
+                {
+                    strError=string("Keyword not allowed in this API");                                                
+                }
+                parsed=true;
+            }
             if(d.name_ == "open")
             {
                 if(d.value_.get_bool())
@@ -2168,6 +2160,23 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                     is_open=1;
                 }        
                 if((allowed_objects & 0x0005) == 0)
+                {
+                    strError=string("Keyword not allowed in this API");                                                
+                }
+                open_is_set=true;
+                parsed=true;
+            }
+            if(d.name_ == "approve")
+            {
+                if(d.value_.get_bool())
+                {
+                    approve=1;
+                }        
+                else
+                {
+                    approve=0;                    
+                }
+                if((allowed_objects & 0x0020) == 0)
                 {
                     strError=string("Keyword not allowed in this API");                                                
                 }
@@ -2183,7 +2192,21 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                 {
                     BOOST_FOREACH(const Pair& p, d.value_.get_obj()) 
                     {              
-                        lpDetails->SetParamValue(p.name_.c_str(),p.name_.size(),(unsigned char*)p.value_.get_str().c_str(),p.value_.get_str().size());                
+                        if( (p.name_ == "protocol-version") && (p.value_.type() == int_type) )
+                        {
+                            if( p.value_.get_int() > 0 )
+                            {
+                                protocol_version=p.value_.get_int();                                
+                            }                            
+                            else
+                            {
+                                strError=string("Invalid protocol-version");                                                                                                            
+                            }
+                        }
+                        else
+                        {
+                            lpDetails->SetParamValue(p.name_.c_str(),p.name_.size(),(unsigned char*)p.value_.get_str().c_str(),p.value_.get_str().size());                
+                        }
                     }
                 }                
                 if((allowed_objects & 0x000D) == 0)
@@ -2283,7 +2306,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             {
                 if((allowed_objects & 0x0001) == 0)
                 {
-                    strError=string("Follow-on issuance not allowed in this API");                                                
+                    strError=string("Creating new streams not allowed in this API");                                                
                 }
                 else
                 {
@@ -2315,8 +2338,120 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                 format=-1;            
             }
         }
+
+        if(strError.size() == 0)
+        {
+            if(new_type != MC_ENT_TYPE_UPGRADE)
+            {
+                if(protocol_version > 0)
+                {
+                    strError=string("Invalid field: protocol-version");                                                                                
+                }
+                if(startblock_is_set)
+                {
+                    strError=string("Invalid field: startblock");
+                }
+            }
+            if(new_type != -5)
+            {
+                if(approve >= 0)
+                {
+                    strError=string("Invalid field: approve");                    
+                }
+            }
+        }
         
+        if(strError.size() == 0)
+        {
+            if(new_type == MC_ENT_TYPE_UPGRADE)
+            {
+                if(mc_gState->m_Features->Upgrades())
+                {
+                    if((allowed_objects & 0x0040) == 0)
+                    {
+                        strError=string("Creating new upgrades not allowed in this API");                                                
+                    }
+                    else
+                    {
+                        if(lpDetails->m_Size)
+                        {
+                            strError=string("Invalid fields in details object");                                                            
+                        }
+                        if(entity_name.size())
+                        {
+                            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());//+1);
+                        }
+                        if(protocol_version > 0)
+                        {
+                            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,(unsigned char*)&protocol_version,4);                                
+                        }
+                        else
+                        {
+                            strError=string("Missing protocol-version");                                                                                    
+                        }
+                        if(startblock > 0)
+                        {
+                            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_START_BLOCK,(unsigned char*)&startblock,4);        
+                        }                    
+                        if(multiple_is_set)
+                        {
+                            strError=string("Invalid field: multiple");                                                            
+                        }
+                        if(open_is_set)
+                        {
+                            strError=string("Invalid field: open");                                                            
+                        }
+                        if(vKey.size())
+                        {
+                            strError=string("Invalid field: key");                                                            
+                        }
+                        if(vValue.size())
+                        {
+                            strError=string("Invalid field: value");                                                            
+                        }
+                    }
+                }
+                else
+                {
+                    strError=string("Upgrades are not supported by this protocol version"); 
+                }
+            }
+        }
         
+        if(strError.size() == 0)
+        {
+            if(mc_gState->m_Features->Upgrades())
+            {
+                if(new_type == -5)
+                {
+                    if(lpDetails->m_Size)
+                    {
+                        strError=string("Invalid field: details");                                                            
+                    }
+                    if(multiple_is_set)
+                    {
+                        strError=string("Invalid field: multiple");                                                            
+                    }
+                    if(open_is_set)
+                    {
+                        strError=string("Invalid field: open");                                                            
+                    }
+                    if(vKey.size())
+                    {
+                        strError=string("Invalid field: key");                                                            
+                    }
+                    if(vValue.size())
+                    {
+                        strError=string("Invalid field: value");                                                            
+                    }
+                }
+            }
+            else
+            {
+                strError=string("Upgrades are not supported by this protocol version"); 
+            }
+        }
+
         if(strError.size() == 0)
         {
             int err;
@@ -2386,6 +2521,22 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                 }
             }
             
+            if(new_type == MC_ENT_TYPE_UPGRADE)
+            {
+                int err;
+                script=lpDetails->GetData(0,&bytes);
+                err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_UPGRADE,0,script,bytes);
+                if(err)
+                {
+                    strError=string("Invalid custom fields, too long");                                                            
+                }
+                else
+                {
+                    script = lpDetailsScript->GetData(0,&bytes);
+                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+                }
+            }
+            
             if(new_type == -2)
             {
                 if(mc_gState->m_Features->OpDropDetailsScripts())
@@ -2445,6 +2596,25 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                 scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
             }
 
+            if(new_type == -5)
+            {
+                if(approve < 0)
+                {
+                    strError=string("Missing approve field");                                                                                    
+                }
+                
+                lpDetailsScript->Clear();
+                lpDetailsScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
+                script = lpDetailsScript->GetData(0,&bytes);
+                scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;                    
+                
+                lpDetailsScript->Clear();
+                lpDetailsScript->SetApproval(approve, mc_TimeNowAsUInt());
+                script = lpDetailsScript->GetData(0,&bytes);
+                scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;                    
+
+                scriptOpReturn << OP_RETURN;                    
+            }
         }
 
         delete lpDetails;

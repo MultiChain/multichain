@@ -1728,6 +1728,12 @@ Value signrawtransaction(const Array& params, bool fHelp)
 
     RPCTypeCheck(params, list_of(str_type)(array_type)(array_type)(str_type), true);
 
+    bool fOffline=GetBoolArg("-offline",false);
+    if(fOffline && (params.size() < 3) )
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "prevtxs and privatekeys are required in offline mode");            
+    }
+
     vector<unsigned char> txData(ParseHexV(params[0], "argument 1"));
     CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION);
     vector<CMutableTransaction> txVariants;
@@ -1753,6 +1759,8 @@ Value signrawtransaction(const Array& params, bool fHelp)
     // Fetch previous transactions (inputs):
     CCoinsView viewDummy;
     CCoinsViewCache view(&viewDummy);
+    
+    if(!fOffline)
     {
         LOCK(mempool.cs);
         CCoinsViewCache &viewChain = *pcoinsTip;

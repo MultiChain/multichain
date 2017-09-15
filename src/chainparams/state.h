@@ -15,6 +15,13 @@
 #define MC_FAT_NETWORK     3
 #define MC_FAT_NETWORKSEED 4
 
+#define MC_ETP_DAEMON      1
+#define MC_ETP_UTIL        2
+#define MC_ETP_CLI         3
+
+#define MC_SSF_DEFAULT        0x00000000
+#define MC_SSF_COLD           0x00000001
+
 #define MC_NTS_UNCONNECTED             0
 #define MC_NTS_WAITING_FOR_SEED        1
 #define MC_NTS_SEED_READY              2     
@@ -82,7 +89,7 @@ typedef struct mc_Params
         }
     }
     
-    void Parse(int argc, const char* const argv[]);
+    void Parse(int argc, const char* const argv[], int exe_type);
     int ReadConfig(const char *network_name);
     const char* GetOption(const char* strArg,const char* strDefault);
     int64_t GetOption(const char* strArg,int64_t nDefault);
@@ -115,6 +122,8 @@ typedef struct mc_Features
     int FixedIn10007();
     int Upgrades();
     int FixedIn10008();
+    int FixedDestinationExtraction();
+    int FixedIn1000920001();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo
@@ -148,6 +157,7 @@ typedef struct mc_State
     uint32_t m_WalletMode;
     int m_ProtocolVersionToUpgrade;
     void *m_pSeedNode;
+    uint32_t m_SessionFlags;
     
     mc_Script               *m_TmpScript;
     mc_Script               *m_TmpScript1;
@@ -168,6 +178,8 @@ typedef struct mc_State
         m_NetworkState=MC_NTS_UNCONNECTED;
         m_NodePausedState=MC_NPS_NONE;
         m_ProtocolVersionToUpgrade=0;
+        m_SessionFlags=MC_SSF_DEFAULT;
+        
         m_IPv4Address=0;
         m_WalletMode=0;
         m_TmpAssetsOut=new mc_Buffer;

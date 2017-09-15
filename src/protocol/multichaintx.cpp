@@ -952,6 +952,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
     nNewEntityOutput=-1;
     fSeedNodeInvolved=false;
     fShouldHaveDestination=false;
+    fShouldHaveDestination |= (MCP_ALLOW_ARBITRARY_OUTPUTS == 0);
     fShouldHaveDestination |= (MCP_ANYONE_CAN_RECEIVE == 0);
     fShouldHaveDestination |= (MCP_ALLOW_MULTISIG_OUTPUTS == 0);
     fShouldHaveDestination |= (MCP_ALLOW_P2SH_OUTPUTS == 0);
@@ -1389,25 +1390,29 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
 
                 if( (pass == 0) && fShouldHaveDestination )                     // Some setting in the protocol require address can be extracted
                 {
-                    if(fNoDestinationInOutput && (MCP_ANYONE_CAN_RECEIVE == 0))
+                    if(fNoDestinationInOutput && 
+                      ( (MCP_ANYONE_CAN_RECEIVE == 0) || (MCP_ALLOW_ARBITRARY_OUTPUTS == 0) ) )
                     {
                         reason="Script rejected - destination required ";
                         fReject=true;
                         goto exitlbl;                    
                     }
                     
-                    if((typeRet == TX_MULTISIG) && (MCP_ALLOW_MULTISIG_OUTPUTS == 0))
+                    if(MCP_ALLOW_ARBITRARY_OUTPUTS == 0)
                     {
-                        reason="Script rejected - multisig is not allowed";
-                        fReject=true;
-                        goto exitlbl;                    
-                    }
+                        if((typeRet == TX_MULTISIG) && (MCP_ALLOW_MULTISIG_OUTPUTS == 0))
+                        {
+                            reason="Script rejected - multisig is not allowed";
+                            fReject=true;
+                            goto exitlbl;                    
+                        }
 
-                    if((typeRet == TX_SCRIPTHASH) && (MCP_ALLOW_P2SH_OUTPUTS == 0))
-                    {
-                        reason="Script rejected - P2SH is not allowed";
-                        fReject=true;
-                        goto exitlbl;                    
+                        if((typeRet == TX_SCRIPTHASH) && (MCP_ALLOW_P2SH_OUTPUTS == 0))
+                        {
+                            reason="Script rejected - P2SH is not allowed";
+                            fReject=true;
+                            goto exitlbl;                    
+                        }
                     }
                 }                
                 
@@ -1929,6 +1934,7 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
     vector <bool> vInputCanGrantAdminMine;
     vector <bool> vInputHadAdminPermissionBeforeThisTx;
     vector <CScript> vInputPrevOutputScripts;
+    bool fIsEntity;
     bool fReject;    
     bool fAdminFound;
     int err;
@@ -2101,7 +2107,6 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
     for (unsigned int j = 0; j < tx.vout.size(); j++)
     {
         unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
-        mc_EntityDetails entity;
         uint32_t type,from,to,timestamp,flags;
             
         const CScript& script1 = tx.vout[j].scriptPubKey;        
@@ -2115,17 +2120,22 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
 
         if(ExtractDestination(script1,addressRet))
         {            
-            entity.Zero();                                                  
+            fIsEntity=false;
+
             for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
             {
                 mc_gState->m_TmpScript->SetElement(e);
                 if(mc_gState->m_TmpScript->GetEntity(short_txid) == 0)      
                 {
-                    if(entity.GetEntityType())
+                    if(fIsEntity)
                     {
                         reason="Script rejected - duplicate entity script";
                         fReject=true;
                         goto exitlbl;                                                
+                    }
+                    if(mc_gState->m_Features->FixedIn1000920001())
+                    {
+                        fIsEntity=true;
                     }
                 }
                 else                                                        
@@ -2133,7 +2143,7 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
                     if(mc_gState->m_TmpScript->GetPermission(&type,&from,&to,&timestamp) == 0)
                     {                        
                         type &= ( MC_PTP_MINE | MC_PTP_ADMIN );                                        
-                        if(entity.GetEntityType())
+                        if(fIsEntity)
                         {
                             type=0;
                         }
@@ -2163,7 +2173,7 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
                             {
                                 if(vInputCanGrantAdminMine[i])
                                 {
-                                    if(mc_gState->m_Permissions->SetPermission(entity.GetTxID(),ptr,type,(unsigned char*)&vInputDestinations[i],from,to,timestamp,flags,1,offset) == 0)
+                                    if(mc_gState->m_Permissions->SetPermission(NULL,ptr,type,(unsigned char*)&vInputDestinations[i],from,to,timestamp,flags,1,offset) == 0)
                                     {
                                         fAdminFound=true;
                                     }                                
@@ -2183,11 +2193,11 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
                                 }                                
                             }
                         }
-                        entity.Zero();                                                                                          
+                        fIsEntity=false;
                     }
                     else                                                   
                     {
-                        if(entity.GetEntityType())                              
+                        if(fIsEntity)                              
                         {
                             reason="Script rejected - entity script should be followed by permission";
                             fReject=true;
@@ -2466,7 +2476,6 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
                     if(quantity+total<0)
                     {
                         reason="Asset issue script rejected - negative total amount";
-//                        printf("%s\n",reason.c_str());
                         return false;                                        
                     }
                                         
@@ -2801,7 +2810,6 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
                         else
                         {                        
                             reason="Permission script rejected - invalid signature hash type";
-    //                        printf("%s\n",reason.c_str());
                             return false;
                         }
                     }                
@@ -3055,7 +3063,6 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
                         if((lpKeyID == NULL) && (lpScriptID == NULL))
                         {
                             reason="Script rejected - wrong destination type";
-//                            printf("%s\n",reason.c_str());
                             reject=true;
                             goto exitlbl;                                                            
                         }
