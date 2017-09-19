@@ -34,6 +34,36 @@ using namespace json_spirit;
 #define MC_ASSET_KEY_INVALID_SIZE          -4
 #define MC_ASSET_KEY_INVALID_EMPTY         -5
 
+#define MC_DATA_API_PARAM_TYPE_NONE            0x00000000
+#define MC_DATA_API_PARAM_TYPE_CREATE_STREAM   0x00000001
+#define MC_DATA_API_PARAM_TYPE_PUBLISH         0x00000002
+#define MC_DATA_API_PARAM_TYPE_ISSUE           0x00000004
+#define MC_DATA_API_PARAM_TYPE_FOLLOWON        0x00000008
+#define MC_DATA_API_PARAM_TYPE_RESERVED1       0x00000010
+#define MC_DATA_API_PARAM_TYPE_APPROVAL        0x00000020
+#define MC_DATA_API_PARAM_TYPE_CREATE_UPGRADE  0x00000040
+#define MC_DATA_API_PARAM_TYPE_EMPTY_RAW       0x00000100
+#define MC_DATA_API_PARAM_TYPE_RAW             0x00000200
+#define MC_DATA_API_PARAM_TYPE_FORMATTED       0x00000400
+#define MC_DATA_API_PARAM_TYPE_CIS             0x00001000
+
+#define MC_DATA_API_PARAM_TYPE_SIMPLE          0x00000602
+#define MC_DATA_API_PARAM_TYPE_ALL             0xFFFFFFFF
+
+
+// codes for allowed_objects fields    
+// 0x0001 - create    
+// 0x0002 - publish    
+// 0x0004 - issue
+// 0x0008 - follow-on
+// 0x0010 - pure details
+// 0x0020 - approval
+// 0x0040 - create upgrade
+// 0x0100 - encode empty hex
+// 0x0200 - cache input script
+
+
+
 //string HelpRequiringPassphrase();
 string AllowedPermissions();
 string AllowedPausedServices();

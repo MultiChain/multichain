@@ -1258,7 +1258,7 @@ Value appendrawtransaction(const Array& params, bool fHelp)
     {
         BOOST_FOREACH(const Value& data, params[3].get_array()) 
         {
-            CScript scriptOpReturn=ParseRawMetadata(data,0xFFFF,&entity,NULL);
+            CScript scriptOpReturn=ParseRawMetadata(data,MC_DATA_API_PARAM_TYPE_ALL,&entity,NULL);
             CTxOut out(0, scriptOpReturn);
             rawTx.vout.push_back(out);            
         }
@@ -1425,7 +1425,7 @@ Value createrawtransaction(const Array& params, bool fHelp)
     {
         BOOST_FOREACH(const Value& data, params[2].get_array()) 
         {
-            CScript scriptOpReturn=ParseRawMetadata(data,0xFFFF,&entity,NULL);
+            CScript scriptOpReturn=ParseRawMetadata(data,MC_DATA_API_PARAM_TYPE_ALL,&entity,NULL);
             CTxOut out(0, scriptOpReturn);
             rawTx.vout.push_back(out);            
         }
@@ -1529,7 +1529,7 @@ Value appendrawmetadata(const json_spirit::Array& params, bool fHelp)
         }
     }
     
-    CScript scriptOpReturn=ParseRawMetadata(params[1],0xFFFF,&entity,NULL);
+    CScript scriptOpReturn=ParseRawMetadata(params[1],MC_DATA_API_PARAM_TYPE_ALL,&entity,NULL);
     
     CTxOut txout(0, scriptOpReturn);
     tx.vout.push_back(txout);

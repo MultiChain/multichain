@@ -73,7 +73,7 @@ Value createrawsendfrom(const Array& params, bool fHelp)
     {
         BOOST_FOREACH(const Value& data, params[2].get_array()) 
         {
-            CScript scriptOpReturn=ParseRawMetadata(data,0x01FF,&entity,&found_entity);
+            CScript scriptOpReturn=ParseRawMetadata(data,MC_DATA_API_PARAM_TYPE_ALL-MC_DATA_API_PARAM_TYPE_CIS,&entity,&found_entity);
             if(found_entity.GetEntityType() == MC_ENT_TYPE_STREAM)
             {
                 FindAddressesWithPublishPermission(fromaddresses,&found_entity);
@@ -331,7 +331,7 @@ Value sendwithmetadatafrom(const Array& params, bool fHelp)
     }
     
     mc_EntityDetails found_entity;
-    CScript scriptOpReturn=ParseRawMetadata(params[3],0x0002,NULL,&found_entity);
+    CScript scriptOpReturn=ParseRawMetadata(params[3],MC_DATA_API_PARAM_TYPE_SIMPLE,NULL,&found_entity);
     
     vector<CTxDestination> fromaddresses;        
     set<CTxDestination> thisFromAddresses;

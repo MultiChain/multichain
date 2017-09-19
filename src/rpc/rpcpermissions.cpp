@@ -153,7 +153,7 @@ Value grantoperation(const Array& params)
     CScript scriptOpReturn=CScript();
     if (params.size() > 3)
     {
-        scriptOpReturn=ParseRawMetadata(params[3],0x0002,NULL,&found_entity);
+        scriptOpReturn=ParseRawMetadata(params[3],MC_DATA_API_PARAM_TYPE_SIMPLE,NULL,&found_entity);
     }
     
     if(fromaddresses.size() == 1)

@@ -930,7 +930,7 @@ Value completerawexchange(const json_spirit::Array& params, bool fHelp)
     if(params.size() > 4)
     {    
         mc_EntityDetails found_entity;
-        CScript scriptOpReturn=ParseRawMetadata(params[4],0x0002,NULL,&found_entity);
+        CScript scriptOpReturn=ParseRawMetadata(params[4],MC_DATA_API_PARAM_TYPE_SIMPLE,NULL,&found_entity);
         
         if(found_entity.GetEntityType() == MC_ENT_TYPE_STREAM)
         {        

@@ -1842,8 +1842,10 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
     
     return vecSend;
 }
-    
-CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *given_entity,mc_EntityDetails *found_entity)
+
+
+
+CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_EntityDetails *given_entity,mc_EntityDetails *found_entity)
 {
 // codes for allowed_objects fields    
 // 0x0001 - create    
@@ -1854,7 +1856,8 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
 // 0x0020 - approval
 // 0x0040 - create upgrade
 // 0x0100 - encode empty hex
-// 0x0200 - cache input script
+// 0x0200 - raw hex
+// 0x1000 - cache input script
     
     CScript scriptOpReturn=CScript();
     if(found_entity)
