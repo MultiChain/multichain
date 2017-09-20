@@ -13,10 +13,10 @@
 #define MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER              0x00000001
 #define MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON              0x00000002
 
-#define MC_SCR_DATA_FORMAT_RAW                     0x00 
-#define MC_SCR_DATA_FORMAT_UTF8                    0x01 
-#define MC_SCR_DATA_FORMAT_UBJSON                  0x02 
-#define MC_SCR_DATA_FORMAT_UNKNOWN                 0x4F 
+#define MC_SCR_DATA_FORMAT_UNKNOWN                 0x00 
+#define MC_SCR_DATA_FORMAT_RAW                     0x01 
+#define MC_SCR_DATA_FORMAT_UTF8                    0x02 
+#define MC_SCR_DATA_FORMAT_UBJSON                  0x03 
 #define MC_SCR_DATA_FORMAT_EXTENDED_MASK           0x80 
 
 

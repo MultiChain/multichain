@@ -2291,15 +2291,15 @@ int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format)
     {        
         return MC_ERR_NOERROR;
     }
-    for(elem=m_NumElements-1;elem>=0;elem--)
-    {        
-        SetElement(elem);
-        if( (err=GetDataFormat(format)) != MC_ERR_WRONG_SCRIPT  )
-        {
-            DeleteElement(elem);
-            return err;
-        }        
-    }
+        
+    elem=m_NumElements-2;
+        
+    SetElement(elem);
+    if( (err=GetDataFormat(format)) != MC_ERR_WRONG_SCRIPT  )
+    {
+        DeleteElement(elem);
+        return err;
+    }        
     
     return MC_ERR_NOERROR;
 }
