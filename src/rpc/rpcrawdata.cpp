@@ -268,7 +268,7 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t data_for
             const unsigned char *script;
             lpDetailsScript->Clear();
             lpDetailsScript->AddElement();
-            if((err = ubjson_write(*value,lpDetailsScript,GetArg("-maxformatteddatadepth",MAX_FORMATTED_DATA_DEPTH))) != MC_ERR_NOERROR)
+            if((err = ubjson_write(*value,lpDetailsScript,MAX_FORMATTED_DATA_DEPTH)) != MC_ERR_NOERROR)
             {
                 *strError=string("Couldn't transfer JSON object to internal UBJSON format");    
             }

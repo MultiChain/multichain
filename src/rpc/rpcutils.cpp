@@ -722,12 +722,12 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
     {
         if(format_text_out)
         {
-            *format_text_out=OpReturnFormatToText(format);
+            *format_text_out=OpReturnFormatToText((format == MC_SCR_DATA_FORMAT_UNKNOWN) ? MC_SCR_DATA_FORMAT_RAW : format);
         }
         switch(format)
         {
             case MC_SCR_DATA_FORMAT_UBJSON:
-                metadata_value=ubjson_read(elem,elem_size,GetArg("-maxformatteddatadepth",MAX_FORMATTED_DATA_DEPTH),&err);
+                metadata_value=ubjson_read(elem,elem_size,MAX_FORMATTED_DATA_DEPTH,&err);
                 if(err == MC_ERR_NOERROR)
                 {
                     return metadata_value;
@@ -750,7 +750,7 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
     }    
     if(format_text_out)
     {
-        *format_text_out="getdata";
+        *format_text_out="gettxoutdata";
     }
     metadata_object.push_back(Pair("format", OpReturnFormatToText(format)));
     metadata_object.push_back(Pair("txid", txid.ToString()));
@@ -2407,7 +2407,7 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
                     const unsigned char *script;
                     lpDetailsScript->Clear();
                     lpDetailsScript->AddElement();
-                    if((err = ubjson_write(formatted_data,lpDetailsScript,GetArg("-maxformatteddatadepth",MAX_FORMATTED_DATA_DEPTH))) != MC_ERR_NOERROR)
+                    if((err = ubjson_write(formatted_data,lpDetailsScript,MAX_FORMATTED_DATA_DEPTH)) != MC_ERR_NOERROR)
                     {
                         strError=string("Couldn't transfer JSON object to internal UBJSON format");    
                     }
