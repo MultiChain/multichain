@@ -704,6 +704,7 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
     lpDetails->Clear();
     lpDetails->AddElement();                   
        
+    protocol_version=-1;
     
     BOOST_FOREACH(const Pair& d, param->get_obj()) 
     {
