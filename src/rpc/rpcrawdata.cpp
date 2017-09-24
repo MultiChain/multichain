@@ -307,7 +307,6 @@ CScript RawDataScriptFormatted(Value *param,uint32_t data_format,mc_Script *lpDe
     CScript scriptOpReturn=CScript();
     vector<unsigned char> vValue;
     size_t bytes;
-    int err;
     const unsigned char *script;
     bool field_parsed;
     bool missing_data=true;
@@ -692,7 +691,6 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
     CScript scriptOpReturn=CScript();
     bool field_parsed;
     size_t bytes;
-    int err;
     const unsigned char *script;
     string entity_name;
     int protocol_version;
@@ -831,7 +829,6 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t data
     vector<unsigned char> vValue;
     vector<unsigned char> vKey;
     size_t bytes;
-    int err;
     const unsigned char *script;
     bool field_parsed;
     bool missing_data=true;
@@ -939,10 +936,9 @@ CScript RawDataScriptApprove(Value *param,mc_EntityDetails *entity,mc_Script *lp
     vector<unsigned char> vValue;
     vector<unsigned char> vKey;
     size_t bytes;
-    int err;
     const unsigned char *script;
     bool field_parsed;
-    int is_approve;
+    int is_approve=true;
     bool missing_approve=true;
     
     BOOST_FOREACH(const Pair& d, param->get_obj()) 
@@ -1001,7 +997,6 @@ CScript RawDataScriptInputCache(Value *param,mc_Script *lpDetails,int *errorCode
 {
     CScript scriptOpReturn=CScript();
     size_t bytes;
-    int err;
     const unsigned char *script;
     bool field_parsed;
     BOOST_FOREACH(const Pair& d, param->get_obj()) 
