@@ -490,7 +490,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -hideknownopdrops=<n>  " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON_RPC calls (default: %u)"), 0) + "\n";
     strUsage += "  -maxshowndata=<n>      " + strprintf(_("The maximum number of bytes to show in the data field of API responses. (default: %u)"), MAX_OP_RETURN_SHOWN) + "\n";
     strUsage += "                         " + _("Pieces of data larger than this will be returned as an object with txid, vout and size fields, for use with the gettxoutdata command.") + "\n";
-    strUsage += "  -v1compatible=<n>      " + strprintf(_("JSON_RPC calls responses compatible with MultiChain 1.0 (default: %u)"), 0) + "\n";
+    strUsage += "  -v1apicompatible=<n>   " + strprintf(_("JSON_RPC calls responses compatible with MultiChain 1.0 (default: %u)"), 0) + "\n";
            
     strUsage += "\n" + _("Wallet optimization options:") + "\n";
     strUsage += "  -autocombineminconf    " + _("Only automatically combine outputs with at least this number of confirmations, default 1") + "\n";
@@ -1028,7 +1028,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     uiInterface.InitMessage(_("Initializing multichain..."));
     RegisterNodeSignals(GetNodeSignals());
 
-    if(GetBoolArg("-v1compatible",false))
+    if(GetBoolArg("-v1apicompatible",false))
     {
         mc_gState->m_Compatibility |= MC_VCM_1_0;
     }
