@@ -940,6 +940,19 @@ int mc_Script::SetScript(const unsigned char* src,const size_t bytes,int type)
                     {
                         lastSize=-1;                                                    
                     }
+                    else
+                    {
+                        if(opcode > MC_DCT_SCRIPT_OP_PUSHDATA4)
+                        {
+                            if(mc_gState->m_Features->FormattedData())
+                            {
+                                if( (m_ScriptType & MC_DCT_SCRIPT_TYPE_OP_RETURN ) == 0) 
+                                {
+                                    m_ScriptType |= MC_DCT_SCRIPT_TYPE_DIRTY_OP_RETURN;                                
+                                }
+                            }
+                        }
+                    }
                 }
                 else
                 {
@@ -971,10 +984,21 @@ int mc_Script::SetScript(const unsigned char* src,const size_t bytes,int type)
     
     if(m_ScriptType & MC_DCT_SCRIPT_TYPE_DIRTY_OP_RETURN)
     {
-        if( (m_ScriptType & MC_DCT_SCRIPT_TYPE_OP_RETURN ) == 0) 
+        if(mc_gState->m_Features->FormattedData())                              // OP_RETURN scripts should be clean from 20001
         {
-            m_ScriptType -= MC_DCT_SCRIPT_TYPE_DIRTY_OP_RETURN;                                
-        }        
+            if(m_ScriptType & MC_DCT_SCRIPT_TYPE_OP_RETURN) 
+            {
+                m_ScriptType -= MC_DCT_SCRIPT_TYPE_OP_RETURN;                                
+                DeleteElement(GetNumElements()-1);
+            }                    
+        }
+        else
+        {
+            if( (m_ScriptType & MC_DCT_SCRIPT_TYPE_OP_RETURN ) == 0) 
+            {
+                m_ScriptType -= MC_DCT_SCRIPT_TYPE_DIRTY_OP_RETURN;                                
+            }        
+        }
     }
     
     return MC_ERR_NOERROR;

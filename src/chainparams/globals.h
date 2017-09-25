@@ -19,6 +19,7 @@ int64_t MAX_MONEY = 21000000 * COIN;                                            
 unsigned int MAX_SCRIPT_ELEMENT_SIZE=520;                                       // script.h
 int MAX_OP_RETURN_SHOWN=16384;
 int MAX_FORMATTED_DATA_DEPTH=100;
+unsigned int MAX_OP_RETURN_OP_DROP_COUNT=1000;
 
 int MCP_MAX_STD_OP_RETURN_COUNT=0;
 int64_t MCP_INITIAL_BLOCK_REWARD=0;

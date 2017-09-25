@@ -21,6 +21,7 @@
 /* MCHN END */
 
 extern unsigned int MAX_SCRIPT_ELEMENT_SIZE;                                    // MCHN global
+extern unsigned int MAX_OP_RETURN_OP_DROP_COUNT;                                // MCHN global
 //static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520; // bytes
 
 template <typename T>
@@ -601,17 +602,16 @@ public:
      * regardless of the initial stack. This allows outputs to be pruned
      * instantly when entering the UTXO set.
      */
-    bool IsUnspendable() const
+    bool IsUnspendable() const;
+/*    
     {
-/* MCHN START */        
         int op_drop_offset[2];
         int op_drop_size[2];
         int op_return_offset,op_return_size;
         return (mc_ParseOpDropOpReturnScript((unsigned char*)&begin()[0],(int)size(),op_drop_offset,op_drop_size,2,&op_return_offset,&op_return_size)) != NULL;        
 //        return (size() > 0 && *begin() == OP_RETURN);
-/* MCHN END */        
     }
-
+*/
     std::string ToString() const;
 
 /* MCHN START */    

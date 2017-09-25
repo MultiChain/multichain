@@ -386,14 +386,26 @@ bool IsStandardNullData(const CScript& scriptPubKey,bool standard_check)
     bool fixed=(mc_gState->m_Features->FixedDestinationExtraction() != 0);
     int op_drop_count=0;
     int max_op_drop_count=2;
+    bool check_sizes=false;
+
+    if(mc_gState->m_Features->VerifySizeOfOpDropElements())
+    {
+        if( !fixed || standard_check )
+        {
+            check_sizes=true;
+        }
+    }
+    
+/*    
     unsigned int sizes[3];
     sizes[0]=0;
     sizes[1]=0;
     sizes[2]=0;
-    
+*/    
     if(mc_gState->m_Features->FormattedData())
     {
-        max_op_drop_count=3;
+    
+        max_op_drop_count=MAX_OP_RETURN_OP_DROP_COUNT;
     }
     
     CScript::const_iterator pc = scriptPubKey.begin();
@@ -421,7 +433,13 @@ bool IsStandardNullData(const CScript& scriptPubKey,bool standard_check)
         {
             if( opcode < OP_PUSHDATA1 )
             {
-                sizes[op_drop_count]=(unsigned int)opcode;
+                if(check_sizes)
+                {
+                    if( (unsigned int)opcode > MAX_SCRIPT_ELEMENT_SIZE )
+                    {
+                        return false;
+                    }                                
+                }
             }
             else
             {
@@ -471,7 +489,17 @@ bool IsStandardNullData(const CScript& scriptPubKey,bool standard_check)
             scriptPubKey.GetOp(pc, opcode);
             if(opcode >= OP_PUSHDATA1)
             {
-                return false;
+                if(mc_gState->m_Features->FormattedData())
+                {
+                    if(opcode > OP_16)
+                    {
+                        return false;                        
+                    }
+                }
+                else
+                {
+                    return false;
+                }
             }
             if( !fixed || standard_check )
             {
@@ -487,37 +515,36 @@ bool IsStandardNullData(const CScript& scriptPubKey,bool standard_check)
         }
     }
 
-    if(mc_gState->m_Features->VerifySizeOfOpDropElements())
+    if(check_sizes && recheck)
     {
-        if( !fixed || standard_check )
-        {
-        if(recheck)
-        {
-            pc = scriptPubKey.begin();
+        pc = scriptPubKey.begin();
 
-            op_drop_count=0;
-            while( op_drop_count < max_op_drop_count+1 )
+        op_drop_count=0;
+        while( op_drop_count < max_op_drop_count+1 )
+        {
+            scriptPubKey.GetOp(pc, opcode, vch);
+            if(opcode == OP_RETURN)
             {
-                scriptPubKey.GetOp(pc, opcode, vch);
-                if(opcode == OP_RETURN)
+                op_drop_count=max_op_drop_count+1;
+            }
+            if( opcode >= OP_PUSHDATA1 )
+            {
+                if( opcode <= OP_PUSHDATA4 )
                 {
-                    op_drop_count=max_op_drop_count+1;
-                }
-                if( opcode >= OP_PUSHDATA1 )
-                {
-                    if( opcode <= OP_PUSHDATA4 )
+                    if( (unsigned int)vch.size() > MAX_SCRIPT_ELEMENT_SIZE )
                     {
-                        sizes[op_drop_count]=(unsigned int)vch.size();
-                    }            
-                }
-                if(op_drop_count < max_op_drop_count+1)
-                {
-                    scriptPubKey.GetOp(pc, opcode);
-                    op_drop_count++;
-                }        
-            }                       
-        }
+                        return false;
+                    }                                
+                }            
+            }
+            if(op_drop_count < max_op_drop_count+1)
+            {
+                scriptPubKey.GetOp(pc, opcode);
+                op_drop_count++;
+            }        
+        }                       
 
+/*        
         for(op_drop_count=0;op_drop_count<max_op_drop_count;op_drop_count++)
         {
             if( sizes[op_drop_count] > MAX_SCRIPT_ELEMENT_SIZE )
@@ -525,17 +552,23 @@ bool IsStandardNullData(const CScript& scriptPubKey,bool standard_check)
                 return false;
             }            
         }
+ */ 
 /*        
         if( (sizes[0] > MAX_SCRIPT_ELEMENT_SIZE) || (sizes[1] > MAX_SCRIPT_ELEMENT_SIZE) )
         {
             return false;
         }
 */        
-        }
     }
     
     return true;
 }
+
+bool CScript::IsUnspendable() const
+{
+    return IsStandardNullData(*this,false);
+}
+
 
 bool ExtractDestinations10008(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet)
 {
@@ -860,6 +893,7 @@ bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType)
     vector<unsigned char> vch;
     whichType = TX_NONSTANDARD;
     int max_op_drops;
+    bool result;
 
     CScript::const_iterator pc = scriptPubKey.begin();
     
@@ -908,7 +942,16 @@ bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType)
                 }
                 else
                 {
-                    return IsStandardFull(scriptPubKey,whichType);
+                    result=IsStandardFull(scriptPubKey,whichType);
+                    if( (whichType == TX_PUBKEY) || (whichType == TX_MULTISIG) )
+                    {
+                        return result;
+                    }
+                    else                                                        // Avoiding duplicate check for other type
+                    {
+                        whichType = TX_NONSTANDARD;
+                        return false;
+                    }
                 }
             }
         }
