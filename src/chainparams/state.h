@@ -128,6 +128,7 @@ typedef struct mc_Features
     int FormattedData();
     int FixedDestinationExtraction();
     int FixedIn1000920001();
+    int MultipleStreamKeys();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo

@@ -435,7 +435,7 @@ Object StreamItemEntry(const CWalletTx& wtx,const unsigned char *stream_id, bool
     Object entry;
     Array publishers;
     set<uint160> publishers_set;
-    Array items;
+    Array keys;    
     int stream_output;
     const unsigned char *ptr;
     unsigned char item_key[MC_ENT_MAX_ITEM_KEY_SIZE+1];
@@ -470,18 +470,22 @@ Object StreamItemEntry(const CWalletTx& wtx,const unsigned char *stream_id, bool
                         if(memcmp(short_txid,stream_id,MC_AST_SHORT_TXID_SIZE) == 0)
                         {
                             stream_output=j;
-                            mc_gState->m_TmpScript->SetElement(1);
-                                                                                        // Should be spkk
-                            if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
+                            for(int e=1;e<mc_gState->m_TmpScript->GetNumElements()-1;e++)
                             {
-                                return entry;
-                            }                                            
-                            item_key[item_key_size]=0;
-                            
+                                mc_gState->m_TmpScript->SetElement(e);
+                                                                                            // Should be spkk
+                                if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
+                                {
+                                    return entry;
+                                }                                            
+                                item_key[item_key_size]=0;
+                                keys.push_back(strprintf("%s",item_key));
+                            }
+                                                        
                             size_t elem_size;
                             const unsigned char *elem;
 
-                            elem = mc_gState->m_TmpScript->GetData(2,&elem_size);
+                            elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
                             item_value=OpReturnEntry(elem,elem_size,wtx.GetHash(),j);
                             format_item_value=OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),j,format,&format_text_str);
                         }
@@ -527,9 +531,10 @@ Object StreamItemEntry(const CWalletTx& wtx,const unsigned char *stream_id, bool
     }
     
     entry.push_back(Pair("publishers", publishers));
-    entry.push_back(Pair("key", strprintf("%s",item_key)));
+    entry.push_back(Pair("keys", keys));
     if(mc_gState->m_Compatibility & MC_VCM_1_0)
-    {
+    {    
+        entry.push_back(Pair("key", keys[0]));
         entry.push_back(Pair("data", item_value));        
     }
     entry.push_back(Pair("format", format_text_str));        

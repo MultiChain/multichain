@@ -1173,7 +1173,9 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                     }
                 }
                 
-                if( (pass == 0) && (mc_gState->m_TmpScript->GetNumElements() > 3) ) // More than 2 OP_DROPs
+                if( (pass == 0) && 
+                    (mc_gState->m_TmpScript->GetNumElements() > 3) && 
+                    (mc_gState->m_Features->MultipleStreamKeys() == 0) ) // More than 2 OP_DROPs
                 {
                     reason="Metadata script rejected - too many elements";
                     fReject=true;
@@ -1199,7 +1201,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                     }
                 }
                 
-                if( (pass == 3) && (mc_gState->m_TmpScript->GetNumElements() == 3) ) // 2 OP_DROPs + OP_RETURN - item key or entity update or upgrade approval
+                if( (pass == 3) && (mc_gState->m_TmpScript->GetNumElements() >= 3) ) // 2 OP_DROPs + OP_RETURN - item key or entity update or upgrade approval
                 {
                     mc_gState->m_TmpScript->SetElement(0);
                                                                                 // Should be spke
@@ -1220,6 +1222,12 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                     {
                         if(entity.GetEntityType() == MC_ENT_TYPE_ASSET)
                         {
+                            if(mc_gState->m_TmpScript->GetNumElements() > 3)                            
+                            {
+                                reason="Metadata script rejected - too many elements in asset update script";
+                                fReject=true;
+                                goto exitlbl;                                                                                                                                                                                                                                    
+                            }
                             mc_gState->m_TmpScript->SetElement(1);
                             err=mc_gState->m_TmpScript->GetNewEntityType(&new_entity_type,&entity_update,details_script,&details_script_size);
                             if(err == 0)    // New entity element
@@ -1248,17 +1256,26 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                         {
                             if((mc_gState->m_Features->Upgrades() == 0) || (entity.GetEntityType() != MC_ENT_TYPE_UPGRADE)) // (pseudo)stream
                             {
-                                mc_gState->m_TmpScript->SetElement(1);
-                                                                                    // Should be spkk
-                                if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
+                                for (int e = 1; e < mc_gState->m_TmpScript->GetNumElements()-1; e++)
                                 {
-                                    reason="Metadata script rejected - wrong element, should be item key";
-                                    fReject=true;
-                                    goto exitlbl;                                                                                                                                        
-                                }                                            
+                                    mc_gState->m_TmpScript->SetElement(e);
+                                                                                        // Should be spkk
+                                    if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
+                                    {
+                                        reason="Metadata script rejected - wrong element, should be item key";
+                                        fReject=true;
+                                        goto exitlbl;                                                                                                                                        
+                                    }                                            
+                                }
                             }
                             else                        
                             {
+                                if(mc_gState->m_TmpScript->GetNumElements() > 3)                            
+                                {
+                                    reason="Metadata script rejected - too many elements in upgrade approval script";
+                                    fReject=true;
+                                    goto exitlbl;                                                                                                                                                                                                                                    
+                                }
                                 mc_gState->m_TmpScript->SetElement(1);          // Upgrade approval
                                 
                                 if(mc_gState->m_TmpScript->GetApproval(&approval,&timestamp))

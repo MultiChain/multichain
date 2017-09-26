@@ -535,12 +535,7 @@ Value publishfrom(const Array& params, bool fHelp)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
     }
-       
-    if(params[2].get_str() == "*")
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid item-key-string: *");                
-    }
-    
+           
     mc_Script *lpScript;
     mc_EntityDetails stream_entity;
     parseStreamIdentifier(params[1],&stream_entity);           
@@ -569,9 +564,43 @@ Value publishfrom(const Array& params, bool fHelp)
 
     FindAddressesWithPublishPermission(fromaddresses,&stream_entity);
         
-    if(params[2].get_str().size() > MC_ENT_MAX_ITEM_KEY_SIZE)
+    Array keys;
+    
+    if(params[2].type() == str_type)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Item key is too long");                                                                                                    
+        keys.push_back(params[2]);
+    }
+    else
+    {
+        if(params[2].type() == array_type)
+        {
+            keys=params[2].get_array();
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Item keys should be either string or array");                                                                                                                
+        }
+    }
+    
+    if(keys.size() == 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Item keys array cannot be empty");                                                                                                                
+    }
+    
+    for(int k=0;k<(int)keys.size();k++)
+    {
+        if(keys[k].type() != str_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Item key should be string");                                                                                                                
+        }        
+        if(keys[k].get_str().size() > MC_ENT_MAX_ITEM_KEY_SIZE)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Item key is too long");                                                                                                    
+        }        
+        if(keys[k].get_str() == "*")
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid item-key-string: *");                
+        }
     }
     
     mc_Script *lpDetailsScript;
@@ -662,7 +691,10 @@ Value publishfrom(const Array& params, bool fHelp)
     
     lpDetailsScript->Clear();
     lpDetailsScript->SetEntity(stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
-    lpDetailsScript->SetItemKey((unsigned char*)params[2].get_str().c_str(),params[2].get_str().size());
+    for(int k=0;k<(int)keys.size();k++)
+    {
+        lpDetailsScript->SetItemKey((unsigned char*)keys[k].get_str().c_str(),keys[k].get_str().size());
+    }
     if( data_format != MC_SCR_DATA_FORMAT_UNKNOWN )
     {
         lpDetailsScript->SetDataFormat(data_format);
@@ -1010,7 +1042,7 @@ Value liststreamitems(const Array& params, bool fHelp)
     
     Array retArray;
     pwalletTxsMain->GetList(&entStat.m_Entity,start+1,count,entity_rows);
-    
+
     for(int i=0;i<entity_rows->GetCount();i++)
     {
         mc_TxEntityRow *lpEntTx;

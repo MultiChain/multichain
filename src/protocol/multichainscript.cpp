@@ -2328,3 +2328,55 @@ int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format)
     return MC_ERR_NOERROR;
 }
 
+int mc_Script::DeleteDuplicatesInRange(int from,int to)
+{
+    int *len0,*len1,*len2,*len3,*len4;
+
+    len0=m_lpCoord+from*2+1;
+    len3=m_lpCoord+to*2+1;    
+    len4=m_lpCoord+m_NumElements*2+1;    
+    
+    len1=len3-2;    
+    while(len1>len0)
+    {
+        len2=len1-2;
+        while(len2 >= len0)
+        {
+            if(*len2 >= 0)
+            {
+                if(*len2 == *len1)
+                {
+                    if( (*len2==0) || (memcmp(m_lpData+*(len2-1),m_lpData+*(len1-1),*len2) == 0) )
+                    {
+                        *len1=-1;
+                        len2=len0;
+                    }
+                }
+            }
+            len2-=2;
+        }
+        len1-=2;
+    }
+    
+    len1=len0+2;
+    len2=len0+2;
+    
+    while(len2<len4)
+    {
+        if(*len2 >= 0)
+        {
+            if(len1 != len2)
+            {
+                *len1=*len2;
+                *(len1-1)=*(len2-1);
+            }
+            len1+=2;
+        }
+        len2+=2;
+    }
+    
+    m_NumElements-=(len2-len1)/2;
+    m_CurrentElement=-1;
+    
+   return MC_ERR_NOERROR;
+ }

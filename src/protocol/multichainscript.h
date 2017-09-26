@@ -104,6 +104,7 @@ typedef struct mc_Script
     int SetDataFormat(const uint32_t format);
     
     int ExtractAndDeleteDataFormat(uint32_t *format);
+    int DeleteDuplicatesInRange(int from,int to);
     
     
 } mc_Script;
