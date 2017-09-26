@@ -589,7 +589,7 @@ Value publishfrom(const Array& params, bool fHelp)
         {
             data_format=MC_SCR_DATA_FORMAT_UTF8;
         }
-        if(params[4].get_str() == "hex")
+        if(params[4].get_str() == "json")
         {
             data_format=MC_SCR_DATA_FORMAT_UBJSON;
         }
@@ -602,7 +602,7 @@ Value publishfrom(const Array& params, bool fHelp)
     {            
         if(params[3].type() != str_type)
         {
-            data_format=MC_SCR_DATA_FORMAT_UTF8;
+            data_format=MC_SCR_DATA_FORMAT_UBJSON;
         }
     }
     
