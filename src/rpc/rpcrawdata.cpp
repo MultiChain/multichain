@@ -828,11 +828,14 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t data
     CScript scriptOpReturn=CScript();
     vector<unsigned char> vValue;
     vector<unsigned char> vKey;
+    Array vKeys; 
     size_t bytes;
     const unsigned char *script;
     bool field_parsed;
     bool missing_data=true;
     bool missing_key=true;
+    bool should_be_hex=false;
+    vKeys.clear();
     BOOST_FOREACH(const Pair& d, param->get_obj()) 
     {
         field_parsed=false;
@@ -840,11 +843,11 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t data
         {
             if(!missing_key)
             {
-                *strError=string("key or key-hex fields can appear only once in the object");                                                                                                        
+                *strError=string("only one of the key fields can appear in the object");                                                                                                        
             }
             if(d.value_.type() != null_type && (d.value_.type()==str_type))
             {
-                vKey=vector<unsigned char>(d.value_.get_str().begin(), d.value_.get_str().end());    
+                vKeys.push_back(d.value_);
             }
             else
             {
@@ -857,20 +860,63 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t data
         {
             if(!missing_key)
             {
-                *strError=string("key or key-hex fields can appear only once in the object");                                                                                                        
+                *strError=string("only one of the key fields can appear in the object");                                                                                                        
             }
             if(d.value_.type() != null_type && (d.value_.type()==str_type))
             {
-                bool fIsHex;
-                vKey=ParseHex(d.value_.get_str().c_str(),fIsHex);    
-                if(!fIsHex)
-                {
-                    *strError=string("key should be hexadecimal string");                            
-                }
+                vKeys.push_back(d.value_);
+                should_be_hex=true;
             }
             else
             {
                 *strError=string("Invalid key");                            
+            }
+            field_parsed=true;
+            missing_key=false;
+        }
+        if(d.name_ == "keys")
+        {
+            if( mc_gState->m_Features->MultipleStreamKeys() == 0 )
+            {
+                *errorCode=RPC_NOT_SUPPORTED;
+                *strError=string("Multiple keys are not supported by this protocol version");       
+                goto exitlbl;
+            }
+            if(!missing_key)
+            {
+                *strError=string("only one of the key fields can appear in the object");                                                                                                        
+            }
+            if(d.value_.type() == array_type)
+            {
+                vKeys=d.value_.get_array();
+            }            
+            else
+            {
+                *strError=string("Invalid keys - should be array");                            
+            }
+            field_parsed=true;
+            missing_key=false;
+        }
+        if(d.name_ == "keys-hex")
+        {
+            if( mc_gState->m_Features->MultipleStreamKeys() == 0 )
+            {
+                *errorCode=RPC_NOT_SUPPORTED;
+                *strError=string("Multiple keys are not supported by this protocol version");       
+                goto exitlbl;
+            }
+            if(!missing_key)
+            {
+                *strError=string("only one of the key fields can appear in the object");                                                                                                        
+            }
+            if(d.value_.type() == array_type)
+            {
+                vKeys=d.value_.get_array();
+                should_be_hex=true;
+            }            
+            else
+            {
+                *strError=string("Invalid keys - should be array");                            
             }
             field_parsed=true;
             missing_key=false;
@@ -909,11 +955,42 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t data
         script = lpDetailsScript->GetData(0,&bytes);
         scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
 
-        lpDetailsScript->Clear();
-        if(lpDetailsScript->SetItemKey(&vKey[0],vKey.size()) == MC_ERR_NOERROR)
+        for(int i=0;i<(int)vKeys.size();i++)
         {
-            script = lpDetailsScript->GetData(0,&bytes);
-            scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
+            lpDetailsScript->Clear();
+            if(vKeys[i].type() != null_type && (vKeys[i].type()==str_type))
+            {
+                if(should_be_hex)
+                {
+                    bool fIsHex;
+                    vKey=ParseHex(vKeys[i].get_str().c_str(),fIsHex);    
+                    if(!fIsHex)
+                    {
+                        *strError=string("key should be hexadecimal string");          
+                        goto exitlbl;
+                    }                
+                }
+                else
+                {
+                    vKey=vector<unsigned char>(vKeys[i].get_str().begin(), vKeys[i].get_str().end());    
+                }
+                if(vKey.size() > MC_ENT_MAX_ITEM_KEY_SIZE)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Item key is too long");                                                                                                    
+                    goto exitlbl;
+                }        
+            }
+            else
+            {
+                *strError=string("key should be string");                                            
+                goto exitlbl;
+            }
+        
+            if(lpDetailsScript->SetItemKey(&vKey[0],vKey.size()) == MC_ERR_NOERROR)
+            {
+                script = lpDetailsScript->GetData(0,&bytes);
+                scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
+            }
         }
 
         if(data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
@@ -927,6 +1004,8 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t data
         scriptOpReturn << OP_RETURN << vValue;                            
     }
     
+exitlbl:
+            
     return scriptOpReturn;
 }
 
