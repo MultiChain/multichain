@@ -479,7 +479,7 @@ Object StreamItemEntry(const CWalletTx& wtx,const unsigned char *stream_id, bool
                                     return entry;
                                 }                                            
                                 item_key[item_key_size]=0;
-                                keys.push_back(strprintf("%s",item_key));
+                                keys.push_back(string(item_key,item_key+item_key_size));
                             }
                                                         
                             size_t elem_size;

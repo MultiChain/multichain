@@ -838,7 +838,7 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
             return Value::null;
         }                                            
         item_key[item_key_size]=0;
-        keys.push_back(strprintf("%s",item_key));
+        keys.push_back(string(item_key,item_key+item_key_size));
     }
 
     size_t elem_size;
