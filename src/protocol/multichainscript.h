@@ -17,6 +17,7 @@
 #define MC_SCR_DATA_FORMAT_RAW                     0x01 
 #define MC_SCR_DATA_FORMAT_UTF8                    0x02 
 #define MC_SCR_DATA_FORMAT_UBJSON                  0x03 
+#define MC_SCR_DATA_FORMAT_MAX                     0x03 
 #define MC_SCR_DATA_FORMAT_EXTENDED_MASK           0x80 
 
 

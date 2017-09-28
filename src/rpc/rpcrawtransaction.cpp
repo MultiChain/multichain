@@ -126,7 +126,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     new_entity_type=MC_ENT_TYPE_NONE;
     set<uint256> streams_already_seen;
     uint32_t format;
-    Array aFormatMetaData;
+    Array aFormatMetaData[MC_SCR_DATA_FORMAT_MAX+1];
     
     Array vout;
     for (unsigned int i = 0; i < tx.vout.size(); i++) {
@@ -156,6 +156,11 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         {
 //            int e=mc_gState->m_TmpScript->GetNumElements()-1;
             lpScript->ExtractAndDeleteDataFormat(&format);
+            if(format == MC_SCR_DATA_FORMAT_UNKNOWN)
+            {
+                format=MC_SCR_DATA_FORMAT_RAW;
+            }
+            
             int e=lpScript->GetNumElements()-1;
             {
                 if(mc_gState->m_Features->OpDropDetailsScripts())
@@ -224,7 +229,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                 {
                     elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
                     vdata.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
-                    aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,tx.GetHash(),i,format));
+                    aFormatMetaData[format].push_back(OpReturnFormatEntry(elem,elem_size,tx.GetHash(),i,format,NULL));
                 }                        
             }
             else
@@ -233,7 +238,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                 if(elem_size)
                 {
                     vdata.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
-                    aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,tx.GetHash(),i,format));
+                    aFormatMetaData[format].push_back(OpReturnFormatEntry(elem,elem_size,tx.GetHash(),i,format,NULL));
                 }
                 
                 lpScript->SetElement(0);
@@ -446,12 +451,25 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         entry.push_back(Pair("create", StreamEntry((unsigned char*)&txid,0x05)));
     }
     
+    if( ( (mc_gState->m_Compatibility & MC_VCM_1_0) != 0) || (aFormatMetaData[MC_SCR_DATA_FORMAT_RAW].size() != 0) )
+    {
+        entry.push_back(Pair("data", aFormatMetaData[MC_SCR_DATA_FORMAT_RAW]));
+    }
+    if(aFormatMetaData[MC_SCR_DATA_FORMAT_UTF8].size())        
+    {
+        entry.push_back(Pair("text", aFormatMetaData[MC_SCR_DATA_FORMAT_UTF8]));        
+    }
+    if(aFormatMetaData[MC_SCR_DATA_FORMAT_UBJSON].size())        
+    {
+        entry.push_back(Pair("json", aFormatMetaData[MC_SCR_DATA_FORMAT_UBJSON]));        
+    }
+/*    
     if(mc_gState->m_Compatibility & MC_VCM_1_0)
     {
         entry.push_back(Pair("data", vdata));
     }
     entry.push_back(Pair("txdata", aFormatMetaData));
-    
+*/    
 /* MCHN START */        
 
     delete lpScript;
