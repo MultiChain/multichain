@@ -7,6 +7,8 @@
 
 #include "rpc/rpcwallet.h"
 #include "json/json_spirit_ubjson.h"
+#include "json/json_spirit_reader_template.h"
+#include "json/json_spirit_writer_template.h"
 
 Value createupgradefromcmd(const Array& params, bool fHelp);
 
@@ -607,6 +609,8 @@ Value publishfrom(const Array& params, bool fHelp)
     lpDetailsScript=NULL;
         
     uint32_t data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
+    
+    Value jVal=params[3];
 
     if( params.size() > 4 )
     {
@@ -642,9 +646,14 @@ Value publishfrom(const Array& params, bool fHelp)
         case MC_SCR_DATA_FORMAT_UTF8:
             if(params[3].type() != str_type)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Item data should be string");                                                                                                                                
+                string json_str=write_string(params[3],false);
+                dataData=vector<unsigned char> (json_str.begin(),json_str.end());                
+//                throw JSONRPCError(RPC_INVALID_PARAMETER, "Item data should be string");                                                                                                                                
             }
-            dataData=vector<unsigned char> (params[3].get_str().begin(),params[3].get_str().end());                
+            else
+            {
+                dataData=vector<unsigned char> (params[3].get_str().begin(),params[3].get_str().end());                
+            }
             break;
         case MC_SCR_DATA_FORMAT_UBJSON:                                         // do it after script allocation
             break;
@@ -678,9 +687,21 @@ Value publishfrom(const Array& params, bool fHelp)
         size_t bytes;
         const unsigned char *script;
         int err;
+        
+        jVal=params[3];
+        
+        if(jVal.type() == str_type)
+        {
+            string strVal=jVal.get_str();
+            if (!read_string(strVal, jVal))
+            {
+                jVal=params[3];                
+            }                
+        }
+        
         lpDetailsScript->Clear();
         lpDetailsScript->AddElement();
-        if((err = ubjson_write(params[3],lpDetailsScript,MAX_FORMATTED_DATA_DEPTH)) != MC_ERR_NOERROR)
+        if((err = ubjson_write(jVal,lpDetailsScript,MAX_FORMATTED_DATA_DEPTH)) != MC_ERR_NOERROR)
         {
             delete lpDetailsScript;
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Couldn't transfer JSON object to internal UBJSON format");    
