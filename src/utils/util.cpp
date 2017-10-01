@@ -724,6 +724,7 @@ void ShrinkDebugFile()
 {
     ShrinkDebugFile("debug.log");
     ShrinkDebugFile("permissions.log");
+    ShrinkDebugFile("wallet/txs.log");
     // Scroll debug.log if it's getting too big
 /*    
     boost::filesystem::path pathLog = GetDataDir() / "debug.log";
