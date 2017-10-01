@@ -2622,9 +2622,9 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
         
         if(strError.size() == 0)
         {
-            if(mc_gState->m_Features->Upgrades())
+            if(new_type == -5)
             {
-                if(new_type == -5)
+                if(mc_gState->m_Features->Upgrades())
                 {
                     if(lpDetails->m_Size)
                     {
@@ -2647,10 +2647,10 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
                         strError=string("Invalid field: value");                                                            
                     }
                 }
-            }
-            else
-            {
-                strError=string("Upgrades are not supported by this protocol version"); 
+                else
+                {
+                    strError=string("Upgrades are not supported by this protocol version"); 
+                }
             }
         }
 
