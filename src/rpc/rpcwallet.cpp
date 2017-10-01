@@ -623,7 +623,7 @@ Value gettxoutdata(const Array& params, bool fHelp)
             }
             break;
     }
-
+/*
     if(mc_gState->m_Compatibility & MC_VCM_1_0)
     {
         if( (format == MC_SCR_DATA_FORMAT_RAW) || (format == MC_SCR_DATA_FORMAT_UNKNOWN) )
@@ -631,8 +631,8 @@ Value gettxoutdata(const Array& params, bool fHelp)
             return HexStr(elem+start,elem+start+count);
         }
     }
-    
-    return OpReturnFormatEntry(elem+start,count,0,0,format);        
+*/    
+    return OpReturnFormatEntry(elem+start,count,0,0,format,NULL);        
 }
 
 /* MCHN END */

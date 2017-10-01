@@ -703,7 +703,7 @@ string OpReturnFormatToText(int format)
     switch(format)
     {
         case MC_SCR_DATA_FORMAT_RAW:
-            return "data";
+            return "raw";
         case MC_SCR_DATA_FORMAT_UTF8:
             return "text";
         case MC_SCR_DATA_FORMAT_UBJSON:
@@ -730,16 +730,20 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
                 metadata_value=ubjson_read(elem,elem_size,MAX_FORMATTED_DATA_DEPTH,&err);
                 if(err == MC_ERR_NOERROR)
                 {
-                    return metadata_value;
+                    metadata_object.push_back(Pair("json",metadata_value));
+                    return metadata_object;
                 }
                 if(format_text_out)
                 {
                     *format_text_out=OpReturnFormatToText(MC_SCR_DATA_FORMAT_UNKNOWN);
                 }
-                metadata=HexStr(elem,elem+elem_size);                    
+                metadata=HexStr(elem,elem+elem_size);    
+//                metadata_object.push_back(Pair("json",metadata));
                 break;
             case MC_SCR_DATA_FORMAT_UTF8:
                 metadata=string(elem,elem+elem_size);
+                metadata_object.push_back(Pair("text",metadata));
+                return metadata_object;
 //                metadata.push_back(0x00);
                 break;
             default:                                                            // including MC_SCR_DATA_FORMAT_RAW and unknown
@@ -752,9 +756,9 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
     {
         *format_text_out="gettxoutdata";
     }
-//    metadata_object.push_back(Pair("format", OpReturnFormatToText(format)));
     metadata_object.push_back(Pair("txid", txid.ToString()));
     metadata_object.push_back(Pair("vout", vout));
+    metadata_object.push_back(Pair("format", OpReturnFormatToText(format)));
     metadata_object.push_back(Pair("size", (int)elem_size));
     return metadata_object;    
 }
@@ -892,6 +896,8 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     {
         entry.push_back(Pair("key", keys[0]));        
     }
+    entry.push_back(Pair("data", format_item_value));        
+/*    
     if( ((mc_gState->m_Compatibility & MC_VCM_1_0) != 0) || (format == MC_SCR_DATA_FORMAT_RAW) )
     {
         entry.push_back(Pair("data", item_value));        
@@ -904,7 +910,7 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     {
         entry.push_back(Pair("json", format_item_value));        
     }
-
+*/
 /*    
     entry.push_back(Pair("format", format_text_str));        
     entry.push_back(Pair("formatdata", format_item_value));        

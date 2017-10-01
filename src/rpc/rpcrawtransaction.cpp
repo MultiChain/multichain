@@ -229,7 +229,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                 {
                     elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
                     vdata.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
-                    aFormatMetaData[format].push_back(OpReturnFormatEntry(elem,elem_size,tx.GetHash(),i,format,NULL));
+                    aFormatMetaData[MC_SCR_DATA_FORMAT_RAW].push_back(OpReturnFormatEntry(elem,elem_size,tx.GetHash(),i,format,NULL));
                 }                        
             }
             else
@@ -238,7 +238,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                 if(elem_size)
                 {
                     vdata.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
-                    aFormatMetaData[format].push_back(OpReturnFormatEntry(elem,elem_size,tx.GetHash(),i,format,NULL));
+                    aFormatMetaData[MC_SCR_DATA_FORMAT_RAW].push_back(OpReturnFormatEntry(elem,elem_size,tx.GetHash(),i,format,NULL));
                 }
                 
                 lpScript->SetElement(0);
@@ -451,10 +451,11 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         entry.push_back(Pair("create", StreamEntry((unsigned char*)&txid,0x05)));
     }
     
-    if( ( (mc_gState->m_Compatibility & MC_VCM_1_0) != 0) || (aFormatMetaData[MC_SCR_DATA_FORMAT_RAW].size() != 0) )
+//    if( ( (mc_gState->m_Compatibility & MC_VCM_1_0) != 0) || (aFormatMetaData[MC_SCR_DATA_FORMAT_RAW].size() != 0) )
     {
         entry.push_back(Pair("data", aFormatMetaData[MC_SCR_DATA_FORMAT_RAW]));
     }
+/*    
     if(aFormatMetaData[MC_SCR_DATA_FORMAT_UTF8].size())        
     {
         entry.push_back(Pair("text", aFormatMetaData[MC_SCR_DATA_FORMAT_UTF8]));        
@@ -463,6 +464,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     {
         entry.push_back(Pair("json", aFormatMetaData[MC_SCR_DATA_FORMAT_UBJSON]));        
     }
+ */ 
 /*    
     if(mc_gState->m_Compatibility & MC_VCM_1_0)
     {
