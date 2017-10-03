@@ -610,6 +610,37 @@ Value publishfrom(const Array& params, bool fHelp)
         
     uint32_t data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
     
+/*    
+    if( params.size() > 4 )
+    {
+        if(params[4].get_str() == "hex")
+        {
+            data_format=MC_SCR_DATA_FORMAT_RAW;
+        }
+        if(params[4].get_str() == "text")
+        {
+            data_format=MC_SCR_DATA_FORMAT_UTF8;
+        }
+        if(params[4].get_str() == "json")
+        {
+            data_format=MC_SCR_DATA_FORMAT_UBJSON;
+        }
+        if(data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid format");                                                                                                                
+        }
+    }
+    else
+    {            
+        if(params[3].type() != str_type)
+        {
+            data_format=MC_SCR_DATA_FORMAT_UBJSON;
+        }
+    }
+*/    
+    vector<unsigned char> dataData;
+    lpDetailsScript=new mc_Script;
+    
     Value jVal=params[3];
 
     if(jVal.type() != str_type)
@@ -647,36 +678,6 @@ Value publishfrom(const Array& params, bool fHelp)
         }
     }
 
-/*    
-    if( params.size() > 4 )
-    {
-        if(params[4].get_str() == "hex")
-        {
-            data_format=MC_SCR_DATA_FORMAT_RAW;
-        }
-        if(params[4].get_str() == "text")
-        {
-            data_format=MC_SCR_DATA_FORMAT_UTF8;
-        }
-        if(params[4].get_str() == "json")
-        {
-            data_format=MC_SCR_DATA_FORMAT_UBJSON;
-        }
-        if(data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid format");                                                                                                                
-        }
-    }
-    else
-    {            
-        if(params[3].type() != str_type)
-        {
-            data_format=MC_SCR_DATA_FORMAT_UBJSON;
-        }
-    }
-*/    
-    vector<unsigned char> dataData;
-    
     switch(data_format)
     {
         case MC_SCR_DATA_FORMAT_UTF8:
@@ -745,7 +746,6 @@ Value publishfrom(const Array& params, bool fHelp)
 */
     
     
-    lpDetailsScript=new mc_Script;
     
     if( data_format == MC_SCR_DATA_FORMAT_UBJSON )
     {
@@ -774,6 +774,15 @@ Value publishfrom(const Array& params, bool fHelp)
         }
         script = lpDetailsScript->GetData(0,&bytes);
         dataData=vector<unsigned char> (script,script+bytes);                                            
+    }
+    
+    string strError;
+    int errorCode=RPC_INVALID_PARAMETER;
+    dataData=ParseRawFormattedData(&(params[3]),&data_format,lpDetailsScript,&errorCode,&strError);
+
+    if(strError.size())
+    {
+        throw JSONRPCError(errorCode, strError);                                                                                                                
     }
     
     lpDetailsScript->Clear();

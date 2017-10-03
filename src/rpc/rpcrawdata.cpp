@@ -17,7 +17,8 @@ using namespace json_spirit;
 uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_EntityDetails *entity,uint32_t *data_format,int *errorCode,string *strError)
 {
     uint32_t param_type=MC_DATA_API_PARAM_TYPE_NONE;   
-    uint32_t this_param_type;   
+    uint32_t this_param_type;  
+    bool missing_data=true;
     *data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
     entity->Zero();
     
@@ -116,6 +117,25 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     goto exitlbl;                        
                 }
             }
+            
+            if(d.name_ == "data")
+            {
+                if(!missing_data)
+                {
+                    *strError=string("data field can appear only once in the object");                                                                                        
+                    goto exitlbl;                    
+                }
+                missing_data=false;
+                if(d.value_.type() != str_type)
+                {
+                    if(d.value_.type() != obj_type)
+                    {
+                        *strError=string("data should be string or object");                                                                                        
+                        goto exitlbl;                                            
+                    }
+                }
+            }
+/*            
             if(d.name_ == "format")
             {
                 if( mc_gState->m_Features->FormattedData() == 0 )
@@ -149,6 +169,7 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     *strError=string("Invalid format");                                                    
                 }
             }
+ */ 
             if(this_param_type != MC_DATA_API_PARAM_TYPE_NONE)
             {
                 if(param_type != MC_DATA_API_PARAM_TYPE_NONE)
@@ -164,7 +185,8 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
         }    
         if(param_type == MC_DATA_API_PARAM_TYPE_NONE)
         {                
-            if(*data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
+//            if(*data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
+            if(!missing_data)
             {
                 param_type=MC_DATA_API_PARAM_TYPE_FORMATTED;                                    
             }
@@ -231,9 +253,82 @@ CScript RawDataScriptRawHex(Value *param,int *errorCode,string *strError)
     return scriptOpReturn;
 }
 
-vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t data_format,mc_Script *lpDetailsScript,int *errorCode,string *strError)
+vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,int *errorCode,string *strError)
 {
     vector<unsigned char> vValue;
+    if(value->type() == str_type)
+    {
+        bool fIsHex;
+        vValue=ParseHex(value->get_str().c_str(),fIsHex);    
+        if(!fIsHex)
+        {
+            *strError=string("data should be hexadecimal string");                            
+        }        
+        *data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
+    }
+    else
+    {
+        if(value->type() == obj_type)
+        {
+            if(value->get_obj().size() != 1)
+            {
+                *strError=string("data should be object with single element");                                                        
+            }
+            else
+            {
+                BOOST_FOREACH(const Pair& d, value->get_obj()) 
+                {
+                    if(d.name_ == "raw")
+                    {
+                        bool fIsHex;
+                        vValue=ParseHex(d.value_.get_str().c_str(),fIsHex);    
+                        if(!fIsHex)
+                        {
+                            *strError=string("value in data object should be hexadecimal string");                            
+                        }
+                        *data_format=MC_SCR_DATA_FORMAT_RAW;                    
+                    }
+                    if(d.name_ == "text")
+                    {
+                        if(d.value_.type() == str_type)
+                        {
+                            vValue=vector<unsigned char> (d.value_.get_str().begin(),d.value_.get_str().end());    
+                        }
+                        else
+                        {
+                            *strError=string("value in data object should be string");                            
+                        }
+                        *data_format=MC_SCR_DATA_FORMAT_UTF8;                    
+                    }
+                    if(d.name_ == "json")
+                    {
+                        size_t bytes;
+                        int err;
+                        const unsigned char *script;
+                        lpDetailsScript->Clear();
+                        lpDetailsScript->AddElement();
+                        if((err = ubjson_write(d.value_,lpDetailsScript,MAX_FORMATTED_DATA_DEPTH)) != MC_ERR_NOERROR)
+                        {
+                            *strError=string("Couldn't transfer JSON object to internal UBJSON format");    
+                        }
+                        script = lpDetailsScript->GetData(0,&bytes);
+                        vValue=vector<unsigned char> (script,script+bytes);                                            
+                        *data_format=MC_SCR_DATA_FORMAT_UBJSON;                    
+                    }
+                    if(*data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "Unsupported item data type: " + d.name_);                                    
+                    }                    
+                }                
+            }
+        }   
+        else
+        {
+            *strError=string("data should be string or object");                                        
+        }
+    }
+    
+/*    
     switch(data_format)
     {
         case MC_SCR_DATA_FORMAT_RAW:
@@ -276,7 +371,7 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t data_for
             vValue=vector<unsigned char> (script,script+bytes);                                            
             break;
     }
-
+*/
     return vValue;
 }
 
@@ -302,7 +397,7 @@ void ParseRawDetails(const Value *value,mc_Script *lpDetails,int *errorCode,stri
     }    
 }
 
-CScript RawDataScriptFormatted(Value *param,uint32_t data_format,mc_Script *lpDetailsScript,int *errorCode,string *strError)
+CScript RawDataScriptFormatted(Value *param,uint32_t *data_format,mc_Script *lpDetailsScript,int *errorCode,string *strError)
 {
     CScript scriptOpReturn=CScript();
     vector<unsigned char> vValue;
@@ -323,7 +418,7 @@ CScript RawDataScriptFormatted(Value *param,uint32_t data_format,mc_Script *lpDe
             field_parsed=true;
             missing_data=false;
         }
-        if(d.name_ == "format")field_parsed=true;
+//        if(d.name_ == "format")field_parsed=true;
         if(!field_parsed)
         {
             *strError=strprintf("Invalid field: %s",d.name_.c_str());;                                
@@ -338,7 +433,7 @@ CScript RawDataScriptFormatted(Value *param,uint32_t data_format,mc_Script *lpDe
     if(strError->size() == 0)
     {
         lpDetailsScript->Clear();
-        lpDetailsScript->SetDataFormat(data_format);
+        lpDetailsScript->SetDataFormat(*data_format);
         script = lpDetailsScript->GetData(0,&bytes);
         scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;                    
 
@@ -823,7 +918,7 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
     return scriptOpReturn;
 }
 
-CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t data_format,mc_Script *lpDetailsScript,int *errorCode,string *strError)
+CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *data_format,mc_Script *lpDetailsScript,int *errorCode,string *strError)
 {
     CScript scriptOpReturn=CScript();
     vector<unsigned char> vValue;
@@ -932,7 +1027,7 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t data
             missing_data=false;
         }
         if(d.name_ == "for")field_parsed=true;
-        if(d.name_ == "format")field_parsed=true;
+//        if(d.name_ == "format")field_parsed=true;
         if(!field_parsed)
         {
             *strError=strprintf("Invalid field: %s",d.name_.c_str());;                                
@@ -993,10 +1088,10 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t data
             }
         }
 
-        if(data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
+        if(*data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
         {
             lpDetailsScript->Clear();
-            lpDetailsScript->SetDataFormat(data_format);
+            lpDetailsScript->SetDataFormat(*data_format);
             script = lpDetailsScript->GetData(0,&bytes);
             scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;                    
         }
@@ -1041,7 +1136,6 @@ CScript RawDataScriptApprove(Value *param,mc_EntityDetails *entity,mc_Script *lp
             missing_approve=false;
         }
         if(d.name_ == "for")field_parsed=true;
-        if(d.name_ == "format")field_parsed=true;
         if(!field_parsed)
         {
             *strError=strprintf("Invalid field: %s",d.name_.c_str());;                                
@@ -1254,7 +1348,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             scriptOpReturn=RawDataScriptRawHex(&param,&errorCode,&strError);
             break;
         case MC_DATA_API_PARAM_TYPE_FORMATTED:
-            scriptOpReturn=RawDataScriptFormatted(&param,data_format,lpDetailsScript,&errorCode,&strError);
+            scriptOpReturn=RawDataScriptFormatted(&param,&data_format,lpDetailsScript,&errorCode,&strError);
             break;
         case MC_DATA_API_PARAM_TYPE_ISSUE:
             scriptOpReturn=RawDataScriptIssue(&param,lpDetails,lpDetailsScript,&errorCode,&strError);
@@ -1266,7 +1360,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             scriptOpReturn=RawDataScriptCreateStream(&param,lpDetails,lpDetailsScript,&errorCode,&strError);
             break;
         case MC_DATA_API_PARAM_TYPE_PUBLISH:
-            scriptOpReturn=RawDataScriptPublish(&param,&entity,data_format,lpDetailsScript,&errorCode,&strError);
+            scriptOpReturn=RawDataScriptPublish(&param,&entity,&data_format,lpDetailsScript,&errorCode,&strError);
             break;
         case MC_DATA_API_PARAM_TYPE_CREATE_UPGRADE:
             scriptOpReturn=RawDataScriptCreateUpgrade(&param,lpDetails,lpDetailsScript,&errorCode,&strError);
