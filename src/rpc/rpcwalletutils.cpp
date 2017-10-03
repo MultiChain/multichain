@@ -541,29 +541,6 @@ Object StreamItemEntry(const CWalletTx& wtx,const unsigned char *stream_id, bool
         entry.push_back(Pair("key", keys[0]));        
     }
     entry.push_back(Pair("data", format_item_value));        
-/*    
-    if( ((mc_gState->m_Compatibility & MC_VCM_1_0) != 0) || (format == MC_SCR_DATA_FORMAT_RAW) )
-    {
-        entry.push_back(Pair("data", item_value));        
-    }
-    if(format == MC_SCR_DATA_FORMAT_UTF8)
-    {
-        entry.push_back(Pair("text", format_item_value));        
-    }
-    if(format == MC_SCR_DATA_FORMAT_UBJSON)
-    {
-        entry.push_back(Pair("json", format_item_value));        
-    }
- */ 
-/*    
-    if(mc_gState->m_Compatibility & MC_VCM_1_0)
-    {    
-        entry.push_back(Pair("key", keys[0]));
-        entry.push_back(Pair("data", item_value));        
-    }
-    entry.push_back(Pair("format", format_text_str));        
-    entry.push_back(Pair("formatdata", format_item_value));        
- */   
     if(verbose)
     {
         WalletTxToJSON(wtx, entry, true, stream_output);

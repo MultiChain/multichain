@@ -1602,7 +1602,7 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
     Array aMetaData;
     Array aItems;
     uint32_t format;
-    Array aFormatMetaData[MC_SCR_DATA_FORMAT_MAX+1];
+    Array aFormatMetaData;
 //    string format_text_str;
     
     double units=1.;
@@ -1741,7 +1741,7 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
                 {
                     elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
                     aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
-                    aFormatMetaData[MC_SCR_DATA_FORMAT_RAW].push_back(OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),i,format,NULL));
+                    aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),i,format,NULL));
                 }                        
             }
             else
@@ -1750,7 +1750,7 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
                 if(elem_size)
                 {
                     aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
-                    aFormatMetaData[MC_SCR_DATA_FORMAT_RAW].push_back(OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),i,format,NULL));
+                    aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),i,format,NULL));
                 }
                 
                 lpScript->SetElement(0);
@@ -1820,21 +1820,7 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
     
     entry.push_back(Pair("addresses", oBalance));
     entry.push_back(Pair("items", aItems));
-//    if( ( (mc_gState->m_Compatibility & MC_VCM_1_0) != 0) || (aFormatMetaData[MC_SCR_DATA_FORMAT_RAW].size() != 0) )
-    {
-        entry.push_back(Pair("data", aFormatMetaData[MC_SCR_DATA_FORMAT_RAW]));
-    }
-/*    
-    if(aFormatMetaData[MC_SCR_DATA_FORMAT_UTF8].size())        
-    {
-        entry.push_back(Pair("text", aFormatMetaData[MC_SCR_DATA_FORMAT_UTF8]));        
-    }
-    if(aFormatMetaData[MC_SCR_DATA_FORMAT_UBJSON].size())        
-    {
-        entry.push_back(Pair("json", aFormatMetaData[MC_SCR_DATA_FORMAT_UBJSON]));        
-    }
- */ 
-//    entry.push_back(Pair("txdata", aFormatMetaData));
+    entry.push_back(Pair("data", aFormatMetaData));
     
     WalletTxToJSON(wtx, entry, true);
 
