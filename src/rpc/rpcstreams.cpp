@@ -530,7 +530,7 @@ Value publish(const Array& params, bool fHelp)
 
 Value publishfrom(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 4 || params.size() > 5)
+    if (fHelp || params.size() != 4)
         throw runtime_error("Help message not found\n");
 
     if(mc_gState->m_Features->Streams() == 0)
@@ -612,6 +612,42 @@ Value publishfrom(const Array& params, bool fHelp)
     
     Value jVal=params[3];
 
+    if(jVal.type() != str_type)
+    {
+        if(jVal.type() == obj_type)
+        {            
+            if(jVal.get_obj().size() != 1)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Item data object should have one element");                
+            }
+            BOOST_FOREACH(const Pair& d, jVal.get_obj()) 
+            {
+                if(d.name_ == "raw")
+                {
+                    data_format=MC_SCR_DATA_FORMAT_RAW;                    
+                }
+                if(d.name_ == "text")
+                {
+                    data_format=MC_SCR_DATA_FORMAT_UTF8;                    
+                }
+                if(d.name_ == "json")
+                {
+                    data_format=MC_SCR_DATA_FORMAT_UBJSON;                    
+                }
+                if(data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
+                {
+                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Unsupported item data type: " + d.name_);                                    
+                }
+                jVal=d.value_;
+            }            
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Item data should be string or object");                                                                                                                
+        }
+    }
+
+/*    
     if( params.size() > 4 )
     {
         if(params[4].get_str() == "hex")
@@ -638,9 +674,38 @@ Value publishfrom(const Array& params, bool fHelp)
             data_format=MC_SCR_DATA_FORMAT_UBJSON;
         }
     }
-    
+*/    
     vector<unsigned char> dataData;
     
+    switch(data_format)
+    {
+        case MC_SCR_DATA_FORMAT_UTF8:
+            if(jVal.type() != str_type)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Item data should be string");                                                                                                                                
+            }
+            else
+            {
+                dataData=vector<unsigned char> (jVal.get_str().begin(),jVal.get_str().end());                
+            }
+            break;
+        case MC_SCR_DATA_FORMAT_UBJSON:                                         // do it after script allocation
+            break;
+        default:
+            if(jVal.type() != str_type)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Item data should be hexadecimal string");                                                                                                                                
+            }
+            bool fIsHex;
+            dataData=ParseHex(jVal.get_str().c_str(),fIsHex);    
+            if(!fIsHex)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Item data should be hexadecimal string");                                                                                                    
+            }
+            
+            break;
+    }
+/*    
     switch(data_format)
     {
         case MC_SCR_DATA_FORMAT_UTF8:
@@ -648,7 +713,6 @@ Value publishfrom(const Array& params, bool fHelp)
             {
                 string json_str=write_string(params[3],false);
                 dataData=vector<unsigned char> (json_str.begin(),json_str.end());                
-//                throw JSONRPCError(RPC_INVALID_PARAMETER, "Item data should be string");                                                                                                                                
             }
             else
             {
@@ -671,6 +735,7 @@ Value publishfrom(const Array& params, bool fHelp)
             
             break;
     }
+ */ 
 /*    
     vector<unsigned char> dataData(ParseHex(params[3].get_str().c_str(),fIsHex));    
     if(!fIsHex)
@@ -688,6 +753,7 @@ Value publishfrom(const Array& params, bool fHelp)
         const unsigned char *script;
         int err;
         
+/*        
         jVal=params[3];
         
         if(jVal.type() == str_type)
@@ -698,7 +764,7 @@ Value publishfrom(const Array& params, bool fHelp)
                 jVal=params[3];                
             }                
         }
-        
+*/        
         lpDetailsScript->Clear();
         lpDetailsScript->AddElement();
         if((err = ubjson_write(jVal,lpDetailsScript,MAX_FORMATTED_DATA_DEPTH)) != MC_ERR_NOERROR)
