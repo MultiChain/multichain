@@ -201,6 +201,8 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                 param_type=MC_DATA_API_PARAM_TYPE_FORMATTED;                                    
             }
         }
+
+/*        
         if(param_type == MC_DATA_API_PARAM_TYPE_NONE)
         {                
             if(given_entity && given_entity->GetEntityType())
@@ -213,7 +215,7 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                 param_type=MC_DATA_API_PARAM_TYPE_ISSUE; 
             }            
         }
-
+*/
 /*        
         if(param_type == MC_DATA_API_PARAM_TYPE_FOLLOWON)
         {
