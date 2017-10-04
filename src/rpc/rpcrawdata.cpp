@@ -57,7 +57,7 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     }
                     if(d.value_.get_str() == "upgrade")
                     {
-                        if( mc_gState->m_Features->Streams() == 0 )
+                        if( mc_gState->m_Features->Upgrades() == 0 )
                         {
                             *errorCode=RPC_NOT_SUPPORTED;
                             *strError=string("Upgrades are not supported by this protocol version");       
@@ -138,6 +138,12 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
  */ 
             if( (d.name_ == "text") || (d.name_ == "json") )
             {
+                if( mc_gState->m_Features->FormattedData() == 0 )
+                {
+                    *errorCode=RPC_NOT_SUPPORTED;
+                    *strError=string("Formatted data is not supported by this protocol version");       
+                    goto exitlbl;
+                }
                 if(!missing_data)
                 {
                     *strError=string("data field can appear only once in the object");                                                                                        
@@ -184,7 +190,15 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
             {
                 if(param_type != MC_DATA_API_PARAM_TYPE_NONE)
                 {                
-                    *strError=string("Only one of the following keywords can appear in the object: create, update, for");                                                                                        
+                    *strError=string("Only one of the following keywords can appear in the object: create, update");                                                                                        
+                    if(mc_gState->m_Features->Streams())
+                    {
+                        *strError += string(", for");
+                    }
+                    if(mc_gState->m_Features->Streams())
+                    {
+                        *strError += string(", json, text");
+                    }
                     goto exitlbl;
                 }
             }
@@ -259,7 +273,7 @@ CScript RawDataScriptRawHex(Value *param,int *errorCode,string *strError)
     vector<unsigned char> dataData(ParseHex(param->get_str().c_str(),fIsHex));    
     if(!fIsHex)
     {
-        *strError="data-hex should be hexadecimal string";
+        *strError="data should be hexadecimal string";
     }
     scriptOpReturn << OP_RETURN << dataData;
     return scriptOpReturn;
@@ -280,65 +294,72 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
     }
     else
     {
-        if(value->type() == obj_type)
+        if(mc_gState->m_Features->FormattedData())
         {
-            if(value->get_obj().size() != 1)
+            if(value->type() == obj_type) 
             {
-                *strError=string("data should be object with single element");                                                        
-            }
+                if(value->get_obj().size() != 1)
+                {
+                    *strError=string("data should be object with single element");                                                        
+                }
+                else
+                {
+                    BOOST_FOREACH(const Pair& d, value->get_obj()) 
+                    {
+    /*                    
+                        if(d.name_ == "raw")
+                        {
+                            bool fIsHex;
+                            vValue=ParseHex(d.value_.get_str().c_str(),fIsHex);    
+                            if(!fIsHex)
+                            {
+                                *strError=string("value in data object should be hexadecimal string");                            
+                            }
+                            *data_format=MC_SCR_DATA_FORMAT_RAW;                    
+                        }
+    */ 
+                        if(d.name_ == "text")
+                        {
+                            if(d.value_.type() == str_type)
+                            {
+                                vValue=vector<unsigned char> (d.value_.get_str().begin(),d.value_.get_str().end());    
+                            }
+                            else
+                            {
+                                *strError=string("value in data object should be string");                            
+                            }
+                            *data_format=MC_SCR_DATA_FORMAT_UTF8;                    
+                        }
+                        if(d.name_ == "json")
+                        {
+                            size_t bytes;
+                            int err;
+                            const unsigned char *script;
+                            lpDetailsScript->Clear();
+                            lpDetailsScript->AddElement();
+                            if((err = ubjson_write(d.value_,lpDetailsScript,MAX_FORMATTED_DATA_DEPTH)) != MC_ERR_NOERROR)
+                            {
+                                *strError=string("Couldn't transfer JSON object to internal UBJSON format");    
+                            }
+                            script = lpDetailsScript->GetData(0,&bytes);
+                            vValue=vector<unsigned char> (script,script+bytes);                                            
+                            *data_format=MC_SCR_DATA_FORMAT_UBJSON;                    
+                        }
+                        if(*data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
+                        {
+                            throw JSONRPCError(RPC_NOT_SUPPORTED, "Unsupported item data type: " + d.name_);                                    
+                        }                    
+                    }                
+                }
+            }   
             else
             {
-                BOOST_FOREACH(const Pair& d, value->get_obj()) 
-                {
-/*                    
-                    if(d.name_ == "raw")
-                    {
-                        bool fIsHex;
-                        vValue=ParseHex(d.value_.get_str().c_str(),fIsHex);    
-                        if(!fIsHex)
-                        {
-                            *strError=string("value in data object should be hexadecimal string");                            
-                        }
-                        *data_format=MC_SCR_DATA_FORMAT_RAW;                    
-                    }
-*/ 
-                    if(d.name_ == "text")
-                    {
-                        if(d.value_.type() == str_type)
-                        {
-                            vValue=vector<unsigned char> (d.value_.get_str().begin(),d.value_.get_str().end());    
-                        }
-                        else
-                        {
-                            *strError=string("value in data object should be string");                            
-                        }
-                        *data_format=MC_SCR_DATA_FORMAT_UTF8;                    
-                    }
-                    if(d.name_ == "json")
-                    {
-                        size_t bytes;
-                        int err;
-                        const unsigned char *script;
-                        lpDetailsScript->Clear();
-                        lpDetailsScript->AddElement();
-                        if((err = ubjson_write(d.value_,lpDetailsScript,MAX_FORMATTED_DATA_DEPTH)) != MC_ERR_NOERROR)
-                        {
-                            *strError=string("Couldn't transfer JSON object to internal UBJSON format");    
-                        }
-                        script = lpDetailsScript->GetData(0,&bytes);
-                        vValue=vector<unsigned char> (script,script+bytes);                                            
-                        *data_format=MC_SCR_DATA_FORMAT_UBJSON;                    
-                    }
-                    if(*data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
-                    {
-                        throw JSONRPCError(RPC_NOT_SUPPORTED, "Unsupported item data type: " + d.name_);                                    
-                    }                    
-                }                
+                *strError=string("data should be hexadecimal string or object");                                        
             }
-        }   
+        }
         else
         {
-            *strError=string("data should be string or object");                                        
+            *strError=string("data should be hexadecimal string");                                                    
         }
     }
     
@@ -438,7 +459,7 @@ CScript RawDataScriptFormatted(Value *param,uint32_t *data_format,mc_Script *lpD
         {
             if(!missing_data)
             {
-                *strError=string("data field can appear only once in the object");                                                                                                        
+                *strError=string("data object should have single key - json or text");                                                                                                        
             }
             vValue=ParseRawFormattedData(param,data_format,lpDetailsScript,errorCode,strError);
             field_parsed=true;
@@ -453,7 +474,7 @@ CScript RawDataScriptFormatted(Value *param,uint32_t *data_format,mc_Script *lpD
     
     if(missing_data)
     {
-        *strError=string("Missing data-hex field");            
+        *strError=string("Missing json or text field");            
     }
 
     if(strError->size() == 0)
@@ -1019,7 +1040,7 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
     
     if(missing_data)
     {
-        *strError=string("Missing data-hex field");            
+        *strError=string("Missing data field");            
     }
     if(missing_key)
     {
