@@ -702,14 +702,12 @@ string OpReturnFormatToText(int format)
 {
     switch(format)
     {
-        case MC_SCR_DATA_FORMAT_RAW:
-            return "raw";
         case MC_SCR_DATA_FORMAT_UTF8:
             return "text";
         case MC_SCR_DATA_FORMAT_UBJSON:
             return "json";            
     }
-    return "unknown";
+    return "raw";
 }
 
 Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out)
@@ -722,7 +720,7 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
     {
         if(format_text_out)
         {
-            *format_text_out=OpReturnFormatToText((format == MC_SCR_DATA_FORMAT_UNKNOWN) ? MC_SCR_DATA_FORMAT_RAW : format);
+            *format_text_out=OpReturnFormatToText(format);
         }
         switch(format)
         {
@@ -746,7 +744,7 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
                 return metadata_object;
 //                metadata.push_back(0x00);
                 break;
-            default:                                                            // including MC_SCR_DATA_FORMAT_RAW and unknown
+            default:                                                            // unknown
                 metadata=HexStr(elem,elem+elem_size);
                 break;
         }
@@ -812,10 +810,6 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     }
     
     mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
-    if(format == MC_SCR_DATA_FORMAT_UNKNOWN)
-    {
-        format=MC_SCR_DATA_FORMAT_RAW;
-    }
     
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     mc_gState->m_TmpScript->SetElement(0);
@@ -2025,10 +2019,6 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
                 data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
                 if(d.value_.type() != null_type && !d.value_.get_str().empty())
                 {
-                    if(d.value_.get_str() == "hex")
-                    {
-                        data_format=MC_SCR_DATA_FORMAT_RAW;                        
-                    }
                     if(d.value_.get_str() == "text")
                     {
                         data_format=MC_SCR_DATA_FORMAT_UTF8;                        
@@ -2385,7 +2375,6 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
         {
             switch(data_format)
             {
-                case MC_SCR_DATA_FORMAT_RAW:
                 case MC_SCR_DATA_FORMAT_UNKNOWN:
                     if(formatted_data.type() != null_type && (formatted_data.type()==str_type))
                     {

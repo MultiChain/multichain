@@ -626,7 +626,7 @@ Value gettxoutdata(const Array& params, bool fHelp)
 /*
     if(mc_gState->m_Compatibility & MC_VCM_1_0)
     {
-        if( (format == MC_SCR_DATA_FORMAT_RAW) || (format == MC_SCR_DATA_FORMAT_UNKNOWN) )
+        if( format == MC_SCR_DATA_FORMAT_UNKNOWN )
         {
             return HexStr(elem+start,elem+start+count);
         }

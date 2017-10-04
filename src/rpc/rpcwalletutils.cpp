@@ -461,10 +461,6 @@ Object StreamItemEntry(const CWalletTx& wtx,const unsigned char *stream_id, bool
                 if(mc_gState->m_TmpScript->GetNumElements()) // 2 OP_DROPs + OP_RETURN - item key
                 {
                     mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
-                    if(format == MC_SCR_DATA_FORMAT_UNKNOWN)
-                    {
-                        format=MC_SCR_DATA_FORMAT_RAW;
-                    }
                     
                     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
                     mc_gState->m_TmpScript->SetElement(0);

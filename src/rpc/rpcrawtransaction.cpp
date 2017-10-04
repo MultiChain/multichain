@@ -156,10 +156,6 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         {
 //            int e=mc_gState->m_TmpScript->GetNumElements()-1;
             lpScript->ExtractAndDeleteDataFormat(&format);
-            if(format == MC_SCR_DATA_FORMAT_UNKNOWN)
-            {
-                format=MC_SCR_DATA_FORMAT_RAW;
-            }
             
             int e=lpScript->GetNumElements()-1;
             {

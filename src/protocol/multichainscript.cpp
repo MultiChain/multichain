@@ -2303,7 +2303,7 @@ int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format)
     
     if(format)
     {
-        *format=MC_SCR_DATA_FORMAT_RAW;
+        *format=MC_SCR_DATA_FORMAT_UNKNOWN;
     }
     
     if(mc_gState->m_Features->FormattedData() == 0)

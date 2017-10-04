@@ -1728,10 +1728,6 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
             lpScript->SetScript((unsigned char*)(&pc2[0]),(size_t)(script2.end()-pc2),MC_SCR_TYPE_SCRIPTPUBKEY);
             
             lpScript->ExtractAndDeleteDataFormat(&format);
-            if(format == MC_SCR_DATA_FORMAT_UNKNOWN)
-            {
-                format=MC_SCR_DATA_FORMAT_RAW;
-            }
             size_t elem_size;
             const unsigned char *elem;
 
