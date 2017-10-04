@@ -117,7 +117,7 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     goto exitlbl;                        
                 }
             }
-            
+/*            
             if(d.name_ == "data")
             {
                 if(!missing_data)
@@ -134,6 +134,16 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                         goto exitlbl;                                            
                     }
                 }
+            }
+ */ 
+            if( (d.name_ == "text") || (d.name_ == "json") )
+            {
+                if(!missing_data)
+                {
+                    *strError=string("data field can appear only once in the object");                                                                                        
+                    goto exitlbl;                    
+                }
+                missing_data=false;
             }
 /*            
             if(d.name_ == "format")
@@ -278,6 +288,7 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
             {
                 BOOST_FOREACH(const Pair& d, value->get_obj()) 
                 {
+/*                    
                     if(d.name_ == "raw")
                     {
                         bool fIsHex;
@@ -288,6 +299,7 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
                         }
                         *data_format=MC_SCR_DATA_FORMAT_RAW;                    
                     }
+*/ 
                     if(d.name_ == "text")
                     {
                         if(d.value_.type() == str_type)
@@ -408,6 +420,7 @@ CScript RawDataScriptFormatted(Value *param,uint32_t *data_format,mc_Script *lpD
     BOOST_FOREACH(const Pair& d, param->get_obj()) 
     {
         field_parsed=false;
+/*        
         if(d.name_ == "data")        
         {
             if(!missing_data)
@@ -415,6 +428,17 @@ CScript RawDataScriptFormatted(Value *param,uint32_t *data_format,mc_Script *lpD
                 *strError=string("data field can appear only once in the object");                                                                                                        
             }
             vValue=ParseRawFormattedData(&(d.value_),data_format,lpDetailsScript,errorCode,strError);
+            field_parsed=true;
+            missing_data=false;
+        }
+ */ 
+        if( (d.name_ == "text") || (d.name_ == "json") )      
+        {
+            if(!missing_data)
+            {
+                *strError=string("data field can appear only once in the object");                                                                                                        
+            }
+            vValue=ParseRawFormattedData(param,data_format,lpDetailsScript,errorCode,strError);
             field_parsed=true;
             missing_data=false;
         }
