@@ -646,10 +646,19 @@ Object TxOutEntry(const CTxOut& TxOutIn,int vout,const CTxIn& TxIn,uint256 hash,
     if(fIsFound)
     {
         txout_entry.push_back(Pair("amount", ValueFromAmount(txout.nValue)));
-        txout_entry.push_back(Pair("assets", AssetArrayFromAmounts(amounts,-1,hash,fIsInput ? 0 : 1)));                
+        Array assets;
+        assets=AssetArrayFromAmounts(amounts,-1,hash,fIsInput ? 0 : 1);
+        if( (assets.size() > 0) || (mc_gState->m_Compatibility & MC_VCM_1_0) )
+        {
+            txout_entry.push_back(Pair("assets", AssetArrayFromAmounts(amounts,-1,hash,fIsInput ? 0 : 1)));                
+        }
+        
         if(!fIsInput)
         {
-            txout_entry.push_back(Pair("permissions", permissions));                            
+            if( (permissions.size() > 0) || (mc_gState->m_Compatibility & MC_VCM_1_0) )
+            {
+                txout_entry.push_back(Pair("permissions", permissions));                            
+            }
         }
     }
 

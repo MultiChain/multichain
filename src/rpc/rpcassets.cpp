@@ -1603,6 +1603,7 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
     Array aItems;
     uint32_t format;
     Array aFormatMetaData;
+    vector<Array> aFormatMetaDataPerOutput;
 //    string format_text_str;
     
     double units=1.;
@@ -1671,6 +1672,8 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
         }
     }    
 
+    aFormatMetaDataPerOutput.resize(wtx.vout.size());
+
     for (int i = 0; i < (int)wtx.vout.size(); ++i)
     {
         const CTxOut& txout = wtx.vout[i];
@@ -1736,17 +1739,22 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
                 if(lpScript->GetNumElements()==1)
                 {
                     elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
-                    aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
-                    aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),i,format,NULL));
+//                    aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
+                    Value metadata=OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),i,format,NULL);
+                    aFormatMetaData.push_back(metadata);
+                    aFormatMetaDataPerOutput[i].push_back(metadata);
                 }                        
             }
             else
             {
-                elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
-                if(elem_size)
+                if(mc_gState->m_Compatibility & MC_VCM_1_0)
                 {
-                    aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
-                    aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),i,format,NULL));
+                    elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
+                    if(elem_size)
+                    {
+                        aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
+                        aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),i,format,NULL));
+                    }
                 }
                 
                 lpScript->SetElement(0);
@@ -1787,7 +1795,18 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
                 aTxOutItems.push_back(data_item_entry);
             }
             Object txout_entry=TxOutEntry(wtx.vout[i],i,TxIn,wtx.GetHash(),amounts,lpScript);
-            txout_entry.push_back(Pair("items", aTxOutItems));
+            if( (aTxOutItems.size() > 0) || (mc_gState->m_Compatibility & MC_VCM_1_0) )
+            {
+                txout_entry.push_back(Pair("items", aTxOutItems));
+            }
+            if( (mc_gState->m_Compatibility & MC_VCM_1_0) == 0)
+            {
+                if(aFormatMetaDataPerOutput[i].size())
+                {
+                    txout_entry.push_back(Pair("data", aFormatMetaDataPerOutput[i]));                    
+                }
+            }
+            
             vout.push_back(txout_entry);
         }
     }        

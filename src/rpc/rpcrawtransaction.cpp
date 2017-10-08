@@ -127,6 +127,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     set<uint256> streams_already_seen;
     uint32_t format;
     Array aFormatMetaData;
+    Array aFullFormatMetaData;
     
     Array vout;
     for (unsigned int i = 0; i < tx.vout.size(); i++) {
@@ -140,6 +141,9 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         
 /* MCHN START */    
 // TODO too many duplicate code with ListWalletTransactions and may be AccepMultiChainTransaction
+        
+        aFormatMetaData.clear();
+        
         const CScript& script1 = tx.vout[i].scriptPubKey;        
         CScript::const_iterator pc1 = script1.begin();
         
@@ -224,19 +228,25 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                 if(lpScript->GetNumElements()==1)
                 {
                     elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
-                    vdata.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
+//                    vdata.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
                     aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,tx.GetHash(),i,format,NULL));
+                    if(mc_gState->m_Compatibility & MC_VCM_1_0)
+                    {
+                        aFullFormatMetaData.push_back(aFormatMetaData[0]);
+                    }
                 }                        
             }
             else
             {
-                elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
-                if(elem_size)
+                if(mc_gState->m_Compatibility & MC_VCM_1_0)
                 {
-                    vdata.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
-                    aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,tx.GetHash(),i,format,NULL));
+                    elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
+                    if(elem_size)
+                    {
+//                        vdata.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
+                        aFullFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,tx.GetHash(),i,format,NULL));
+                    }
                 }
-                
                 lpScript->SetElement(0);
                 if(lpScript->GetNewEntityType(&new_entity_type))
                 {
@@ -335,10 +345,16 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                 }
             }
             
-            out.push_back(Pair("assets", assets));
+            if( (assets.size() > 0) || (mc_gState->m_Compatibility & MC_VCM_1_0) )
+            {
+                out.push_back(Pair("assets", assets));
+            }
         }        
         Array permissions=PermissionEntries(txout,lpScript,false);
-        out.push_back(Pair("permissions", permissions));
+        if( (permissions.size() > 0) || (mc_gState->m_Compatibility & MC_VCM_1_0) )
+        {
+            out.push_back(Pair("permissions", permissions));
+        }
         
         Array items;
         Value data_item_entry=DataItemEntry(tx,i,streams_already_seen, 0x03);
@@ -346,7 +362,14 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         {
             items.push_back(data_item_entry);
         }
-        out.push_back(Pair("items", items));
+        if( (items.size() > 0) || (mc_gState->m_Compatibility & MC_VCM_1_0) )
+        {
+            out.push_back(Pair("items", items));
+        }
+        if(aFormatMetaData.size())
+        {
+            out.push_back(Pair("data", aFormatMetaData));            
+        }
 /* MCHN END */    
         vout.push_back(out);
     }
@@ -447,7 +470,10 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         entry.push_back(Pair("create", StreamEntry((unsigned char*)&txid,0x05)));
     }
     
-    entry.push_back(Pair("data", aFormatMetaData));
+    if(mc_gState->m_Compatibility & MC_VCM_1_0)
+    {
+        entry.push_back(Pair("data", aFullFormatMetaData));
+    }
 
     delete lpScript;
     delete asset_amounts;
