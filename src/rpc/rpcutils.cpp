@@ -826,11 +826,13 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
 
     hash=*(uint256*)entity.GetTxID();
     
+/*    
     if(already_seen.find(hash) != already_seen.end())
     {
         return Value::null;
     }
-
+*/
+    
     for(int e=1;e<mc_gState->m_TmpScript->GetNumElements()-1;e++)
     {
         mc_gState->m_TmpScript->SetElement(e);
