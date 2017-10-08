@@ -1012,6 +1012,10 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
             if(d.value_.type() == array_type)
             {
                 vKeys=d.value_.get_array();
+                if(vKeys.size() == 0)
+                {
+                    *strError=string("Invalid keys - should be non-empty array");                                                
+                }
             }            
             else
             {
@@ -1053,7 +1057,7 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
         lpDetailsScript->SetEntity(entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET);
         script = lpDetailsScript->GetData(0,&bytes);
         scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
-
+        
         for(int i=0;i<(int)vKeys.size();i++)
         {
             lpDetailsScript->Clear();
