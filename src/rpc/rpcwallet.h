@@ -27,7 +27,7 @@ vector<CTxDestination> ParseAddresses(string param, bool create_full_list, bool 
 void FindAddressesWithPublishPermission(std::vector<CTxDestination>& fromaddresses,mc_EntityDetails *stream_entity);
 set<string> ParseAddresses(Value param, isminefilter filter);
 bool CBitcoinAddressFromTxEntity(CBitcoinAddress &address,mc_TxEntity *lpEntity);
-Object StreamItemEntry(const CWalletTx& wtx,const unsigned char *stream_id, bool verbose);
+Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char *stream_id, bool verbose, const char** given_key,const char ** given_publisher,int *output);
 Object TxOutEntry(const CTxOut& TxOutIn,int vout,const CTxIn& TxIn,uint256 hash,mc_Buffer *amounts,mc_Script *lpScript);
 void WalletTxToJSON(const CWalletTx& wtx, Object& entry,bool skipWalletConflicts = false, int vout = -1);
 void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry);

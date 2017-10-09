@@ -17,6 +17,10 @@ void sprintf_hex(char *hex,const unsigned char *bin,int size)
     hex[64]=0;      
 }
 
+void mc_TxEntityRowExtension::Zero()
+{
+    memset(this,0,sizeof(mc_TxEntityRowExtension));    
+}
 
 void mc_TxEntity::Zero()
 {
@@ -93,7 +97,7 @@ int mc_TxImport::Init(int generation,int block)
     m_Entities=new mc_Buffer;
     m_TmpEntities=new mc_Buffer;
     
-    m_TmpEntities->Initialize(sizeof(mc_TxEntity),sizeof(mc_TxEntity),MC_BUF_MODE_MAP);    
+    m_TmpEntities->Initialize(sizeof(mc_TxEntity),sizeof(mc_TxEntity)+sizeof(mc_TxEntityRowExtension),MC_BUF_MODE_MAP);    
     return m_Entities->Initialize(sizeof(mc_TxEntity),sizeof(mc_TxEntityStat),MC_BUF_MODE_MAP);    
 }
 
@@ -920,7 +924,8 @@ int mc_TxDB::IncrementSubKey(
               mc_TxEntity *parent_entity,                                       
               mc_TxEntity *entity,                                              
               const unsigned char *subkey_hash,                                 
-              const unsigned char *tx_hash,                                     
+              const unsigned char *tx_hash,          
+              mc_TxEntityRowExtension *extension,
               int block,                                                        
               uint32_t flags,                                                   
               int newtx)
@@ -1007,6 +1012,15 @@ int mc_TxDB::IncrementSubKey(
         erow.m_TempPos=last_pos+1;        
         erow.m_Block=block;
         erow.m_Flags=flags;
+        if(extension)
+        {
+            if(extension->m_Count)
+            {
+                memcpy(erow.m_TxId+MC_TEE_OFFSET_IN_TXID,extension,MC_TEE_SIZE_IN_EXTENSION);                
+                erow.m_Flags |= MC_TFL_IS_EXTENSION;
+            }
+        }
+        
         mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);        
         
         if(last_pos == 0)
@@ -1052,7 +1066,7 @@ int mc_TxDB::AddTx(mc_TxImport *import,
     char txtype[16];
     char msg[256];
     
-    int newtx,duplicate,isrelevant,ondisk,i,mprow,size;
+    int newtx,duplicate,isrelevant,ondisk,i,mprow,size,ext_flag;
     uint32_t LastFileID,LastFileSize; 
     mc_TxImport *imp;
     mc_Buffer *mempool;
@@ -1061,6 +1075,7 @@ int mc_TxDB::AddTx(mc_TxImport *import,
     mc_TxEntityRow erow;
     mc_TxDefRow txdef;
     mc_TxDefRow *lptxdef;
+    mc_TxEntityRowExtension *extension;
     
     err=MC_ERR_NOERROR;
 
@@ -1220,11 +1235,19 @@ int mc_TxDB::AddTx(mc_TxImport *import,
             memcpy(&erow.m_Entity,&stat->m_Entity,sizeof(mc_TxEntity));
             erow.m_Generation=stat->m_Generation;
             memcpy(erow.m_TxId,hash,MC_TDB_TXID_SIZE);
+            ext_flag=0;
+            extension=(mc_TxEntityRowExtension*)(entities->GetRow(i)+sizeof(mc_TxEntity));
+            if(extension->m_Count)
+            {
+                memcpy(erow.m_TxId+MC_TEE_OFFSET_IN_TXID,extension,MC_TEE_SIZE_IN_EXTENSION);                
+                ext_flag = MC_TFL_IS_EXTENSION;
+            }
+            
             mprow=mempool->Seek(&erow);
             if(mprow >= 0)                                                      // Update block and flags if found in mempool
             {
                 ((mc_TxEntityRow*)(mempool->GetRow(mprow)))->m_Block=block;
-                ((mc_TxEntityRow*)(mempool->GetRow(mprow)))->m_Flags=flags;                
+                ((mc_TxEntityRow*)(mempool->GetRow(mprow)))->m_Flags=flags | ext_flag;                
             }
             else
             {
@@ -1234,7 +1257,7 @@ int mc_TxDB::AddTx(mc_TxImport *import,
                    ((erow.m_Entity.m_EntityType & MC_TET_ORDERMASK) != MC_TET_TIMERECEIVED)) // Ordered by chain position - add always   
                 {                        
                     erow.m_Block=block;
-                    erow.m_Flags=flags;
+                    erow.m_Flags=flags | ext_flag;
                     stat->m_LastPos+=1;
                     erow.m_TempPos=stat->m_LastPos;                             // Will be copied to m_LastPos on commit. m_LastPos=0 to allow Seek() above
                     mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);

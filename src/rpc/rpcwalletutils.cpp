@@ -430,7 +430,7 @@ bool CBitcoinAddressFromTxEntity(CBitcoinAddress &address,mc_TxEntity *lpEntity)
     return false;
 }
 
-Object StreamItemEntry(const CWalletTx& wtx,const unsigned char *stream_id, bool verbose)
+Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char *stream_id, bool verbose, const char** given_key,const char ** given_publisher,int *output)
 {
     Object entry;
     Array publishers;
@@ -444,91 +444,151 @@ Object StreamItemEntry(const CWalletTx& wtx,const unsigned char *stream_id, bool
     uint32_t format;
     Value format_item_value;
     string format_text_str;
+    int start_from=first_output;
+    bool key_found,publisher_found;
     
     stream_output=-1;
-    for (int j = 0; j < (int)wtx.vout.size(); ++j)
+    if(output)
     {
-        if(stream_output < 0)
+        *output=(int)wtx.vout.size();
+    }
+    while( (stream_output < 0) && (start_from<(int)wtx.vout.size()) )
+    {
+        stream_output=-1;
+        for (int j = start_from; j < (int)wtx.vout.size(); ++j)
         {
-            const CScript& script1 = wtx.vout[j].scriptPubKey;        
-            CScript::const_iterator pc1 = script1.begin();
-
-            mc_gState->m_TmpScript->Clear();
-            mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
-
-            if(mc_gState->m_TmpScript->IsOpReturnScript())                      
+            if(stream_output < 0)
             {
-                if(mc_gState->m_TmpScript->GetNumElements()) // 2 OP_DROPs + OP_RETURN - item key
+                keys.clear();
+                const CScript& script1 = wtx.vout[j].scriptPubKey;        
+                CScript::const_iterator pc1 = script1.begin();
+
+                mc_gState->m_TmpScript->Clear();
+                mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+
+                if(mc_gState->m_TmpScript->IsOpReturnScript())                      
                 {
-                    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
-                    
-                    unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
-                    mc_gState->m_TmpScript->SetElement(0);
-
-                    if(mc_gState->m_TmpScript->GetEntity(short_txid) == 0)           
+                    if(mc_gState->m_TmpScript->GetNumElements()) // 2 OP_DROPs + OP_RETURN - item key
                     {
-                        if(memcmp(short_txid,stream_id,MC_AST_SHORT_TXID_SIZE) == 0)
-                        {
-                            stream_output=j;
-                            for(int e=1;e<mc_gState->m_TmpScript->GetNumElements()-1;e++)
-                            {
-                                mc_gState->m_TmpScript->SetElement(e);
-                                                                                            // Should be spkk
-                                if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
-                                {
-                                    return entry;
-                                }                                            
-                                item_key[item_key_size]=0;
-                                keys.push_back(string(item_key,item_key+item_key_size));
-                            }
-                                                        
-                            size_t elem_size;
-                            const unsigned char *elem;
+                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
 
-                            elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
-                            item_value=OpReturnEntry(elem,elem_size,wtx.GetHash(),j);
-                            format_item_value=OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),j,format,&format_text_str);
+                        unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
+                        mc_gState->m_TmpScript->SetElement(0);
+
+                        if(mc_gState->m_TmpScript->GetEntity(short_txid) == 0)           
+                        {
+                            if(memcmp(short_txid,stream_id,MC_AST_SHORT_TXID_SIZE) == 0)
+                            {
+                                stream_output=j;
+                                key_found=false;
+                                for(int e=1;e<mc_gState->m_TmpScript->GetNumElements()-1;e++)
+                                {
+                                    mc_gState->m_TmpScript->SetElement(e);
+                                                                                                // Should be spkk
+                                    if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
+                                    {
+                                        return entry;
+                                    }                                            
+                                    item_key[item_key_size]=0;
+                                    if(given_key)
+                                    {
+                                        if(strcmp((char*)item_key,*given_key) == 0)
+                                        {
+                                            key_found=true;                                   
+                                        }
+                                    }
+                                    keys.push_back(string(item_key,item_key+item_key_size));
+                                }
+                                
+                                if(given_key)
+                                {
+                                    if(!key_found)
+                                    {
+                                        stream_output=-1;
+                                    }
+                                }
+
+                                size_t elem_size;
+                                const unsigned char *elem;
+
+                                elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
+                                item_value=OpReturnEntry(elem,elem_size,wtx.GetHash(),j);
+                                format_item_value=OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),j,format,&format_text_str);
+                            }
                         }
-                    }
-                }                        
+                    }                        
+                }
             }
         }
+
+        if(stream_output < 0)
+        {
+            return entry;
+        }
+        if(output)
+        {
+            *output=stream_output;
+        }
+
+        publishers.clear();
+        publishers_set.clear();
+        publisher_found=false;
+        for (int i = 0; i < (int)wtx.vin.size(); ++i)
+        {
+            int op_addr_offset,op_addr_size,is_redeem_script,sighash_type;
+
+            const CScript& script2 = wtx.vin[i].scriptSig;        
+            CScript::const_iterator pc2 = script2.begin();
+
+            ptr=mc_ExtractAddressFromInputScript((unsigned char*)(&pc2[0]),(int)(script2.end()-pc2),&op_addr_offset,&op_addr_size,&is_redeem_script,&sighash_type,0);
+            if(ptr)
+            {
+                if( (sighash_type == SIGHASH_ALL) || ( (sighash_type == SIGHASH_SINGLE) && (i == stream_output) ) )
+                {
+                    uint160 publisher_hash=Hash160(ptr+op_addr_offset,ptr+op_addr_offset+op_addr_size);
+                    if(publishers_set.count(publisher_hash) == 0)
+                    {
+                        publishers_set.insert(publisher_hash);
+                        string publisher_str;
+                        if(is_redeem_script)
+                        {
+                            publisher_str=CBitcoinAddress((CScriptID)publisher_hash).ToString();
+                        }
+                        else
+                        {
+                            publisher_str=CBitcoinAddress((CKeyID)publisher_hash).ToString();                    
+                        }
+                        if(given_publisher)
+                        {
+                            if(strcmp(publisher_str.c_str(),*given_publisher) == 0)
+                            {
+                                publisher_found=true;                                   
+                            }
+                        }
+                        publishers.push_back(publisher_str);
+                    }
+                }
+            }        
+        }
+        if(given_publisher)
+        {
+            if(!publisher_found)
+            {
+                stream_output=-1;
+            }
+        }
+                
+        if(stream_output < 0)
+        {
+            start_from++;
+        }
     }
-    
+
     if(stream_output < 0)
     {
         return entry;
     }
-    
-    publishers_set.clear();
-    for (int i = 0; i < (int)wtx.vin.size(); ++i)
-    {
-        int op_addr_offset,op_addr_size,is_redeem_script,sighash_type;
-                    
-        const CScript& script2 = wtx.vin[i].scriptSig;        
-        CScript::const_iterator pc2 = script2.begin();
-                                          
-        ptr=mc_ExtractAddressFromInputScript((unsigned char*)(&pc2[0]),(int)(script2.end()-pc2),&op_addr_offset,&op_addr_size,&is_redeem_script,&sighash_type,0);
-        if(ptr)
-        {
-            if( (sighash_type == SIGHASH_ALL) || ( (sighash_type == SIGHASH_SINGLE) && (i == stream_output) ) )
-            {
-                uint160 publisher_hash=Hash160(ptr+op_addr_offset,ptr+op_addr_offset+op_addr_size);
-                if(publishers_set.count(publisher_hash) == 0)
-                {
-                    publishers_set.insert(publisher_hash);
-                    if(is_redeem_script)
-                    {
-                        publishers.push_back(CBitcoinAddress((CScriptID)publisher_hash).ToString());
-                    }
-                    else
-                    {
-                        publishers.push_back(CBitcoinAddress((CKeyID)publisher_hash).ToString());                    
-                    }
-                }
-            }
-        }        
-    }
+
     
     entry.push_back(Pair("publishers", publishers));
     entry.push_back(Pair("keys", keys));

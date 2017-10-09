@@ -860,7 +860,7 @@ Value unsubscribe(const Array& params, bool fHelp)
     return Value::null;
 }
 
-Value getstreamitem(const Array& params, bool fHelp)
+Value liststreamtxitems(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 3)
         throw runtime_error("Help message not found\n");
@@ -900,14 +900,68 @@ Value getstreamitem(const Array& params, bool fHelp)
     
     const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
     
-    Object entry=StreamItemEntry(wtx,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose);    
-    
-    if(entry.size() == 0)
+    Array output_array;
+    int first_output=0;
+    int stream_output;
+    while(first_output < (int)wtx.vout.size())
     {
-        throw JSONRPCError(RPC_TX_NOT_FOUND, "This transaction was not found in this stream");                
+        Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,NULL,NULL,&stream_output);   
+        
+        if(stream_output < (int)wtx.vout.size())
+        {
+            output_array.push_back(entry);
+        }
+        first_output=stream_output+1;
     }
     
-    return entry;
+    return output_array;    
+}
+
+Value getstreamitem(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 2 || params.size() > 3)
+        throw runtime_error("Help message not found\n");
+   
+    Array items=liststreamtxitems(params,fHelp).get_array();
+    
+    if(items.size() == 0)
+    {
+        throw JSONRPCError(RPC_TX_NOT_FOUND, "This transaction was not found in this stream");                        
+    }
+    if(items.size() > 1)
+    {
+        throw JSONRPCError(RPC_NOT_ALLOWED, "This transaction has more than one output for this stream, please use liststreamtxitems");                                
+    }
+
+    return items[0];    
+}
+
+int mc_GetHashAndFirstOutput(mc_TxEntityRow *lpEntTx,uint256 *hash)
+{
+    int first_output=0;
+    int count;
+    mc_TxEntityRow erow;
+
+    memcpy(hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);        
+    if(lpEntTx->m_Flags & MC_TFL_IS_EXTENSION)
+    {
+        erow.Zero();
+        memcpy(&erow.m_Entity,&lpEntTx->m_Entity,sizeof(mc_TxEntity));
+        erow.m_Generation=lpEntTx->m_Generation;
+        erow.m_Pos=lpEntTx->m_Pos;
+        first_output=(int)mc_GetLE(lpEntTx->m_TxId+MC_TEE_OFFSET_IN_TXID,sizeof(uint32_t));
+        count=(int)mc_GetLE(lpEntTx->m_TxId+MC_TEE_OFFSET_IN_TXID+sizeof(uint32_t),sizeof(uint32_t));
+        if(erow.m_Pos > count)
+        {
+            erow.m_Pos-=count;
+            if(pwalletTxsMain->GetRow(&erow) == 0)
+            {
+                memcpy(hash,erow.m_TxId,MC_TDB_TXID_SIZE);                
+            }
+        }
+    }
+    
+    return first_output;
 }
 
 Value liststreamitems(const Array& params, bool fHelp)
@@ -982,9 +1036,9 @@ Value liststreamitems(const Array& params, bool fHelp)
         mc_TxEntityRow *lpEntTx;
         lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
         uint256 hash;
-        memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);
+        int first_output=mc_GetHashAndFirstOutput(lpEntTx,&hash);
         const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
-        Object entry=StreamItemEntry(wtx,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose);
+        Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,NULL,NULL,NULL);
         if(entry.size())
         {
             retArray.push_back(entry);                                
@@ -1014,8 +1068,11 @@ void getTxsForBlockRange(vector <uint256>& txids,mc_TxEntity *entity,int height_
             for(i=0;i<count;i++)
             {
                 lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
-                memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);
-                txids.push_back(hash);
+                if( (lpEntTx->m_Flags & MC_TFL_IS_EXTENSION) == 0 )
+                {
+                    memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);
+                    txids.push_back(hash);
+                }
             }
         }        
     }
@@ -1105,10 +1162,16 @@ Value liststreamblockitems(const Array& params, bool fHelp)
     for(int i=start;i<start+count;i++)
     {
         const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(txids[i],NULL,NULL);
-        Object entry=StreamItemEntry(wtx,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose);
-        if(entry.size())
+        int first_output=0;
+        int stream_output;
+        while(first_output < (int)wtx.vout.size())
         {
-            retArray.push_back(entry);                                
+            Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,NULL,NULL,&stream_output);
+            if(entry.size())
+            {
+                retArray.push_back(entry);                                
+            }
+            first_output=stream_output+1;
         }
     }
     
@@ -1240,6 +1303,8 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
     }
 
+    string key_string=params[1].get_str();
+    const char *key_ptr=key_string.c_str();
     getSubKeyEntityFromKey(params[1].get_str(),entStat,&entity);
     
     
@@ -1257,9 +1322,9 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
         mc_TxEntityRow *lpEntTx;
         lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
         uint256 hash;
-        memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);
+        int first_output=mc_GetHashAndFirstOutput(lpEntTx,&hash);
         const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
-        Object entry=StreamItemEntry(wtx,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose);
+        Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,&key_ptr,NULL,NULL);
         if(entry.size())
         {
             retArray.push_back(entry);                                
@@ -1348,6 +1413,8 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
     }
 
+    string key_string=params[1].get_str();
+    const char *key_ptr=key_string.c_str();
     getSubKeyEntityFromPublisher(params[1].get_str(),entStat,&entity);
     
     mc_Buffer *entity_rows;
@@ -1364,9 +1431,9 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
         mc_TxEntityRow *lpEntTx;
         lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
         uint256 hash;
-        memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);
+        int first_output=mc_GetHashAndFirstOutput(lpEntTx,&hash);
         const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
-        Object entry=StreamItemEntry(wtx,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose);
+        Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,NULL,&key_ptr,NULL);
         if(entry.size())
         {
             retArray.push_back(entry);                                
@@ -1395,6 +1462,8 @@ Value liststreammap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& in
     mc_TxEntityRow erow;
     uint160 stream_subkey_hash;    
     int row,enitity_count;
+    const char **given_key;
+    const char **given_publisher;
     
     entity_rows=NULL;
     enitity_count=inputEntities.size();
@@ -1447,13 +1516,18 @@ Value liststreammap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& in
         {
             shift=1;
         }
+        const char *key_ptr=key_string.c_str();
+        given_key=NULL;
+        given_publisher=NULL;
         if((parent_entity->m_EntityType & MC_TET_TYPE_MASK) == MC_TET_STREAM_PUBLISHER)
         {
-            all_entry.push_back(Pair("publisher", key_string));                                                                                                                
+            all_entry.push_back(Pair("publisher", key_string));        
+            given_publisher=&key_ptr;
         }
         else
         {
-            all_entry.push_back(Pair("key", key_string));                                                                                            
+            all_entry.push_back(Pair("key", key_string));         
+            given_key=&key_ptr;
         }
         all_entry.push_back(Pair("items", total));                                                                        
         all_entry.push_back(Pair("confirmed", confirmed));                                                                        
@@ -1472,12 +1546,13 @@ Value liststreammap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& in
                     if(pwalletTxsMain->GetRow(&erow) == 0)
                     {
                         uint256 hash;
-                        memcpy(&hash,erow.m_TxId,MC_TDB_TXID_SIZE);
+                        int first_output=mc_GetHashAndFirstOutput(&erow,&hash);                       
+//                        memcpy(&hash,erow.m_TxId,MC_TDB_TXID_SIZE);
                         const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
 
                         Value item_value;
 
-                        item_value=StreamItemEntry(wtx,parent_entity->m_EntityID,true);
+                        item_value=StreamItemEntry(wtx,first_output,parent_entity->m_EntityID,true,given_key,given_publisher,NULL);
                         if(row == 1)
                         {
                             all_entry.push_back(Pair("first", item_value));                                                                        

@@ -250,6 +250,7 @@ extern json_spirit::Value unsubscribe(const json_spirit::Array& params, bool fHe
 extern json_spirit::Value listassettransactions(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getassettransaction(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getstreamitem(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value liststreamtxitems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreamitems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreamkeyitems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreampublisheritems(const json_spirit::Array& params, bool fHelp);

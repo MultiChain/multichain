@@ -228,6 +228,7 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "listassettransactions",  &listassettransactions,         false,     false,      true },
     { "wallet",             "getassettransaction",    &getassettransaction,         false,     false,      true },
     { "wallet",             "getstreamitem",          &getstreamitem,         false,     false,      true },
+    { "wallet",             "liststreamtxitems",      &liststreamtxitems,         false,     false,      true },
     { "wallet",             "liststreamitems",        &liststreamitems,         false,     false,      true },
     { "wallet",             "liststreamkeyitems",     &liststreamkeyitems,      false,     false,      true },
     { "wallet",             "liststreampublisheritems",&liststreampublisheritems,false,     false,      true },

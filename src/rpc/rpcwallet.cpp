@@ -623,7 +623,7 @@ Value gettxoutdata(const Array& params, bool fHelp)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start, should be 0 for JSON object");                                                                            
         }
-        if(count != elem_size)
+        if(count != (int)elem_size)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, should not be larger than encoded UBJSON object size");                                                                            
         }

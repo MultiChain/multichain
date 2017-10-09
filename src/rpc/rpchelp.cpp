@@ -3789,6 +3789,21 @@ void mc_InitRPCHelpMap16()
             + HelpExampleRpc("liststreamblockitems", "\"test-stream\", 1000, false, 20")
         ));
     
+    mapHelpStrings.insert(std::make_pair("liststreamtxitems",
+            "liststreamtxitems \"stream-identifier\" \"txid\" ( verbose )\n"
+            "\nReturns stream item.\n"
+            "\nArguments:\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "2. \"txid\"                           (string, required) The transaction id\n"
+            "3. verbose                          (boolean, optional, default=false) If true, returns information about item transaction \n"
+            "\nResult:\n"
+            "\"stream-items\"                      (array) Array of stream item.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("liststreamtxitems", "\"mytxid\"") 
+            + HelpExampleCli("liststreamtxitems", "\"mytxid\"  true") 
+            + HelpExampleRpc("liststreamtxitems", "\"mytxid\", false")
+        ));
+    
 
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""

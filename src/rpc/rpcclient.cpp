@@ -175,6 +175,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "listassettransactions", 4 },
     { "getassettransaction", 2 },
     { "getstreamitem", 2 },
+    { "liststreamtxitems", 2 },
     { "liststreamitems", 1 },
     { "liststreamitems", 2 },
     { "liststreamitems", 3 },

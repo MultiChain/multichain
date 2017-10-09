@@ -69,6 +69,7 @@ struct mc_WalletTxs;
 #define MC_TFL_ALL_INPUTS_FROM_ME       0x00020000
 #define MC_TFL_IS_CHANGE                0x00040000
 #define MC_TFL_IS_SPENDABLE             0x00080000
+//#define MC_TFL_IS_EXTENSION             0x01000000                            // defined in walletdb.h
 #define MC_TFL_IS_MINE_FOR_THIS_SEND    0x10000000
 #define MC_TFL_IMPOSSIBLE               0x80000000
 
