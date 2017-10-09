@@ -224,6 +224,7 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     obj.push_back(Pair("lockblock",GetArg("-lockblock","")));                        
     obj.push_back(Pair("hideknownopdrops",GetBoolArg("-hideknownopdrops",false)));                    
     obj.push_back(Pair("maxshowndata",GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)));                    
+    obj.push_back(Pair("v1apicompatible",GetBoolArg("-v1apicompatible",false)));                    
     obj.push_back(Pair("miningrequirespeers",Params().MiningRequiresPeers()));                    
     obj.push_back(Pair("mineemptyrounds",Params().MineEmptyRounds()));                    
     obj.push_back(Pair("miningturnover",Params().MiningTurnover()));                    

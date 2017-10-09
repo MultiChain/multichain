@@ -274,6 +274,10 @@ CScript RawDataScriptRawHex(Value *param,int *errorCode,string *strError)
     if(!fIsHex)
     {
         *strError="data should be hexadecimal string";
+        if(mc_gState->m_Features->FormattedData())
+        {
+            *strError+=" or recognized object";
+        }
     }
     scriptOpReturn << OP_RETURN << dataData;
     return scriptOpReturn;
@@ -289,6 +293,10 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
         if(!fIsHex)
         {
             *strError=string("data should be hexadecimal string");                            
+            if(mc_gState->m_Features->FormattedData())
+            {
+                *strError+=" or recognized object";
+            }
         }        
         *data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
     }
@@ -354,7 +362,7 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
             }   
             else
             {
-                *strError=string("data should be hexadecimal string or object");                                        
+                *strError=string("data should be hexadecimal string or recognized object");                                        
             }
         }
         else
@@ -1048,7 +1056,11 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
     }
     if(missing_key)
     {
-        *strError=string("Missing key field");            
+        *strError=string("Missing keys field");        
+        if(mc_gState->m_Features->MultipleStreamKeys())
+        {
+            *strError=string("Missing key field");                    
+        }
     }
 
     if(strError->size() == 0)

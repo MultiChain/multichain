@@ -589,39 +589,44 @@ Value gettxoutdata(const Array& params, bool fHelp)
     count=elem_size;
     start=0;
     
-    switch(format)
+    if (params.size() > 2)    
     {
-        case MC_SCR_DATA_FORMAT_UBJSON:
-            break;
-        default:
-            if (params.size() > 2)    
-            {
-                count=paramtoint(params[2],true,0,"Invalid count");
-            }
-            if (params.size() > 3)    
-            {
-                start=paramtoint(params[3],false,0,"Invalid start");
-            }
+        count=paramtoint(params[2],true,0,"Invalid count");
+    }
+    if (params.size() > 3)    
+    {
+        start=paramtoint(params[3],false,0,"Invalid start");
+    }
 
 
-            if(start < 0)
-            {
-                start=elem_size+start;
-                if(start<0)
-                {
-                    start=0;
-                }        
-            }
+    if(start < 0)
+    {
+        start=elem_size+start;
+        if(start<0)
+        {
+            start=0;
+        }        
+    }
 
-            if(start > (int)elem_size)
-            {
-                start=elem_size;
-            }
-            if(start+count > (int)elem_size)
-            {
-                count=elem_size-start;
-            }
-            break;
+    if(start > (int)elem_size)
+    {
+        start=elem_size;
+    }
+    if(start+count > (int)elem_size)
+    {
+        count=elem_size-start;
+    }
+
+    if(format == MC_SCR_DATA_FORMAT_UBJSON)
+    {
+        if(start != 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start, should be 0 for JSON object");                                                                            
+        }
+        if(count != elem_size)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, should not be larger than encoded UBJSON object size");                                                                            
+        }
     }
 /*
     if(mc_gState->m_Compatibility & MC_VCM_1_0)
