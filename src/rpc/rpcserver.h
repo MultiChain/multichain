@@ -260,6 +260,7 @@ extern json_spirit::Value gettxoutdata(const json_spirit::Array& params, bool fH
 extern json_spirit::Value listblocks(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreamblockitems(const json_spirit::Array& params, bool fHelp);
 
+extern json_spirit::Value purehelpitem(const json_spirit::Array& params, bool fHelp);
 /* MCHN END */    
 extern json_spirit::Value signmessage(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value verifymessage(const json_spirit::Array& params, bool fHelp);
