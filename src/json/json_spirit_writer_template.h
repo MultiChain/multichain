@@ -197,9 +197,11 @@ namespace json_spirit
                 case int_type:   output_int( value );         break;
 
                 /// Bitcoin: Added std::fixed and changed precision from 16 to 8
+/*                
                 case real_type:  os_ << std::showpoint << std::fixed << std::setprecision(8)
                                      << value.get_real();     break;
-
+*/
+                case real_type:  output_double( value.get_real() );break;
                 case null_type:  os_ << "null";               break;
                 default: assert( false );
             }
@@ -234,6 +236,37 @@ namespace json_spirit
             }
         }
 
+        void output_double( const double& value )
+        {
+            double a=fabs(value);
+            double e=0.0;
+            if(a > 0)
+            {
+                e=log10(a);
+            }
+            if(e < -4)
+            {
+                double f=a*10.e+9;
+                int k=(int)f;
+                if(k)
+                {
+                    if( (f-k) < 0.0001)
+                    {
+                        e=0;
+                    }
+                }
+            }
+            if( (e < -4.) || (e > 12.) )
+            {
+                double v=value/pow(10.,(int)e);
+                os_ << std::showpoint << std::fixed << std::setprecision(9) << v << "e" << ((e>=0) ? "+" : "") << (int)e;
+            }
+            else
+            {
+                os_ << std::showpoint << std::fixed << std::setprecision(9) << value;
+            }
+        }
+        
         void output( const String_type& s )
         {
             os_ << '"' << add_esc_chars( s ) << '"';
