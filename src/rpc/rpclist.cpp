@@ -136,6 +136,7 @@ static const CRPCCommand vRPCCommands[] =
     { "hidden",             "reconsiderblock",        &reconsiderblock,        true,      true,       false },
     { "hidden",             "setmocktime",            &setmocktime,            true,      false,      false },
     { "hidden",             "data-all",               &purehelpitem,           true,      true,       true },
+    { "hidden",             "addresses-all",          &purehelpitem,           true,      true,       true },
 
 #ifdef ENABLE_WALLET
     /* Wallet */
