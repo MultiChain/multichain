@@ -731,11 +731,15 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
                     metadata_object.push_back(Pair("json",metadata_value));
                     return metadata_object;
                 }
+                metadata_object.push_back(Pair("json",Value::null));
+                return metadata_object;
+/*                
                 if(format_text_out)
                 {
                     *format_text_out=OpReturnFormatToText(MC_SCR_DATA_FORMAT_UNKNOWN);
                 }
                 metadata=HexStr(elem,elem+elem_size);    
+ */ 
 //                metadata_object.push_back(Pair("json",metadata));
                 break;
             case MC_SCR_DATA_FORMAT_UTF8:
