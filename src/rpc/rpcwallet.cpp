@@ -617,26 +617,15 @@ Value gettxoutdata(const Array& params, bool fHelp)
         count=elem_size-start;
     }
 
-    if(format == MC_SCR_DATA_FORMAT_UBJSON)
+    if( (format == MC_SCR_DATA_FORMAT_UBJSON) || (format == MC_SCR_DATA_FORMAT_UTF8) )
     {
         if(start != 0)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start, should be 0 for JSON objects");                                                                            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start, must be 0 for text and JSON data");                                                                            
         }
         if(count != (int)elem_size)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, should be equal to encoded UBJSON object size");                                                                            
-        }
-    }
-    if(format == MC_SCR_DATA_FORMAT_UTF8)
-    {
-        if(start != 0)
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start, should be 0 for texts");                                                                            
-        }
-        if(count != (int)elem_size)
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, should be equal to the text size");                                                                            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, must include all text or JSON data");                                                                            
         }
     }
 /*
