@@ -240,19 +240,22 @@ namespace json_spirit
         {
             double a=fabs(value);
             double e=0.0;
+            int z=0;
+            double f=0.;
+            int j=0;
             if(a > 0)
             {
                 e=log10(a);
-            }
+            }            
             if(e < -4)
             {
-                double f=a*10.e+9;
-                int k=(int)f;
-                if(k)
+                f=a*1.e+9;
+                j=(int)f;
+                if(j)
                 {
-                    if( (f-k) < 0.0001)
+                    if( (f-j) < 0.0001)
                     {
-                        e=0;
+                        z=1;
                     }
                 }
             }
@@ -274,8 +277,7 @@ namespace json_spirit
                 n=m;
                 m=(int64_t)(t/10.+0.5);
             }
-            
-            if( (e < -4.) || (e > 12.) )
+            if( ((e < -4.) || (e > 12.)) && (z == 0))
             {
                 if(p > 0)
                 {
@@ -289,12 +291,9 @@ namespace json_spirit
             }
             else
             {
-                if( (p > 0) || (k < 0))
+                p-=k;
+                if(p > 0)
                 {
-                    if(k<0)
-                    {
-                        p-=k;
-                    }
                     os_ << std::showpoint << std::fixed << std::setprecision(p) << value;
                 }
                 else
