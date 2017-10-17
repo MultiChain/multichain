@@ -256,14 +256,51 @@ namespace json_spirit
                     }
                 }
             }
+            int k=(int)e;
+            if(e<k)
+            {
+                k--;
+            }
+            double v=value/pow(10.,k);
+            
+            int p=9;
+            double t=fabs(v)*pow(10.,p);
+            int64_t n=(int64_t)(t+0.5);
+            int64_t m=(int64_t)(t/10+0.5);
+            while( (p>0) && (n == m*10))
+            {
+                p--;
+                t/=10.;
+                n=m;
+                m=(int64_t)(t/10.+0.5);
+            }
+            
             if( (e < -4.) || (e > 12.) )
             {
-                double v=value/pow(10.,(int)e);
-                os_ << std::showpoint << std::fixed << std::setprecision(9) << v << "e" << ((e>=0) ? "+" : "") << (int)e;
+                if(p > 0)
+                {
+                    os_ << std::showpoint << std::fixed << std::setprecision(p) << v;
+                }
+                else
+                {
+                    os_ << (int)v;
+                }
+                os_ << "e" << ((e>=0) ? "+" : "") << k;
             }
             else
             {
-                os_ << std::showpoint << std::fixed << std::setprecision(9) << value;
+                if( (p > 0) || (k < 0))
+                {
+                    if(k<0)
+                    {
+                        p-=k;
+                    }
+                    os_ << std::showpoint << std::fixed << std::setprecision(p) << value;
+                }
+                else
+                {
+                    os_ << (int64_t)value;                    
+                }
             }
         }
         
