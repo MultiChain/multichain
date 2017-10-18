@@ -1228,6 +1228,169 @@ void getSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity
     entity->m_EntityType=entStat.m_Entity.m_EntityType | MC_TET_SUBKEY;    
 }
 
+Value getstreamkeysummary(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 3)
+        throw runtime_error("Help message not found\n");
+    
+    if(mc_gState->m_Features->Streams() == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
+    }
+    if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+    }   
+
+    mc_TxEntityStat entStat;
+    mc_TxEntity entity;
+    
+    mc_EntityDetails stream_entity;
+    parseStreamIdentifier(params[0],&stream_entity);           
+
+    entStat.Zero();
+    memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+    entStat.m_Entity.m_EntityType=MC_TET_STREAM_KEY;
+    entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
+    if(!pwalletTxsMain->FindEntity(&entStat))
+    {
+        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
+    }
+
+    string key_string=params[1].get_str();
+    const char *key_ptr=key_string.c_str();
+    getSubKeyEntityFromKey(params[1].get_str(),entStat,&entity);
+    
+    vector<string> inputStrings;
+    inputStrings=ParseStringList(params[2]);
+    uint32_t mode=0;
+    for(int j=0;j<(int)inputStrings.size();j++)
+    {
+        bool found=false;
+        if(inputStrings[j]=="jsonupdate")
+        {
+            mode |= MC_VMM_MERGE_OBJECTS;
+            found=true;
+        }
+        if(inputStrings[j]=="recursive")
+        {
+            mode |= MC_VMM_RECURSIVE;
+            found=true;
+        }
+        if(inputStrings[j]=="ignore")
+        {
+            mode |= MC_VMM_IGNORE;
+            found=true;
+        }
+        if(inputStrings[j]=="first")
+        {
+            mode |= MC_VMM_TAKE_FIRST;
+            found=true;
+        }
+        if(!found)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Unrecognized mode: " + inputStrings[j]);                                            
+        }
+    }
+    
+    mc_Buffer *entity_rows;
+    entity_rows=new mc_Buffer;
+    entity_rows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);
+        
+    Object empty_object;
+    int i,n,c,m,err;
+    err=MC_ERR_NOERROR;
+    n=pwalletTxsMain->GetListSize(&entity,entStat.m_Generation,NULL);
+    i=0;
+    m=10;
+    
+    Value result;
+    
+    while(i<n)
+    {
+        if((i % m) == 0)
+        {
+            c=m;
+            if(i+c > n)
+            {
+                c=n-i;
+            }
+            pwalletTxsMain->GetList(&entity,entStat.m_Generation,i+1,c,entity_rows);
+        }
+        mc_TxEntityRow *lpEntTx;
+        lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
+        uint256 hash;
+        int first_output=mc_GetHashAndFirstOutput(lpEntTx,&hash);
+        const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
+        Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,false,&key_ptr,NULL,NULL);
+        BOOST_FOREACH(const Pair& a, entry) 
+        {
+            if(a.name_ == "data")
+            {
+                if(i == 0)
+                {
+                    if(a.value_.type() == obj_type)
+                    {
+                        result=empty_object;
+                    }
+
+                    if( (i==0) && ((mode & MC_VMM_TAKE_FIRST) != 0) )               
+                    {
+                        result=mc_MergeValues(&(a.value_),&result,mode | MC_VMM_IGNORE,0,&err);
+                    }
+                    else
+                    {
+                        result=mc_MergeValues(&result,&(a.value_),mode | MC_VMM_IGNORE,0,&err);
+                    }                    
+                }
+                else
+                {
+                    result=mc_MergeValues(&result,&(a.value_),mode,0,&err);
+                }
+            }
+        }    
+        if(err)
+        {
+            goto exitlbl;
+        }
+        i++;
+    }
+    
+    if(result.type() == obj_type)
+    {
+        if(result.get_obj().size() == 1)
+        {
+            if(result.get_obj()[0].name_ == "json")
+            {
+                if(result.get_obj()[0].value_.type() == obj_type)
+                {
+                    Value json=result.get_obj()[0].value_;
+                    Value empty_value=empty_object;
+                    Object obj;
+                    json=mc_MergeValues(&json,&empty_value,mode | MC_VMM_TAKE_FIRST,1,&err);     
+                    obj.push_back(Pair("json", json));
+                    result=obj;
+                }
+            }
+        }
+    }    
+exitlbl:    
+
+    delete entity_rows;
+    
+    if(err)
+    {
+        throw JSONRPCError(RPC_NOT_ALLOWED, "Could not merge stream items for this key");                                                    
+    }
+
+    return result;
+}
+
+Value getstreampublishersummary(const Array& params, bool fHelp)
+{
+    return Value::null; 
+}
+
 Value liststreamkeyitems(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 6)

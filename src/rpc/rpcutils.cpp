@@ -3373,3 +3373,153 @@ int paramtoint(Value param,bool check_for_min,int min_value,string error_message
     
     return result;
 }
+
+bool mc_IsJsonObjectForMerge(const Value *value,int level)
+{
+    if(value->type() != obj_type)
+    {
+        return false;
+    }
+    if(level == 0)
+    {
+        if(value->get_obj().size() != 1)
+        {
+            return false;            
+        }
+        if((value->get_obj()[0].name_ != "json"))
+        {
+            return false;            
+        }
+        if((value->get_obj()[0].value_.type() != obj_type))
+        {
+            return false;            
+        }        
+    }
+    
+    return true;
+}
+
+Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int level,int *error)
+{
+    int no_merge=0;
+    bool value1_is_obj=mc_IsJsonObjectForMerge(value1,level);
+    bool value2_is_obj=mc_IsJsonObjectForMerge(value2,level);
+    if( (mode & MC_VMM_MERGE_OBJECTS) == 0)
+    {
+        no_merge=1;
+    }
+    else
+    {
+        if(level>1)
+        {
+            if( (mode & MC_VMM_RECURSIVE) == 0 )
+            {
+                no_merge=1;
+            }
+        }
+    }
+            
+    if(!value1_is_obj)
+    {
+        if(!value2_is_obj)
+        {
+            no_merge=1;
+        }
+    }
+    
+    if(no_merge)
+    {
+        if(mode & MC_VMM_TAKE_FIRST)
+        {
+            return *value1;
+        }
+        return *value2;                
+    }
+    
+        
+        
+    if(!value1_is_obj)
+    {
+        if(mode & MC_VMM_IGNORE)
+        {
+            return *value2; 
+        }
+        *error=MC_ERR_INVALID_PARAMETER_VALUE;
+        return Value::null;
+    }
+    else
+    {
+        if(!value2_is_obj)
+        {
+            if(mode & MC_VMM_IGNORE)
+            {
+                return *value1;
+            }            
+            *error=MC_ERR_INVALID_PARAMETER_VALUE;
+            return Value::null;
+        }       
+    }
+    
+    
+    Object result;
+    map<string, Value> map1;   
+    map<string, Value> map2;   
+    
+    BOOST_FOREACH(const Pair& a, value1->get_obj()) 
+    {
+        map<string, Value>::iterator it1 = map1.find(a.name_); 
+        if( it1 == map1.end() )
+        {
+            map1.insert(make_pair(a.name_, a.value_));
+        }
+        else
+        {
+            if( (mode & MC_VMM_TAKE_FIRST_FOR_FIELD) == 0 )
+            {
+                it1->second=a.value_;
+            }
+        }
+    }
+
+    BOOST_FOREACH(const Pair& a, value2->get_obj()) 
+    {
+        map<string, Value>::iterator it2 = map2.find(a.name_); 
+        if( it2 == map2.end() )
+        {
+            map2.insert(make_pair(a.name_, a.value_));
+        }
+        else
+        {
+            if( (mode & MC_VMM_TAKE_FIRST_FOR_FIELD) == 0 )
+            {
+                it2->second=a.value_;
+            }
+        }
+    }
+    
+    for(map<string,Value>::iterator it1 = map1.begin(); it1 != map1.end(); ++it1) 
+    {
+        map<string, Value>::iterator it2 = map2.find(it1->first); 
+        if( it2 == map2.end() )
+        {
+            result.push_back(Pair(it1->first, it1->second));  
+        }
+        else
+        {
+            Value merged=mc_MergeValues(&(it1->second),&it2->second,mode,level+1,error);
+            if(*error)
+            {
+                return Value::null;                
+            }
+            result.push_back(Pair(it1->first, merged));  
+            map2.erase(it2);
+        }
+    }
+    
+    for(map<string,Value>::iterator it2 = map2.begin(); it2 != map2.end(); ++it2) 
+    {
+        result.push_back(Pair(it2->first, it2->second));  
+    }
+    
+    return result;
+}

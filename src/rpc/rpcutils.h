@@ -50,6 +50,12 @@ using namespace json_spirit;
 #define MC_DATA_API_PARAM_TYPE_SIMPLE          0x00000602
 #define MC_DATA_API_PARAM_TYPE_ALL             0xFFFFFFFF
 
+#define MC_VMM_MERGE_OBJECTS                   0x00000001
+#define MC_VMM_RECURSIVE                       0x00000002
+#define MC_VMM_IGNORE                          0x00000004
+#define MC_VMM_TAKE_FIRST                      0x00000008
+#define MC_VMM_TAKE_FIRST_FOR_FIELD            0x00000010
+
 
 // codes for allowed_objects fields    
 // 0x0001 - create    
@@ -101,6 +107,7 @@ bool paramtobool(Value param);
 int paramtoint(Value param,bool check_for_min,int min_value,string error_message);
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
 vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,int *errorCode,string *strError);
+Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int level,int *error);
 
 
 #endif	/* RPCMULTICHAINUTILS_H */
