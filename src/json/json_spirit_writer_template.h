@@ -277,6 +277,12 @@ namespace json_spirit
                 n=m;
                 m=(int64_t)(t/10.+0.5);
             }
+            
+            if(p-k > 9)
+            {
+                z=0;
+            }
+            
             if( ((e < -4.) || (e > 12.)) && (z == 0))
             {
                 if(p > 0)
