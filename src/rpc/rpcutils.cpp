@@ -3402,6 +3402,25 @@ bool mc_IsJsonObjectForMerge(const Value *value,int level)
 Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int level,int *error)
 {
     int no_merge=0;
+    
+    if(mode & MC_VMM_OMIT_NULL)
+    {
+        if(mode & MC_VMM_TAKE_FIRST)
+        {
+            if(value1->type() == null_type)    
+            {
+                return Value::null;
+            }
+        }            
+        else
+        {
+            if(value2->type() == null_type)    
+            {
+                return Value::null;                
+            }            
+        }        
+    }
+    
     bool value1_is_obj=mc_IsJsonObjectForMerge(value1,level);
     bool value2_is_obj=mc_IsJsonObjectForMerge(value2,level);
     if( (mode & MC_VMM_MERGE_OBJECTS) == 0)
@@ -3502,7 +3521,10 @@ Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int l
         map<string, Value>::iterator it2 = map2.find(it1->first); 
         if( it2 == map2.end() )
         {
-            result.push_back(Pair(it1->first, it1->second));  
+            if( ((mode & MC_VMM_OMIT_NULL) == 0) || (it1->second.type() != null_type) )
+            {
+                result.push_back(Pair(it1->first, it1->second));  
+            }
         }
         else
         {
@@ -3511,14 +3533,20 @@ Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int l
             {
                 return Value::null;                
             }
-            result.push_back(Pair(it1->first, merged));  
+            if( ((mode & MC_VMM_OMIT_NULL) == 0) || (merged.type() != null_type) )
+            {
+                result.push_back(Pair(it1->first, merged));  
+            }
             map2.erase(it2);
         }
     }
     
     for(map<string,Value>::iterator it2 = map2.begin(); it2 != map2.end(); ++it2) 
     {
-        result.push_back(Pair(it2->first, it2->second));  
+        if( ((mode & MC_VMM_OMIT_NULL) == 0) || (it2->second.type() != null_type) )
+        {
+            result.push_back(Pair(it2->first, it2->second));  
+        }
     }
     
     return result;

@@ -3825,7 +3825,54 @@ void mc_InitRPCHelpMap16()
             "}\n"
         ));
     
+}
+
+void mc_InitRPCHelpMap17()
+{
+     mapHelpStrings.insert(std::make_pair("getstreamkeysummary",
+            "getstreamkeysummary \"stream-identifier\" \"key\" \"mode\"\n"
+            "\nReturns stream json object items summary for specific key.\n"
+            "\nArguments:\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "2. \"key\"                            (string, required) Stream key\n"
+            "3. \"mode\"                           (string, required) Comma delimited list of the following:\n"
+            "                                                       jsonobjectmerge - merge json objects\n"
+            "                                                       ignore - if non-object items found - ignore them if specified, return error otherwise\n"
+            "                                                       recursive - merge json objects recursively\n"
+            "                                                       noupdate - if specified, first appearance of the key is taken\n"
+            "                                                       firstpublisherany - if specified, only items published by one of original publishers will be summarized\n"
+            "                                                       firstpublisherall - if specified, only items published by all original publishers will be summarized\n"
+            "                                                       omitnull - omit keys with null values\n"
+            "\nResult:\n"
+            "summary-object                      (object) Summary object for specific key.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getstreamkeysummary", "\"test-stream\" \"key01\" \"jsonobjectmerge\"") 
+            + HelpExampleCli("getstreamkeysummary", "\"test-stream\" \"key01\" \"jsonobjectmerge,ignore,recursive\"") 
+            + HelpExampleRpc("getstreamkeysummary", "\"test-stream\", \"key01\", \"jsonobjectmerge,ignore,recursive\"")
+        ));
+    
    
+     mapHelpStrings.insert(std::make_pair("getstreampublishersummary",
+            "getstreampublishersummary \"stream-identifier\" \"address\" \"mode\"\n"
+            "\nReturns stream json object items summary for specific publisher.\n"
+            "\nArguments:\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "2. \"address\"                        (string, required) Publisher address\n"
+            "3. \"mode\"                           (string, required) Comma delimited list of the following:\n"
+            "                                                       jsonobjectmerge - merge json objects\n"
+            "                                                       ignore - if non-object items found - ignore them if specified, return error otherwise\n"
+            "                                                       recursive - merge json objects recursively\n"
+            "                                                       noupdate - if specified, first appearance of the key is taken\n"
+            "                                                       omitnull - omit keys with null values\n"
+            "\nResult:\n"
+            "summary-object                      (object) Summary object for specific publisher.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("liststreampublisheritems", "\"test-stream\" \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"jsonobjectmerge\"") 
+            + HelpExampleCli("liststreampublisheritems", "\"test-stream\" \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"jsonobjectmerge,ignore,recursive\"") 
+            + HelpExampleRpc("liststreampublisheritems", "\"test-stream\", \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"jsonobjectmerge,ignore,recursive\"")
+        ));
+    
+  
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
@@ -3922,6 +3969,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap14();
     mc_InitRPCHelpMap15();
     mc_InitRPCHelpMap16();
+    mc_InitRPCHelpMap17();
     
     mc_InitRPCLogParamCountMap();
     mc_InitRPCAllowedWhenWaitingForUpgradeSet();    

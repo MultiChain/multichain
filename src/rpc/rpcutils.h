@@ -55,6 +55,7 @@ using namespace json_spirit;
 #define MC_VMM_IGNORE                          0x00000004
 #define MC_VMM_TAKE_FIRST                      0x00000008
 #define MC_VMM_TAKE_FIRST_FOR_FIELD            0x00000010
+#define MC_VMM_OMIT_NULL                       0x00000020
 
 
 // codes for allowed_objects fields    
@@ -107,6 +108,7 @@ bool paramtobool(Value param);
 int paramtoint(Value param,bool check_for_min,int min_value,string error_message);
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
 vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,int *errorCode,string *strError);
+bool mc_IsJsonObjectForMerge(const Value *value,int level);
 Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int level,int *error);
 
 

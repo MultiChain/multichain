@@ -1228,11 +1228,8 @@ void getSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity
     entity->m_EntityType=entStat.m_Entity.m_EntityType | MC_TET_SUBKEY;    
 }
 
-Value getstreamkeysummary(const Array& params, bool fHelp)
+Value getstreamsummary(const Array& params, bool fPublisher)
 {
-    if (fHelp || params.size() != 3)
-        throw runtime_error("Help message not found\n");
-    
     if(mc_gState->m_Features->Streams() == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
@@ -1251,15 +1248,30 @@ Value getstreamkeysummary(const Array& params, bool fHelp)
     entStat.Zero();
     memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
     entStat.m_Entity.m_EntityType=MC_TET_STREAM_KEY;
+    if(fPublisher)
+    {
+        entStat.m_Entity.m_EntityType=MC_TET_STREAM_PUBLISHER;        
+    }
     entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
     if(!pwalletTxsMain->FindEntity(&entStat))
     {
         throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
     }
 
-    string key_string=params[1].get_str();
+    bool fFirstPublisher=false;
+    bool fFirstPublisherAll=false;
+    string key_string=params[1].get_str();    
     const char *key_ptr=key_string.c_str();
-    getSubKeyEntityFromKey(params[1].get_str(),entStat,&entity);
+    if(fPublisher)
+    {
+        getSubKeyEntityFromPublisher(params[1].get_str(),entStat,&entity);        
+    }
+    else
+    {
+        getSubKeyEntityFromKey(params[1].get_str(),entStat,&entity);
+    }
+    
+    set<string> setFirstPublishers;
     
     vector<string> inputStrings;
     inputStrings=ParseStringList(params[2]);
@@ -1267,7 +1279,7 @@ Value getstreamkeysummary(const Array& params, bool fHelp)
     for(int j=0;j<(int)inputStrings.size();j++)
     {
         bool found=false;
-        if(inputStrings[j]=="jsonupdate")
+        if(inputStrings[j]=="jsonobjectmerge")
         {
             mode |= MC_VMM_MERGE_OBJECTS;
             found=true;
@@ -1282,10 +1294,31 @@ Value getstreamkeysummary(const Array& params, bool fHelp)
             mode |= MC_VMM_IGNORE;
             found=true;
         }
-        if(inputStrings[j]=="first")
+        if(inputStrings[j]=="noupdate")
         {
             mode |= MC_VMM_TAKE_FIRST;
+            mode |= MC_VMM_TAKE_FIRST_FOR_FIELD;
             found=true;
+        }
+        if(inputStrings[j]=="omitnull")
+        {
+            mode |= MC_VMM_OMIT_NULL;
+            found=true;
+        }
+        if(!fPublisher)
+        {
+            if(inputStrings[j]=="firstpublisherany")
+            {
+                fFirstPublisher=true;
+                fFirstPublisherAll=false;                
+                found=true;
+            }            
+            if(inputStrings[j]=="firstpublisherall")
+            {
+                fFirstPublisher=true;
+                fFirstPublisherAll=true;                
+                found=true;
+            }            
         }
         if(!found)
         {
@@ -1298,7 +1331,8 @@ Value getstreamkeysummary(const Array& params, bool fHelp)
     entity_rows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);
         
     Object empty_object;
-    int i,n,c,m,err;
+    Object obj;
+    int i,n,c,m,err,pcount;
     err=MC_ERR_NOERROR;
     n=pwalletTxsMain->GetListSize(&entity,entStat.m_Generation,NULL);
     i=0;
@@ -1318,11 +1352,57 @@ Value getstreamkeysummary(const Array& params, bool fHelp)
             pwalletTxsMain->GetList(&entity,entStat.m_Generation,i+1,c,entity_rows);
         }
         mc_TxEntityRow *lpEntTx;
-        lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
+        lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i % m);
         uint256 hash;
         int first_output=mc_GetHashAndFirstOutput(lpEntTx,&hash);
         const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
-        Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,false,&key_ptr,NULL,NULL);
+        Object entry;
+        if(fPublisher)
+        {
+            entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,false,NULL,&key_ptr,NULL);
+        }
+        else
+        {
+            entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,false,&key_ptr,NULL,NULL);            
+        }
+        
+        if(fFirstPublisher)
+        {
+            pcount=0;
+            BOOST_FOREACH(const Pair& a, entry) 
+            {
+                if(a.name_ == "publishers")
+                {
+                    Array arr=a.value_.get_array();
+                    if(i == 0)
+                    {
+                        setFirstPublishers.clear();
+                        for(unsigned int j=0;j<arr.size();j++) 
+                        {
+                            setFirstPublishers.insert(arr[j].get_str());
+                            pcount++;      
+                        }
+                    }
+                    else
+                    {                       
+                        for(unsigned int j=0;j<arr.size();j++) 
+                        {
+                            const set<string>::const_iterator it=setFirstPublishers.find(arr[j].get_str());   
+                            if(it != setFirstPublishers.end())
+                            {
+                                pcount++;      
+                            }
+                        }
+                    }                
+                }            
+            }
+            if( ( fFirstPublisherAll && (pcount != (int)setFirstPublishers.size())) || 
+                (!fFirstPublisherAll && (pcount == 0)) )                     
+            {
+                entry.clear();
+            }
+        }
+        
         BOOST_FOREACH(const Pair& a, entry) 
         {
             if(a.name_ == "data")
@@ -1356,39 +1436,45 @@ Value getstreamkeysummary(const Array& params, bool fHelp)
         i++;
     }
     
-    if(result.type() == obj_type)
+    if(mc_IsJsonObjectForMerge(&result,0))
     {
-        if(result.get_obj().size() == 1)
-        {
-            if(result.get_obj()[0].name_ == "json")
-            {
-                if(result.get_obj()[0].value_.type() == obj_type)
-                {
-                    Value json=result.get_obj()[0].value_;
-                    Value empty_value=empty_object;
-                    Object obj;
-                    json=mc_MergeValues(&json,&empty_value,mode | MC_VMM_TAKE_FIRST,1,&err);     
-                    obj.push_back(Pair("json", json));
-                    result=obj;
-                }
-            }
-        }
-    }    
+        Value json=result.get_obj()[0].value_;
+        Value empty_value=empty_object;
+        json=mc_MergeValues(&json,&empty_value,mode | MC_VMM_TAKE_FIRST,1,&err);     
+        obj.push_back(Pair("json", json));        
+    }            
+    else
+    {
+        obj.push_back(Pair("json", empty_object));        
+    }
+    result=obj;
+    
 exitlbl:    
 
     delete entity_rows;
     
     if(err)
     {
-        throw JSONRPCError(RPC_NOT_ALLOWED, "Could not merge stream items for this key");                                                    
+        throw JSONRPCError(RPC_NOT_ALLOWED, "Could not merge stream items for this " + (fPublisher ? string("publisher") : string("key")));                                                    
     }
 
     return result;
 }
 
+Value getstreamkeysummary(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 3)
+        throw runtime_error("Help message not found\n");
+    
+    return getstreamsummary(params,false);
+}
+
 Value getstreampublishersummary(const Array& params, bool fHelp)
 {
-    return Value::null; 
+    if (fHelp || params.size() != 3)
+        throw runtime_error("Help message not found\n");
+    
+    return getstreamsummary(params,true);
 }
 
 Value liststreamkeyitems(const Array& params, bool fHelp)
