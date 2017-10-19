@@ -105,6 +105,11 @@ Value createrawsendfrom(const Array& params, bool fHelp)
         flags |= MC_CSF_ALLOWED_COINS_ARE_MINE;
     }
     
+    if(vecSend.size() == 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Either addresses object or data array should not be empty");                                                        
+    }
+    
     EnsureWalletIsUnlocked();
     {
         LOCK (pwalletMain->cs_wallet_send);
