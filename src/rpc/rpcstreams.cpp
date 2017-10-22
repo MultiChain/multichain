@@ -1307,14 +1307,22 @@ Value getstreamsummary(const Array& params, bool fPublisher)
         }
         if(!fPublisher)
         {
-            if(inputStrings[j]=="firstpublisherany")
+            if(inputStrings[j]=="firstpublishersany")
             {
+                if(fFirstPublisher)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "firstpublishers* option can appear only once in them mode");                                                                        
+                }
                 fFirstPublisher=true;
                 fFirstPublisherAll=false;                
                 found=true;
             }            
-            if(inputStrings[j]=="firstpublisherall")
+            if(inputStrings[j]=="firstpublishersall")
             {
+                if(fFirstPublisher)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "firstpublishers* option can appear only once in them mode");                                                                        
+                }
                 fFirstPublisher=true;
                 fFirstPublisherAll=true;                
                 found=true;
@@ -1324,6 +1332,11 @@ Value getstreamsummary(const Array& params, bool fPublisher)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Unrecognized mode: " + inputStrings[j]);                                            
         }
+    }
+    
+    if( (mode & MC_VMM_MERGE_OBJECTS) == 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "missing jsonobjectmerge");                                                    
     }
     
     mc_Buffer *entity_rows;
@@ -1409,18 +1422,18 @@ Value getstreamsummary(const Array& params, bool fPublisher)
             {
                 if(i == 0)
                 {
-                    if(a.value_.type() == obj_type)
+//                    if(a.value_.type() == obj_type)
                     {
                         result=empty_object;
                     }
 
                     if( (i==0) && ((mode & MC_VMM_TAKE_FIRST) != 0) )               
                     {
-                        result=mc_MergeValues(&(a.value_),&result,mode | MC_VMM_IGNORE,0,&err);
+                        result=mc_MergeValues(&(a.value_),&result,mode,0,&err);
                     }
                     else
                     {
-                        result=mc_MergeValues(&result,&(a.value_),mode | MC_VMM_IGNORE,0,&err);
+                        result=mc_MergeValues(&result,&(a.value_),mode,0,&err);
                     }                    
                 }
                 else

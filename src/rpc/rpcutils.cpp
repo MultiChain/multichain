@@ -3437,7 +3437,7 @@ Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int l
             }
         }
     }
-            
+/*            
     if(!value1_is_obj)
     {
         if(!value2_is_obj)
@@ -3445,7 +3445,7 @@ Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int l
             no_merge=1;
         }
     }
-    
+*/    
     if(no_merge)
     {
         if(mode & MC_VMM_TAKE_FIRST)
