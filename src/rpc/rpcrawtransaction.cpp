@@ -41,6 +41,7 @@ using namespace std;
 
 bool OutputCanSend(COutput out);
 uint32_t mc_CheckSigScriptForMutableTx(const unsigned char *src,int size);
+Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total);
 
 /* MCHN END */
 
@@ -353,6 +354,9 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         bool is_open=false;
         if(detals_script_found)
         {
+            Value vfields;
+            vfields=mc_ExtractDetailsJSONObject(details_script,details_script_size);
+            
             offset=0;
             
             while((int)offset<details_script_size)
@@ -430,7 +434,11 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                     }                    
                 }
             }
-            issue.push_back(Pair("details", details));            
+            if(vfields.type() == null_type )
+            {
+                vfields=details;
+            }
+            issue.push_back(Pair("details", vfields));            
         }
         entry.push_back(Pair("issue", issue));
     }
