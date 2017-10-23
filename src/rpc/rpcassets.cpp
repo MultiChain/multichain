@@ -241,7 +241,6 @@ Value issuefromcmd(const Array& params, bool fHelp)
     const unsigned char *elem;
     CScript scriptOpReturn=CScript();
     
-    script=lpDetails->GetData(0,&bytes);
     
         
     vector<CTxDestination> addresses;    
@@ -257,6 +256,8 @@ Value issuefromcmd(const Array& params, bool fHelp)
             goto exitlbl;
         }
     }
+    
+    script=lpDetails->GetData(0,&bytes);
     lpDetailsScript->Clear();
         
     if(mc_gState->m_Features->OpDropDetailsScripts())
@@ -463,6 +464,7 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     CScript scriptOpReturn=CScript();
     int errorCode=RPC_INVALID_PARAMETER;
     string strError;    
+    lpDetailsScript=new mc_Script;
     if (params.size() > 5)
     {
         ParseRawDetails(&(params[5]),lpDetails,lpDetailsScript,&errorCode,&strError);        
@@ -500,7 +502,6 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     if(bytes > 0)
     {
 //        mc_DumpSize("script",script,bytes,bytes);
-        lpDetailsScript=new mc_Script;
         if(mc_gState->m_Features->OpDropDetailsScripts())
         {
             lpDetailsScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
