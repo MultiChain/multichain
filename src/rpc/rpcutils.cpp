@@ -77,6 +77,53 @@ uint256 mc_GenesisCoinbaseTxID()
     return hGenesisCoinbaseTxID;
 }
 
+Value mc_ExtractDetailsJSONObject(mc_EntityDetails *lpEnt)
+{
+    size_t value_size;
+    int err;
+    
+    const void* ptr=lpEnt->GetSpecialParam(MC_ENT_SPRM_JSON_DETAILS,&value_size);
+    
+    if(ptr == NULL)
+    {
+        return Value::null;        
+    }
+    
+    Value value=ubjson_read((const unsigned char *)ptr,value_size,MAX_FORMATTED_DATA_DEPTH,&err);
+    
+    if(err)
+    {
+        return Value::null;        
+    }
+    
+    return value;
+}
+
+Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total)
+{
+    size_t value_size;
+    int err;
+       
+    uint32_t offset;
+    offset=mc_FindSpecialParamInDetailsScript(script,total,MC_ENT_SPRM_JSON_DETAILS,&value_size);
+    if(offset == total)
+    {
+        return Value::null;
+    }
+    
+    const void* ptr=script+offset;
+    
+    
+    Value value=ubjson_read((const unsigned char *)ptr,value_size,MAX_FORMATTED_DATA_DEPTH,&err);
+    
+    if(err)
+    {
+        return Value::null;        
+    }
+    
+    return value;
+}
+
 
 int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset_ref,char *name,int *multiple,int *type,int entity_type)
 {
@@ -546,41 +593,48 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
         Array openers;
         if(output_level & 0x0004)
         {
-            offset=0;
-            while(offset>=0)
+            Value vfields;
+            vfields=mc_ExtractDetailsJSONObject(&entity);
+            if(vfields.type() == null_type)
             {
-                new_offset=entity.NextParam(offset,&value_offset,&value_size);
-                if(value_offset > 0)
+                offset=0;
+                while(offset>=0)
                 {
-                    if(ptr[offset])
+                    new_offset=entity.NextParam(offset,&value_offset,&value_size);
+                    if(value_offset > 0)
                     {
-                        string param_name((char*)ptr+offset);
-                        string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
-                        fields.push_back(Pair(param_name, param_value));                                                                        
-                    }
-                    else
-                    {
-                        if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
+                        if(ptr[offset])
                         {
-                            if(value_size == 24)
+                            string param_name((char*)ptr+offset);
+                            string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
+                            fields.push_back(Pair(param_name, param_value));                                                                        
+                        }
+                        else
+                        {
+                            if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
                             {
-                                unsigned char tptr[4];
-                                memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
-                                if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
+                                if(value_size == 24)
                                 {
-                                    openers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
+                                    unsigned char tptr[4];
+                                    memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
+                                    if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
+                                    {
+                                        openers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
+                                    }
+                                    else
+                                    {
+                                        openers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
+                                    }
                                 }
-                                else
-                                {
-                                    openers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
-                                }
-                            }
-                        }                        
+                            }                        
+                        }
                     }
-                }
-                offset=new_offset;
-            }      
-            entry.push_back(Pair("details",fields));                    
+                    offset=new_offset;
+                }      
+                vfields=fields;
+            }
+            
+            entry.push_back(Pair("details",vfields));                    
         }
 
         if(output_level & 0x0020)
@@ -994,31 +1048,36 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         }
         
         Object fields;
+        Value vfields;
         if(output_level & 0x0002)
         {
-            offset=0;
-            while(offset>=0)
+            vfields=mc_ExtractDetailsJSONObject(&entity);
+            if(vfields.type() == null_type)
             {
-                new_offset=entity.NextParam(offset,&value_offset,&value_size);
-                if(value_offset > 0)
+                offset=0;
+                while(offset>=0)
                 {
-                    if(ptr[offset])
+                    new_offset=entity.NextParam(offset,&value_offset,&value_size);
+                    if(value_offset > 0)
                     {
-                        if(ptr[offset] != 0xff)
+                        if(ptr[offset])
                         {
-                            string param_name((char*)ptr+offset);
-                            string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
-                            fields.push_back(Pair(param_name, param_value));                                                                        
+                            if(ptr[offset] != 0xff)
+                            {
+                                string param_name((char*)ptr+offset);
+                                string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
+                                fields.push_back(Pair(param_name, param_value));                                                                        
+                            }
                         }
                     }
-                }
-                offset=new_offset;
-            }      
-    
+                    offset=new_offset;
+                }      
+                vfields=fields;
+            }
         }
         if(output_level & 0x0002)
         {
-            entry.push_back(Pair("details",fields));                    
+            entry.push_back(Pair("details",vfields));                    
         }
 
         Array issues;
@@ -1045,6 +1104,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                         Object followon_fields;
                         Array followon_issuers;
 
+                        vfields=mc_ExtractDetailsJSONObject(&followon);
                         ptr=followon.GetScript();
                         offset=0;
                         while(offset>=0)
@@ -1088,7 +1148,11 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                             offset=new_offset;
                         }      
 
-                        issue.push_back(Pair("details",followon_fields));                    
+                        if(vfields.type() == null_type)
+                        {                        
+                            vfields=followon_fields;
+                        }
+                        issue.push_back(Pair("details",vfields));                    
                         issue.push_back(Pair("issuers",followon_issuers));                    
                         issues.push_back(issue);                    
                     }

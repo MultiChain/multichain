@@ -418,10 +418,26 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
     return vValue;
 }
 
-void ParseRawDetails(const Value *value,mc_Script *lpDetails,int *errorCode,string *strError)
+void ParseRawDetails(const Value *value,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError)
 {
     if(value->type() == obj_type)
     {
+        size_t bytes;
+        int err;
+        const unsigned char *script;
+        lpDetailsScript->Clear();
+        lpDetailsScript->AddElement();
+        if((err = ubjson_write(*value,lpDetailsScript,MAX_FORMATTED_DATA_DEPTH)) != MC_ERR_NOERROR)
+        {
+            *strError=string("Couldn't transfer details JSON object to internal UBJSON format");    
+        }
+        else
+        {
+            script = lpDetailsScript->GetData(0,&bytes);
+            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_JSON_DETAILS,script,bytes);            
+        }
+
+/*        
         BOOST_FOREACH(const Pair& p, value->get_obj()) 
         {              
             if(p.value_.type() == str_type)
@@ -433,6 +449,7 @@ void ParseRawDetails(const Value *value,mc_Script *lpDetails,int *errorCode,stri
                 *strError=string("Invalid details value, should be string");                                                                            
             }      
         }
+*/ 
     }                
     else
     {
@@ -588,7 +605,7 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             {
                 *strError=string("details field can appear only once in the object");                                                                                                        
             }
-            ParseRawDetails(&(d.value_),lpDetails,errorCode,strError);
+            ParseRawDetails(&(d.value_),lpDetails,lpDetailsScript,errorCode,strError);
             missing_details=false;
             field_parsed=true;
         }            
@@ -659,7 +676,7 @@ CScript RawDataScriptFollowOn(Value *param,mc_EntityDetails *entity,mc_Script *l
             {
                 *strError=string("details field can appear only once in the object");                                                                                                        
             }
-            ParseRawDetails(&(d.value_),lpDetails,errorCode,strError);
+            ParseRawDetails(&(d.value_),lpDetails,lpDetailsScript,errorCode,strError);
             missing_details=false;
             field_parsed=true;
         }            
@@ -781,7 +798,7 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
             {
                 *strError=string("details field can appear only once in the object");                                                                                                        
             }
-            ParseRawDetails(&(d.value_),lpDetails,errorCode,strError);
+            ParseRawDetails(&(d.value_),lpDetails,lpDetailsScript,errorCode,strError);
             missing_details=false;
             field_parsed=true;
         }            
@@ -1392,7 +1409,7 @@ exitlbl:
     }
     if(strError.size())
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, strError);            
+        throw JSONRPCError(errorCode, strError);            
     }
 
     return scriptOpReturn;

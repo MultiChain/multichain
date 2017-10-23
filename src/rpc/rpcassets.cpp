@@ -217,6 +217,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);
     }
     
+/*    
     if (params.size() > 6)
     {
         if(params[6].type() == obj_type)
@@ -232,6 +233,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields, expecting object");                                        
         }
     }
+ */ 
     int err;
     size_t bytes;
     const unsigned char *script;
@@ -240,40 +242,54 @@ Value issuefromcmd(const Array& params, bool fHelp)
     CScript scriptOpReturn=CScript();
     
     script=lpDetails->GetData(0,&bytes);
-//    if(bytes > 0)
-    {
-        lpDetailsScript=new mc_Script;
+    
         
-        if(mc_gState->m_Features->OpDropDetailsScripts())
+    vector<CTxDestination> addresses;    
+    vector<CTxDestination> fromaddresses;        
+    int errorCode=RPC_INVALID_PARAMETER;
+    string strError;    
+    lpDetailsScript=new mc_Script;
+    if (params.size() > 6)
+    {
+        ParseRawDetails(&(params[6]),lpDetails,lpDetailsScript,&errorCode,&strError);        
+        if(strError.size())
         {
-            err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
-            if(err)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or asset name, too long");                                                        
-            }
-            
-            elem = lpDetailsScript->GetData(0,&elem_size);
-            scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;                    
+            goto exitlbl;
         }
-        else
+    }
+    lpDetailsScript->Clear();
+        
+    if(mc_gState->m_Features->OpDropDetailsScripts())
+    {
+        err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
+        if(err)
         {
-            err=lpDetailsScript->SetAssetDetails(asset_name.c_str(),multiple,script,bytes);
-            if(err)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or asset name, too long");                                                    
-            }
+            strError= "Invalid custom fields or asset name, too long";
+            goto exitlbl;
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or asset name, too long");                                                        
+        }
 
-            elem = lpDetailsScript->GetData(0,&elem_size);
-            scriptOpReturn << OP_RETURN << vector<unsigned char>(elem, elem + elem_size);
+        elem = lpDetailsScript->GetData(0,&elem_size);
+        scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;                    
+    }
+    else
+    {
+        err=lpDetailsScript->SetAssetDetails(asset_name.c_str(),multiple,script,bytes);
+        if(err)
+        {
+            strError= "Invalid custom fields or asset name, too long";
+            goto exitlbl;
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or asset name, too long");                                                    
         }
+
+        elem = lpDetailsScript->GetData(0,&elem_size);
+        scriptOpReturn << OP_RETURN << vector<unsigned char>(elem, elem + elem_size);
     }
         
     
 
-    vector<CTxDestination> addresses;    
     addresses.push_back(address.Get());
     
-    vector<CTxDestination> fromaddresses;        
     
     if(params[0].get_str() != "*")
     {
@@ -281,12 +297,17 @@ Value issuefromcmd(const Array& params, bool fHelp)
 
         if(fromaddresses.size() != 1)
         {
+            strError= "Single from-address should be specified";
+            goto exitlbl;
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
         }
 
         if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
         {
-            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
+            strError= "Private key for from-address is not found in this wallet";
+            errorCode=RPC_WALLET_ADDRESS_NOT_FOUND;
+            goto exitlbl;
+//            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
         }
         
         set<CTxDestination> thisFromAddresses;
@@ -299,7 +320,10 @@ Value issuefromcmd(const Array& params, bool fHelp)
         CPubKey pkey;
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_ISSUE,&thisFromAddresses))
         {
-            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have issue permission");                
+            strError= "from-address doesn't have issue permission";
+            errorCode=RPC_INSUFFICIENT_PERMISSIONS;
+            goto exitlbl;
+//            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have issue permission");                
         }   
     }
     else
@@ -307,15 +331,22 @@ Value issuefromcmd(const Array& params, bool fHelp)
         CPubKey pkey;
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_ISSUE))
         {
-            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with issue permission");                
+            strError= "This wallet doesn't have keys with issue permission";
+            errorCode=RPC_INSUFFICIENT_PERMISSIONS;
+            goto exitlbl;
+//            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with issue permission");                
         }        
     }
     
     EnsureWalletIsUnlocked();
-    LOCK (pwalletMain->cs_wallet_send);
-    
-    SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, scriptOpReturn,fromaddresses);
+    {
+        LOCK (pwalletMain->cs_wallet_send);
 
+        SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, scriptOpReturn,fromaddresses);
+    }
+
+exitlbl:    
+    
     if(lpDetailsScript)
     {
         delete lpDetailsScript;
@@ -427,6 +458,22 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     lpDetails=new mc_Script;
     lpDetails->AddElement();
         
+    vector<CTxDestination> addresses;    
+    vector<CTxDestination> fromaddresses;        
+    CScript scriptOpReturn=CScript();
+    int errorCode=RPC_INVALID_PARAMETER;
+    string strError;    
+    if (params.size() > 5)
+    {
+        ParseRawDetails(&(params[5]),lpDetails,lpDetailsScript,&errorCode,&strError);        
+        if(strError.size())
+        {
+            goto exitlbl;
+        }
+    }
+    lpDetailsScript->Clear();
+
+/*    
     if (params.size() > 5)
     {
         if(params[5].type() == obj_type)
@@ -442,13 +489,12 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid extra-params, expecting object");                                        
         }
     }
-    
+*/    
     int err;
     size_t bytes;
     const unsigned char *script;
     size_t elem_size;
     const unsigned char *elem;
-    CScript scriptOpReturn=CScript();
     
     script=lpDetails->GetData(0,&bytes);
     if(bytes > 0)
@@ -461,7 +507,9 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
             err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
             if(err)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields, too long");                                                        
+                strError= "Invalid custom fields, too long";
+                goto exitlbl;
+//                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields, too long");                                                        
             }
 
             elem = lpDetailsScript->GetData(0,&elem_size);
@@ -479,10 +527,8 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
         
     
 
-    vector<CTxDestination> addresses;    
     addresses.push_back(address.Get());
     
-    vector<CTxDestination> fromaddresses;        
     
     if(params[0].get_str() != "*")
     {
@@ -490,12 +536,17 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
 
         if(fromaddresses.size() != 1)
         {
+            strError= "Single from-address should be specified";
+            goto exitlbl;
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
         }
         
         if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
         {
-            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
+            strError= "Private key for from-address is not found in this wallet";
+            errorCode=RPC_WALLET_ADDRESS_NOT_FOUND;
+            goto exitlbl;
+//            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
         }        
     }
     else
@@ -520,12 +571,17 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
                 {
                     if(mc_gState->m_Permissions->CanIssue(entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
                     {
-                        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Issuing more units for this asset is not allowed from this address");                                                                        
+                        strError= "Issuing more units for this asset is not allowed from this address";
+                        errorCode=RPC_INSUFFICIENT_PERMISSIONS;
+                        goto exitlbl;
+//                        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Issuing more units for this asset is not allowed from this address");                                                                        
                     }                                                 
                 }
                 else
                 {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Issuing more units is allowed only from P2PKH addresses");                                                
+                    strError= "Issuing more units is allowed only from P2PKH addresses";
+                    goto exitlbl;
+//                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Issuing more units is allowed only from P2PKH addresses");                                                
                 }
             }
             else
@@ -546,26 +602,39 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
                 }                    
                 if(!issuer_found)
                 {
-                    throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Issuing more units for this asset is not allowed from this wallet");                                                                                            
+                    strError= "Issuing more units for this asset is not allowed from this wallet";
+                    errorCode=RPC_INSUFFICIENT_PERMISSIONS;
+                    goto exitlbl;
+//                    throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Issuing more units for this asset is not allowed from this wallet");                                                                                            
                 }
             }
         }
         else
         {
-            throw JSONRPCError(RPC_NOT_ALLOWED, "Issuing more units not allowed for this asset: "+params[2].get_str());                            
+            strError= "Issuing more units not allowed for this asset: "+params[2].get_str();
+            errorCode=RPC_NOT_ALLOWED;
+            goto exitlbl;
+//            throw JSONRPCError(RPC_NOT_ALLOWED, "Issuing more units not allowed for this asset: "+params[2].get_str());                            
         }
     }   
     else
     {
-        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Asset not found");                
+        strError= "Asset not found";
+        errorCode=RPC_ENTITY_NOT_FOUND;
+        goto exitlbl;
+//        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Asset not found");                
     }
     
     
     EnsureWalletIsUnlocked();
-    LOCK (pwalletMain->cs_wallet_send);
-    
-    SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, scriptOpReturn,fromaddresses);
+    {
+        LOCK (pwalletMain->cs_wallet_send);
 
+        SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, scriptOpReturn,fromaddresses);
+    }
+    
+exitlbl:    
+    
     if(lpDetailsScript)
     {
         delete lpDetailsScript;

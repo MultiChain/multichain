@@ -108,8 +108,10 @@ bool paramtobool(Value param);
 int paramtoint(Value param,bool check_for_min,int min_value,string error_message);
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
 vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,int *errorCode,string *strError);
+void ParseRawDetails(const Value *value,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError);
 bool mc_IsJsonObjectForMerge(const Value *value,int level);
 Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int level,int *error);
+Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total);
 
 
 #endif	/* RPCMULTICHAINUTILS_H */

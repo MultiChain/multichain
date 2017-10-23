@@ -337,7 +337,7 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     }
     
     
-
+/*
     if (params.size() > 4)
     {
         if(params[4].type() == obj_type)
@@ -353,24 +353,42 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields, expecting object");                                        
         }
     }
+*/
+    
+    vector<CTxDestination> addresses;       
+    vector<CTxDestination> fromaddresses;
+    CScript scriptOpReturn=CScript();
+    
+    int errorCode=RPC_INVALID_PARAMETER;
+    string strError;    
+    lpDetailsScript=new mc_Script;
+    if (params.size() > 4)
+    {
+        ParseRawDetails(&(params[4]),lpDetails,lpDetailsScript,&errorCode,&strError);        
+        if(strError.size())
+        {
+            goto exitlbl;
+        }
+    }
+    lpDetailsScript->Clear();
     
     int err;
     size_t bytes;
     const unsigned char *script;
     script=lpDetails->GetData(0,&bytes);
     
-    lpDetailsScript=new mc_Script;
 
     size_t elem_size;
     const unsigned char *elem;
-    CScript scriptOpReturn=CScript();
     
     if(mc_gState->m_Features->OpDropDetailsScripts())
     {
         err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
         if(err)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or stream name, too long");                                                        
+            strError= "Invalid custom fields or stream name, too long";
+            goto exitlbl;
+//            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or stream name, too long");                                                        
         }
         
         elem = lpDetailsScript->GetData(0,&elem_size);
@@ -383,7 +401,9 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
         err=lpDetailsScript->SetGeneralDetails(script,bytes);
         if(err)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or stream name, too long");                                                    
+            strError= "Invalid custom fields or stream name, too long";
+            goto exitlbl;
+//            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or stream name, too long");                                                    
         }
 
         for(int e=0;e<lpDetailsScript->GetNumElements();e++)
@@ -410,9 +430,6 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
         }    
     }
     
-    vector<CTxDestination> addresses;    
-    
-    vector<CTxDestination> fromaddresses;        
     
     if(params[0].get_str() != "*")
     {
@@ -420,12 +437,17 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
 
         if(fromaddresses.size() != 1)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
+            strError= "Single from-address should be specified";
+            goto exitlbl;
+//            throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
         }
 
         if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
         {
-            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
+            strError= "Private key for from-address is not found in this wallet";
+            errorCode=RPC_WALLET_ADDRESS_NOT_FOUND;
+            goto exitlbl;
+//            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
         }
         
         set<CTxDestination> thisFromAddresses;
@@ -438,7 +460,10 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
         CPubKey pkey;
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_CREATE,&thisFromAddresses))
         {
-            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have create permission");                
+            strError= "from-address doesn't have create permission";
+            errorCode=RPC_INSUFFICIENT_PERMISSIONS;
+            goto exitlbl;
+//            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have create permission");                
         }   
     }
     else
@@ -446,16 +471,28 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
         CPubKey pkey;
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_CREATE))
         {
+            strError= "This wallet doesn't have keys with create permission";
+            errorCode=RPC_INSUFFICIENT_PERMISSIONS;
+            goto exitlbl;
             throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with create permission");                
         }        
     }
     
     
     EnsureWalletIsUnlocked();
-    LOCK (pwalletMain->cs_wallet_send);
-    
-    SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn,fromaddresses);
+    {
+        LOCK (pwalletMain->cs_wallet_send);
 
+        SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn,fromaddresses);
+    }
+    
+exitlbl:
+
+    if(strError.size())
+    {
+        throw JSONRPCError(errorCode, strError);            
+    }
+                
     if(lpDetailsScript)
     {
         delete lpDetailsScript;
