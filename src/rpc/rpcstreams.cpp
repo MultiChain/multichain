@@ -488,11 +488,6 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     
 exitlbl:
 
-    if(strError.size())
-    {
-        throw JSONRPCError(errorCode, strError);            
-    }
-                
     if(lpDetailsScript)
     {
         delete lpDetailsScript;
@@ -500,6 +495,11 @@ exitlbl:
     delete lpDetails;
     delete lpScript;
   
+    if(strError.size())
+    {
+        throw JSONRPCError(errorCode, strError);            
+    }
+                
     return wtx.GetHash().GetHex();    
 }
 
