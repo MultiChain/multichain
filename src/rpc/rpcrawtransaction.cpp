@@ -1927,7 +1927,7 @@ Value signrawtransaction(const Array& params, bool fHelp)
         BOOST_FOREACH(const CMutableTransaction& txv, txVariants) {
             txin.scriptSig = CombineSignatures(prevPubKey, mergedTx, i, txin.scriptSig, txv.vin[i].scriptSig);
         }
-        if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, MutableTransactionSignatureChecker(&mergedTx, i)))
+        if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK, MutableTransactionSignatureChecker(&mergedTx, i)))
             fComplete = false;
     }
 
