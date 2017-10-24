@@ -649,6 +649,11 @@ exitlbl:
     delete lpDetails;
     delete lpScript;
   
+    if(strError.size())
+    {
+        throw JSONRPCError(errorCode, strError);            
+    }
+                
     return wtx.GetHash().GetHex();    
 }
  
