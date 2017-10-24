@@ -1460,6 +1460,7 @@ Value getstreamsummary(const Array& params, bool fPublisher)
                 if(i == 0)
                 {
 //                    if(a.value_.type() == obj_type)
+/*                    
                     {
                         result=empty_object;
                     }
@@ -1471,7 +1472,9 @@ Value getstreamsummary(const Array& params, bool fPublisher)
                     else
                     {
                         result=mc_MergeValues(&result,&(a.value_),mode,0,&err);
-                    }                    
+                    }         
+ */ 
+                    result=a.value_;
                 }
                 else
                 {
