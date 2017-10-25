@@ -1959,10 +1959,11 @@ Value sendrawtransaction(const Array& params, bool fHelp)
     const CCoins* existingCoins = view.AccessCoins(hashTx);
     bool fHaveMempool = mempool.exists(hashTx);
     bool fHaveChain = existingCoins && existingCoins->nHeight < 1000000000;
+    bool fMissingInputs;
     if (!fHaveMempool && !fHaveChain) {
         // push to local node and sync with wallets
         CValidationState state;
-        if (!AcceptToMemoryPool(mempool, state, tx, false, NULL, !fOverrideFees)) {
+        if (!AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, !fOverrideFees)) {
             if(state.IsInvalid())
                 throw JSONRPCError(RPC_TRANSACTION_REJECTED, strprintf("%i: %s", state.GetRejectCode(), state.GetRejectReason()));
             else
@@ -1976,6 +1977,13 @@ Value sendrawtransaction(const Array& params, bool fHelp)
                 {
                     if(!mempool.exists(hashTx))
                     {
+                        if(fMissingInputs)
+                        {
+                            if(!fHaveChain)
+                            {
+                                throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "missing inputs");                    
+                            }
+                        }
                         throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "transaction already in block chain");                    
                     }
                 }

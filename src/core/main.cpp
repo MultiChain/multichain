@@ -1488,8 +1488,17 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         if (!CheckInputs(tx, state, view, true, scriptVerifyFlags, true))
         {
-//            return error("AcceptToMemoryPool: : ConnectInputs failed %s", hash.ToString());            
-            return state.DoS(0,error("AcceptToMemoryPool: : ConnectInputs failed %s", hash.ToString()),REJECT_INVALID,"ConnectInputs failed");
+//            return error("AcceptToMemoryPool: : ConnectInputs failed %s", hash.ToString());    
+            string strError=state.GetRejectReason();
+            if(strError.size() == 0)
+            {
+                strError="ConnectInputs failed";
+            }
+            else
+            {
+                strError="ConnectInputs failed: " + strError;
+            }
+            return state.DoS(0,error("AcceptToMemoryPool: : ConnectInputs failed %s", hash.ToString()),REJECT_INVALID,strError);
         }
         
 
