@@ -1508,7 +1508,7 @@ exitlbl:
     
     if(err)
     {
-        throw JSONRPCError(RPC_NOT_ALLOWED, "Could not merge stream items for this " + (fPublisher ? string("publisher") : string("key")));                                                    
+        throw JSONRPCError(RPC_NOT_ALLOWED, "Some items to be merged are in the wrong format (try using \'ignore\')" );                                                    
     }
 
     return result;
