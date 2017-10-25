@@ -131,7 +131,7 @@ bool AppInit(int argc, char* argv[])
 
     if(!GetBoolArg("-shortoutput", false))
     {
-        fprintf(stdout,"\nMultiChain %s Daemon (protocol %d)\n\n",mc_gState->GetVersion(),mc_gState->GetProtocolVersion());
+        fprintf(stdout,"\nMultiChain %s Daemon (latest protocol %d)\n\n",mc_gState->GetVersion(),mc_gState->GetProtocolVersion());
     }
     
     pipes[1]=STDOUT_FILENO;
