@@ -21,6 +21,25 @@ using namespace json_spirit;
 
 uint256 hGenesisCoinbaseTxID=0;
 
+int c_UTF8_charlen[256]={
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+ 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+ 3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
+ 4,4,4,4,4,4,4,4,5,5,5,5,6,6,0,0
+};
+
 CScript RemoveOpDropsIfNeeded(const CScript& scriptInput)
 {
     if (!GetBoolArg("-hideknownopdrops", false))
@@ -764,6 +783,27 @@ string OpReturnFormatToText(int format)
     return "raw";
 }
 
+int mc_IsUTF8(const unsigned char *elem,size_t elem_size)
+{
+    unsigned char *ptr=(unsigned char *)elem;
+    unsigned char *ptrEnd=ptr+elem_size;
+    int size;
+    while(ptr<ptrEnd)
+    {
+        size=c_UTF8_charlen[*ptr];
+        if(size==0)
+        {
+            return 0;
+        }
+        ptr+=size;
+    }
+    if(ptr>ptrEnd)
+    {
+        return 0;        
+    }
+    return 1;
+}
+
 Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out)
 {
     string metadata="";
@@ -797,6 +837,11 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
 //                metadata_object.push_back(Pair("json",metadata));
                 break;
             case MC_SCR_DATA_FORMAT_UTF8:
+                if(mc_IsUTF8(elem,elem_size) == 0)
+                {
+                    metadata_object.push_back(Pair("text",Value::null));
+                    return metadata_object;                    
+                }
                 metadata=string(elem,elem+elem_size);
                 metadata_object.push_back(Pair("text",metadata));
                 return metadata_object;
