@@ -1252,6 +1252,19 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         {
             if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_GENERATED)
             {
+                if(init_privkey.size())
+                {
+                    if(mc_gState->m_NetworkParams->GetParam("privatekeyversion",NULL) == NULL)
+                    {
+                        return InitError(_("The initprivkey runtime parameter can only be used when connecting to MultiChain 1.0 beta 2 or later"));                                                        
+                    }
+                    string init_privkey_error=pwalletMain->SetDefaultKeyIfInvalid(init_privkey);
+                    if(init_privkey_error.size())
+                    {
+                        return InitError(strprintf("Cannot set initial private key: %s",init_privkey_error));                            
+                    }
+                    init_privkey="";
+                }
                 const unsigned char *pubKey=pwalletMain->vchDefaultKey.begin();
                 int pubKeySize=pwalletMain->vchDefaultKey.size();
 
