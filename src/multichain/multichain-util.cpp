@@ -25,7 +25,7 @@ int main(int argc, char* argv[])
     
     mc_ExpandDataDirParam();
     
-    printf("\nMultiChain %s Utilities (protocol %d)\n\n",mc_BuildDescription(mc_gState->GetNumericVersion()).c_str(),mc_gState->GetProtocolVersion());
+    printf("\nMultiChain %s Utilities (latest protocol %d)\n\n",mc_BuildDescription(mc_gState->GetNumericVersion()).c_str(),mc_gState->GetProtocolVersion());
              
     err=MC_ERR_OPERATION_NOT_SUPPORTED;
      

@@ -2126,7 +2126,16 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     {
         if(!GetBoolArg("-shortoutput", false))
         {    
-            sprintf(bufOutput,"Protocol version %d\n\n",version);            
+            int original_protocol_version=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
+
+            if(version != original_protocol_version)
+            {
+                sprintf(bufOutput,"Protocol version %d (chain created with %d)\n\n",version,original_protocol_version);                            
+            }
+            else
+            {
+                sprintf(bufOutput,"Protocol version %d\n\n",version);            
+            }
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
         }
     }
