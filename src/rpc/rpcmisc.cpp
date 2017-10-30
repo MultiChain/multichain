@@ -749,19 +749,50 @@ Value validateaddress(const Array& params, bool fHelp)
     if (fHelp || params.size() != 1)                                            // MCHN
         throw runtime_error("Help message not found\n");
 
-    CBitcoinAddress address(params[0].get_str());
+    string str=params[0].get_str();
+    CBitcoinAddress address(str);
     bool isValid = address.IsValid();
 
     Object ret;
 /* MCHN START */        
     if(!isValid)
     {
-        ret.push_back(Pair("isvalid", false));        
+        CBitcoinSecret vchSecret;
+        CPubKey pubkey;
+        isValid = vchSecret.SetString(str);
+
+        if (isValid)
+        {
+            CKey key;
+            key = vchSecret.GetKey();
+            isValid=key.IsValid();
+            if (isValid) 
+            {
+                pubkey = key.GetPubKey();
+                isValid=key.VerifyPubKey(pubkey);
+            }
+        }        
+        else
+        {
+            if (IsHex(str))
+            {
+                pubkey=CPubKey(ParseHex(str));
+                isValid=pubkey.IsFullyValid();            
+            }                
+        }        
+        if(isValid)
+        {
+            address=CBitcoinAddress(pubkey.GetID());
+        }        
     }
-    else
+    
+    if(!isValid)
     {
-        return AddressEntry(address,0x03);
+        ret.push_back(Pair("isvalid", false));        
+        return ret;
     }
+    
+    return AddressEntry(address,0x03);
 /*    
     ret.push_back(Pair("isvalid", isValid));
     if (isValid)
@@ -784,7 +815,7 @@ Value validateaddress(const Array& params, bool fHelp)
         
     }
 */   
-    return ret;
+//    return ret;
 /* MCHN END */        
 }
 

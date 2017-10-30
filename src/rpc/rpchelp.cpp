@@ -1265,10 +1265,14 @@ void mc_InitRPCHelpMap06()
         ));
     
     mapHelpStrings.insert(std::make_pair("validateaddress",
-            "validateaddress \"address\"\n"
-            "\nReturn information about the given  address.\n"
+            "validateaddress \"address\"|\"pubkey\"|\"privkey\"\n"
+            "\nReturn information about the given address or public key or private key.\n"
             "\nArguments:\n"
-            "1. address                          (string, required) The address to validate\n"
+            "1. \"address\"                        (string, required) The address to validate\n"
+            "  or \n"
+            "1. \"pubkey\"                         (string, required) The public key (hexadecimal) to validate\n"
+            "  or \n"
+            "1. \"privkey\"                        (string, required) The private key (see dumpprivkey) to validate\n"
             "\nResult:\n"
             "{\n"
             "  \"isvalid\" : true|false,           (boolean) If the address is valid or not. If not, this is the only property returned.\n"
