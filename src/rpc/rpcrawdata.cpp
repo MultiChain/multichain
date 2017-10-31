@@ -569,9 +569,16 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             if(d.value_.type() == int_type)
             {
                 multiple=d.value_.get_int();
-                if(mc_gState->m_Features->OpDropDetailsScripts())
+                if(multiple <= 0)
                 {
-                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,4);
+                    *strError=string("Invalid multiple - should be positive");                                                                                                        
+                }
+                else
+                {
+                    if(mc_gState->m_Features->OpDropDetailsScripts())                    
+                    {
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,4);
+                    }
                 }
             }
             else
