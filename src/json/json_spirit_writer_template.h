@@ -12,6 +12,8 @@
 #include <sstream>
 #include <iomanip>
 
+extern uint32_t JSON_NO_DOUBLE_FORMATTING;                             
+
 
 namespace json_spirit
 {
@@ -238,6 +240,11 @@ namespace json_spirit
 
         void output_double( const double& value )
         {
+            if(JSON_NO_DOUBLE_FORMATTING)                     
+            {
+                os_ << std::showpoint << std::fixed << std::setprecision(9) << value;                
+                return; 
+            }
             double a=fabs(value);
             double e=0.0;
             int z=0;

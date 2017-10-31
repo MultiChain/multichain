@@ -27,6 +27,7 @@ using namespace boost::asio;
 using namespace json_spirit;
 
 static const int CONTINUE_EXECUTION=-1;
+extern unsigned int JSON_NO_DOUBLE_FORMATTING;  
 
 std::string HelpMessageCli()
 {
@@ -105,8 +106,7 @@ static int AppInitRPC(int argc, char* argv[])
     {
         mc_gState->m_SessionFlags |= MC_SSF_COLD;
     }
-    
-    
+                
     mc_CheckDataDirInConfFile();
    
     if(mc_gState->m_Params->NetworkName())
@@ -239,7 +239,9 @@ Object CallRPC(const string& strMethod, const Array& params)
     map<string, string> mapRequestHeaders;
     mapRequestHeaders["Authorization"] = string("Basic ") + strUserPass64;
     // Send request
+    JSON_NO_DOUBLE_FORMATTING=1;    
     string strRequest = JSONRPCRequest(strMethod, params, 1);
+    JSON_NO_DOUBLE_FORMATTING=0;    
     string strPost = HTTPPost(strRequest, mapRequestHeaders);
     stream << strPost << std::flush;
 
