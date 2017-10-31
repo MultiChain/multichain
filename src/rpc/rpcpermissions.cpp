@@ -150,6 +150,7 @@ Value grantoperation(const Array& params)
     }
     
     mc_EntityDetails found_entity;
+    found_entity.Zero();
     CScript scriptOpReturn=CScript();
     if (params.size() > 3)
     {
