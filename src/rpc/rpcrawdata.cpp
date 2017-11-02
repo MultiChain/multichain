@@ -768,10 +768,7 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
                 entity_name=d.value_.get_str();
                 if(entity_name.size())
                 {
-                    if(mc_gState->m_Features->OpDropDetailsScripts())
-                    {
-                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());
-                    }
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());
                 }
             }
             else
@@ -1127,7 +1124,14 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
             scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;                    
         }
 
-        scriptOpReturn << OP_RETURN << vValue;                            
+        if(vValue.size())
+        {
+            scriptOpReturn << OP_RETURN << vValue;                            
+        }
+        else
+        {
+            scriptOpReturn << OP_RETURN;                                        
+        }
     }
     
 exitlbl:
