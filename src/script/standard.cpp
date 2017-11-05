@@ -566,6 +566,13 @@ bool IsStandardNullData(const CScript& scriptPubKey,bool standard_check)
 
 bool CScript::IsUnspendable() const
 {
+    if(mc_gState->m_Features->FixedIsUnspendable() == 0)
+    {
+        int op_drop_offset[2];
+        int op_drop_size[2];
+        int op_return_offset,op_return_size;
+        return (mc_ParseOpDropOpReturnScript((unsigned char*)&begin()[0],(int)size(),op_drop_offset,op_drop_size,2,&op_return_offset,&op_return_size)) != NULL;                
+    }
     return IsStandardNullData(*this,false);
 }
 

@@ -129,6 +129,7 @@ typedef struct mc_Features
     int FixedDestinationExtraction();
     int FixedIn1000920001();
     int MultipleStreamKeys();
+    int FixedIsUnspendable();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo
