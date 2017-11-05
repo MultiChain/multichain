@@ -975,6 +975,11 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
         }
     }    
     
+    if(protocol_version < 0)
+    {                    
+        *strError=string("Missing protocol-version");                                                                                            
+    }
+    
     if(strError->size() == 0)
     {
         int err;
@@ -1077,10 +1082,10 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
     }
     if(missing_key)
     {
-        *strError=string("Missing keys field");        
+        *strError=string("Missing key field");        
         if(mc_gState->m_Features->MultipleStreamKeys())
         {
-            *strError=string("Missing key field");                    
+            *strError=string("Missing keys field");                    
         }
     }
 
