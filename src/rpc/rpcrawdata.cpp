@@ -975,9 +975,12 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
         }
     }    
     
-    if(protocol_version < 0)
-    {                    
-        *strError=string("Missing protocol-version");                                                                                            
+    if(strError->size() == 0)
+    {
+        if(protocol_version < 0)
+        {                    
+            *strError=string("Missing protocol-version");                                                                                            
+        }
     }
     
     if(strError->size() == 0)
