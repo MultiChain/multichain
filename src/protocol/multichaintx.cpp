@@ -1416,7 +1416,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                         goto exitlbl;                    
                     }
                     
-                    if(MCP_ALLOW_ARBITRARY_OUTPUTS == 0)
+                    if((MCP_ALLOW_ARBITRARY_OUTPUTS == 0) || (mc_gState->m_Features->FixedDestinationExtraction() == 0) )
                     {
                         if((typeRet == TX_MULTISIG) && (MCP_ALLOW_MULTISIG_OUTPUTS == 0))
                         {
