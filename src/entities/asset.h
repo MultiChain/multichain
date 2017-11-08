@@ -55,6 +55,7 @@
 #define MC_ENT_SPRM_FOLLOW_ONS                0x02
 #define MC_ENT_SPRM_ISSUER                    0x03
 #define MC_ENT_SPRM_ANYONE_CAN_WRITE          0x04
+#define MC_ENT_SPRM_JSON_DETAILS              0x05
 #define MC_ENT_SPRM_ASSET_MULTIPLE            0x41
 #define MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION  0x42
 #define MC_ENT_SPRM_UPGRADE_START_BLOCK       0x43

@@ -186,6 +186,7 @@ libbitcoin_server_a_SOURCES = \
   chain/pow.cpp \
   net/rest.cpp \
   utils/utilparse.cpp \
+  json/json_spirit_ubjson.cpp \
   rpc/rpcutils.cpp \
   rpc/rpchelp.cpp \
   rpc/rpcblockchain.cpp \

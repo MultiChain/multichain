@@ -219,7 +219,7 @@ std::string HelpMessage_Cold()
     strUsage += "  -rpcallowip=<ip>       " + _("Allow JSON-RPC connections from specified source. Valid for <ip> are a single IP (e.g. 1.2.3.4), a network/netmask (e.g. 1.2.3.4/255.255.255.0) or a network/CIDR (e.g. 1.2.3.4/24).") + "\n";
     strUsage += "                         " + _("This option can be specified multiple times") + "\n";
     strUsage += "  -rpcthreads=<n>        " + strprintf(_("Set the number of threads to service RPC calls (default: %d)"), 4) + "\n";
-    strUsage += "  -rpckeepalive          " + strprintf(_("RPC support for HTTP persistent connections (default: %d)"), 1) + "\n";
+    strUsage += "  -rpckeepalive          " + strprintf(_("RPC support for HTTP persistent connections (default: %d)"), 0) + "\n";
 
     strUsage += "\n" + _("RPC SSL options") + "\n";
     strUsage += "  -rpcssl                                  " + _("Use OpenSSL (https) for JSON-RPC connections") + "\n";
@@ -1020,7 +1020,16 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     {
         if(!GetBoolArg("-shortoutput", false))
         {    
-            sprintf(bufOutput,"Protocol version %d\n\n",version);            
+            int original_protocol_version=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
+
+            if(version != original_protocol_version)
+            {
+                sprintf(bufOutput,"Protocol version %d (chain created with %d)\n\n",version,original_protocol_version);                            
+            }
+            else
+            {
+                sprintf(bufOutput,"Protocol version %d\n\n",version);            
+            }
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
         }
     }

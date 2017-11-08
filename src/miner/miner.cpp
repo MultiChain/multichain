@@ -1297,7 +1297,10 @@ void static BitcoinMiner(CWallet *pwallet)
                         }
                     
                         if(active_nodes == 0)
-                        MilliSleep(1000);
+                        {
+                            MilliSleep(1000);
+                            boost::this_thread::interruption_point();                                    
+                        }
                     }
                 }
             }

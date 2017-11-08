@@ -41,6 +41,7 @@ using namespace std;
 
 bool OutputCanSend(COutput out);
 uint32_t mc_CheckSigScriptForMutableTx(const unsigned char *src,int size);
+Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total);
 
 /* MCHN END */
 
@@ -353,6 +354,9 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         bool is_open=false;
         if(detals_script_found)
         {
+            Value vfields;
+            vfields=mc_ExtractDetailsJSONObject(details_script,details_script_size);
+            
             offset=0;
             
             while((int)offset<details_script_size)
@@ -430,7 +434,11 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                     }                    
                 }
             }
-            issue.push_back(Pair("details", details));            
+            if(vfields.type() == null_type )
+            {
+                vfields=details;
+            }
+            issue.push_back(Pair("details", vfields));            
         }
         entry.push_back(Pair("issue", issue));
     }
@@ -1729,9 +1737,9 @@ Value signrawtransaction(const Array& params, bool fHelp)
     RPCTypeCheck(params, list_of(str_type)(array_type)(array_type)(str_type), true);
 
     bool fOffline=GetBoolArg("-offline",false);
-    if(fOffline && (params.size() < 3) )
+    if(fOffline && (params.size() < 2) )
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "prevtxs and privatekeys are required in offline mode");            
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "prevtxs is required in offline mode");            
     }
 
     vector<unsigned char> txData(ParseHexV(params[0], "argument 1"));
@@ -1890,7 +1898,7 @@ Value signrawtransaction(const Array& params, bool fHelp)
         BOOST_FOREACH(const CMutableTransaction& txv, txVariants) {
             txin.scriptSig = CombineSignatures(prevPubKey, mergedTx, i, txin.scriptSig, txv.vin[i].scriptSig);
         }
-        if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, MutableTransactionSignatureChecker(&mergedTx, i)))
+        if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK, MutableTransactionSignatureChecker(&mergedTx, i)))
             fComplete = false;
     }
 
@@ -1922,10 +1930,11 @@ Value sendrawtransaction(const Array& params, bool fHelp)
     const CCoins* existingCoins = view.AccessCoins(hashTx);
     bool fHaveMempool = mempool.exists(hashTx);
     bool fHaveChain = existingCoins && existingCoins->nHeight < 1000000000;
+    bool fMissingInputs;
     if (!fHaveMempool && !fHaveChain) {
         // push to local node and sync with wallets
         CValidationState state;
-        if (!AcceptToMemoryPool(mempool, state, tx, false, NULL, !fOverrideFees)) {
+        if (!AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, !fOverrideFees)) {
             if(state.IsInvalid())
                 throw JSONRPCError(RPC_TRANSACTION_REJECTED, strprintf("%i: %s", state.GetRejectCode(), state.GetRejectReason()));
             else
@@ -1939,6 +1948,13 @@ Value sendrawtransaction(const Array& params, bool fHelp)
                 {
                     if(!mempool.exists(hashTx))
                     {
+                        if(fMissingInputs)
+                        {
+                            if(!fHaveChain)
+                            {
+                                throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "missing inputs");                    
+                            }
+                        }
                         throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "transaction already in block chain");                    
                     }
                 }
