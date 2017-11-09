@@ -54,7 +54,7 @@ struct CNodeStateStats;
 extern unsigned int DEFAULT_BLOCK_MAX_SIZE;                                     // MCHN global
 static const unsigned int DEFAULT_BLOCK_MIN_SIZE = 0;
 /** Default for -blockprioritysize, maximum space for zero/low-fee transactions **/
-static const unsigned int DEFAULT_BLOCK_PRIORITY_SIZE = 50000;
+// static const unsigned int DEFAULT_BLOCK_PRIORITY_SIZE = 50000;
 /** The maximum size for transactions we're willing to relay/mine */
 extern unsigned int MAX_STANDARD_TX_SIZE;                                       // MCHN global
 /** The maximum allowed number of signature check operations in a block (network rule) */
@@ -72,6 +72,7 @@ static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 50000;
 static const unsigned int DEFAULT_MAX_SUCCESSORS_FROM_ONE_NODE = 10;
 /* MCHN END */
 extern int MAX_OP_RETURN_SHOWN;
+extern int MAX_FORMATTED_DATA_DEPTH;
 /* MCHN END */
 /** The maximum size of a blk?????.dat file (since 0.8) */
 extern unsigned int MAX_BLOCKFILE_SIZE;                                     // MCHN global

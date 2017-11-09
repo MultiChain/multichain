@@ -578,22 +578,27 @@ Value gettxoutdata(const Array& params, bool fHelp)
     }
     size_t elem_size;
     const unsigned char *elem;
+    
+    uint32_t format;
 
+    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+    
     elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
 
     int count,start;
     count=elem_size;
+    start=0;
+    
     if (params.size() > 2)    
     {
         count=paramtoint(params[2],true,0,"Invalid count");
     }
-    start=0;
     if (params.size() > 3)    
     {
         start=paramtoint(params[3],false,0,"Invalid start");
     }
-    
-    
+
+
     if(start < 0)
     {
         start=elem_size+start;
@@ -602,7 +607,7 @@ Value gettxoutdata(const Array& params, bool fHelp)
             start=0;
         }        
     }
-    
+
     if(start > (int)elem_size)
     {
         start=elem_size;
@@ -612,7 +617,27 @@ Value gettxoutdata(const Array& params, bool fHelp)
         count=elem_size-start;
     }
 
-    return HexStr(elem+start,elem+start+count);
+    if( (format == MC_SCR_DATA_FORMAT_UBJSON) || (format == MC_SCR_DATA_FORMAT_UTF8) )
+    {
+        if(start != 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start, must be 0 for text and JSON data");                                                                            
+        }
+        if(count != (int)elem_size)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, must include all text or JSON data");                                                                            
+        }
+    }
+/*
+    if(mc_gState->m_Compatibility & MC_VCM_1_0)
+    {
+        if( format == MC_SCR_DATA_FORMAT_UNKNOWN )
+        {
+            return HexStr(elem+start,elem+start+count);
+        }
+    }
+*/    
+    return OpReturnFormatEntry(elem+start,count,0,0,format,NULL);        
 }
 
 /* MCHN END */
@@ -850,7 +875,7 @@ Value getbalance(const Array& params, bool fHelp)
             {
                 CTxOut txout;
                 out.GetHashAndTxOut(txout);
-                if(out.IsTrusted() || (out.nDepth >= nMinDepth))
+                if(out.IsTrustedNoDepth() || (out.nDepth >= nMinDepth))
                 {
                     nBalance+=txout.nValue;
                 }
@@ -861,7 +886,7 @@ Value getbalance(const Array& params, bool fHelp)
             for (map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end(); ++it)
             {
                 const CWalletTx& wtx = (*it).second;
-                if (!wtx.IsTrusted() || wtx.GetBlocksToMaturity() > 0)
+                if (!IsFinalTx(wtx) || wtx.GetBlocksToMaturity() > 0 || wtx.GetDepthInMainChain() < 0)
                     continue;
 
                 CAmount allFee;

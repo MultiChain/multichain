@@ -176,6 +176,9 @@ Object ListWalletTransactions(const CWalletTx& wtx, bool fLong, const isminefilt
     Array aPermissions;
     Array aMetaData;
     Array aItems;
+    uint32_t format;
+    Array aFormatMetaData;
+    vector<Array> aFormatMetaDataPerOutput;
 
     nIsFromMeCount=GetInputOffer(wtx,addresses,filter,nAmount,amounts,lpScript,&from_addresses,&my_addresses);
     nIsToMeCount=0;
@@ -187,6 +190,8 @@ Object ListWalletTransactions(const CWalletTx& wtx, bool fLong, const isminefilt
         quantity=-quantity;
         mc_SetABQuantity(amounts->GetRow(i),quantity);        
     }
+    
+    aFormatMetaDataPerOutput.resize(wtx.vout.size());
     
     new_entity_type=MC_ENT_TYPE_NONE;
     nIsToMeCount=0;
@@ -243,6 +248,8 @@ Object ListWalletTransactions(const CWalletTx& wtx, bool fLong, const isminefilt
             lpScript->Clear();
             lpScript->SetScript((unsigned char*)(&pc2[0]),(size_t)(script2.end()-pc2),MC_SCR_TYPE_SCRIPTPUBKEY);
             
+        	lpScript->ExtractAndDeleteDataFormat(&format);
+            
             size_t elem_size;
             const unsigned char *elem;
 
@@ -251,15 +258,22 @@ Object ListWalletTransactions(const CWalletTx& wtx, bool fLong, const isminefilt
                 if(lpScript->GetNumElements()==1)
                 {
                     elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
-                    aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
+//                    aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
+                    Value metadata=OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),i,format,NULL);
+                    aFormatMetaData.push_back(metadata);
+                    aFormatMetaDataPerOutput[i].push_back(metadata);
                 }                        
             }
             else
             {
-                elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
-                if(elem_size)
+                if(mc_gState->m_Compatibility & MC_VCM_1_0)
                 {
-                    aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
+                    elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
+                    if(elem_size)
+                    {
+    //                    aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
+                        aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),i,format,NULL));
+                    }
                 }
                 
                 lpScript->SetElement(0);
@@ -370,7 +384,18 @@ Object ListWalletTransactions(const CWalletTx& wtx, bool fLong, const isminefilt
                 aTxOutItems.push_back(data_item_entry);
             }
             Object txout_entry=TxOutEntry(wtx.vout[i],i,TxIn,wtx.GetHash(),amounts,lpScript);
-            txout_entry.push_back(Pair("items", aTxOutItems));
+            if( (aTxOutItems.size() > 0) || (mc_gState->m_Compatibility & MC_VCM_1_0) )
+            {
+                txout_entry.push_back(Pair("items", aTxOutItems));
+            }
+            if( (mc_gState->m_Compatibility & MC_VCM_1_0) == 0)
+            {
+                if(aFormatMetaDataPerOutput[i].size())
+                {
+                    txout_entry.push_back(Pair("data", aFormatMetaDataPerOutput[i]));                    
+                }
+            }
+            
             vout.push_back(txout_entry);
         }
     }        
@@ -429,7 +454,8 @@ Object ListWalletTransactions(const CWalletTx& wtx, bool fLong, const isminefilt
         }        
     }
     entry.push_back(Pair("items", aItems));
-    entry.push_back(Pair("data", aMetaData));
+        
+    entry.push_back(Pair("data", aFormatMetaData));
     
     WalletTxToJSON(wtx, entry, true);
 

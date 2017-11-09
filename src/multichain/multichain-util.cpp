@@ -3,6 +3,7 @@
 
 #include "multichain/multichain.h"
 #include "chainparams/globals.h"
+#include "utils/util.h"
 
 int main(int argc, char* argv[])
 {
@@ -17,14 +18,14 @@ int main(int argc, char* argv[])
     mc_MultichainParams* paramsOld;
     mc_gState=new mc_State;
      
-    mc_gState->m_Params->Parse(argc, argv);
+    mc_gState->m_Params->Parse(argc, argv, MC_ETP_UTIL);
     mc_CheckDataDirInConfFile();
 
     mc_gState->m_Params->ReadConfig(NULL);
     
     mc_ExpandDataDirParam();
     
-    printf("MultiChain utilities %s\n\n",mc_gState->GetFullVersion());
+    printf("\nMultiChain %s Utilities (latest protocol %d)\n\n",mc_BuildDescription(mc_gState->GetNumericVersion()).c_str(),mc_gState->GetProtocolVersion());
              
     err=MC_ERR_OPERATION_NOT_SUPPORTED;
      
@@ -42,13 +43,14 @@ int main(int argc, char* argv[])
                 if(mc_gState->m_Params->m_NumArguments>2)
                 {                    
                     v=atoi(mc_gState->m_Params->m_Arguments[2]);
-                    if( (v>=mc_gState->m_Features->MinProtocolVersion()) && (v<=version) )
+//                    if( (v>=mc_gState->m_Features->MinProtocolVersion()) && (v<=version) )
+                    if(mc_gState->IsSupported(v))
                     {
                         version=v;                        
                     }
                     else
                     {
-                        fprintf(stderr,"ERROR: Invalid value for protocol version. Valid range: %d - %d\n",mc_gState->m_Features->MinProtocolVersion(), mc_gState->GetProtocolVersion());   
+                        fprintf(stderr,"ERROR: Invalid value for protocol version. Valid range: %s\n",mc_SupportedProtocols().c_str());   
                         err=MC_ERR_INVALID_PARAMETER_VALUE;
                     }
                 }

@@ -342,7 +342,6 @@ bool ExtractDestinationsFull(const CScript& scriptPubKey, txnouttype& typeRet, v
 /* MCHN START */    
     const CScript& scriptPubKeyDestinationOnly=scriptPubKey.RemoveOpDrops();
     if (!Solver(scriptPubKeyDestinationOnly, typeRet, vSolutions))
-//    if (!Solver(scriptPubKey, typeRet, vSolutions))
         return false;
 /* MCHN END */        
     if (typeRet == TX_NULL_DATA){
@@ -379,48 +378,87 @@ bool ExtractDestinationsFull(const CScript& scriptPubKey, txnouttype& typeRet, v
     return true;
 }
 
-bool IsStandardNullData(const CScript& scriptPubKey)
+bool IsStandardNullData(const CScript& scriptPubKey,bool standard_check)
 {
     opcodetype opcode;
     vector<unsigned char> vch;
     bool recheck=false;
+    bool fixed=(mc_gState->m_Features->FixedDestinationExtraction() != 0);
     int op_drop_count=0;
-    unsigned int sizes[2];
+    int max_op_drop_count=2;
+    bool check_sizes=false;
+
+    if(mc_gState->m_Features->VerifySizeOfOpDropElements())
+    {
+        if( !fixed || standard_check )
+        {
+            check_sizes=true;
+        }
+    }
+    
+/*    
+    unsigned int sizes[3];
     sizes[0]=0;
     sizes[1]=0;
+    sizes[2]=0;
+*/    
+    if(mc_gState->m_Features->FormattedData())
+    {
+    
+        max_op_drop_count=MAX_OP_RETURN_OP_DROP_COUNT;
+    }
     
     CScript::const_iterator pc = scriptPubKey.begin();
     
-    while( op_drop_count < 3 )
+    while( op_drop_count < max_op_drop_count+1 )
     {
         if(!scriptPubKey.GetOp(pc, opcode))
         {
             return false;
         }
+        
         if(opcode == OP_RETURN)
         {
-            op_drop_count=3;
+            op_drop_count=max_op_drop_count+1;
         }
         else
         {
-            if(op_drop_count == 2)
+            if(op_drop_count == max_op_drop_count)
             {
                 return false;
             }
         }
-        if( opcode < OP_PUSHDATA1 )
+        
+        if(op_drop_count < max_op_drop_count+1)
         {
-            sizes[op_drop_count]=(unsigned int)opcode;
-        }
-        else
-        {
-            if( opcode <= OP_PUSHDATA4 )
+            if( opcode < OP_PUSHDATA1 )
             {
-                recheck=true;
-            }            
-        }
-        if(op_drop_count < 3)
-        {
+                if(check_sizes)
+                {
+                    if( (unsigned int)opcode > MAX_SCRIPT_ELEMENT_SIZE )
+                    {
+                        return false;
+                    }                                
+                }
+            }
+            else
+            {
+                if( opcode <= OP_PUSHDATA4 )
+                {
+                    if( !fixed || standard_check )
+                    {
+                        recheck=true;                    
+                    }
+                }         
+                else
+                {
+                    if(fixed)
+                    {
+                        return false;
+                    }
+                }
+            }
+        
             if(!scriptPubKey.GetOp(pc, opcode))
             {
                 return false;
@@ -438,9 +476,12 @@ bool IsStandardNullData(const CScript& scriptPubKey)
         if(pc + OP_PUSHDATA1 < scriptPubKey.end())
         {
             scriptPubKey.GetOp(pc, opcode, vch);
-            if (vch.size() > MAX_OP_RETURN_RELAY)
+            if( !fixed || standard_check )
             {
-                return false;
+                if (vch.size() > MAX_OP_RETURN_RELAY)
+                {
+                    return false;
+                }
             }
         }
         else
@@ -448,12 +489,25 @@ bool IsStandardNullData(const CScript& scriptPubKey)
             scriptPubKey.GetOp(pc, opcode);
             if(opcode >= OP_PUSHDATA1)
             {
-                return false;
+                if(mc_gState->m_Features->FormattedData())
+                {
+                    if(opcode > OP_16)
+                    {
+                        return false;                        
+                    }
+                }
+                else
+                {
+                    return false;
+                }
             }
-            if ((unsigned int)opcode > MAX_OP_RETURN_RELAY)
+            if( !fixed || standard_check )
             {
-                return false;
-            }            
+                if ((unsigned int)opcode > MAX_OP_RETURN_RELAY)
+                {
+                    return false;
+                }            
+            }
         }
         if(scriptPubKey.GetOp(pc, opcode))
         {
@@ -461,44 +515,69 @@ bool IsStandardNullData(const CScript& scriptPubKey)
         }
     }
 
-    if(mc_gState->m_Features->VerifySizeOfOpDropElements())
+    if(check_sizes && recheck)
     {
-        if(recheck)
-        {
-            pc = scriptPubKey.begin();
+        pc = scriptPubKey.begin();
 
-            op_drop_count=0;
-            while( op_drop_count < 3 )
+        op_drop_count=0;
+        while( op_drop_count < max_op_drop_count+1 )
+        {
+            scriptPubKey.GetOp(pc, opcode, vch);
+            if(opcode == OP_RETURN)
             {
-                scriptPubKey.GetOp(pc, opcode, vch);
-                if(opcode == OP_RETURN)
-                {
-                    op_drop_count=3;
-                }
-                if( opcode >= OP_PUSHDATA1 )
-                {
-                    if( opcode <= OP_PUSHDATA4 )
-                    {
-                        sizes[op_drop_count]=(unsigned int)vch.size();
-                    }            
-                }
-                if(op_drop_count < 3)
-                {
-                    scriptPubKey.GetOp(pc, opcode);
-                    op_drop_count++;
-                }        
+                op_drop_count=max_op_drop_count+1;
             }
+            if( opcode >= OP_PUSHDATA1 )
+            {
+                if( opcode <= OP_PUSHDATA4 )
+                {
+                    if( (unsigned int)vch.size() > MAX_SCRIPT_ELEMENT_SIZE )
+                    {
+                        return false;
+                    }                                
+                }            
+            }
+            if(op_drop_count < max_op_drop_count+1)
+            {
+                scriptPubKey.GetOp(pc, opcode);
+                op_drop_count++;
+            }        
+        }                       
+
+/*        
+        for(op_drop_count=0;op_drop_count<max_op_drop_count;op_drop_count++)
+        {
+            if( sizes[op_drop_count] > MAX_SCRIPT_ELEMENT_SIZE )
+            {
+                return false;
+            }            
         }
+ */ 
+/*        
         if( (sizes[0] > MAX_SCRIPT_ELEMENT_SIZE) || (sizes[1] > MAX_SCRIPT_ELEMENT_SIZE) )
         {
             return false;
         }
+*/        
     }
     
     return true;
 }
 
-bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet)
+bool CScript::IsUnspendable() const
+{
+    if(mc_gState->m_Features->FixedIsUnspendable() == 0)
+    {
+        int op_drop_offset[2];
+        int op_drop_size[2];
+        int op_return_offset,op_return_size;
+        return (mc_ParseOpDropOpReturnScript((unsigned char*)&begin()[0],(int)size(),op_drop_offset,op_drop_size,2,&op_return_offset,&op_return_size)) != NULL;                
+    }
+    return IsStandardNullData(*this,false);
+}
+
+
+bool ExtractDestinations10008(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet)
 {
     addressRet.clear();
     typeRet = TX_NONSTANDARD;
@@ -549,7 +628,7 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
             }
             else
             {
-                if(IsStandardNullData(scriptPubKey))
+                if(IsStandardNullData(scriptPubKey,false))
                 {
                     typeRet=TX_NULL_DATA;
                     return false;
@@ -591,6 +670,210 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
     return true;
 }
 
+CTxDestination VectorToAddress(vector<unsigned char>& vch)
+{
+    CTxDestination addressRet;
+    addressRet=CNoDestination();
+    
+    if( (vch.size() >= 33) && (vch.size() <= 65) )                              
+    {
+        CPubKey pubKey(vch.begin(), vch.end());
+        if (pubKey.IsValid())
+        {
+            addressRet = pubKey.GetID();            
+        }
+    }    
+    
+    return addressRet;
+}
+
+bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet,vector<vector<unsigned char> >* lpvSolutionsRet)
+{
+    if(mc_gState->m_Features->FixedDestinationExtraction() == 0)
+    {
+        return ExtractDestinations10008(scriptPubKey,typeRet,addressRet,nRequiredRet);
+    }
+    
+    addressRet.clear();
+    typeRet = TX_NONSTANDARD;
+    opcodetype opcode;
+    vector<unsigned char> vch;
+    CTxDestination pkAddress;
+    int n;
+
+    nRequiredRet=1;
+    
+    CScript::const_iterator pc = scriptPubKey.begin();
+    
+    if (scriptPubKey.GetOp(pc, opcode))
+    {
+        if(opcode == OP_DUP)                                                    // pay-to-pubkeyhash
+        {
+            if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_HASH160) )
+            {
+                return false;
+            }
+            if ( !scriptPubKey.GetOp(pc, opcode, vch) || (vch.size() != 20) )
+            {
+                return false;
+            }
+            addressRet.push_back(CKeyID(uint160(vch)));
+            if(lpvSolutionsRet)
+            {
+                lpvSolutionsRet->push_back(vch);
+            }
+            if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_EQUALVERIFY) )
+            {
+                return false;
+            }
+            if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_CHECKSIG) )
+            {
+                return false;
+            }
+            typeRet = TX_PUBKEYHASH;
+        }
+        else
+        {
+            if(opcode == OP_HASH160)                                            // pay-to-scripthash
+            {
+                if ( !scriptPubKey.GetOp(pc, opcode, vch) || (vch.size() != 20) )
+                {
+                    return false;
+                }
+                addressRet.push_back(CScriptID(uint160(vch)));
+                if(lpvSolutionsRet)
+                {
+                    lpvSolutionsRet->push_back(vch);
+                }
+                if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_EQUAL) )
+                {
+                    return false;
+                }
+                typeRet = TX_SCRIPTHASH;
+            }
+            else
+            {
+                if(IsStandardNullData(scriptPubKey,false))                      // null-data
+                {
+                    typeRet=TX_NULL_DATA;
+                    return false;
+                }
+                else
+                {
+                    pc = scriptPubKey.begin();
+                    if ( !scriptPubKey.GetOp(pc, opcode, vch) )
+                    {
+                        return false;
+                    }
+                    
+                    pkAddress=VectorToAddress(vch);
+                    if( boost::get<CKeyID> (&pkAddress) )                       // pay-to-pubkey
+                    {
+                        if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_CHECKSIG) )
+                        {
+                            return false;
+                        }
+                        addressRet.push_back(pkAddress);                        
+                        if(lpvSolutionsRet)
+                        {
+                            lpvSolutionsRet->push_back(vch);
+                        }
+                        typeRet = TX_PUBKEY;
+                    }
+                    else
+                    {
+                        if ( (opcode >= OP_1 && opcode <= OP_16) )              // bare multisig
+                        {
+                            nRequiredRet=CScript::DecodeOP_N(opcode);
+                            if(lpvSolutionsRet)
+                            {
+                                lpvSolutionsRet->push_back(valtype(1, (char)nRequiredRet));
+                            }
+
+                            n=-1;
+                            while(n != (int)addressRet.size())
+                            {
+                                if ( !scriptPubKey.GetOp(pc, opcode, vch) )
+                                {
+                                    return false;
+                                }
+                                if ( (opcode >= OP_1 && opcode <= OP_16) )
+                                {
+                                    n=CScript::DecodeOP_N(opcode);
+                                    if(n != (int)addressRet.size())
+                                    {
+                                        return false;
+                                    }                                    
+                                }
+                                else
+                                {
+                                    pkAddress=VectorToAddress(vch);
+                                    if( boost::get<CKeyID> (&pkAddress) )
+                                    {
+                                        addressRet.push_back(pkAddress);                        
+                                        if(lpvSolutionsRet)
+                                        {
+                                            lpvSolutionsRet->push_back(vch);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        return false;
+                                    }
+                                }
+                            }
+                            if(lpvSolutionsRet)
+                            {
+                                lpvSolutionsRet->push_back(valtype(1, (char)n));
+                            }
+                            
+                            
+                            if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_CHECKMULTISIG) )
+                            {
+                                return false;
+                            }                            
+                            typeRet = TX_MULTISIG;
+                        }
+                        else
+                        {
+                            return false;                            
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    while(pc < scriptPubKey.end())
+    {
+        if ( !scriptPubKey.GetOp(pc, opcode) || (opcode > OP_PUSHDATA4) )
+        {
+            typeRet = TX_NONSTANDARD;
+            return false;
+        }                            
+        if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_DROP) )
+        {
+            typeRet = TX_NONSTANDARD;
+            return false;
+        }                            
+    }    
+    
+    return true;   
+}
+
+bool TemplateSolver(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<std::vector<unsigned char> >& vSolutionsRet)
+{
+    vector<CTxDestination> addressRet;
+    int nRequiredRet;
+    
+    if(mc_gState->m_Features->FixedDestinationExtraction() == 0)
+    {
+        return Solver(scriptPubKey,typeRet,vSolutionsRet);
+    }
+    return ExtractDestinations(scriptPubKey,typeRet,addressRet,nRequiredRet,&vSolutionsRet);
+}
+
+
 bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
 {
     vector<CTxDestination> addressRets;
@@ -617,6 +900,7 @@ bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType)
     vector<unsigned char> vch;
     whichType = TX_NONSTANDARD;
     int max_op_drops;
+    bool result;
 
     CScript::const_iterator pc = scriptPubKey.begin();
     
@@ -658,14 +942,23 @@ bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType)
             }
             else
             {
-                if(IsStandardNullData(scriptPubKey))
+                if(IsStandardNullData(scriptPubKey,true))
                 {
                     whichType=TX_NULL_DATA;
                     return true;
                 }
                 else
                 {
-                    return IsStandardFull(scriptPubKey,whichType);
+                    result=IsStandardFull(scriptPubKey,whichType);
+                    if( (whichType == TX_PUBKEY) || (whichType == TX_MULTISIG) )
+                    {
+                        return result;
+                    }
+                    else                                                        // Avoiding duplicate check for other type
+                    {
+                        whichType = TX_NONSTANDARD;
+                        return false;
+                    }
                 }
             }
         }

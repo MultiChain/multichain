@@ -22,6 +22,10 @@ int mc_IsNullEntity(const void* lpEntity)
 
 int mc_IsUpgradeEntity(const void* lpEntity)
 {
+    if(lpEntity == NULL)
+    {
+        return 0;
+    }
     if(memcmp(lpEntity,upgrade_entity,MC_PLS_SIZE_ENTITY) == 0)
     {
         return 1;        
@@ -853,6 +857,17 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
         pldRow.m_Flags=pdbRow.m_Flags;
         pldRow.m_ThisRow=pdbRow.m_LedgerRow;
         
+        if(mc_IsUpgradeEntity(lpEntity))
+        {
+            if(m_Ledger->Open() <= 0)
+            {
+                LogString("GetPermission: couldn't open ledger");
+                return 0;
+            }
+            m_Ledger->GetRow(pldRow.m_ThisRow,&pldRow);
+            m_Ledger->Close();                
+        }                
+        
         if( (m_CopiedRow > 0) && ( (type == MC_PTP_ADMIN) || (type == MC_PTP_MINE) || (type == MC_PTP_BLOCK_MINER) ) )
         {
             if(m_Ledger->Open() <= 0)
@@ -873,13 +888,14 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
             
             m_Ledger->Close();
         }        
-        
+               
         if(ptr)
         {
             row->m_BlockFrom=pldRow.m_BlockFrom;
             row->m_BlockTo=pldRow.m_BlockTo;
             row->m_ThisRow=pldRow.m_ThisRow;
-            row->m_Flags=pldRow.m_Flags;        
+            row->m_Flags=pldRow.m_Flags;     
+            row->m_BlockReceived=pldRow.m_BlockReceived;
             pldRow.m_PrevRow=pldRow.m_ThisRow;        
         }
 /*        
@@ -967,22 +983,42 @@ uint32_t mc_Permissions::GetAllPermissions(const void* lpEntity,const void* lpAd
 
 /** Returns non-zero value if upgrade is approved */
 
-int mc_Permissions::IsApproved(const void* lpUpgrade)
+int mc_Permissions::IsApproved(const void* lpUpgrade, int check_current_block)
 {
-    unsigned char address[MC_PLS_SIZE_ADDRESS];
     int result;
-    
-    memset(address,0,MC_PLS_SIZE_ADDRESS);
-    memcpy(address,lpUpgrade,MC_PLS_SIZE_UPGRADE);
     
     Lock(0);
             
-    result=GetPermission(upgrade_entity,address,MC_PTP_UPGRADE);
+    result=IsApprovedInternal(lpUpgrade,check_current_block);
     
     UnLock();
     
     return result;    
 }
+
+
+int mc_Permissions::IsApprovedInternal(const void* lpUpgrade, int check_current_block)
+{
+    unsigned char address[MC_PLS_SIZE_ADDRESS];
+    mc_PermissionLedgerRow row;
+    int result;
+    
+    memset(address,0,MC_PLS_SIZE_ADDRESS);
+    memcpy(address,lpUpgrade,MC_PLS_SIZE_UPGRADE);
+    
+    result=GetPermission(upgrade_entity,address,MC_PTP_UPGRADE,&row,1);
+    if(check_current_block == 0)
+    {
+        result=0;
+        if(row.m_BlockTo > row.m_BlockFrom)
+        {
+            result=MC_PTP_UPGRADE;
+        }
+    }
+    
+    return result;    
+}
+
 
 /** Returns non-zero value if (entity,address) can connect */
 
@@ -1836,7 +1872,15 @@ void mc_Permissions::Dump()
 /** Returns number of admins (NULL entity only) */
 
 int mc_Permissions::GetAdminCount()
-{
+{    
+    if(MCP_ANYONE_CAN_ADMIN)
+    {
+        if(mc_gState->m_Features->FixedIn1000920001())
+        {
+            return 1;
+        }
+    }
+    
     return m_AdminCount;
 }
 
@@ -2346,10 +2390,16 @@ int mc_Permissions::FillPermissionDetails(mc_PermissionDetails *plsRow,mc_Buffer
     
     countLedgerRows=m_Row-m_MemPool->GetCount();
     consensus=AdminConsensus(plsRow->m_Entity,plsRow->m_Type);
+    
+    if(mc_IsUpgradeEntity(plsRow->m_Entity))
+    {
+        consensus=AdminConsensus(plsRow->m_Entity,MC_PTP_UPGRADE);
+    }
+    
     required=consensus;
     
     plsRow->m_RequiredAdmins=consensus;
-
+    
     prevRow=plsRow->m_LastRow;
 
     phase=0;
@@ -2412,6 +2462,7 @@ int mc_Permissions::FillPermissionDetails(mc_PermissionDetails *plsRow,mc_Buffer
                 plsRow->m_Flags |= MC_PFL_HAVE_PENDING;
                 phase=1;                                                        // There are pending records
             }
+            plsRow->m_BlockReceived=pldRow.m_BlockReceived;
             if(plsDetailsBuffer == NULL)                                              // We have details, but they are not required
             {
                 return MC_ERR_NOERROR;
@@ -2713,6 +2764,7 @@ mc_Buffer *mc_Permissions::GetPermissionList(const void* lpEntity,const void* lp
                     plsRow.m_BlockTo=pldRow.m_BlockTo;
                     plsRow.m_Flags=pldRow.m_Flags;
                     plsRow.m_LastRow=pldRow.m_ThisRow;
+                    plsRow.m_BlockReceived=pldRow.m_BlockReceived;
                     result->Add(&plsRow,(unsigned char*)&plsRow+m_Database->m_ValueOffset);
                 }
             }
@@ -2721,6 +2773,11 @@ mc_Buffer *mc_Permissions::GetPermissionList(const void* lpEntity,const void* lp
     }
     else
     {    
+        if(mc_IsUpgradeEntity(lpEntity))
+        {
+            m_Ledger->Open();
+        }
+    
         pdbRow.Zero();
 
         if(lpEntity)
@@ -2756,6 +2813,11 @@ mc_Buffer *mc_Permissions::GetPermissionList(const void* lpEntity,const void* lp
                         plsRow.m_BlockTo=pdbRow.m_BlockTo;
                         plsRow.m_Flags=pdbRow.m_Flags;
                         plsRow.m_LastRow=pdbRow.m_LedgerRow;
+                        if(mc_IsUpgradeEntity(lpEntity))
+                        {
+                            m_Ledger->GetRow(pdbRow.m_LedgerRow,&pldRow);                            
+                        }
+                        plsRow.m_BlockReceived=pldRow.m_BlockReceived;
                         result->Add(&plsRow,(unsigned char*)&plsRow+m_Database->m_ValueOffset);
                     }
                 }
@@ -2827,6 +2889,7 @@ mc_Buffer *mc_Permissions::GetPermissionList(const void* lpEntity,const void* lp
                             plsRow.m_BlockTo=pldRow.m_BlockTo;
                             plsRow.m_Flags=pldRow.m_Flags;
                             plsRow.m_LastRow=pldRow.m_ThisRow;
+                            plsRow.m_BlockReceived=pldRow.m_BlockReceived;
                             result->Add(&plsRow,(unsigned char*)&plsRow+m_Database->m_ValueOffset);                    
                         }
                         first=0;
@@ -2937,7 +3000,10 @@ int mc_Permissions::SetApproval(const void* lpUpgrade,uint32_t approval,const vo
         }
         else
         {
-            result=SetPermissionInternal(upgrade_entity,address,MC_PTP_UPGRADE,lpAdmin,from,approval ? (uint32_t)(-1) : 0,timestamp, flags,update_mempool,offset);                            
+            if(IsApprovedInternal(lpUpgrade,0) == 0)
+            {
+                result=SetPermissionInternal(upgrade_entity,address,MC_PTP_UPGRADE,lpAdmin,from,approval ? (uint32_t)(-1) : 0,timestamp, flags,update_mempool,offset);                            
+            }
         }
     }
 

@@ -305,8 +305,8 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
 
     // How much of the block should be dedicated to high-priority transactions,
     // included regardless of the fees they pay
-    unsigned int nBlockPrioritySize = GetArg("-blockprioritysize", DEFAULT_BLOCK_PRIORITY_SIZE);
-    nBlockPrioritySize = std::min(nBlockMaxSize, nBlockPrioritySize);
+    // unsigned int nBlockPrioritySize = GetArg("-blockprioritysize", DEFAULT_BLOCK_PRIORITY_SIZE);
+    // nBlockPrioritySize = std::min(nBlockMaxSize, nBlockPrioritySize);
 
     // Minimum block size you want to create; block will be filled with free transactions
     // until there are no more or the block reaches this size:
@@ -1250,14 +1250,22 @@ void static BitcoinMiner(CWallet *pwallet)
             {
                 if((canMine & MC_PTP_MINE) == 0)
                 {
-                    __US_Sleep(1000);
+                    if(mc_gState->m_Permissions->m_Block > 1)
+                    {
+                        __US_Sleep(1000);
+                    }
                     boost::this_thread::interruption_point();                    
                 }
                 if(mc_gState->m_Permissions->IsSetupPeriod())
                 {
                     not_setup_period=false;
                 }
+                if(mc_gState->m_Permissions->m_Block <= 1)
+                {
+                    not_setup_period=false;
+                }
             }
+            
             if (Params().MiningRequiresPeers() 
                     && not_setup_period
                     && ( (mc_gState->m_Permissions->GetMinerCount() > 1)
@@ -1273,8 +1281,11 @@ void static BitcoinMiner(CWallet *pwallet)
                 if(wait_for_peers)
                 {
                     int active_nodes=0;
-                    
-                    while ((active_nodes == 0) && (mc_gState->m_Permissions->GetMinerCount() > 1) && Params().MiningRequiresPeers())
+                    while ((active_nodes == 0) && 
+                           ( (mc_gState->m_Permissions->GetMinerCount() > 1)
+                          || (MCP_ANYONE_CAN_MINE != 0)
+                          || (mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+                           ) && Params().MiningRequiresPeers())
                     {
                         vector<CNode*> vNodesCopy = vNodes;
                         BOOST_FOREACH(CNode* pnode, vNodesCopy)
@@ -1286,7 +1297,10 @@ void static BitcoinMiner(CWallet *pwallet)
                         }
                     
                         if(active_nodes == 0)
-                        MilliSleep(1000);
+                        {
+                            MilliSleep(1000);
+                            boost::this_thread::interruption_point();                                    
+                        }
                     }
                 }
             }
@@ -1309,36 +1323,33 @@ void static BitcoinMiner(CWallet *pwallet)
                 nEmptyBlocks=0;
                 if(mc_gState->m_NetworkParams->IsProtocolMultichain())
                 {
-                    if(MCP_ANYONE_CAN_MINE)
-                    {
-                        fMineEmptyBlocks=true;
-                    }
-                    else
+                    nMinerCount=1;
+                    if(MCP_ANYONE_CAN_MINE == 0)
                     {
                         nMinerCount=mc_gState->m_Permissions->GetMinerCount()-mc_gState->m_Permissions->GetActiveMinerCount()+1;
-                        double d=Params().MineEmptyRounds()*nMinerCount-mc_gState->m_NetworkParams->ParamAccuracy();
-                        if(d >= 0)
-                        {
-                            nMaxEmptyBlocks=(int)d+1;
-                        }
-                        
-                        fMineEmptyBlocks=false;
-                        while(!fMineEmptyBlocks && (pindex != NULL) && (nEmptyBlocks < nMaxEmptyBlocks))
-                        {
-                            if(pindex->nTx > 1)
-                            {
-                                fMineEmptyBlocks=true;
-                            }
-                            else
-                            {
-                                nEmptyBlocks++;
-                                pindex=pindex->pprev;
-                            }
-                        }
-                        if(pindex == NULL)
+                    }
+                    double d=Params().MineEmptyRounds()*nMinerCount-mc_gState->m_NetworkParams->ParamAccuracy();
+                    if(d >= 0)
+                    {
+                        nMaxEmptyBlocks=(int)d+1;
+                    }
+
+                    fMineEmptyBlocks=false;
+                    while(!fMineEmptyBlocks && (pindex != NULL) && (nEmptyBlocks < nMaxEmptyBlocks))
+                    {
+                        if(pindex->nTx > 1)
                         {
                             fMineEmptyBlocks=true;
                         }
+                        else
+                        {
+                            nEmptyBlocks++;
+                            pindex=pindex->pprev;
+                        }
+                    }
+                    if(pindex == NULL)
+                    {
+                        fMineEmptyBlocks=true;
                     }
                 }
                 else
@@ -1390,7 +1401,8 @@ void static BitcoinMiner(CWallet *pwallet)
                 }
             }
             
-            if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+//            if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+            if( (mc_gState->m_ProtocolVersionToUpgrade > 0) && (mc_gState->IsSupported(mc_gState->m_ProtocolVersionToUpgrade) == 0) )
             {
                 canMine=0;
             }
@@ -1470,7 +1482,8 @@ void static BitcoinMiner(CWallet *pwallet)
                         LogPrintf("proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex(), hashTarget.GetHex());
 */                     
 /* MCHN START */                        
-                        if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+//                        if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+                        if( (mc_gState->m_ProtocolVersionToUpgrade > 0) && (mc_gState->IsSupported(mc_gState->m_ProtocolVersionToUpgrade) == 0) )
                         {
                             LogPrintf("MultiChainMiner: Waiting for upgrade, block is dropped\n");
                         }
@@ -1572,7 +1585,10 @@ void static BitcoinMiner(CWallet *pwallet)
             } 
             else
             {
-                __US_Sleep(100);                
+                if(mc_gState->m_Permissions->m_Block > 1)
+                {
+                    __US_Sleep(100);                
+                }
             }
 /* MCHN END */    
         }

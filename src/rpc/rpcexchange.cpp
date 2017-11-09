@@ -209,6 +209,7 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
     strError="";
     native_balance=0;
     bool can_disable=false;
+    uint32_t format;
     
     vector <CTxOut> input_txouts;
     vector <string> input_errors;
@@ -307,6 +308,8 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
 
                 lpScript->Clear();
                 lpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);                
+                
+                lpScript->ExtractAndDeleteDataFormat(&format);
                 
                 if(lpScript->GetNumElements()<=1)
                 {
@@ -927,7 +930,7 @@ Value completerawexchange(const json_spirit::Array& params, bool fHelp)
     if(params.size() > 4)
     {    
         mc_EntityDetails found_entity;
-        CScript scriptOpReturn=ParseRawMetadata(params[4],0x0002,NULL,&found_entity);
+        CScript scriptOpReturn=ParseRawMetadata(params[4],MC_DATA_API_PARAM_TYPE_SIMPLE,NULL,&found_entity);
         
         if(found_entity.GetEntityType() == MC_ENT_TYPE_STREAM)
         {        

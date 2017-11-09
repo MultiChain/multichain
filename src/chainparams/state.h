@@ -15,6 +15,13 @@
 #define MC_FAT_NETWORK     3
 #define MC_FAT_NETWORKSEED 4
 
+#define MC_ETP_DAEMON      1
+#define MC_ETP_UTIL        2
+#define MC_ETP_CLI         3
+
+#define MC_SSF_DEFAULT        0x00000000
+#define MC_SSF_COLD           0x00000001
+
 #define MC_NTS_UNCONNECTED             0
 #define MC_NTS_WAITING_FOR_SEED        1
 #define MC_NTS_SEED_READY              2     
@@ -36,6 +43,9 @@
 #define MC_WMD_AUTOSUBSCRIBE_STREAMS 0x02000000
 #define MC_WMD_AUTOSUBSCRIBE_ASSETS  0x04000000
 #define MC_WMD_AUTO                  0x10000000
+
+#define MC_VCM_NONE                  0x00000000
+#define MC_VCM_1_0                   0x00000001
 
 
 #ifdef	__cplusplus
@@ -82,7 +92,7 @@ typedef struct mc_Params
         }
     }
     
-    void Parse(int argc, const char* const argv[]);
+    void Parse(int argc, const char* const argv[], int exe_type);
     int ReadConfig(const char *network_name);
     const char* GetOption(const char* strArg,const char* strDefault);
     int64_t GetOption(const char* strArg,int64_t nDefault);
@@ -115,6 +125,11 @@ typedef struct mc_Features
     int FixedIn10007();
     int Upgrades();
     int FixedIn10008();
+    int FormattedData();
+    int FixedDestinationExtraction();
+    int FixedIn1000920001();
+    int MultipleStreamKeys();
+    int FixedIsUnspendable();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo
@@ -148,6 +163,8 @@ typedef struct mc_State
     uint32_t m_WalletMode;
     int m_ProtocolVersionToUpgrade;
     void *m_pSeedNode;
+    uint32_t m_Compatibility;
+    uint32_t m_SessionFlags;
     
     mc_Script               *m_TmpScript;
     mc_Script               *m_TmpScript1;
@@ -168,12 +185,15 @@ typedef struct mc_State
         m_NetworkState=MC_NTS_UNCONNECTED;
         m_NodePausedState=MC_NPS_NONE;
         m_ProtocolVersionToUpgrade=0;
+        m_SessionFlags=MC_SSF_DEFAULT;
+        
         m_IPv4Address=0;
         m_WalletMode=0;
         m_TmpAssetsOut=new mc_Buffer;
         mc_InitABufferMap(m_TmpAssetsOut);
         m_TmpAssetsIn=new mc_Buffer;
         mc_InitABufferMap(m_TmpAssetsIn);
+        m_Compatibility=MC_VCM_NONE;
         
         m_BlockHeaderSuccessors=new mc_Buffer;
         m_BlockHeaderSuccessors->Initialize(sizeof(mc_BlockHeaderInfo),sizeof(mc_BlockHeaderInfo),0);            
@@ -228,11 +248,14 @@ typedef struct mc_State
         }
     }
     
-    const char* GetVersion();
-    const char* GetFullVersion();
+    int VersionInfo(int version);
     int GetNumericVersion();
     int GetWalletDBVersion();
     int GetProtocolVersion();
+    int MinProtocolVersion();
+    int MinProtocolDowngradeVersion();
+    int IsSupported(int version);
+    int IsDeprecated(int version);
     const char* GetSeedNode();
 } cs_State;
 

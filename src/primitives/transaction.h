@@ -146,7 +146,7 @@ public:
             int64_t minOutput=MCP_MINIMUM_PER_OUTPUT;
             if(minOutput >= 0)
             {
-                return (nValue < minOutput);                
+                return minOutput;                
             }
         }            
         size_t nSize = GetSerializeSize(SER_DISK,0)+148u;

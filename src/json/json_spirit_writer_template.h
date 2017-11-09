@@ -12,6 +12,8 @@
 #include <sstream>
 #include <iomanip>
 
+extern uint32_t JSON_NO_DOUBLE_FORMATTING;                             
+
 
 namespace json_spirit
 {
@@ -197,9 +199,11 @@ namespace json_spirit
                 case int_type:   output_int( value );         break;
 
                 /// Bitcoin: Added std::fixed and changed precision from 16 to 8
+/*                
                 case real_type:  os_ << std::showpoint << std::fixed << std::setprecision(8)
                                      << value.get_real();     break;
-
+*/
+                case real_type:  output_double( value.get_real() );break;
                 case null_type:  os_ << "null";               break;
                 default: assert( false );
             }
@@ -234,6 +238,84 @@ namespace json_spirit
             }
         }
 
+        void output_double( const double& value )
+        {
+            if(JSON_NO_DOUBLE_FORMATTING)                     
+            {
+                os_ << std::showpoint << std::fixed << std::setprecision(9) << value;                
+                return; 
+            }
+            double a=fabs(value);
+            double e=0.0;
+            int z=0;
+            double f=0.;
+            int j=0;
+            if(a > 0)
+            {
+                e=log10(a);
+            }            
+            if(e < -4)
+            {
+                f=a*1.e+9;
+                j=(int)f;
+                if(j)
+                {
+                    if( (f-j) < 0.0001)
+                    {
+                        z=1;
+                    }
+                }
+            }
+            int k=(int)e;
+            if(e<k)
+            {
+                k--;
+            }
+            double v=value/pow(10.,k);
+            
+            int p=9;
+            double t=fabs(v)*pow(10.,p);
+            int64_t n=(int64_t)(t+0.5);
+            int64_t m=(int64_t)(t/10+0.5);
+            while( (p>0) && (n == m*10))
+            {
+                p--;
+                t/=10.;
+                n=m;
+                m=(int64_t)(t/10.+0.5);
+            }
+            
+            if(p-k > 9)
+            {
+                z=0;
+            }
+            
+            if( ((e < -4.) || (e > 12.)) && (z == 0))
+            {
+                if(p > 0)
+                {
+                    os_ << std::showpoint << std::fixed << std::setprecision(p) << v;
+                }
+                else
+                {
+                    os_ << (int)v;
+                }
+                os_ << "e" << ((e>=0) ? "+" : "") << k;
+            }
+            else
+            {
+                p-=k;
+                if(p > 0)
+                {
+                    os_ << std::showpoint << std::fixed << std::setprecision(p) << value;
+                }
+                else
+                {
+                    os_ << (int64_t)value;                    
+                }
+            }
+        }
+        
         void output( const String_type& s )
         {
             os_ << '"' << add_esc_chars( s ) << '"';

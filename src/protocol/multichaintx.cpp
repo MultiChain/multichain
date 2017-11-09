@@ -756,7 +756,6 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
     return true;
 }
 
-
 bool AcceptMultiChainTransaction(const CTransaction& tx, 
                                  const CCoinsViewCache &inputs,
                                  int offset,
@@ -952,6 +951,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
     nNewEntityOutput=-1;
     fSeedNodeInvolved=false;
     fShouldHaveDestination=false;
+    fShouldHaveDestination |= (MCP_ALLOW_ARBITRARY_OUTPUTS == 0);
     fShouldHaveDestination |= (MCP_ANYONE_CAN_RECEIVE == 0);
     fShouldHaveDestination |= (MCP_ALLOW_MULTISIG_OUTPUTS == 0);
     fShouldHaveDestination |= (MCP_ALLOW_P2SH_OUTPUTS == 0);
@@ -992,6 +992,8 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                        
             if(mc_gState->m_TmpScript->IsOpReturnScript())                      // OP_RETURN
             {
+                mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);
+                
                 if( (pass == 0) && !fScriptHashAllFound)             
                 {
                     if(mc_gState->m_Features->FixedIn10007())
@@ -1171,7 +1173,9 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                     }
                 }
                 
-                if( (pass == 0) && (mc_gState->m_TmpScript->GetNumElements() > 3) ) // More than 2 OP_DROPs
+                if( (pass == 0) && 
+                    (mc_gState->m_TmpScript->GetNumElements() > 3) && 
+                    (mc_gState->m_Features->MultipleStreamKeys() == 0) ) // More than 2 OP_DROPs
                 {
                     reason="Metadata script rejected - too many elements";
                     fReject=true;
@@ -1197,7 +1201,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                     }
                 }
                 
-                if( (pass == 3) && (mc_gState->m_TmpScript->GetNumElements() == 3) ) // 2 OP_DROPs + OP_RETURN - item key or entity update or upgrade approval
+                if( (pass == 3) && (mc_gState->m_TmpScript->GetNumElements() >= 3) ) // 2 OP_DROPs + OP_RETURN - item key or entity update or upgrade approval
                 {
                     mc_gState->m_TmpScript->SetElement(0);
                                                                                 // Should be spke
@@ -1218,6 +1222,12 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                     {
                         if(entity.GetEntityType() == MC_ENT_TYPE_ASSET)
                         {
+                            if(mc_gState->m_TmpScript->GetNumElements() > 3)                            
+                            {
+                                reason="Metadata script rejected - too many elements in asset update script";
+                                fReject=true;
+                                goto exitlbl;                                                                                                                                                                                                                                    
+                            }
                             mc_gState->m_TmpScript->SetElement(1);
                             err=mc_gState->m_TmpScript->GetNewEntityType(&new_entity_type,&entity_update,details_script,&details_script_size);
                             if(err == 0)    // New entity element
@@ -1246,17 +1256,26 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                         {
                             if((mc_gState->m_Features->Upgrades() == 0) || (entity.GetEntityType() != MC_ENT_TYPE_UPGRADE)) // (pseudo)stream
                             {
-                                mc_gState->m_TmpScript->SetElement(1);
-                                                                                    // Should be spkk
-                                if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
+                                for (int e = 1; e < mc_gState->m_TmpScript->GetNumElements()-1; e++)
                                 {
-                                    reason="Metadata script rejected - wrong element, should be item key";
-                                    fReject=true;
-                                    goto exitlbl;                                                                                                                                        
-                                }                                            
+                                    mc_gState->m_TmpScript->SetElement(e);
+                                                                                        // Should be spkk
+                                    if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
+                                    {
+                                        reason="Metadata script rejected - wrong element, should be item key";
+                                        fReject=true;
+                                        goto exitlbl;                                                                                                                                        
+                                    }                                            
+                                }
                             }
                             else                        
                             {
+                                if(mc_gState->m_TmpScript->GetNumElements() > 3)                            
+                                {
+                                    reason="Metadata script rejected - too many elements in upgrade approval script";
+                                    fReject=true;
+                                    goto exitlbl;                                                                                                                                                                                                                                    
+                                }
                                 mc_gState->m_TmpScript->SetElement(1);          // Upgrade approval
                                 
                                 if(mc_gState->m_TmpScript->GetApproval(&approval,&timestamp))
@@ -1389,25 +1408,29 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
 
                 if( (pass == 0) && fShouldHaveDestination )                     // Some setting in the protocol require address can be extracted
                 {
-                    if(fNoDestinationInOutput && (MCP_ANYONE_CAN_RECEIVE == 0))
+                    if(fNoDestinationInOutput && 
+                      ( (MCP_ANYONE_CAN_RECEIVE == 0) || (MCP_ALLOW_ARBITRARY_OUTPUTS == 0) ) )
                     {
                         reason="Script rejected - destination required ";
                         fReject=true;
                         goto exitlbl;                    
                     }
                     
-                    if((typeRet == TX_MULTISIG) && (MCP_ALLOW_MULTISIG_OUTPUTS == 0))
+                    if((MCP_ALLOW_ARBITRARY_OUTPUTS == 0) || (mc_gState->m_Features->FixedDestinationExtraction() == 0) )
                     {
-                        reason="Script rejected - multisig is not allowed";
-                        fReject=true;
-                        goto exitlbl;                    
-                    }
+                        if((typeRet == TX_MULTISIG) && (MCP_ALLOW_MULTISIG_OUTPUTS == 0))
+                        {
+                            reason="Script rejected - multisig is not allowed";
+                            fReject=true;
+                            goto exitlbl;                    
+                        }
 
-                    if((typeRet == TX_SCRIPTHASH) && (MCP_ALLOW_P2SH_OUTPUTS == 0))
-                    {
-                        reason="Script rejected - P2SH is not allowed";
-                        fReject=true;
-                        goto exitlbl;                    
+                        if((typeRet == TX_SCRIPTHASH) && (MCP_ALLOW_P2SH_OUTPUTS == 0))
+                        {
+                            reason="Script rejected - P2SH is not allowed";
+                            fReject=true;
+                            goto exitlbl;                    
+                        }
                     }
                 }                
                 
@@ -1929,6 +1952,7 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
     vector <bool> vInputCanGrantAdminMine;
     vector <bool> vInputHadAdminPermissionBeforeThisTx;
     vector <CScript> vInputPrevOutputScripts;
+    bool fIsEntity;
     bool fReject;    
     bool fAdminFound;
     int err;
@@ -2101,7 +2125,6 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
     for (unsigned int j = 0; j < tx.vout.size(); j++)
     {
         unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
-        mc_EntityDetails entity;
         uint32_t type,from,to,timestamp,flags;
             
         const CScript& script1 = tx.vout[j].scriptPubKey;        
@@ -2115,17 +2138,22 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
 
         if(ExtractDestination(script1,addressRet))
         {            
-            entity.Zero();                                                  
+            fIsEntity=false;
+
             for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
             {
                 mc_gState->m_TmpScript->SetElement(e);
                 if(mc_gState->m_TmpScript->GetEntity(short_txid) == 0)      
                 {
-                    if(entity.GetEntityType())
+                    if(fIsEntity)
                     {
                         reason="Script rejected - duplicate entity script";
                         fReject=true;
                         goto exitlbl;                                                
+                    }
+                    if(mc_gState->m_Features->FixedIn1000920001())
+                    {
+                        fIsEntity=true;
                     }
                 }
                 else                                                        
@@ -2133,7 +2161,7 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
                     if(mc_gState->m_TmpScript->GetPermission(&type,&from,&to,&timestamp) == 0)
                     {                        
                         type &= ( MC_PTP_MINE | MC_PTP_ADMIN );                                        
-                        if(entity.GetEntityType())
+                        if(fIsEntity)
                         {
                             type=0;
                         }
@@ -2163,7 +2191,7 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
                             {
                                 if(vInputCanGrantAdminMine[i])
                                 {
-                                    if(mc_gState->m_Permissions->SetPermission(entity.GetTxID(),ptr,type,(unsigned char*)&vInputDestinations[i],from,to,timestamp,flags,1,offset) == 0)
+                                    if(mc_gState->m_Permissions->SetPermission(NULL,ptr,type,(unsigned char*)&vInputDestinations[i],from,to,timestamp,flags,1,offset) == 0)
                                     {
                                         fAdminFound=true;
                                     }                                
@@ -2183,11 +2211,11 @@ bool AcceptAdminMinerPermissions(const CTransaction& tx,
                                 }                                
                             }
                         }
-                        entity.Zero();                                                                                          
+                        fIsEntity=false;
                     }
                     else                                                   
                     {
-                        if(entity.GetEntityType())                              
+                        if(fIsEntity)                              
                         {
                             reason="Script rejected - entity script should be followed by permission";
                             fReject=true;
@@ -2466,7 +2494,6 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
                     if(quantity+total<0)
                     {
                         reason="Asset issue script rejected - negative total amount";
-//                        printf("%s\n",reason.c_str());
                         return false;                                        
                     }
                                         
@@ -2801,7 +2828,6 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
                         else
                         {                        
                             reason="Permission script rejected - invalid signature hash type";
-    //                        printf("%s\n",reason.c_str());
                             return false;
                         }
                     }                
@@ -3055,7 +3081,6 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
                         if((lpKeyID == NULL) && (lpScriptID == NULL))
                         {
                             reason="Script rejected - wrong destination type";
-//                            printf("%s\n",reason.c_str());
                             reject=true;
                             goto exitlbl;                                                            
                         }

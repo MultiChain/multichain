@@ -71,10 +71,9 @@ using namespace std;
 
 const boost::filesystem::path mc_GetDataDir(const char *network_name,int create);
 
-void mc_Params::Parse(int argc, const char* const argv[])
+void mc_Params::Parse(int argc, const char* const argv[],int exe_type)
 {
     int i,length;
-    const char* exe_name;
     ParseParameters(argc,argv);
     mc_ExpandDataDirParam();
     
@@ -112,25 +111,13 @@ void mc_Params::Parse(int argc, const char* const argv[])
     
     if(m_NumArguments)
     {
-        exe_name=argv[0];
-        for(i=0;i<(int)strlen(argv[0]);i++)
-        {
-            if((argv[0][i]=='/') || (argv[0][i]=='\\'))
-            {
-                exe_name=argv[0]+i+1;
-            }
-        }
-        
-        if((strcmp(exe_name,"multichain-util") == 0) || (strcmp(exe_name,"multichain-util.exe") == 0))
+        if( exe_type == MC_ETP_UTIL )
         {
             m_FirstArgumentType=MC_FAT_COMMAND;
         }
         else
         {
-            if((strcmp(exe_name,"multichain-cli") == 0) || 
-               (strcmp(exe_name,"multichain-cli.exe") == 0) ||                     
-               (strcmp(exe_name,"multichaind") == 0) ||                     
-               (strcmp(exe_name,"multichaind.exe") == 0))
+            if( (exe_type == MC_ETP_CLI) || (exe_type == MC_ETP_DAEMON) ) 
             {
                 m_FirstArgumentType=MC_FAT_NETWORK;                
                 for(i=0;i<(int)strlen(m_Arguments[0]);i++)
@@ -144,7 +131,7 @@ void mc_Params::Parse(int argc, const char* const argv[])
                         }
                     }
                 }
-                if((m_FirstArgumentType == MC_FAT_NETWORK) && ((strcmp(exe_name,"multichaind") == 0) || (strcmp(exe_name,"multichaind.exe") == 0)))
+                if((m_FirstArgumentType == MC_FAT_NETWORK) && (exe_type == MC_ETP_DAEMON) )
                 {
                     m_Arguments[m_NumArguments]=m_Arguments[0]+length;
                     m_Arguments[m_NumArguments][0]=0x00;
@@ -285,6 +272,10 @@ boost::filesystem::path mc_GetDefaultDataDir()
     // Mac and Unix: ~/.multichain
 #ifdef WIN32
     // Windows
+    if(mc_gState->m_SessionFlags & MC_SSF_COLD)
+    {
+        return GetSpecialFolderPath(CSIDL_APPDATA) / "MultiChainCold";
+    }
     return GetSpecialFolderPath(CSIDL_APPDATA) / "MultiChain";
 #else
     // Mac and Unix
@@ -295,6 +286,10 @@ boost::filesystem::path mc_GetDefaultDataDir()
     else
         pathRet = boost::filesystem::path(pszHome);
     
+    if(mc_gState->m_SessionFlags & MC_SSF_COLD)
+    {
+        return pathRet / ".multichain-cold";        
+    }
     return pathRet / ".multichain";
 #endif
 }
@@ -694,6 +689,45 @@ int mc_ReadGeneralConfigFile(mc_MapStringString *mapConfig,const char *network_n
     return mc_ReadConfigFile(mc_GetConfigFile(network_name,file_name,extension),(std::map<string, string>*)mapConfig->mapObject, NULL,"");
 }
 
+int mc_BuildDescription(int build, char *desc)
+{
+    int v;
+    int c[5];
+    
+    v=build;
+    
+    c[4]=v%100;v/=100;
+    c[3]=v%10 ;v/=10 ;
+    c[2]=v%100;v/=100;
+    c[1]=v%100;v/=100;
+    c[0]=v%100;v/=100;
+    if(c[0] < 1)return MC_ERR_INVALID_PARAMETER_VALUE;
+    sprintf(desc,"%d.%d",c[0],c[1]);
+    if(c[2])
+    {
+        sprintf(desc+strlen(desc),".%d",c[2]);
+    }
+    switch(c[3])
+    {
+        case 1:
+            sprintf(desc+strlen(desc)," alpha ");
+            break;
+        case 2:
+            sprintf(desc+strlen(desc)," beta ");
+            break;
+        case 9:
+            if(c[4] != 1)return MC_ERR_INVALID_PARAMETER_VALUE;
+            break;
+        default:
+            return MC_ERR_INVALID_PARAMETER_VALUE;
+    }
+    if(c[3] != 9)
+    {
+        sprintf(desc+strlen(desc),"%d",c[4]);        
+    }
+    
+    return MC_ERR_NOERROR;
+}
 
 int mc_MultichainParams::SetGlobals()
 {
@@ -750,6 +784,15 @@ int mc_MultichainParams::SetGlobals()
     MCP_ANYONE_CAN_RECEIVE=mc_gState->m_NetworkParams->GetInt64Param("anyonecanreceive");
     MCP_ANYONE_CAN_ACTIVATE=mc_gState->m_NetworkParams->GetInt64Param("anyonecanactivate");
     MCP_MINIMUM_PER_OUTPUT=mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
+    MCP_ALLOW_ARBITRARY_OUTPUTS=1; 
+    if(mc_gState->m_Features->FixedDestinationExtraction() != 0)
+    {
+        int aao=mc_gState->m_NetworkParams->GetInt64Param("allowarbitraryoutputs");
+        if(aao>=0)
+        {
+            MCP_ALLOW_ARBITRARY_OUTPUTS=aao;
+        }
+    }
     MCP_ALLOW_MULTISIG_OUTPUTS=mc_gState->m_NetworkParams->GetInt64Param("allowmultisigoutputs");
     MCP_ALLOW_P2SH_OUTPUTS=mc_gState->m_NetworkParams->GetInt64Param("allowp2shoutputs");
     MCP_WITH_NATIVE_CURRENCY=0;

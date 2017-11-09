@@ -347,15 +347,17 @@ map<NodeId, CNodeState> mapNodeState;
 
 /* MCHN START */
 
-int MultichainNode_ApplyUpgrades()
+int MultichainNode_ApplyUpgrades(int current_height)
 {
     mc_EntityDetails entity;
     mc_Buffer *permissions;
     permissions=NULL;
     map <uint64_t,int> map_sorted;
 
-    int OldProtocolVersion=mc_gState->m_ProtocolVersionToUpgrade;
-    int NewProtocolVersion=0;
+    int OriginalProtocolVersion=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
+    int CurrentProtocolVersion=mc_gState->m_NetworkParams->ProtocolVersion();//mc_gState->m_ProtocolVersionToUpgrade;
+    int NewProtocolVersion=OriginalProtocolVersion;
+    int version;
     
     permissions=mc_gState->m_Permissions->GetUpgradeList(NULL,NULL);
 
@@ -381,7 +383,19 @@ int MultichainNode_ApplyUpgrades()
             {
                 if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,plsRow->m_Address))
                 {
-                    NewProtocolVersion=entity.UpgradeProtocolVersion();
+                    int applied_height=entity.UpgradeStartBlock();
+                    if((int)plsRow->m_BlockReceived > applied_height)
+                    {
+                        applied_height=plsRow->m_BlockReceived;
+                    }
+                    if(current_height >=applied_height)
+                    {
+                        version=entity.UpgradeProtocolVersion();
+                        if(version >= mc_gState->MinProtocolDowngradeVersion())
+                        {
+                            NewProtocolVersion=version;
+                        }
+                    }
                 }
             }            
         }
@@ -390,21 +404,28 @@ int MultichainNode_ApplyUpgrades()
     mc_gState->m_Permissions->FreePermissionList(permissions);
     mc_gState->m_ProtocolVersionToUpgrade=NewProtocolVersion;
     
-    if(mc_gState->m_ProtocolVersionToUpgrade != OldProtocolVersion)
+    if(mc_gState->m_ProtocolVersionToUpgrade != CurrentProtocolVersion)
     {
-        LogPrintf("New protocol upgrade version: %d (was %d)\n",mc_gState->m_ProtocolVersionToUpgrade,OldProtocolVersion);
-        if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->GetProtocolVersion())
+        LogPrintf("New protocol upgrade version: %d (was %d)\n",mc_gState->m_ProtocolVersionToUpgrade,CurrentProtocolVersion);
+//        if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->GetProtocolVersion())
+        if( (mc_gState->m_ProtocolVersionToUpgrade > 0) && (mc_gState->IsSupported(mc_gState->m_ProtocolVersionToUpgrade) == 0) )
         {
             LogPrintf("NODE SHOULD BE UPGRADED FROM %d TO %d\n",mc_gState->GetProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
         }
         else
         {
-            if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+            if(mc_gState->m_ProtocolVersionToUpgrade != mc_gState->m_NetworkParams->ProtocolVersion())
             {
                 LogPrintf("NODE IS UPGRADED FROM %d TO %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
                 mc_gState->m_NetworkParams->m_ProtocolVersion=mc_gState->m_ProtocolVersionToUpgrade;// UPGRADE CODE HERE
+                mc_gState->m_NetworkParams->SetGlobals();
+                SetMultiChainParams();
             }        
         }
+    }
+    else
+    {
+        mc_gState->m_ProtocolVersionToUpgrade=0;        
     }
     
     return MC_ERR_NOERROR;
@@ -1017,16 +1038,15 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
         txnouttype whichType;
         const CScript& prevScript = prev.scriptPubKey;
         
-/*        
         vector<vector<unsigned char> > vSolutions;
+/*        
         // get the scriptPubKey corresponding to this input:
         if (!Solver(prevScript, whichType, vSolutions))
             return false;
         int nArgsExpected = ScriptSigArgsExpected(whichType, vSolutions);
 */
         vector<CTxDestination> addressRets;
-        int nRequiredRet;
-        if(!ExtractDestinations(prevScript,whichType,addressRets,nRequiredRet))
+        if(!IsStandard(prevScript,whichType))
         {
             return false; 
         }
@@ -1044,7 +1064,8 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
                 nArgsExpected=1;
                 break;
             case TX_MULTISIG:
-                nArgsExpected=nRequiredRet+1;
+                Solver(prevScript, whichType, vSolutions);
+                nArgsExpected = ScriptSigArgsExpected(whichType, vSolutions);
                 break;
             case TX_NONSTANDARD:
             case TX_NULL_DATA:
@@ -1217,7 +1238,7 @@ CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowF
         // * If we are relaying we allow transactions up to DEFAULT_BLOCK_PRIORITY_SIZE - 1000
         //   to be considered to fall into this category. We don't want to encourage sending
         //   multiple transactions instead of one big transaction to avoid fees.
-        if (nBytes < (DEFAULT_BLOCK_PRIORITY_SIZE - 1000))
+        if (nBytes < (MAX_BLOCK_SIZE / 20 - 1000))
             nMinFee = 0;
     }
 
@@ -1233,7 +1254,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     if (pfMissingInputs)
         *pfMissingInputs = false;
     
-    if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+//    if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+    if( (mc_gState->m_ProtocolVersionToUpgrade > 0) && (mc_gState->IsSupported(mc_gState->m_ProtocolVersionToUpgrade) == 0) )
     {
         return false;
     }
@@ -1396,6 +1418,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         CTxMemPoolEntry entry(tx, nFees, GetTime(), dPriority, chainActive.Height());
         unsigned int nSize = entry.GetTxSize();
 
+        ::minRelayTxFee = CFeeRate(MIN_RELAY_TX_FEE);    
+        
         // Don't accept it if it can't get into a block
         CAmount txMinFee = GetMinRelayFee(tx, nSize, true);
         if (fLimitFree && nFees < txMinFee)
@@ -1403,7 +1427,6 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                                       hash.ToString(), nFees, txMinFee),
                              REJECT_INSUFFICIENTFEE, "insufficient fee");
 
-        ::minRelayTxFee = CFeeRate(MIN_RELAY_TX_FEE);    
 
         // Require that free transactions have sufficient priority to be mined in the next block.
         if (GetBoolArg("-relaypriority", true) && nFees < ::minRelayTxFee.GetFee(nSize) && !AllowFree(view.GetPriority(tx, chainActive.Height() + 1))) {
@@ -1427,7 +1450,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             nLastTime = nNow;
             // -limitfreerelay unit is thousand-bytes-per-minute
             // At default rate it would take over a month to fill 1GB
-            if (dFreeCount >= GetArg("-limitfreerelay", 15)*10*1000)
+            if (dFreeCount >= GetArg("-limitfreerelay", 0)*10*1000)
                 return state.DoS(0, error("AcceptToMemoryPool : free transaction rejected by rate limiter"),
                                  REJECT_INSUFFICIENTFEE, "rate limited free transaction");
             if(fDebug)LogPrint("mempool", "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount+nSize);
@@ -1455,15 +1478,27 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
 /* MCHN END */        
         
-
+        unsigned int scriptVerifyFlags = STANDARD_SCRIPT_VERIFY_FLAGS;
+        if (!Params().RequireStandard()) 
+        {
+            scriptVerifyFlags = GetArg("-promiscuousmempoolflags", scriptVerifyFlags);
+        }
+        
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
-        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS, true))
+        if (!CheckInputs(tx, state, view, true, scriptVerifyFlags, true))
         {
-/* MCHN START */            
-//            return error("AcceptToMemoryPool: : ConnectInputs failed %s", hash.ToString());            
-            return state.DoS(0,error("AcceptToMemoryPool: : ConnectInputs failed %s", hash.ToString()),REJECT_INVALID,"ConnectInputs failed");
-/* MCHN END */            
+//            return error("AcceptToMemoryPool: : ConnectInputs failed %s", hash.ToString());    
+            string strError=state.GetRejectReason();
+            if(strError.size() == 0)
+            {
+                strError="ConnectInputs failed";
+            }
+            else
+            {
+                strError="ConnectInputs failed: " + strError;
+            }
+            return state.DoS(0,error("AcceptToMemoryPool: : ConnectInputs failed %s", hash.ToString()),REJECT_INVALID,strError);
         }
         
 
@@ -1520,19 +1555,27 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                                  REJECT_INVALID, reason);
             }
         }
+        
+        if(fAddToWallet)
+        {
+            int err=pwalletTxsMain->AddTx(NULL,tx,-1,NULL,-1,0);
+            if(err)
+            {
+                reason=strprintf("Wallet error %d",err);
+                return state.DoS(0,
+                                 error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
+                                 REJECT_INVALID, reason);            
+            }
+        }
+        
         permissions_to=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
         entry.SetReplayNodeParams(( (replay & MC_PPL_REPLAY) != 0) ? true : false,permissions_from,permissions_to);
-/* MCHN END */
+        
+/* MCHN END */    
         // Store transaction in memory
         pool.addUnchecked(hash, entry);
     }
 
-/* MCHN START */    
-    if(fAddToWallet)
-    {
-        pwalletTxsMain->AddTx(NULL,tx,-1,NULL,-1,0);
-    }
-/* MCHN END */    
     if(fAddToWallet)
     {
         if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
@@ -1708,16 +1751,17 @@ bool IsInitialBlockDownload()
     if (lockIBDState)
         return false;
 /* MCHN START */    
-/*    
+/* We cannot make these checks for private network when chain/nodes can go down for weeks  
     bool state = (chainActive.Height() < pindexBestHeader->nHeight - 24 * 6 ||
             pindexBestHeader->GetBlockTime() < GetTime() - 24 * 60 * 60);
- */ 
     bool state = (chainActive.Height() < pindexBestHeader->nHeight - 86400 / MCP_TARGET_BLOCK_TIME ||
             pindexBestHeader->GetBlockTime() < GetTime() - 24 * 60 * 60);
-/* MCHN END */    
     if (!state)
         lockIBDState = true;
     return state;
+ */ 
+/* MCHN END */    
+    return false;
 }
 
 bool fLargeWorkForkFound = false;
@@ -2175,7 +2219,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     AssertLockHeld(cs_main);
     // Check it again in case a previous version let a bad block in
     // But if pindex->kMiner is set we got this block in this version
-    if(!pindex->kMiner.IsValid())
+    if(!pindex->kMiner.IsValid() || (setBannedTxs.size() != 0) )
     {
         if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
             return false;
@@ -2708,7 +2752,7 @@ bool static DisconnectTip(CValidationState &state) {
     mc_gState->m_Permissions->RollBack(old_height-1);
     mc_gState->m_Assets->RollBack(old_height-1);
     
-    MultichainNode_ApplyUpgrades();        
+    MultichainNode_ApplyUpgrades(old_height-1);        
     if(mc_gState->m_WalletMode & MC_WMD_TXS)
     {
         if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Rolling back wallet             (%s)\n",pwalletTxsMain->Summary());
@@ -2864,7 +2908,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     // ... and about transactions that got confirmed:
 /* MCHN START */        
     VerifyBlockSignature(pblock,false);
-    MultichainNode_ApplyUpgrades();    
+    MultichainNode_ApplyUpgrades(chainActive.Height());    
 /* MCHN END */    
     
     BOOST_FOREACH(const CTransaction &tx, pblock->vtx) {
@@ -3188,7 +3232,8 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
             }
             
 //            }
-            if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+//            if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+            if( (mc_gState->m_ProtocolVersionToUpgrade > 0) && (mc_gState->IsSupported(mc_gState->m_ProtocolVersionToUpgrade) == 0) )
             {
                 LogPrintf("Cannot connect more blocks, required protocol version upgrade %d -> %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
                 fContinue = false;
@@ -3298,7 +3343,8 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
             nCanMine=pindexMostWork->nCanMine;
 /* MCHN START */            
             
-            if( (mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion()) && 
+//            if( (mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion()) && 
+            if( (mc_gState->m_ProtocolVersionToUpgrade > 0) && (mc_gState->IsSupported(mc_gState->m_ProtocolVersionToUpgrade) == 0) &&
                 chainActive.FindFork(pindexMostWork) == chainActive.Tip() )
             {
                 LogPrintf("Cannot connect blocks, required protocol version upgrade %d -> %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
@@ -4527,7 +4573,8 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
             return error("%s : AcceptBlock FAILED", __func__);
         if(pindex)
         {
-            if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+//            if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
+            if( (mc_gState->m_ProtocolVersionToUpgrade > 0) && (mc_gState->IsSupported(mc_gState->m_ProtocolVersionToUpgrade) == 0) )
             {
                 if(chainActive.FindFork(pindex) == chainActive.Tip())
                 {
@@ -4882,7 +4929,7 @@ bool static LoadBlockIndexDB()
         if(fDebug)LogPrint("mchn","mchn: Rolling back wallet txs DB to height %d\n",chainActive.Height());
         pwalletTxsMain->RollBack(NULL,chainActive.Height());
     }
-    MultichainNode_ApplyUpgrades();        
+    MultichainNode_ApplyUpgrades(chainActive.Height());        
     
 /* MCHN END */
     LogPrintf("LoadBlockIndexDB(): hashBestChain=%s height=%d date=%s progress=%f\n",
@@ -6889,7 +6936,9 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         // Start block sync
         if (pindexBestHeader == NULL)
             pindexBestHeader = chainActive.Tip();
-        bool fFetch = state.fPreferredDownload || (nPreferredDownload == 0 && !pto->fClient && !pto->fOneShot); // Download if this is a nice peer, or we have no nice peers and this one might do.
+//        bool fFetch = state.fPreferredDownload || (nPreferredDownload == 0 && !pto->fClient && !pto->fOneShot); // Download if this is a nice peer, or we have no nice peers and this one might do.
+        
+        bool fFetch = true;                                                     // fPreferredDownload is too dangerous in small chains
         if (!state.fSyncStarted && !pto->fClient && fFetch && !fImporting && !fReindex) {
             // Only actively request headers from a single peer, unless we're close to today.
             if (nSyncStarted == 0 || pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) {

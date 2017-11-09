@@ -18,6 +18,9 @@ int64_t CENT = 1000000;                                                         
 int64_t MAX_MONEY = 21000000 * COIN;                                            // amount.h
 unsigned int MAX_SCRIPT_ELEMENT_SIZE=520;                                       // script.h
 int MAX_OP_RETURN_SHOWN=16384;
+int MAX_FORMATTED_DATA_DEPTH=100;
+unsigned int MAX_OP_RETURN_OP_DROP_COUNT=100000000;
+uint32_t JSON_NO_DOUBLE_FORMATTING=0;                             
 
 int MCP_MAX_STD_OP_RETURN_COUNT=0;
 int64_t MCP_INITIAL_BLOCK_REWARD=0;
@@ -30,6 +33,7 @@ int MCP_ANYONE_CAN_SEND=0;
 int MCP_ANYONE_CAN_RECEIVE=0;
 int MCP_ANYONE_CAN_ACTIVATE=0;
 int64_t MCP_MINIMUM_PER_OUTPUT=0;
+int MCP_ALLOW_ARBITRARY_OUTPUTS=1;
 int MCP_ALLOW_MULTISIG_OUTPUTS=0;
 int MCP_ALLOW_P2SH_OUTPUTS=0;
 int MCP_WITH_NATIVE_CURRENCY=0;

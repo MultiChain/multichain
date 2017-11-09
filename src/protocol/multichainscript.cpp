@@ -30,6 +30,8 @@
 #define MC_DCT_SCRIPT_MULTICHAIN_ASSET_DETAILS_PREFIX 'a'
 #define MC_DCT_SCRIPT_MULTICHAIN_ASSET_FOLLOWON_PREFIX 'o'
 #define MC_DCT_SCRIPT_MULTICHAIN_GENERAL_DETAILS_PREFIX 'c'
+#define MC_DCT_SCRIPT_MULTICHAIN_DATA_FORMAT_PREFIX 'f'
+#define MC_DCT_SCRIPT_MULTICHAIN_RAW_DATA_PREFIX 'd'
 
 #define MC_DCT_SCRIPT_TYPE_REGULAR                         0x00
 #define MC_DCT_SCRIPT_TYPE_OP_RETURN                       0x01
@@ -156,6 +158,25 @@ int mc_Script::AddElement()
     m_lpCoord[2*m_CurrentElement + 1]=0;
     
     return MC_ERR_NOERROR;    
+}
+
+int mc_Script::DeleteElement(int element)
+{
+    if(element >= m_NumElements)
+    {
+        return MC_ERR_INVALID_PARAMETER_VALUE;
+    }
+    
+    int elem;
+    for(elem=element;elem<m_NumElements-1;elem++)
+    {
+        m_lpCoord[2*elem + 0]=m_lpCoord[2*(elem+1) + 0];
+        m_lpCoord[2*elem + 1]=m_lpCoord[2*(elem+1) + 1];
+    }
+    m_NumElements--;
+    m_CurrentElement=-1;
+    
+    return MC_ERR_NOERROR;
 }
 
 int mc_Script::GetElement()
@@ -919,6 +940,19 @@ int mc_Script::SetScript(const unsigned char* src,const size_t bytes,int type)
                     {
                         lastSize=-1;                                                    
                     }
+                    else
+                    {
+                        if(opcode > MC_DCT_SCRIPT_OP_PUSHDATA4)
+                        {
+                            if(mc_gState->m_Features->FormattedData())
+                            {
+                                if( (m_ScriptType & MC_DCT_SCRIPT_TYPE_OP_RETURN ) == 0) 
+                                {
+                                    m_ScriptType |= MC_DCT_SCRIPT_TYPE_DIRTY_OP_RETURN;                                
+                                }
+                            }
+                        }
+                    }
                 }
                 else
                 {
@@ -950,10 +984,21 @@ int mc_Script::SetScript(const unsigned char* src,const size_t bytes,int type)
     
     if(m_ScriptType & MC_DCT_SCRIPT_TYPE_DIRTY_OP_RETURN)
     {
-        if( (m_ScriptType & MC_DCT_SCRIPT_TYPE_OP_RETURN ) == 0) 
+        if(mc_gState->m_Features->FormattedData())                              // OP_RETURN scripts should be clean from 20001
         {
-            m_ScriptType -= MC_DCT_SCRIPT_TYPE_DIRTY_OP_RETURN;                                
-        }        
+            if(m_ScriptType & MC_DCT_SCRIPT_TYPE_OP_RETURN) 
+            {
+                m_ScriptType -= MC_DCT_SCRIPT_TYPE_OP_RETURN;                                
+                DeleteElement(GetNumElements()-1);
+            }                    
+        }
+        else
+        {
+            if( (m_ScriptType & MC_DCT_SCRIPT_TYPE_OP_RETURN ) == 0) 
+            {
+                m_ScriptType -= MC_DCT_SCRIPT_TYPE_DIRTY_OP_RETURN;                                
+            }        
+        }
     }
     
     return MC_ERR_NOERROR;
@@ -2168,3 +2213,170 @@ int mc_Script::SetCachedScript(int offset, int *next_offset, int vin, unsigned c
     
     return MC_ERR_NOERROR;    
 }
+
+int mc_Script::GetDataFormat(uint32_t *format)
+{
+    unsigned char *ptr;
+    unsigned char *ptrEnd;
+    unsigned char f;
+    
+    if(format)
+    {
+        *format=MC_SCR_DATA_FORMAT_UNKNOWN;
+    }
+        
+    if(m_CurrentElement<0)
+    {
+        return MC_ERR_INVALID_PARAMETER_VALUE;
+    }
+    
+    if(m_lpCoord[m_CurrentElement*2+1] < MC_DCT_SCRIPT_IDENTIFIER_LEN+1+1)
+    {
+        return MC_ERR_WRONG_SCRIPT;
+    }
+    
+    ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
+    ptrEnd=ptr+m_lpCoord[m_CurrentElement*2+1];
+    
+    if(memcmp(ptr,MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
+    {
+        return MC_ERR_WRONG_SCRIPT;
+    }
+    
+    
+    if(ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN] != MC_DCT_SCRIPT_MULTICHAIN_DATA_FORMAT_PREFIX)
+    {
+        return MC_ERR_WRONG_SCRIPT;            
+    }
+    
+    ptr+=MC_DCT_SCRIPT_IDENTIFIER_LEN+1;
+
+    f=(unsigned char)(*ptr);
+
+    if(f & MC_SCR_DATA_FORMAT_EXTENDED_MASK)
+    {
+        f=MC_SCR_DATA_FORMAT_UNKNOWN;
+    }
+    
+    if(format)
+    {
+        *format=(uint32_t)f;
+    }
+    
+    return MC_ERR_NOERROR;
+}
+
+int mc_Script::SetDataFormat(const uint32_t format)
+{
+    int err;
+    unsigned char buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+1+1];
+    unsigned char f;
+    
+    f=(unsigned char)format;
+    if(f & MC_SCR_DATA_FORMAT_EXTENDED_MASK)
+    {
+        f=MC_SCR_DATA_FORMAT_UNKNOWN;        
+    }
+    
+    err=AddElement();
+    if(err)
+    {
+        return err;
+    }
+    
+    memcpy(buf,MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_DATA_FORMAT_PREFIX;        
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+1]=f;
+    
+    err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+1+1);
+    if(err)
+    {
+        return err;
+    }
+    
+    return MC_ERR_NOERROR;    
+}
+
+int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format)
+{
+    int elem,err;
+    
+    if(format)
+    {
+        *format=MC_SCR_DATA_FORMAT_UNKNOWN;
+    }
+    
+    if(mc_gState->m_Features->FormattedData() == 0)
+    {
+        return MC_ERR_NOERROR;
+    }
+    
+    if(m_NumElements < 2)
+    {        
+        return MC_ERR_NOERROR;
+    }
+        
+    elem=m_NumElements-2;
+        
+    SetElement(elem);
+    if( (err=GetDataFormat(format)) != MC_ERR_WRONG_SCRIPT  )
+    {
+        DeleteElement(elem);
+        return err;
+    }        
+    
+    return MC_ERR_NOERROR;
+}
+
+int mc_Script::DeleteDuplicatesInRange(int from,int to)
+{
+    int *len0,*len1,*len2,*len3,*len4;
+
+    len0=m_lpCoord+from*2+1;
+    len3=m_lpCoord+to*2+1;    
+    len4=m_lpCoord+m_NumElements*2+1;    
+    
+    len1=len3-2;    
+    while(len1>len0)
+    {
+        len2=len1-2;
+        while(len2 >= len0)
+        {
+            if(*len2 >= 0)
+            {
+                if(*len2 == *len1)
+                {
+                    if( (*len2==0) || (memcmp(m_lpData+*(len2-1),m_lpData+*(len1-1),*len2) == 0) )
+                    {
+                        *len1=-1;
+                        len2=len0;
+                    }
+                }
+            }
+            len2-=2;
+        }
+        len1-=2;
+    }
+    
+    len1=len0+2;
+    len2=len0+2;
+    
+    while(len2<len4)
+    {
+        if(*len2 >= 0)
+        {
+            if(len1 != len2)
+            {
+                *len1=*len2;
+                *(len1-1)=*(len2-1);
+            }
+            len1+=2;
+        }
+        len2+=2;
+    }
+    
+    m_NumElements-=(len2-len1)/2;
+    m_CurrentElement=-1;
+    
+   return MC_ERR_NOERROR;
+ }

@@ -125,6 +125,9 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     uint32_t new_entity_type;
     new_entity_type=MC_ENT_TYPE_NONE;
     set<uint256> streams_already_seen;
+    uint32_t format;
+    Array aFormatMetaData;
+    Array aFullFormatMetaData;
     
     Array vout;
     for (unsigned int i = 0; i < tx.vout.size(); i++) {
@@ -138,6 +141,9 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         
 /* MCHN START */    
 // TODO too many duplicate code with ListWalletTransactions and may be AccepMultiChainTransaction
+        
+        aFormatMetaData.clear();
+        
         const CScript& script1 = tx.vout[i].scriptPubKey;        
         CScript::const_iterator pc1 = script1.begin();
         
@@ -153,10 +159,13 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         if(lpScript->IsOpReturnScript())
         {
 //            int e=mc_gState->m_TmpScript->GetNumElements()-1;
+            lpScript->ExtractAndDeleteDataFormat(&format);
+            
             int e=lpScript->GetNumElements()-1;
             {
                 if(mc_gState->m_Features->OpDropDetailsScripts())
                 {
+            
                     lpScript->SetElement(0);
                     err=lpScript->GetNewEntityType(&new_entity_type,&asset_update,details_script,&details_script_size);                
                     if((err == 0) && (new_entity_type == MC_ENT_TYPE_ASSET))
@@ -219,17 +228,25 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                 if(lpScript->GetNumElements()==1)
                 {
                     elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
-                    vdata.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
+//                    vdata.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
+                    aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,tx.GetHash(),i,format,NULL));
+                    if(mc_gState->m_Compatibility & MC_VCM_1_0)
+                    {
+                        aFullFormatMetaData.push_back(aFormatMetaData[0]);
+                    }
                 }                        
             }
             else
             {
-                elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
-                if(elem_size)
+                if(mc_gState->m_Compatibility & MC_VCM_1_0)
                 {
-                    vdata.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
+                    elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
+                    if(elem_size)
+                    {
+//                        vdata.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
+                        aFullFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,tx.GetHash(),i,format,NULL));
+                    }
                 }
-                
                 lpScript->SetElement(0);
                 if(lpScript->GetNewEntityType(&new_entity_type))
                 {
@@ -328,10 +345,16 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                 }
             }
             
-            out.push_back(Pair("assets", assets));
+            if( (assets.size() > 0) || (mc_gState->m_Compatibility & MC_VCM_1_0) )
+            {
+                out.push_back(Pair("assets", assets));
+            }
         }        
         Array permissions=PermissionEntries(txout,lpScript,false);
-        out.push_back(Pair("permissions", permissions));
+        if( (permissions.size() > 0) || (mc_gState->m_Compatibility & MC_VCM_1_0) )
+        {
+            out.push_back(Pair("permissions", permissions));
+        }
         
         Array items;
         Value data_item_entry=DataItemEntry(tx,i,streams_already_seen, 0x03);
@@ -339,7 +362,14 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         {
             items.push_back(data_item_entry);
         }
-        out.push_back(Pair("items", items));
+        if( (items.size() > 0) || (mc_gState->m_Compatibility & MC_VCM_1_0) )
+        {
+            out.push_back(Pair("items", items));
+        }
+        if(aFormatMetaData.size())
+        {
+            out.push_back(Pair("data", aFormatMetaData));            
+        }
 /* MCHN END */    
         vout.push_back(out);
     }
@@ -353,6 +383,9 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         bool is_open=false;
         if(detals_script_found)
         {
+            Value vfields;
+            vfields=mc_ExtractDetailsJSONObject(details_script,details_script_size);
+            
             offset=0;
             
             while((int)offset<details_script_size)
@@ -430,7 +463,11 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                     }                    
                 }
             }
-            issue.push_back(Pair("details", details));            
+            if(vfields.type() == null_type )
+            {
+                vfields=details;
+            }
+            issue.push_back(Pair("details", vfields));            
         }
         entry.push_back(Pair("issue", issue));
     }
@@ -440,14 +477,14 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         entry.push_back(Pair("create", StreamEntry((unsigned char*)&txid,0x05)));
     }
     
-    entry.push_back(Pair("data", vdata));
-    
-/* MCHN START */        
+    if(mc_gState->m_Compatibility & MC_VCM_1_0)
+    {
+        entry.push_back(Pair("data", aFullFormatMetaData));
+    }
 
     delete lpScript;
     delete asset_amounts;
     
-/* MCHN END */        
     
     if (hashBlock != 0) {
         entry.push_back(Pair("blockhash", hashBlock.GetHex()));
@@ -1248,7 +1285,7 @@ Value appendrawtransaction(const Array& params, bool fHelp)
     {
         BOOST_FOREACH(const Value& data, params[3].get_array()) 
         {
-            CScript scriptOpReturn=ParseRawMetadata(data,0xFFFF,&entity,NULL);
+            CScript scriptOpReturn=ParseRawMetadata(data,MC_DATA_API_PARAM_TYPE_ALL,&entity,NULL);
             CTxOut out(0, scriptOpReturn);
             rawTx.vout.push_back(out);            
         }
@@ -1415,7 +1452,7 @@ Value createrawtransaction(const Array& params, bool fHelp)
     {
         BOOST_FOREACH(const Value& data, params[2].get_array()) 
         {
-            CScript scriptOpReturn=ParseRawMetadata(data,0xFFFF,&entity,NULL);
+            CScript scriptOpReturn=ParseRawMetadata(data,MC_DATA_API_PARAM_TYPE_ALL,&entity,NULL);
             CTxOut out(0, scriptOpReturn);
             rawTx.vout.push_back(out);            
         }
@@ -1519,7 +1556,7 @@ Value appendrawmetadata(const json_spirit::Array& params, bool fHelp)
         }
     }
     
-    CScript scriptOpReturn=ParseRawMetadata(params[1],0xFFFF,&entity,NULL);
+    CScript scriptOpReturn=ParseRawMetadata(params[1],MC_DATA_API_PARAM_TYPE_ALL,&entity,NULL);
     
     CTxOut txout(0, scriptOpReturn);
     tx.vout.push_back(txout);
@@ -1728,6 +1765,12 @@ Value signrawtransaction(const Array& params, bool fHelp)
 
     RPCTypeCheck(params, list_of(str_type)(array_type)(array_type)(str_type), true);
 
+    bool fOffline=GetBoolArg("-offline",false);
+    if(fOffline && (params.size() < 2) )
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "prevtxs is required in offline mode");            
+    }
+
     vector<unsigned char> txData(ParseHexV(params[0], "argument 1"));
     CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION);
     vector<CMutableTransaction> txVariants;
@@ -1753,6 +1796,8 @@ Value signrawtransaction(const Array& params, bool fHelp)
     // Fetch previous transactions (inputs):
     CCoinsView viewDummy;
     CCoinsViewCache view(&viewDummy);
+    
+    if(!fOffline)
     {
         LOCK(mempool.cs);
         CCoinsViewCache &viewChain = *pcoinsTip;
@@ -1882,7 +1927,7 @@ Value signrawtransaction(const Array& params, bool fHelp)
         BOOST_FOREACH(const CMutableTransaction& txv, txVariants) {
             txin.scriptSig = CombineSignatures(prevPubKey, mergedTx, i, txin.scriptSig, txv.vin[i].scriptSig);
         }
-        if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, MutableTransactionSignatureChecker(&mergedTx, i)))
+        if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK, MutableTransactionSignatureChecker(&mergedTx, i)))
             fComplete = false;
     }
 
@@ -1914,10 +1959,11 @@ Value sendrawtransaction(const Array& params, bool fHelp)
     const CCoins* existingCoins = view.AccessCoins(hashTx);
     bool fHaveMempool = mempool.exists(hashTx);
     bool fHaveChain = existingCoins && existingCoins->nHeight < 1000000000;
+    bool fMissingInputs;
     if (!fHaveMempool && !fHaveChain) {
         // push to local node and sync with wallets
         CValidationState state;
-        if (!AcceptToMemoryPool(mempool, state, tx, false, NULL, !fOverrideFees)) {
+        if (!AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, !fOverrideFees)) {
             if(state.IsInvalid())
                 throw JSONRPCError(RPC_TRANSACTION_REJECTED, strprintf("%i: %s", state.GetRejectCode(), state.GetRejectReason()));
             else
@@ -1931,6 +1977,13 @@ Value sendrawtransaction(const Array& params, bool fHelp)
                 {
                     if(!mempool.exists(hashTx))
                     {
+                        if(fMissingInputs)
+                        {
+                            if(!fHaveChain)
+                            {
+                                throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "missing inputs");                    
+                            }
+                        }
                         throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "transaction already in block chain");                    
                     }
                 }

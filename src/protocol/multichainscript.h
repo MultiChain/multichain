@@ -13,6 +13,11 @@
 #define MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER              0x00000001
 #define MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON              0x00000002
 
+#define MC_SCR_DATA_FORMAT_UNKNOWN                 0x00 
+#define MC_SCR_DATA_FORMAT_UTF8                    0x01 
+#define MC_SCR_DATA_FORMAT_UBJSON                  0x02 
+#define MC_SCR_DATA_FORMAT_EXTENDED_MASK           0x80 
+
 
 typedef struct mc_Script
 {    
@@ -46,6 +51,7 @@ typedef struct mc_Script
     
     int GetNumElements();
     int AddElement();
+    int DeleteElement(int element);
     int SetSpecialParamValue(unsigned char param,const unsigned char* param_value,const size_t param_value_size);
     int SetParamValue(const char *param_name,const size_t param_name_size,const unsigned char* param_value,const size_t param_value_size);
     size_t GetParamValue(const unsigned char *ptr,size_t total,size_t offset,size_t* param_value_start,size_t *bytes);
@@ -92,6 +98,13 @@ typedef struct mc_Script
     
     int GetCachedScript(int offset, int *next_offset, int* vin, unsigned char** script, int *script_size);
     int SetCachedScript(int offset, int *next_offset, int vin, unsigned char* script, int script_size);
+
+    int GetDataFormat(uint32_t *format);
+    int SetDataFormat(const uint32_t format);
+    
+    int ExtractAndDeleteDataFormat(uint32_t *format);
+    int DeleteDuplicatesInRange(int from,int to);
+    
     
 } mc_Script;
 

@@ -34,6 +34,43 @@ using namespace json_spirit;
 #define MC_ASSET_KEY_INVALID_SIZE          -4
 #define MC_ASSET_KEY_INVALID_EMPTY         -5
 
+#define MC_DATA_API_PARAM_TYPE_NONE            0x00000000
+#define MC_DATA_API_PARAM_TYPE_CREATE_STREAM   0x00000001
+#define MC_DATA_API_PARAM_TYPE_PUBLISH         0x00000002
+#define MC_DATA_API_PARAM_TYPE_ISSUE           0x00000004
+#define MC_DATA_API_PARAM_TYPE_FOLLOWON        0x00000008
+#define MC_DATA_API_PARAM_TYPE_RESERVED1       0x00000010
+#define MC_DATA_API_PARAM_TYPE_APPROVAL        0x00000020
+#define MC_DATA_API_PARAM_TYPE_CREATE_UPGRADE  0x00000040
+#define MC_DATA_API_PARAM_TYPE_EMPTY_RAW       0x00000100
+#define MC_DATA_API_PARAM_TYPE_RAW             0x00000200
+#define MC_DATA_API_PARAM_TYPE_FORMATTED       0x00000400
+#define MC_DATA_API_PARAM_TYPE_CIS             0x00001000
+
+#define MC_DATA_API_PARAM_TYPE_SIMPLE          0x00000602
+#define MC_DATA_API_PARAM_TYPE_ALL             0xFFFFFFFF
+
+#define MC_VMM_MERGE_OBJECTS                   0x00000001
+#define MC_VMM_RECURSIVE                       0x00000002
+#define MC_VMM_IGNORE                          0x00000004
+#define MC_VMM_TAKE_FIRST                      0x00000008
+#define MC_VMM_TAKE_FIRST_FOR_FIELD            0x00000010
+#define MC_VMM_OMIT_NULL                       0x00000020
+
+
+// codes for allowed_objects fields    
+// 0x0001 - create    
+// 0x0002 - publish    
+// 0x0004 - issue
+// 0x0008 - follow-on
+// 0x0010 - pure details
+// 0x0020 - approval
+// 0x0040 - create upgrade
+// 0x0100 - encode empty hex
+// 0x0200 - cache input script
+
+
+
 //string HelpRequiringPassphrase();
 string AllowedPermissions();
 string AllowedPausedServices();
@@ -52,6 +89,8 @@ Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong);
 Object StreamEntry(const unsigned char *txid,uint32_t output_level);
 Object UpgradeEntry(const unsigned char *txid);
 Value OpReturnEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout);
+Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out);
+Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format);
 Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uint32_t stream_output_level);
 Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_level);
 string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript,int *eErrorCode);
@@ -68,6 +107,11 @@ void ParseRawAction(string action,bool& lock_it, bool& sign_it,bool& send_it);
 bool paramtobool(Value param);
 int paramtoint(Value param,bool check_for_min,int min_value,string error_message);
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
+vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,int *errorCode,string *strError);
+void ParseRawDetails(const Value *value,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError);
+bool mc_IsJsonObjectForMerge(const Value *value,int level);
+Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int level,int *error);
+Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total);
 
 
 #endif	/* RPCMULTICHAINUTILS_H */

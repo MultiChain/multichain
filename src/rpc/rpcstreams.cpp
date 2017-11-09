@@ -6,6 +6,9 @@
 
 
 #include "rpc/rpcwallet.h"
+#include "json/json_spirit_ubjson.h"
+#include "json/json_spirit_reader_template.h"
+#include "json/json_spirit_writer_template.h"
 
 Value createupgradefromcmd(const Array& params, bool fHelp);
 
@@ -334,7 +337,7 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     }
     
     
-
+/*
     if (params.size() > 4)
     {
         if(params[4].type() == obj_type)
@@ -350,24 +353,42 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields, expecting object");                                        
         }
     }
+*/
+    
+    vector<CTxDestination> addresses;       
+    vector<CTxDestination> fromaddresses;
+    CScript scriptOpReturn=CScript();
+    
+    int errorCode=RPC_INVALID_PARAMETER;
+    string strError;    
+    lpDetailsScript=new mc_Script;
+    if (params.size() > 4)
+    {
+        ParseRawDetails(&(params[4]),lpDetails,lpDetailsScript,&errorCode,&strError);        
+        if(strError.size())
+        {
+            goto exitlbl;
+        }
+    }
+    lpDetailsScript->Clear();
     
     int err;
     size_t bytes;
     const unsigned char *script;
     script=lpDetails->GetData(0,&bytes);
     
-    lpDetailsScript=new mc_Script;
 
     size_t elem_size;
     const unsigned char *elem;
-    CScript scriptOpReturn=CScript();
     
     if(mc_gState->m_Features->OpDropDetailsScripts())
     {
         err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
         if(err)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or stream name, too long");                                                        
+            strError= "Invalid custom fields or stream name, too long";
+            goto exitlbl;
+//            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or stream name, too long");                                                        
         }
         
         elem = lpDetailsScript->GetData(0,&elem_size);
@@ -380,7 +401,9 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
         err=lpDetailsScript->SetGeneralDetails(script,bytes);
         if(err)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or stream name, too long");                                                    
+            strError= "Invalid custom fields or stream name, too long";
+            goto exitlbl;
+//            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or stream name, too long");                                                    
         }
 
         for(int e=0;e<lpDetailsScript->GetNumElements();e++)
@@ -407,9 +430,6 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
         }    
     }
     
-    vector<CTxDestination> addresses;    
-    
-    vector<CTxDestination> fromaddresses;        
     
     if(params[0].get_str() != "*")
     {
@@ -417,12 +437,17 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
 
         if(fromaddresses.size() != 1)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
+            strError= "Single from-address should be specified";
+            goto exitlbl;
+//            throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
         }
 
         if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
         {
-            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
+            strError= "Private key for from-address is not found in this wallet";
+            errorCode=RPC_WALLET_ADDRESS_NOT_FOUND;
+            goto exitlbl;
+//            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
         }
         
         set<CTxDestination> thisFromAddresses;
@@ -435,7 +460,10 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
         CPubKey pkey;
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_CREATE,&thisFromAddresses))
         {
-            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have create permission");                
+            strError= "from-address doesn't have create permission";
+            errorCode=RPC_INSUFFICIENT_PERMISSIONS;
+            goto exitlbl;
+//            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have create permission");                
         }   
     }
     else
@@ -443,15 +471,22 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
         CPubKey pkey;
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_CREATE))
         {
+            strError= "This wallet doesn't have keys with create permission";
+            errorCode=RPC_INSUFFICIENT_PERMISSIONS;
+            goto exitlbl;
             throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with create permission");                
         }        
     }
     
     
     EnsureWalletIsUnlocked();
-    LOCK (pwalletMain->cs_wallet_send);
+    {
+        LOCK (pwalletMain->cs_wallet_send);
+
+        SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn,fromaddresses);
+    }
     
-    SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn,fromaddresses);
+exitlbl:
 
     if(lpDetailsScript)
     {
@@ -460,6 +495,11 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     delete lpDetails;
     delete lpScript;
   
+    if(strError.size())
+    {
+        throw JSONRPCError(errorCode, strError);            
+    }
+                
     return wtx.GetHash().GetHex();    
 }
 
@@ -507,7 +547,7 @@ Value createcmd(const Array& params, bool fHelp)
 
 Value publish(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() != 3)
+    if (fHelp || params.size() < 3 || params.size() > 4)
         throw runtime_error("Help message not found\n");
     
     if(mc_gState->m_Features->Streams() == 0)
@@ -534,12 +574,7 @@ Value publishfrom(const Array& params, bool fHelp)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
     }
-       
-    if(params[2].get_str() == "*")
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid item-key-string: *");                
-    }
-    
+           
     mc_Script *lpScript;
     mc_EntityDetails stream_entity;
     parseStreamIdentifier(params[1],&stream_entity);           
@@ -568,26 +603,74 @@ Value publishfrom(const Array& params, bool fHelp)
 
     FindAddressesWithPublishPermission(fromaddresses,&stream_entity);
         
-    if(params[2].get_str().size() > MC_ENT_MAX_ITEM_KEY_SIZE)
+    Array keys;
+    
+    if(params[2].type() == str_type)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Item key is too long");                                                                                                    
+        keys.push_back(params[2]);
+    }
+    else
+    {
+        if(params[2].type() == array_type)
+        {
+            keys=params[2].get_array();
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Item keys should be either string or array");                                                                                                                
+        }
+    }
+    
+    if(keys.size() == 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Item keys array cannot be empty");                                                                                                                
+    }
+    
+    for(int k=0;k<(int)keys.size();k++)
+    {
+        if(keys[k].type() != str_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Item key should be string");                                                                                                                
+        }        
+        if(keys[k].get_str().size() > MC_ENT_MAX_ITEM_KEY_SIZE)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Item key is too long");                                                                                                    
+        }        
+        if(keys[k].get_str() == "*")
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid item-key-string: *");                
+        }
     }
     
     mc_Script *lpDetailsScript;
     lpDetailsScript=NULL;
         
+    uint32_t data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
+    
+    vector<unsigned char> dataData;
+    lpDetailsScript=new mc_Script;
 
-    bool fIsHex;
-    vector<unsigned char> dataData(ParseHex(params[3].get_str().c_str(),fIsHex));    
-    if(!fIsHex)
+    string strError;
+    int errorCode=RPC_INVALID_PARAMETER;
+    dataData=ParseRawFormattedData(&(params[3]),&data_format,lpDetailsScript,&errorCode,&strError);
+
+    if(strError.size())
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Item data should be hexadecimal string");                                                                                                    
+        delete lpDetailsScript;
+        throw JSONRPCError(errorCode, strError);                                                                                                                
     }
     
-    lpDetailsScript=new mc_Script;
+    lpDetailsScript->Clear();
     lpDetailsScript->SetEntity(stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
-    lpDetailsScript->SetItemKey((unsigned char*)params[2].get_str().c_str(),params[2].get_str().size());
-
+    for(int k=0;k<(int)keys.size();k++)
+    {
+        lpDetailsScript->SetItemKey((unsigned char*)keys[k].get_str().c_str(),keys[k].get_str().size());
+    }
+    if( data_format != MC_SCR_DATA_FORMAT_UNKNOWN )
+    {
+        lpDetailsScript->SetDataFormat(data_format);
+    }
+    
     lpDetailsScript->AddElement();
     if(dataData.size())
     {
@@ -814,7 +897,7 @@ Value unsubscribe(const Array& params, bool fHelp)
     return Value::null;
 }
 
-Value getstreamitem(const Array& params, bool fHelp)
+Value liststreamtxitems(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 3)
         throw runtime_error("Help message not found\n");
@@ -854,14 +937,68 @@ Value getstreamitem(const Array& params, bool fHelp)
     
     const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
     
-    Object entry=StreamItemEntry(wtx,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose);    
-    
-    if(entry.size() == 0)
+    Array output_array;
+    int first_output=0;
+    int stream_output;
+    while(first_output < (int)wtx.vout.size())
     {
-        throw JSONRPCError(RPC_TX_NOT_FOUND, "This transaction was not found in this stream");                
+        Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,NULL,NULL,&stream_output);   
+        
+        if(stream_output < (int)wtx.vout.size())
+        {
+            output_array.push_back(entry);
+        }
+        first_output=stream_output+1;
     }
     
-    return entry;
+    return output_array;    
+}
+
+Value getstreamitem(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 2 || params.size() > 3)
+        throw runtime_error("Help message not found\n");
+   
+    Array items=liststreamtxitems(params,fHelp).get_array();
+    
+    if(items.size() == 0)
+    {
+        throw JSONRPCError(RPC_TX_NOT_FOUND, "This transaction was not found in this stream");                        
+    }
+    if(items.size() > 1)
+    {
+        throw JSONRPCError(RPC_NOT_ALLOWED, "This transaction has more than one output for this stream, please use liststreamtxitems");                                
+    }
+
+    return items[0];    
+}
+
+int mc_GetHashAndFirstOutput(mc_TxEntityRow *lpEntTx,uint256 *hash)
+{
+    int first_output=0;
+    int count;
+    mc_TxEntityRow erow;
+
+    memcpy(hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);        
+    if(lpEntTx->m_Flags & MC_TFL_IS_EXTENSION)
+    {
+        erow.Zero();
+        memcpy(&erow.m_Entity,&lpEntTx->m_Entity,sizeof(mc_TxEntity));
+        erow.m_Generation=lpEntTx->m_Generation;
+        erow.m_Pos=lpEntTx->m_Pos;
+        first_output=(int)mc_GetLE(lpEntTx->m_TxId+MC_TEE_OFFSET_IN_TXID,sizeof(uint32_t));
+        count=(int)mc_GetLE(lpEntTx->m_TxId+MC_TEE_OFFSET_IN_TXID+sizeof(uint32_t),sizeof(uint32_t));
+        if(erow.m_Pos > count)
+        {
+            erow.m_Pos-=count;
+            if(pwalletTxsMain->GetRow(&erow) == 0)
+            {
+                memcpy(hash,erow.m_TxId,MC_TDB_TXID_SIZE);                
+            }
+        }
+    }
+    
+    return first_output;
 }
 
 Value liststreamitems(const Array& params, bool fHelp)
@@ -930,15 +1067,15 @@ Value liststreamitems(const Array& params, bool fHelp)
     
     Array retArray;
     pwalletTxsMain->GetList(&entStat.m_Entity,start+1,count,entity_rows);
-    
+
     for(int i=0;i<entity_rows->GetCount();i++)
     {
         mc_TxEntityRow *lpEntTx;
         lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
         uint256 hash;
-        memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);
+        int first_output=mc_GetHashAndFirstOutput(lpEntTx,&hash);
         const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
-        Object entry=StreamItemEntry(wtx,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose);
+        Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,NULL,NULL,NULL);
         if(entry.size())
         {
             retArray.push_back(entry);                                
@@ -968,8 +1105,11 @@ void getTxsForBlockRange(vector <uint256>& txids,mc_TxEntity *entity,int height_
             for(i=0;i<count;i++)
             {
                 lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
-                memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);
-                txids.push_back(hash);
+                if( (lpEntTx->m_Flags & MC_TFL_IS_EXTENSION) == 0 )
+                {
+                    memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);
+                    txids.push_back(hash);
+                }
             }
         }        
     }
@@ -1059,10 +1199,16 @@ Value liststreamblockitems(const Array& params, bool fHelp)
     for(int i=start;i<start+count;i++)
     {
         const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(txids[i],NULL,NULL);
-        Object entry=StreamItemEntry(wtx,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose);
-        if(entry.size())
+        int first_output=0;
+        int stream_output;
+        while(first_output < (int)wtx.vout.size())
         {
-            retArray.push_back(entry);                                
+            Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,NULL,NULL,&stream_output);
+            if(entry.size())
+            {
+                retArray.push_back(entry);                                
+            }
+            first_output=stream_output+1;
         }
     }
     
@@ -1117,6 +1263,271 @@ void getSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity
 
     memcpy(entity->m_EntityID,&stream_subkey_hash,MC_TDB_ENTITY_ID_SIZE);
     entity->m_EntityType=entStat.m_Entity.m_EntityType | MC_TET_SUBKEY;    
+}
+
+Value getstreamsummary(const Array& params, bool fPublisher)
+{
+    if(mc_gState->m_Features->Streams() == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
+    }
+    if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+    }   
+
+    mc_TxEntityStat entStat;
+    mc_TxEntity entity;
+    
+    mc_EntityDetails stream_entity;
+    parseStreamIdentifier(params[0],&stream_entity);           
+
+    entStat.Zero();
+    memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+    entStat.m_Entity.m_EntityType=MC_TET_STREAM_KEY;
+    if(fPublisher)
+    {
+        entStat.m_Entity.m_EntityType=MC_TET_STREAM_PUBLISHER;        
+    }
+    entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
+    if(!pwalletTxsMain->FindEntity(&entStat))
+    {
+        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
+    }
+
+    bool fFirstPublisher=false;
+    bool fFirstPublisherAll=false;
+    string key_string=params[1].get_str();    
+    const char *key_ptr=key_string.c_str();
+    if(fPublisher)
+    {
+        getSubKeyEntityFromPublisher(params[1].get_str(),entStat,&entity);        
+    }
+    else
+    {
+        getSubKeyEntityFromKey(params[1].get_str(),entStat,&entity);
+    }
+    
+    set<string> setFirstPublishers;
+    
+    vector<string> inputStrings;
+    inputStrings=ParseStringList(params[2]);
+    uint32_t mode=0;
+    for(int j=0;j<(int)inputStrings.size();j++)
+    {
+        bool found=false;
+        if(inputStrings[j]=="jsonobjectmerge")
+        {
+            mode |= MC_VMM_MERGE_OBJECTS;
+            found=true;
+        }
+        if(inputStrings[j]=="recursive")
+        {
+            mode |= MC_VMM_RECURSIVE;
+            found=true;
+        }
+        if(inputStrings[j]=="ignore")
+        {
+            mode |= MC_VMM_IGNORE;
+            found=true;
+        }
+        if(inputStrings[j]=="noupdate")
+        {
+            mode |= MC_VMM_TAKE_FIRST;
+            mode |= MC_VMM_TAKE_FIRST_FOR_FIELD;
+            found=true;
+        }
+        if(inputStrings[j]=="omitnull")
+        {
+            mode |= MC_VMM_OMIT_NULL;
+            found=true;
+        }
+        if(!fPublisher)
+        {
+            if(inputStrings[j]=="firstpublishersany")
+            {
+                if(fFirstPublisher)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "firstpublishers* option can appear only once in them mode");                                                                        
+                }
+                fFirstPublisher=true;
+                fFirstPublisherAll=false;                
+                found=true;
+            }            
+            if(inputStrings[j]=="firstpublishersall")
+            {
+                if(fFirstPublisher)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "firstpublishers* option can appear only once in them mode");                                                                        
+                }
+                fFirstPublisher=true;
+                fFirstPublisherAll=true;                
+                found=true;
+            }            
+        }
+        if(!found)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Unrecognized mode: " + inputStrings[j]);                                            
+        }
+    }
+    
+    if( (mode & MC_VMM_MERGE_OBJECTS) == 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "missing jsonobjectmerge");                                                    
+    }
+    
+    mc_Buffer *entity_rows;
+    entity_rows=new mc_Buffer;
+    entity_rows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);
+        
+    Object empty_object;
+    Object obj;
+    int i,n,c,m,err,pcount;
+    err=MC_ERR_NOERROR;
+    n=pwalletTxsMain->GetListSize(&entity,entStat.m_Generation,NULL);
+    i=0;
+    m=10;
+    
+    Value result;
+    
+    while(i<n)
+    {
+        if((i % m) == 0)
+        {
+            c=m;
+            if(i+c > n)
+            {
+                c=n-i;
+            }
+            pwalletTxsMain->GetList(&entity,entStat.m_Generation,i+1,c,entity_rows);
+        }
+        mc_TxEntityRow *lpEntTx;
+        lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i % m);
+        uint256 hash;
+        int first_output=mc_GetHashAndFirstOutput(lpEntTx,&hash);
+        const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
+        Object entry;
+        if(fPublisher)
+        {
+            entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,false,NULL,&key_ptr,NULL);
+        }
+        else
+        {
+            entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,false,&key_ptr,NULL,NULL);            
+        }
+        
+        if(fFirstPublisher)
+        {
+            pcount=0;
+            BOOST_FOREACH(const Pair& a, entry) 
+            {
+                if(a.name_ == "publishers")
+                {
+                    Array arr=a.value_.get_array();
+                    if(i == 0)
+                    {
+                        setFirstPublishers.clear();
+                        for(unsigned int j=0;j<arr.size();j++) 
+                        {
+                            setFirstPublishers.insert(arr[j].get_str());
+                            pcount++;      
+                        }
+                    }
+                    else
+                    {                       
+                        for(unsigned int j=0;j<arr.size();j++) 
+                        {
+                            const set<string>::const_iterator it=setFirstPublishers.find(arr[j].get_str());   
+                            if(it != setFirstPublishers.end())
+                            {
+                                pcount++;      
+                            }
+                        }
+                    }                
+                }            
+            }
+            if( ( fFirstPublisherAll && (pcount != (int)setFirstPublishers.size())) || 
+                (!fFirstPublisherAll && (pcount == 0)) )                     
+            {
+                entry.clear();
+            }
+        }
+        
+        BOOST_FOREACH(const Pair& a, entry) 
+        {
+            if(a.name_ == "data")
+            {
+                if(i == 0)
+                {
+//                    if(a.value_.type() == obj_type)
+/*                    
+                    {
+                        result=empty_object;
+                    }
+
+                    if( (i==0) && ((mode & MC_VMM_TAKE_FIRST) != 0) )               
+                    {
+                        result=mc_MergeValues(&(a.value_),&result,mode,0,&err);
+                    }
+                    else
+                    {
+                        result=mc_MergeValues(&result,&(a.value_),mode,0,&err);
+                    }         
+ */ 
+                    result=a.value_;
+                }
+                else
+                {
+                    result=mc_MergeValues(&result,&(a.value_),mode,0,&err);
+                }
+            }
+        }    
+        if(err)
+        {
+            goto exitlbl;
+        }
+        i++;
+    }
+    
+    if(mc_IsJsonObjectForMerge(&result,0))
+    {
+        Value json=result.get_obj()[0].value_;
+        Value empty_value=empty_object;
+        json=mc_MergeValues(&json,&empty_value,mode | MC_VMM_TAKE_FIRST,1,&err);     
+        obj.push_back(Pair("json", json));        
+    }            
+    else
+    {
+        obj.push_back(Pair("json", empty_object));        
+    }
+    result=obj;
+    
+exitlbl:    
+
+    delete entity_rows;
+    
+    if(err)
+    {
+        throw JSONRPCError(RPC_NOT_ALLOWED, "Some items to be merged are in the wrong format (try using \'ignore\')" );                                                    
+    }
+
+    return result;
+}
+
+Value getstreamkeysummary(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 3)
+        throw runtime_error("Help message not found\n");
+    
+    return getstreamsummary(params,false);
+}
+
+Value getstreampublishersummary(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 3)
+        throw runtime_error("Help message not found\n");
+    
+    return getstreamsummary(params,true);
 }
 
 Value liststreamkeyitems(const Array& params, bool fHelp)
@@ -1194,6 +1605,8 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
     }
 
+    string key_string=params[1].get_str();
+    const char *key_ptr=key_string.c_str();
     getSubKeyEntityFromKey(params[1].get_str(),entStat,&entity);
     
     
@@ -1211,9 +1624,9 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
         mc_TxEntityRow *lpEntTx;
         lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
         uint256 hash;
-        memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);
+        int first_output=mc_GetHashAndFirstOutput(lpEntTx,&hash);
         const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
-        Object entry=StreamItemEntry(wtx,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose);
+        Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,&key_ptr,NULL,NULL);
         if(entry.size())
         {
             retArray.push_back(entry);                                
@@ -1302,6 +1715,8 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
     }
 
+    string key_string=params[1].get_str();
+    const char *key_ptr=key_string.c_str();
     getSubKeyEntityFromPublisher(params[1].get_str(),entStat,&entity);
     
     mc_Buffer *entity_rows;
@@ -1318,9 +1733,9 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
         mc_TxEntityRow *lpEntTx;
         lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
         uint256 hash;
-        memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);
+        int first_output=mc_GetHashAndFirstOutput(lpEntTx,&hash);
         const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
-        Object entry=StreamItemEntry(wtx,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose);
+        Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,NULL,&key_ptr,NULL);
         if(entry.size())
         {
             retArray.push_back(entry);                                
@@ -1349,6 +1764,8 @@ Value liststreammap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& in
     mc_TxEntityRow erow;
     uint160 stream_subkey_hash;    
     int row,enitity_count;
+    const char **given_key;
+    const char **given_publisher;
     
     entity_rows=NULL;
     enitity_count=inputEntities.size();
@@ -1401,13 +1818,18 @@ Value liststreammap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& in
         {
             shift=1;
         }
+        const char *key_ptr=key_string.c_str();
+        given_key=NULL;
+        given_publisher=NULL;
         if((parent_entity->m_EntityType & MC_TET_TYPE_MASK) == MC_TET_STREAM_PUBLISHER)
         {
-            all_entry.push_back(Pair("publisher", key_string));                                                                                                                
+            all_entry.push_back(Pair("publisher", key_string));        
+            given_publisher=&key_ptr;
         }
         else
         {
-            all_entry.push_back(Pair("key", key_string));                                                                                            
+            all_entry.push_back(Pair("key", key_string));         
+            given_key=&key_ptr;
         }
         all_entry.push_back(Pair("items", total));                                                                        
         all_entry.push_back(Pair("confirmed", confirmed));                                                                        
@@ -1426,12 +1848,13 @@ Value liststreammap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& in
                     if(pwalletTxsMain->GetRow(&erow) == 0)
                     {
                         uint256 hash;
-                        memcpy(&hash,erow.m_TxId,MC_TDB_TXID_SIZE);
+                        int first_output=mc_GetHashAndFirstOutput(&erow,&hash);                       
+//                        memcpy(&hash,erow.m_TxId,MC_TDB_TXID_SIZE);
                         const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
 
                         Value item_value;
 
-                        item_value=StreamItemEntry(wtx,parent_entity->m_EntityID,true);
+                        item_value=StreamItemEntry(wtx,first_output,parent_entity->m_EntityID,true,given_key,given_publisher,NULL);
                         if(row == 1)
                         {
                             all_entry.push_back(Pair("first", item_value));                                                                        

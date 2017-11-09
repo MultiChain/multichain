@@ -724,6 +724,7 @@ void ShrinkDebugFile()
 {
     ShrinkDebugFile("debug.log");
     ShrinkDebugFile("permissions.log");
+    ShrinkDebugFile("wallet/txs.log");
     // Scroll debug.log if it's getting too big
 /*    
     boost::filesystem::path pathLog = GetDataDir() / "debug.log";
@@ -851,4 +852,76 @@ void SetThreadPriority(int nPriority)
     setpriority(PRIO_PROCESS, 0, nPriority);
 #endif // PRIO_THREAD
 #endif // WIN32
+}
+
+
+std::string mc_SupportedProtocols()
+{
+    std::string protocol_list;
+    int protocol_min,protocol_max,protocol_next,this_build,next_build,out_it;
+    
+    protocol_list="";
+    this_build=mc_gState->GetNumericVersion();
+    protocol_next=mc_gState->MinProtocolVersion();
+    protocol_min=0;
+    protocol_max=-1;
+    next_build=-mc_gState->VersionInfo(protocol_next);
+    
+    while(next_build <= this_build)
+    {
+        out_it=0;
+        if(next_build > 0)
+        {
+            if(next_build == this_build)
+            {
+                if(protocol_min == 0)
+                {
+                    protocol_min=protocol_next;                    
+                }
+                protocol_max=protocol_next;
+            }
+            else
+            {
+                out_it=1;
+            }
+            protocol_next++;
+        }
+        else
+        {
+            out_it=1;   
+            protocol_next=-next_build;
+        }
+        next_build=-mc_gState->VersionInfo(protocol_next);
+        if(next_build > this_build)
+        {
+            out_it=1;
+        }
+        if(out_it)
+        {
+            if(protocol_list.size())
+            {
+                protocol_list += ", ";
+            }
+            if(protocol_max > protocol_min)
+            {
+                protocol_list += strprintf("%d-%d",protocol_min,protocol_max);
+            }
+            else
+            {
+                protocol_list += strprintf("%d",protocol_min);                
+            }
+            protocol_min=0;
+            protocol_max=-1;
+        }
+    }
+    
+    
+    return protocol_list;    
+}
+
+std::string mc_BuildDescription(int build)
+{
+    char build_desc[32];
+    mc_BuildDescription(build,build_desc);
+    return std::string(build_desc);
 }

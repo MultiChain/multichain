@@ -67,7 +67,8 @@ Value getinfo(const Array& params, bool fHelp)
 /* MCHN START */    
 //    obj.push_back(Pair("version", CLIENT_VERSION));
 //    obj.push_back(Pair("protocolversion", PROTOCOL_VERSION));
-    obj.push_back(Pair("version", mc_gState->GetVersion()));
+    
+    obj.push_back(Pair("version", mc_BuildDescription(mc_gState->GetNumericVersion())));
     obj.push_back(Pair("nodeversion", mc_gState->GetNumericVersion()));
     obj.push_back(Pair("protocolversion", mc_gState->m_NetworkParams->ProtocolVersion()));
     obj.push_back(Pair("chainname", string(mc_gState->m_NetworkParams->Name())));
@@ -223,6 +224,7 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     obj.push_back(Pair("lockblock",GetArg("-lockblock","")));                        
     obj.push_back(Pair("hideknownopdrops",GetBoolArg("-hideknownopdrops",false)));                    
     obj.push_back(Pair("maxshowndata",GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)));                    
+    obj.push_back(Pair("v1apicompatible",GetBoolArg("-v1apicompatible",false)));                    
     obj.push_back(Pair("miningrequirespeers",Params().MiningRequiresPeers()));                    
     obj.push_back(Pair("mineemptyrounds",Params().MineEmptyRounds()));                    
     obj.push_back(Pair("miningturnover",Params().MiningTurnover()));                    
@@ -385,6 +387,27 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         }
         fFound=true;
     }
+    if( (param_name == "compatibility") )
+    {
+        if( (params[1].type() == int_type) || (params[1].type() == str_type) )
+        {
+            int nValue;
+            if(params[1].type() == int_type)
+            {
+                nValue=params[1].get_int();
+            }
+            else
+            {
+                nValue=atoi(params[1].get_str().c_str());
+            }
+            mc_gState->m_Compatibility=(uint32_t)nValue;
+        }        
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value type");                                            
+        }
+        fFound=true;
+    }
     if(param_name == "bantx")
     {
         if(params[1].type() == str_type)
@@ -490,7 +513,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
 
 Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
 {
-    if (fHelp || params.size() > 1)                                            // MCHN
+    if (fHelp || params.size() > 2)                                            // MCHN
         throw runtime_error("Help message not found\n");
 
     
@@ -498,8 +521,45 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
     if (params.size() > 0)
         fDisplay = params[0].get_bool();
     
+    int nHeight=chainActive.Height();
+    if (params.size() > 1)
+    {
+        if(params[1].type() == bool_type)
+        {
+            if(!params[1].get_bool())
+            {
+                nHeight=0;
+            }
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "with-upgrades should be boolean");                
+/*            
+            if(params[1].type() == int_type)
+            {
+                nHeight=params[1].get_int();
+            }            
+ */ 
+        }
+    }
+    
+    if (nHeight < 0 || nHeight > chainActive.Height())
+    {
+        nHeight+=chainActive.Height();
+        if (nHeight <= 0 || nHeight > chainActive.Height())
+        {
+            throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range");
+        }
+    }
+    
     Object obj;
     int protocol_version=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
+    
+    if(nHeight)
+    {
+        protocol_version=mc_gState->m_NetworkParams->ProtocolVersion();
+    }
+
     for(int i=0;i<mc_gState->m_NetworkParams->m_Count;i++)
     {
         if((mc_gState->m_NetworkParams->m_lpParams+i)->IsRelevant(protocol_version))
@@ -598,6 +658,17 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                         break;
                 }
             }
+            else
+            {
+                param_value=Value::null;
+            }
+            if(strcmp("protocolversion",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+            {
+                if(nHeight)
+                {
+                    param_value=mc_gState->m_NetworkParams->m_ProtocolVersion;
+                }
+            }
 
             obj.push_back(Pair(param_name,param_value));        
         }
@@ -678,19 +749,50 @@ Value validateaddress(const Array& params, bool fHelp)
     if (fHelp || params.size() != 1)                                            // MCHN
         throw runtime_error("Help message not found\n");
 
-    CBitcoinAddress address(params[0].get_str());
+    string str=params[0].get_str();
+    CBitcoinAddress address(str);
     bool isValid = address.IsValid();
 
     Object ret;
 /* MCHN START */        
     if(!isValid)
     {
-        ret.push_back(Pair("isvalid", false));        
+        CBitcoinSecret vchSecret;
+        CPubKey pubkey;
+        isValid = vchSecret.SetString(str);
+
+        if (isValid)
+        {
+            CKey key;
+            key = vchSecret.GetKey();
+            isValid=key.IsValid();
+            if (isValid) 
+            {
+                pubkey = key.GetPubKey();
+                isValid=key.VerifyPubKey(pubkey);
+            }
+        }        
+        else
+        {
+            if (IsHex(str))
+            {
+                pubkey=CPubKey(ParseHex(str));
+                isValid=pubkey.IsFullyValid();            
+            }                
+        }        
+        if(isValid)
+        {
+            address=CBitcoinAddress(pubkey.GetID());
+        }        
     }
-    else
+    
+    if(!isValid)
     {
-        return AddressEntry(address,0x03);
+        ret.push_back(Pair("isvalid", false));        
+        return ret;
     }
+    
+    return AddressEntry(address,0x03);
 /*    
     ret.push_back(Pair("isvalid", isValid));
     if (isValid)
@@ -713,7 +815,7 @@ Value validateaddress(const Array& params, bool fHelp)
         
     }
 */   
-    return ret;
+//    return ret;
 /* MCHN END */        
 }
 
@@ -918,9 +1020,13 @@ Value createmultisig(const Array& params, bool fHelp)
 /* MCHN START */    
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-        if(MCP_ALLOW_P2SH_OUTPUTS == 0)
+//        if(MCP_ALLOW_ARBITRARY_OUTPUTS == 0)
+        if((MCP_ALLOW_ARBITRARY_OUTPUTS == 0) || (mc_gState->m_Features->FixedDestinationExtraction() == 0) )
         {
-            throw JSONRPCError(RPC_NOT_ALLOWED, "P2SH outputs are not allowed for this blockchain");
+            if(MCP_ALLOW_P2SH_OUTPUTS == 0)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "P2SH outputs are not allowed for this blockchain");
+            }
         }
     }
 /* MCHN END */    

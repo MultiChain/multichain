@@ -437,7 +437,14 @@ int mc_Buffer::Add(const void *lpKey,const void *lpValue)
     
     if(m_KeySize<m_RowSize)
     {
-        memcpy(m_lpData+m_Size+m_KeySize,lpValue,m_RowSize-m_KeySize);
+        if(lpValue)
+        {
+            memcpy(m_lpData+m_Size+m_KeySize,lpValue,m_RowSize-m_KeySize);
+        }
+        else
+        {
+            memset(m_lpData+m_Size+m_KeySize,0,m_RowSize-m_KeySize);
+        }
     }
         
     m_Size+=m_RowSize;

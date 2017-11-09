@@ -2266,7 +2266,9 @@ void CNode::AskFor(const CInv& inv)
     nNow = std::max(nNow, nLastTime);
     nLastTime = nNow;
     // Each retry is 2 minutes after the last
-    nRequestTime = std::max(nRequestTime + 2 * 60 * 1000000, nNow);
+//    nRequestTime = std::max(nRequestTime + 2 * 60 * 1000000, nNow);
+    nRequestTime = std::max(nRequestTime + Params().TargetSpacing() * 500000, nNow);
+    
     if (it != mapAlreadyAskedFor.end())
         mapAlreadyAskedFor.update(it, nRequestTime);
     else

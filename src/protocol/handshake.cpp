@@ -84,12 +84,12 @@ bool MultichainNode_DisconnectLocal(CNode *pnode)
 
 bool MultichainNode_RespondToGetData(CNode *pnode)
 {
-    return !(pnode->fDisconnect) & mc_gState->m_Permissions->CanConnect(NULL,pnode->kAddrRemote.begin());    
+    return !(pnode->fDisconnect) && (mc_gState->m_Permissions->CanConnect(NULL,pnode->kAddrRemote.begin()) != 0);    
 }
 
 bool MultichainNode_SendInv(CNode *pnode)
 {
-    return !(pnode->fDisconnect) & mc_gState->m_Permissions->CanConnect(NULL,pnode->kAddrRemote.begin());    
+    return !(pnode->fDisconnect) && (mc_gState->m_Permissions->CanConnect(NULL,pnode->kAddrRemote.begin()) != 0);    
 }
 
 bool MultichainNode_AcceptData(CNode *pnode)

@@ -339,10 +339,13 @@ void mc_InitRPCHelpMap02()
         ));
     
     mapHelpStrings.insert(std::make_pair("getblockchainparams",
-            "getblockchainparams ( displaynames )\n"    
+            "getblockchainparams ( displaynames with-upgrades )\n"    
             "\nReturns a list of values of this blockchain’s parameters\n"
             "\nArguments:\n"
             "1. displaynames                     (boolean, optional, default=true) use display names instead of internal\n"
+//            "2. height                           (numeric or boolean, optional, default true) The block height in active chain or height before current tip (if negative)\n"
+//            "                                    false - original configuration (height=0), true - current configuration\n"
+            "2. with-upgrades                    (boolean, optional, default=true) Take upgrades into account \n"
             "\nResult:\n"
             "An object containing various blockchain parameters.\n"
             "\nExamples:\n"
@@ -788,57 +791,14 @@ void mc_InitRPCHelpMap04()
         ));
     
     mapHelpStrings.insert(std::make_pair("appendrawmetadata",
-            "appendrawmetadata \"tx-hex\" \"data-hex\"|object \n"
+            "appendrawmetadata \"tx-hex\" data \n"
             "\nAppends new OP_RETURN output to existing raw transaction\n"
             "Returns hex-encoded raw transaction.\n"
             "\nArguments:\n"
             "1. \"tx-hex\"                           (string, required) The transaction hex string\n"
-            "2. \"data-hex\"                         (string, required) Data hex string\n"
-            " or\n"
-            "2. issue-details                      (object, required) A json object with issue metadata\n"
-            "    {\n"
-            "      \"create\" : \"asset\"              (string,required) asset\n" 
-            "      \"name\" : \"asset-name\"           (string,optional) Asset name\n"
-            "      \"multiple\" : n                  (numeric,optional, default 1) Number of raw units in one displayed unit\n"
-            "      \"open\" : true|false             (boolean, optional, default false) True if follow-on issues are allowed\n"                
-            "      \"details\" :                     (object, optional)  a json object with custom fields\n"           
-            "        {\n"
-            "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
-            "          ,...\n"
-            "        }\n"
-            " or\n"
-            "2. issuemore-details                  (object, required) A json object with issuemore metadata\n"
-            "    {\n"
-            "      \"update\" : \"asset-identifier\"   (string,required) Asset identifier - one of the following: asset txid, asset reference, asset name.\n"
-            "      \"details\" :                     (object, optional)  a json object with custom fields\n"           
-            "        {\n"
-            "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
-            "          ,...\n"
-            "        }\n"
-            "    }\n"                                
-            " or\n"
-            "2. create-new-stream                  (object, required) A json object with new stream details\n"
-            "    {\n"                
-            "      \"create\" : \"stream\"             (string,required) stream\n"
-            "      \"name\" : \"stream-name\"          (string,optional) Stream name\n"
-            "      \"open\" : true|false             (string,optional, default: false) If true, anyone can publish\n"
-            "      \"details\" :                     (object, optional)  a json object with custom fields\n"           
-            "        {\n"
-            "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
-            "          ,...\n"
-            "        }\n"
-            "    }\n"                                
-            " or\n"
-            "2. publish-new-stream-item            (object, required) A json object with stream item\n"
-            "    {\n"                
-            "      \"for\" : \"stream-identifier\"     (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
-            "      \"key\" : \"key\"                   (string,optional, default: \"\") Item key\n"
-            "      \"data\" : \"data-hex\"             (string,optional, default: \"\") Data hex string\n"
-            "    }\n"                                
+            "2. data                               (string or object, required) Data, see help data-all for details.\n"
             "\nResult:\n"
-            "{\n"
-            "  \"hex\": \"value\",                     (string) The raw transaction with appended data output (hex-encoded string)\n"
-            "}\n"
+            "\"transaction\"                         (string) hex string of the transaction\n"
             "\nExamples:\n"
             + HelpExampleCli("appendrawmetadata", "\"tx-hexstring\" 48656C6C6F20576F726C64210A" )
             + HelpExampleRpc("appendrawmetadata", "\"tx-hexstring\",\"48656C6C6F20576F726C64210A\"")
@@ -849,12 +809,24 @@ void mc_InitRPCHelpMap04()
 void mc_InitRPCHelpMap05()
 {
     mapHelpStrings.insert(std::make_pair("appendrawdata",
-            "appendrawdata tx-hex data-hex|object \n"
+            "appendrawdata tx-hex data \n"
             "\nAppends new OP_RETURN output to existing raw transaction\n"
             "Returns hex-encoded raw transaction.\n"
             "\nArguments:\n"
             "1. \"tx-hex\"                           (string, required) The transaction hex string\n"
+            "2. data                               (string or object, required) Data, see help data-all for details.\n"
+/*    
             "2. \"data-hex\"                         (string, required) Data hex string\n"
+            " or\n"
+            "2. data-json                          (object, required) JSON data object\n"
+            "    {\n"
+            "      \"json\" : json-data              (object, required) Valid JSON object\n" 
+            "    }\n"                                
+            " or\n"
+            "2. data-text                          (object, required) Text data object\n"
+            "    {\n"
+            "      \"text\" : text                   (string, required) Data string\n" 
+            "    }\n"                                
             " or\n"
             "2. issue-details                      (object, required) A json object with issue metadata\n"
             "    {\n"
@@ -867,6 +839,7 @@ void mc_InitRPCHelpMap05()
             "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
             "          ,...\n"
             "        }\n"
+            "    }\n"                                
             " or\n"
             "2. issuemore-details                  (object, required) A json object with issuemore metadata\n"
             "    {\n"
@@ -883,7 +856,7 @@ void mc_InitRPCHelpMap05()
             "      \"create\" : stream               (string,required) stream\n"
             "      \"name\" : stream-name            (string,optional) Stream name\n"
             "      \"open\" : true|false             (string,optional, default: false) If true, anyone can publish\n"
-            "      \"details\" :                     (object, optional)  a json object with custom fields\n"           
+            "      \"details\" :                     (object,optional) a json object with custom fields\n"           
             "        {\n"
             "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
             "          ,...\n"
@@ -894,12 +867,39 @@ void mc_InitRPCHelpMap05()
             "    {\n"                
             "      \"for\" : stream-identifier       (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
             "      \"key\" : key                     (string,optional, default: \"\") Item key\n"
+            "      \"keys\" : keys                   (array,optional) Item keys, array of strings\n"
             "      \"data\" : data-hex               (string,optional, default: \"\") Data hex string\n"
+            "        or\n"
+            "      \"data\" :                        (object, required) JSON data object\n"
+            "        {\n"
+            "          \"json\" : json-data          (object, required) Valid JSON string\n" 
+            "        }\n"                                
+            "        or\n"
+            "      \"data\" :                        (object, required) JSON data object\n"
+            "        {\n"
+            "          \"text\" : \"text\"             (string, required) Data string\n" 
+            "        }\n"                                
             "    }\n"                                
+            " or\n"
+            "2. create-new-upgrade                 (object, required) A json object with new upgrade details\n"
+            "    {\n"                
+            "      \"create\" : upgrade              (string,required) upgrade\n"
+            "      \"name\" : upgrade-name           (string,optional) Upgrade name\n"
+            "      \"startblock\" : n                (numeric,optional, default: 0) Block to apply upgrade from (inclusive).\n"
+            "      \"details\" :                     (object,optional) a json object with custom fields\n"           
+            "        {\n"
+            "          \"protocol-version\": version (numeric, required) Protocol version to upgrade to \n"
+            "        }\n"
+            "    }\n"                                
+            " or\n"
+            "2. approve-upgrade                    (object, required) A json object with approval details\n"
+            "    {\n"                
+            "      \"approve\" : approve             (boolean,required) Approve or disapprove\n"
+            "      \"for\" : upgrade-identifier      (string,required)  Upgrade identifier - one of the following: upgrade txid, upgrade name.\n"
+            "    }\n"                                
+ */ 
             "\nResult:\n"
-            "{\n"
-            "  \"hex\": \"value\",                     (string) The raw transaction with appended data output (hex-encoded string)\n"
-            "}\n"
+            "\"transaction\"                         (string) hex string of the transaction\n"
             "\nExamples:\n"
             + HelpExampleCli("appendrawdata", "\"tx-hexstring\" 48656C6C6F20576F726C64210A" )
             + HelpExampleRpc("appendrawdata", "\"tx-hexstring\",\"48656C6C6F20576F726C64210A\"")
@@ -921,6 +921,8 @@ void mc_InitRPCHelpMap05()
             "       }\n"
             "       ,...\n"
             "     ]\n"
+            "2. addresses                              (object, required) Object with addresses as keys, see help addresses-all for details.\n"
+/*    
             "2. addresses                              (object, required) a json object with addresses as keys and amounts as values\n"
             "    {\n"
             "      \"address\": \n"
@@ -965,8 +967,9 @@ void mc_InitRPCHelpMap05()
             "        }\n"                                
             "      ,...\n"
             "    }\n"
-            "3. data                                   (array, optional) Array of hexadecimal strings or data objects, see help appendrawdata for details.\n"
-            "4.\"action\"                                (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
+ */ 
+            "3. data                                   (array, optional) Array of hexadecimal strings or data objects, see help data-all for details.\n"
+            "4. \"action\"                               (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
                 
 
             "\nResult:\n"
@@ -1262,10 +1265,14 @@ void mc_InitRPCHelpMap06()
         ));
     
     mapHelpStrings.insert(std::make_pair("validateaddress",
-            "validateaddress \"address\"\n"
-            "\nReturn information about the given  address.\n"
+            "validateaddress \"address\"|\"pubkey\"|\"privkey\"\n"
+            "\nReturn information about the given address or public key or private key.\n"
             "\nArguments:\n"
-            "1. address                          (string, required) The address to validate\n"
+            "1. \"address\"                        (string, required) The address to validate\n"
+            "  or \n"
+            "1. \"pubkey\"                         (string, required) The public key (hexadecimal) to validate\n"
+            "  or \n"
+            "1. \"privkey\"                        (string, required) The private key (see dumpprivkey) to validate\n"
             "\nResult:\n"
             "{\n"
             "  \"isvalid\" : true|false,           (boolean) If the address is valid or not. If not, this is the only property returned.\n"
@@ -1380,7 +1387,7 @@ void mc_InitRPCHelpMap06()
     
     mapHelpStrings.insert(std::make_pair("create",
             "create \"entity-type\" \"entity-name\" open ( custom-fields )\n"
-            "\nCreates stream\n"
+            "\nCreates stream or upgrade\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"entity-type\"                    (string, required) stream\n"
@@ -1398,8 +1405,8 @@ void mc_InitRPCHelpMap06()
             "4  custom-fields                    (object, required)  a json object with custom fields\n"
             "    {\n"
             "      \"protocol-version\": version   (numeric, required) Protocol version to upgrade to\n"
-            "      \"start-block\": block          (numeric, optional, default 0) Block to apply from \n"
-            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
+            "      \"startblock\": block           (numeric, optional, default 0) Block to apply from \n"
+//            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
             "      ,...\n"
             "    }\n"
 
@@ -1434,7 +1441,7 @@ void mc_InitRPCHelpMap06()
             "    {\n"
             "      \"protocol-version\": version   (numeric, required) Protocol version to upgrade to \n"
             "      \"start-block\": block          (numeric, optional, default 0) Block to apply from \n"
-            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
+//            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
             "      ,...\n"
             "    }\n"
             "\nResult:\n"
@@ -1475,51 +1482,8 @@ void mc_InitRPCHelpMap07()
 
             "\nArguments:\n"
             "1. \"from-address\"                           (string, required) Address to send from.\n"
-            "2. addresses                                (array, required) a json object with addresses as keys and amounts as values\n"
-            "    {\n"
-            "      \"address\": \n"
-            "        x.xxx                               (numeric, required) The key is the address, the value is the native currency amount\n"
-            "          or \n"
-            "        {                                   (object) A json object of assets to send\n"
-            "          \"asset-identifier\" : asset-quantity \n"
-            "          ,...\n"
-            "        }\n"                                
-            "          or \n"
-            "        {                                   (object) A json object describing new asset issue\n"
-            "          \"issue\" : \n"
-            "            {\n"
-            "              \"raw\" : n                     (numeric, required) The asset total amount in raw units \n"
-            "              ,...\n"
-            "            }\n"                                
-            "          ,...\n"
-            "        }\n"                                
-            "          or \n"
-            "        {                                   (object) A json object describing follow-on asset issue\n"
-            "          \"issuemore\" : \n"
-            "            {\n"
-            "              \"asset\" : \"asset-identifier\"  (string, required) Asset identifier - one of the following: issue txid. asset reference, asset name.\n"
-            "              \"raw\" : n                     (numeric, required) The asset total amount in raw units \n"
-            "              ,...\n"
-            "            }\n"                                
-            "          ,...\n"
-            "        }\n"                                
-            "          or \n"
-            "        {                                   (object) A json object describing permission change\n"
-            "          \"permissions\" : \n"
-            "            {\n"
-            "              \"type\" : \"permission(s)\"      (string,required) Permission strings, comma delimited. Possible values:\n"
-            "                                                              " + AllowedPermissions() + " \n"
-            "              \"startblock\"                  (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
-            "              \"endblock\"                    (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
-            "              \"timestamp\"                   (numeric, optional) This helps resolve conflicts between permissions\n"
-            "                                                                  assigned by the same administrator. Default - current time\n"
-            "              ,...\n"
-            "            }\n"                                
-            "          ,...\n"
-            "        }\n"                                
-            "      ,...\n"
-            "    }\n"
-            "3. data                                     (array, optional) Array of hexadecimal strings or data objects, see help appendrawdata for details.\n"
+            "2. addresses                                (object, required) Object with addresses as keys, see help addresses-all for details.\n"
+            "3. data                                     (array, optional) Array of hexadecimal strings or data objects, see help data-all for details.\n"
             "4. \"action\"                                 (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
                 
 
@@ -2110,7 +2074,7 @@ void mc_InitRPCHelpMap09()
         ));
     
     mapHelpStrings.insert(std::make_pair("grantwithdata",
-            "grantwithdata \"address(es)\" \"permission(s)\" \"data-hex\"|object ( native-amount startblock endblock )\n"
+            "grantwithdata \"address(es)\" \"permission(s)\" data|publish-new-stream-item ( native-amount startblock endblock )\n"
             "\nGrant permission(s) with metadata to a given address. \n"
             "\nArguments:\n"
             "1. \"address(es)\"                    (string, required) The multichain addresses to send to (comma delimited)\n"
@@ -2118,14 +2082,7 @@ void mc_InitRPCHelpMap09()
             "                                                       Global: " + AllowedPermissions() + " \n"
             "                                                       or per-asset: asset-identifier.issue,admin \n"
             "                                                       or per-stream: stream-identifier.write,activate,admin \n"
-            "3. \"data-hex\"                       (string, required) Data hex string\n"
-            " or\n"
-            "3. publish-new-stream-item          (object, required) A json object with stream item\n"
-            "    {\n"                
-            "      \"for\" : stream-identifier     (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
-            "      \"key\" : key                   (string,optional, default: \"\") Item key\n"
-            "      \"data\" : data-hex             (string,optional, default: \"\") Data hex string\n"
-            "    }\n"                                
+            "3. data|publish-new-stream-item     (string or object, required) Data, see help data-with for details. \n"
             "4. native-amount                    (numeric, optional)  Native currency amount to send. eg 0.1. Default - 0.0\n"
             "5. startblock                       (numeric, optional)  Block to apply permissions from (inclusive). Default - 0\n"
             "6. endblock                         (numeric, optional)  Block to apply permissions to (exclusive). Default - 4294967295\n"
@@ -2143,7 +2100,7 @@ void mc_InitRPCHelpMap09()
 void mc_InitRPCHelpMap10()
 {
     mapHelpStrings.insert(std::make_pair("grantwithmetadata",
-            "grantwithdata \"address(es)\" \"permission(s)\" \"data-hex\"|object ( native-amount startblock endblock )\n"
+            "grantwithdata \"address(es)\" \"permission(s)\" data|publish-new-stream-item ( native-amount startblock endblock )\n"
             "\nGrant permission(s) with metadata to a given address. \n"
             "\nArguments:\n"
             "1. \"address(es)\"                    (string, required) The multichain addresses to send to (comma delimited)\n"
@@ -2151,14 +2108,7 @@ void mc_InitRPCHelpMap10()
             "                                                        Global: " + AllowedPermissions() + " \n"
             "                                                        or per-asset: asset-identifier.issue,admin \n"
             "                                                        or per-stream: stream-identifier.write,activate,admin \n"
-            "3. \"data-hex\"                       (string, required) Data hex string\n"
-            " or\n"
-            "3. publish-new-stream-item          (object, required) A json object with stream item\n"
-            "    {\n"                
-            "      \"for\" : stream-identifier     (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
-            "      \"key\" : key                   (string,optional, default: \"\") Item key\n"
-            "      \"data\" : data-hex             (string,optional, default: \"\") Data hex string\n"
-            "    }\n"                                
+            "3. data|publish-new-stream-item     (string or object, required) Data, see help data-with for details. \n"
             "4. native-amount                    (numeric, optional)  Native currency amount to send. eg 0.1. Default - 0.0\n"
             "5. startblock                       (numeric, optional)  Block to apply permissions from (inclusive). Default - 0\n"
             "6. endblock                         (numeric, optional)  Block to apply permissions to (exclusive). Default - 4294967295\n"
@@ -2172,7 +2122,7 @@ void mc_InitRPCHelpMap10()
         ));
     
     mapHelpStrings.insert(std::make_pair("grantwithdatafrom",
-            "grantwithdatafrom \"from-address\" \"to-address(es)\" \"permission(s)\" \"data-hex\"|object ( native-amount startblock endblock )\n"
+            "grantwithdatafrom \"from-address\" \"to-address(es)\" \"permission(s)\" data|publish-new-stream-item ( native-amount startblock endblock )\n"
             "\nGrant permission with metadata using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -2182,14 +2132,7 @@ void mc_InitRPCHelpMap10()
             "                                                       Global: " + AllowedPermissions() + " \n"
             "                                                       or per-asset: asset-identifier.issue,admin \n"
             "                                                       or per-stream: stream-identifier.write,activate,admin \n"
-            "4. \"data-hex\"                       (string, required) Data hex string\n"
-            " or\n"
-            "4. publish-new-stream-item          (object, required) A json object with stream item\n"
-            "    {\n"                
-            "      \"for\" : stream-identifier     (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
-            "      \"key\" : key                   (string,optional, default: \"\") Item key\n"
-            "      \"data\" : data-hex             (string,optional, default: \"\") Data hex string\n"
-            "    }\n"                                
+            "4. data|publish-new-stream-item     (string or object, required) Data, see help data-with for details. \n"
             "5. native-amount                    (numeric, optional)  Native currency amount to send. eg 0.1. Default - 0.0\n"
             "6. startblock                       (numeric, optional)  Block to apply permissions from (inclusive). Default - 0\n"
             "7. endblock                         (numeric, optional)  Block to apply permissions to (exclusive). Default - 4294967295\n"
@@ -2203,7 +2146,7 @@ void mc_InitRPCHelpMap10()
         ));
     
     mapHelpStrings.insert(std::make_pair("grantwithmetadatafrom",
-            "grantwithmetadatafrom \"from-address\" \"to-address(es)\" \"permission(s)\" data-hex|object ( native-amount startblock endblock )\n"
+            "grantwithmetadatafrom \"from-address\" \"to-address(es)\" \"permission(s)\" data|publish-new-stream-item ( native-amount startblock endblock )\n"
             "\nGrant permission with metadata using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -2213,14 +2156,7 @@ void mc_InitRPCHelpMap10()
             "                                                       Global: " + AllowedPermissions() + " \n"
             "                                                       or per-asset: asset-identifier.issue,admin \n"
             "                                                       or per-stream: stream-identifier.write,activate,admin \n"
-            "4. \"data-hex\"                       (string, required) Data hex string\n"
-            " or\n"
-            "4. publish-new-stream-item          (object, required) A json object with stream item\n"
-            "    {\n"                
-            "      \"for\" : stream-identifier     (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
-            "      \"key\" : key                   (string,optional, default: \"\") Item key\n"
-            "      \"data\" : data-hex             (string,optional, default: \"\") Data hex string\n"
-            "    }\n"                                
+            "4. data|publish-new-stream-item     (string or object, required) Data, see help data-with for details. \n"
             "5. native-amount                    (numeric, optional)  Native currency amount to send. eg 0.1. Default - 0.0\n"
             "6. startblock                       (numeric, optional)  Block to apply permissions from (inclusive). Default - 0\n"
             "7. endblock                         (numeric, optional)  Block to apply permissions to (exclusive). Default - 4294967295\n"
@@ -2436,9 +2372,9 @@ void mc_InitRPCHelpMap11()
             "listaddresses ( address(es) verbose count start ) \n"
             "\nReturns asset balances for specified address\n"
             "\nArguments:\n"
-            "1. \"address(es)\"                    (string, optional, default *) Address(es) to return balance for, comma delimited. Default - all\n"
+            "1. \"address(es)\"                    (string, optional, default *) Address(es) to return information for, comma delimited. Default - all\n"
             " or\n"
-            "1. address(es)                      (array, optional) A json array of addresses to return balance for\n"                
+            "1. address(es)                      (array, optional) A json array of addresses to return information for\n"                
             "2. verbose                          (boolean, optional, default=false) If true return more information about address.\n"
             "3. count                            (number, optional, default=INT_MAX - all) The number of addresses to display\n"
             "4. start                            (number, optional, default=-count - last) Start from specific address, 0 based, if negative - from the end\n"
@@ -2995,13 +2931,25 @@ void mc_InitRPCHelpMap13()
         ));
     
     mapHelpStrings.insert(std::make_pair("publish",
-            "publish \"stream-identifier\" \"key\" \"data-hex\"\n"
+            "publish \"stream-identifier\" \"key\"|keys \"data-hex\"|data-obj \n"
             "\nPublishes stream item\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
             "2. \"key\"                            (string, required) Item key\n"
-            "3. \"data-hex\"                       (string, required) Item data hex string\n"
+            " or\n"    
+            "2. keys                             (array, required) Array of item keys\n"
+            "3. \"data-hex\"                       (string, required) Data hex string\n"
+            " or\n"
+            "3. data-json                        (object, required) JSON data object\n"
+            "    {\n"
+            "      \"json\" : data-json            (object, required) Valid JSON object\n" 
+            "    }\n"                                
+            " or\n"
+            "3. data-text                        (object, required) Text data object\n"
+            "    {\n"
+            "      \"text\" : \"data-text\"          (string, required) Data string\n" 
+            "    }\n"                                
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -3010,14 +2958,26 @@ void mc_InitRPCHelpMap13()
         ));
     
     mapHelpStrings.insert(std::make_pair("publishfrom",
-            "publishfrom \"from-address\" \"stream-identifier\" \"key\" \"data-hex\"\n"
+            "publishfrom \"from-address\" \"stream-identifier\" \"key\"|keys \"data-hex\"|data-obj \n"
             "\nPublishes stream item from specific address\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"from-address\"                   (string, required) Address used for issuing.\n"
             "2. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
             "3. \"key\"                            (string, required) Item key\n"
-            "4. \"data-hex\"                       (string, required) Item data hex string\n"
+            " or\n"    
+            "3. keys                             (array, required) Array of item keys\n"
+            "4. \"data-hex\"                       (string, required) Data hex string\n"
+            " or\n"
+            "4. data-json                        (object, required) JSON data object\n"
+            "    {\n"
+            "      \"json\" : data-json            (object, required) Valid JSON object\n" 
+            "    }\n"                                
+            " or\n"
+            "4. data-text                        (object, required) Text data object\n"
+            "    {\n"
+            "      \"text\" : \"data-text\"          (string, required) Data string\n" 
+            "    }\n"                                
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -3308,7 +3268,7 @@ void mc_InitRPCHelpMap14()
         ));
     
     mapHelpStrings.insert(std::make_pair("sendwithdata",
-            "sendwithdata \"address\" amount|asset-quantities \"data-hex\"|object\n"
+            "sendwithdata \"address\" amount|asset-quantities data|publish-new-stream-item\n"
             "\nSend an amount (or several asset amounts) to a given address with appended metadata. \n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -3320,14 +3280,7 @@ void mc_InitRPCHelpMap14()
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
             "    }\n"                                
-            "3. \"data-hex\"                       (string, required) Data hex string\n"
-            " or\n"
-            "3. publish-new-stream-item          (object, required) A json object with stream item\n"
-            "    {\n"                
-            "      \"for\" : stream-identifier     (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
-            "      \"key\" : key                   (string,optional, default: \"\") Item key\n"
-            "      \"data\" : data-hex             (string,optional, default: \"\") Data hex string\n"
-            "    }\n"                                
+            "3. data|publish-new-stream-item     (string or object, required) Data, see help data-with for details. \n"
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -3337,7 +3290,7 @@ void mc_InitRPCHelpMap14()
         ));
     
     mapHelpStrings.insert(std::make_pair("sendwithmetadata",
-            "sendwithmetadata \"address\" amount|asset-quantities \"data-hex\"|object\n"
+            "sendwithmetadata \"address\" amount|asset-quantities data|publish-new-stream-item\n"
             "\nSend an amount (or several asset amounts) to a given address with appended metadata. \n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -3349,14 +3302,7 @@ void mc_InitRPCHelpMap14()
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
             "    }\n"                                
-            "3. \"data-hex\"                       (string, required) Data hex string\n"
-            " or\n"
-            "3. publish-new-stream-item          (object, required) A json object with stream item\n"
-            "    {\n"                
-            "      \"for\" : stream-identifier     (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
-            "      \"key\" : key                   (string,optional, default: \"\") Item key\n"
-            "      \"data\" : data-hex             (string,optional, default: \"\") Data hex string\n"
-            "    }\n"                                
+            "3. data|publish-new-stream-item     (string or object, required) Data, see help data-with for details. \n"
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -3366,7 +3312,7 @@ void mc_InitRPCHelpMap14()
         ));
     
     mapHelpStrings.insert(std::make_pair("sendwithdatafrom",
-            "sendwithdatafrom \"from-address\" \"to-address\" amount|asset-quantities \"data-hex\"|object\n"
+            "sendwithdatafrom \"from-address\" \"to-address\" amount|asset-quantities data|publish-new-stream-item\n"
             "\nSend an amount (or several asset amounts) using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -3379,14 +3325,7 @@ void mc_InitRPCHelpMap14()
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
             "    }\n"                                
-            "4. \"data-hex\"                       (string, required) Data hex string\n"
-            " or\n"
-            "4. publish-new-stream-item          (object, required) A json object with stream item\n"
-            "    {\n"                
-            "      \"for\" : stream-identifier     (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
-            "      \"key\" : key                   (string,optional, default: \"\") Item key\n"
-            "      \"data\" : data-hex             (string,optional, default: \"\") Data hex string\n"
-            "    }\n"                                
+            "4. data|publish-new-stream-item     (string or object, required) Data, see help data-with for details. \n"
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -3396,7 +3335,7 @@ void mc_InitRPCHelpMap14()
         ));
     
     mapHelpStrings.insert(std::make_pair("sendwithmetadatafrom",
-            "sendwithmetadatafrom \"from-address\" \"to-address\" amount|asset-quantities \"data-hex\"|object\n"
+            "sendwithmetadatafrom \"from-address\" \"to-address\" amount|asset-quantities data|publish-new-stream-item\n"
             "\nSend an amount (or several asset amounts) using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -3409,14 +3348,7 @@ void mc_InitRPCHelpMap14()
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
             "    }\n"                                
-            "4. \"data-hex\"                       (string, required) Data hex string\n"
-            " or\n"
-            "4. publish-new-stream-item    (object, required) A json object with stream item\n"
-            "    {\n"                
-            "      \"for\" : stream-identifier     (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
-            "      \"key\" : key                   (string,optional, default: \"\") Item key\n"
-            "      \"data\" : data-hex             (string,optional, default: \"\") Data hex string\n"
-            "    }\n"                                
+            "4. data|publish-new-stream-item     (string or object, required) Data, see help data-with for details. \n"
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -3578,7 +3510,7 @@ void mc_InitRPCHelpMap15()
 void mc_InitRPCHelpMap16()
 {
     mapHelpStrings.insert(std::make_pair("completerawexchange",
-            "completerawexchange hex txid vout ask-assets ( \"data-hex\"|object ) \n"
+            "completerawexchange hex txid vout ask-assets ( data|publish-new-stream-item ) \n"
             "\nCompletes existing exchange transaction, adds fee if needed\n"
             "Returns hex-encoded raw transaction.\n"
             + HelpRequiringPassphraseWrapper() +
@@ -3591,14 +3523,7 @@ void mc_InitRPCHelpMap16()
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
             "    }\n"                
-            "5. \"data-hex\"                       (string, optional) Data hex string\n"
-            " or\n"
-            "5. publish-new-stream-item          (object, optional) A json object with stream item\n"
-            "    {\n"                
-            "      \"for\" : stream-identifier     (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
-            "      \"key\" : key                   (string,optional, default: \"\") Item key\n"
-            "      \"data\" : data-hex             (string,optional, default: \"\") Data hex string\n"
-            "    }\n"                                
+            "5. data|publish-new-stream-item     (string or object, optional) Data, see help data-with for details. \n"
             "\nResult:\n"
             "\"transaction\"                       (string) hex string of the transaction\n"
             "\nExamples:\n"
@@ -3612,8 +3537,8 @@ void mc_InitRPCHelpMap16()
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"from-address\"                   (string, required) Address used for approval.\n"
-            "2. \"upgrade-identifier\"             (string, required) Upgrade identifier - one of the following: upgrade txid, upgrade reference, upgrade name.\n"
-            "3. approve                          (boolean, optional)  Approve or disapprove, default true\n"
+            "2. \"upgrade-identifier\"             (string, required) Upgrade identifier - one of the following: upgrade txid, upgrade name.\n"
+            "3. approve                          (boolean, required)  Approve or disapprove\n"
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -3625,10 +3550,10 @@ void mc_InitRPCHelpMap16()
     mapHelpStrings.insert(std::make_pair("listupgrades",
             "listupgrades (upgrade-identifier(s))\n"
             "1. \"upgrade-identifier(s)\"          (string, optional, default=*, all upgrades) Upgrade identifier - one of the following:\n"
-            "                                                                                upgrade txid, upgrade reference, upgrade name.\n"
+            "                                                                                upgrade txid, upgrade name.\n"
             " or\n"
             "1. upgrade-identifier(s)            (array, optional) A json array of upgrade identifiers \n"                
-            "\nReturns list of defined streams\n"
+            "\nReturns list of defined upgrades\n"
             "\nExamples:\n"
             + HelpExampleCli("listupgrades", "")
             + HelpExampleRpc("listupgrades", "")
@@ -3651,51 +3576,8 @@ void mc_InitRPCHelpMap16()
             "       }\n"
             "       ,...\n"
             "     ]\n"
-            "3. addresses                              (object, optional) a json object with addresses as keys and amounts as values\n"
-            "    {\n"
-            "      \"address\": \n"
-            "        x.xxx                             (numeric, required) The key is the address, the value is the native currency amount\n"
-            "          or \n"
-            "        {                                 (object) A json object of assets to send\n"
-            "          \"asset-identifier\" : asset-quantity \n"
-            "          ,...\n"
-            "        }\n"                                
-            "          or \n"
-            "        {                                 (object) A json object describing new asset issue\n"
-            "          \"issue\" : \n"
-            "            {\n"
-            "              \"raw\" : n                   (numeric, required) The asset total amount in raw units \n"
-            "              ,...\n"
-            "            }\n"                                
-            "          ,...\n"
-            "        }\n"                                
-            "          or \n"
-            "        {                                 (object) A json object describing follow-on asset issue\n"
-            "          \"issuemore\" : \n"
-            "            {\n"
-            "              \"asset\" : \"asset-identifier\"(string, required) Asset identifier - one of the following: issue txid. asset reference, asset name.\n"
-            "              \"raw\" : n                   (numeric, required) The asset total amount in raw units \n"
-            "              ,...\n"
-            "            }\n"                                
-            "          ,...\n"
-            "        }\n"                                
-            "          or \n"
-            "        {                                 (object) A json object describing permission change\n"
-            "          \"permissions\" : \n"
-            "            {\n"
-            "              \"type\" : \"permission(s)\"    (string,required) Permission strings, comma delimited. Possible values:\n"
-            "                                                              " + AllowedPermissions() + " \n"
-            "              \"startblock\" : n            (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
-            "              \"endblock\" : n              (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
-            "              \"timestamp\" : n             (numeric, optional) This helps resolve conflicts between\n"
-            "                                                                permissions assigned by the same administrator. Default - current time\n"
-            "              ,...\n"
-            "            }\n"                                
-            "          ,...\n"
-            "        }\n"                                
-            "      ,...\n"
-            "    }\n"
-            "4. data                                   (array, optional) Array of hexadecimal strings or data objects, see help appendrawdata for details.\n"
+            "3. addresses                              (object, required) Object with addresses as keys, see help addresses-all for details.\n"
+            "4. data                                   (array, optional) Array of hexadecimal strings or data objects, see help data-all for details.\n"
             "5.\"action\"                                (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
                 
 
@@ -3769,7 +3651,232 @@ void mc_InitRPCHelpMap16()
             + HelpExampleRpc("liststreamblockitems", "\"test-stream\", 1000, false, 20")
         ));
     
+    mapHelpStrings.insert(std::make_pair("liststreamtxitems",
+            "liststreamtxitems \"stream-identifier\" \"txid\" ( verbose )\n"
+            "\nReturns stream items.\n"
+            "\nArguments:\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "2. \"txid\"                           (string, required) The transaction id\n"
+            "3. verbose                          (boolean, optional, default=false) If true, returns information about item transaction \n"
+            "\nResult:\n"
+            "\"stream-items\"                      (array) Array of stream items.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("liststreamtxitems", "\"mytxid\"") 
+            + HelpExampleCli("liststreamtxitems", "\"mytxid\"  true") 
+            + HelpExampleRpc("liststreamtxitems", "\"mytxid\", false")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("data-all",
+            "Data parameter(s) appearing in appendrawdata, appendrawtransaction, createrawtransaction, createrawsendfrom \n\n"
+            "\"data-hex\"                            (string, required) Data hex string\n"
+            " or\n"
+            "data-json                             (object, required) JSON data object\n"
+            "    {\n"
+            "      \"json\" : data-json              (object, required) Valid JSON object\n" 
+            "    }\n"                                
+            " or\n"
+            "data-text                             (object, required) Text data object\n"
+            "    {\n"
+            "      \"text\" : \"data-text\"            (string, required) Data string\n" 
+            "    }\n"                                
+            " or\n"
+            "issue-details                         (object, required) A json object with issue metadata\n"
+            "    {\n"
+            "      \"create\" : \"asset\"              (string, required) asset\n" 
+            "      \"name\" : \"asset-name\"           (string, optional) Asset name\n"
+            "      \"multiple\" : n                  (numeric, optional, default 1) Number of raw units in one displayed unit\n"
+            "      \"open\" : true|false             (boolean, optional, default false) True if follow-on issues are allowed\n"                
+            "      \"details\" :                     (object, optional) A json object with custom fields\n"           
+            "        {\n"
+            "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
+            "          ,...\n"
+            "        }\n"
+            "    }\n"                                
+            " or\n"
+            "issuemore-details                     (object, required) A json object with issuemore metadata\n"
+            "    {\n"
+            "      \"update\" : \"asset-identifier\"   (string, required) Asset identifier - one of the following: asset txid, asset reference, asset name.\n"
+            "      \"details\" :                     (object, optional) A json object with custom fields\n"           
+            "        {\n"
+            "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
+            "          ,...\n"
+            "        }\n"
+            "    }\n"                                
+            " or\n"
+            "create-new-stream                     (object, required) A json object with new stream details\n"
+            "    {\n"                
+            "      \"create\" : \"stream\"             (string, required) stream\n"
+            "      \"name\" : \"stream-name\"          (string, optional) Stream name\n"
+            "      \"open\" : true|false             (string, optional, default: false) If true, anyone can publish\n"
+            "      \"details\" :                     (object, optional) A json object with custom fields\n"           
+            "        {\n"
+            "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
+            "          ,...\n"
+            "        }\n"
+            "    }\n"                                
+            " or\n"
+            "publish-new-stream-item               (object, required) A json object with stream item\n"
+            "    {\n"                
+            "      \"for\" : \"stream-identifier\"     (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "      \"key\" : \"key\"                   (string, optional, default: \"\") Item key\n"
+            "        or\n"
+            "      \"keys\" : keys                   (array, optional) Item keys, array of strings\n"
+            "      \"data\" : \"data-hex\"             (string, optional, default: \"\") Data hex string\n"
+            "        or\n"
+            "      \"data\" :                        (object, required) JSON data object\n"
+            "        {\n"
+            "          \"json\" : data-json          (object, required) Valid JSON string\n" 
+            "        }\n"                                
+            "        or\n"
+            "      \"data\" :                        (object, required) JSON data object\n"
+            "        {\n"
+            "          \"text\" : \"data-text\"        (string, required) Data string\n" 
+            "        }\n"                                
+            "    }\n"                                
+            " or\n"
+            "create-new-upgrade                    (object, required) A json object with new upgrade details\n"
+            "    {\n"                
+            "      \"create\" : \"upgrade\"            (string, required) upgrade\n"
+            "      \"name\" : \"upgrade-name\"         (string, optional) Upgrade name\n"
+            "      \"startblock\" : n                (numeric, optional, default: 0) Block to apply upgrade from (inclusive).\n"
+            "      \"details\" :                     (object, optional) A json object with custom fields\n"           
+            "        {\n"
+            "          \"protocol-version\": version (numeric, required) Protocol version to upgrade to \n"
+            "        }\n"
+            "    }\n"                                
+            " or\n"
+            "approve-upgrade                       (object, required) A json object with approval details\n"
+            "    {\n"                
+            "      \"approve\" : approve             (boolean, required) Approve or disapprove\n"
+            "      \"for\" : \"upgrade-identifier\"    (string, required)  Upgrade identifier - one of the following: upgrade txid, upgrade name.\n"
+            "    }\n"                                
+        ));
 
+    mapHelpStrings.insert(std::make_pair("data-with",
+            "Data parameter(s) appearing in completerawexchange, grantwithdata, grantwithdatafrom, sendwithdata, sendwithdatafrom\n\n"
+            "\"data-hex\"                            (string, required) Data hex string\n"
+            " or\n"
+            "data-json                             (object, required) JSON data object\n"
+            "    {\n"
+            "      \"json\" : data-json              (object, required) Valid JSON object\n" 
+            "    }\n"                                
+            " or\n"
+            "data-text                             (object, required) Text data object\n"
+            "    {\n"
+            "      \"text\" : \"data-text\"            (string, required) Data string\n" 
+            "    }\n"                                
+            " or\n"
+            "publish-new-stream-item               (object, required) A json object with stream item\n"
+            "    {\n"                
+            "      \"for\" : \"stream-identifier\"     (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "      \"key\" : \"key\"                   (string, optional, default: \"\") Item key\n"
+            "        or\n"
+            "      \"keys\" : keys                   (array, optional) Item keys, array of strings\n"
+            "      \"data\" : \"data-hex\"             (string, optional, default: \"\") Data hex string\n"
+            "        or\n"
+            "      \"data\" :                        (object, required) JSON data object\n"
+            "        {\n"
+            "          \"json\" : data-json          (object, required) Valid JSON string\n" 
+            "        }\n"                                
+            "        or\n"
+            "      \"data\" :                        (object, required) JSON data object\n"
+            "        {\n"
+            "          \"text\" : \"data-text\"        (string, required) Data string\n" 
+            "        }\n"                                
+            "    }\n"                                
+        ));
+
+     mapHelpStrings.insert(std::make_pair("addresses-all",
+            "Addresses parameter(s) appearing in appendrawtransaction, createrawtransaction, createrawsendfrom,  \n\n"
+
+            "{\n"
+            "  \"address\":                           (string, required) Destination address\n"
+            "   x.xxx                               (numeric, required) The value is the native currency amount\n"
+            "     or \n"
+            "   {                                   (object) A json object of assets to send\n"
+            "      \"asset-identifier\" :             (string, required) Asset identifier - one of the following: issue txid, asset reference, asset name. \"\" for native currency.\n"
+            "       asset-quantity                  (numeric, required) The asset value. \n"
+            "     ,...\n"
+            "   }\n"                                
+            "      or \n"
+            "   {                                   (object) A json object describing new asset issue\n"
+            "     \"issue\" : \n"
+            "       {\n"
+            "          \"raw\" : n                    (numeric, required) The asset total amount in raw units \n"
+            "       }\n"                                
+            "   }\n"                                
+            "      or \n"
+            "   {                                   (object) A json object describing follow-on asset issue\n"
+            "     \"issuemore\" : \n"
+            "       {\n"
+            "          \"asset\" : \"asset-identifier\" (string, required) Asset identifier - one of the following: issue txid. asset reference, asset name.\n"
+            "          \"raw\" : n                    (numeric, required) The asset total amount in raw units \n"
+            "       }\n"                                
+            "   }\n"                                
+            "      or \n"
+            "   {                                   (object) A json object describing permission change\n"
+            "      \"permissions\" : \n"
+            "        {\n"
+            "          \"type\" : \"permission(s)\"     (string, required) Permission strings, comma delimited. Possible values:\n"
+            "                                                          " + AllowedPermissions() + " \n"
+            "          \"startblock\" : n             (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
+            "          \"endblock\"  : n              (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
+            "          \"timestamp\" : n              (numeric, optional) This helps resolve conflicts between\n"
+            "                                                           permissions assigned by the same administrator. Default - current time\n"
+            "        }\n"                                
+            "   }\n"                                
+            " ,...\n"
+            "}\n"
+        ));
+    
+}
+
+void mc_InitRPCHelpMap17()
+{
+     mapHelpStrings.insert(std::make_pair("getstreamkeysummary",
+            "getstreamkeysummary \"stream-identifier\" \"key\" \"mode\"\n"
+            "\nReturns stream json object items summary for specific key.\n"
+            "\nArguments:\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "2. \"key\"                            (string, required) Stream key\n"
+            "3. \"mode\"                           (string, required) Comma delimited list of the following:\n"
+            "                                                       jsonobjectmerge (required) - merge json objects\n"
+            "                                                       recursive - merge json sub-objects recursively\n"
+            "                                                       noupdate -  preserve first value for each key instead of taking the last\n"
+            "                                                       omitnull - omit keys with null values\n"
+            "                                                       ignore - ignore items that cannot be included in summary (otherwise returns an error)\n"
+            "                                                       firstpublishersany - only summarize items by a publisher of first item with this key\n"
+            "                                                       firstpublishersall - only summarize items by all publishers of first item with this key\n"
+            "\nResult:\n"
+            "summary-object                      (object) Summary object for specific key.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getstreamkeysummary", "\"test-stream\" \"key01\" \"jsonobjectmerge\"") 
+            + HelpExampleCli("getstreamkeysummary", "\"test-stream\" \"key01\" \"jsonobjectmerge,ignore,recursive\"") 
+            + HelpExampleRpc("getstreamkeysummary", "\"test-stream\", \"key01\", \"jsonobjectmerge,ignore,recursive\"")
+        ));
+    
+   
+     mapHelpStrings.insert(std::make_pair("getstreampublishersummary",
+            "getstreampublishersummary \"stream-identifier\" \"address\" \"mode\"\n"
+            "\nReturns stream json object items summary for specific publisher.\n"
+            "\nArguments:\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "2. \"address\"                        (string, required) Publisher address\n"
+            "3. \"mode\"                           (string, required) Comma delimited list of the following:\n"
+            "                                                       jsonobjectmerge (required) - merge json objects\n"
+            "                                                       recursive - merge json sub-objects recursively\n"
+            "                                                       noupdate -  preserve first value for each key instead of taking the last\n"
+            "                                                       omitnull - omit keys with null values\n"
+            "                                                       ignore - ignore items that cannot be included in summary (otherwise returns an error)\n"
+            "\nResult:\n"
+            "summary-object                      (object) Summary object for specific publisher.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("liststreampublisheritems", "\"test-stream\" \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"jsonobjectmerge\"") 
+            + HelpExampleCli("liststreampublisheritems", "\"test-stream\" \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"jsonobjectmerge,ignore,recursive\"") 
+            + HelpExampleRpc("liststreampublisheritems", "\"test-stream\", \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"jsonobjectmerge,ignore,recursive\"")
+        ));
+    
+  
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
@@ -3803,7 +3910,6 @@ void mc_InitRPCAllowedWhenWaitingForUpgradeSet()
     setAllowedWhenWaitingForUpgrade.insert("getblockhash");    
     setAllowedWhenWaitingForUpgrade.insert("getmempoolinfo");    
     setAllowedWhenWaitingForUpgrade.insert("listupgrades");    
-    setAllowedWhenWaitingForUpgrade.insert("listpermissions");    
     setAllowedWhenWaitingForUpgrade.insert("decoderawtransaction");    
     setAllowedWhenWaitingForUpgrade.insert("getrawtransaction");    
     setAllowedWhenWaitingForUpgrade.insert("dumpprivkey");    
@@ -3816,6 +3922,37 @@ void mc_InitRPCAllowedWhenWaitingForUpgradeSet()
     setAllowedWhenWaitingForUpgrade.insert("getpeerinfo");    
     setAllowedWhenWaitingForUpgrade.insert("signmessage");    
     setAllowedWhenWaitingForUpgrade.insert("verifymessage");    
+}
+
+void mc_InitRPCAllowedWhenOffline()
+{
+    setAllowedWhenOffline.insert("getblockchainparams");    
+    setAllowedWhenOffline.insert("getinfo");    
+    setAllowedWhenOffline.insert("help");    
+    setAllowedWhenOffline.insert("stop");    
+    setAllowedWhenOffline.insert("decodescript");    
+    setAllowedWhenOffline.insert("signrawtransaction");    
+    setAllowedWhenOffline.insert("createkeypairs");    
+    setAllowedWhenOffline.insert("verifymessage");    
+    setAllowedWhenOffline.insert("signmessage");    
+    
+    
+    setAllowedWhenOffline.insert("addmultisigaddress");    
+    setAllowedWhenOffline.insert("getaddresses");    
+    setAllowedWhenOffline.insert("getnewaddress");    
+    setAllowedWhenOffline.insert("importaddress");    
+    setAllowedWhenOffline.insert("listaddresses");    
+    setAllowedWhenOffline.insert("validateaddress");    
+    setAllowedWhenOffline.insert("createmultisig");    
+    setAllowedWhenOffline.insert("backupwallet");    
+    setAllowedWhenOffline.insert("dumpprivkey");    
+    setAllowedWhenOffline.insert("dumpwallet");    
+    setAllowedWhenOffline.insert("encryptwallet");    
+    setAllowedWhenOffline.insert("importprivkey");    
+    setAllowedWhenOffline.insert("importwallet");    
+    setAllowedWhenOffline.insert("walletlock");    
+    setAllowedWhenOffline.insert("walletpassphrase");    
+    setAllowedWhenOffline.insert("walletpassphrasechange");    
 }
 
 void mc_InitRPCHelpMap()
@@ -3836,8 +3973,17 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap14();
     mc_InitRPCHelpMap15();
     mc_InitRPCHelpMap16();
+    mc_InitRPCHelpMap17();
     
     mc_InitRPCLogParamCountMap();
     mc_InitRPCAllowedWhenWaitingForUpgradeSet();    
+    mc_InitRPCAllowedWhenOffline();    
 }
 
+Value purehelpitem(const Array& params, bool fHelp)
+{
+    if (fHelp)
+        throw runtime_error("Help message not found\n");
+    
+    return Value::null; 
+}

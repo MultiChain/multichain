@@ -21,6 +21,9 @@
 static bool fDaemon;
 
 void DebugPrintClose();
+std::string HelpMessage_Cold();
+bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe=STDOUT_FILENO);
+void Shutdown_Cold();
 
 void DetectShutdownThread(boost::thread_group* threadGroup)
 {
@@ -77,6 +80,8 @@ bool AppInit(int argc, char* argv[])
         
     mc_gState=new mc_State;
     
+    mc_gState->m_SessionFlags |= MC_SSF_COLD;
+    
     mc_gState->m_Params->Parse(argc, argv, MC_ETP_DAEMON);
     mc_CheckDataDirInConfFile();
     
@@ -93,7 +98,7 @@ bool AppInit(int argc, char* argv[])
     
     if(!mc_DoesParentDataDirExist())
     {
-        fprintf(stderr,"\nError: Data directory %s needs to exist before calling multichaind. Exiting...\n\n",mapArgs["-datadir"].c_str());
+        fprintf(stderr,"\nError: Data directory %s needs to exist before calling multichaind-cold. Exiting...\n\n",mapArgs["-datadir"].c_str());
         return false;        
     }
         
@@ -106,7 +111,7 @@ bool AppInit(int argc, char* argv[])
         mc_gState->m_Params->HasOption("-version") || 
         (mc_gState->m_Params->NetworkName() == NULL))
     {
-        fprintf(stdout,"\nMultiChain %s Daemon (protocol %s)\n\n",mc_BuildDescription(mc_gState->GetNumericVersion()).c_str(),mc_SupportedProtocols().c_str());
+        fprintf(stdout,"\nMultiChain %s Offline Daemon (protocol %s)\n\n",mc_BuildDescription(mc_gState->GetNumericVersion()).c_str(),mc_SupportedProtocols().c_str());
         std::string strUsage = "";
         if (mc_gState->m_Params->HasOption("-version"))
         {
@@ -115,9 +120,9 @@ bool AppInit(int argc, char* argv[])
         else
         {
             strUsage += "\n" + _("Usage:") + "\n" +
-                  "  multichaind <blockchain-name> [options]                     " + _("Start MultiChain Core Daemon") + "\n";
+                  "  multichaind-cold <blockchain-name> [options]                     " + _("Start MultiChain Offline Daemon") + "\n";
 
-            strUsage += "\n" + HelpMessage(HMM_BITCOIND);                       // MCHN-TODO edit help message
+            strUsage += "\n" + HelpMessage_Cold();  
         }
 
         fprintf(stdout, "%s", strUsage.c_str());
@@ -128,7 +133,7 @@ bool AppInit(int argc, char* argv[])
 
     if(!GetBoolArg("-shortoutput", false))
     {
-        fprintf(stdout,"\nMultiChain %s Daemon (latest protocol %d)\n\n",mc_BuildDescription(mc_gState->GetNumericVersion()).c_str(),mc_gState->GetProtocolVersion());
+        fprintf(stdout,"\nMultiChain %s Offline Daemon (latest protocol %d)\n\n",mc_BuildDescription(mc_gState->GetNumericVersion()).c_str(),mc_gState->GetProtocolVersion());
     }
     
     pipes[1]=STDOUT_FILENO;
@@ -155,7 +160,6 @@ bool AppInit(int argc, char* argv[])
             if (pid < 0)
             {
                 fprintf(stderr, "Error: fork() returned %d errno %d\n", pid, errno);
-//                delete mc_gState;
                 return false;
             }
             
@@ -167,7 +171,6 @@ bool AppInit(int argc, char* argv[])
             
             if (pid > 0)                                                        // Parent process, pid is child process id
             {
-//                delete mc_gState;
                 close(pipes[1]);            
                 bytes_read=1;                
                 while(bytes_read>0)
@@ -191,6 +194,7 @@ bool AppInit(int argc, char* argv[])
                 fprintf(stderr, "ERROR: setsid() returned %d errno %d\n", sid, errno);
             
             mc_gState=new mc_State;
+            mc_gState->m_SessionFlags |= MC_SSF_COLD;
 
             mc_gState->m_Params->Parse(argc, argv, MC_ETP_DAEMON);
             mc_CheckDataDirInConfFile();
@@ -223,7 +227,19 @@ bool AppInit(int argc, char* argv[])
         delete mc_gState;                
         return false;
     }
- 
+    
+    SoftSetBoolArg("-offline",true);
+
+    if(mc_gState->m_NetworkParams->m_Status != MC_PRM_STATUS_VALID)
+    {
+        char fileName[MC_DCT_DB_MAX_PATH];
+        mc_GetFullFileName(mc_gState->m_Params->NetworkName(),"params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
+        fprintf(stderr,"ERROR: Parameter set for blockchain %s is not valid.\n\nThe file %s must be copied manually from an existing node.\n\n",
+                mc_gState->m_Params->NetworkName(),fileName);                        
+        delete mc_gState;                
+        return false;        
+    }
+    
     if(GetBoolArg("-reindex", false))
     {
         mc_RemoveDir(mc_gState->m_Params->NetworkName(),"permissions.db");
@@ -272,55 +288,6 @@ bool AppInit(int argc, char* argv[])
         }
     }
                         
-
-    if(!GetBoolArg("-verifyparamsethash", true))
-    {
-        if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_INVALID)
-        {
-            mc_gState->m_NetworkParams->m_Status=MC_PRM_STATUS_VALID;
-        }
-    }
-    
-    switch(mc_gState->m_NetworkParams->m_Status)
-    {
-        case MC_PRM_STATUS_EMPTY:
-        case MC_PRM_STATUS_MINIMAL:
-            if(mc_gState->GetSeedNode() == NULL)
-            {
-                fprintf(stderr,"ERROR: Parameter set for blockchain %s is not complete. \n\n\n",mc_gState->m_Params->NetworkName());  
-                fprintf(stderr,"If you want to create new blockchain please run one of the following:\n\n");
-                fprintf(stderr,"  multichain-util create %s\n",mc_gState->m_Params->NetworkName());
-                fprintf(stderr,"  multichain-util clone <old-blockchain-name> %s\n",mc_gState->m_Params->NetworkName());
-                fprintf(stderr,"\nAnd rerun multichaind %s\n\n\n",mc_gState->m_Params->NetworkName());                        
-                fprintf(stderr,"If you want to connect to existing blockchain please specify seed node:\n\n");
-                fprintf(stderr,"  multichaind %s@<seed-node-ip>\n",mc_gState->m_Params->NetworkName());
-                fprintf(stderr,"  multichaind %s@<seed-node-ip>:<seed-node-port>\n\n\n",mc_gState->m_Params->NetworkName());
-                delete mc_gState;                
-                return false;
-            }
-            break;
-        case MC_PRM_STATUS_ERROR:
-            fprintf(stderr,"ERROR: Parameter set for blockchain %s has errors. Please run one of the following:\n\n",mc_gState->m_Params->NetworkName());                        
-            fprintf(stderr,"  multichain-util create %s\n",mc_gState->m_Params->NetworkName());
-            fprintf(stderr,"  multichain-util clone <old-blockchain-name> %s\n",mc_gState->m_Params->NetworkName());
-            fprintf(stderr,"\nAnd rerun multichaind %s\n",mc_gState->m_Params->NetworkName());                        
-            delete mc_gState;                
-            return false;
-        case MC_PRM_STATUS_INVALID:
-            fprintf(stderr,"ERROR: Parameter set for blockchain %s is invalid. You may generate new network using these parameters by running:\n\n",mc_gState->m_Params->NetworkName());                        
-            fprintf(stderr,"  multichain-util clone %s <new-blockchain-name>\n",mc_gState->m_Params->NetworkName());
-            delete mc_gState;                
-            return false;
-        case MC_PRM_STATUS_GENERATED:
-        case MC_PRM_STATUS_VALID:
-            break;
-        default:
-            fprintf(stderr,"INTERNAL ERROR: Unknown parameter set status %d\n",mc_gState->m_NetworkParams->m_Status);
-            delete mc_gState;                
-            return false;
-            break;
-    }
-            
     SelectMultiChainParams(mc_gState->m_Params->NetworkName());
 
     try
@@ -355,7 +322,7 @@ bool AppInit(int argc, char* argv[])
 */
         SoftSetBoolArg("-server", true);
         detectShutdownThread = new boost::thread(boost::bind(&DetectShutdownThread, &threadGroup));
-        fRet = AppInit2(threadGroup,pipes[1]);
+        fRet = AppInit2_Cold(threadGroup,pipes[1]);
         if(is_daemon)
         {
             close(pipes[1]);            
@@ -387,22 +354,7 @@ bool AppInit(int argc, char* argv[])
     Shutdown();    
     DebugPrintClose();
     
-    std::string datadir_to_delete="";
-    
-    if(mc_gState->m_NetworkParams->Validate() == 0)
-    {
-        if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY) 
-        {
-            datadir_to_delete=strprintf("%s",mc_gState->m_Params->NetworkName());
-        }            
-    }
-    
     delete mc_gState;
-    
-    if(datadir_to_delete.size())
-    {
-        mc_RemoveDataDir(datadir_to_delete.c_str());        
-    }
     
     return fRet;
 }

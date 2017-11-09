@@ -12,6 +12,7 @@
 #include "utils/util.h"
 #include "utils/utilmoneystr.h"
 #include "wallet/wallettxs.h"
+#include "json/json_spirit_ubjson.h"
 
 #include <boost/assign/list_of.hpp>
 
@@ -19,6 +20,25 @@ using namespace std;
 using namespace json_spirit;
 
 uint256 hGenesisCoinbaseTxID=0;
+
+int c_UTF8_charlen[256]={
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+ 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+ 3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
+ 4,4,4,4,4,4,4,4,5,5,5,5,6,6,0,0
+};
 
 CScript RemoveOpDropsIfNeeded(const CScript& scriptInput)
 {
@@ -76,6 +96,53 @@ uint256 mc_GenesisCoinbaseTxID()
     return hGenesisCoinbaseTxID;
 }
 
+Value mc_ExtractDetailsJSONObject(mc_EntityDetails *lpEnt)
+{
+    size_t value_size;
+    int err;
+    
+    const void* ptr=lpEnt->GetSpecialParam(MC_ENT_SPRM_JSON_DETAILS,&value_size);
+    
+    if(ptr == NULL)
+    {
+        return Value::null;        
+    }
+    
+    Value value=ubjson_read((const unsigned char *)ptr,value_size,MAX_FORMATTED_DATA_DEPTH,&err);
+    
+    if(err)
+    {
+        return Value::null;        
+    }
+    
+    return value;
+}
+
+Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total)
+{
+    size_t value_size;
+    int err;
+       
+    uint32_t offset;
+    offset=mc_FindSpecialParamInDetailsScript(script,total,MC_ENT_SPRM_JSON_DETAILS,&value_size);
+    if(offset == total)
+    {
+        return Value::null;
+    }
+    
+    const void* ptr=script+offset;
+    
+    
+    Value value=ubjson_read((const unsigned char *)ptr,value_size,MAX_FORMATTED_DATA_DEPTH,&err);
+    
+    if(err)
+    {
+        return Value::null;        
+    }
+    
+    return value;
+}
+
 
 int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset_ref,char *name,int *multiple,int *type,int entity_type)
 {
@@ -110,9 +177,8 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
             }
             else
             {
-                unsigned char *root_stream_name;
                 int root_stream_name_size;
-                root_stream_name=(unsigned char *)mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
+                mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
                 if(root_stream_name_size <= 1)
                 {
                     if(hash == mc_GenesisCoinbaseTxID())
@@ -546,41 +612,48 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
         Array openers;
         if(output_level & 0x0004)
         {
-            offset=0;
-            while(offset>=0)
+            Value vfields;
+            vfields=mc_ExtractDetailsJSONObject(&entity);
+            if(vfields.type() == null_type)
             {
-                new_offset=entity.NextParam(offset,&value_offset,&value_size);
-                if(value_offset > 0)
+                offset=0;
+                while(offset>=0)
                 {
-                    if(ptr[offset])
+                    new_offset=entity.NextParam(offset,&value_offset,&value_size);
+                    if(value_offset > 0)
                     {
-                        string param_name((char*)ptr+offset);
-                        string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
-                        fields.push_back(Pair(param_name, param_value));                                                                        
-                    }
-                    else
-                    {
-                        if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
+                        if(ptr[offset])
                         {
-                            if(value_size == 24)
+                            string param_name((char*)ptr+offset);
+                            string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
+                            fields.push_back(Pair(param_name, param_value));                                                                        
+                        }
+                        else
+                        {
+                            if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
                             {
-                                unsigned char tptr[4];
-                                memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
-                                if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
+                                if(value_size == 24)
                                 {
-                                    openers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
+                                    unsigned char tptr[4];
+                                    memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
+                                    if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
+                                    {
+                                        openers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
+                                    }
+                                    else
+                                    {
+                                        openers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
+                                    }
                                 }
-                                else
-                                {
-                                    openers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
-                                }
-                            }
-                        }                        
+                            }                        
+                        }
                     }
-                }
-                offset=new_offset;
-            }      
-            entry.push_back(Pair("details",fields));                    
+                    offset=new_offset;
+                }      
+                vfields=fields;
+            }
+            
+            entry.push_back(Pair("details",vfields));                    
         }
 
         if(output_level & 0x0020)
@@ -650,7 +723,9 @@ Object UpgradeEntry(const unsigned char *txid)
 
     if(txid == NULL)
     {
-        entry.push_back(Pair("upgraderef", ""));
+        Value null_value;
+        entry.push_back(Pair("name",null_value));
+        entry.push_back(Pair("createtxid",null_value));
         return entry;
     }
     
@@ -664,71 +739,10 @@ Object UpgradeEntry(const unsigned char *txid)
             entry.push_back(Pair("name", string((char*)ptr)));            
         }
         entry.push_back(Pair("createtxid", hash.GetHex()));
-        ptr=(unsigned char *)entity.GetRef();
-        string streamref="";
-        if(entity.IsUnconfirmedGenesis())
-        {
-            Value null_value;
-            entry.push_back(Pair("upgraderef",null_value));
-        }
-        else
-        {
-            streamref += itostr((int)mc_GetLE(ptr,4));
-            streamref += "-";
-            streamref += itostr((int)mc_GetLE(ptr+4,4));
-            streamref += "-";
-            streamref += itostr((int)mc_GetLE(ptr+8,2));
-            entry.push_back(Pair("upgraderef", streamref));
-        }
-
-        entry.push_back(Pair("protocol-version",entity.UpgradeProtocolVersion()));                    
-        entry.push_back(Pair("start-block",(int64_t)entity.UpgradeStartBlock()));                    
-        
-        size_t value_size;
-        int64_t offset,new_offset;
-        uint32_t value_offset;
-        const unsigned char *ptr;
-
-        ptr=entity.GetScript();
-        
         Object fields;
-        Array openers;
-        offset=0;
-        while(offset>=0)
-        {
-            new_offset=entity.NextParam(offset,&value_offset,&value_size);
-            if(value_offset > 0)
-            {
-                if(ptr[offset])
-                {
-                    string param_name((char*)ptr+offset);
-                    string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
-                    fields.push_back(Pair(param_name, param_value));                                                                        
-                }
-                else
-                {
-                    if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
-                    {
-                        if(value_size == 24)
-                        {
-                            unsigned char tptr[4];
-                            memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
-                            if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
-                            {
-                                openers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
-                            }
-                            else
-                            {
-                                openers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
-                            }
-                        }
-                    }                        
-                }
-            }
-            offset=new_offset;
-        }      
-        entry.push_back(Pair("params",fields));                    
-//        entry.push_back(Pair("creators",openers));                    
+        fields.push_back(Pair("protocol-version",entity.UpgradeProtocolVersion()));                    
+        entry.push_back(Pair("params",fields));      
+        entry.push_back(Pair("startblock",(int64_t)entity.UpgradeStartBlock()));                    
         
     }
     else
@@ -736,7 +750,6 @@ Object UpgradeEntry(const unsigned char *txid)
         Value null_value;
         entry.push_back(Pair("name",null_value));
         entry.push_back(Pair("createtxid",null_value));
-        entry.push_back(Pair("upgraderef", null_value));
     }
     
     return entry;
@@ -758,18 +771,127 @@ Value OpReturnEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int
     return metadata_object;    
 }
 
+string OpReturnFormatToText(int format)
+{
+    switch(format)
+    {
+        case MC_SCR_DATA_FORMAT_UTF8:
+            return "text";
+        case MC_SCR_DATA_FORMAT_UBJSON:
+            return "json";            
+    }
+    return "raw";
+}
 
+int mc_IsUTF8(const unsigned char *elem,size_t elem_size)
+{
+    unsigned char *ptr=(unsigned char *)elem;
+    unsigned char *ptrEnd=ptr+elem_size;
+    int size;
+    while(ptr<ptrEnd)
+    {
+        size=c_UTF8_charlen[*ptr];
+        if(size==0)
+        {
+            return 0;
+        }
+        ptr+=size;
+    }
+    if(ptr>ptrEnd)
+    {
+        return 0;        
+    }
+    return 1;
+}
+
+Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out)
+{
+    string metadata="";
+    Object metadata_object;
+    Value metadata_value;
+    int err;
+    if( ((int)elem_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)) || (txid == 0) )
+    {
+        if(format_text_out)
+        {
+            *format_text_out=OpReturnFormatToText(format);
+        }
+        switch(format)
+        {
+            case MC_SCR_DATA_FORMAT_UBJSON:
+                metadata_value=ubjson_read(elem,elem_size,MAX_FORMATTED_DATA_DEPTH,&err);
+                if(err == MC_ERR_NOERROR)
+                {
+                    metadata_object.push_back(Pair("json",metadata_value));
+                    return metadata_object;
+                }
+                metadata_object.push_back(Pair("json",Value::null));
+                return metadata_object;
+/*                
+                if(format_text_out)
+                {
+                    *format_text_out=OpReturnFormatToText(MC_SCR_DATA_FORMAT_UNKNOWN);
+                }
+                metadata=HexStr(elem,elem+elem_size);    
+ */ 
+//                metadata_object.push_back(Pair("json",metadata));
+                break;
+            case MC_SCR_DATA_FORMAT_UTF8:
+                if(mc_IsUTF8(elem,elem_size) == 0)
+                {
+                    metadata_object.push_back(Pair("text",Value::null));
+                    return metadata_object;                    
+                }
+                metadata=string(elem,elem+elem_size);
+                metadata_object.push_back(Pair("text",metadata));
+                return metadata_object;
+//                metadata.push_back(0x00);
+                break;
+            default:                                                            // unknown
+                metadata=HexStr(elem,elem+elem_size);
+                break;
+        }
+        return metadata;
+    }    
+    if(format_text_out)
+    {
+        *format_text_out="gettxoutdata";
+    }
+    metadata_object.push_back(Pair("txid", txid.ToString()));
+    metadata_object.push_back(Pair("vout", vout));
+    metadata_object.push_back(Pair("format", OpReturnFormatToText(format)));
+    metadata_object.push_back(Pair("size", (int)elem_size));
+    return metadata_object;    
+}
+
+Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format)
+{
+    Value format_item_value;
+    string format_text_str;
+    Object result;
+
+    format_item_value=OpReturnFormatEntry(elem,elem_size,txid,vout,format,&format_text_str);
+    
+    result.push_back(Pair("format", format_text_str));
+    result.push_back(Pair("formatdata", format_item_value));
+    
+    return result;
+}
 
 Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uint32_t stream_output_level)
 {
     Object entry;
     Array publishers;
     set<uint160> publishers_set;
-    Array items;
+    Array keys;
     const unsigned char *ptr;
-    unsigned char item_key[MC_ENT_MAX_ITEM_KEY_SIZE+1];
+    unsigned char item_key[MC_ENT_MAX_ITEM_KEY_SIZE+1];    
     int item_key_size;
     Value item_value;
+    uint32_t format;
+    Value format_item_value;
+    string format_text_str;
+    
     mc_EntityDetails entity;
     uint256 hash;
     
@@ -779,6 +901,7 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     mc_gState->m_TmpScript->Clear();
     mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
 
+    
     if(mc_gState->m_TmpScript->IsOpReturnScript() == 0)                      
     {
         return Value::null;
@@ -788,6 +911,8 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     {
         return Value::null;
     }
+    
+    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
     
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     mc_gState->m_TmpScript->SetElement(0);
@@ -804,24 +929,31 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
 
     hash=*(uint256*)entity.GetTxID();
     
+/*    
     if(already_seen.find(hash) != already_seen.end())
     {
         return Value::null;
     }
+*/
     
-    mc_gState->m_TmpScript->SetElement(1);
-                                                                // Should be spkk
-    if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
+    for(int e=1;e<mc_gState->m_TmpScript->GetNumElements()-1;e++)
     {
-        return Value::null;
-    }                                            
-    item_key[item_key_size]=0;
+        mc_gState->m_TmpScript->SetElement(e);
+                                                                    // Should be spkk
+        if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
+        {
+            return Value::null;
+        }                                            
+        item_key[item_key_size]=0;
+        keys.push_back(string(item_key,item_key+item_key_size));
+    }
 
     size_t elem_size;
     const unsigned char *elem;
 
-    elem = mc_gState->m_TmpScript->GetData(2,&elem_size);
+    elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
     item_value=OpReturnEntry(elem,elem_size,tx.GetHash(),n);
+	format_item_value=OpReturnFormatEntry(elem,elem_size,tx.GetHash(),n,format,&format_text_str);
     
     already_seen.insert(hash);
     
@@ -857,9 +989,13 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
 
     entry=StreamEntry((unsigned char*)&hash,stream_output_level);
     entry.push_back(Pair("publishers", publishers));
-    entry.push_back(Pair("key", strprintf("%s",item_key)));
-    entry.push_back(Pair("data", item_value));        
+    entry.push_back(Pair("keys", keys));
     
+    if(mc_gState->m_Compatibility & MC_VCM_1_0)
+    {
+        entry.push_back(Pair("key", keys[0]));        
+    }
+    entry.push_back(Pair("data", format_item_value));        
     return entry;
 }
 
@@ -957,31 +1093,36 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         }
         
         Object fields;
+        Value vfields;
         if(output_level & 0x0002)
         {
-            offset=0;
-            while(offset>=0)
+            vfields=mc_ExtractDetailsJSONObject(&entity);
+            if(vfields.type() == null_type)
             {
-                new_offset=entity.NextParam(offset,&value_offset,&value_size);
-                if(value_offset > 0)
+                offset=0;
+                while(offset>=0)
                 {
-                    if(ptr[offset])
+                    new_offset=entity.NextParam(offset,&value_offset,&value_size);
+                    if(value_offset > 0)
                     {
-                        if(ptr[offset] != 0xff)
+                        if(ptr[offset])
                         {
-                            string param_name((char*)ptr+offset);
-                            string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
-                            fields.push_back(Pair(param_name, param_value));                                                                        
+                            if(ptr[offset] != 0xff)
+                            {
+                                string param_name((char*)ptr+offset);
+                                string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
+                                fields.push_back(Pair(param_name, param_value));                                                                        
+                            }
                         }
                     }
-                }
-                offset=new_offset;
-            }      
-    
+                    offset=new_offset;
+                }      
+                vfields=fields;
+            }
         }
         if(output_level & 0x0002)
         {
-            entry.push_back(Pair("details",fields));                    
+            entry.push_back(Pair("details",vfields));                    
         }
 
         Array issues;
@@ -1008,6 +1149,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                         Object followon_fields;
                         Array followon_issuers;
 
+                        vfields=mc_ExtractDetailsJSONObject(&followon);
                         ptr=followon.GetScript();
                         offset=0;
                         while(offset>=0)
@@ -1051,7 +1193,11 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                             offset=new_offset;
                         }      
 
-                        issue.push_back(Pair("details",followon_fields));                    
+                        if(vfields.type() == null_type)
+                        {                        
+                            vfields=followon_fields;
+                        }
+                        issue.push_back(Pair("details",vfields));                    
                         issue.push_back(Pair("issuers",followon_issuers));                    
                         issues.push_back(issue);                    
                     }
@@ -1816,8 +1962,10 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
     
     return vecSend;
 }
-    
-CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *given_entity,mc_EntityDetails *found_entity)
+
+
+
+CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_EntityDetails *given_entity,mc_EntityDetails *found_entity)
 {
 // codes for allowed_objects fields    
 // 0x0001 - create    
@@ -1825,8 +1973,11 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
 // 0x0004 - issue
 // 0x0008 - follow-on
 // 0x0010 - pure details
+// 0x0020 - approval
+// 0x0040 - create upgrade
 // 0x0100 - encode empty hex
-// 0x0200 - cache input script
+// 0x0200 - raw hex
+// 0x1000 - cache input script
     
     CScript scriptOpReturn=CScript();
     if(found_entity)
@@ -1847,10 +1998,18 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
         int multiple=1;
         int is_open=0;
         bool multiple_is_set=false;
+        bool open_is_set=false;
         string strError="";
         mc_EntityDetails entity;
         vector<unsigned char> vKey;
         vector<unsigned char> vValue;
+        uint32_t data_format;
+        Value formatted_data=Value::null;
+        data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
+        int protocol_version=-1;
+        uint32_t startblock=0;
+        int approve=-1;
+        bool startblock_is_set=false;
 //        bool key_is_set=false;
 //        bool value_is_set=false;
 
@@ -1970,11 +2129,36 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                 parsed=true;
             }
             
+            if(d.name_ == "format")
+            {
+                data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
+                if(d.value_.type() != null_type && !d.value_.get_str().empty())
+                {
+                    if(d.value_.get_str() == "text")
+                    {
+                        data_format=MC_SCR_DATA_FORMAT_UTF8;                        
+                    }
+                    if(d.value_.get_str() == "json")
+                    {
+                        data_format=MC_SCR_DATA_FORMAT_UBJSON;                        
+                    }
+                    if(data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
+                    {
+                        strError=string("Invalid format");                                                    
+                    }
+                }
+                else
+                {
+                    strError=string("Invalid format");                            
+                }
+                parsed=true;
+            }
+            
             if(d.name_ == "create")
             {
                 if(new_type != 0)
                 {
-                    strError=string("Only one of the following keywords can appear in the object: create, update, for");                                                                        
+                    strError=string("Only one of the following keywords can appear in the object: create, update, for, format");                                                                        
                 }
                 if(d.value_.type() != null_type && !d.value_.get_str().empty())
                 {
@@ -1990,15 +2174,26 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                     {
                         if(d.value_.get_str() == "asset")
                         {
-                        if((allowed_objects & 0x0004) == 0)
-                        {
-                            strError=string("Keyword not allowed in this API");                                                
-                        }
+                            if((allowed_objects & 0x0004) == 0)
+                            {
+                                strError=string("Keyword not allowed in this API");                                                
+                            }
                             new_type=MC_ENT_TYPE_ASSET;
                         }
                         else
                         {
-                            strError=string("Invalid new entity type");                                                    
+                            if(d.value_.get_str() == "upgrade")
+                            {
+                                if((allowed_objects & 0x0040) == 0)
+                                {
+                                    strError=string("Keyword not allowed in this API");                                                
+                                }
+                                new_type=MC_ENT_TYPE_UPGRADE;
+                            }
+                            else
+                            {
+                                strError=string("Invalid new entity type");                                                    
+                            }
                         }
                     }
                 }
@@ -2013,26 +2208,37 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             {                 
                 if(new_type != 0)
                 {
-                    strError=string("Only one of the following keywords can appear in the object: create, update, for");                                                                        
+                    strError=string("Only one of the following keywords can appear in the object: create, update, for, format");                                                                        
                 }
                 if(d.value_.type() != null_type && !d.value_.get_str().empty())
                 {
-                    ParseEntityIdentifier(d.value_,&entity, MC_ENT_TYPE_STREAM);       
+                    ParseEntityIdentifier(d.value_,&entity, MC_ENT_TYPE_ANY);       
                     if(found_entity)
                     {
                         memcpy(found_entity,&entity,sizeof(mc_EntityDetails));
                     }                        
                 }                
-                new_type=-1;
-                if((allowed_objects & 0x0002) == 0)
+                if(entity.GetEntityType() == MC_ENT_TYPE_STREAM)
                 {
-                    strError=string("Keyword not allowed in this API");                                                
+                    new_type=-1;
+                    if((allowed_objects & 0x0002) == 0)
+                    {
+                        strError=string("Keyword not allowed in this API");                                                
+                    }                        
                 }
                 else
                 {
-                    if(entity.GetEntityType() != MC_ENT_TYPE_STREAM)
+                    if(entity.GetEntityType() == MC_ENT_TYPE_UPGRADE)
                     {
-                        strError=string("Stream with this identifier not found");                                                                        
+                        new_type=-5;
+                        if((allowed_objects & 0x0020) == 0)
+                        {
+                            strError=string("Keyword not allowed in this API");                                                
+                        }                        
+                    }
+                    else
+                    {
+                        strError=string("Entity with this identifier not found");                                                                                                
                     }
                 }
                 parsed=true;
@@ -2042,7 +2248,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             {                 
                 if(new_type != 0)
                 {
-                    strError=string("Only one of the following keywords can appear in the object: create, update, for");                                                                        
+                    strError=string("Only one of the following keywords can appear in the object: create, update, for, format");                                                                        
                 }
                 if(d.value_.type() != null_type && !d.value_.get_str().empty())
                 {
@@ -2107,6 +2313,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             }
             if(d.name_ == "data")
             {
+/*                
                 if(d.value_.type() != null_type && (d.value_.type()==str_type))
                 {
                     bool fIsHex;
@@ -2121,6 +2328,8 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                 {
                     strError=string("Invalid value");                            
                 }
+ */ 
+                formatted_data=d.value_;
                 if((allowed_objects & 0x0002) == 0)
                 {
                     strError=string("Keyword not allowed in this API");                                                
@@ -2161,6 +2370,30 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                 }
                 parsed=true;
             }
+            if(d.name_ == "startblock")
+            {
+                if(d.value_.type() == int_type)
+                {
+                    if( (d.value_.get_int64() >= 0) && (d.value_.get_int64() <= 0xFFFFFFFF) )
+                    {
+                        startblock=(uint32_t)(d.value_.get_int64());
+                        startblock_is_set=true;
+                    }
+                    else
+                    {
+                        strError=string("Invalid startblock");                                                    
+                    }
+                }
+                else
+                {
+                    strError=string("Invalid startblock");                            
+                }
+                if((allowed_objects & 0x0040) == 0)
+                {
+                    strError=string("Keyword not allowed in this API");                                                
+                }
+                parsed=true;
+            }
             if(d.name_ == "open")
             {
                 if(d.value_.get_bool())
@@ -2168,6 +2401,23 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                     is_open=1;
                 }        
                 if((allowed_objects & 0x0005) == 0)
+                {
+                    strError=string("Keyword not allowed in this API");                                                
+                }
+                open_is_set=true;
+                parsed=true;
+            }
+            if(d.name_ == "approve")
+            {
+                if(d.value_.get_bool())
+                {
+                    approve=1;
+                }        
+                else
+                {
+                    approve=0;                    
+                }
+                if((allowed_objects & 0x0020) == 0)
                 {
                     strError=string("Keyword not allowed in this API");                                                
                 }
@@ -2183,7 +2433,21 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                 {
                     BOOST_FOREACH(const Pair& p, d.value_.get_obj()) 
                     {              
-                        lpDetails->SetParamValue(p.name_.c_str(),p.name_.size(),(unsigned char*)p.value_.get_str().c_str(),p.value_.get_str().size());                
+                        if( (p.name_ == "protocol-version") && (p.value_.type() == int_type) )
+                        {
+                            if( p.value_.get_int() > 0 )
+                            {
+                                protocol_version=p.value_.get_int();                                
+                            }                            
+                            else
+                            {
+                                strError=string("Invalid protocol-version");                                                                                                            
+                            }
+                        }
+                        else
+                        {
+                            lpDetails->SetParamValue(p.name_.c_str(),p.name_.size(),(unsigned char*)p.value_.get_str().c_str(),p.value_.get_str().size());                
+                        }
                     }
                 }                
                 if((allowed_objects & 0x000D) == 0)
@@ -2203,18 +2467,71 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             if(new_type == 0)
             {
 //                strError=string("One of the following keywords can appear in the object: create, update, for");                                                                        
-                if(given_entity && given_entity->GetEntityType())
+                if(data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
                 {
-                    memcpy(&entity,given_entity,sizeof(mc_EntityDetails));
-                    new_type=-2;
+                    if(given_entity && given_entity->GetEntityType())
+                    {
+                        memcpy(&entity,given_entity,sizeof(mc_EntityDetails));
+                        new_type=-2;
+                    }
+                    else
+                    {
+                        new_type=MC_ENT_TYPE_ASSET; 
+                    }
                 }
                 else
                 {
-                    new_type=MC_ENT_TYPE_ASSET; 
+                    new_type=-4;
                 }
             }
         }
 
+        if( (data_format != MC_SCR_DATA_FORMAT_UNKNOWN) || (new_type == -1) )
+        {
+            switch(data_format)
+            {
+                case MC_SCR_DATA_FORMAT_UNKNOWN:
+                    if(formatted_data.type() != null_type && (formatted_data.type()==str_type))
+                    {
+                        bool fIsHex;
+                        vValue=ParseHex(formatted_data.get_str().c_str(),fIsHex);    
+                        if(!fIsHex)
+                        {
+                            strError=string("value should be hexadecimal string");                            
+                        }
+    //                    value_is_set=true;
+                    }
+                    else
+                    {
+                        strError=string("Invalid value");                            
+                    }
+                    break;
+                case MC_SCR_DATA_FORMAT_UTF8:
+                    if(formatted_data.type() != null_type && (formatted_data.type()==str_type))
+                    {
+                        vValue=vector<unsigned char> (formatted_data.get_str().begin(),formatted_data.get_str().end());    
+                    }
+                    else
+                    {
+                        strError=string("Invalid value");                            
+                    }
+                    break;
+                case MC_SCR_DATA_FORMAT_UBJSON:
+                    size_t bytes;
+                    int err;
+                    const unsigned char *script;
+                    lpDetailsScript->Clear();
+                    lpDetailsScript->AddElement();
+                    if((err = ubjson_write(formatted_data,lpDetailsScript,MAX_FORMATTED_DATA_DEPTH)) != MC_ERR_NOERROR)
+                    {
+                        strError=string("Couldn't transfer JSON object to internal UBJSON format");    
+                    }
+                    script = lpDetailsScript->GetData(0,&bytes);
+                    vValue=vector<unsigned char> (script,script+bytes);                                            
+                    break;
+            }
+        }
+        
         if(strError.size() == 0)
         {
             if(new_type == -2)
@@ -2283,7 +2600,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             {
                 if((allowed_objects & 0x0001) == 0)
                 {
-                    strError=string("Follow-on issuance not allowed in this API");                                                
+                    strError=string("Creating new streams not allowed in this API");                                                
                 }
                 else
                 {
@@ -2315,8 +2632,120 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                 format=-1;            
             }
         }
+
+        if(strError.size() == 0)
+        {
+            if(new_type != MC_ENT_TYPE_UPGRADE)
+            {
+                if(protocol_version > 0)
+                {
+                    strError=string("Invalid field: protocol-version");                                                                                
+                }
+                if(startblock_is_set)
+                {
+                    strError=string("Invalid field: startblock");
+                }
+            }
+            if(new_type != -5)
+            {
+                if(approve >= 0)
+                {
+                    strError=string("Invalid field: approve");                    
+                }
+            }
+        }
         
+        if(strError.size() == 0)
+        {
+            if(new_type == MC_ENT_TYPE_UPGRADE)
+            {
+                if(mc_gState->m_Features->Upgrades())
+                {
+                    if((allowed_objects & 0x0040) == 0)
+                    {
+                        strError=string("Creating new upgrades not allowed in this API");                                                
+                    }
+                    else
+                    {
+                        if(lpDetails->m_Size)
+                        {
+                            strError=string("Invalid fields in details object");                                                            
+                        }
+                        if(entity_name.size())
+                        {
+                            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());//+1);
+                        }
+                        if(protocol_version > 0)
+                        {
+                            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,(unsigned char*)&protocol_version,4);                                
+                        }
+                        else
+                        {
+                            strError=string("Missing protocol-version");                                                                                    
+                        }
+                        if(startblock > 0)
+                        {
+                            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_START_BLOCK,(unsigned char*)&startblock,4);        
+                        }                    
+                        if(multiple_is_set)
+                        {
+                            strError=string("Invalid field: multiple");                                                            
+                        }
+                        if(open_is_set)
+                        {
+                            strError=string("Invalid field: open");                                                            
+                        }
+                        if(vKey.size())
+                        {
+                            strError=string("Invalid field: key");                                                            
+                        }
+                        if(vValue.size())
+                        {
+                            strError=string("Invalid field: value");                                                            
+                        }
+                    }
+                }
+                else
+                {
+                    strError=string("Upgrades are not supported by this protocol version"); 
+                }
+            }
+        }
         
+        if(strError.size() == 0)
+        {
+            if(new_type == -5)
+            {
+                if(mc_gState->m_Features->Upgrades())
+                {
+                    if(lpDetails->m_Size)
+                    {
+                        strError=string("Invalid field: details");                                                            
+                    }
+                    if(multiple_is_set)
+                    {
+                        strError=string("Invalid field: multiple");                                                            
+                    }
+                    if(open_is_set)
+                    {
+                        strError=string("Invalid field: open");                                                            
+                    }
+                    if(vKey.size())
+                    {
+                        strError=string("Invalid field: key");                                                            
+                    }
+                    if(vValue.size())
+                    {
+                        strError=string("Invalid field: value");                                                            
+                    }
+                }
+                else
+                {
+                    strError=string("Upgrades are not supported by this protocol version"); 
+                }
+            }
+        }
+
         if(strError.size() == 0)
         {
             int err;
@@ -2386,6 +2815,22 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                 }
             }
             
+            if(new_type == MC_ENT_TYPE_UPGRADE)
+            {
+                int err;
+                script=lpDetails->GetData(0,&bytes);
+                err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_UPGRADE,0,script,bytes);
+                if(err)
+                {
+                    strError=string("Invalid custom fields, too long");                                                            
+                }
+                else
+                {
+                    script = lpDetailsScript->GetData(0,&bytes);
+                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+                }
+            }
+            
             if(new_type == -2)
             {
                 if(mc_gState->m_Features->OpDropDetailsScripts())
@@ -2436,15 +2881,52 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
                     scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
                 }
 
+                if(data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
+                {
+                    lpDetailsScript->Clear();
+                    lpDetailsScript->SetDataFormat(data_format);
+                    script = lpDetailsScript->GetData(0,&bytes);
+                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;                    
+                }
+                
                 scriptOpReturn << OP_RETURN << vValue;                    
             }
                 
+            if(new_type == -4)
+            {
+                lpDetailsScript->Clear();
+                lpDetailsScript->SetDataFormat(data_format);
+                script = lpDetailsScript->GetData(0,&bytes);
+                scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;                    
+                
+                scriptOpReturn << OP_RETURN << vValue;                    
+            }
+            
             if(new_type == -3)
             {
                 script=lpDetails->GetData(0,&bytes);
                 scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
             }
 
+            if(new_type == -5)
+            {
+                if(approve < 0)
+                {
+                    strError=string("Missing approve field");                                                                                    
+                }
+                
+                lpDetailsScript->Clear();
+                lpDetailsScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
+                script = lpDetailsScript->GetData(0,&bytes);
+                scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;                    
+                
+                lpDetailsScript->Clear();
+                lpDetailsScript->SetApproval(approve, mc_TimeNowAsUInt());
+                script = lpDetailsScript->GetData(0,&bytes);
+                scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;                    
+
+                scriptOpReturn << OP_RETURN;                    
+            }
         }
 
         delete lpDetails;
@@ -2823,12 +3305,17 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
                     to=from;
                 }
             }
-            if (from < 0 || from > chainActive.Height())
-                throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range for " + str);
-            if (to < 0 || to > chainActive.Height())
-                throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range for " + str);            
             if (from > to)
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid range " + str);            
+   
+            if(from<0)
+            {
+                from=0;
+            }
+            if(to>chainActive.Height())
+            {
+                to=chainActive.Height();
+            }
             
             for(int block=from;block<=to;block++)
             {
@@ -2990,6 +3477,184 @@ int paramtoint(Value param,bool check_for_min,int min_value,string error_message
         if(result < min_value)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, error_message);                    
+        }
+    }
+    
+    return result;
+}
+
+bool mc_IsJsonObjectForMerge(const Value *value,int level)
+{
+    if(value->type() != obj_type)
+    {
+        return false;
+    }
+    if(level == 0)
+    {
+        if(value->get_obj().size() != 1)
+        {
+            return false;            
+        }
+        if((value->get_obj()[0].name_ != "json"))
+        {
+            return false;            
+        }
+        if((value->get_obj()[0].value_.type() != obj_type))
+        {
+            return false;            
+        }        
+    }
+    
+    return true;
+}
+
+Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int level,int *error)
+{
+    int no_merge=0;
+    
+    if(mode & MC_VMM_OMIT_NULL)
+    {
+        if(mode & MC_VMM_TAKE_FIRST)
+        {
+            if(value1->type() == null_type)    
+            {
+                return Value::null;
+            }
+        }            
+        else
+        {
+            if(value2->type() == null_type)    
+            {
+                return Value::null;                
+            }            
+        }        
+    }
+    
+    bool value1_is_obj=mc_IsJsonObjectForMerge(value1,level);
+    bool value2_is_obj=mc_IsJsonObjectForMerge(value2,level);
+    if( (mode & MC_VMM_MERGE_OBJECTS) == 0)
+    {
+        no_merge=1;
+    }
+    else
+    {
+        if(level>1)
+        {
+            if( (mode & MC_VMM_RECURSIVE) == 0 )
+            {
+                no_merge=1;
+            }
+        }
+    }
+/*            
+    if(!value1_is_obj)
+    {
+        if(!value2_is_obj)
+        {
+            no_merge=1;
+        }
+    }
+*/    
+    if(no_merge)
+    {
+        if(mode & MC_VMM_TAKE_FIRST)
+        {
+            return *value1;
+        }
+        return *value2;                
+    }
+    
+        
+        
+    if(!value1_is_obj)
+    {
+        if(mode & MC_VMM_IGNORE)
+        {
+            return *value2; 
+        }
+        *error=MC_ERR_INVALID_PARAMETER_VALUE;
+        return Value::null;
+    }
+    else
+    {
+        if(!value2_is_obj)
+        {
+            if(mode & MC_VMM_IGNORE)
+            {
+                return *value1;
+            }            
+            *error=MC_ERR_INVALID_PARAMETER_VALUE;
+            return Value::null;
+        }       
+    }
+    
+    
+    Object result;
+    map<string, Value> map1;   
+    map<string, Value> map2;   
+    
+    BOOST_FOREACH(const Pair& a, value1->get_obj()) 
+    {
+        map<string, Value>::iterator it1 = map1.find(a.name_); 
+        if( it1 == map1.end() )
+        {
+            map1.insert(make_pair(a.name_, a.value_));
+        }
+        else
+        {
+            if( (mode & MC_VMM_TAKE_FIRST_FOR_FIELD) == 0 )
+            {
+                it1->second=a.value_;
+            }
+        }
+    }
+
+    BOOST_FOREACH(const Pair& a, value2->get_obj()) 
+    {
+        map<string, Value>::iterator it2 = map2.find(a.name_); 
+        if( it2 == map2.end() )
+        {
+            map2.insert(make_pair(a.name_, a.value_));
+        }
+        else
+        {
+            if( (mode & MC_VMM_TAKE_FIRST_FOR_FIELD) == 0 )
+            {
+                it2->second=a.value_;
+            }
+        }
+    }
+    
+    for(map<string,Value>::iterator it1 = map1.begin(); it1 != map1.end(); ++it1) 
+    {
+        map<string, Value>::iterator it2 = map2.find(it1->first); 
+        if( it2 == map2.end() )
+        {
+            if( ((mode & MC_VMM_OMIT_NULL) == 0) || (it1->second.type() != null_type) )
+            {
+                result.push_back(Pair(it1->first, it1->second));  
+            }
+        }
+        else
+        {
+            Value merged=mc_MergeValues(&(it1->second),&it2->second,mode,level+1,error);
+            if(*error)
+            {
+                return Value::null;                
+            }
+            if( ((mode & MC_VMM_OMIT_NULL) == 0) || (merged.type() != null_type) )
+            {
+                result.push_back(Pair(it1->first, merged));  
+            }
+            map2.erase(it2);
+        }
+    }
+    
+    for(map<string,Value>::iterator it2 = map2.begin(); it2 != map2.end(); ++it2) 
+    {
+        if( ((mode & MC_VMM_OMIT_NULL) == 0) || (it2->second.type() != null_type) )
+        {
+            result.push_back(Pair(it2->first, it2->second));  
         }
     }
     
