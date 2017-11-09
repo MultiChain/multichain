@@ -48,57 +48,6 @@ uint160 mc_GenesisAdmin(const CTransaction& tx)
     return 0;
 }
 
-bool mc_VerifyAssetPermissions(mc_Buffer *assets, vector<CTxDestination> addressRets, int required_permissions, uint32_t permission, string& reason)
-{
-    mc_EntityDetails entity;
-    
-    for(int i=0;i<assets->GetCount();i++)
-    {
-        if(mc_gState->m_Assets->FindEntityByFullRef(&entity,assets->GetRow(i)))
-        {
-            if( entity.Permissions() & (MC_PTP_SEND | MC_PTP_RECEIVE) )
-            {
-                if(assets->GetCount() > 1)
-                {
-                    if(permission == MC_PTP_SEND)
-                    {
-                        reason="One of multiple assets in input has per-asset permissions";
-                    }
-                    if(permission == MC_PTP_RECEIVE)
-                    {
-                        reason="One of multiple assets in output has per-asset permissions";
-                    }
-                    return false;                                
-                }
-                if(entity.Permissions() & permission)
-                {
-                    int found=required_permissions;
-                    for(int j=0;j<(int)addressRets.size();j++)
-                    {
-                        if(mc_gState->m_Permissions->GetPermission(entity.GetTxID(),GetAddressIDPtr(addressRets[i]),permission))
-                        {
-                            found--;
-                        }
-                    }
-                    if(found > 0)
-                    {
-                        if(permission == MC_PTP_SEND)
-                        {
-                            reason="One of the inputs doesn't have per-asset send permission";
-                        }
-                        if(permission == MC_PTP_RECEIVE)
-                        {
-                            reason="One of the outputs doesn't have per-asset receive permission";
-                        }                    
-                        return false;                                
-                    }
-                }
-            }
-        }        
-    }
-    
-    return true;
-}
 
 
 bool mc_ExtractInputAssetQuantities(mc_Buffer *assets, const CScript& script1, uint256 hash, string& reason)

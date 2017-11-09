@@ -795,8 +795,30 @@ bool FindRelevantCoins(CWallet *lpWallet,                                       
             }
             if(is_relevant)
             {
-                if(allowed & MC_PTP_SEND)
+                if(mc_gState->m_Features->PerAssetPermissions())
                 {
+                    CTxDestination addressRet;        
+
+                    if(allowed & MC_PTP_SEND)
+                    {
+                        if(ExtractDestinationScriptValid(txout.scriptPubKey, addressRet))
+                        {
+                            string strPerAssetFailReason;
+
+                            vector<CTxDestination> addressRets;
+                            addressRets.push_back(addressRet);
+
+                            if(!mc_VerifyAssetPermissions(tmp_amounts,addressRets,1,MC_PTP_SEND,strPerAssetFailReason) || 
+                               !mc_VerifyAssetPermissions(tmp_amounts,addressRets,1,MC_PTP_RECEIVE,strPerAssetFailReason))
+                            {
+                                allowed -= MC_PTP_SEND;                                
+                            }
+                        }
+                    }
+                }
+                    
+                if(allowed & MC_PTP_SEND)
+                {                    
                     if(!InsertCoinIntoMatrix(coin_id,hash,out_i,tmp_amounts,out_amounts,in_amounts,in_map,in_row,in_size,in_special_row,pure_native))
                     {
                         strFailReason=_("Internal error: Cannot update input amount matrix");
