@@ -130,6 +130,7 @@ typedef struct mc_Features
     int FixedIn1000920001();
     int MultipleStreamKeys();
     int FixedIsUnspendable();
+    int PerAssetPermissions();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo
@@ -170,6 +171,7 @@ typedef struct mc_State
     mc_Script               *m_TmpScript1;
     mc_Buffer               *m_TmpAssetsOut;
     mc_Buffer               *m_TmpAssetsIn;
+    mc_Buffer               *m_TmpAssetsTmp;
     
     mc_Buffer               *m_BlockHeaderSuccessors;
     
@@ -193,6 +195,8 @@ typedef struct mc_State
         mc_InitABufferMap(m_TmpAssetsOut);
         m_TmpAssetsIn=new mc_Buffer;
         mc_InitABufferMap(m_TmpAssetsIn);
+        m_TmpAssetsTmp=new mc_Buffer;
+        mc_InitABufferMap(m_TmpAssetsTmp);
         m_Compatibility=MC_VCM_NONE;
         
         m_BlockHeaderSuccessors=new mc_Buffer;
@@ -241,6 +245,10 @@ typedef struct mc_State
         if(m_TmpAssetsIn)
         {
             delete m_TmpAssetsIn;
+        }
+        if(m_TmpAssetsTmp)
+        {
+            delete m_TmpAssetsTmp;
         }
         if(m_BlockHeaderSuccessors)
         {

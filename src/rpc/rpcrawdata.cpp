@@ -525,6 +525,7 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
     string entity_name;
     int multiple=1;
     int is_open=0;
+    uint32_t permissions=0;
     bool missing_name=true;
     bool missing_multiple=true;
     bool missing_open=true;
@@ -606,6 +607,38 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             missing_open=false;
             field_parsed=true;
         }
+        if(d.name_ == "permissions")
+        {
+            if(mc_gState->m_Features->PerAssetPermissions() == 0)
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "Per-asset permissions not supported for this protocol version");   
+            }
+            if(permissions == 0)
+            {
+                if(d.value_.type() == str_type)
+                {
+                    permissions=mc_gState->m_Permissions->GetPermissionType(d.value_.get_str().c_str(),MC_PTP_SEND | MC_PTP_RECEIVE);
+                    if(permissions == 0)
+                    {
+                        *strError=string("Invalid permission");                                                                
+                    }
+                }
+                else
+                {
+                    *strError=string("Invalid permission");                                                                
+                }
+            }
+            else
+            {
+                *strError=string("permissions field can appear only once in the object");                                                                                                                        
+            }
+            if(permissions)
+            {
+                lpDetails->SetSpecialParamValue(MC_ENT_SPRM_PERMISSIONS,(unsigned char*)&permissions,sizeof(uint32_t));                                
+            }
+            field_parsed=true;
+        }
+        
         if(d.name_ == "details")
         {
             if(!missing_details)

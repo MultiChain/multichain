@@ -7,8 +7,8 @@
 
 int mc_State::VersionInfo(int version)
 {
-    int this_build=20000101;
-    int this_protocol=20001;
+    int this_build=20000102;
+    int this_protocol=20002;
     if(version < 0)
     {
         return 0;
@@ -32,7 +32,7 @@ int mc_State::VersionInfo(int version)
     if(version < 10004)return -10000201;                                        // last build supporting this version (negative)
     if(version < 10010)return -this_build;                                      // supported by this version    
     if(version < 20001)return 20001;                                            // next version
-    if(version < 20002)return -this_build;                                      // supported by this version    
+    if(version < this_protocol+1)return -this_build;                            // supported by this version    
         
     return VersionInfo(MULTICHAIN_VERSION_CODE_BUILD)-1;                        // Created by the following builds
 }

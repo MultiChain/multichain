@@ -127,13 +127,13 @@ Value issuefromcmd(const Array& params, bool fHelp)
     lpDetailsScript=NULL;
     
     mc_Script *lpDetails;
-    lpDetails=new mc_Script;
-    lpDetails->AddElement();
+    lpDetails=NULL;
     
     int ret,type;
     string asset_name="";
     bool is_open=false;
     bool name_is_found=false;
+    uint32_t permissions=0;
     
     if (params.size() > 2 && params[2].type() != null_type)// && !params[2].get_str().empty())
     {
@@ -159,6 +159,24 @@ Value issuefromcmd(const Array& params, bool fHelp)
                     else
                     {
                         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'open' field, should be boolean");                                                                
+                    }
+                }
+                if(s.name_ == "permissions")
+                {
+                    if(mc_gState->m_Features->PerAssetPermissions() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "Per-asset permissions not supported for this protocol version");   
+                    }
+                    if(permissions == 0)
+                    {
+                        if(s.value_.type() == str_type)
+                        {
+                            permissions=mc_gState->m_Permissions->GetPermissionType(s.value_.get_str().c_str(),MC_PTP_SEND | MC_PTP_RECEIVE);
+                            if(permissions == 0)
+                            {
+                                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'permissions' field");                                                                                                
+                            }
+                        }
                     }
                 }
             }
@@ -202,6 +220,9 @@ Value issuefromcmd(const Array& params, bool fHelp)
         }        
     }
 
+    lpDetails=new mc_Script;
+    lpDetails->AddElement();
+    
     if(mc_gState->m_Features->OpDropDetailsScripts())
     {
         if(asset_name.size())
@@ -217,6 +238,11 @@ Value issuefromcmd(const Array& params, bool fHelp)
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);
     }
     
+    if(permissions)
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_PERMISSIONS,(unsigned char*)&permissions,sizeof(uint32_t));                                
+    }
+
 /*    
     if (params.size() > 6)
     {

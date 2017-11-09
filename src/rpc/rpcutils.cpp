@@ -486,7 +486,8 @@ Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong)
             {                
                 Object entry;
                 entry.push_back(Pair("for", PermissionForFieldEntry(&entity)));            
-                full_type=mc_gState->m_Permissions->GetPossiblePermissionTypes(entity.GetEntityType());
+//                full_type=mc_gState->m_Permissions->GetPossiblePermissionTypes(entity.GetEntityType());
+                full_type=mc_gState->m_Permissions->GetPossiblePermissionTypes(&entity);
                 if(full_type & MC_PTP_CONNECT)entry.push_back(Pair("connect", (type & MC_PTP_CONNECT) ? true : false));
                 if(full_type & MC_PTP_SEND)entry.push_back(Pair("send", (type & MC_PTP_SEND) ? true : false));
                 if(full_type & MC_PTP_RECEIVE)entry.push_back(Pair("receive", (type & MC_PTP_RECEIVE) ? true : false));
@@ -1005,7 +1006,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
 // output_level constants
 // 0x0000 minimal: name, assetref, non-negative qty, negative actual issueqty    
 // 0x0001 raw 
-// 0x0002 multiple, units, open, details
+// 0x0002 multiple, units, open, details, permissions
 // 0x0004 issuetxid,     
 // 0x0008 subscribed/synchronized    
 // 0x0020 issuers
@@ -1071,9 +1072,11 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         uint64_t multiple=1;
         const unsigned char *ptr;
         double units=1.;
+        uint32_t permissions;
 
         ptr=entity.GetScript();
         multiple=genesis_entity.GetAssetMultiple();
+        permissions=genesis_entity.Permissions();
         units= 1./(double)multiple;
         if(output_level & 0x0002)
         {
@@ -1088,6 +1091,13 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                 else
                 {
                     entry.push_back(Pair("open",false));                                            
+                }
+                if(mc_gState->m_Features->PerAssetPermissions())
+                {
+                    Object pObject;
+                    pObject.push_back(Pair("send",(permissions & MC_PTP_SEND) ? true : false));
+                    pObject.push_back(Pair("receive",(permissions & MC_PTP_RECEIVE) ? true : false));
+                    entry.push_back(Pair("permissions",pObject));                                            
                 }
             }
         }
@@ -1570,7 +1580,8 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                 
                 if(type_string.size())
                 {
-                    type=mc_gState->m_Permissions->GetPermissionType(type_string.c_str(),entity.GetEntityType());
+                    type=mc_gState->m_Permissions->GetPermissionType(type_string.c_str(),&entity);
+//                    type=mc_gState->m_Permissions->GetPermissionType(type_string.c_str(),entity.GetEntityType());
                     if(entity.GetEntityType() == MC_ENT_TYPE_NONE)
                     {
                         if(required)
