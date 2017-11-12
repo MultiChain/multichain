@@ -1097,7 +1097,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                     Object pObject;
                     pObject.push_back(Pair("send",(permissions & MC_PTP_SEND) ? true : false));
                     pObject.push_back(Pair("receive",(permissions & MC_PTP_RECEIVE) ? true : false));
-                    entry.push_back(Pair("permissions",pObject));                                            
+                    entry.push_back(Pair("restrict",pObject));                                            
                 }
             }
         }

@@ -607,7 +607,7 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             missing_open=false;
             field_parsed=true;
         }
-        if(d.name_ == "permissions")
+        if(d.name_ == "restrict")
         {
             if(mc_gState->m_Features->PerAssetPermissions() == 0)
             {
@@ -620,21 +620,21 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
                     permissions=mc_gState->m_Permissions->GetPermissionType(d.value_.get_str().c_str(),MC_PTP_SEND | MC_PTP_RECEIVE);
                     if(permissions == 0)
                     {
-                        *strError=string("Invalid permission");                                                                
+                        *strError=string("Invalid restrict");                                                                
                     }
                 }
                 else
                 {
-                    *strError=string("Invalid permission");                                                                
+                    *strError=string("Invalid restrict");                                                                
                 }
             }
             else
             {
-                *strError=string("permissions field can appear only once in the object");                                                                                                                        
+                *strError=string("restrict field can appear only once in the object");                                                                                                                        
             }
             if(permissions)
             {
-                lpDetails->SetSpecialParamValue(MC_ENT_SPRM_PERMISSIONS,(unsigned char*)&permissions,sizeof(uint32_t));                                
+                lpDetails->SetSpecialParamValue(MC_ENT_SPRM_PERMISSIONS,(unsigned char*)&permissions,1);                                
             }
             field_parsed=true;
         }

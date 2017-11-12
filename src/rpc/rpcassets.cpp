@@ -161,7 +161,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
                         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'open' field, should be boolean");                                                                
                     }
                 }
-                if(s.name_ == "permissions")
+                if(s.name_ == "restrict")
                 {
                     if(mc_gState->m_Features->PerAssetPermissions() == 0)
                     {
@@ -174,7 +174,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
                             permissions=mc_gState->m_Permissions->GetPermissionType(s.value_.get_str().c_str(),MC_PTP_SEND | MC_PTP_RECEIVE);
                             if(permissions == 0)
                             {
-                                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'permissions' field");                                                                                                
+                                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for restrict field");                                                                                                
                             }
                         }
                     }
@@ -240,7 +240,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
     
     if(permissions)
     {
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_PERMISSIONS,(unsigned char*)&permissions,sizeof(uint32_t));                                
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_PERMISSIONS,(unsigned char*)&permissions,1);                                
     }
 
 /*    
