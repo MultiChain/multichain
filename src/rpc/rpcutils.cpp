@@ -446,6 +446,42 @@ Value PermissionForFieldEntry(mc_EntityDetails *lpEntity)
     return Value::null;
 }
 
+Array PerOutputDataEntries(const CTxOut& txout,mc_Script *lpScript,uint256 txid,int vout)
+{
+    Array results;
+    unsigned char *ptr;
+    int size;
+    
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return results;
+    }    
+    
+    const CScript& script1 = txout.scriptPubKey;        
+    CScript::const_iterator pc1 = script1.begin();
+
+    lpScript->Clear();
+    lpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+    
+    for (int e = 0; e < lpScript->GetNumElements(); e++)
+    {
+        lpScript->SetElement(e);
+        if(lpScript->GetRawData(&ptr,&size) == 0)      
+        {
+            uint32_t format=MC_SCR_DATA_FORMAT_UNKNOWN;
+            if(e > 0)
+            {
+                lpScript->SetElement(e-1);
+                lpScript->GetDataFormat(&format);
+            }
+            results.push_back(OpReturnFormatEntry(ptr,size,txid,vout,format,NULL));            
+        }        
+    }
+    
+    return results;
+}
+
+
 Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong)
 {
     Array results;
@@ -1327,7 +1363,8 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
     
     BOOST_FOREACH(const Pair& a, param.get_obj()) 
     {
-        if(a.value_.type() == obj_type)
+        if( (a.value_.type() == obj_type) ||
+            (( (a.value_.type() == str_type) || (a.value_.type() == array_type) ) && (a.name_== "data")) )
         {
             bool parsed=false;
             
@@ -1463,6 +1500,47 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                 mc_SetABQuantity(buf,quantity);
                 lpFollowonBuffer->Add(buf);                    
                 lpScript->SetAssetQuantities(lpFollowonBuffer,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);                
+                parsed=true;
+            }
+
+            if(!parsed && (a.name_ == "data"))
+            {
+                Array arr;
+                if( (a.value_.type() == str_type) || (a.value_.type() == obj_type) )
+                {
+                    arr.push_back(a.value_);
+                }
+                else
+                {
+                    if(a.value_.type() == array_type)
+                    {
+                        arr=a.value_.get_array();
+                    }
+                }
+                
+                for(int i=0;i<(int)arr.size();i++)
+                {
+                    uint32_t data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
+                    int errorCode=RPC_INVALID_PARAMETER;
+
+                    mc_gState->m_TmpScript->Clear();
+
+                    vector<unsigned char> vData=ParseRawFormattedData(&(arr[i]),&data_format,mc_gState->m_TmpScript,&errorCode,&strError);
+                    if(strError.size())
+                    {
+                        if(eErrorCode)
+                        {
+                            *eErrorCode=errorCode;
+                        }
+                        goto exitlbl;
+                    }
+
+                    if(data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
+                    {
+                        lpScript->SetDataFormat(data_format);                    
+                    }
+                    lpScript->SetRawData(&(vData[0]),(int)vData.size());                    
+                }
                 parsed=true;
             }
             

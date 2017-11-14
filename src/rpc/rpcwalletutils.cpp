@@ -621,6 +621,7 @@ Object TxOutEntry(const CTxOut& TxOutIn,int vout,const CTxIn& TxIn,uint256 hash,
 
     Object txout_entry;
     Array permissions;
+    Array peroutputdata;
     isminetype fIsMine=ISMINE_NO;
     amounts->Clear();
 //    int iad=-1;
@@ -719,6 +720,12 @@ Object TxOutEntry(const CTxOut& TxOutIn,int vout,const CTxIn& TxIn,uint256 hash,
             {
                 txout_entry.push_back(Pair("permissions", permissions));                            
             }
+            
+            peroutputdata=PerOutputDataEntries(txout,lpScript,hash,vout);
+            if(peroutputdata.size())
+            {
+                txout_entry.push_back(Pair("data", peroutputdata));
+            }            
         }
     }
 

@@ -355,6 +355,11 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         {
             out.push_back(Pair("permissions", permissions));
         }
+        Array peroutputdata=PerOutputDataEntries(txout,lpScript,tx.GetHash(),i);
+        if(peroutputdata.size())
+        {
+            out.push_back(Pair("data", peroutputdata));
+        }
         
         Array items;
         Value data_item_entry=DataItemEntry(tx,i,streams_already_seen, 0x03);
@@ -689,6 +694,13 @@ Value listunspent(const Array& params, bool fHelp)
         }
         Array permissions=PermissionEntries(txout,lpScript,false);
         entry.push_back(Pair("permissions", permissions));
+        
+        Array peroutputdata=PerOutputDataEntries(txout,lpScript,hash,out.i);
+        if(peroutputdata.size())
+        {
+            entry.push_back(Pair("data", peroutputdata));
+        }
+        
 //        entry.push_back(Pair("spendable", out.fSpendable));
 /* MCHN END */                
         results.push_back(entry);

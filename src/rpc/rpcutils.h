@@ -85,6 +85,7 @@ int ParseAssetKeyToFullAssetRef(const char* asset_key,unsigned char *full_asset_
 Array AddressEntries(const CTxIn& txin,txnouttype& typeRet,mc_Script *lpScript);
 Array AddressEntries(const CTxOut& txout,txnouttype& typeRet);
 Value PermissionForFieldEntry(mc_EntityDetails *lpEntity);
+Array PerOutputDataEntries(const CTxOut& txout,mc_Script *lpScript,uint256 txid,int vout);
 Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong);
 Object StreamEntry(const unsigned char *txid,uint32_t output_level);
 Object UpgradeEntry(const unsigned char *txid);

@@ -30,6 +30,7 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
 bool CreateAssetBalanceList(const CTxOut& out,mc_Buffer *amounts,mc_Script *lpScript);
 Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_level);
 Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong);
+Array PerOutputDataEntries(const CTxOut& txout,mc_Script *lpScript,uint256 txid,int vout);
 string EncodeHexTx(const CTransaction& tx);
 int OrphanPoolSize();
 bool paramtobool(Value param);
@@ -560,7 +561,8 @@ Value gettxout(const Array& params, bool fHelp)
     }
     Array permissions=PermissionEntries(txout,lpScript,false);
     ret.push_back(Pair("permissions", permissions));
-    
+    Array data=PerOutputDataEntries(txout,lpScript,hash,n);
+    ret.push_back(Pair("data", data));
 /* MCHN END */        
 
     return ret;
