@@ -30,6 +30,7 @@ const unsigned char* GetAddressIDPtr(const CTxDestination& address)
 bool mc_VerifyAssetPermissions(mc_Buffer *assets, vector<CTxDestination> addressRets, int required_permissions, uint32_t permission, string& reason)
 {
     mc_EntityDetails entity;
+    int asset_count=-1;
     
     for(int i=0;i<assets->GetCount();i++)
     {
@@ -39,15 +40,29 @@ bool mc_VerifyAssetPermissions(mc_Buffer *assets, vector<CTxDestination> address
             {
                 if(assets->GetCount() > 1)
                 {
-                    if(permission == MC_PTP_SEND)
+                    if(asset_count < 0)
                     {
-                        reason="One of multiple assets in input has per-asset permissions";
+                        asset_count=0;
+                        for(int j=0;j<assets->GetCount();j++)
+                        {
+                            if(mc_GetABRefType(assets->GetRow(j)) != MC_AST_ASSET_REF_TYPE_SPECIAL)
+                            {
+                                asset_count++;
+                            }                            
+                        }
                     }
-                    if(permission == MC_PTP_RECEIVE)
+                    if(asset_count > 1)
                     {
-                        reason="One of multiple assets in output has per-asset permissions";
+                        if(permission == MC_PTP_SEND)
+                        {
+                            reason="One of multiple assets in input has per-asset permissions";
+                        }
+                        if(permission == MC_PTP_RECEIVE)
+                        {
+                            reason="One of multiple assets in output has per-asset permissions";
+                        }
+                        return false;                                
                     }
-                    return false;                                
                 }
                 if(entity.Permissions() & permission)
                 {
