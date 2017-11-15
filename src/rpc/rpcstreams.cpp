@@ -988,7 +988,7 @@ int mc_GetHashAndFirstOutput(mc_TxEntityRow *lpEntTx,uint256 *hash)
         erow.m_Pos=lpEntTx->m_Pos;
         first_output=(int)mc_GetLE(lpEntTx->m_TxId+MC_TEE_OFFSET_IN_TXID,sizeof(uint32_t));
         count=(int)mc_GetLE(lpEntTx->m_TxId+MC_TEE_OFFSET_IN_TXID+sizeof(uint32_t),sizeof(uint32_t));
-        if(erow.m_Pos > count)
+        if((int)erow.m_Pos > count)
         {
             erow.m_Pos-=count;
             if(pwalletTxsMain->GetRow(&erow) == 0)

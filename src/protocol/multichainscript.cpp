@@ -2218,7 +2218,6 @@ int mc_Script::GetRawData(unsigned char **data,int *size)
 {
     unsigned char *ptr;
     unsigned char *ptrEnd;
-    unsigned char f;
     
     if(data)
     {
@@ -2264,7 +2263,6 @@ int mc_Script::SetRawData(const unsigned char *data,const int size)
 {
     int err;
     unsigned char buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+1];
-    unsigned char f;
     
     err=AddElement();
     if(err)
@@ -2274,7 +2272,6 @@ int mc_Script::SetRawData(const unsigned char *data,const int size)
     
     memcpy(buf,MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
     buf[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_RAW_DATA_PREFIX;        
-    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+1]=f;
     
     err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+1);
     if(err)
