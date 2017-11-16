@@ -557,12 +557,21 @@ Value gettxout(const Array& params, bool fHelp)
             assets.push_back(asset_entry);
         }
 
-        ret.push_back(Pair("assets", assets));
+        if( (assets.size() > 0) || (mc_gState->m_Compatibility & MC_VCM_1_0) )
+        {
+            ret.push_back(Pair("assets", assets));
+        }
     }
     Array permissions=PermissionEntries(txout,lpScript,false);
-    ret.push_back(Pair("permissions", permissions));
+    if( (permissions.size() > 0) || (mc_gState->m_Compatibility & MC_VCM_1_0) )
+    {
+        ret.push_back(Pair("permissions", permissions));
+    }
     Array data=PerOutputDataEntries(txout,lpScript,hash,n);
-    ret.push_back(Pair("data", data));
+    if(data.size())
+    {
+        ret.push_back(Pair("data", data));
+    }
 /* MCHN END */        
 
     return ret;
