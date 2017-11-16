@@ -283,7 +283,7 @@ CScript RawDataScriptRawHex(Value *param,int *errorCode,string *strError)
     return scriptOpReturn;
 }
 
-vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,int *errorCode,string *strError)
+vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,bool allow_formatted,int *errorCode,string *strError)
 {
     vector<unsigned char> vValue;
     if(value->type() == str_type)
@@ -302,7 +302,7 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
     }
     else
     {
-        if(mc_gState->m_Features->FormattedData())
+        if(allow_formatted || (mc_gState->m_Features->FormattedData() != 0) )
         {
             if(value->type() == obj_type) 
             {
@@ -486,7 +486,7 @@ CScript RawDataScriptFormatted(Value *param,uint32_t *data_format,mc_Script *lpD
             {
                 *strError=string("data object should have single key - json or text");                                                                                                        
             }
-            vValue=ParseRawFormattedData(param,data_format,lpDetailsScript,errorCode,strError);
+            vValue=ParseRawFormattedData(param,data_format,lpDetailsScript,false,errorCode,strError);
             field_parsed=true;
             missing_data=false;
         }
@@ -1100,7 +1100,7 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
             {
                 *strError=string("data field can appear only once in the object");                                                                                                        
             }
-            vValue=ParseRawFormattedData(&(d.value_),data_format,lpDetailsScript,errorCode,strError);
+            vValue=ParseRawFormattedData(&(d.value_),data_format,lpDetailsScript,false,errorCode,strError);
             field_parsed=true;
             missing_data=false;
         }

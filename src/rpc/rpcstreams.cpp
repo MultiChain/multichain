@@ -652,7 +652,7 @@ Value publishfrom(const Array& params, bool fHelp)
 
     string strError;
     int errorCode=RPC_INVALID_PARAMETER;
-    dataData=ParseRawFormattedData(&(params[3]),&data_format,lpDetailsScript,&errorCode,&strError);
+    dataData=ParseRawFormattedData(&(params[3]),&data_format,lpDetailsScript,false,&errorCode,&strError);
 
     if(strError.size())
     {

@@ -1525,7 +1525,7 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
 
                     mc_gState->m_TmpScript->Clear();
 
-                    vector<unsigned char> vData=ParseRawFormattedData(&(arr[i]),&data_format,mc_gState->m_TmpScript,&errorCode,&strError);
+                    vector<unsigned char> vData=ParseRawFormattedData(&(arr[i]),&data_format,mc_gState->m_TmpScript,true,&errorCode,&strError);
                     if(strError.size())
                     {
                         if(eErrorCode)
