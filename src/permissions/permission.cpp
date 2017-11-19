@@ -3047,7 +3047,7 @@ int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAdd
     mc_PermissionLedgerRow pldLast;
     int err,i,num_types,thisBlock,lastAllowed,thisAllowed;        
     char msg[256];
-    uint32_t types[9];
+    uint32_t types[32];
     uint32_t pr_entity,pr_address,pr_admin;
     num_types=0;
     types[num_types]=MC_PTP_CONNECT;num_types++;
