@@ -1385,6 +1385,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                             case MC_TET_STREAM:
                             case MC_TET_STREAM_KEY:
                             case MC_TET_STREAM_PUBLISHER:
+                            case MC_TET_ASSET:
                                 vSubscribedEntities.push_back(stat->m_Entity);
                                 break;
                         }
