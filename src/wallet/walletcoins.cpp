@@ -16,7 +16,7 @@ extern mc_WalletTxs* pwalletTxsMain;
 
 using namespace std;
 
-bool debug_print=false;
+bool debug_print=true;
 bool csperf_debug_print=false;
 
 void CAssetGroupTree::Clear()
@@ -25,6 +25,7 @@ void CAssetGroupTree::Clear()
     nMaxAssetsPerGroup=0;
     nOptimalGroupCount=0;
     nMode=0;
+    nSingleAssetGroupCount=0;
     lpAssets=NULL;
     lpAssetGroups=NULL;
     lpTmpGroupBuffer=NULL;
@@ -52,10 +53,12 @@ void CAssetGroupTree::Dump()
     CAssetGroup *thisGroup;
     int *aptr;
     unsigned char *assetrefbin;
-    int i,j;
+    int i,j,s;
     
-    if(debug_print)printf("Asset Grouping. Group Size: %d. Group Count: %d\n",nAssetsPerGroup,lpAssetGroups->GetCount()-1);
-    if(fDebug)LogPrint("mchn","mchn: Asset Grouping. Group Size: %d. Group Count: %d\n",nAssetsPerGroup,lpAssetGroups->GetCount()-1);
+    if(debug_print)printf("Asset Grouping. Assets: %d. Group Size: %d. Group Count: %d. Single-Asset Groups: %d.\n",
+            lpAssets->GetCount(),nAssetsPerGroup,lpAssetGroups->GetCount()-1,nSingleAssetGroupCount);
+    if(fDebug)LogPrint("mchn","mchn: Asset Grouping. Assets: %d. Group Size: %d. Group Count: %d. Single-Asset Groups: %d.\n",
+            lpAssets->GetCount(),nAssetsPerGroup,lpAssetGroups->GetCount()-1,nSingleAssetGroupCount);
     for(i=1;i<lpAssetGroups->GetCount();i++)                                    
     {    
         thisGroup=(CAssetGroup*)lpAssetGroups->GetRow(i);
@@ -63,7 +66,12 @@ void CAssetGroupTree::Dump()
         {
             printf("Group: %4d. Asset Count: %d\n",i,thisGroup->nSize);
             aptr=(int*)(lpAssetGroups->GetRow(i)+sizeof(CAssetGroup));
-            for(j=0;j<thisGroup->nSize;j++)
+            s=thisGroup->nSize;
+            if(s<0)
+            {
+                s=1;
+            }
+            for(j=0;j<s;j++)
             {
                 assetrefbin=(unsigned char*)lpAssets->GetRow(aptr[j]);
                 
@@ -102,8 +110,7 @@ int CAssetGroupTree::Resize(int newAssets)
     CAssetGroup *thisGroup;
     
     n=nAssetsPerGroup;
-    
-    while(nOptimalGroupCount*n < lpAssets->GetCount()+newAssets)
+    while(nOptimalGroupCount*n < lpAssets->GetCount()+newAssets-nSingleAssetGroupCount)
     {
         n*=2;
     }
@@ -276,7 +283,6 @@ CAssetGroup *CAssetGroupTree::FindAndShiftBestGroup(int assets)
         thisGroup->nNextGroup=0;                                                // The group is full
     }
     
-    
     return thisGroup;    
 }
 
@@ -297,13 +303,14 @@ int CAssetGroupTree::GetGroup(mc_Buffer* assets, int addIfNeeded)
         return -1;
     }
 
-    int group_id,last_asset_count,new_asset_count;
+    int group_id,last_asset_count,new_asset_count,only_asset;
     int i,g;
     int *iptr;
     int *aptr;
     unsigned char *assetRef;
     CAssetGroup *thisGroup;
     
+    only_asset=-1;
     group_id=-2;                                                                // No assets in this buffer
     last_asset_count=lpAssets->GetCount();
     for(i=0;i<assets->GetCount();i++)
@@ -314,6 +321,14 @@ int CAssetGroupTree::GetGroup(mc_Buffer* assets, int addIfNeeded)
             (mc_GetABRefType(assetRef) != MC_AST_ASSET_REF_TYPE_GENESIS) )                    
 //        if(mc_GetLE(assetRef,4) > 0)                             
         {
+            if(only_asset == -1)
+            {
+                only_asset=i;
+            }
+            else
+            {
+                only_asset=-2;                                                  // More than one asset
+            }
             g=GetGroup(assetRef,0);
             if(g>0)
             {
@@ -361,7 +376,17 @@ int CAssetGroupTree::GetGroup(mc_Buffer* assets, int addIfNeeded)
     
     thisGroup=NULL;
     
-    Resize(new_asset_count - last_asset_count);
+    if(only_asset >= 0)                                                         // Assets which cannot be combined with other
+    {
+        thisGroup=AddSingleAssetGroup(assets->GetRow(only_asset));
+        if(thisGroup)
+        {
+            return thisGroup->nThisGroup;            
+        }
+    }
+    
+//    Resize(new_asset_count - last_asset_count);
+    Resize(0);                                                                  // Assets already added
 
     if(group_id > 0)                                                                // There are old assets, so we know what should be group id
     {
@@ -425,6 +450,47 @@ int CAssetGroupTree::GetGroup(mc_Buffer* assets, int addIfNeeded)
     
     return 0;
 }
+
+
+/*
+ * Returns group id of the asset 
+ * Adds single assets
+ */
+
+CAssetGroup *CAssetGroupTree::AddSingleAssetGroup(unsigned char *assetRef)
+{
+    mc_EntityDetails entity;
+    int group_id,asset_id;
+    int *aptr;
+    if(mc_gState->m_Features->PerAssetPermissions())
+    {
+        if(mc_gState->m_Assets->FindEntityByFullRef(&entity,assetRef))
+        {
+            if( entity.Permissions() & (MC_PTP_SEND | MC_PTP_RECEIVE) )
+            {
+                asset_id=lpAssets->GetCount()-1;
+                group_id=lpAssetGroups->GetCount();
+                CAssetGroup assetGroup;
+                assetGroup.nThisGroup=group_id;
+                assetGroup.nNextGroup=0;
+                assetGroup.nSize=-1;
+                memset(lpTmpGroupBuffer,0,nAssetsPerGroup*sizeof(int));
+                if(lpAssetGroups->Add(&assetGroup,lpTmpGroupBuffer))
+                {
+                    return NULL;
+                }
+                *(int*)(lpAssets->GetRow(asset_id)+MC_AST_ASSET_QUANTITY_OFFSET)=group_id;
+                aptr=(int*)(lpAssetGroups->GetRow(group_id)+sizeof(CAssetGroup));
+                aptr[0]=asset_id;
+                nSingleAssetGroupCount++;
+                return (CAssetGroup *)(lpAssetGroups->GetRow(group_id));
+            }
+        }
+    }
+    
+    return NULL;
+}
+
 
 /*
  * Returns group id of the asset 
@@ -2508,7 +2574,7 @@ bool CWallet::InitializeUnspentList()
     int max_assets_per_group=assets_per_opdrop*MCP_STD_OP_DROP_COUNT;
 
     lpAssetGroups->Initialize(1,max_assets_per_group,32,1);
-
+    
     vector <COutput> vCoins;
 
     mc_Buffer *tmp_amounts;
@@ -2532,8 +2598,22 @@ bool CWallet::InitializeUnspentList()
             ParseMultichainTxOutToBuffer(hash,txout,tmp_amounts,lpScript,NULL,NULL,strError);
         }
         asset_count=tmp_amounts->GetCount();
-        if(asset_count)                                         // Resize asset grouping to prevent crazy autocombine on 
-                                                                            // already autocombined with higher assets-per-group setting   
+        if(mc_gState->m_Features->PerAssetPermissions())
+        {
+            mc_EntityDetails entity;
+            for(int i=0;i<tmp_amounts->GetCount();i++)
+            {
+                if(mc_gState->m_Assets->FindEntityByFullRef(&entity,tmp_amounts->GetRow(i)))
+                {
+                    if( entity.Permissions() & (MC_PTP_SEND | MC_PTP_RECEIVE) )
+                    {
+                        asset_count--;
+                    }
+                }
+            }
+        }
+        if(asset_count > 0)                                                     // Resize asset grouping to prevent crazy autocombine on 
+                                                                                 // already autocombined with higher assets-per-group setting   
         {
             lpAssetGroups->Resize(asset_count);
         }

@@ -2895,7 +2895,7 @@ void mc_InitRPCHelpMap13()
             "      \"asset-identifier\" : asset-quantity\n"
             "      ,...\n"
             "    }\n"                
-            "2. lock                             (boolean, optiona, default=true) Lock prepared unspent output\n"
+            "2. lock                             (boolean, optional, default=true) Lock prepared unspent output\n"
             "\nResult:\n"
             "{\n"
             "  \"txid\": \"transactionid\",          (string) Transaction ID of the output which can be spent in createrawexchange or createrawexchange\n"

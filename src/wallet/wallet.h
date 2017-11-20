@@ -179,6 +179,7 @@ private:
     int nMaxAssetsPerGroup;
     int nOptimalGroupCount;
     int nMode;
+    int nSingleAssetGroupCount;
     void Clear();
     void Destroy();
     
@@ -187,6 +188,7 @@ private:
     int *lpTmpGroupBuffer;
     
     CAssetGroup *FindAndShiftBestGroup(int assets);
+    CAssetGroup *AddSingleAssetGroup(unsigned char *assetRef);
     
 public:
     
