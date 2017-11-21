@@ -462,29 +462,27 @@ CAssetGroup *CAssetGroupTree::AddSingleAssetGroup(unsigned char *assetRef)
     mc_EntityDetails entity;
     int group_id,asset_id;
     int *aptr;
-    if(mc_gState->m_Features->PerAssetPermissions())
+    
+    if(mc_gState->m_Assets->FindEntityByFullRef(&entity,assetRef))
     {
-        if(mc_gState->m_Assets->FindEntityByFullRef(&entity,assetRef))
+        if( entity.Permissions() & (MC_PTP_SEND | MC_PTP_RECEIVE) )
         {
-            if( entity.Permissions() & (MC_PTP_SEND | MC_PTP_RECEIVE) )
+            asset_id=lpAssets->GetCount()-1;
+            group_id=lpAssetGroups->GetCount();
+            CAssetGroup assetGroup;
+            assetGroup.nThisGroup=group_id;
+            assetGroup.nNextGroup=0;
+            assetGroup.nSize=-1;
+            memset(lpTmpGroupBuffer,0,nAssetsPerGroup*sizeof(int));
+            if(lpAssetGroups->Add(&assetGroup,lpTmpGroupBuffer))
             {
-                asset_id=lpAssets->GetCount()-1;
-                group_id=lpAssetGroups->GetCount();
-                CAssetGroup assetGroup;
-                assetGroup.nThisGroup=group_id;
-                assetGroup.nNextGroup=0;
-                assetGroup.nSize=-1;
-                memset(lpTmpGroupBuffer,0,nAssetsPerGroup*sizeof(int));
-                if(lpAssetGroups->Add(&assetGroup,lpTmpGroupBuffer))
-                {
-                    return NULL;
-                }
-                *(int*)(lpAssets->GetRow(asset_id)+MC_AST_ASSET_QUANTITY_OFFSET)=group_id;
-                aptr=(int*)(lpAssetGroups->GetRow(group_id)+sizeof(CAssetGroup));
-                aptr[0]=asset_id;
-                nSingleAssetGroupCount++;
-                return (CAssetGroup *)(lpAssetGroups->GetRow(group_id));
+                return NULL;
             }
+            *(int*)(lpAssets->GetRow(asset_id)+MC_AST_ASSET_QUANTITY_OFFSET)=group_id;
+            aptr=(int*)(lpAssetGroups->GetRow(group_id)+sizeof(CAssetGroup));
+            aptr[0]=asset_id;
+            nSingleAssetGroupCount++;
+            return (CAssetGroup *)(lpAssetGroups->GetRow(group_id));
         }
     }
     
