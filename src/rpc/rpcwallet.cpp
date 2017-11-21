@@ -570,20 +570,46 @@ Value gettxoutdata(const Array& params, bool fHelp)
     mc_gState->m_TmpScript->Clear();
     mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
 
+    uint32_t format;
     string metadata="";
-    
-    if(mc_gState->m_TmpScript->IsOpReturnScript() == 0)                      
-    {
-        throw JSONRPCError(RPC_OUTPUT_NOT_DATA, "Output without metadata");        
-    }
     size_t elem_size;
     const unsigned char *elem;
     
-    uint32_t format;
-
-    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
-    
-    elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
+    if(mc_gState->m_TmpScript->IsOpReturnScript() == 0)                      
+    {
+        unsigned char *ptr;
+        int size;
+        elem=NULL;
+        
+        for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
+        {
+            mc_gState->m_TmpScript->SetElement(e);
+            if(mc_gState->m_TmpScript->GetRawData(&ptr,&size) == 0)      
+            {
+                if(elem)
+                {
+                    throw JSONRPCError(RPC_NOT_ALLOWED, "This output has more than one data item");                                
+                }
+                format=MC_SCR_DATA_FORMAT_UNKNOWN;
+                if(e > 0)
+                {
+                    mc_gState->m_TmpScript->SetElement(e-1);
+                    mc_gState->m_TmpScript->GetDataFormat(&format);
+                }
+                elem=ptr;
+                elem_size=size;
+            }        
+        }
+        if(elem == NULL)
+        {
+            throw JSONRPCError(RPC_OUTPUT_NOT_DATA, "Output without metadata");        
+        }
+    }
+    else
+    {
+        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+        elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
+    }
 
     int count,start;
     count=elem_size;
