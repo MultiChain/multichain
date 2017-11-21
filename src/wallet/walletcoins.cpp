@@ -1921,6 +1921,130 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
     return 0;
 }
 
+bool CheckOutputPermissions(const vector<pair<CScript, CAmount> >& vecSend,mc_Buffer *tmp_amounts,std::string& strFailReason,int *eErrorCode)
+{
+    int receive_required;
+    int64_t quantity;
+    int err;
+    bool fIsMaybePurePermission,fIsGenesis;
+    
+    BOOST_FOREACH (const PAIRTYPE(CScript, CAmount)& s, vecSend)            
+    {
+        txnouttype typeRet;
+        int nRequiredRet;
+        vector<CTxDestination> addressRets;
+        if(!ExtractDestinations(s.first,typeRet,addressRets,nRequiredRet))
+        {
+            if(typeRet != TX_NULL_DATA)
+            {
+                strFailReason="Non-standard outputs are not supported in coin selection";
+                *eErrorCode=RPC_INTERNAL_ERROR;
+                return false;
+            }
+        }
+        if(addressRets.size()>0)
+        {
+            receive_required=addressRets.size();
+            if(typeRet == TX_MULTISIG)
+            {
+                receive_required-=nRequiredRet;
+                receive_required+=1;
+                if(receive_required>(int)addressRets.size())
+                {
+                    receive_required=addressRets.size();
+                }
+            }
+            
+            CScript::const_iterator pc1 = s.first.begin();
+
+            mc_gState->m_TmpScript->Clear();
+            mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(s.first.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+            
+            tmp_amounts->Clear();
+            if(!mc_ExtractOutputAssetQuantities(tmp_amounts,strFailReason,true))   
+            {
+                *eErrorCode=RPC_INTERNAL_ERROR;
+                return false;
+            }
+            if(!mc_VerifyAssetPermissions(tmp_amounts,addressRets,receive_required,MC_PTP_RECEIVE,strFailReason))
+            {
+                *eErrorCode=RPC_NOT_ALLOWED;
+                return false;
+            }
+            
+            fIsMaybePurePermission=true;
+            fIsGenesis=false;
+            for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
+            {
+                mc_gState->m_TmpScript->SetElement(e);
+                err=mc_gState->m_TmpScript->GetAssetGenesis(&quantity);
+                if(err == 0)
+                {
+                    fIsGenesis=true;
+                    fIsMaybePurePermission=false;
+                }         
+                err=mc_gState->m_TmpScript->GetRawData(NULL,NULL);              
+                if(err == 0)
+                {
+                    fIsMaybePurePermission=false;
+                }
+            }
+
+            if(tmp_amounts->GetCount())                                         
+            {
+                if(fIsGenesis)
+                {
+                    strFailReason="Asset issuance and asset transfer are not allowed in one output";
+                    *eErrorCode=RPC_NOT_ALLOWED;
+                    return false;                    
+                }
+                fIsMaybePurePermission=false;                
+            }
+            
+            if( (s.second > 0) || 
+                !fIsMaybePurePermission || 
+                (mc_gState->m_Features->AnyoneCanReceiveEmpty() == 0) )
+            {
+                for(int a=0;a<(int)addressRets.size();a++)
+                {                            
+                    CKeyID *lpKeyID=boost::get<CKeyID> (&addressRets[a]);
+                    CScriptID *lpScriptID=boost::get<CScriptID> (&addressRets[a]);
+                    if((lpKeyID == NULL) && (lpScriptID == NULL))
+                    {
+                        strFailReason="Wrong destination type";
+                        *eErrorCode=RPC_INTERNAL_ERROR;
+                        return false;
+                    }
+                    unsigned char* ptr=NULL;
+                    if(lpKeyID != NULL)
+                    {
+                        ptr=(unsigned char*)(lpKeyID);
+                    }
+                    else
+                    {
+                        ptr=(unsigned char*)(lpScriptID);
+                    }
+
+                    bool fCanReceive=mc_gState->m_Permissions->CanReceive(NULL,ptr);
+
+                    if(fCanReceive)                        
+                    {
+                        receive_required--;
+                    }                                    
+                }
+                if(receive_required>0)
+                {
+                    strFailReason="One of the outputs doesn't have receive permission";
+                    *eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
+                    return false;
+                }
+            }            
+        }            
+    }
+    
+    return true;
+}
+
 bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript, CAmount> >& vecSend,
                                 CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, std::string& strFailReason, const CCoinControl* coinControl,
                                 const set<CTxDestination>* addresses,int min_conf,int min_inputs,int max_inputs,const vector<COutPoint>* lpCoinsToUse,uint32_t flags,int *eErrorCode)
@@ -2004,6 +2128,11 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
     required=0;
     if(vecSend.size())
     {
+        if(!CheckOutputPermissions(vecSend,tmp_amounts,strFailReason,eErrorCode))
+        {
+            goto exitlbl;
+        }
+                
         required=0;
         if( (addresses == NULL) || (addresses->size() != 1) )
         {

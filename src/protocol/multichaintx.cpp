@@ -117,27 +117,6 @@ bool mc_ExtractInputAssetQuantities(mc_Buffer *assets, const CScript& script1, u
     return true;
 }
 
-bool mc_ExtractOutputAssetQuantities(mc_Buffer *assets,string& reason,bool with_followons)
-{
-    int err;
-    uint32_t script_type=MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER;
-    if(with_followons)
-    {        
-        script_type |= MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON;
-    }
-    for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
-    {
-        mc_gState->m_TmpScript->SetElement(e);
-        err=mc_gState->m_TmpScript->GetAssetQuantities(assets,script_type);
-        if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
-        {
-            reason="Asset transfer script rejected - error in output transfer script";
-            return false;                                
-        }
-    }
-
-    return true;
-}
 
 bool mc_CompareAssetQuantities(string& reason)
 {
