@@ -16,7 +16,7 @@ extern mc_WalletTxs* pwalletTxsMain;
 
 using namespace std;
 
-bool debug_print=true;
+bool debug_print=false;
 bool csperf_debug_print=false;
 
 void CAssetGroupTree::Clear()

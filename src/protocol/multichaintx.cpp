@@ -117,13 +117,18 @@ bool mc_ExtractInputAssetQuantities(mc_Buffer *assets, const CScript& script1, u
     return true;
 }
 
-bool mc_ExtractOutputAssetQuantities(mc_Buffer *assets,string& reason)
+bool mc_ExtractOutputAssetQuantities(mc_Buffer *assets,string& reason,bool with_followons)
 {
     int err;
+    uint32_t script_type=MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER;
+    if(with_followons)
+    {        
+        script_type |= MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON;
+    }
     for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
     {
         mc_gState->m_TmpScript->SetElement(e);
-        err=mc_gState->m_TmpScript->GetAssetQuantities(assets,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);
+        err=mc_gState->m_TmpScript->GetAssetQuantities(assets,script_type);
         if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
         {
             reason="Asset transfer script rejected - error in output transfer script";
@@ -221,7 +226,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
     int err;
     int64_t quantity,total;
     uint256 txid;
-    bool new_issue,follow_on;
+    bool new_issue,follow_on,issue_in_output;
     int details_script_type;
     unsigned char *ptrOut;
     vector <uint160> issuers;
@@ -379,12 +384,16 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
         }
         else
         {
+            mc_gState->m_TmpAssetsTmp->Clear();
+            issue_in_output=false;
+            
             for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
             {
                 mc_gState->m_TmpScript->SetElement(e);
                 err=mc_gState->m_TmpScript->GetAssetGenesis(&quantity);
                 if(err == 0)
                 {
+                    issue_in_output=true;
                     new_issue=true;
                     if(quantity+total<0)
                     {
@@ -430,6 +439,16 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                         reason="Asset issue script rejected - error in script";
                         return false;                                    
                     }
+                    if(mc_gState->m_Features->PerAssetPermissions())
+                    {
+                        err=mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsTmp,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);
+                        if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
+                        {
+                            reason="Script rejected - error in asset transfer script";
+                            return false;                                
+                        }
+                    }                    
+
                     err=mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
                     if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
                     {
@@ -446,6 +465,17 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                     }
                 }                
             }        
+            if(issue_in_output)
+            {
+                if(mc_gState->m_Features->PerAssetPermissions())
+                {
+                    if(mc_gState->m_TmpAssetsTmp->GetCount())
+                    {
+                        reason="Asset issue script rejected - asset transfer in script";
+                        return false;                                    
+                    }                    
+                }
+            }
         }
     }    
 
@@ -1693,7 +1723,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                     if(mc_gState->m_Features->PerAssetPermissions())
                     {
                         mc_gState->m_TmpAssetsTmp->Clear();
-                        if(!mc_ExtractOutputAssetQuantities(mc_gState->m_TmpAssetsTmp,reason))                // Filling output asset quantity list
+                        if(!mc_ExtractOutputAssetQuantities(mc_gState->m_TmpAssetsTmp,reason,true))   
                         {
                             fReject=true;
                             goto exitlbl;                                                                        
@@ -1703,7 +1733,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                             return false;                                
                         }
                     }
-                    if(!mc_ExtractOutputAssetQuantities(mc_gState->m_TmpAssetsOut,reason))                // Filling output asset quantity list
+                    if(!mc_ExtractOutputAssetQuantities(mc_gState->m_TmpAssetsOut,reason,false))                // Filling output asset quantity list
                     {
                         fReject=true;
                         goto exitlbl;                                                                        
