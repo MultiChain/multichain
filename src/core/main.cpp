@@ -4155,7 +4155,7 @@ bool CheckBranchForInvalidBlocks(CBlockIndex * const pindexPrev)
 
 
 
-bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex * const pindexPrev)
+bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex * const pindexPrev, CBlockIndex *pindexChecked)
 {
     uint256 hash = block.GetHash();
     if (hash == Params().HashGenesisBlock())
@@ -4228,11 +4228,14 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
             }
         }
     }
-    
-    if(!CheckBranchForInvalidBlocks(pindexPrev))
+
+    if(pindexChecked != pindexPrev)                                         
     {
-        return state.Invalid(error("%s : %s rejected - invalid branch", __func__,block.GetHash().ToString().c_str()),
-                             REJECT_INVALID, "reorg-invalid branch");                                
+        if(!CheckBranchForInvalidBlocks(pindexPrev))
+        {
+            return state.Invalid(error("%s : %s rejected - invalid branch", __func__,block.GetHash().ToString().c_str()),
+                                 REJECT_INVALID, "reorg-invalid branch");                                
+        }
     }
 
     
@@ -4285,7 +4288,7 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
     return true;
 }
 
-bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex** ppindex, int node_id)
+bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex** ppindex, int node_id, CBlockIndex *pindexChecked)
 {
     AssertLockHeld(cs_main);
     // Check for duplicate
@@ -4299,10 +4302,13 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
             *ppindex = pindex;
         if (pindex->nStatus & BLOCK_FAILED_MASK)
             return state.Invalid(error("%s : block is marked invalid", __func__), 0, "duplicate");
-        if(!CheckBranchForInvalidBlocks(pindex->pprev))
+        if(pindexChecked != pindex->pprev)                                         
         {
-            return state.Invalid(error("%s : %s rejected - invalid branch", __func__,block.GetHash().ToString().c_str()),
-                                 REJECT_INVALID, "reorg-invalid branch");                                
+            if(!CheckBranchForInvalidBlocks(pindex->pprev))
+            {
+                return state.Invalid(error("%s : %s rejected - invalid branch", __func__,block.GetHash().ToString().c_str()),
+                                     REJECT_INVALID, "reorg-invalid branch");                                
+            }
         }
         return true;
     }
@@ -4321,7 +4327,7 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
             return state.DoS(10, error("%s : prev block invalid", __func__), REJECT_INVALID, "bad-prevblk");// MCHN was 100 before, softened for reorgs due to mining diversity change
     }
 
-    if (!ContextualCheckBlockHeader(block, state, pindexPrev))
+    if (!ContextualCheckBlockHeader(block, state, pindexPrev, pindexChecked))
         return false;
 
     int successor=0;
@@ -6226,7 +6232,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 Misbehaving(pfrom->GetId(), 20);
                 return error("non-continuous headers sequence");
             }
-            if (!AcceptBlockHeader(header, state, &pindexLast, pfrom->GetId())) {
+            if (!AcceptBlockHeader(header, state, &pindexLast, pfrom->GetId(),pindexLast)) {
                 int nDoS;
                 if (state.IsInvalid(nDoS)) {
                     if (nDoS > 0)
