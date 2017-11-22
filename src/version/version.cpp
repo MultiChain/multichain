@@ -25,6 +25,8 @@ int mc_State::VersionInfo(int version)
                 return 10004;                                                   // first supported version
             case MULTICHAIN_VERSION_CODE_PROTOCOL_MIN_DOWNGRADE:
                 return 10008;                                                   // cannot downgrade below this version
+            case MULTICHAIN_VERSION_CODE_PROTOCOL_MIN_NO_DOWNGRADE:
+                return 20002;                                                   // if we are on this version or above, downgrades are forbidden
         }
         return 0;        
     }
@@ -102,6 +104,10 @@ int mc_State::MinProtocolDowngradeVersion()
     return VersionInfo(MULTICHAIN_VERSION_CODE_PROTOCOL_MIN_DOWNGRADE);
 }
 
+int mc_State::MinProtocolForbiddenDowngradeVersion()
+{
+    return VersionInfo(MULTICHAIN_VERSION_CODE_PROTOCOL_MIN_NO_DOWNGRADE);    
+}
 
 
 int mc_State::GetWalletDBVersion()

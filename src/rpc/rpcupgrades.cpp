@@ -113,6 +113,13 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
                 {
                     throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid protocol version, cannot downgrade to this version");                                                                                                        
                 }
+                if( mc_gState->m_NetworkParams->ProtocolVersion() >= mc_gState->MinProtocolForbiddenDowngradeVersion() )
+                {
+                    if(protocol_version < mc_gState->m_NetworkParams->ProtocolVersion())
+                    {
+                        throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid protocol version, cannot downgrade from current version");
+                    }                    
+                }
                 lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,(unsigned char*)&protocol_version,4);        
             }
             else
@@ -267,6 +274,14 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
     mc_EntityDetails entity;
     entity.Zero();
     ParseEntityIdentifier(entity_identifier,&entity, MC_ENT_TYPE_UPGRADE);           
+
+    if( mc_gState->m_NetworkParams->ProtocolVersion() >= mc_gState->MinProtocolForbiddenDowngradeVersion() )
+    {
+        if(entity.UpgradeProtocolVersion() < mc_gState->m_NetworkParams->ProtocolVersion())
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid protocol version, cannot downgrade from current version");
+        }                    
+    }
     
     if(mc_gState->m_Permissions->IsApproved(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,0))
     {
@@ -337,6 +352,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
 
     Array results;
     mc_Buffer *upgrades;
+    int latest_version;
     
     upgrades=NULL;
     
@@ -420,6 +436,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
         }
     }    
     
+    latest_version=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
     BOOST_FOREACH(PAIRTYPE(const uint64_t, int)& item, map_sorted)
     {
         int i=item.second;
@@ -454,7 +471,16 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
             }
             if(current_height >=applied_height)
             {
-                entry.push_back(Pair("appliedblock",(int64_t)applied_height));                            
+                if((latest_version < mc_gState->MinProtocolForbiddenDowngradeVersion()) || (upgrade_entity.UpgradeProtocolVersion() >= latest_version))
+                {
+                    latest_version=upgrade_entity.UpgradeProtocolVersion();
+                    entry.push_back(Pair("appliedblock",(int64_t)applied_height));                            
+                }
+                else
+                {
+                    Value null_value;
+                    entry.push_back(Pair("appliedblock",null_value));                                                
+                }
             }
             else
             {

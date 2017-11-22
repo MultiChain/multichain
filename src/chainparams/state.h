@@ -262,6 +262,7 @@ typedef struct mc_State
     int GetProtocolVersion();
     int MinProtocolVersion();
     int MinProtocolDowngradeVersion();
+    int MinProtocolForbiddenDowngradeVersion();
     int IsSupported(int version);
     int IsDeprecated(int version);
     const char* GetSeedNode();
