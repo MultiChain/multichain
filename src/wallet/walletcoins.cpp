@@ -2001,42 +2001,51 @@ bool CheckOutputPermissions(const vector<pair<CScript, CAmount> >& vecSend,mc_Bu
                 fIsMaybePurePermission=false;                
             }
             
-            if( (s.second > 0) || 
-                !fIsMaybePurePermission || 
-                (mc_gState->m_Features->AnyoneCanReceiveEmpty() == 0) )
+            if(s.second > 0)
             {
-                for(int a=0;a<(int)addressRets.size();a++)
-                {                            
-                    CKeyID *lpKeyID=boost::get<CKeyID> (&addressRets[a]);
-                    CScriptID *lpScriptID=boost::get<CScriptID> (&addressRets[a]);
-                    if((lpKeyID == NULL) && (lpScriptID == NULL))
+                fIsMaybePurePermission=false;    
+            }
+            
+            if(!fIsMaybePurePermission)
+                
+            {
+                if( (s.second > 0) || 
+                    (tmp_amounts->GetCount() > 0) ||
+                    (mc_gState->m_Features->AnyoneCanReceiveEmpty() == 0) )
+                {
+                    for(int a=0;a<(int)addressRets.size();a++)
+                    {                            
+                        CKeyID *lpKeyID=boost::get<CKeyID> (&addressRets[a]);
+                        CScriptID *lpScriptID=boost::get<CScriptID> (&addressRets[a]);
+                        if((lpKeyID == NULL) && (lpScriptID == NULL))
+                        {
+                            strFailReason="Wrong destination type";
+                            *eErrorCode=RPC_INTERNAL_ERROR;
+                            return false;
+                        }
+                        unsigned char* ptr=NULL;
+                        if(lpKeyID != NULL)
+                        {
+                            ptr=(unsigned char*)(lpKeyID);
+                        }
+                        else
+                        {
+                            ptr=(unsigned char*)(lpScriptID);
+                        }
+
+                        bool fCanReceive=mc_gState->m_Permissions->CanReceive(NULL,ptr);
+
+                        if(fCanReceive)                        
+                        {
+                            receive_required--;
+                        }                                    
+                    }
+                    if(receive_required>0)
                     {
-                        strFailReason="Wrong destination type";
-                        *eErrorCode=RPC_INTERNAL_ERROR;
+                        strFailReason="One of the outputs doesn't have receive permission";
+                        *eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
                         return false;
                     }
-                    unsigned char* ptr=NULL;
-                    if(lpKeyID != NULL)
-                    {
-                        ptr=(unsigned char*)(lpKeyID);
-                    }
-                    else
-                    {
-                        ptr=(unsigned char*)(lpScriptID);
-                    }
-
-                    bool fCanReceive=mc_gState->m_Permissions->CanReceive(NULL,ptr);
-
-                    if(fCanReceive)                        
-                    {
-                        receive_required--;
-                    }                                    
-                }
-                if(receive_required>0)
-                {
-                    strFailReason="One of the outputs doesn't have receive permission";
-                    *eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
-                    return false;
                 }
             }            
         }            
