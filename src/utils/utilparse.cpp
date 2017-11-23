@@ -60,6 +60,11 @@ bool mc_VerifyAssetPermissions(mc_Buffer *assets, vector<CTxDestination> address
         {
             if( entity.Permissions() & (MC_PTP_SEND | MC_PTP_RECEIVE) )
             {
+                if( (addressRets.size() != 1) || (required_permissions > 1) )
+                {
+                    reason="Sending restricted asset to non-standard and multisig addresses not allowed";
+                    return false;                                                    
+                }
                 if(assets->GetCount() > 1)
                 {
                     if(asset_count < 0)
