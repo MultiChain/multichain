@@ -114,6 +114,13 @@ Object ExchangeAssetEntry(uint256 hash,const CTxOut txout,mc_Script *lpScript,mc
             {
                 address=CBitcoinAddress(*lpKeyID);
                 address_found=true;
+                if(mc_gState->m_Permissions->CanReceive(NULL,(unsigned char*)(lpKeyID)) == 0)
+                {
+                    if(strError.size() == 0)
+                    {
+                        strError="Address doesn't have receive permission";                                                        
+                    }
+                }
             }
             else
             {
@@ -122,14 +129,12 @@ Object ExchangeAssetEntry(uint256 hash,const CTxOut txout,mc_Script *lpScript,mc
                     strError="Only pay-to-keyhash addresses are supported in exchange";                                    
                 }                
             }
-            if(mc_gState->m_Permissions->CanReceive(NULL,(unsigned char*)(lpKeyID)) == 0)
-            {
-                if(strError.size() == 0)
-                {
-                    strError="Address doesn't have receive permission";                                                        
-                }
-            }
         }
+    }
+    
+    if(strError.size())
+    {
+        return result;
     }
     
     Array assets;
