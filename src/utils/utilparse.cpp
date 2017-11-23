@@ -91,7 +91,7 @@ bool mc_VerifyAssetPermissions(mc_Buffer *assets, vector<CTxDestination> address
                     int found=required_permissions;
                     for(int j=0;j<(int)addressRets.size();j++)
                     {
-                        if(mc_gState->m_Permissions->GetPermission(entity.GetTxID(),GetAddressIDPtr(addressRets[i]),permission))
+                        if(mc_gState->m_Permissions->GetPermission(entity.GetTxID(),GetAddressIDPtr(addressRets[j]),permission))
                         {
                             found--;
                         }
