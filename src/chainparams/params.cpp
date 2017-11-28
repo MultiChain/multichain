@@ -18,14 +18,20 @@ int mc_OneMultichainParam::IsRelevant(int version)
 {
     int ret=1;
     
-    if(m_ProtocolVersion > version)
+    int relevant_version=mc_gState->RelevantParamProtocolVersion();
+    if(relevant_version == 0)
+    {
+        relevant_version=version;
+    }
+    
+    if(m_ProtocolVersion > relevant_version)
     {
         ret=0;
     }
     
     if(m_Removed > 0)
     {
-        if(m_Removed <= version)
+        if(m_Removed <= relevant_version)
         {
             ret=0;
         }

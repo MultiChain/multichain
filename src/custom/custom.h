@@ -6,6 +6,7 @@
 #include "utils/utilparse.h"
 #include "multichain/multichain.h"
 #include "structs/base58.h"
+#include "version/version.h"
 
 
 

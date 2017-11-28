@@ -7,14 +7,14 @@
 
 int mc_State::VersionInfo(int version)
 {
-    int this_build=20000102;
-    int this_protocol=20002;
-    
     int custom_version=custom_version_info(version);
     if(custom_version != 0)
     {
         return custom_version;
     }
+    
+    int this_build=20000102;
+    int this_protocol=20002;   
     
     if(version < 0)
     {
@@ -34,6 +34,8 @@ int mc_State::VersionInfo(int version)
                 return 10008;                                                   // cannot downgrade below this version
             case MULTICHAIN_VERSION_CODE_PROTOCOL_MIN_NO_DOWNGRADE:
                 return 20002;                                                   // if we are on this version or above, downgrades are forbidden
+            case MULTICHAIN_VERSION_CODE_PROTOCOL_FOR_RELEVANCE:                
+                return 0;                                                       // If not 0, defines relevant parameter set
         }
         return 0;        
     }
@@ -116,6 +118,10 @@ int mc_State::MinProtocolForbiddenDowngradeVersion()
     return VersionInfo(MULTICHAIN_VERSION_CODE_PROTOCOL_MIN_NO_DOWNGRADE);    
 }
 
+int mc_State::RelevantParamProtocolVersion()
+{
+    return VersionInfo(MULTICHAIN_VERSION_CODE_PROTOCOL_FOR_RELEVANCE);        
+}
 
 int mc_State::GetWalletDBVersion()
 {
