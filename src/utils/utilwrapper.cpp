@@ -718,6 +718,9 @@ int mc_BuildDescription(int build, char *desc)
         case 2:
             sprintf(desc+strlen(desc)," beta ");
             break;
+        case 7:
+            sprintf(desc+strlen(desc)," build ");
+            break;
         case 9:
             if(c[4] != 1)return MC_ERR_INVALID_PARAMETER_VALUE;
             break;
