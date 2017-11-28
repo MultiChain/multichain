@@ -252,6 +252,8 @@ multichain_libbitcoin_multichain_a_SOURCES = \
   utils/tools.cpp \
   utils/utilwrapper.cpp \
   version/version.cpp \
+  custom/custom.cpp \
+  custom/custom_multichain.cpp \
   chainparams/params.cpp \
   protocol/multichainscript.cpp \
   utils/dbwrapper.cpp \
@@ -513,6 +515,8 @@ libbitcoinconsensus_la_SOURCES = \
   utils/utilwrapper.cpp \
   chainparams/buildgenesis.cpp \
   version/version.cpp \
+  custom/custom.cpp \
+  custom/custom_multichain.cpp \
   chainparams/chainparams.cpp \
   protocol/multichainscript.cpp \
   utils/dbwrapper.cpp \

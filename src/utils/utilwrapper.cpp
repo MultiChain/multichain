@@ -47,6 +47,7 @@
 #include "structs/hash.h"
 #include "core/main.h"
 #include "net/net.h"
+#include "custom/custom.h"
 
 #define MC_DCT_SEED_NODE_MAX_SIZE 32
 
@@ -76,6 +77,8 @@ void mc_Params::Parse(int argc, const char* const argv[],int exe_type)
     int i,length;
     ParseParameters(argc,argv);
     mc_ExpandDataDirParam();
+    
+    custom_set_runtime_defaults(exe_type);
     
     m_NumArguments=0;
     length=MC_DCT_SEED_NODE_MAX_SIZE+1;

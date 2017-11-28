@@ -3,12 +3,19 @@
 
 #include "multichain/multichain.h"
 #include "version/version.h"
-
+#include "custom/custom.h"
 
 int mc_State::VersionInfo(int version)
 {
     int this_build=20000102;
     int this_protocol=20002;
+    
+    int custom_version=custom_version_info(version);
+    if(custom_version != 0)
+    {
+        return custom_version;
+    }
+    
     if(version < 0)
     {
         return 0;

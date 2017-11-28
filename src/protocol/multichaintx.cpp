@@ -9,6 +9,7 @@
 #include "utils/utilparse.h"
 #include "multichain/multichain.h"
 #include "structs/base58.h"
+#include "custom/custom.h"
 
 using namespace std;
 
@@ -1940,6 +1941,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
         }
     }
     
+    fReject=!custom_accept_transacton(tx,inputs,offset,accept,reason,replay);
     
 exitlbl:
                                     
