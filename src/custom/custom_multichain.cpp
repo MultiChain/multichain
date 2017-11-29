@@ -3,7 +3,7 @@
 
 #include "multichain/multichain.h"
 
-void* custom_get_blockchain_default(const char *param,int* size)
+void* custom_get_blockchain_default(const char *param,int* size,void *param_in)
 {
     *size=0;
     

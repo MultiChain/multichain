@@ -466,6 +466,7 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
     mc_OneMultichainParam *param;
     char *ptrData;
     const char *ptr;
+    unsigned char custom_param[8];
     
     if(name == NULL)
     {
@@ -700,7 +701,7 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
 
                 ptrData=m_lpData+offset+MC_PRM_PARAM_SIZE_BYTES;
 
-                ptr=(char*)custom_get_blockchain_default(param->m_Name,&size);
+                ptr=(char*)custom_get_blockchain_default(param->m_Name,&size,custom_param);
                 if(ptr == NULL)
                 {
                     ptr=(char*)lpDefaultParams->GetParam(param->m_Name,&size);                    

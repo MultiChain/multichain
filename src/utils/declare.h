@@ -243,7 +243,7 @@ void mc_SetDataDirArg(char *buf);
 void mc_ExpandDataDirParam();
 void mc_CheckDataDirInConfFile();
 void mc_AdjustStartAndCount(int *count,int *start,int size);
-void* custom_get_blockchain_default(const char *param,int* size);
+void* custom_get_blockchain_default(const char *param,int* size,void *param_in);
 
 
 int mc_TestScenario(char* scenario_file);
