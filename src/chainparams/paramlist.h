@@ -159,7 +159,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
                    "firstblockreward","Native blockchain currency (likely not required)",
                    "Initial block mining reward in raw native currency units."},
     { "rewardhalvinginterval"            , "reward-halving-interval"          ,
-                   MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE                  , -1,  52560000,         60,4294967295U, 0.0, 10001, 0, "-mc-rewardhalvinginterval",
+                   MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE                  , -1,  52560000,         60,1000000000, 0.0, 10001, 0, "-mc-rewardhalvinginterval",
                    "rewardspendabledelay","",
                    "Interval for halving of mining rewards, in blocks."},
     { "rewardspendabledelay"                  , "reward-spendable-delay"                  , 
