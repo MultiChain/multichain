@@ -166,6 +166,7 @@ typedef struct mc_State
     void *m_pSeedNode;
     uint32_t m_Compatibility;
     uint32_t m_SessionFlags;
+    unsigned char m_BurnAddress[20];
     
     mc_Script               *m_TmpScript;
     mc_Script               *m_TmpScript1;
@@ -188,6 +189,7 @@ typedef struct mc_State
         m_NodePausedState=MC_NPS_NONE;
         m_ProtocolVersionToUpgrade=0;
         m_SessionFlags=MC_SSF_DEFAULT;
+        memset(m_BurnAddress,0,20);
         
         m_IPv4Address=0;
         m_WalletMode=0;
