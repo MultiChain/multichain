@@ -5,6 +5,10 @@
 
 using namespace std;
 
+bool custom_good_for_coin_selection(const CScript& script)
+{
+    return true;    
+}
 
 bool custom_accept_transacton(const CTransaction& tx, 
                               const CCoinsViewCache &inputs,

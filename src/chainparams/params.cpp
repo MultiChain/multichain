@@ -50,6 +50,7 @@ void mc_MultichainParams::Zero()
     m_Size=0;
     m_IsProtocolMultiChain=1;
     m_ProtocolVersion=0;
+    m_RelevantProtocolVersion=0;
     
     m_AssetRefSize=MC_AST_SHORT_TXID_SIZE;
 }
@@ -1555,6 +1556,10 @@ const unsigned char* mc_MultichainParams::AddressCheckumValue()
 
 int mc_MultichainParams::ProtocolVersion()
 {
+    if(mc_gState->m_NetworkParams->m_RelevantProtocolVersion)
+    {
+        return mc_gState->m_NetworkParams->m_RelevantProtocolVersion;
+    }
     if(m_ProtocolVersion)
     {
         return m_ProtocolVersion;

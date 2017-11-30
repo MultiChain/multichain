@@ -18,6 +18,7 @@ extern "C" {
 #endif
 
 int custom_version_info(int version);
+bool custom_good_for_coin_selection(const CScript& script);
 bool custom_accept_transacton(const CTransaction& tx, 
                               const CCoinsViewCache &inputs,
                               int offset,

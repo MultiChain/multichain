@@ -11,6 +11,7 @@
 #include "script/sign.h"
 #include "utils/utilmoneystr.h"
 #include "rpc/rpcprotocol.h"
+#include "custom/custom.h"
 
 extern mc_WalletTxs* pwalletTxsMain;
 
@@ -815,7 +816,8 @@ bool FindRelevantCoins(CWallet *lpWallet,                                       
         
         out_i=out.i;
         tmp_amounts->Clear();
-        if(ParseMultichainTxOutToBuffer(hash,txout,tmp_amounts,lpScript,&allowed,&required,mapSpecialEntity,strError))
+        if(custom_good_for_coin_selection(txout.scriptPubKey) &&
+            ParseMultichainTxOutToBuffer(hash,txout,tmp_amounts,lpScript,&allowed,&required,mapSpecialEntity,strError))
         {
                                                                                 // All coins are taken, possible future optimization
 /*            

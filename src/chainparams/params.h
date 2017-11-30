@@ -96,6 +96,7 @@ typedef struct mc_MultichainParams
     int m_Count;
     int m_IsProtocolMultiChain;
     int m_ProtocolVersion;
+    int m_RelevantProtocolVersion;
     
     int m_AssetRefSize;
     
