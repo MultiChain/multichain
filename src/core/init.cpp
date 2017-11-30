@@ -1334,6 +1334,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             return InitError(_(seed_error.c_str()));        
         }
         
+        string strBurnAddress=BurnAddress(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS)); // Caching burn address
+        LogPrint("mchn","mchn: Burn address: %s\n",strBurnAddress.c_str());                
+        
         int64_t wallet_mode=GetArg("-walletdbversion",0);
         bool wallet_mode_valid=false;
         if(wallet_mode == 0)

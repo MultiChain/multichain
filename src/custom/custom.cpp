@@ -16,13 +16,4 @@ void custom_set_runtime_defaults(int exe_type)
 }
 
 
-bool custom_accept_transacton(const CTransaction& tx, 
-                              const CCoinsViewCache &inputs,
-                              int offset,
-                              bool accept,
-                              string& reason,
-                              uint32_t *replay)
-{
-    return true;
-}
 
