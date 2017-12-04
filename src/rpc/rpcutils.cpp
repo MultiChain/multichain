@@ -1942,6 +1942,11 @@ CScript GetScriptForString(string source)
         destinations.push_back(tok);
     }    
     
+    if(destinations.size() == 0)
+    {
+        throw runtime_error(" Address cannot be empty");        
+    }   
+    
     if(destinations.size() == 1)
     {
         CBitcoinAddress address(destinations[0]);
