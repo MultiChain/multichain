@@ -944,7 +944,6 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
     int full_count,this_count,pure_native_count;
     CAmount total_native;
     int total_native_hit;
-    
     vector <pair<int,int> > active_groups;                                      // Groups found in UTXOs
     
     group_count=lpWallet->lpAssetGroups->GroupCount();
@@ -969,7 +968,8 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
             uint256 hash=out.GetHashAndTxOut(txout);
             out_i=out.i;
             tmp_amounts->Clear();
-            if(ParseMultichainTxOutToBuffer(hash,txout,tmp_amounts,lpScript,&allowed,&required,strError))
+            if(custom_good_for_coin_selection(txout.scriptPubKey) && 
+                    ParseMultichainTxOutToBuffer(hash,txout,tmp_amounts,lpScript,&allowed,&required,strError))
             {
                 if( (required & MC_PTP_ISSUE) == 0 )                            // Ignore txouts containing unconfirmed geneses
                 {
@@ -1079,7 +1079,8 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
             uint256 hash=out.GetHashAndTxOut(txout);
             out_i=out.i;
             tmp_amounts->Clear();
-            if(ParseMultichainTxOutToBuffer(hash,txout,tmp_amounts,lpScript,&allowed,&required,strError))
+            if(custom_good_for_coin_selection(txout.scriptPubKey) &&
+                    ParseMultichainTxOutToBuffer(hash,txout,tmp_amounts,lpScript,&allowed,&required,strError))
             {
                 if( (required & MC_PTP_ISSUE) == 0 )                            // Ignore txouts containing unconfirmed geneses
                 {
