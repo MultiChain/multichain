@@ -368,6 +368,10 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
         else
         {
             *strError=string("data should be hexadecimal string");                                                    
+            if(mc_gState->m_Features->FormattedData() == 0)
+            {
+                *strError+=" for this protocol version";
+            }
         }
     }
     

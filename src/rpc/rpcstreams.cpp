@@ -642,6 +642,14 @@ Value publishfrom(const Array& params, bool fHelp)
         }
     }
     
+    if(keys.size() > 1)
+    {
+        if( mc_gState->m_Features->MultipleStreamKeys() == 0 )
+        {
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Multiple keys are not supported by this protocol version");                            
+        }
+    }
+    
     mc_Script *lpDetailsScript;
     lpDetailsScript=NULL;
         
