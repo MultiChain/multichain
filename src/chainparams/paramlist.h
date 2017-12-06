@@ -13,7 +13,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
     { "chaindescription"                       , "chain-description"                       ,
                    MC_PRM_STRING  | MC_PRM_USER | MC_PRM_CLONE | MC_PRM_SPECIAL ,256,         0,          0,         0, 0.0, 10001, 0, "-mc-chaindescription",
                    "rootstreamname","",
-                   "Chain description, embedded in genesis block coinbase, max 256 chars."},
+                   "Chain description, embedded in genesis block coinbase, max 90 chars."},
     { "rootstreamname"                       , "root-stream-name"                       ,
                    MC_PRM_STRING  | MC_PRM_USER | MC_PRM_CLONE  | MC_PRM_SPECIAL,256,         0,          0,         0, 0.0, 10006, 0, "-mc-rootstreamname",
                    "rootstreamopen","",

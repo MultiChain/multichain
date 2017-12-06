@@ -1117,6 +1117,12 @@ int mc_MultichainParams::Validate()
                     return MC_ERR_INVALID_PARAMETER_VALUE;                                                                                    
                 }
            }
+            GetParam("chaindescription",&size);
+            if(size-1 > 90)                                                     
+            {
+                printf("Invalid parameter value for chain-description - too long: %d\n",size-1);                
+                return MC_ERR_INVALID_PARAMETER_VALUE;                                                                                    
+            }
         }
         else
         {
