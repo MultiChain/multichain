@@ -1506,6 +1506,10 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     }            
     else
     {
+        if( (mode & MC_VMM_IGNORE) == 0)
+        {
+            err=MC_ERR_INVALID_PARAMETER_VALUE;
+        }
         obj.push_back(Pair("json", empty_object));        
     }
     result=obj;
