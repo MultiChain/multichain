@@ -261,7 +261,7 @@ bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet)
 
 /* MCHN START */    
 //CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
-CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CPubKey *ppubkey,int *canMine)
+CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CPubKey *ppubkey,int *canMine,CBlockIndex** ppPrev)
 /* MCHN END */    
 {
     // Create new block
@@ -322,6 +322,10 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
                 
         CBlockIndex* pindexPrev = chainActive.Tip();
         const int nHeight = pindexPrev->nHeight + 1;
+        if(ppPrev)
+        {
+            *ppPrev=pindexPrev;
+        }
         CCoinsViewCache view(pcoinsTip);
 
         // Priority order to process transactions
@@ -678,7 +682,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
 /* MCHN START */    
 CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
 {
-    return CreateNewBlock(scriptPubKeyIn,NULL,NULL,NULL);
+    return CreateNewBlock(scriptPubKeyIn,NULL,NULL,NULL,NULL);
 }
 /* MCHN END */    
 
@@ -769,7 +773,7 @@ CBlockTemplate* CreateNewBlockWithKey(CReserveKey& reservekey)
 // Block should be mined for specific keys, not just any from pool
 
 
-CBlockTemplate* CreateNewBlockWithDefaultKey(CWallet *pwallet,int *canMine,const set<CTxDestination>* addresses)
+CBlockTemplate* CreateNewBlockWithDefaultKey(CWallet *pwallet,int *canMine,const set<CTxDestination>* addresses,CBlockIndex** ppPrev)
 {
     CPubKey pubkey;            
     bool key_found;
@@ -795,7 +799,7 @@ CBlockTemplate* CreateNewBlockWithDefaultKey(CWallet *pwallet,int *canMine,const
     
     CScript scriptPubKey = CScript() << OP_DUP << OP_HASH160 << vector<unsigned char>(pubkey_hash, pubkey_hash + 20) << OP_EQUALVERIFY << OP_CHECKSIG;
     
-    return CreateNewBlock(scriptPubKey,pwallet,&pubkey,canMine);
+    return CreateNewBlock(scriptPubKey,pwallet,&pubkey,canMine,ppPrev);
 }
 
 /* MCHN END */    
@@ -1422,7 +1426,7 @@ void static BitcoinMiner(CWallet *pwallet)
                 const unsigned char *pubkey_hash=(unsigned char *)Hash160(kMiner.begin(),kMiner.end()).begin();
                 CScript scriptPubKey = CScript() << OP_DUP << OP_HASH160 << vector<unsigned char>(pubkey_hash, pubkey_hash + 20) << OP_EQUALVERIFY << OP_CHECKSIG;
                 canMine=prevCanMine;
-                auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(scriptPubKey,pwallet,&kMiner,&canMine));            
+                auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(scriptPubKey,pwallet,&kMiner,&canMine,&pindexPrev));            
                 prevCanMine=canMine;
 /* MCHN END */    
             if (!pblocktemplate.get())
