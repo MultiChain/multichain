@@ -1870,7 +1870,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
             if(found_ips > 1)
             {
-                sprintf(bufOutput,"\nThis host has multiple IP addresses, so from some networks:\n\n");
+                sprintf(bufOutput,"This host has multiple IP addresses, so from some networks:\n");
                 bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                 for(int i_ips=0;i_ips<found_ips;i_ips++)
                 {
@@ -1891,7 +1891,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             }
             if (mapArgs.count("-externalip")) 
             {            
-                sprintf(bufOutput,"\nBased on the -externalip setting, this node is reachable at:\n\n");
+                sprintf(bufOutput,"Based on the -externalip setting, this node is reachable at:\n");
                 bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                 BOOST_FOREACH(string strAddr, mapMultiArgs["-externalip"]) 
                 {
@@ -2138,6 +2138,12 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
 
+    if(mapMultiArgs.count("-rpcallowip") == 0)
+    {
+        sprintf(bufOutput,"Listening for API requests on port %d (local only - see rpcallowip setting)\n\n",(int)GetArg("-rpcport", BaseParams().RPCPort()));                            
+        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+    }
+    
 //    int version=mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
     int version=mc_gState->m_NetworkParams->ProtocolVersion();
     LogPrintf("MultiChain protocol version: %d\n",version);
@@ -2149,11 +2155,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
             if(version != original_protocol_version)
             {
-                sprintf(bufOutput,"Protocol version %d (chain created with %d)\n\n",version,original_protocol_version);                            
+                sprintf(bufOutput,"Chain running protocol version %d (chain created with %d)\n\n",version,original_protocol_version);                            
             }
             else
             {
-                sprintf(bufOutput,"Protocol version %d\n\n",version);            
+                sprintf(bufOutput,"Chain running protocol version %d\n\n",version);            
             }
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
         }
@@ -2411,7 +2417,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 /* MCHN START */    
     if(!GetBoolArg("-shortoutput", false))
     {    
-        sprintf(bufOutput,"Node started\n");
+        sprintf(bufOutput,"Node ready.\n\n");
         bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
     }
     mc_InitRPCHelpMap();

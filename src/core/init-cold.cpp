@@ -1013,6 +1013,13 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
         return false;
     }
     LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
+    
+    if(mapMultiArgs.count("-rpcallowip") == 0)
+    {
+        sprintf(bufOutput,"Listening for API requests on port %d (local only - see rpcallowip setting)\n\n",(int)GetArg("-rpcport", BaseParams().RPCPort()));                            
+        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+    }
+    
 
     int version=mc_gState->m_NetworkParams->ProtocolVersion();
     LogPrintf("MultiChain protocol version: %d\n",version);
@@ -1024,11 +1031,11 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
 
             if(version != original_protocol_version)
             {
-                sprintf(bufOutput,"Protocol version %d (chain created with %d)\n\n",version,original_protocol_version);                            
+                sprintf(bufOutput,"Chain running protocol version %d (chain created with %d)\n\n",version,original_protocol_version);                            
             }
             else
             {
-                sprintf(bufOutput,"Protocol version %d\n\n",version);            
+                sprintf(bufOutput,"Chain running protocol version %d\n\n",version);            
             }
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
         }
@@ -1236,7 +1243,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
 /* MCHN START */    
     if(!GetBoolArg("-shortoutput", false))
     {    
-        sprintf(bufOutput,"Node started\n");
+        sprintf(bufOutput,"Node ready.\n\n");
         bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
     }
     mc_InitRPCHelpMap();

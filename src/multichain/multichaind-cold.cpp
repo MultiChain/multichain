@@ -147,7 +147,7 @@ bool AppInit(int argc, char* argv[])
             
             if(!GetBoolArg("-shortoutput", false))
             {
-                fprintf(stdout, "MultiChain server starting\n");
+                fprintf(stdout, "Starting up node...\n");
             }
             
             if (pipe(pipes)) 
