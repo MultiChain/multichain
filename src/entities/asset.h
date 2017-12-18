@@ -60,6 +60,7 @@
 #define MC_ENT_SPRM_ASSET_MULTIPLE            0x41
 #define MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION  0x42
 #define MC_ENT_SPRM_UPGRADE_START_BLOCK       0x43
+#define MC_ENT_SPRM_UPGRADE_CHAIN_PARAMS      0x44
 
 #define MC_ENT_FLAG_OFFSET_IS_SET     0x00000001
 #define MC_ENT_FLAG_NAME_IS_SET       0x00000010
@@ -147,6 +148,8 @@ typedef struct mc_EntityDetails
     const unsigned char* GetFullRef();    
     const unsigned char* GetShortRef();
     const unsigned char* GetScript();    
+    const unsigned char* GetParamUpgrades(int *size);    
+    
     int IsUnconfirmedGenesis();    
     int GetAssetMultiple();
     int IsFollowOn(); 

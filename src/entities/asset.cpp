@@ -675,18 +675,21 @@ int mc_AssetDB::InsertEntity(const void* txid, int offset, int entity_type, cons
         {
             if(script)
             {
-                value_offset=mc_FindSpecialParamInDetailsScript((unsigned char*)script,script_size,MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,&value_size);
-                if(value_offset == script_size)
+                if(mc_gState->m_Features->ParameterUpgrades() == 0)
                 {
-                    return MC_ERR_ERROR_IN_SCRIPT;                                            
-                }
-                if( (value_size <=0) || (value_size > 4) )
-                {
-                    return MC_ERR_ERROR_IN_SCRIPT;                        
-                }
-                if((int)mc_GetLE((unsigned char*)script+value_offset,value_size) < 0)
-                {
-                    return MC_ERR_ERROR_IN_SCRIPT;                        
+                    value_offset=mc_FindSpecialParamInDetailsScript((unsigned char*)script,script_size,MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,&value_size);
+                    if(value_offset == script_size)
+                    {
+                        return MC_ERR_ERROR_IN_SCRIPT;                                            
+                    }
+                    if( (value_size <=0) || (value_size > 4) )
+                    {
+                        return MC_ERR_ERROR_IN_SCRIPT;                        
+                    }
+                    if((int)mc_GetLE((unsigned char*)script+value_offset,value_size) < 0)
+                    {
+                        return MC_ERR_ERROR_IN_SCRIPT;                        
+                    }
                 }
                 value_offset=mc_FindSpecialParamInDetailsScript((unsigned char*)script,script_size,MC_ENT_SPRM_UPGRADE_START_BLOCK,&value_size);
                 if(value_offset != script_size)
@@ -1619,7 +1622,24 @@ int mc_AssetDB::FindEntityByFollowOn(mc_EntityDetails *entity,const unsigned cha
     return 0;
 }
 
-
+const unsigned char* mc_EntityDetails::GetParamUpgrades(int *size)
+{
+    uint32_t value_offset;
+    size_t value_size;
+    
+    if(m_LedgerRow.m_ScriptSize)
+    {
+        value_offset=mc_FindSpecialParamInDetailsScript(m_LedgerRow.m_Script,m_LedgerRow.m_ScriptSize,MC_ENT_SPRM_UPGRADE_CHAIN_PARAMS,&value_size);
+        if(value_offset != m_LedgerRow.m_ScriptSize)
+        {
+            *size=(int)value_size;
+            return m_LedgerRow.m_Script+value_offset;
+        }
+    }
+    
+    *size=0;
+    return NULL;
+}
 
 const char* mc_EntityDetails::GetName()
 {
@@ -1784,12 +1804,17 @@ int mc_EntityDetails::UpgradeProtocolVersion()
 {
     unsigned char *ptr;
     size_t bytes;
+    int version;
     ptr=(unsigned char *)GetSpecialParam(MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,&bytes);
     if(ptr)
     {
         if((bytes>0) && (bytes<=4))
         {
-            return (int)mc_GetLE(ptr,bytes);
+            version=(int)mc_GetLE(ptr,bytes);
+            if(version > 0)
+            {
+                return version;
+            }
         }
     }
     return 0;

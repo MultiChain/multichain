@@ -752,6 +752,60 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
     return entry;
 }
 
+map<string, Value> ParamsToUpgrade(mc_EntityDetails *entity,int version)   
+{
+    map<string, Value> result;
+    int size=0;
+    const mc_OneMultichainParam *param;
+    char* ptr=(char*)entity->GetParamUpgrades(&size);
+    char* ptrEnd;
+    string param_name;
+    int param_size,given_size;
+    int64_t param_value;
+    if(ptr)
+    {
+        ptrEnd=ptr+size;
+        while(ptr<ptrEnd)
+        {
+            if(strcmp(ptr,"protocolversion"))
+            {        
+                param=mc_gState->m_NetworkParams->FindParam(ptr);
+                ptr+=strlen(ptr)+1;
+                if(param)
+                {
+                    param_size=mc_gState->m_NetworkParams->CanBeUpgradedByVersion(param->m_Name,version,0);
+                    given_size=(int)mc_GetLE(ptr,MC_PRM_PARAM_SIZE_BYTES);
+                    ptr+=MC_PRM_PARAM_SIZE_BYTES;
+                    if( (param_size > 0) && (param_size == given_size) )
+                    {
+                        param_name=string(param->m_DisplayName);
+                        param_value=mc_GetLE(ptr,param_size);                            
+                        if(result.find(param_name) == result.end())
+                        {
+                            switch(param->m_Type & MC_PRM_DATA_TYPE_MASK)
+                            {
+                                case MC_PRM_BOOLEAN:
+                                    result.insert(make_pair(param_name, (param_value != 0) ));
+                                    break;
+                                case MC_PRM_INT32:
+                                    result.insert(make_pair(param_name, (int)param_value));
+                                case MC_PRM_UINT32:
+                                case MC_PRM_INT64:
+                                    result.insert(make_pair(param_name, param_value));
+                                    break;
+                            }                                
+                        }
+                    }
+                    ptr+=given_size;
+                }
+            }
+        }
+    }
+        
+    return result;    
+}
+
+
 Object UpgradeEntry(const unsigned char *txid)
 {
     Object entry;
@@ -777,7 +831,15 @@ Object UpgradeEntry(const unsigned char *txid)
         }
         entry.push_back(Pair("createtxid", hash.GetHex()));
         Object fields;
-        fields.push_back(Pair("protocol-version",entity.UpgradeProtocolVersion()));                    
+        map<string, Value> params_to_upgrade=ParamsToUpgrade(&entity,0);
+        if(entity.UpgradeProtocolVersion())
+        {
+            fields.push_back(Pair("protocol-version",entity.UpgradeProtocolVersion()));                    
+        }
+        for(map<string,Value>::iterator it = params_to_upgrade.begin(); it != params_to_upgrade.end(); ++it) 
+        {
+            fields.push_back(Pair(it->first, it->second));  
+        }
         entry.push_back(Pair("params",fields));      
         entry.push_back(Pair("startblock",(int64_t)entity.UpgradeStartBlock()));                    
         

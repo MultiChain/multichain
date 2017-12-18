@@ -894,6 +894,73 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
     return scriptOpReturn;
 }
 
+bool AddParamNameValueToScript(const string  param_name,const Value param_value,mc_Script *lpDetailsScript,int version,int *errorCode,string *strError)
+{
+    int64_t value;
+    string name=param_name;
+            
+    int size=-1;
+    unsigned char zero=0;
+    if(param_value.type() == bool_type)
+    {
+        value=param_value.get_bool() ? 1 : 0;
+        size=1;
+    }
+    if(param_value.type() == int_type)
+    {
+        value=param_value.get_int64();
+        size=0;
+    }
+    if(size < 0)
+    {
+        *errorCode=RPC_INVALID_PARAMETER;
+        *strError=string("Invalid parameter type");                                                                                                                    
+        return false;
+    }
+    
+    name.erase(std::remove(name.begin(), name.end(), '-'), name.end());
+    size=mc_gState->m_NetworkParams->CanBeUpgradedByVersion(name.c_str(),version,size);
+
+    if(size == 1)
+    {
+        if(param_value.type() != bool_type)
+        {
+            *errorCode=RPC_INVALID_PARAMETER;
+            *strError=string("Invalid parameter type");                                                                                                                            
+            return false;
+        }        
+    }
+    
+    if(size == -4)
+    {
+        *errorCode=RPC_INVALID_PARAMETER;
+        *strError=string("Invalid parameter type");                                                                                                                            
+        return false;
+    }
+    
+    if(size < 0)
+    {
+        *errorCode=RPC_INVALID_PARAMETER;
+        *strError=string("Invalid parameter name"); 
+        return false;        
+    }
+    
+    if(size == 0)
+    {
+        *errorCode=RPC_NOT_SUPPORTED;
+        *strError=string("One of parameters cannot be upgraded by this protocol version"); 
+        return false;                
+    }
+    
+    lpDetailsScript->SetData((unsigned char*)name.c_str(),name.size());
+    lpDetailsScript->SetData((unsigned char*)&zero,1);
+    lpDetailsScript->SetData((unsigned char*)&size,MC_PRM_PARAM_SIZE_BYTES);
+    lpDetailsScript->SetData((unsigned char*)&value,size);
+    
+    return true;
+}
+
+
 CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError)
 {
     CScript scriptOpReturn=CScript();
@@ -906,10 +973,14 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
 
     bool missing_name=true;
     bool missing_startblock=true;
+    bool missing_details=true;
     
     lpDetails->Clear();
     lpDetails->AddElement();                   
-       
+
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();                   
+    
     protocol_version=-1;
     
     BOOST_FOREACH(const Pair& d, param->get_obj()) 
@@ -966,7 +1037,7 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
         }
         if(d.name_ == "details")
         {
-            if(protocol_version > 0)
+            if(!missing_details)
             {                    
                 *strError=string("details field can appear only once in the object");                                                                                                                        
             }
@@ -979,7 +1050,10 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
                     {
                         if( (p.value_.type() == int_type) && (p.value_.get_int() > 0) )
                         {
-                            protocol_version=p.value_.get_int();
+                            if(protocol_version < 0)
+                            {
+                                protocol_version=p.value_.get_int();
+                            }
                         }                            
                         else
                         {
@@ -988,21 +1062,39 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
                     }
                     else
                     {
-                        *strError=string("Invalid details");     
+                        if(mc_gState->m_Features->ParameterUpgrades())
+                        {                        
+                            AddParamNameValueToScript(p.name_,p.value_,lpDetailsScript,0,errorCode,strError);
+                        }
+                        else
+                        {
+                            *strError=string("Invalid details");     
+                        }
                     }
                 }
+                
+                script = lpDetailsScript->GetData(0,&bytes);
+                if(strError->size() == 0)
+                {                    
+                    if( (protocol_version <= 0) && (bytes == 0) )
+                    {
+                        *strError=string("Missing protocol-version");                                                                                                            
+                    }
+                }
+                                
                 if(strError->size() == 0)
                 {
                     if(protocol_version > 0)
                     {                    
                         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,(unsigned char*)&protocol_version,4);                                
                     }
-                    else
+                    if(bytes)
                     {
-                        *strError=string("Missing protocol-version");                                                                                    
-                    }                
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_CHAIN_PARAMS,script,bytes);                                                        
+                    }
                 }
-            }                
+            }             
+            missing_details=false;
             field_parsed=true;
         }            
         if(d.name_ == "create")field_parsed=true;
@@ -1014,9 +1106,9 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
     
     if(strError->size() == 0)
     {
-        if(protocol_version < 0)
+        if(missing_details)
         {                    
-            *strError=string("Missing protocol-version");                                                                                            
+            *strError=string("Missing details");                                                                                            
         }
     }
     
@@ -1024,6 +1116,7 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
     {
         int err;
         script=lpDetails->GetData(0,&bytes);
+        lpDetailsScript->Clear();
         err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_UPGRADE,0,script,bytes);
         if(err)
         {

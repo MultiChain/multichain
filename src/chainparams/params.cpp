@@ -137,6 +137,55 @@ void* mc_MultichainParams::GetParam(const char *param,int* size)
     return m_lpData+offset;
 }
 
+int mc_MultichainParams::CanBeUpgradedByVersion(const char *param,int version,int size)
+{
+    if(m_lpIndex == NULL)
+    {
+        return -1;
+    }
+    int index=m_lpIndex->Get(param);
+    if(index<0)
+    {
+        return -2;
+    }   
+    int offset=m_lpCoord[2 * index + 0];
+    if(offset<0)
+    {
+        return -3;
+    }   
+    
+    if(size)
+    {
+        if(size != m_lpCoord[2 * index + 1])
+        {
+            return -4;
+        }
+    }
+    
+    if(version == 0)
+    {
+        return m_lpCoord[2 * index + 1];        
+    }
+    
+    if(strcmp(param,"maximumblocksize") == 0)
+    {
+        if(version >= 20002)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    if(strcmp(param,"targetblocktime") == 0)
+    {
+        if(version >= 20002)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    return 0;
+}
+
 
 int mc_MultichainParams::SetParam(const char *param,const char* value,int size)
 {
@@ -453,6 +502,19 @@ double mc_MultichainParams::ParamAccuracy()
     return 1./(double)MC_PRM_DECIMAL_GRANULARITY;
 }
 
+
+const mc_OneMultichainParam *mc_MultichainParams::FindParam(const char* param)
+{
+    int i;
+    for(i=0;i<m_Count;i++)
+    {
+        if(strcmp((MultichainParamArray+i)->m_Name,param) == 0)
+        {
+            return MultichainParamArray+i;
+        }        
+    }    
+    return NULL;
+}
 
 int mc_MultichainParams::Read(const char* name)
 {
@@ -1984,6 +2046,26 @@ int mc_Features::FixedIsUnspendable()
 }
 
 int mc_Features::PerAssetPermissions()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 20002)
+        {
+            ret=1;
+        }
+    }
+    
+    return ret;    
+}
+
+int mc_Features::ParameterUpgrades()
 {
     int ret=0;
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)

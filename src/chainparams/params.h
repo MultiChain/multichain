@@ -127,7 +127,7 @@ typedef struct mc_MultichainParams
     int Import(const char *name,const char *source_address);
     int Set(const char *name,const char *source,int source_size);
     
-    int FindParam(const char *param);
+    const mc_OneMultichainParam *FindParam(const char *param);
     void* GetParam(const char *param,int* size);
     int64_t GetInt64Param(const char *param);
     double GetDoubleParam(const char *param);
@@ -135,6 +135,7 @@ typedef struct mc_MultichainParams
     int SetParam(const char *param,const char* value,int size);
     int SetParam(const char *param,int64_t value);
     
+    int CanBeUpgradedByVersion(const char *param,int version,int size);
     
     const char* Name();
     const unsigned char* DefaultMessageStart();

@@ -131,6 +131,7 @@ typedef struct mc_Features
     int MultipleStreamKeys();
     int FixedIsUnspendable();
     int PerAssetPermissions();
+    int ParameterUpgrades();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo
