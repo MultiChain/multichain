@@ -72,6 +72,7 @@ bool MultichainNode_AcceptData(CNode *pnode);
 bool MultichainNode_IgnoreIncoming(CNode *pnode);
 bool MultichainNode_IsLocal(CNode *pnode);
 bool IsTxBanned(uint256 txid);
+int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,vector<mc_UpgradeStatus> *vUpgrades);
 
 
 
@@ -348,6 +349,56 @@ map<NodeId, CNodeState> mapNodeState;
 /* MCHN START */
 
 int MultichainNode_ApplyUpgrades(int current_height)
+{
+    vector<mc_UpgradedParameter> vParams;
+    int err=MC_ERR_NOERROR;
+    
+    CreateUpgradeLists(chainActive.Height(),&vParams,NULL);
+    
+    int OriginalProtocolVersion=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
+    int CurrentProtocolVersion=mc_gState->m_NetworkParams->ProtocolVersion();//mc_gState->m_ProtocolVersionToUpgrade;
+    int NewProtocolVersion=OriginalProtocolVersion;
+    
+    mc_gState->m_NetworkParams->SetGlobals();
+    for(int p=0;p<(int)vParams.size();p++)
+    {
+        if(strcmp(vParams[p].m_Param->m_Name,"protocolversion") == 0)
+        {
+            err=mc_gState->m_NetworkParams->m_ProtocolVersion=mc_gState->m_ProtocolVersionToUpgrade;// UPGRADE CODE HERE
+            mc_gState->m_NetworkParams->SetProtocolGlobals();
+        }
+        else
+        {
+            mc_gState->m_NetworkParams->SetUpgradedParamValue(vParams[p].m_Param,vParams[p].m_Value);
+        }
+    }
+    SetMultiChainParams();            
+    
+    if(mc_gState->m_ProtocolVersionToUpgrade != CurrentProtocolVersion)
+    {
+        LogPrintf("New protocol upgrade version: %d (was %d)\n",mc_gState->m_ProtocolVersionToUpgrade,CurrentProtocolVersion);
+        if( (err == MC_ERR_NOT_SUPPORTED) || ((mc_gState->m_ProtocolVersionToUpgrade > 0) && (mc_gState->IsSupported(mc_gState->m_ProtocolVersionToUpgrade) == 0)) )
+        {
+            LogPrintf("NODE SHOULD BE UPGRADED FROM %d TO %d\n",mc_gState->GetProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
+        }
+        else
+        {
+            if(mc_gState->m_ProtocolVersionToUpgrade != mc_gState->m_NetworkParams->ProtocolVersion())
+            {
+                LogPrintf("NODE IS UPGRADED FROM %d TO %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
+            }        
+        }
+    }
+    else
+    {
+        mc_gState->m_ProtocolVersionToUpgrade=0;        
+    }
+    
+    return MC_ERR_NOERROR;
+}
+
+
+int MultichainNode_ApplyUpgrades_Old(int current_height)
 {
     mc_EntityDetails entity;
     mc_Buffer *permissions;

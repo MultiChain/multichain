@@ -124,6 +124,8 @@ typedef struct mc_MultichainParams
     int Write(int overwrite);
     int Print(FILE *);
     int SetGlobals();
+    int SetProtocolGlobals();
+    int SetUpgradedParamValue(const mc_OneMultichainParam *param,int64_t value);
     int Import(const char *name,const char *source_address);
     int Set(const char *name,const char *source,int source_size);
     
