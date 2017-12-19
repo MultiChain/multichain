@@ -896,47 +896,72 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
 
 bool AddParamNameValueToScript(const string  param_name,const Value param_value,mc_Script *lpDetailsScript,int version,int *errorCode,string *strError)
 {
+    
     int64_t value;
-    string name=param_name;
-            
-    int size=-1;
-    unsigned char zero=0;
-    if(param_value.type() == bool_type)
-    {
-        value=param_value.get_bool() ? 1 : 0;
-        size=1;
-    }
-    if(param_value.type() == int_type)
-    {
-        value=param_value.get_int64();
-        size=0;
-    }
-    if(size < 0)
-    {
-        *errorCode=RPC_INVALID_PARAMETER;
-        *strError=string("Invalid parameter type");                                                                                                                    
-        return false;
-    }
-    
+    string name=param_name;   
     name.erase(std::remove(name.begin(), name.end(), '-'), name.end());
-    size=mc_gState->m_NetworkParams->CanBeUpgradedByVersion(name.c_str(),version,size);
-
-    if(size == 1)
-    {
-        if(param_value.type() != bool_type)
-        {
-            *errorCode=RPC_INVALID_PARAMETER;
-            *strError=string("Invalid parameter type");                                                                                                                            
-            return false;
-        }        
-    }
-    
-    if(size == -4)
+    const mc_OneMultichainParam *param=mc_gState->m_NetworkParams->FindParam(name.c_str());
+            
+    if(param == NULL)
     {
         *errorCode=RPC_INVALID_PARAMETER;
-        *strError=string("Invalid parameter type");                                                                                                                            
-        return false;
+        *strError=string("Invalid parameter name"); 
+        return false;                    
+    }        
+    
+    int size;
+    unsigned char zero=0;
+    switch(param->m_Type & MC_PRM_DATA_TYPE_MASK)
+    {
+        case MC_PRM_BOOLEAN:
+            if(param_value.type() == bool_type)
+            {
+                value=param_value.get_bool() ? 1 : 0;
+            }
+            else
+            {
+                *errorCode=RPC_INVALID_PARAMETER;
+                *strError=string("Invalid parameter type, should be boolean");     
+                return false;            
+            }                
+            break;
+        case MC_PRM_INT32:
+        case MC_PRM_INT64:
+        case MC_PRM_UINT32:
+            if(param->m_Type & MC_PRM_DECIMAL)            
+            {
+                if(param_value.type() == real_type)
+                {
+                    value=mc_gState->m_NetworkParams->DecimalToInt64(param_value.get_real());
+                }                
+                else
+                {
+                    *errorCode=RPC_INVALID_PARAMETER;
+                    *strError=string("Invalid parameter type, should be numeric");     
+                    return false;                            
+                }
+            }
+            else
+            {
+                if(param_value.type() == int_type)
+                {
+                    value=param_value.get_int64();
+                }
+                else
+                {
+                    *errorCode=RPC_INVALID_PARAMETER;
+                    *strError=string("Invalid parameter type, should be integer");     
+                    return false;                            
+                }
+            }
+            break;    
+        default:
+            *errorCode=RPC_NOT_SUPPORTED;
+            *strError=string("One of parameters cannot be upgraded by this protocol version"); 
+            return false;                            
     }
+        
+    size=mc_gState->m_NetworkParams->CanBeUpgradedByVersion(name.c_str(),version,0);
     
     if(size < 0)
     {

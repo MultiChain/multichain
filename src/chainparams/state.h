@@ -106,6 +106,21 @@ typedef struct mc_Params
     
 } mc_Params;
 
+typedef struct mc_UpgradeStatus
+{    
+    unsigned char m_EntityShortTxID[MC_ENT_KEY_SIZE];                                
+    uint32_t m_ApprovedBlock;
+    uint32_t m_AppliedBlock;
+    uint32_t m_FirstParam;
+    uint32_t m_LastParam;    
+} mc_UpgradeStatus;
+
+typedef struct mc_UpgradedParameter
+{    
+    const mc_OneMultichainParam *m_Param;
+    int64_t m_Value;    
+} mc_UpgradedParameter;
+
 typedef struct mc_Features
 {    
     int MinProtocolVersion();

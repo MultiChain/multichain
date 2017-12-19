@@ -102,6 +102,32 @@ int64_t mc_MultichainParams::GetInt64Param(const char *param)
     return mc_GetLE(ptr,size);
 }
 
+double mc_MultichainParams::Int64ToDecimal(int64_t value)
+{
+    if(value < 0)
+    {
+        return -((double)(-value) / MC_PRM_DECIMAL_GRANULARITY);
+    }
+    return (double)value / MC_PRM_DECIMAL_GRANULARITY;    
+}
+
+int64_t mc_MultichainParams::DecimalToInt64(double value)
+{
+    return (int64_t)(value*MC_PRM_DECIMAL_GRANULARITY+mc_gState->m_NetworkParams->ParamAccuracy());    
+}
+
+int mc_MultichainParams::GetParamFromScript(char* script,int64_t *value,int *size)
+{
+    char *ptr;    
+    ptr=script;
+    ptr+=strlen(ptr)+1;
+    *size=(int)mc_GetLE(ptr,MC_PRM_PARAM_SIZE_BYTES);
+    ptr+=MC_PRM_PARAM_SIZE_BYTES;
+    *value=mc_GetLE(ptr,*size);
+    ptr+=*size;
+    return ptr-script; 
+}
+
 double mc_MultichainParams::GetDoubleParam(const char *param)
 {
     int n=(int)mc_gState->m_NetworkParams->GetInt64Param(param);
@@ -137,6 +163,18 @@ void* mc_MultichainParams::GetParam(const char *param,int* size)
     return m_lpData+offset;
 }
 
+int mc_MultichainParams::IsParamUpgradeValueInRange(const mc_OneMultichainParam *param,int version,int64_t value)
+{
+    if(value >= param->m_MinIntegerValue)
+    {
+        if(value <= param->m_MaxIntegerValue)
+        {
+            return 1;
+        }        
+    }
+    return 0;
+}
+
 int mc_MultichainParams::CanBeUpgradedByVersion(const char *param,int version,int size)
 {
     if(m_lpIndex == NULL)
@@ -154,7 +192,7 @@ int mc_MultichainParams::CanBeUpgradedByVersion(const char *param,int version,in
         return -3;
     }   
     
-    if(size)
+    if(size > 0)
     {
         if(size != m_lpCoord[2 * index + 1])
         {

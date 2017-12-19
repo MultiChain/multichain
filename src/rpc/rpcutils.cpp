@@ -767,36 +767,40 @@ map<string, Value> ParamsToUpgrade(mc_EntityDetails *entity,int version)
         ptrEnd=ptr+size;
         while(ptr<ptrEnd)
         {
+            param=mc_gState->m_NetworkParams->FindParam(ptr);
+            ptr+=mc_gState->m_NetworkParams->GetParamFromScript(ptr,&param_value,&given_size);
+            
             if(strcmp(ptr,"protocolversion"))
             {        
-                param=mc_gState->m_NetworkParams->FindParam(ptr);
-                ptr+=strlen(ptr)+1;
                 if(param)
                 {
                     param_size=mc_gState->m_NetworkParams->CanBeUpgradedByVersion(param->m_Name,version,0);
-                    given_size=(int)mc_GetLE(ptr,MC_PRM_PARAM_SIZE_BYTES);
-                    ptr+=MC_PRM_PARAM_SIZE_BYTES;
                     if( (param_size > 0) && (param_size == given_size) )
                     {
                         param_name=string(param->m_DisplayName);
-                        param_value=mc_GetLE(ptr,param_size);                            
                         if(result.find(param_name) == result.end())
                         {
-                            switch(param->m_Type & MC_PRM_DATA_TYPE_MASK)
+                            if(param->m_Type & MC_PRM_DECIMAL)
                             {
-                                case MC_PRM_BOOLEAN:
-                                    result.insert(make_pair(param_name, (param_value != 0) ));
-                                    break;
-                                case MC_PRM_INT32:
-                                    result.insert(make_pair(param_name, (int)param_value));
-                                case MC_PRM_UINT32:
-                                case MC_PRM_INT64:
-                                    result.insert(make_pair(param_name, param_value));
-                                    break;
-                            }                                
+                                result.insert(make_pair(param_name, mc_gState->m_NetworkParams->Int64ToDecimal(param_value)));
+                            }
+                            else
+                            {
+                                switch(param->m_Type & MC_PRM_DATA_TYPE_MASK)
+                                {
+                                    case MC_PRM_BOOLEAN:
+                                        result.insert(make_pair(param_name, (param_value != 0) ));
+                                        break;
+                                    case MC_PRM_INT32:
+                                        result.insert(make_pair(param_name, (int)param_value));
+                                    case MC_PRM_UINT32:
+                                    case MC_PRM_INT64:
+                                        result.insert(make_pair(param_name, param_value));
+                                        break;
+                                }                                
+                            }
                         }
                     }
-                    ptr+=given_size;
                 }
             }
         }

@@ -131,11 +131,15 @@ typedef struct mc_MultichainParams
     void* GetParam(const char *param,int* size);
     int64_t GetInt64Param(const char *param);
     double GetDoubleParam(const char *param);
+    double Int64ToDecimal(int64_t value);
+    int64_t DecimalToInt64(double value);
+    int GetParamFromScript(char* ptr,int64_t *value,int *size);
     
     int SetParam(const char *param,const char* value,int size);
     int SetParam(const char *param,int64_t value);
     
     int CanBeUpgradedByVersion(const char *param,int version,int size);
+    int IsParamUpgradeValueInRange(const mc_OneMultichainParam *param,int version,int64_t value);
     
     const char* Name();
     const unsigned char* DefaultMessageStart();

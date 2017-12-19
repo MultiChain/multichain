@@ -7,6 +7,7 @@
 
 #include "rpc/rpcwallet.h"
 bool AddParamNameValueToScript(const string  param_name,const Value param_value,mc_Script *lpDetailsScript,int version,int *errorCode,string *strError);
+int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,vector<mc_UpgradeStatus> *vUpgrades);
 
 Value createupgradefromcmd(const Array& params, bool fHelp)
 {
@@ -404,6 +405,185 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
 }
 
 Value listupgrades(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 1)
+        throw runtime_error("Help message not found\n");
+
+    Array results;
+    mc_Buffer *upgrades;
+    int latest_version;
+    
+    upgrades=NULL;
+    
+   
+    vector<string> inputStrings;
+    if (params.size() > 0 && params[0].type() != null_type && ((params[0].type() != str_type) || (params[0].get_str() !="*" ) ) )
+    {        
+        if(params[0].type() == str_type)
+        {
+            inputStrings.push_back(params[0].get_str());
+            if(params[0].get_str() == "")
+            {
+                return results;                
+            }
+        }
+        else
+        {
+            inputStrings=ParseStringList(params[0]);        
+            if(inputStrings.size() == 0)
+            {
+                return results;
+            }
+        }
+    }
+    
+/*    
+    if(inputStrings.size())
+    {
+        {
+            LOCK(cs_main);
+            for(int is=0;is<(int)inputStrings.size();is++)
+            {
+                string param=inputStrings[is];
+
+                mc_EntityDetails upgrade_entity;
+                ParseEntityIdentifier(param,&upgrade_entity, MC_ENT_TYPE_UPGRADE);           
+                
+                upgrades=mc_gState->m_Permissions->GetUpgradeList(upgrade_entity.GetTxID() + MC_AST_SHORT_TXID_OFFSET,upgrades);
+            }
+        }
+    }
+    else
+    {        
+        {
+            LOCK(cs_main);
+            upgrades=mc_gState->m_Permissions->GetUpgradeList(NULL,upgrades);
+        }
+    }
+  */
+    vector<mc_UpgradedParameter> vParams;
+    vector<mc_UpgradeStatus> vUpgrades;
+    int current_height=chainActive.Height();
+    
+    CreateUpgradeLists(chainActive.Height(),&vParams,&vUpgrades);
+
+    for(int u=0;u<(int)vUpgrades.size();u++)
+    {
+        Object entry;
+        Object applied_params;
+        mc_PermissionDetails *plsRow;
+        mc_PermissionDetails *plsDet;
+        mc_EntityDetails upgrade_entity;
+        bool take_it,approved;
+        int flags,consensus,remaining;
+        Value null_value;
+        string param_name;
+        
+        upgrade_entity.Zero();
+        mc_gState->m_Assets->FindEntityByShortTxID(&upgrade_entity,vUpgrades[u].m_EntityShortTxID);
+        entry=UpgradeEntry(upgrade_entity.GetTxID());
+        
+        entry.push_back(Pair("approved", (vUpgrades[u].m_ApprovedBlock <= current_height+1)));            
+
+        for(int p=vUpgrades[u].m_FirstParam;p<vUpgrades[u].m_LastParam;p++)
+        {
+            param_name=string(vParams[p].m_Param->m_DisplayName);
+            if(vParams[p].m_Param->m_Type & MC_PRM_DECIMAL)
+            {
+                applied_params.push_back(Pair(param_name,mc_gState->m_NetworkParams->Int64ToDecimal(vParams[p].m_Value)));            
+            }
+            else
+            {
+                switch(vParams[p].m_Param->m_Type & MC_PRM_DATA_TYPE_MASK)
+                {
+                    case MC_PRM_BOOLEAN:
+                        applied_params.push_back(Pair(param_name,(vParams[p].m_Value != 0)));            
+                        break;
+                    case MC_PRM_INT32:
+                        applied_params.push_back(Pair(param_name,(int)vParams[p].m_Value));            
+                    case MC_PRM_UINT32:
+                    case MC_PRM_INT64:
+                        applied_params.push_back(Pair(param_name,vParams[p].m_Value));            
+                        break;
+                }                                
+            }
+        }
+        
+        if(vUpgrades[u].m_ApprovedBlock <= current_height)
+        {
+            entry.push_back(Pair("appliedblock", (int64_t)vUpgrades[u].m_ApprovedBlock));                  
+            entry.push_back(Pair("appliedparams", applied_params));                  
+        }
+        else
+        {
+            entry.push_back(Pair("appliedblock", null_value));                  
+            entry.push_back(Pair("appliedparams", null_value));                              
+        }
+        
+        upgrades=mc_gState->m_Permissions->GetUpgradeList(upgrade_entity.GetTxID() + MC_AST_SHORT_TXID_OFFSET,upgrades);
+        if(upgrades->GetCount())
+        {
+            plsRow=(mc_PermissionDetails *)(upgrades->GetRow(upgrades->GetCount()-1));
+            flags=plsRow->m_Flags;
+            consensus=plsRow->m_RequiredAdmins;
+            if(plsRow->m_Type != MC_PTP_UPGRADE)
+            {
+                plsRow->m_BlockTo=0;
+            }
+
+            Array admins;
+            Array pending;
+            mc_Buffer *details;
+
+            if(plsRow->m_Type == MC_PTP_UPGRADE)
+            {
+                details=mc_gState->m_Permissions->GetPermissionDetails(plsRow);                            
+            }
+            else
+            {
+                details=NULL;
+            }
+
+            if(details)
+            {             
+                for(int j=0;j<details->GetCount();j++)
+                {
+                    plsDet=(mc_PermissionDetails *)(details->GetRow(j));
+                    remaining=plsDet->m_RequiredAdmins;
+                    if(plsDet->m_BlockFrom < plsDet->m_BlockTo)
+                    {
+                        uint160 addr;
+                        memcpy(&addr,plsDet->m_LastAdmin,sizeof(uint160));
+                        CKeyID lpKeyID=CKeyID(addr);
+                        admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                    }
+                }                    
+                consensus=plsRow->m_RequiredAdmins;
+            }
+            if(admins.size() == 0)
+            {
+                if(plsRow->m_BlockFrom < plsRow->m_BlockTo)
+                {
+                    uint160 addr;
+                    memcpy(&addr,plsRow->m_LastAdmin,sizeof(uint160));
+                    CKeyID lpKeyID=CKeyID(addr);
+                    admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                                    
+                }                
+            }
+            
+            entry.push_back(Pair("admins", admins));
+            entry.push_back(Pair("required", (int64_t)(consensus-admins.size())));
+        }
+        upgrades->Clear();
+        results.push_back(entry);
+    }
+    
+    mc_gState->m_Permissions->FreePermissionList(upgrades);
+     
+    return results;
+}
+
+Value listupgrades_old(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)
         throw runtime_error("Help message not found\n");

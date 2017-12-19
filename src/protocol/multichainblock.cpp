@@ -9,6 +9,8 @@
 #include "multichain/multichain.h"
 #include "wallet/wallettxs.h"
 
+#include <boost/assign/list_of.hpp>
+
 extern mc_WalletTxs* pwalletTxsMain;
 
 
@@ -30,6 +32,166 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
 bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string& reason);
 bool IsTxBanned(uint256 txid);
 
+
+int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,vector<mc_UpgradeStatus> *vUpgrades)
+{
+    mc_EntityDetails entity;
+    mc_Buffer *upgrades;
+    mc_UpgradeStatus upgrade;
+    mc_UpgradedParameter param;
+            
+    upgrades=NULL;
+    set <uint160> stored_upgrades;
+    map <uint64_t,int> map_sorted;
+    uint160 hash;
+
+    int OriginalProtocolVersion=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
+    int NewProtocolVersion=OriginalProtocolVersion;
+    int version;
+    int err=MC_ERR_NOERROR;
+
+    if(vUpgrades)
+    {
+        vUpgrades->clear();
+    }
+    vParams->clear();
+        
+    upgrades=mc_gState->m_Permissions->GetUpgradeList(NULL,NULL);
+
+    
+    for(int i=0;i<upgrades->GetCount();i++)
+    {
+        mc_PermissionDetails *plsRow;
+        plsRow=(mc_PermissionDetails *)(upgrades->GetRow(i));
+        if(plsRow->m_Type == MC_PTP_UPGRADE)
+        {            
+            if(vParams)
+            {
+                memcpy(&hash,plsRow->m_Address,sizeof(uint160));
+                stored_upgrades.insert(hash);
+            }
+            map_sorted.insert(std::make_pair(plsRow->m_LastRow,i));
+        }        
+    }   
+    
+    if(vParams)
+    {
+        for(int i=0;i<upgrades->GetCount();i++)
+        {
+            mc_PermissionDetails *plsRow;
+            plsRow=(mc_PermissionDetails *)(upgrades->GetRow(i));
+            if(plsRow->m_Type != MC_PTP_UPGRADE)
+            {
+                memcpy(&hash,plsRow->m_Address,sizeof(uint160));
+                if(stored_upgrades.count(hash) == 0)
+                {
+                    plsRow->m_BlockTo = 0;
+                    map_sorted.insert(std::make_pair(plsRow->m_LastRow,i));
+                }
+            }
+        }    
+    }
+    
+/*    
+    for(int i=0;i<permissions->GetCount();i++)
+    {        
+        mc_PermissionDetails *plsRow;
+        plsRow=(mc_PermissionDetails *)(permissions->GetRow(i));
+        if(plsRow->m_Type == MC_PTP_UPGRADE)
+        {
+            map_sorted.insert(std::make_pair(plsRow->m_LastRow,i));
+        }        
+    }
+*/    
+    BOOST_FOREACH(PAIRTYPE(const uint64_t, int)& item, map_sorted)
+    {
+        int i=item.second;
+        mc_PermissionDetails *plsRow;
+        plsRow=(mc_PermissionDetails *)(upgrades->GetRow(i));
+//        if(plsRow->m_Type == MC_PTP_UPGRADE)
+        {
+            memset(&upgrade,0,sizeof(mc_UpgradeStatus));
+            memcpy(upgrade.m_EntityShortTxID,plsRow->m_Address,MC_AST_SHORT_TXID_SIZE);
+            upgrade.m_ApprovedBlock=current_height+2;
+            upgrade.m_AppliedBlock=current_height+2;
+            upgrade.m_FirstParam=(int)vParams->size();
+            if(plsRow->m_BlockFrom < plsRow->m_BlockTo) 
+            {
+                upgrade.m_ApprovedBlock=plsRow->m_BlockReceived;
+                if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,plsRow->m_Address))
+                {
+                    int applied_height=entity.UpgradeStartBlock();
+                    if((int)plsRow->m_BlockReceived > applied_height)
+                    {
+                        applied_height=plsRow->m_BlockReceived;
+                    }
+                    upgrade.m_AppliedBlock=applied_height;
+                    if(current_height >=applied_height)
+                    {
+                        version=entity.UpgradeProtocolVersion();
+                        if(version >= mc_gState->MinProtocolDowngradeVersion())
+                        {
+                            if((NewProtocolVersion < mc_gState->MinProtocolForbiddenDowngradeVersion()) || (version >= NewProtocolVersion))
+                            {
+                                NewProtocolVersion=version;
+                                if( mc_gState->IsSupported(version) == 0 )
+                                {
+                                    err=MC_ERR_NOT_SUPPORTED;
+                                }
+                                memset(&param,0,sizeof(mc_UpgradedParameter));
+                                param.m_Param=mc_gState->m_NetworkParams->FindParam("protocolversion");
+                                param.m_Value=version;
+                                vParams->push_back(param);
+                            }
+                        }   
+
+                        if(err == MC_ERR_NOERROR)
+                        {
+                            int size=0;                        
+                            char* ptr=(char*)entity.GetParamUpgrades(&size);
+                            char* ptrEnd;
+                            int param_size,given_size;
+                            int64_t param_value;
+                            if(ptr)
+                            {
+                                ptrEnd=ptr+size;
+                                while(ptr<ptrEnd)
+                                {
+                                    param.m_Param=mc_gState->m_NetworkParams->FindParam(ptr);                                
+                                    ptr+=mc_gState->m_NetworkParams->GetParamFromScript(ptr,&param_value,&given_size);
+                                    if(param.m_Param)
+                                    {
+                                        param_size=mc_gState->m_NetworkParams->CanBeUpgradedByVersion(param.m_Param->m_Name,NewProtocolVersion,0);
+                                        if( (param_size > 0) && (param_size == given_size) )
+                                        {
+                                            if(mc_gState->m_NetworkParams->IsParamUpgradeValueInRange(param.m_Param,NewProtocolVersion,param_value))
+                                            {
+                                                param.m_Value=param_value;
+                                                vParams->push_back(param);
+                                            }
+                                        }                                    
+                                    }
+                                }
+                            }                        
+                        }
+                    }
+                }
+            }       
+            upgrade.m_LastParam=(int)vParams->size();     
+            if(vUpgrades)
+            {
+                vUpgrades->push_back(upgrade);
+            }
+        }
+    }
+
+    
+exitlbl:
+    mc_gState->m_Permissions->FreePermissionList(upgrades);
+    mc_gState->m_ProtocolVersionToUpgrade=NewProtocolVersion;
+    
+    return err;
+}
 
 bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
 {
