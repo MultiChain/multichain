@@ -411,7 +411,8 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
 
     Array results;
     mc_Buffer *upgrades;
-    int latest_version;
+    
+    set<uint160> inputUpgrades;
     
     upgrades=NULL;
     
@@ -437,30 +438,18 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
         }
     }
     
-/*    
-    if(inputStrings.size())
+    for(int is=0;is<(int)inputStrings.size();is++)
     {
-        {
-            LOCK(cs_main);
-            for(int is=0;is<(int)inputStrings.size();is++)
-            {
-                string param=inputStrings[is];
+        string param=inputStrings[is];
 
-                mc_EntityDetails upgrade_entity;
-                ParseEntityIdentifier(param,&upgrade_entity, MC_ENT_TYPE_UPGRADE);           
-                
-                upgrades=mc_gState->m_Permissions->GetUpgradeList(upgrade_entity.GetTxID() + MC_AST_SHORT_TXID_OFFSET,upgrades);
-            }
-        }
+        mc_EntityDetails upgrade_entity;
+        ParseEntityIdentifier(param,&upgrade_entity, MC_ENT_TYPE_UPGRADE);           
+
+        uint160 hash=0;
+        memcpy(&hash,upgrade_entity.GetTxID() + MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+        inputUpgrades.insert(hash);
     }
-    else
-    {        
-        {
-            LOCK(cs_main);
-            upgrades=mc_gState->m_Permissions->GetUpgradeList(NULL,upgrades);
-        }
-    }
-  */
+
     vector<mc_UpgradedParameter> vParams;
     vector<mc_UpgradeStatus> vUpgrades;
     int current_height=chainActive.Height();
@@ -474,108 +463,113 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
         mc_PermissionDetails *plsRow;
         mc_PermissionDetails *plsDet;
         mc_EntityDetails upgrade_entity;
-        bool take_it,approved;
         int flags,consensus,remaining;
         Value null_value;
         string param_name;
         
-        upgrade_entity.Zero();
-        mc_gState->m_Assets->FindEntityByShortTxID(&upgrade_entity,vUpgrades[u].m_EntityShortTxID);
-        entry=UpgradeEntry(upgrade_entity.GetTxID());
+        uint160 hash=0;
+        memcpy(&hash,vUpgrades[u].m_EntityShortTxID,sizeof(uint160));
         
-        entry.push_back(Pair("approved", (vUpgrades[u].m_ApprovedBlock <= current_height+1)));            
-
-        for(int p=vUpgrades[u].m_FirstParam;p<vUpgrades[u].m_LastParam;p++)
+        if( (inputUpgrades.size() == 0) || (inputUpgrades.count(hash) > 0) )
         {
-            param_name=string(vParams[p].m_Param->m_DisplayName);
-            if(vParams[p].m_Param->m_Type & MC_PRM_DECIMAL)
+            upgrade_entity.Zero();
+            mc_gState->m_Assets->FindEntityByShortTxID(&upgrade_entity,vUpgrades[u].m_EntityShortTxID);
+            entry=UpgradeEntry(upgrade_entity.GetTxID());
+
+            entry.push_back(Pair("approved", (vUpgrades[u].m_ApprovedBlock <= current_height+1)));            
+
+            for(int p=vUpgrades[u].m_FirstParam;p<vUpgrades[u].m_LastParam;p++)
             {
-                applied_params.push_back(Pair(param_name,mc_gState->m_NetworkParams->Int64ToDecimal(vParams[p].m_Value)));            
+                param_name=string(vParams[p].m_Param->m_DisplayName);
+                if(vParams[p].m_Param->m_Type & MC_PRM_DECIMAL)
+                {
+                    applied_params.push_back(Pair(param_name,mc_gState->m_NetworkParams->Int64ToDecimal(vParams[p].m_Value)));            
+                }
+                else
+                {
+                    switch(vParams[p].m_Param->m_Type & MC_PRM_DATA_TYPE_MASK)
+                    {
+                        case MC_PRM_BOOLEAN:
+                            applied_params.push_back(Pair(param_name,(vParams[p].m_Value != 0)));            
+                            break;
+                        case MC_PRM_INT32:
+                            applied_params.push_back(Pair(param_name,(int)vParams[p].m_Value));            
+                        case MC_PRM_UINT32:
+                        case MC_PRM_INT64:
+                            applied_params.push_back(Pair(param_name,vParams[p].m_Value));            
+                            break;
+                    }                                
+                }
+            }
+
+            if(vUpgrades[u].m_ApprovedBlock <= current_height)
+            {
+                entry.push_back(Pair("appliedblock", (int64_t)vUpgrades[u].m_ApprovedBlock));                  
+                entry.push_back(Pair("appliedparams", applied_params));                  
             }
             else
             {
-                switch(vParams[p].m_Param->m_Type & MC_PRM_DATA_TYPE_MASK)
+                entry.push_back(Pair("appliedblock", null_value));                  
+                entry.push_back(Pair("appliedparams", null_value));                              
+            }
+
+            upgrades=mc_gState->m_Permissions->GetUpgradeList(upgrade_entity.GetTxID() + MC_AST_SHORT_TXID_OFFSET,upgrades);
+            if(upgrades->GetCount())
+            {
+                plsRow=(mc_PermissionDetails *)(upgrades->GetRow(upgrades->GetCount()-1));
+                flags=plsRow->m_Flags;
+                consensus=plsRow->m_RequiredAdmins;
+                if(plsRow->m_Type != MC_PTP_UPGRADE)
                 {
-                    case MC_PRM_BOOLEAN:
-                        applied_params.push_back(Pair(param_name,(vParams[p].m_Value != 0)));            
-                        break;
-                    case MC_PRM_INT32:
-                        applied_params.push_back(Pair(param_name,(int)vParams[p].m_Value));            
-                    case MC_PRM_UINT32:
-                    case MC_PRM_INT64:
-                        applied_params.push_back(Pair(param_name,vParams[p].m_Value));            
-                        break;
-                }                                
-            }
-        }
-        
-        if(vUpgrades[u].m_ApprovedBlock <= current_height)
-        {
-            entry.push_back(Pair("appliedblock", (int64_t)vUpgrades[u].m_ApprovedBlock));                  
-            entry.push_back(Pair("appliedparams", applied_params));                  
-        }
-        else
-        {
-            entry.push_back(Pair("appliedblock", null_value));                  
-            entry.push_back(Pair("appliedparams", null_value));                              
-        }
-        
-        upgrades=mc_gState->m_Permissions->GetUpgradeList(upgrade_entity.GetTxID() + MC_AST_SHORT_TXID_OFFSET,upgrades);
-        if(upgrades->GetCount())
-        {
-            plsRow=(mc_PermissionDetails *)(upgrades->GetRow(upgrades->GetCount()-1));
-            flags=plsRow->m_Flags;
-            consensus=plsRow->m_RequiredAdmins;
-            if(plsRow->m_Type != MC_PTP_UPGRADE)
-            {
-                plsRow->m_BlockTo=0;
-            }
+                    plsRow->m_BlockTo=0;
+                }
 
-            Array admins;
-            Array pending;
-            mc_Buffer *details;
+                Array admins;
+                Array pending;
+                mc_Buffer *details;
 
-            if(plsRow->m_Type == MC_PTP_UPGRADE)
-            {
-                details=mc_gState->m_Permissions->GetPermissionDetails(plsRow);                            
-            }
-            else
-            {
-                details=NULL;
-            }
-
-            if(details)
-            {             
-                for(int j=0;j<details->GetCount();j++)
+                if(plsRow->m_Type == MC_PTP_UPGRADE)
                 {
-                    plsDet=(mc_PermissionDetails *)(details->GetRow(j));
-                    remaining=plsDet->m_RequiredAdmins;
-                    if(plsDet->m_BlockFrom < plsDet->m_BlockTo)
+                    details=mc_gState->m_Permissions->GetPermissionDetails(plsRow);                            
+                }
+                else
+                {
+                    details=NULL;
+                }
+
+                if(details)
+                {             
+                    for(int j=0;j<details->GetCount();j++)
+                    {
+                        plsDet=(mc_PermissionDetails *)(details->GetRow(j));
+                        remaining=plsDet->m_RequiredAdmins;
+                        if(plsDet->m_BlockFrom < plsDet->m_BlockTo)
+                        {
+                            uint160 addr;
+                            memcpy(&addr,plsDet->m_LastAdmin,sizeof(uint160));
+                            CKeyID lpKeyID=CKeyID(addr);
+                            admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                        }
+                    }                    
+                    consensus=plsRow->m_RequiredAdmins;
+                }
+                if(admins.size() == 0)
+                {
+                    if(plsRow->m_BlockFrom < plsRow->m_BlockTo)
                     {
                         uint160 addr;
-                        memcpy(&addr,plsDet->m_LastAdmin,sizeof(uint160));
+                        memcpy(&addr,plsRow->m_LastAdmin,sizeof(uint160));
                         CKeyID lpKeyID=CKeyID(addr);
-                        admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
-                    }
-                }                    
-                consensus=plsRow->m_RequiredAdmins;
+                        admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                                    
+                    }                
+                }
+
+                entry.push_back(Pair("admins", admins));
+                entry.push_back(Pair("required", (int64_t)(consensus-admins.size())));
             }
-            if(admins.size() == 0)
-            {
-                if(plsRow->m_BlockFrom < plsRow->m_BlockTo)
-                {
-                    uint160 addr;
-                    memcpy(&addr,plsRow->m_LastAdmin,sizeof(uint160));
-                    CKeyID lpKeyID=CKeyID(addr);
-                    admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                                    
-                }                
-            }
-            
-            entry.push_back(Pair("admins", admins));
-            entry.push_back(Pair("required", (int64_t)(consensus-admins.size())));
+            upgrades->Clear();
+            results.push_back(entry);
         }
-        upgrades->Clear();
-        results.push_back(entry);
     }
     
     mc_gState->m_Permissions->FreePermissionList(upgrades);

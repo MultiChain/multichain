@@ -43,7 +43,7 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
     upgrades=NULL;
     set <uint160> stored_upgrades;
     map <uint64_t,int> map_sorted;
-    uint160 hash;
+    uint160 hash=0;
 
     int OriginalProtocolVersion=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
     int NewProtocolVersion=OriginalProtocolVersion;
