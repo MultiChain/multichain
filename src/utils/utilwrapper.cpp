@@ -737,6 +737,27 @@ int mc_BuildDescription(int build, char *desc)
 
 int mc_MultichainParams::SetUpgradedParamValue(const mc_OneMultichainParam *param,int64_t value)
 {
+    if(mc_gState->m_Features->ParameterUpgrades() == 0)
+    {
+        return MC_ERR_NOERROR;        
+    }
+    
+    if(strcmp(param->m_Name,"maximumblocksize") == 0)
+    {
+        MAX_BLOCK_SIZE=(unsigned int)value;    
+        DEFAULT_BLOCK_MAX_SIZE=MAX_BLOCK_SIZE;    
+        while(MAX_BLOCK_SIZE>MAX_BLOCKFILE_SIZE)
+        {
+            MAX_BLOCKFILE_SIZE *= 2;
+        }
+        while(MAX_BLOCK_SIZE>MAX_SIZE)
+        {
+            MAX_SIZE *= 2;
+        }
+        MAX_BLOCK_SIGOPS = MAX_BLOCK_SIZE/50;
+        MAX_TX_SIGOPS = MAX_BLOCK_SIGOPS/5;        
+    }
+    
     return MC_ERR_NOERROR;
 }
 
@@ -755,6 +776,11 @@ int mc_MultichainParams::SetProtocolGlobals()
             MCP_ALLOW_ARBITRARY_OUTPUTS=aao;
         }
     }    
+    if(mc_gState->m_Features->ParameterUpgrades())
+    {
+        MAX_BLOCK_SIGOPS = MAX_BLOCK_SIZE/50;
+        MAX_TX_SIGOPS = MAX_BLOCK_SIGOPS/5;
+    }
     return MC_ERR_NOERROR;
 }
 

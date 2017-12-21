@@ -669,6 +669,13 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                     param_value=mc_gState->m_NetworkParams->m_ProtocolVersion;
                 }
             }
+            if(strcmp("maximumblocksize",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+            {
+                if(nHeight)
+                {
+                    param_value=(int)MAX_BLOCK_SIZE;
+                }
+            }
 
             obj.push_back(Pair(param_name,param_value));        
         }

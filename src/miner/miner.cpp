@@ -478,7 +478,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
         // Collect transactions into block
         uint64_t nBlockSize = 1000;
         uint64_t nBlockTx = 0;
-        int nBlockSigOps = 100;
+        int nBlockSigOps = 40;
 //        bool fSortedByFee = (nBlockPrioritySize <= 0);
 
 /* MCHN START */            
