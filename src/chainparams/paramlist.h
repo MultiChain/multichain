@@ -31,7 +31,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
                    "maximumblocksize","",
                    "Target time between blocks (transaction confirmation delay), seconds."},
     { "maximumblocksize"                       , "maximum-block-size"               , 
-                   MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE                  , -1,   8388608,       1000,1000000000, 0.0, 10001, 0, "-mc-maximumblocksize",
+                   MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE                  , -1,   8388608,       5000,1000000000, 0.0, 10001, 0, "-mc-maximumblocksize",
                    "defaultnetworkport","",
                    "Maximum block size in bytes."},
     { "defaultnetworkport"                , "default-network-port"              ,
