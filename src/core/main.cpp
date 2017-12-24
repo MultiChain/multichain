@@ -348,6 +348,38 @@ map<NodeId, CNodeState> mapNodeState;
 
 /* MCHN START */
 
+int SetUpgradedParamValue(const mc_OneMultichainParam *param,int64_t value)
+{
+    if(mc_gState->m_Features->ParameterUpgrades() == 0)
+    {
+        return MC_ERR_NOERROR;        
+    }
+    
+    if(strcmp(param->m_Name,"maximumblocksize") == 0)
+    {
+        MAX_BLOCK_SIZE=(unsigned int)value;    
+        DEFAULT_BLOCK_MAX_SIZE=MAX_BLOCK_SIZE;    
+        while(MAX_BLOCK_SIZE>MAX_BLOCKFILE_SIZE)
+        {
+            MAX_BLOCKFILE_SIZE *= 2;
+        }
+        while(MAX_BLOCK_SIZE>MAX_SIZE)
+        {
+            MAX_SIZE *= 2;
+        }
+        MAX_BLOCK_SIGOPS = MAX_BLOCK_SIZE/50;
+        MAX_TX_SIGOPS = MAX_BLOCK_SIGOPS/5;        
+    }
+
+    if(strcmp(param->m_Name,"targetblocktime") == 0)
+    {
+        MCP_TARGET_BLOCK_TIME=value;
+        SetMultiChainParam("targetblocktime",value);
+    }   
+    
+    return MC_ERR_NOERROR;
+}
+
 int MultichainNode_ApplyUpgrades(int current_height)
 {
     vector<mc_UpgradedParameter> vParams;
@@ -362,14 +394,17 @@ int MultichainNode_ApplyUpgrades(int current_height)
     mc_gState->m_NetworkParams->SetGlobals();
     for(int p=0;p<(int)vParams.size();p++)
     {
-        if(strcmp(vParams[p].m_Param->m_Name,"protocolversion") == 0)
+        if(vParams[p].m_Skipped == MC_PSK_APPLIED)
         {
-            err=mc_gState->m_NetworkParams->m_ProtocolVersion=mc_gState->m_ProtocolVersionToUpgrade;// UPGRADE CODE HERE
-            mc_gState->m_NetworkParams->SetProtocolGlobals();
-        }
-        else
-        {
-            mc_gState->m_NetworkParams->SetUpgradedParamValue(vParams[p].m_Param,vParams[p].m_Value);
+            if(strcmp(vParams[p].m_Param->m_Name,"protocolversion") == 0)
+            {
+                err=mc_gState->m_NetworkParams->m_ProtocolVersion=mc_gState->m_ProtocolVersionToUpgrade;// UPGRADE CODE HERE
+                mc_gState->m_NetworkParams->SetProtocolGlobals();
+            }
+            else
+            {
+                SetUpgradedParamValue(vParams[p].m_Param,vParams[p].m_Value);
+            }
         }
     }
     SetMultiChainParams();            

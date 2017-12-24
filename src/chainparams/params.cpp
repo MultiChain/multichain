@@ -179,24 +179,24 @@ int mc_MultichainParams::CanBeUpgradedByVersion(const char *param,int version,in
 {
     if(m_lpIndex == NULL)
     {
-        return -1;
+        return -MC_PSK_INTERNAL_ERROR;
     }
     int index=m_lpIndex->Get(param);
     if(index<0)
     {
-        return -2;
+        return -MC_PSK_NOT_FOUND;
     }   
     int offset=m_lpCoord[2 * index + 0];
     if(offset<0)
     {
-        return -3;
+        return -MC_PSK_NOT_FOUND;
     }   
     
     if(size > 0)
     {
         if(size != m_lpCoord[2 * index + 1])
         {
-            return -4;
+            return -MC_PSK_WRONG_SIZE;
         }
     }
     
@@ -215,9 +215,12 @@ int mc_MultichainParams::CanBeUpgradedByVersion(const char *param,int version,in
     
     if(strcmp(param,"targetblocktime") == 0)
     {
-        if(version >= 20002)
+        if(GetInt64Param("targetadjustfreq") >= 0)
         {
-            return m_lpCoord[2 * index + 1];
+            if(version >= 20002)
+            {
+                return m_lpCoord[2 * index + 1];
+            }
         }
     }
     
@@ -1200,23 +1203,20 @@ int mc_MultichainParams::Validate()
         if(isGenerated)
         {
             m_Status=MC_PRM_STATUS_GENERATED;
-            iv=GetInt64Param("targetblocktime");
-            if(iv>0)
+            dv=2*(double)GetInt64Param("rewardhalvinginterval");
+            dv*=(double)GetInt64Param("initialblockreward");
+            iv=GetInt64Param("firstblockreward");
+            if(iv<0)
             {
-                dv=2*(double)GetInt64Param("rewardhalvinginterval")/(double)iv;
-                dv*=(double)GetInt64Param("initialblockreward");
-                iv=GetInt64Param("firstblockreward");
-                if(iv<0)
-                {
-                    iv=GetInt64Param("initialblockreward");
-                }
-                dv+=(double)iv;
-                if(dv > 9.e+18)
-                {
-                    printf("Total mining reward over blockchain's history is more than 2^63 raw units. Please reduce initial-block-reward or reward-halving-interval.\n");
-                    return MC_ERR_INVALID_PARAMETER_VALUE;                                                                                    
-                }
-           }
+                iv=GetInt64Param("initialblockreward");
+            }
+            dv+=(double)iv;
+            if(dv > 9.e+18)
+            {
+                printf("Total mining reward over blockchain's history is more than 2^63 raw units. Please reduce initial-block-reward or reward-halving-interval.\n");
+                return MC_ERR_INVALID_PARAMETER_VALUE;                                                                                    
+            }
+            
             GetParam("chaindescription",&size);
             if(size-1 > 90)                                                     
             {

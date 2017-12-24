@@ -46,6 +46,20 @@
 #define MC_PRM_STATUS_INVALID            4
 #define MC_PRM_STATUS_VALID              5
 
+#define MC_PSK_APPLIED                   0
+#define MC_PSK_INTERNAL_ERROR            1
+#define MC_PSK_NOT_FOUND                 2
+#define MC_PSK_WRONG_SIZE                3
+#define MC_PSK_OUT_OF_RANGE              4
+#define MC_PSK_FRESH_UPGRADE             5
+#define MC_PSK_DOUBLE_RANGE              6
+#define MC_PSK_NOT_SUPPORTED             7
+#define MC_PSK_NEW_NOT_DOWNGRADABLE      8
+#define MC_PSK_OLD_NOT_DOWNGRADABLE      9
+
+
+
+
 extern int MCP_MAX_STD_OP_RETURN_COUNT;
 extern int64_t MCP_INITIAL_BLOCK_REWARD;
 extern int64_t MCP_FIRST_BLOCK_REWARD;

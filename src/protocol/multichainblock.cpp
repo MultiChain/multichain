@@ -43,6 +43,7 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
     upgrades=NULL;
     set <uint160> stored_upgrades;
     map <uint64_t,int> map_sorted;
+    map <string,int> map_last_upgrade;
     uint160 hash=0;
 
     int OriginalProtocolVersion=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
@@ -129,21 +130,33 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
                     if(current_height >=applied_height)
                     {
                         version=entity.UpgradeProtocolVersion();
-                        if(version >= mc_gState->MinProtocolDowngradeVersion())
+                        if(version > 0)
                         {
-                            if((NewProtocolVersion < mc_gState->MinProtocolForbiddenDowngradeVersion()) || (version >= NewProtocolVersion))
+                            param.m_Param=mc_gState->m_NetworkParams->FindParam("protocolversion");
+                            param.m_Value=version;
+                            param.m_Block=upgrade.m_AppliedBlock;
+                            if(version >= mc_gState->MinProtocolDowngradeVersion())
                             {
-                                NewProtocolVersion=version;
-                                if( mc_gState->IsSupported(version) == 0 )
+                                if((NewProtocolVersion < mc_gState->MinProtocolForbiddenDowngradeVersion()) || (version >= NewProtocolVersion))
                                 {
-                                    err=MC_ERR_NOT_SUPPORTED;
+                                    NewProtocolVersion=version;
+                                    if( mc_gState->IsSupported(version) == 0 )
+                                    {
+                                        err=MC_ERR_NOT_SUPPORTED;
+                                    }
+                                    memset(&param,0,sizeof(mc_UpgradedParameter));
                                 }
-                                memset(&param,0,sizeof(mc_UpgradedParameter));
-                                param.m_Param=mc_gState->m_NetworkParams->FindParam("protocolversion");
-                                param.m_Value=version;
-                                vParams->push_back(param);
+                                else
+                                {
+                                    param.m_Skipped = MC_PSK_OLD_NOT_DOWNGRADABLE;                                    
+                                }
                             }
-                        }   
+                            else
+                            {
+                                param.m_Skipped = MC_PSK_NEW_NOT_DOWNGRADABLE;
+                            }
+                            vParams->push_back(param);
+                        }
 
                         if(err == MC_ERR_NOERROR)
                         {
@@ -159,6 +172,9 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
                                 {
                                     param.m_Param=mc_gState->m_NetworkParams->FindParam(ptr);                                
                                     ptr+=mc_gState->m_NetworkParams->GetParamFromScript(ptr,&param_value,&given_size);
+                                    param.m_Value=param_value;
+                                    param.m_Block=upgrade.m_AppliedBlock;  
+                                    param.m_Skipped=MC_PSK_APPLIED;
                                     if(param.m_Param)
                                     {
                                         param_size=mc_gState->m_NetworkParams->CanBeUpgradedByVersion(param.m_Param->m_Name,NewProtocolVersion,0);
@@ -166,12 +182,79 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
                                         {
                                             if(mc_gState->m_NetworkParams->IsParamUpgradeValueInRange(param.m_Param,NewProtocolVersion,param_value))
                                             {
-                                                param.m_Value=param_value;
-                                                vParams->push_back(param);
+                                                bool take_it=true;
+                                                string param_name=string(param.m_Param->m_Name);
+                                                map <string,int>::iterator it = map_last_upgrade.find(param_name); 
+                                                
+                                                if (it != map_last_upgrade.end())
+                                                {
+                                                    take_it=false;
+                                                    if((*vParams)[it->second].m_Block + 100 <= upgrade.m_AppliedBlock)
+                                                    {
+                                                        int64_t old_value=(*vParams)[it->second].m_Value;
+                                                        if(param.m_Value >= old_value)
+                                                        {
+                                                            if(param_value <= 2*old_value)
+                                                            {
+                                                                take_it=true;
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            if(old_value <= 2*param_value)
+                                                            {
+                                                                take_it=true;
+                                                            }                                                            
+                                                        }
+                                                        if(!take_it)
+                                                        {
+                                                            param.m_Skipped =MC_PSK_DOUBLE_RANGE;
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        param.m_Skipped = MC_PSK_FRESH_UPGRADE;
+                                                    }
+                                                    if(take_it)
+                                                    {
+                                                        it->second=(int)vParams->size();
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    map_last_upgrade.insert(std::make_pair(param_name,(int)vParams->size()));                                                    
+                                                }
                                             }
-                                        }                                    
+                                            else
+                                            {
+                                                param.m_Skipped = MC_PSK_OUT_OF_RANGE;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            if(param_size > 0)
+                                            {
+                                                param.m_Skipped = MC_PSK_WRONG_SIZE;
+                                            }
+                                            else
+                                            {
+                                                if(param_size < 0)
+                                                {
+                                                    param.m_Skipped = -param_size;
+                                                }
+                                                else
+                                                {
+                                                    param.m_Skipped = MC_PSK_NOT_SUPPORTED;
+                                                }
+                                            }
+                                        }
                                     }
-                                }
+                                    else
+                                    {
+                                        param.m_Skipped = MC_PSK_NOT_FOUND;
+                                    }
+                                    vParams->push_back(param);                                    
+                                }                                
                             }                        
                         }
                     }

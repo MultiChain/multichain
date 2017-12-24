@@ -119,6 +119,8 @@ typedef struct mc_UpgradedParameter
 {    
     const mc_OneMultichainParam *m_Param;
     int64_t m_Value;    
+    uint32_t m_Block;
+    int32_t m_Skipped; 
 } mc_UpgradedParameter;
 
 typedef struct mc_Features

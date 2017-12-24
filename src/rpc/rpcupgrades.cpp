@@ -460,6 +460,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
     {
         Object entry;
         Object applied_params;
+        Object skipped_params;
         mc_PermissionDetails *plsRow;
         mc_PermissionDetails *plsDet;
         mc_EntityDetails upgrade_entity;
@@ -481,24 +482,45 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
             for(int p=vUpgrades[u].m_FirstParam;p<vUpgrades[u].m_LastParam;p++)
             {
                 param_name=string(vParams[p].m_Param->m_DisplayName);
-                if(vParams[p].m_Param->m_Type & MC_PRM_DECIMAL)
-                {
-                    applied_params.push_back(Pair(param_name,mc_gState->m_NetworkParams->Int64ToDecimal(vParams[p].m_Value)));            
+                if(vParams[p].m_Skipped == MC_PSK_APPLIED)
+                {                
+                    if(vParams[p].m_Param->m_Type & MC_PRM_DECIMAL)
+                    {
+                        applied_params.push_back(Pair(param_name,mc_gState->m_NetworkParams->Int64ToDecimal(vParams[p].m_Value)));            
+                    }
+                    else
+                    {
+                        switch(vParams[p].m_Param->m_Type & MC_PRM_DATA_TYPE_MASK)
+                        {
+                            case MC_PRM_BOOLEAN:
+                                applied_params.push_back(Pair(param_name,(vParams[p].m_Value != 0)));            
+                                break;
+                            case MC_PRM_INT32:
+                                applied_params.push_back(Pair(param_name,(int)vParams[p].m_Value));            
+                            case MC_PRM_UINT32:
+                            case MC_PRM_INT64:
+                                applied_params.push_back(Pair(param_name,vParams[p].m_Value));            
+                                break;
+                        }                                
+                    }
                 }
                 else
                 {
-                    switch(vParams[p].m_Param->m_Type & MC_PRM_DATA_TYPE_MASK)
+                    string param_err;
+                    switch(vParams[p].m_Skipped)
                     {
-                        case MC_PRM_BOOLEAN:
-                            applied_params.push_back(Pair(param_name,(vParams[p].m_Value != 0)));            
-                            break;
-                        case MC_PRM_INT32:
-                            applied_params.push_back(Pair(param_name,(int)vParams[p].m_Value));            
-                        case MC_PRM_UINT32:
-                        case MC_PRM_INT64:
-                            applied_params.push_back(Pair(param_name,vParams[p].m_Value));            
-                            break;
-                    }                                
+                        case MC_PSK_INTERNAL_ERROR:         param_err="Parameter not applied because of internal error, please report this"; break;
+                        case MC_PSK_NOT_FOUND:              param_err="Parameter name not recognized"; break;
+                        case MC_PSK_WRONG_SIZE:             param_err="Parameter is encoded with wrong size"; break;
+                        case MC_PSK_OUT_OF_RANGE:           param_err="Parameter value is out of range"; break;
+                        case MC_PSK_FRESH_UPGRADE:          param_err="Parameter is upgraded less than 100 blocks ago"; break;
+                        case MC_PSK_DOUBLE_RANGE:           param_err="New pparameter value must be between half and double preview time"; break;
+                        case MC_PSK_NOT_SUPPORTED:          param_err="This parameter cannot be upgraded in this protocol version"; break;
+                        case MC_PSK_NEW_NOT_DOWNGRADABLE:   param_err="Cannot downgrade to this version"; break;
+                        case MC_PSK_OLD_NOT_DOWNGRADABLE:   param_err="Downgrades are not allowed in this protocol version"; break;
+                        default:                            param_err="Parameter not applied because of internal error, please report this"; break;
+                    }
+                    skipped_params.push_back(Pair(param_name,param_err));            
                 }
             }
 
@@ -506,11 +528,13 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
             {
                 entry.push_back(Pair("appliedblock", (int64_t)vUpgrades[u].m_ApprovedBlock));                  
                 entry.push_back(Pair("appliedparams", applied_params));                  
+                entry.push_back(Pair("skippedparams", skipped_params));                  
             }
             else
             {
                 entry.push_back(Pair("appliedblock", null_value));                  
                 entry.push_back(Pair("appliedparams", null_value));                              
+                entry.push_back(Pair("skippedparams", null_value));                  
             }
 
             upgrades=mc_gState->m_Permissions->GetUpgradeList(upgrade_entity.GetTxID() + MC_AST_SHORT_TXID_OFFSET,upgrades);
