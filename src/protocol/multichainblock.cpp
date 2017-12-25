@@ -189,7 +189,7 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
                                                 if (it != map_last_upgrade.end())
                                                 {
                                                     take_it=false;
-                                                    if((*vParams)[it->second].m_Block + 5 <= upgrade.m_AppliedBlock)
+                                                    if((*vParams)[it->second].m_Block + 100 <= upgrade.m_AppliedBlock)
                                                     {
                                                         int64_t old_value=(*vParams)[it->second].m_Value;
                                                         if(param.m_Value >= old_value)

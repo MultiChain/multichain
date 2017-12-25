@@ -676,6 +676,13 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                     param_value=(int)MAX_BLOCK_SIZE;
                 }
             }
+            if(strcmp("targetblocktime",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+            {
+                if(nHeight)
+                {
+                    param_value=(int)MCP_TARGET_BLOCK_TIME;
+                }
+            }
 
             obj.push_back(Pair(param_name,param_value));        
         }
