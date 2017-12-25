@@ -453,7 +453,6 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
     vector<mc_UpgradedParameter> vParams;
     vector<mc_UpgradeStatus> vUpgrades;
     int current_height=chainActive.Height();
-    
     CreateUpgradeLists(chainActive.Height(),&vParams,&vUpgrades);
 
     for(int u=0;u<(int)vUpgrades.size();u++)
@@ -514,7 +513,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
                         case MC_PSK_WRONG_SIZE:             param_err="Parameter is encoded with wrong size"; break;
                         case MC_PSK_OUT_OF_RANGE:           param_err="Parameter value is out of range"; break;
                         case MC_PSK_FRESH_UPGRADE:          param_err="Parameter is upgraded less than 100 blocks ago"; break;
-                        case MC_PSK_DOUBLE_RANGE:           param_err="New pparameter value must be between half and double preview time"; break;
+                        case MC_PSK_DOUBLE_RANGE:           param_err="New parameter value must be between half and double preview time"; break;
                         case MC_PSK_NOT_SUPPORTED:          param_err="This parameter cannot be upgraded in this protocol version"; break;
                         case MC_PSK_NEW_NOT_DOWNGRADABLE:   param_err="Cannot downgrade to this version"; break;
                         case MC_PSK_OLD_NOT_DOWNGRADABLE:   param_err="Downgrades are not allowed in this protocol version"; break;
