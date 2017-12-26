@@ -452,7 +452,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
 
     vector<mc_UpgradedParameter> vParams;
     vector<mc_UpgradeStatus> vUpgrades;
-    int current_height=chainActive.Height();
+    uint32_t current_height=chainActive.Height();
     CreateUpgradeLists(chainActive.Height(),&vParams,&vUpgrades);
 
     for(int u=0;u<(int)vUpgrades.size();u++)

@@ -269,7 +269,6 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
     }
 
     
-exitlbl:
     mc_gState->m_Permissions->FreePermissionList(upgrades);
     mc_gState->m_ProtocolVersionToUpgrade=NewProtocolVersion;
     
