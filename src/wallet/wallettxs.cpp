@@ -25,7 +25,8 @@ using namespace std;
 
 void WalletTxNotify(mc_TxImport *imp,const CWalletTx& tx,int block,bool fFound,uint256 block_hash)
 {
-    std::string strNotifyCmd = GetArg("-walletnotify", "");
+//    std::string strNotifyCmd = GetArg("-walletnotify", "");
+    std::string strNotifyCmd = GetArg("-walletnotify", fFound ? "" : GetArg("-walletnotifynew", ""));
     if ( strNotifyCmd.empty() )
     {
         return;
@@ -2610,7 +2611,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     }
     
     fAlreadyInTheWalletForNotify=false;
-    if(!GetArg("-walletnotify", "").empty())
+    if(!GetArg("-walletnotify", "").empty() || !GetArg("-walletnotifynew", "").empty())
     {
         mc_TxDefRow StoredTxDef;
         if(m_Database->GetTx(&StoredTxDef,(unsigned char*)&hash) == 0)
