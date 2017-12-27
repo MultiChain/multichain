@@ -127,7 +127,7 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
                         applied_height=plsRow->m_BlockReceived;
                     }
                     upgrade.m_AppliedBlock=applied_height;
-                    if(current_height >=applied_height)
+                    if(current_height >= applied_height)
                     {
                         version=entity.UpgradeProtocolVersion();
                         if(version > 0)
@@ -245,6 +245,16 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
                                                 else
                                                 {
                                                     param.m_Skipped = MC_PSK_NOT_SUPPORTED;
+                                                }
+                                            }
+                                        }
+                                        if(vUpgrades == NULL)                   // Called from MultichainNode_ApplyUpgrades
+                                        {
+                                            if(param.m_Block == current_height)
+                                            {
+                                                if(param.m_Skipped == MC_PSK_APPLIED)
+                                                {
+                                                    LogPrintf("PARAMETER UPGRADE: %s = %ld\n",param.m_Param->m_DisplayName,param.m_Value);
                                                 }
                                             }
                                         }
