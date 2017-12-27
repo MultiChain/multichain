@@ -512,7 +512,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
                         case MC_PSK_NOT_FOUND:              param_err="Parameter name not recognized"; break;
                         case MC_PSK_WRONG_SIZE:             param_err="Parameter is encoded with wrong size"; break;
                         case MC_PSK_OUT_OF_RANGE:           param_err="Parameter value is out of range"; break;
-                        case MC_PSK_FRESH_UPGRADE:          param_err="Parameter is upgraded less than 100 blocks ago"; break;
+                        case MC_PSK_FRESH_UPGRADE:          param_err=strprintf("Parameter is upgraded less than %d blocks ago",MIN_BLOCKS_BETWEEN_UPGRADES); break;
                         case MC_PSK_DOUBLE_RANGE:           param_err="New parameter value must be between half and double preview time"; break;
                         case MC_PSK_NOT_SUPPORTED:          param_err="This parameter cannot be upgraded in this protocol version"; break;
                         case MC_PSK_NEW_NOT_DOWNGRADABLE:   param_err="Cannot downgrade to this version"; break;

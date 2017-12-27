@@ -73,6 +73,7 @@ static const unsigned int DEFAULT_MAX_SUCCESSORS_FROM_ONE_NODE = 10;
 /* MCHN END */
 extern int MAX_OP_RETURN_SHOWN;
 extern int MAX_FORMATTED_DATA_DEPTH;
+extern int MIN_BLOCKS_BETWEEN_UPGRADES;
 /* MCHN END */
 /** The maximum size of a blk?????.dat file (since 0.8) */
 extern unsigned int MAX_BLOCKFILE_SIZE;                                     // MCHN global
@@ -395,6 +396,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 /** Context-independent validity checks */
 bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool fCheckPOW = true);
 bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
+bool CheckBlockForUpgardableConstraints(const CBlock& block, CValidationState& state, std::string parameter, bool in_sync);
 
 /** Context-dependent validity checks */
 bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex *pindexPrev, CBlockIndex *pindexChecked = NULL);

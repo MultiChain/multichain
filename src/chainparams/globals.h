@@ -19,6 +19,7 @@ int64_t COIN = 100000000;                                                       
 int64_t CENT = 1000000;                                                         // amount.h
 int64_t MAX_MONEY = 21000000 * COIN;                                            // amount.h
 unsigned int MAX_SCRIPT_ELEMENT_SIZE=520;                                       // script.h
+int MIN_BLOCKS_BETWEEN_UPGRADES = 100;                                          
 int MAX_OP_RETURN_SHOWN=16384;
 int MAX_FORMATTED_DATA_DEPTH=100;
 unsigned int MAX_OP_RETURN_OP_DROP_COUNT=100000000;

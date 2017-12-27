@@ -2314,6 +2314,15 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             return false;
     }
 
+    if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-size",true))
+    {
+        return false;
+    }
+    if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-sigops",true))
+    {
+        return false;
+    }
+    
 /* MCHN START */    
     uint256 block_hash;
     unsigned char miner_address[20];
@@ -4135,6 +4144,34 @@ bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool f
 }
 
 /* MCHN START */
+
+bool CheckBlockForUpgardableConstraints(const CBlock& block, CValidationState& state, string parameter, bool in_sync)
+{
+    if(!in_sync)
+    {
+        return true;
+    }
+    
+    if(parameter == "maximum-block-size")
+    {
+        if (block.vtx.empty() || block.vtx.size() > MAX_BLOCK_SIZE || ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
+            return state.DoS(100, error("CheckBlock() : size limits failed"),
+                             REJECT_INVALID, "bad-blk-length");        
+    }
+    if(parameter == "maximum-block-sigops")
+    {
+        unsigned int nSigOps = 0;
+        BOOST_FOREACH(const CTransaction& tx, block.vtx)
+        {
+            nSigOps += GetLegacySigOpCount(tx);
+        }
+        if (nSigOps > MAX_BLOCK_SIGOPS)
+            return state.DoS(100, error("CheckBlock() : out-of-bounds SigOpCount"),
+                             REJECT_INVALID, "bad-blk-sigops", true);        
+    }
+    return true;
+}
+
 //bool CheckBlock(CBlock& block, CValidationState& state, bool fCheckPOW, bool fCheckMerkleRoot)
 bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bool fCheckMerkleRoot)
 /* MCHN END */
@@ -4167,10 +4204,16 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     // because we receive the wrong transactions for it.
 
     // Size limits
+    if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-size",false))
+    {
+        return false;
+    }
+/*    
     if (block.vtx.empty() || block.vtx.size() > MAX_BLOCK_SIZE || ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
         return state.DoS(100, error("CheckBlock() : size limits failed"),
                          REJECT_INVALID, "bad-blk-length");
-
+*/
+    
     // First transaction must be coinbase, the rest must not be
     if (block.vtx.empty() || !block.vtx[0].IsCoinBase())
         return state.DoS(100, error("CheckBlock() : first tx is not coinbase"),
@@ -4200,7 +4243,12 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
         }
     }
     
+    if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-sigops",false))
+    {
+        return false;
+    }
     
+/*    
     unsigned int nSigOps = 0;
     BOOST_FOREACH(const CTransaction& tx, block.vtx)
     {
@@ -4209,7 +4257,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     if (nSigOps > MAX_BLOCK_SIGOPS)
         return state.DoS(100, error("CheckBlock() : out-of-bounds SigOpCount"),
                          REJECT_INVALID, "bad-blk-sigops", true);
-
+*/
     return true;
 }
 
