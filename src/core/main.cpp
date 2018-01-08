@@ -3499,13 +3499,17 @@ string SetLastBlock(uint256 hash,bool *fNotFound)
             
             pindex=pindex->pprev;
         }
-        
-        if(!ActivateBestChainStep(state,pblockindex,&block))
+
+        while(pblockindex != chainActive.Tip())
         {
-            string error=state.GetRejectReason();
-            ActivateBestChain(state);
-            return error;
-        }        
+            if(!ActivateBestChainStep(state,pblockindex,NULL))
+            {
+                string error=state.GetRejectReason();
+                ActivateBestChain(state);
+                return error;
+            }        
+        }
+
         setBlockIndexCandidates.insert(pblockindex);
 
         LogPrintf("Set active chain tip: %s\n",hash.GetHex().c_str());
