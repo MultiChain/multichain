@@ -523,9 +523,9 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
                 }
             }
 
-            if(vUpgrades[u].m_ApprovedBlock <= current_height)
+            if(vUpgrades[u].m_AppliedBlock <= current_height)
             {
-                entry.push_back(Pair("appliedblock", (int64_t)vUpgrades[u].m_ApprovedBlock));                  
+                entry.push_back(Pair("appliedblock", (int64_t)vUpgrades[u].m_AppliedBlock));                  
                 entry.push_back(Pair("appliedparams", applied_params));                  
                 entry.push_back(Pair("skippedparams", skipped_params));                  
             }

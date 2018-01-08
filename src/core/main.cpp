@@ -385,12 +385,12 @@ int MultichainNode_ApplyUpgrades(int current_height)
     vector<mc_UpgradedParameter> vParams;
     int err=MC_ERR_NOERROR;
     
-    CreateUpgradeLists(chainActive.Height(),&vParams,NULL);
+    err=CreateUpgradeLists(current_height,&vParams,NULL);
     
     int OriginalProtocolVersion=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
     int CurrentProtocolVersion=mc_gState->m_NetworkParams->ProtocolVersion();//mc_gState->m_ProtocolVersionToUpgrade;
-    int NewProtocolVersion=OriginalProtocolVersion;
     
+    mc_gState->m_NetworkParams->m_ProtocolVersion=OriginalProtocolVersion;
     mc_gState->m_NetworkParams->SetGlobals();
     for(int p=0;p<(int)vParams.size();p++)
     {
@@ -398,7 +398,7 @@ int MultichainNode_ApplyUpgrades(int current_height)
         {
             if(strcmp(vParams[p].m_Param->m_Name,"protocolversion") == 0)
             {
-                err=mc_gState->m_NetworkParams->m_ProtocolVersion=mc_gState->m_ProtocolVersionToUpgrade;// UPGRADE CODE HERE
+                mc_gState->m_NetworkParams->m_ProtocolVersion=(int)vParams[p].m_Value;
                 mc_gState->m_NetworkParams->SetProtocolGlobals();
             }
             else
@@ -408,20 +408,26 @@ int MultichainNode_ApplyUpgrades(int current_height)
         }
     }
     SetMultiChainParams();            
+    mc_gState->m_ProtocolVersionToUpgrade=mc_gState->m_NetworkParams->m_ProtocolVersion;
+    
     
     if(mc_gState->m_ProtocolVersionToUpgrade != CurrentProtocolVersion)
     {
         LogPrintf("New protocol upgrade version: %d (was %d)\n",mc_gState->m_ProtocolVersionToUpgrade,CurrentProtocolVersion);
         if( (err == MC_ERR_NOT_SUPPORTED) || ((mc_gState->m_ProtocolVersionToUpgrade > 0) && (mc_gState->IsSupported(mc_gState->m_ProtocolVersionToUpgrade) == 0)) )
         {
+            mc_gState->m_NetworkParams->m_ProtocolVersion=CurrentProtocolVersion;
             LogPrintf("NODE SHOULD BE UPGRADED FROM %d TO %d\n",mc_gState->GetProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
         }
         else
         {
+            LogPrintf("NODE IS UPGRADED FROM %d TO %d\n",CurrentProtocolVersion,mc_gState->m_ProtocolVersionToUpgrade);
+/*            
             if(mc_gState->m_ProtocolVersionToUpgrade != mc_gState->m_NetworkParams->ProtocolVersion())
             {
                 LogPrintf("NODE IS UPGRADED FROM %d TO %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
             }        
+ */ 
         }
     }
     else
@@ -3569,7 +3575,6 @@ string SetLastBlock(uint256 hash,bool *fNotFound)
 
         CBlockIndex *pindex;
         pindex=pblockindex;
-        
         while(pindex != pindexFork)
         {
             if (pblockindex->nStatus & BLOCK_FAILED_MASK)
@@ -3601,12 +3606,16 @@ string SetLastBlock(uint256 hash,bool *fNotFound)
             pindex=pindex->pprev;
         }
         
-        if(!ActivateBestChainStep(state,pblockindex,&block))
+        while(pblockindex != chainActive.Tip())
         {
-            string error=state.GetRejectReason();
-            ActivateBestChain(state);
-            return error;
-        }        
+            if(!ActivateBestChainStep(state,pblockindex,NULL))
+            {
+                string error=state.GetRejectReason();
+                ActivateBestChain(state);
+                return error;
+            }        
+        }
+        
         setBlockIndexCandidates.insert(pblockindex);
 
         LogPrintf("Set active chain tip: %s\n",hash.GetHex().c_str());

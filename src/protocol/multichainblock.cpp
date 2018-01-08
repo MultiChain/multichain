@@ -110,6 +110,7 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
         mc_PermissionDetails *plsRow;
         plsRow=(mc_PermissionDetails *)(upgrades->GetRow(i));
 //        if(plsRow->m_Type == MC_PTP_UPGRADE)
+        if(err == MC_ERR_NOERROR)
         {
             memset(&upgrade,0,sizeof(mc_UpgradeStatus));
             memcpy(upgrade.m_EntityShortTxID,plsRow->m_Address,MC_AST_SHORT_TXID_SIZE);
@@ -135,6 +136,7 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
                             param.m_Param=mc_gState->m_NetworkParams->FindParam("protocolversion");
                             param.m_Value=version;
                             param.m_Block=upgrade.m_AppliedBlock;
+                            param.m_Skipped=MC_PSK_APPLIED;
                             if(version >= mc_gState->MinProtocolDowngradeVersion())
                             {
                                 if((NewProtocolVersion < mc_gState->MinProtocolForbiddenDowngradeVersion()) || (version >= NewProtocolVersion))
@@ -144,7 +146,6 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
                                     {
                                         err=MC_ERR_NOT_SUPPORTED;
                                     }
-                                    memset(&param,0,sizeof(mc_UpgradedParameter));
                                 }
                                 else
                                 {
