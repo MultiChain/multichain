@@ -311,7 +311,18 @@ Value help(const Array& params, bool fHelp)
     string strCommand;
     if (params.size() > 0)
         strCommand = params[0].get_str();
-
+    
+    if(strCommand.size())
+    {
+        if(setAllowedWhenLimited.size())
+        {
+            if( setAllowedWhenLimited.count(strCommand) == 0 )
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Method not allowed with current setting of -rpcallowmethod runtime parameter");                
+            }        
+        }
+    }
+    
     return tableRPC.help(strCommand);
 }
 
@@ -622,9 +633,27 @@ static ip::tcp::endpoint ParseEndpoint(const std::string &strEndpoint, int defau
     return ip::tcp::endpoint(asio::ip::address::from_string(addr), port);
 }
 
+void mc_InitRPCListIfLimited()
+{
+    if (mapArgs.count("-rpcallowmethod")) 
+    {
+        setAllowedWhenLimited.insert("help");
+        BOOST_FOREACH(const std::string& methods, mapMultiArgs["-rpcallowmethod"]) 
+        {
+            stringstream ss(methods); 
+            string tok;
+            while(getline(ss, tok, ',')) 
+            {
+                setAllowedWhenLimited.insert(tok);    
+            }
+        }
+    }
+}
+
 void StartRPCThreads()
 {
     mc_InitRPCList(vStaticRPCCommands,vStaticRPCWalletReadCommands);
+    mc_InitRPCListIfLimited();
     tableRPC.initialize();
 
     rpc_allow_subnets.clear();
@@ -1134,6 +1163,14 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         }        
     }
     
+    if(setAllowedWhenLimited.size())
+    {
+        if( setAllowedWhenLimited.count(strMethod) == 0 )
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Method not allowed with current setting of -rpcallowmethod runtime parameter");                
+        }        
+    }
+    
     // Observe safe mode
     string strWarning = GetWarnings("rpc");
     if (strWarning != "" && !GetBoolArg("-disablesafemode", false) &&
@@ -1241,6 +1278,7 @@ std::map<std::string, std::string> mapHelpStrings;
 std::map<std::string, int> mapLogParamCounts;
 std::set<std::string> setAllowedWhenWaitingForUpgrade;
 std::set<std::string> setAllowedWhenOffline;
+std::set<std::string> setAllowedWhenLimited;
 
 std::vector<CRPCCommand> vStaticRPCCommands;
 std::vector<CRPCCommand> vStaticRPCWalletReadCommands;
