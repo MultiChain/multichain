@@ -251,7 +251,7 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
                                         }
                                         if(vUpgrades == NULL)                   // Called from MultichainNode_ApplyUpgrades
                                         {
-                                            if(param.m_Block == current_height)
+                                            if((int)param.m_Block == current_height)
                                             {
                                                 if(param.m_Skipped == MC_PSK_APPLIED)
                                                 {

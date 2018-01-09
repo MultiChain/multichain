@@ -478,7 +478,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
 
             entry.push_back(Pair("approved", (vUpgrades[u].m_ApprovedBlock <= current_height+1)));            
 
-            for(int p=vUpgrades[u].m_FirstParam;p<vUpgrades[u].m_LastParam;p++)
+            for(uint32_t p=vUpgrades[u].m_FirstParam;p<vUpgrades[u].m_LastParam;p++)
             {
                 param_name=string(vParams[p].m_Param->m_DisplayName);
                 if(vParams[p].m_Skipped == MC_PSK_APPLIED)
