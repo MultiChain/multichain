@@ -218,13 +218,11 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
     vector <CTxOut> input_txouts;
     vector <string> input_errors;
 
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer2;
     asset_amounts->Clear();
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript4;
+    lpScript->Clear();    
 
     AcceptExchange(tx, input_txouts, input_errors,strError);
 
@@ -342,9 +340,6 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
     }
 
     
-    delete lpScript;
-    delete asset_amounts;
-
     is_complete=true;
     if(lpAssets != NULL)
     {
@@ -489,8 +484,8 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
             {
                 CTxDestination address=CTxDestination(pkey.GetID());    
 
-                mc_Script *lpScript;
-                lpScript=new mc_Script;
+                mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript4;
+                lpScript->Clear();
 
                 Value param=tocomplete;
                 uint256 offer_hash;            
@@ -539,8 +534,6 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
                         result.push_back(Pair("cancomplete", true));                            
                     }
                 }
-
-                delete lpScript;
             }
         }
             
@@ -617,8 +610,8 @@ Value createrawexchange(const json_spirit::Array& params, bool fHelp)
     
     
     COutPoint offer_input;
-    mc_Script *lpScript;
-    lpScript=new mc_Script;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
     CAmount nAmount=0;
     int eErrorCode;
     string strError=FindExchangeOutPoint(params,0,offer_input,nAmount,lpScript,&eErrorCode);
@@ -714,9 +707,6 @@ Value createrawexchange(const json_spirit::Array& params, bool fHelp)
         }
     }
         
-    delete lpScript;
-    
-    
     return EncodeHexTx(tx);
 }
 
@@ -727,8 +717,8 @@ Value appendrawexchange(const json_spirit::Array& params, bool fHelp)
         throw runtime_error("Help message not found\n");
 
     COutPoint offer_input;
-    mc_Script *lpScript;
-    lpScript=new mc_Script;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
     CAmount nAmount=0;
     int eErrorCode;
     
@@ -827,14 +817,11 @@ Value appendrawexchange(const json_spirit::Array& params, bool fHelp)
             throw JSONRPCError(RPC_WALLET_ERROR, "Signing transaction failed");                                    
         }
     }        
-    delete lpScript;
     
     bool is_complete=true;
     int64_t native_balance;
     
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
     asset_amounts->Clear();
     
     {
@@ -844,8 +831,6 @@ Value appendrawexchange(const json_spirit::Array& params, bool fHelp)
         decode_result=DecodeExchangeTransaction(tx,0,native_balance,asset_amounts,is_complete,false,strError);
     }
 
-    delete asset_amounts;
-    
     Object result;
     result.push_back(Pair("hex", EncodeHexTx(tx)));
     result.push_back(Pair("complete", is_complete));
@@ -859,8 +844,8 @@ Value completerawexchange(const json_spirit::Array& params, bool fHelp)
         throw runtime_error("Help message not found\n");
 
     COutPoint offer_input;
-    mc_Script *lpScript;
-    lpScript=new mc_Script;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
     CAmount nAmount=0;
     int eErrorCode;
     
@@ -986,14 +971,11 @@ Value completerawexchange(const json_spirit::Array& params, bool fHelp)
             throw JSONRPCError(RPC_WALLET_ERROR, "Signing transaction failed");                                    
         }
     }        
-    delete lpScript;
     
     bool is_complete=true;
     int64_t native_balance;
     
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
     asset_amounts->Clear();
     
     {
@@ -1002,8 +984,6 @@ Value completerawexchange(const json_spirit::Array& params, bool fHelp)
         
         decode_result=DecodeExchangeTransaction(tx,0,native_balance,asset_amounts,is_complete,true,strError);
     }
-
-    delete asset_amounts;
     
     if(!is_complete)
     {
@@ -1038,9 +1018,7 @@ Value decoderawexchange(const json_spirit::Array& params, bool fHelp)
     int64_t native_balance;
     string strError;
     
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
     asset_amounts->Clear();
     
     {
@@ -1048,8 +1026,6 @@ Value decoderawexchange(const json_spirit::Array& params, bool fHelp)
         
         result=DecodeExchangeTransaction(tx,verbose,native_balance,asset_amounts,is_complete,true,strError);
     }
-
-    delete asset_amounts;
     
     return result;
 }
