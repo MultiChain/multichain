@@ -60,8 +60,8 @@ Value issuefromcmd(const Array& params, bool fHelp)
     // Wallet comments
     CWalletTx wtx;
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
 
     int64_t quantity;
     int multiple;
@@ -123,11 +123,10 @@ Value issuefromcmd(const Array& params, bool fHelp)
     
     lpScript->SetAssetGenesis(quantity);
     
-    mc_Script *lpDetailsScript;
-    lpDetailsScript=NULL;
-    
-    mc_Script *lpDetails;
-    lpDetails=NULL;
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;   
+    lpDetailsScript->Clear();
+    mc_Script *lpDetails=mc_gState->m_TmpBuffers->m_RpcScript2;
+    lpDetails->Clear();
     
     int ret,type;
     string asset_name="";
@@ -220,7 +219,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
         }        
     }
 
-    lpDetails=new mc_Script;
+    lpDetails->Clear();
     lpDetails->AddElement();
     
     if(mc_gState->m_Features->OpDropDetailsScripts())
@@ -273,7 +272,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
     vector<CTxDestination> fromaddresses;        
     int errorCode=RPC_INVALID_PARAMETER;
     string strError;    
-    lpDetailsScript=new mc_Script;
+    lpDetailsScript->Clear();
     if (params.size() > 6)
     {
         ParseRawDetails(&(params[6]),lpDetails,lpDetailsScript,&errorCode,&strError);        
@@ -375,13 +374,6 @@ Value issuefromcmd(const Array& params, bool fHelp)
 exitlbl:    
     
     
-    if(lpDetailsScript)
-    {
-        delete lpDetailsScript;
-    }
-    delete lpDetails;
-    delete lpScript;
-  
     if(strError.size())
     {
         throw JSONRPCError(errorCode, strError);            
@@ -425,8 +417,8 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");
     }
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
     unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
     memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
     int multiple=1;
@@ -460,18 +452,12 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
         
     mc_SetABQuantity(buf,quantity);
     
-    mc_Buffer *lpBuffer;
-    lpBuffer=new mc_Buffer;
-    
-    mc_InitABufferDefault(lpBuffer);
+    mc_Buffer *lpBuffer=mc_gState->m_TmpBuffers->m_RpcABNoMapBuffer2;
+    lpBuffer->Clear();
     
     lpBuffer->Add(buf);
     
     lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
-    
-    delete lpBuffer;
-        
-        
     
     // Wallet comments
     CWalletTx wtx;
@@ -484,11 +470,12 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     }
     
     
-    mc_Script *lpDetailsScript;
-    lpDetailsScript=NULL;
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
+    lpDetailsScript->Clear();
     
-    mc_Script *lpDetails;
-    lpDetails=new mc_Script;
+    mc_Script *lpDetails=mc_gState->m_TmpBuffers->m_RpcScript2;
+    lpDetails->Clear();
+    
     lpDetails->AddElement();
         
     vector<CTxDestination> addresses;    
@@ -668,13 +655,6 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     
 exitlbl:    
     
-    if(lpDetailsScript)
-    {
-        delete lpDetailsScript;
-    }
-    delete lpDetails;
-    delete lpScript;
-  
     if(strError.size())
     {
         throw JSONRPCError(errorCode, strError);            
@@ -791,8 +771,10 @@ Value getmultibalances(const Array& params, bool fHelp)
         }
     }
 
-    mc_Buffer *asset_amounts;
-    mc_Buffer *addresstxid_amounts;
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
+    asset_amounts->Clear();
+    mc_Buffer *addresstxid_amounts=mc_gState->m_TmpBuffers->m_RpcBuffer1;
+    addresstxid_amounts->Clear();
     unsigned char buf[80+MC_AST_ASSET_QUANTITY_SIZE];
     unsigned char totbuf[80+MC_AST_ASSET_QUANTITY_SIZE];
     int64_t quantity;
@@ -805,14 +787,11 @@ Value getmultibalances(const Array& params, bool fHelp)
     {
         LOCK(cs_main);
         
-        mc_Script *lpScript;
-        lpScript=new mc_Script;    
+        mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+        lpScript->Clear();    
         
-        asset_amounts=new mc_Buffer;
-        mc_InitABufferMap(asset_amounts);
         asset_amounts->Clear();
 
-        addresstxid_amounts=new mc_Buffer;
         addresstxid_amounts->Initialize(80,80+MC_AST_ASSET_QUANTITY_SIZE,MC_BUF_MODE_MAP);
         addresstxid_amounts->Clear();
 
@@ -1065,9 +1044,6 @@ Value getmultibalances(const Array& params, bool fHelp)
         }
         
         
-        delete addresstxid_amounts;
-        delete asset_amounts;
-        delete lpScript;
     }        
         
     return balances;    
@@ -1112,18 +1088,15 @@ Value getaddressbalances(const Array& params, bool fHelp)
     if (params.size() > 1)
         nMinDepth = params[1].get_int();
 
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
     asset_amounts->Clear();
     
-    mc_Buffer *genesis_amounts;
-    genesis_amounts=new mc_Buffer;
+    mc_Buffer *genesis_amounts=mc_gState->m_TmpBuffers->m_RpcBuffer1;
     genesis_amounts->Initialize(32,32+MC_AST_ASSET_QUANTITY_SIZE,MC_BUF_MODE_MAP);
     genesis_amounts->Clear();
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();    
 
     int last_size=0;
     Array assets;
@@ -1300,10 +1273,6 @@ Value getaddressbalances(const Array& params, bool fHelp)
     }
     
 
-    delete lpScript;
-    delete asset_amounts;
-    delete genesis_amounts;
-    
 /* MCHN END */        
     return assets;
 }
@@ -1359,18 +1328,15 @@ Value getassetbalances(const Array& params, bool fHelp)
     if (params.size() > 1)
         nMinDepth = params[1].get_int();
 
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
     asset_amounts->Clear();
     
-    mc_Buffer *genesis_amounts;
-    genesis_amounts=new mc_Buffer;
+    mc_Buffer *genesis_amounts=mc_gState->m_TmpBuffers->m_RpcBuffer1;
     genesis_amounts->Initialize(32,32+MC_AST_ASSET_QUANTITY_SIZE,MC_BUF_MODE_MAP);
     genesis_amounts->Clear();
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();    
 
     int last_size=0;
     Array assets;
@@ -1521,11 +1487,7 @@ Value getassetbalances(const Array& params, bool fHelp)
         asset_entry=AssetEntry(ptr,mc_GetLE(ptr+32,MC_AST_ASSET_QUANTITY_SIZE),0x00);
         assets.push_back(asset_entry);
     }
-    
-    delete lpScript;
-    delete asset_amounts;
-    delete genesis_amounts;
-    
+        
 /* MCHN END */        
     return assets;
 }
@@ -1992,12 +1954,11 @@ Value getassettransaction(const Array& params, bool fHelp)
     }
     
     const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
+    asset_amounts->Clear();
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();    
     
     Object entry=ListAssetTransactions(wtx, &asset_entity, verbose, asset_amounts, lpScript);
     
@@ -2006,8 +1967,6 @@ Value getassettransaction(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_TX_NOT_FOUND, "This transaction was not found for this asset");                
     }
     
-    delete asset_amounts;
-    delete lpScript;
     
     return entry;
 }
@@ -2071,16 +2030,14 @@ Value listassettransactions(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this asset");                                
     }
     
-    mc_Buffer *entity_rows;
-    entity_rows=new mc_Buffer;
-    entity_rows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);
+    mc_Buffer *entity_rows=mc_gState->m_TmpBuffers->m_RpcEntityRows;
+    entity_rows->Clear();
 
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
+    asset_amounts->Clear();
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();    
 
     pwalletTxsMain->GetList(&entStat.m_Entity,1,1,entity_rows);
     shift=1;
@@ -2134,10 +2091,6 @@ Value listassettransactions(const Array& params, bool fHelp)
             retArray.push_back(entry);                                
         }
     }
-    
-    delete entity_rows;
-    delete asset_amounts;
-    delete lpScript;
     
     return retArray;
 }

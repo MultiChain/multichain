@@ -102,12 +102,11 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     entry.push_back(Pair("vin", vin));
 
 /* MCHN START */    
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer2;
+    asset_amounts->Clear();
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript4;
+    lpScript->Clear();    
 /* MCHN END */    
     
     Array vdata;
@@ -487,10 +486,6 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         entry.push_back(Pair("data", aFullFormatMetaData));
     }
 
-    delete lpScript;
-    delete asset_amounts;
-    
-    
     if (hashBlock != 0) {
         entry.push_back(Pair("blockhash", hashBlock.GetHex()));
         BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
@@ -577,12 +572,11 @@ Value listunspent(const Array& params, bool fHelp)
     }
 /* MCHN START */        
 
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
+    asset_amounts->Clear();
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();    
     
     {
         LOCK(pwalletMain->cs_wallet);
@@ -708,9 +702,6 @@ Value listunspent(const Array& params, bool fHelp)
 
 /* MCHN START */        
 
-    delete lpScript;
-    delete asset_amounts;
-    
 /* MCHN END */        
     return results;
 }
@@ -761,15 +752,13 @@ Value appendrawchange(const Array& params, bool fHelp)
         }        
     }
     
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
-    mc_Buffer *amounts;
-    amounts=new mc_Buffer;
-    mc_InitABufferMap(amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
+    asset_amounts->Clear();
+    mc_Buffer *amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer2;
+    amounts->Clear();
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();    
 
     int allowed=0;
     int required=0;
@@ -945,10 +934,6 @@ Value appendrawchange(const Array& params, bool fHelp)
         }                    
     }        
     
-    delete lpScript;
-    delete asset_amounts;    
-    delete amounts;    
-
     
     return EncodeHexTx(txNew);    
 }

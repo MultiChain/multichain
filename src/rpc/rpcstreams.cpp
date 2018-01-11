@@ -270,12 +270,12 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
 
     CWalletTx wtx;
     
-    mc_Script *lpScript;
-    
-    mc_Script *lpDetailsScript;
-    lpDetailsScript=NULL;
-    
-    mc_Script *lpDetails;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;   
+    lpScript->Clear();
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;    
+    lpDetailsScript->Clear();
+    mc_Script *lpDetails=mc_gState->m_TmpBuffers->m_RpcScript2;
+    lpDetails->Clear();
     
     int ret,type;
     string stream_name="";
@@ -322,9 +322,9 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
         }        
     }
 
-    lpScript=new mc_Script;
+    lpScript->Clear();
     
-    lpDetails=new mc_Script;
+    lpDetails->Clear();
     lpDetails->AddElement();
     if(params[3].get_bool())
     {
@@ -361,7 +361,7 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     
     int errorCode=RPC_INVALID_PARAMETER;
     string strError;    
-    lpDetailsScript=new mc_Script;
+    lpDetailsScript->Clear();
     if (params.size() > 4)
     {
         ParseRawDetails(&(params[4]),lpDetails,lpDetailsScript,&errorCode,&strError);        
@@ -488,13 +488,6 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     
 exitlbl:
 
-    if(lpDetailsScript)
-    {
-        delete lpDetailsScript;
-    }
-    delete lpDetails;
-    delete lpScript;
-  
     if(strError.size())
     {
         throw JSONRPCError(errorCode, strError);            
@@ -575,7 +568,9 @@ Value publishfrom(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
     }
            
-    mc_Script *lpScript;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
+    
     mc_EntityDetails stream_entity;
     parseStreamIdentifier(params[1],&stream_entity);           
                
@@ -650,13 +645,13 @@ Value publishfrom(const Array& params, bool fHelp)
         }
     }
     
-    mc_Script *lpDetailsScript;
-    lpDetailsScript=NULL;
-        
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
+    lpDetailsScript->Clear();
+    
     uint32_t data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
     
     vector<unsigned char> dataData;
-    lpDetailsScript=new mc_Script;
+    lpDetailsScript->Clear();
 
     string strError;
     int errorCode=RPC_INVALID_PARAMETER;
@@ -664,7 +659,6 @@ Value publishfrom(const Array& params, bool fHelp)
 
     if(strError.size())
     {
-        delete lpDetailsScript;
         throw JSONRPCError(errorCode, strError);                                                                                                                
     }
     
@@ -713,16 +707,13 @@ Value publishfrom(const Array& params, bool fHelp)
     }    
     
     
-    lpScript=new mc_Script;
+    lpScript->Clear();
          
     EnsureWalletIsUnlocked();
     LOCK (pwalletMain->cs_wallet_send);
     
     SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn,fromaddresses);
 
-    delete lpDetailsScript;
-    delete lpScript;
-  
     return wtx.GetHash().GetHex();    
 }
 
@@ -849,8 +840,7 @@ Value unsubscribe(const Array& params, bool fHelp)
         inputEntities.push_back(entity_to_subscribe);
     }
         
-    mc_Buffer *streams;
-    streams=new mc_Buffer;
+    mc_Buffer *streams=mc_gState->m_TmpBuffers->m_RpcBuffer1;
     streams->Initialize(sizeof(mc_TxEntity),sizeof(mc_TxEntity),MC_BUF_MODE_DEFAULT);
     
     
@@ -896,12 +886,10 @@ Value unsubscribe(const Array& params, bool fHelp)
     {
         if(pwalletTxsMain->Unsubscribe(streams))
         {
-            delete streams;
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't unsubscribe from stream");                                    
         }
     }
 
-    delete streams;
     return Value::null;
 }
 
@@ -1067,9 +1055,8 @@ Value liststreamitems(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
     }
     
-    mc_Buffer *entity_rows;
-    entity_rows=new mc_Buffer;
-    entity_rows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);
+    mc_Buffer *entity_rows=mc_gState->m_TmpBuffers->m_RpcEntityRows;
+    entity_rows->Clear();
     
     mc_AdjustStartAndCount(&count,&start,entStat.m_LastPos);
     
@@ -1089,8 +1076,6 @@ Value liststreamitems(const Array& params, bool fHelp)
             retArray.push_back(entry);                                
         }
     }
-    
-    delete entity_rows;
     
     return retArray;
 }
@@ -1184,9 +1169,8 @@ Value liststreamblockitems(const Array& params, bool fHelp)
     height_from=heights[0];
     height_to=heights[0];
 
-    mc_Buffer *entity_rows;
-    entity_rows=new mc_Buffer;
-    entity_rows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);
+    mc_Buffer *entity_rows=mc_gState->m_TmpBuffers->m_RpcEntityRows;
+    entity_rows->Clear();
     
     for(unsigned int i=1;i<heights.size();i++)
     {
@@ -1200,7 +1184,6 @@ Value liststreamblockitems(const Array& params, bool fHelp)
     
     
     getTxsForBlockRange(txids,&entStat.m_Entity,height_from,height_to,entity_rows);
-    delete entity_rows;
     
     mc_AdjustStartAndCount(&count,&start,txids.size());
     
@@ -1384,9 +1367,8 @@ Value getstreamsummary(const Array& params, bool fPublisher)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "missing jsonobjectmerge");                                                    
     }
     
-    mc_Buffer *entity_rows;
-    entity_rows=new mc_Buffer;
-    entity_rows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);
+    mc_Buffer *entity_rows=mc_gState->m_TmpBuffers->m_RpcEntityRows;
+    entity_rows->Clear();
         
     Object empty_object;
     Object obj;
@@ -1516,8 +1498,6 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     
 exitlbl:    
 
-    delete entity_rows;
-    
     if(err)
     {
         throw JSONRPCError(RPC_NOT_ALLOWED, "Some items to be merged are in the wrong format (try using \'ignore\')" );                                                    
@@ -1622,9 +1602,8 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
     getSubKeyEntityFromKey(params[1].get_str(),entStat,&entity);
     
     
-    mc_Buffer *entity_rows;
-    entity_rows=new mc_Buffer;
-    entity_rows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);
+    mc_Buffer *entity_rows=mc_gState->m_TmpBuffers->m_RpcEntityRows;
+    entity_rows->Clear();
     
     mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->GetListSize(&entity,entStat.m_Generation,NULL));
     
@@ -1644,8 +1623,6 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
             retArray.push_back(entry);                                
         }
     }
-    
-    delete entity_rows;
     
     return retArray;
 }
@@ -1731,9 +1708,8 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
     const char *key_ptr=key_string.c_str();
     getSubKeyEntityFromPublisher(params[1].get_str(),entStat,&entity);
     
-    mc_Buffer *entity_rows;
-    entity_rows=new mc_Buffer;
-    entity_rows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);
+    mc_Buffer *entity_rows=mc_gState->m_TmpBuffers->m_RpcEntityRows;
+    entity_rows->Clear();
     
     mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->GetListSize(&entity,entStat.m_Generation,NULL));
     
@@ -1754,8 +1730,6 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
         }
     }
     
-    delete entity_rows;
-    
     return retArray;
 }
 
@@ -1772,20 +1746,19 @@ Value liststreammap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& in
     mc_TxEntity entity;
     mc_TxEntityStat entStat;
     Array retArray;
-    mc_Buffer *entity_rows;
+    mc_Buffer *entity_rows=mc_gState->m_TmpBuffers->m_RpcEntityRows;
     mc_TxEntityRow erow;
     uint160 stream_subkey_hash;    
     int row,enitity_count;
     const char **given_key;
     const char **given_publisher;
     
-    entity_rows=NULL;
+    entity_rows->Clear();
     enitity_count=inputEntities.size();
     if(enitity_count == 0)
     {
         mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->GetListSize(parent_entity,NULL));
-        entity_rows=new mc_Buffer;
-        entity_rows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);
+        entity_rows->Clear();
         pwalletTxsMain->GetList(parent_entity,start+1,count,entity_rows);
         enitity_count=entity_rows->GetCount();
     }
@@ -1882,11 +1855,6 @@ Value liststreammap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& in
         retArray.push_back(all_entry);                                
     }
 
-    if(entity_rows)
-    {
-        delete entity_rows;
-    }
-    
     return retArray;
 }
 

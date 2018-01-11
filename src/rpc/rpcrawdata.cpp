@@ -1484,12 +1484,10 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
     uint32_t data_format;
     mc_EntityDetails entity;
     CScript scriptOpReturn=CScript();
-    mc_Script *lpDetailsScript;
-    mc_Script *lpDetails;
-    
-    lpDetailsScript=NULL;
-    lpDetails=NULL;
-    
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
+    lpDetailsScript->Clear();
+    mc_Script *lpDetails=mc_gState->m_TmpBuffers->m_RpcScript2;
+    lpDetails->Clear();
     uint32_t param_type=ParseRawDataParamType(&param,given_entity,&entity,&data_format,&errorCode,&strError);
 
     if(strError.size())
@@ -1517,28 +1515,6 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
         memcpy(found_entity,&entity,sizeof(mc_EntityDetails));
     }                        
     
-    switch(param_type)
-    {
-        case MC_DATA_API_PARAM_TYPE_EMPTY_RAW:
-        case MC_DATA_API_PARAM_TYPE_RAW:
-            break;
-        default:
-            lpDetailsScript=new mc_Script;
-            break;
-    }
-    
-    switch(param_type)
-    {
-        case MC_DATA_API_PARAM_TYPE_ISSUE:
-        case MC_DATA_API_PARAM_TYPE_FOLLOWON:
-        case MC_DATA_API_PARAM_TYPE_CREATE_STREAM:
-        case MC_DATA_API_PARAM_TYPE_CREATE_UPGRADE:
-            lpDetails=new mc_Script;
-            break;
-        default:
-            break;
-    }
-
     switch(param_type)
     {
         case MC_DATA_API_PARAM_TYPE_EMPTY_RAW:
@@ -1573,14 +1549,6 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
     
 exitlbl:
     
-    if(lpDetailsScript)       
-    {
-        delete lpDetailsScript;
-    }
-    if(lpDetails)       
-    {
-        delete lpDetails;
-    }
     if(strError.size())
     {
         throw JSONRPCError(errorCode, strError);            

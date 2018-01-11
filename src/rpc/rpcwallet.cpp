@@ -1483,36 +1483,6 @@ Value listtransactions(const Array& params, bool fHelp)
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "Not supported with scalable wallet - if you need listtransactions, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
-/*
-        mc_Buffer *entity_rows;
-        entity_rows=new mc_Buffer;
-        entity_rows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);
-        
-        mc_TxEntity wallet_by_time;
-        mc_TxEntityRow *lpEntTx;
-        wallet_by_time.Zero();
-        wallet_by_time.m_EntityType=MC_TET_TIMERECEIVED;
-        if(filter & ISMINE_WATCH_ONLY)
-        {
-            wallet_by_time.m_EntityType |= MC_TET_WALLET_ALL;
-        }
-        else
-        {
-            wallet_by_time.m_EntityType |= MC_TET_WALLET_SPENDABLE;            
-        }
-        pwalletTxsMain->GetList(&wallet_by_time,-nFrom,nCount,entity_rows);
-        for(int i=entity_rows->GetCount()-1;i>=0;i--)
-        {
-            lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
-            uint256 hash;
-            mc_TxDefRow txdef;
-            memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);
-            const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,&txdef,NULL);
-            ListTransactions(wtx, strAccount, 0, true, ret, filter,&txdef);
-        }
-        delete entity_rows;
-        std::reverse(ret.begin(), ret.end()); // Return oldest to newest
-*/
     }
     else
     {

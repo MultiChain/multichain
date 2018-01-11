@@ -9,6 +9,7 @@
 #include "protocol/multichainscript.h"
 #include "permissions/permission.h"
 #include "entities/asset.h"
+#include "wallet/wallettxdb.h"
 
 #define MC_FAT_UNKNOWN     1
 #define MC_FAT_COMMAND     2
@@ -159,6 +160,64 @@ typedef struct mc_BlockHeaderInfo
     
 } mc_BlockHeaderInfo;
 
+typedef struct mc_TmpBuffers
+{
+    mc_TmpBuffers()
+    {
+        Init();
+    }
+    
+    ~mc_TmpBuffers()
+    {
+        Destroy();
+    }
+    
+    mc_Script               *m_RpcScript1;
+    mc_Script               *m_RpcScript2;
+    mc_Script               *m_RpcScript3;
+    mc_Script               *m_RpcScript4;
+    mc_Buffer               *m_RpcABBuffer1;
+    mc_Buffer               *m_RpcABBuffer2;
+    mc_Buffer               *m_RpcBuffer1;
+    mc_Buffer               *m_RpcABNoMapBuffer1;
+    mc_Buffer               *m_RpcABNoMapBuffer2;
+    mc_Buffer               *m_RpcEntityRows;
+    
+    void  Init()
+    {
+        m_RpcScript1=new mc_Script();
+        m_RpcScript2=new mc_Script();
+        m_RpcScript3=new mc_Script();
+        m_RpcScript4=new mc_Script();
+        m_RpcABBuffer1=new mc_Buffer;
+        mc_InitABufferMap(m_RpcABBuffer1);
+        m_RpcABBuffer2=new mc_Buffer;
+        mc_InitABufferMap(m_RpcABBuffer2);
+        m_RpcBuffer1=new mc_Buffer;
+        m_RpcABNoMapBuffer1=new mc_Buffer;
+        mc_InitABufferDefault(m_RpcABNoMapBuffer1);
+        m_RpcABNoMapBuffer2=new mc_Buffer;
+        mc_InitABufferDefault(m_RpcABNoMapBuffer2);
+        m_RpcEntityRows=new mc_Buffer;
+        m_RpcEntityRows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);        
+    }    
+
+    void  Destroy()
+    {
+        delete m_RpcScript1;
+        delete m_RpcScript2;
+        delete m_RpcScript3;
+        delete m_RpcScript4;
+        delete m_RpcABBuffer1;
+        delete m_RpcABBuffer2;
+        delete m_RpcBuffer1;
+        delete m_RpcABNoMapBuffer1;
+        delete m_RpcABNoMapBuffer2;
+        delete m_RpcEntityRows;
+    }
+    
+} mc_TmpBuffers;
+
 typedef struct mc_State
 {    
     mc_State()
@@ -194,6 +253,8 @@ typedef struct mc_State
     
     mc_Buffer               *m_BlockHeaderSuccessors;
     
+    mc_TmpBuffers           *m_TmpBuffers;
+    
     void  InitDefaults()
     {
         m_Params=new mc_Params;     
@@ -224,6 +285,8 @@ typedef struct mc_State
         mc_BlockHeaderInfo bhi;
         memset(&bhi,0,sizeof(mc_BlockHeaderInfo));
         m_BlockHeaderSuccessors->Add(&bhi);
+        
+        m_TmpBuffers=new mc_TmpBuffers;
         
         m_pSeedNode=NULL;
     }
@@ -273,6 +336,10 @@ typedef struct mc_State
         if(m_BlockHeaderSuccessors)
         {
             delete m_BlockHeaderSuccessors;
+        }
+        if(m_TmpBuffers)
+        {
+            delete m_TmpBuffers;
         }
     }
     

@@ -24,14 +24,12 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
 
     CWalletTx wtx;
     
-    mc_Script *lpScript;
-    lpScript=NULL;
-    
-    mc_Script *lpDetailsScript;
-    lpDetailsScript=NULL;
-    
-    mc_Script *lpDetails;
-    lpDetails=NULL;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;    
+    lpScript->Clear();
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
+    lpDetailsScript->Clear();
+    mc_Script *lpDetails=mc_gState->m_TmpBuffers->m_RpcScript2;
+    lpDetails->Clear();
     
     int ret,type;
     string upgrade_name="";
@@ -136,9 +134,9 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
         }        
     }
     
-    lpScript=new mc_Script;
+    lpScript->Clear();
     
-    lpDetails=new mc_Script;
+    lpDetails->Clear();
     lpDetails->AddElement();
     if(upgrade_name.size())
     {        
@@ -156,7 +154,7 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
     int start_block;
     CScript scriptOpReturn=CScript();
     
-    lpDetailsScript=new mc_Script;
+    lpDetailsScript->Clear();
     lpDetailsScript->AddElement();                   
 
     if(params[4].type() == obj_type)
@@ -283,19 +281,6 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
         
 exitlbl:
 
-    if(lpDetailsScript)
-    {
-        delete lpDetailsScript;
-    }
-    if(lpDetailsScript)
-    {
-        delete lpDetails;
-    }
-    if(lpScript)
-    {
-        delete lpScript;
-    }
-  
     if(strError.size())
     {
         throw JSONRPCError(errorCode, strError);                        
@@ -372,8 +357,8 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Please use raw transactions to approve upgrades from P2SH addresses");                                                
     }
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
     
     lpScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);        
     lpScript->SetApproval(approval, timestamp);
@@ -399,7 +384,6 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
 
     SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn, fromaddresses);
 
-    delete lpScript;
     return wtx.GetHash().GetHex();
     
 }
