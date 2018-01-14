@@ -37,6 +37,8 @@
 #define MC_PRM_NOHASH           0x00040000
 #define MC_PRM_MINIMAL          0x00080000
 #define MC_PRM_DECIMAL          0x00100000
+#define MC_PRM_HIDDEN           0x00200000
+#define MC_PRM_TIME             0x00400000
 
 
 #define MC_PRM_STATUS_EMPTY              0

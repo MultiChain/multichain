@@ -1245,7 +1245,7 @@ int mc_MultichainParams::Print(FILE* fileHan)
     int i,c,size;
     int version;
     int header_printed;
-    int set,chars_remaining;
+    int set,chars_remaining,hidden;
     void *ptr;
     char line[MC_PRM_DAT_FILE_LINE_SIZE+1+100];
     char *cptr;
@@ -1303,6 +1303,7 @@ int mc_MultichainParams::Print(FILE* fileHan)
             if( (((m_lpParams+i)->m_Type & MC_PRM_SOURCE_MASK) == param_sets[set]) && 
                     ((m_lpParams+i)->IsRelevant(version) > 0))
             {
+                hidden=0;
                 if(header_printed == 0)
                 {
                     fprintf(fileHan,"\n");
@@ -1463,6 +1464,13 @@ int mc_MultichainParams::Print(FILE* fileHan)
                             else
                             {
                                 sprintf(line+strlen(line),"%ld",mc_GetLE(ptr,4));                                                                
+                                if((m_lpParams+i)->m_Type & MC_PRM_HIDDEN)
+                                {
+                                    if(mc_GetLE(ptr,4) == (m_lpParams+i)->m_DefaultIntegerValue)
+                                    {
+                                        hidden=1;
+                                    }
+                                }
                             }
                             break;
                         case MC_PRM_INT64:
@@ -1477,76 +1485,79 @@ int mc_MultichainParams::Print(FILE* fileHan)
                 {
                     sprintf(line+strlen(line),"[null]");                                                                                    
                 }
-                if(chars_remaining == 0)
+                if(hidden == 0)
                 {
-                    fprintf(fileHan,"%s",line);
-                    chars_remaining=MC_PRM_DAT_FILE_LINE_SIZE-strlen(line)+1;
-                }
-                for(c=0;c<chars_remaining;c++)
-                {
-                    fprintf(fileHan," ");
-                }
-                cptr=(m_lpParams+i)->m_Description;
-                while(*cptr)
-                {
-                    c=0;
-                    
-                    while((c<(int)strlen(cptr)) && (cptr[c]!='\n'))
+                    if(chars_remaining == 0)
                     {
-                        c++;
+                        fprintf(fileHan,"%s",line);
+                        chars_remaining=MC_PRM_DAT_FILE_LINE_SIZE-strlen(line)+1;
                     }
-                    
-                    if(c<(int)strlen(cptr))
+                    for(c=0;c<chars_remaining;c++)
                     {
-                        cptr[c]=0x00;
-                        fprintf(fileHan,"# %s",cptr);
-                        memset(line,0x20,MC_PRM_DAT_FILE_LINE_SIZE);
-                        line[MC_PRM_DAT_FILE_LINE_SIZE]=0x00;
-                        fprintf(fileHan,"\n%s ",line);
-                        cptr+=c+1;
+                        fprintf(fileHan," ");
                     }
-                    else
+                    cptr=(m_lpParams+i)->m_Description;
+                    while(*cptr)
                     {
-                        fprintf(fileHan,"# %s",cptr);
-                        cptr+=c;
-                    }
-                }
+                        c=0;
 
-                switch((m_lpParams+i)->m_Type & MC_PRM_DATA_TYPE_MASK)
-                {
-                    case MC_PRM_INT32:
-                    case MC_PRM_INT64:
-                    case MC_PRM_UINT32:
-                        switch(param_sets[set])
+                        while((c<(int)strlen(cptr)) && (cptr[c]!='\n'))
                         {
-                            case MC_PRM_COMMENT:
-                            case MC_PRM_USER:
-                                if((m_lpParams+i)->m_MinIntegerValue <= (m_lpParams+i)->m_MaxIntegerValue)
-                                {
-                                    if((m_lpParams+i)->m_Type & MC_PRM_DECIMAL)
-                                    {
-                                        d1=0;
-                                        if((m_lpParams+i)->m_MinIntegerValue)
-                                        {
-                                            d1=((double)((m_lpParams+i)->m_MinIntegerValue)+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
-                                        }
-                                        d2=0;
-                                        if((m_lpParams+i)->m_MaxIntegerValue)
-                                        {
-                                            d2=((double)((m_lpParams+i)->m_MaxIntegerValue)+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
-                                        }
-                                        fprintf(fileHan," (%0.6g - %0.6g)",d1,d2);                            
-                                    }
-                                    else
-                                    {
-                                        fprintf(fileHan," (%ld - %ld)",(m_lpParams+i)->m_MinIntegerValue,(m_lpParams+i)->m_MaxIntegerValue);                            
-                                    }
-                                }
-                                break;
+                            c++;
                         }
-                        break;
+
+                        if(c<(int)strlen(cptr))
+                        {
+                            cptr[c]=0x00;
+                            fprintf(fileHan,"# %s",cptr);
+                            memset(line,0x20,MC_PRM_DAT_FILE_LINE_SIZE);
+                            line[MC_PRM_DAT_FILE_LINE_SIZE]=0x00;
+                            fprintf(fileHan,"\n%s ",line);
+                            cptr+=c+1;
+                        }
+                        else
+                        {
+                            fprintf(fileHan,"# %s",cptr);
+                            cptr+=c;
+                        }
+                    }
+
+                    switch((m_lpParams+i)->m_Type & MC_PRM_DATA_TYPE_MASK)
+                    {
+                        case MC_PRM_INT32:
+                        case MC_PRM_INT64:
+                        case MC_PRM_UINT32:
+                            switch(param_sets[set])
+                            {
+                                case MC_PRM_COMMENT:
+                                case MC_PRM_USER:
+                                    if((m_lpParams+i)->m_MinIntegerValue <= (m_lpParams+i)->m_MaxIntegerValue)
+                                    {
+                                        if((m_lpParams+i)->m_Type & MC_PRM_DECIMAL)
+                                        {
+                                            d1=0;
+                                            if((m_lpParams+i)->m_MinIntegerValue)
+                                            {
+                                                d1=((double)((m_lpParams+i)->m_MinIntegerValue)+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
+                                            }
+                                            d2=0;
+                                            if((m_lpParams+i)->m_MaxIntegerValue)
+                                            {
+                                                d2=((double)((m_lpParams+i)->m_MaxIntegerValue)+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
+                                            }
+                                            fprintf(fileHan," (%0.6g - %0.6g)",d1,d2);                            
+                                        }
+                                        else
+                                        {
+                                            fprintf(fileHan," (%ld - %ld)",(m_lpParams+i)->m_MinIntegerValue,(m_lpParams+i)->m_MaxIntegerValue);                            
+                                        }
+                                    }
+                                    break;
+                            }
+                            break;
+                    }
+                    fprintf(fileHan,"\n");                    
                 }
-                fprintf(fileHan,"\n");                    
             }
             
             if(strlen((m_lpParams+i)->m_Next))

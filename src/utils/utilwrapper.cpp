@@ -785,6 +785,7 @@ int mc_MultichainParams::SetGlobals()
     {
         MAX_SIZE *= 2;
     }
+    MIN_BLOCKS_BETWEEN_UPGRADES=(unsigned int)GetInt64Param("timingupgrademingap"); 
     MAX_STANDARD_TX_SIZE=(unsigned int)GetInt64Param("maxstdtxsize");    
     MAX_SCRIPT_ELEMENT_SIZE=(unsigned int)GetInt64Param("maxstdelementsize");
     COINBASE_MATURITY=(int)GetInt64Param("rewardspendabledelay");    

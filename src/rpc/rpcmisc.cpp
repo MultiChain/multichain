@@ -516,7 +516,6 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
     if (fHelp || params.size() > 2)                                            // MCHN
         throw runtime_error("Help message not found\n");
 
-    
     bool fDisplay = true;
     if (params.size() > 0)
         fDisplay = params[0].get_bool();
@@ -569,6 +568,7 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
             Value param_value;
             unsigned char* ptr;
             int size;
+            bool hidden=false;
             string param_string="";;
 
             ptr=(unsigned char*)mc_gState->m_NetworkParams->GetParam((mc_gState->m_NetworkParams->m_lpParams+i)->m_Name,&size);
@@ -648,6 +648,13 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                         else
                         {
                             param_value=mc_GetLE(ptr,4);                                                                
+                            if((mc_gState->m_NetworkParams->m_lpParams+i)->m_Type & MC_PRM_HIDDEN)
+                            {
+                                if(mc_GetLE(ptr,4) == (mc_gState->m_NetworkParams->m_lpParams+i)->m_DefaultIntegerValue)
+                                {
+                                    hidden=true;
+                                }
+                            }
                         }
                         break;
                     case MC_PRM_INT64:
@@ -684,7 +691,10 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                 }
             }
 
-            obj.push_back(Pair(param_name,param_value));        
+            if(!hidden)
+            {
+                obj.push_back(Pair(param_name,param_value));        
+            }
         }
     }
     
