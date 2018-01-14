@@ -483,7 +483,6 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     CScript scriptOpReturn=CScript();
     int errorCode=RPC_INVALID_PARAMETER;
     string strError;    
-    lpDetailsScript=new mc_Script;
     if (params.size() > 5)
     {
         ParseRawDetails(&(params[5]),lpDetails,lpDetailsScript,&errorCode,&strError);        

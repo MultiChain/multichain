@@ -1090,9 +1090,7 @@ void AddCacheInputScriptIfNeeded(CMutableTransaction& rawTx,Array inputs, bool f
     
     if(fNewOutputs)
     {
-        mc_Script *lpDetails;
-        lpDetails=new mc_Script;
-    
+        mc_Script *lpDetails=mc_gState->m_TmpBuffers->m_RpcScript4;
         lpDetails->Clear();
         for(int i=0;i<(int)cache_array.size();i++)
         {

@@ -515,12 +515,10 @@ Value gettxout(const Array& params, bool fHelp)
     
 /* MCHN START */        
 
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);    
-    
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
+       
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
     
     asset_amounts->Clear();
     CTxOut txout=coins.vout[n];

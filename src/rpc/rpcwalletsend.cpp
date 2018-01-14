@@ -725,7 +725,7 @@ Value preparelockunspent(const json_spirit::Array& params, bool fHelp)
     addresses.push_back(CTxDestination(pkey.GetID()));
     
     mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
-    lpScript=new mc_Script;
+    lpScript->Clear();
     
     CAmount nAmount=0;
     uint256 offer_hash;
