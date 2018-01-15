@@ -377,6 +377,34 @@ int SetUpgradedParamValue(const mc_OneMultichainParam *param,int64_t value)
         SetMultiChainParam("targetblocktime",value);
     }   
     
+    if(strcmp(param->m_Name,"maxstdtxsize") == 0)
+    {
+        MAX_STANDARD_TX_SIZE=value;
+    }   
+    
+    if(strcmp(param->m_Name,"maxstdopreturnscount") == 0)
+    {
+        MCP_MAX_STD_OP_RETURN_COUNT=value;
+    }   
+    
+    if(strcmp(param->m_Name,"maxstdopreturnsize") == 0)
+    {
+        MAX_OP_RETURN_RELAY=value;    
+        MAX_OP_RETURN_RELAY=GetArg("-datacarriersize", MAX_OP_RETURN_RELAY);
+    }   
+    
+    if(strcmp(param->m_Name,"maxstdopdropscount") == 0)
+    {
+        MCP_STD_OP_DROP_COUNT=value;
+        pwalletMain->InitializeUnspentList();        
+    }   
+    
+    if(strcmp(param->m_Name,"maxstdelementsize") == 0)
+    {
+        MAX_SCRIPT_ELEMENT_SIZE=value;
+        pwalletMain->InitializeUnspentList();        
+    }   
+    
     return MC_ERR_NOERROR;
 }
 

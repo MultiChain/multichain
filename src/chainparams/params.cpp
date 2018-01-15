@@ -224,6 +224,48 @@ int mc_MultichainParams::CanBeUpgradedByVersion(const char *param,int version,in
         }
     }
     
+    if(strcmp(param,"maxstdtxsize") == 0)
+    {
+        if(version >= 20002)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    if(strcmp(param,"maxstdopreturnscount") == 0)
+    {
+        if(version >= 20002)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    if(strcmp(param,"maxstdopreturnsize") == 0)
+    {
+        if(version >= 20002)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    if(strcmp(param,"maxstdopdropscount") == 0)
+    {
+        if(version >= 20002)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    if(strcmp(param,"maxstdelementsize") == 0)
+    {
+        if(version >= 20002)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    
+    
     return 0;
 }
 

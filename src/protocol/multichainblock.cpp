@@ -224,7 +224,31 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
                                                 }
                                                 else
                                                 {
-                                                    map_last_upgrade.insert(std::make_pair(param_name,(int)vParams->size()));                                                    
+                                                    take_it=false;
+                                                    int64_t old_value=mc_gState->m_NetworkParams->GetInt64Param(param.m_Param->m_Name);
+                                                    
+                                                    if(param.m_Value >= old_value)
+                                                    {
+                                                        if(param_value <= 2*old_value)
+                                                        {
+                                                            take_it=true;
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        if(old_value <= 2*param_value)
+                                                        {
+                                                            take_it=true;
+                                                        }                                                            
+                                                    }
+                                                    if(!take_it)
+                                                    {
+                                                        param.m_Skipped =MC_PSK_DOUBLE_RANGE;
+                                                    }
+                                                    else
+                                                    {
+                                                        map_last_upgrade.insert(std::make_pair(param_name,(int)vParams->size()));                                                    
+                                                    }
                                                 }
                                             }
                                             else
