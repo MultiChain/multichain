@@ -1944,7 +1944,8 @@ CAmount CWallet::GetImmatureWatchOnlyBalance() const
 /**
  * populate vCoins with vector of available COutputs.
  */
-void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const CCoinControl *coinControl, bool fOnlyUnlocked, bool fOnlyCoinsNoTxs, uint160 addr, uint32_t flags) const
+void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const CCoinControl *coinControl, bool fOnlyUnlocked, bool fOnlyCoinsNoTxs, 
+                             uint160 addr, const set<uint160>* addresses, uint32_t flags) const
 {
     vCoins.clear();
 
@@ -1960,10 +1961,12 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
             for (map<COutPoint, mc_Coin>::const_iterator it = pwalletTxsMain->m_UTXOs[0].begin(); it != pwalletTxsMain->m_UTXOs[0].end(); ++it)
             {
                 const mc_Coin& coin = it->second;
-                if((addr == 0) || (addr == coin.m_EntityID))
+                if( ( (addresses == NULL) && (addr == 0) ) || 
+                    (addr == coin.m_EntityID) || 
+                    ( (addresses != NULL) && (addresses->count(coin.m_EntityID) != 0)) )
                 {
                     isminetype mine;
-                    bool is_p2sh=false;;
+                    bool is_p2sh=false;
                     if(coin.m_EntityType)
                     {
                         if(coin.m_Flags & MC_TFL_IS_SPENDABLE)
