@@ -559,6 +559,9 @@ Value listunspent(const Array& params, bool fHelp)
         nMaxDepth = params[1].get_int64();
 
     set<CBitcoinAddress> setAddress;
+    set<uint160> setAddressUints;
+    set<uint160> *lpSetAddressUint=NULL;
+    CTxDestination dest;
     if (params.size() > 2) {
         Array inputs = params[2].get_array();
         BOOST_FOREACH(Value& input, inputs) {
@@ -567,7 +570,27 @@ Value listunspent(const Array& params, bool fHelp)
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address: ")+input.get_str());
             if (setAddress.count(address))
                 throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ")+input.get_str());
-           setAddress.insert(address);
+            setAddress.insert(address);
+
+            dest=address.Get();
+            const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
+            const CScriptID *lpScriptID=boost::get<CScriptID> (&dest);
+            if(lpKeyID)
+            {
+                setAddressUints.insert(*(uint160*)lpKeyID);
+            }
+            else
+            {
+                if(lpScriptID)
+                {
+                    setAddressUints.insert(*(uint160*)lpScriptID);
+                }
+           }
+        }
+        
+        if(setAddressUints.size())
+        {
+            lpSetAddressUint=&setAddressUints;
         }
     }
 /* MCHN START */        
@@ -588,7 +611,7 @@ Value listunspent(const Array& params, bool fHelp)
     vector<COutput> vecOutputs;
     assert(pwalletMain != NULL);
 //    pwalletMain->AvailableCoins(vecOutputs, false);
-    pwalletMain->AvailableCoins(vecOutputs, false, NULL, true, true);
+    pwalletMain->AvailableCoins(vecOutputs, false, NULL, true, true, 0, lpSetAddressUint);
     BOOST_FOREACH(const COutput& out, vecOutputs) {
         if (out.nDepth < nMinDepth || out.nDepth > nMaxDepth)
             continue;

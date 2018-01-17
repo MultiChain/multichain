@@ -718,6 +718,10 @@ Value getmultibalances(const Array& params, bool fHelp)
     
     set<string> setAddresses;
     set<string> setAddressesWithBalances;
+    set<uint160> setAddressUints;
+    set<uint160> *lpSetAddressUint=NULL;
+    CTxDestination dest;
+    
     if(params.size() > 0)
     {
         if( (params[0].type() != str_type) || (params[0].get_str() != "*") )
@@ -729,6 +733,30 @@ Value getmultibalances(const Array& params, bool fHelp)
             {
                 return balances;
             }
+        
+            BOOST_FOREACH(string str_addr, setAddresses) 
+            {
+                CBitcoinAddress address(str_addr);
+                dest=address.Get();
+                const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
+                const CScriptID *lpScriptID=boost::get<CScriptID> (&dest);
+                if(lpKeyID)
+                {
+                    setAddressUints.insert(*(uint160*)lpKeyID);
+                }
+                else
+                {
+                    if(lpScriptID)
+                    {
+                        setAddressUints.insert(*(uint160*)lpScriptID);
+                    }
+               }
+            }
+
+            if(setAddressUints.size())
+            {
+                lpSetAddressUint=&setAddressUints;
+            }            
         }
     }
     
@@ -799,7 +827,7 @@ Value getmultibalances(const Array& params, bool fHelp)
         
         
         vector<COutput> vecOutputs;
-        pwalletMain->AvailableCoins(vecOutputs, false, NULL, fUnlockedOnly,true);
+        pwalletMain->AvailableCoins(vecOutputs, false, NULL, fUnlockedOnly,true, 0, lpSetAddressUint);
         BOOST_FOREACH(const COutput& out, vecOutputs) 
         {        
             if(!out.IsTrustedNoDepth())

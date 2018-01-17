@@ -670,7 +670,7 @@ void AvalableCoinsForAddress(CWallet *lpWallet,vector<COutput>& vCoins, const CC
         }
     }
     
-    lpWallet->AvailableCoins(vCoins, true, coinControl,true,true,addr,flags);
+    lpWallet->AvailableCoins(vCoins, true, coinControl,true,true,addr,NULL,flags);
     this_time=mc_TimeNowAsDouble();    
     if(fDebug)LogPrint("mcperf","mcperf: AvailableCoins: Time: %8.6f \n", this_time-last_time);
     last_time=this_time;
