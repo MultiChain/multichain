@@ -3390,8 +3390,11 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
         if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Reaccepting wallet transactions\n");
         if(pwalletMain)
         {
-            pwalletMain->ReacceptWalletTransactions();                          // Some wallet transactions may become invalid in reorg            
+            if( (mc_gState->m_NodePausedState & MC_NPS_REACCEPT) == 0 )
+            {
+                pwalletMain->ReacceptWalletTransactions();                      // Some wallet transactions may become invalid in reorg            
                                                                                 // Some may become invalid if not confirmed in time
+            }
         }
         if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Best chain activation completed\n");
 
