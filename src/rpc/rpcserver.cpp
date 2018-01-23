@@ -368,8 +368,9 @@ uint32_t GetPausedServices(const char *str)
             if(ptr > start)
             {
                 type=0;
-                if(memcmp(start,"incoming",  ptr-start) == 0)type = MC_NPS_INCOMING;
-                if(memcmp(start,"mining",    ptr-start) == 0)type = MC_NPS_MINING;
+                if(memcmp(start,"incoming",    ptr-start) == 0)type = MC_NPS_INCOMING;
+                if(memcmp(start,"mining",      ptr-start) == 0)type = MC_NPS_MINING;
+                if(memcmp(start,"reaccepting", ptr-start) == 0)type = MC_NPS_REACCEPT;
                 
                 if(type == 0)
                 {
@@ -426,6 +427,11 @@ Value resumecmd(const Array& params, bool fHelp)
     LOCK(cs_main);
     
     mc_gState->m_NodePausedState &= (MC_NPS_ALL ^ type);
+    
+    if( type & MC_NPS_REACCEPT )
+    {
+        pwalletMain->ReacceptWalletTransactions();                                                                                            
+    }
     
     LogPrintf("Node paused state is set to %08X\n",mc_gState->m_NodePausedState);
     

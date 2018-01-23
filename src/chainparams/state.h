@@ -33,6 +33,7 @@
 #define MC_NPS_NETWORK   0x00000001
 #define MC_NPS_INCOMING  0x00000002
 #define MC_NPS_MINING    0x00000004
+#define MC_NPS_REACCEPT  0x00000008
 #define MC_NPS_ALL       0xFFFFFFFF
 
 #define MC_WMD_NONE                  0x00000000
