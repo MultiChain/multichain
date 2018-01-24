@@ -669,25 +669,39 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
             {
                 param_value=Value::null;
             }
-            if(strcmp("protocolversion",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+            if(nHeight)
             {
-                if(nHeight)
+                if(strcmp("protocolversion",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
                 {
                     param_value=mc_gState->m_NetworkParams->m_ProtocolVersion;
                 }
-            }
-            if(strcmp("maximumblocksize",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
-            {
-                if(nHeight)
+                if(strcmp("maximumblocksize",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
                 {
                     param_value=(int)MAX_BLOCK_SIZE;
                 }
-            }
-            if(strcmp("targetblocktime",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
-            {
-                if(nHeight)
+                if(strcmp("targetblocktime",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
                 {
                     param_value=(int)MCP_TARGET_BLOCK_TIME;
+                }
+                if(strcmp("maxstdtxsize",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(int)MAX_STANDARD_TX_SIZE;
+                }
+                if(strcmp("maxstdopreturnscount",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(int)MCP_MAX_STD_OP_RETURN_COUNT;
+                }
+                if(strcmp("maxstdopreturnsize",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(int)MAX_OP_RETURN_RELAY;
+                }
+                if(strcmp("maxstdopdropscount",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(int)MCP_STD_OP_DROP_COUNT;
+                }
+                if(strcmp("maxstdelementsize",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(int)MAX_SCRIPT_ELEMENT_SIZE;
                 }
             }
 
