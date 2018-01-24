@@ -88,11 +88,6 @@ public:
     }
 };
 
-uint32_t RandomStartNonce()
-{
-    return mc_RandomInRange(0,0x4fffffff);
-}
-
 bool UpdateTime(CBlockHeader* pblock, const CBlockIndex* pindexPrev)
 {
 /* MCHN START */    
@@ -698,7 +693,7 @@ void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& 
     static uint256 hashPrevBlock;
     if (hashPrevBlock != pblock->hashPrevBlock)
     {
-        nExtraNonce = RandomStartNonce();
+        nExtraNonce = 0;
         hashPrevBlock = pblock->hashPrevBlock;
     }
     ++nExtraNonce;
@@ -1206,7 +1201,7 @@ void static BitcoinMiner(CWallet *pwallet)
 
     // Each thread has its own key and counter
     CReserveKey reservekey(pwallet);
-    unsigned int nExtraNonce = RandomStartNonce();//0;
+    unsigned int nExtraNonce = 0;
     
 /* MCHN START */            
     int canMine;
@@ -1442,6 +1437,8 @@ void static BitcoinMiner(CWallet *pwallet)
             CBlock *pblock = &pblocktemplate->block;
             IncrementExtraNonce(pblock, pindexPrev, nExtraNonce,pwallet);
 
+            LogPrint("mcminer","mchn-miner: Running MultiChainMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
+                ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION));
 
             //
             // Search
@@ -1449,11 +1446,9 @@ void static BitcoinMiner(CWallet *pwallet)
             int64_t nStart = GetTime();
             uint256 hashTarget = uint256().SetCompact(pblock->nBits);
             uint256 hash;
-            uint32_t nNonce = RandomStartNonce();
-            uint32_t nStartNonce=nNonce;
+            uint32_t nNonce = 0;
             uint32_t nOldNonce = 0;
-            LogPrint("mcminer","mchn-miner: Running MultiChainMiner with %u transactions in block (%u bytes). Starting nonce: %08x/%08x\n", pblock->vtx.size(),
-                ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION),nNonce,nExtraNonce);
+
             double wStartTime=mc_TimeNowAsDouble();
             uint64_t wThisCount=0;
             while (true) {
@@ -1559,12 +1554,8 @@ void static BitcoinMiner(CWallet *pwallet)
 //                if (vNodes.empty() && Params().MiningRequiresPeers() && not_setup_period)
                     break;
                 }
-//                if (nNonce >= 0xffff0000)
-                if ( (nNonce-nStartNonce) >= 0x8fffffff/GetArg("-genproclimit", 1))
-                {
-                    LogPrint("mcminer","Too many nonces tried for %08x, switching timestamp\n",nStartNonce);
+                if (nNonce >= 0xffff0000)
                     break;
-                }
                 if (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 60)
                     break;
                 if (pindexPrev != chainActive.Tip())
