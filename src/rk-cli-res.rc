@@ -17,7 +17,7 @@ BEGIN
         BLOCK "040904E4" // U.S. English - multilingual (hex)
         BEGIN
             VALUE "CompanyName",        "Coin Sciences Ltd"
-            VALUE "FileDescription",    "rk-cli (OSS RPC client for MultiChain)"
+            VALUE "FileDescription",    "rk-cli (OSS RPC client for Rk)"
             VALUE "FileVersion",        VER_FILEVERSION_STR
             VALUE "InternalName",       "rk-cli"
             VALUE "LegalCopyright",     COPYRIGHT_STR

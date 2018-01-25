@@ -1,8 +1,8 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
-#ifndef MULTICHAINSCRIPT_H
-#define	MULTICHAINSCRIPT_H
+#ifndef RKSCRIPT_H
+#define	RKSCRIPT_H
 
 #include "utils/declare.h"
 
@@ -96,5 +96,5 @@ typedef struct mc_Script
 } mc_Script;
 
 
-#endif	/* MULTICHAINSCRIPT_H */
+#endif	/* RKSCRIPT_H */
 

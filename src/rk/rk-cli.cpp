@@ -1,7 +1,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "chainparams/chainparamsbase.h"
 #include "version/clientversion.h"
@@ -125,7 +125,7 @@ static int AppInitRPC(int argc, char* argv[])
         (mc_gState->m_Params->NetworkName() == NULL) ||
         mc_gState->m_Params->m_NumArguments<minargs)
       {
-        fprintf(stdout,"\nMultiChain %s RPC client\n\n",mc_gState->GetVersion());
+        fprintf(stdout,"\nRK %s RPC client\n\n",mc_gState->GetVersion());
         
         std::string strUsage = "";
         if (mc_gState->m_Params->HasOption("-version"))
@@ -134,7 +134,7 @@ static int AppInitRPC(int argc, char* argv[])
         else
         {
             strUsage += "\n" + _("Usage:") + "\n" +
-                  "  rk-cli <blockchain-name> [options] <command> [params]  " + _("Send command to MultiChain Core") + "\n" +
+                  "  rk-cli <blockchain-name> [options] <command> [params]  " + _("Send command to Rk Core") + "\n" +
                   "  rk-cli <blockchain-name> [options] help                " + _("List commands") + "\n" +
                   "  rk-cli <blockchain-name> [options] help <command>      " + _("Get help for a command") + "\n";
 
@@ -177,7 +177,7 @@ static int AppInitRPC(int argc, char* argv[])
                 {
                     if(read_err != MC_ERR_FILE_READ_ERROR)
                     {
-                        fprintf(stderr,"ERROR: Couldn't read configuration file for blockchain %s. Please try upgrading MultiChain. Exiting...\n",mc_gState->m_Params->NetworkName());
+                        fprintf(stderr,"ERROR: Couldn't read configuration file for blockchain %s. Please try upgrading Rk. Exiting...\n",mc_gState->m_Params->NetworkName());
                         return EXIT_FAILURE;
                     }
                 }
@@ -198,7 +198,7 @@ static int AppInitRPC(int argc, char* argv[])
 
     RPCPort=mc_gState->m_Params->GetOption("-rpcport",RPCPort);
     
-    SelectMultiChainBaseParams(mc_gState->m_Params->NetworkName(),RPCPort);
+    SelectRKBaseParams(mc_gState->m_Params->NetworkName(),RPCPort);
     
     // Check for -testnet or -regtest parameter (BaseParams() calls are only valid after this clause)
 /*    
@@ -405,7 +405,7 @@ int main(int argc, char* argv[])
  #ifndef WIN32   
     if(mc_gState->m_Params->m_NumArguments == 1)                                // Interactive mode
     {
-        fprintf(stdout,"\nMultiChain %s RPC client\n\n",mc_gState->GetVersion());
+        fprintf(stdout,"\nRK %s RPC client\n\n",mc_gState->GetVersion());
         if (mapArgs["-rpcuser"] == "" && mapArgs["-rpcpassword"] == "")
         {
             string str=strprintf(

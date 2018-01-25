@@ -1,10 +1,10 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
-#ifndef MULTICHAIN_WALLETTXS_H
-#define	MULTICHAIN_WALLETTXS_H
+#ifndef RK_WALLETTXS_H
+#define	RK_WALLETTXS_H
 
 #include "utils/util.h"
 #include "structs/base58.h"
@@ -190,5 +190,5 @@ typedef struct mc_WalletTxs
 
 
 
-#endif	/* MULTICHAIN_WALLETTXS_H */
+#endif	/* RK_WALLETTXS_H */
 

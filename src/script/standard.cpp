@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "script/standard.h"
 
@@ -62,7 +62,7 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
         mTemplates.insert(make_pair(TX_NULL_DATA, CScript() << OP_RETURN));
         
 /* MCHN START*/    
-        if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+        if(mc_gState->m_NetworkParams->IsProtocolRk())
         {
             if(mc_gState->m_Features->Streams())
             {
@@ -259,7 +259,7 @@ bool IsStandardFull(const CScript& scriptPubKey, txnouttype& whichType)
 bool ExtractDestinationScriptValid(const CScript& scriptPubKey, CTxDestination& addressRet)
 {
 /*    
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return ExtractDestination(scriptPubKey, addressRet);
     }

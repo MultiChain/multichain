@@ -2,7 +2,7 @@
 // Copyright (c) 2009-2016 The Bitcoin developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #if defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
@@ -475,11 +475,11 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -rpcsslprivatekeyfile=<file.pem>         " + strprintf(_("Server private key (default: %s)"), "server.pem") + "\n";
     strUsage += "  -rpcsslciphers=<ciphers>                 " + strprintf(_("Acceptable ciphers (default: %s)"), "TLSv1.2+HIGH:TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!3DES:@STRENGTH") + "\n";
 
-    strUsage += "\n" + _("MultiChain runtime parameters") + "\n";    
+    strUsage += "\n" + _("Rk runtime parameters") + "\n";    
     strUsage += "  -offline                                 " + _("Start rkd in offline mode, no connections to other nodes.") + "\n";
     strUsage += "  -initprivkey=<privkey>                   " + _("Manually set the wallet default address and private key when running rkd for the first time.") + "\n";
-    strUsage += "  -handshakelocal=<address>                " + _("Manually override the wallet address which is used for handshaking with other peers in a MultiChain blockchain.") + "\n";
-    strUsage += "  -hideknownopdrops=<n>                    " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON_RPC calls (default: %u)"), 0) + "\n";
+    strUsage += "  -handshakelocal=<address>                " + _("Manually override the wallet address which is used for handshaking with other peers in a Rk blockchain.") + "\n";
+    strUsage += "  -hideknownopdrops=<n>                    " + strprintf(_("Remove recognized Rk OP_DROP metadata from the responses to JSON_RPC calls (default: %u)"), 0) + "\n";
     strUsage += "  -lockadminminerounds=<n>                 " + _("If set overrides lock-admin-mine-rounds blockchain setting.") + "\n";
     strUsage += "  -miningrequirespeers=<n>                 " + _("If set overrides mining-requires-peers blockchain setting, values 0/1.") + "\n";
     strUsage += "  -mineemptyrounds=<n>                     " + _("If set overrides mine-empty-rounds blockchain setting, values 0.0-1000.0 or -1.") + "\n";
@@ -896,7 +896,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
     // Sanity check
     if (!InitSanityCheck())
-        return InitError(_("Initialization sanity check failed. MultiChain Core is shutting down."));
+        return InitError(_("Initialization sanity check failed. Rk Core is shutting down."));
 
     std::string strDataDir = GetDataDir().string();
     LogPrint("mchn","mchn: Data directory: %s\n",strDataDir.c_str());
@@ -916,7 +916,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 #ifndef WIN32
     static boost::interprocess::file_lock lock(pathLockFile.string().c_str());
     if (!lock.try_lock())
-        return InitError(strprintf(_("Cannot obtain a lock on data directory %s. MultiChain Core is probably already running."), strDataDir));
+        return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Rk Core is probably already running."), strDataDir));
 #endif
 /* MCHN END */
     
@@ -928,9 +928,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     LogPrintf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
 //    LogPrintf("Bitcoin version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
 /* MCHN START */    
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    if(mc_gState->m_NetworkParams->IsProtocolRk())
     {
-        LogPrintf("MultiChain version %s (%s)\n", mc_gState->GetFullVersion(), CLIENT_DATE);
+        LogPrintf("Rk version %s (%s)\n", mc_gState->GetFullVersion(), CLIENT_DATE);
     }
 
 /* MCHN END */    
@@ -1113,14 +1113,14 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         {
             if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL)
             {
-                InitializeMultiChainParams();                    
+                InitializeRKParams();                    
                 if(init_privkey.size())
                 {
                     if(seed_attempt == 1)
                     {
                         if(mc_gState->m_NetworkParams->GetParam("privatekeyversion",NULL) == NULL)
                         {
-                            return InitError(_("The initprivkey runtime parameter can only be used when connecting to MultiChain 1.0 beta 2 or later"));                                                        
+                            return InitError(_("The initprivkey runtime parameter can only be used when connecting to Rk 1.0 beta 2 or later"));                                                        
                         }
                         string init_privkey_error=pwalletMain->SetDefaultKeyIfInvalid(init_privkey);
                         if(init_privkey_error.size())
@@ -1199,7 +1199,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             {
                 seed_error=strprintf("Couldn't connect to the seed node %s on port %d.\n"
                             "Blockchain was created by rkd with newer protocol version (%d)\n"                
-                            "Please upgrade to the latest version of MultiChain or connect only to blockchains using protocol version %d or earlier.\n",                
+                            "Please upgrade to the latest version of Rk or connect only to blockchains using protocol version %d or earlier.\n",                
                         seed_ip.c_str(),seed_port,(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion"), mc_gState->GetProtocolVersion());
             }
             else
@@ -1209,7 +1209,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     (mc_gState->m_NetworkParams->GetParam("chainprotocol",NULL) != NULL) && 
                     (strcmp((char*)mc_gState->m_NetworkParams->GetParam("chainprotocol",NULL),"rk") == 0) )
                 {
-                    seed_error=strprintf("The protocol version (%d) for blockchain %s has been deprecated and was last supported in MultiChain 1.0 beta 1\n",                
+                    seed_error=strprintf("The protocol version (%d) for blockchain %s has been deprecated and was last supported in Rk 1.0 beta 1\n",                
                             (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion"), mc_gState->m_Params->NetworkName());                    
                     return InitError(seed_error);            
                 }
@@ -1231,7 +1231,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
             if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_VALID)
             {
-                SelectMultiChainParams(mc_gState->m_Params->NetworkName());
+                SelectRKParams(mc_gState->m_Params->NetworkName());
                 delete mc_gState->m_Permissions;
                 mc_gState->m_Permissions= new mc_Permissions;
                 if(mc_gState->m_Permissions->Initialize(mc_gState->m_Params->NetworkName(),0))                                
@@ -1249,7 +1249,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 {
                     if(mc_gState->m_NetworkParams->GetParam("privatekeyversion",NULL) == NULL)
                     {
-                        return InitError(_("The initprivkey runtime parameter can only be used when connecting to MultiChain 1.0 beta 2 or later"));                                                        
+                        return InitError(_("The initprivkey runtime parameter can only be used when connecting to Rk 1.0 beta 2 or later"));                                                        
                     }
                     string init_privkey_error=pwalletMain->SetDefaultKeyIfInvalid(init_privkey);
                     if(init_privkey_error.size())
@@ -1267,7 +1267,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     sprintf(bufOutput,"Looking for genesis block...\n");
                     bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                
                 }
-                mc_gState->m_NetworkParams->SetGlobals();                           // Needed to update IsProtocolMultichain flag in case of bitcoin
+                mc_gState->m_NetworkParams->SetGlobals();                           // Needed to update IsProtocolRk flag in case of bitcoin
                 if(mc_gState->m_NetworkParams->Build(pubKey,pubKeySize))
                 {
                     return InitError(_("Cannot build new blockchain"));
@@ -1312,7 +1312,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     {
         LogPrintf("mchn: Parameter set is valid - initializing blockchain parameters...\n");
         mc_gState->m_NetworkParams->SetGlobals();
-        InitializeMultiChainParams();        
+        InitializeRKParams();        
 
         if(GetBoolArg("-reindex", false))
         {
@@ -1605,7 +1605,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             }
             
             CPubKey pkey;
-            if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+            if(mc_gState->m_NetworkParams->IsProtocolRk())
             {
                 if(pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_CONNECT))
                 {
@@ -1661,7 +1661,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     {
         if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL)
         {
-            InitializeMultiChainParams();        
+            InitializeRKParams();        
 
             if(seed_node)
             {
@@ -1853,7 +1853,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         {
             sprintf(bufOutput,"Other nodes can connect to this node using:\n");
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-            sprintf(bufOutput,"rkd %s:%d\n\n",MultichainServerAddress().c_str(),GetListenPort());
+            sprintf(bufOutput,"rkd %s:%d\n\n",RkServerAddress().c_str(),GetListenPort());
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
             if(found_ips > 1)
             {
@@ -1904,7 +1904,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         {
             if(GetBoolArg("-offline",false))
             {                
-                sprintf(bufOutput,"MultiChain started in offline mode, other nodes cannot connect.\n\n");
+                sprintf(bufOutput,"Rk started in offline mode, other nodes cannot connect.\n\n");
                 bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));            
             }
             else
@@ -1916,7 +1916,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     }
     else
     {
-        sprintf(bufOutput,"%s:%d\n",MultichainServerAddress().c_str(),GetListenPort());                
+        sprintf(bufOutput,"%s:%d\n",RkServerAddress().c_str(),GetListenPort());                
         bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
     }
 
@@ -2127,7 +2127,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
 //    int version=mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
     int version=mc_gState->m_NetworkParams->ProtocolVersion();
-    LogPrintf("MultiChain protocol version: %d\n",version);
+    LogPrintf("Rk protocol version: %d\n",version);
     if(version != mc_gState->GetProtocolVersion())
     {
         if(!GetBoolArg("-shortoutput", false))
@@ -2188,10 +2188,10 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 InitWarning(msg);
             }
             else if (nLoadWalletRet == DB_TOO_NEW)                              // MCHN
-                strErrors << _("Error loading wallet.dat: Wallet requires newer version of MultiChain Core") << "\n";
+                strErrors << _("Error loading wallet.dat: Wallet requires newer version of Rk Core") << "\n";
             else if (nLoadWalletRet == DB_NEED_REWRITE)                         // MCHN
             {
-                strErrors << _("Wallet needed to be rewritten: restart MultiChain Core to complete") << "\n";
+                strErrors << _("Wallet needed to be rewritten: restart Rk Core to complete") << "\n";
                 LogPrintf("%s", strErrors.str());
                 return InitError(strErrors.str());
             }

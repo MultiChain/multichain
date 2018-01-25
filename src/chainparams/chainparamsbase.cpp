@@ -2,7 +2,7 @@
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "chainparams/chainparamsbase.h"
 
@@ -59,10 +59,10 @@ static CBaseRegTestParams regTestParams;
 
 /* MCHN START */      
 
-class CBaseMultiChainParams : public CBaseTestNetParams
+class CBaseRKParams : public CBaseTestNetParams
 {
 public:
-    CBaseMultiChainParams()
+    CBaseRKParams()
     {
         networkID = CBaseChainParams::RK;
         strDataDir = "rk";
@@ -76,7 +76,7 @@ public:
         nRPCPort=port;
     }
 };
-static CBaseMultiChainParams multiChainParams;
+static CBaseRKParams rKParams;
 /* MCHN END */      
 
 
@@ -150,11 +150,11 @@ bool SelectBaseParamsFromCommandLine()
 
 /* MCHN START */
 
-bool SelectMultiChainBaseParams(const char *NetworkName,int RPCPort)
+bool SelectRKBaseParams(const char *NetworkName,int RPCPort)
 {
-    multiChainParams.setDataDir(std::string(NetworkName));
-    multiChainParams.setRPCPort(RPCPort);
-    pCurrentBaseParams = &multiChainParams;
+    rKParams.setDataDir(std::string(NetworkName));
+    rKParams.setRPCPort(RPCPort);
+    pCurrentBaseParams = &rKParams;
     
     return true;
 }

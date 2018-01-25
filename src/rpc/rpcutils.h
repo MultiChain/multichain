@@ -1,10 +1,10 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
-#ifndef RPCMULTICHAINUTILS_H
-#define	RPCMULTICHAINUTILS_H
+#ifndef RPCRKUTILS_H
+#define	RPCRKUTILS_H
 
 #include "primitives/transaction.h"
 #include "core/init.h"
@@ -70,5 +70,5 @@ int paramtoint(Value param,bool check_for_min,int min_value,string error_message
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
 
 
-#endif	/* RPCMULTICHAINUTILS_H */
+#endif	/* RPCRKUTILS_H */
 

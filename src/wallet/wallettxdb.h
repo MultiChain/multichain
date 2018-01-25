@@ -1,8 +1,8 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
-#ifndef MULTICHAIN_WALLETTXDB_H
-#define	MULTICHAIN_WALLETTXDB_H
+#ifndef RK_WALLETTXDB_H
+#define	RK_WALLETTXDB_H
 
 #include "utils/declare.h"
 #include "utils/dbwrapper.h"
@@ -385,5 +385,5 @@ typedef struct mc_TxDB
 } mc_TxDB;
 
 
-#endif	/* MULTICHAIN_WALLETTXDB_H */
+#endif	/* RK_WALLETTXDB_H */
 

@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "interpreter.h"
 /* MCHN START */
@@ -902,7 +902,7 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                     {
                         cannot_send=false;
                     }
-                    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+                    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
                     {
                         cannot_send=false;
                     }
@@ -1144,7 +1144,7 @@ bool TransactionSignatureChecker::CheckSig(const vector<unsigned char>& vchSigIn
 /* MCHN START */
     if(CheckSendPermission)
     {
-        if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+        if(mc_gState->m_NetworkParams->IsProtocolRk())
         {
             const unsigned char *pubkey_hash=(unsigned char *)Hash160(vchPubKey.begin(),vchPubKey.end()).begin();
 

@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "chain/checkpoints.h"
 #include "core/main.h"
@@ -25,7 +25,7 @@ using namespace std;
 extern void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
 
 /* MCHN START */
-bool ParseMultichainTxOutToBuffer(uint256 hash,const CTxOut& txout,mc_Buffer *amounts,mc_Script *lpScript,int *allowed,int *required,string& strFailReason);
+bool ParseRkTxOutToBuffer(uint256 hash,const CTxOut& txout,mc_Buffer *amounts,mc_Script *lpScript,int *allowed,int *required,string& strFailReason);
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
 bool CreateAssetBalanceList(const CTxOut& out,mc_Buffer *amounts,mc_Script *lpScript);
 Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_level);
@@ -75,7 +75,7 @@ Object blockToJSONForListBlocks(const CBlock& block, const CBlockIndex* blockind
 /* MCHN START */    
     CKeyID keyID;
     Value miner;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    if(mc_gState->m_NetworkParams->IsProtocolRk())
     {
         if(mc_gState->m_Permissions->GetBlockMiner(blockindex->nHeight,(unsigned char*)&keyID) == MC_ERR_NOERROR)
         {
@@ -122,7 +122,7 @@ Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDe
 /* MCHN START */    
     CKeyID keyID;
     Value miner;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    if(mc_gState->m_NetworkParams->IsProtocolRk())
     {
         if(mc_gState->m_Permissions->GetBlockMiner(blockindex->nHeight,(unsigned char*)&keyID) == MC_ERR_NOERROR)
         {

@@ -1,5 +1,5 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "rk/rk.h"
 
@@ -53,7 +53,7 @@ int mc_GenerateConfFiles(const char *network_name)
         fileHan=mc_OpenFile(network_name,"rk",".conf","w",MC_FOM_RELATIVE_TO_DATADIR);
         if(fileHan)
         {
-            fprintf(fileHan,"rpcuser=multichainrpc\n");
+            fprintf(fileHan,"rpcuser=rkrpc\n");
             mc_RandomEncodedBase58String(rpcpwd,32);
             fprintf(fileHan,"rpcpassword=%s\n",rpcpwd);
 //            mc_CloseFile(fileHan);
@@ -69,7 +69,7 @@ int mc_GenerateConfFiles(const char *network_name)
 
 
 
-int mc_MultichainParams::Build(const unsigned char* pubkey, int pubkey_size) 
+int mc_RkParams::Build(const unsigned char* pubkey, int pubkey_size) 
 {
     if(m_Status == MC_PRM_STATUS_VALID)
     {
@@ -128,7 +128,7 @@ int mc_MultichainParams::Build(const unsigned char* pubkey, int pubkey_size)
     if(mc_gState->m_Features->Streams())
     {
         root_stream_name=(unsigned char *)GetParam("rootstreamname",&root_stream_name_size);        
-        if(IsProtocolMultichain() == 0)
+        if(IsProtocolRk() == 0)
         {
             root_stream_name_size=0;
         }    
@@ -155,7 +155,7 @@ int mc_MultichainParams::Build(const unsigned char* pubkey, int pubkey_size)
                 
         txNew.vout[0].nValue = GetInt64Param("initialblockreward");// * COIN;
         
-        if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+        if(mc_gState->m_NetworkParams->IsProtocolRk())
         {
             txNew.vout[0].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << vector<unsigned char>(pubkey_hash, pubkey_hash + 20) << OP_EQUALVERIFY << OP_CHECKSIG;
         }
@@ -164,7 +164,7 @@ int mc_MultichainParams::Build(const unsigned char* pubkey, int pubkey_size)
             txNew.vout[0].scriptPubKey = CScript() << vector<unsigned char>(pubkey, pubkey + pubkey_size) << OP_CHECKSIG;       
         }
         
-        if(IsProtocolMultichain())
+        if(IsProtocolRk())
         {
             mc_Script *lpScript;
             

@@ -1,5 +1,5 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "rk/rk.h"
 
@@ -8,17 +8,17 @@
 
 const char* mc_State::GetVersion()
 {
-    return MULTICHAIN_BUILD_DESC;
+    return RK_BUILD_DESC;
 }
 
 const char* mc_State::GetFullVersion()
 {
-    return MULTICHAIN_FULL_VERSION;
+    return RK_FULL_VERSION;
 }
 
 int mc_State::GetNumericVersion()
 {
-    return MULTICHAIN_BUILD_DESC_NUMERIC;
+    return RK_BUILD_DESC_NUMERIC;
 }
 
 int mc_State::GetWalletDBVersion()
@@ -40,5 +40,5 @@ int mc_State::GetWalletDBVersion()
 
 int mc_State::GetProtocolVersion()
 {
-    return MULTICHAIN_PROTOCOL_VERSION;
+    return RK_PROTOCOL_VERSION;
 }

@@ -2,7 +2,7 @@
 // Copyright (c) 2009-2016 The Bitcoin developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "core/main.h"
 #include "utils/util.h"
@@ -229,7 +229,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     
         
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return true;
     }    
@@ -757,7 +757,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
 }
 
 
-bool AcceptMultiChainTransaction(const CTransaction& tx, 
+bool AcceptRKTransaction(const CTransaction& tx, 
                                  const CCoinsViewCache &inputs,
                                  int offset,
                                  bool accept,
@@ -786,7 +786,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
     set <string> vAllowedAdmins;
     set <string> vAllowedActivators;
     
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return true;
     }    
@@ -2231,7 +2231,7 @@ bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs,
     int err;
     int64_t quantity;
     
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return true;
     }    
@@ -2408,7 +2408,7 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
     vector <uint160> issuers;
     
     
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return true;
     }    
@@ -2758,7 +2758,7 @@ bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string&
     int pass;
     mc_Script *lpInputScript=NULL;    
     
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return true;
     }    

@@ -1,5 +1,5 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "utils/utilparse.h"
 #include "util.h"
@@ -34,7 +34,7 @@ const unsigned char* GetAddressIDPtr(const CTxDestination& address)
  */
 
 
-bool ParseMultichainTxOutToBuffer(uint256 hash,                                 // IN, tx hash, if !=0 genesis asset reference is retrieved from asset DB
+bool ParseRkTxOutToBuffer(uint256 hash,                                 // IN, tx hash, if !=0 genesis asset reference is retrieved from asset DB
                                   const CTxOut& txout,                          // IN, tx to be parsed
                                   mc_Buffer *amounts,                           // OUT, output amount buffer
                                   mc_Script *lpScript,                          // TMP, temporary script object
@@ -68,7 +68,7 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
         expected_required=*required;
         *required=0;
     }
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    if(mc_gState->m_NetworkParams->IsProtocolRk())
     {
         disallow_if_assets_found=0;
         const CScript& script1 = txout.scriptPubKey;        
@@ -600,7 +600,7 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
     return true;
 }
 
-bool ParseMultichainTxOutToBuffer(uint256 hash,                                 // IN, tx hash, if !=0 genesis asset reference is retrieved from asset DB
+bool ParseRkTxOutToBuffer(uint256 hash,                                 // IN, tx hash, if !=0 genesis asset reference is retrieved from asset DB
                                   const CTxOut& txout,                          // IN, tx to be parsed
                                   mc_Buffer *amounts,                           // OUT, output amount buffer
                                   mc_Script *lpScript,                          // TMP, temporary script object
@@ -608,7 +608,7 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                                   int *required,                                // IN/OUT/NULL returns permission required by this output, adds special rows to output buffer according to input value   
                                   string& strFailReason)                        // OUT error
 {
-    return ParseMultichainTxOutToBuffer(hash,txout,amounts,lpScript,allowed,required,NULL,strFailReason);
+    return ParseRkTxOutToBuffer(hash,txout,amounts,lpScript,allowed,required,NULL,strFailReason);
 }
 
 bool CreateAssetBalanceList(const CTxOut& txout,mc_Buffer *amounts,mc_Script *lpScript,int *required)
@@ -628,7 +628,7 @@ bool CreateAssetBalanceList(const CTxOut& txout,mc_Buffer *amounts,mc_Script *lp
         *required=0;
     }
     
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    if(mc_gState->m_NetworkParams->IsProtocolRk())
     {
         const CScript& script1 = txout.scriptPubKey;        
         CScript::const_iterator pc1 = script1.begin();
@@ -727,7 +727,7 @@ bool CreateAssetBalanceList(const CTxOut& txout,mc_Buffer *amounts,mc_Script *lp
 bool FindFollowOnsInScript(const CScript& script1,mc_Buffer *amounts,mc_Script *lpScript)
 {
     int err;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    if(mc_gState->m_NetworkParams->IsProtocolRk())
     {
         CScript::const_iterator pc1 = script1.begin();
 
@@ -779,7 +779,7 @@ void LogAssetTxOut(string message,uint256 hash,int index,unsigned char* assetref
 
 bool AddressCanReceive(CTxDestination address)
 {
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return true;
     }

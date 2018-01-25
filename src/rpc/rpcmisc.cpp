@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "structs/base58.h"
 #include "version/clientversion.h"
@@ -76,7 +76,7 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("port", GetListenPort()));    
     obj.push_back(Pair("setupblocks", mc_gState->m_NetworkParams->GetInt64Param("setupfirstblocks")));    
     
-    obj.push_back(Pair("nodeaddress", MultichainServerAddress() + strprintf(":%d",GetListenPort())));       
+    obj.push_back(Pair("nodeaddress", RkServerAddress() + strprintf(":%d",GetListenPort())));       
 
     obj.push_back(Pair("burnaddress", BurnAddress(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS))));                
     obj.push_back(Pair("incomingpaused", (mc_gState->m_NodePausedState & MC_NPS_INCOMING) ? true : false));                
@@ -279,7 +279,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
     if (fHelp || params.size() != 2)                                            
         throw runtime_error("Help message not found\n");
     
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "This API is supported only if protocol=rk");                
     }
@@ -483,7 +483,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Unsupported runtime parameter: " + param_name);                                                    
     }
 
-    SetMultiChainRuntimeParams();    
+    SetRKRuntimeParams();    
     
     return Value::null;
 }    
@@ -995,7 +995,7 @@ Value createmultisig(const Array& params, bool fHelp)
 
     
 /* MCHN START */    
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    if(mc_gState->m_NetworkParams->IsProtocolRk())
     {
 //        if(MCP_ALLOW_ARBITRARY_OUTPUTS == 0)
         if((MCP_ALLOW_ARBITRARY_OUTPUTS == 0) || (mc_gState->m_Features->FixedDestinationExtraction() == 0) )

@@ -1,5 +1,5 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "rk/rk.h"
 #include "chainparams/globals.h"
@@ -13,8 +13,8 @@ int main(int argc, char* argv[])
     int isSetDataDirArg;
     FILE *fHan;
     
-    mc_MultichainParams* params;
-    mc_MultichainParams* paramsOld;
+    mc_RkParams* params;
+    mc_RkParams* paramsOld;
     mc_gState=new mc_State;
      
     mc_gState->m_Params->Parse(argc, argv, MC_ETP_UTIL);
@@ -24,7 +24,7 @@ int main(int argc, char* argv[])
     
     mc_ExpandDataDirParam();
     
-    printf("\nMultiChain %s Utilities (latest protocol %d)\n\n",mc_gState->GetVersion(),mc_gState->GetProtocolVersion());
+    printf("\nRK %s Utilities (latest protocol %d)\n\n",mc_gState->GetVersion(),mc_gState->GetProtocolVersion());
              
     err=MC_ERR_OPERATION_NOT_SUPPORTED;
      
@@ -34,7 +34,7 @@ int main(int argc, char* argv[])
         {
             if(mc_gState->m_Params->m_NumArguments>1)
             {
-                params=new mc_MultichainParams;
+                params=new mc_RkParams;
                 
                 err=MC_ERR_NOERROR;
                 
@@ -89,8 +89,8 @@ int main(int argc, char* argv[])
         {
             if(mc_gState->m_Params->m_NumArguments>2)
             {
-                params=new mc_MultichainParams;
-                paramsOld=new mc_MultichainParams;
+                params=new mc_RkParams;
+                paramsOld=new mc_RkParams;
 
                 
                 isSetDataDirArg=mc_GetDataDirArg(DataDirArg);

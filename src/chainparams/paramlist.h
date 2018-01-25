@@ -1,10 +1,10 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
-#ifndef MULTICHAINPARAMLIST_H
-#define MULTICHAINPARAMLIST_H
+#ifndef RKPARAMLIST_H
+#define RKPARAMLIST_H
 
-static const mc_OneMultichainParam MultichainParamArray[] =
+static const mc_OneRkParam RkParamArray[] =
 {
     { "chainprotocol"                          , "chain-protocol"                          ,
                    MC_PRM_STRING  | MC_PRM_USER | MC_PRM_CLONE | MC_PRM_SPECIAL , 16,         0,          0,         0, 0.0, 10001, 0, "-mc-chainprotocol",
@@ -302,5 +302,5 @@ static const mc_OneMultichainParam MultichainParamArray[] =
 };
 
 
-#endif  /* MULTICHAINPARAMLIST_H */
+#endif  /* RKPARAMLIST_H */
 

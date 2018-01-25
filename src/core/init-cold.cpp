@@ -2,7 +2,7 @@
 // Copyright (c) 2009-2016 The Bitcoin developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #if defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
@@ -227,9 +227,9 @@ std::string HelpMessage_Cold()
     strUsage += "  -rpcsslprivatekeyfile=<file.pem>         " + strprintf(_("Server private key (default: %s)"), "server.pem") + "\n";
     strUsage += "  -rpcsslciphers=<ciphers>                 " + strprintf(_("Acceptable ciphers (default: %s)"), "TLSv1.2+HIGH:TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!3DES:@STRENGTH") + "\n";
 
-    strUsage += "\n" + _("MultiChain runtime parameters") + "\n";    
+    strUsage += "\n" + _("Rk runtime parameters") + "\n";    
     strUsage += "  -initprivkey=<privkey>                   " + _("Manually set the wallet default address and private key when running rkd for the first time.") + "\n";
-    strUsage += "  -hideknownopdrops=<n>                    " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON_RPC calls (default: %u)"), 0) + "\n";
+    strUsage += "  -hideknownopdrops=<n>                    " + strprintf(_("Remove recognized Rk OP_DROP metadata from the responses to JSON_RPC calls (default: %u)"), 0) + "\n";
     strUsage += "  -shrinkdebugfilesize=<n>                 " + _("If shrinkdebugfile is 1, this controls the size of the debug file. Whenever the debug.log file reaches over 5 times this number of bytes, it is reduced back down to this size.") + "\n";
     
     
@@ -349,7 +349,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
 
     // Sanity check
     if (!InitSanityCheck())
-        return InitError(_("Initialization sanity check failed. MultiChain Core is shutting down."));
+        return InitError(_("Initialization sanity check failed. Rk Core is shutting down."));
 
     std::string strDataDir = GetDataDir().string();
     LogPrint("mchn","mchn: Data directory: %s\n",strDataDir.c_str());
@@ -369,7 +369,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
 #ifndef WIN32
     static boost::interprocess::file_lock lock(pathLockFile.string().c_str());
     if (!lock.try_lock())
-        return InitError(strprintf(_("Cannot obtain a lock on data directory %s. MultiChain Core is probably already running."), strDataDir));
+        return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Rk Core is probably already running."), strDataDir));
 #endif
 /* MCHN END */
     
@@ -381,9 +381,9 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     LogPrintf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
 //    LogPrintf("Bitcoin version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
 /* MCHN START */    
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    if(mc_gState->m_NetworkParams->IsProtocolRk())
     {
-        LogPrintf("MultiChain offline version %s (%s)\n", mc_gState->GetFullVersion(), CLIENT_DATE);
+        LogPrintf("Rk offline version %s (%s)\n", mc_gState->GetFullVersion(), CLIENT_DATE);
     }
 
 /* MCHN END */    
@@ -481,7 +481,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     {
         LogPrintf("mchn: Parameter set is valid - initializing blockchain parameters...\n");
         mc_gState->m_NetworkParams->SetGlobals();
-        InitializeMultiChainParams();        
+        InitializeRKParams();        
 
         if(GetBoolArg("-reindex", false))
         {
@@ -774,7 +774,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
             }
             
             CPubKey pkey;
-            if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+            if(mc_gState->m_NetworkParams->IsProtocolRk())
             {
                 if(pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_CONNECT))
                 {
@@ -841,7 +841,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     // ********************************************************* Step 6: network initialization
 /*
     int version=mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
-    LogPrintf("MultiChain protocol version: %d\n",version);
+    LogPrintf("Rk protocol version: %d\n",version);
     if(version != mc_gState->GetProtocolVersion())
     {
         if(!GetBoolArg("-shortoutput", false))
@@ -1015,7 +1015,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
 
     int version=mc_gState->m_NetworkParams->ProtocolVersion();
-    LogPrintf("MultiChain protocol version: %d\n",version);
+    LogPrintf("Rk protocol version: %d\n",version);
     if(version != mc_gState->GetProtocolVersion())
     {
         if(!GetBoolArg("-shortoutput", false))
@@ -1077,10 +1077,10 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
                 InitWarning(msg);
             }
             else if (nLoadWalletRet == DB_TOO_NEW)                              // MCHN
-                strErrors << _("Error loading wallet.dat: Wallet requires newer version of MultiChain Core") << "\n";
+                strErrors << _("Error loading wallet.dat: Wallet requires newer version of Rk Core") << "\n";
             else if (nLoadWalletRet == DB_NEED_REWRITE)                         // MCHN
             {
-                strErrors << _("Wallet needed to be rewritten: restart MultiChain Core to complete") << "\n";
+                strErrors << _("Wallet needed to be rewritten: restart Rk Core to complete") << "\n";
                 LogPrintf("%s", strErrors.str());
                 return InitError(strErrors.str());
             }

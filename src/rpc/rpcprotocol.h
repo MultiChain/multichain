@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef BITCOIN_RPCPROTOCOL_H
 #define BITCOIN_RPCPROTOCOL_H
@@ -78,7 +78,7 @@ enum RPCErrorCode
     RPC_WALLET_ENCRYPTION_FAILED    = -16, //! Failed to encrypt the wallet
     RPC_WALLET_ALREADY_UNLOCKED     = -17, //! Wallet is already unlocked
     
-    //! MultiChain specific errors
+    //! Rk specific errors
     
     RPC_NOT_ALLOWED                 = -701,  //! Given action is not allowed in current database state 
     RPC_NOT_SUPPORTED               = -702,  //! API not supported

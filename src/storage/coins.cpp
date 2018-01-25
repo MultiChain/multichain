@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2014 The Bitcoin developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "storage/coins.h"
 #include "utils/util.h"

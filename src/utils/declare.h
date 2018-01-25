@@ -1,8 +1,8 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
-#ifndef MULTICHAIN_DECLARE_H
-#define	MULTICHAIN_DECLARE_H
+#ifndef RK_DECLARE_H
+#define	RK_DECLARE_H
 
 #include "utils/define.h"
 
@@ -283,5 +283,5 @@ void __US_FlushFile(int FileHan);
 #endif
 
 
-#endif	/* MULTICHAIN_DECLARE_H */
+#endif	/* RK_DECLARE_H */
 

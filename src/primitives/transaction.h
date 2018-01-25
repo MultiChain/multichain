@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef BITCOIN_PRIMITIVES_TRANSACTION_H
 #define BITCOIN_PRIMITIVES_TRANSACTION_H
@@ -141,7 +141,7 @@ public:
 /* MCHN START */        
     CAmount GetDustThreshold(const CFeeRate &minRelayTxFee) const
     {
-        if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+        if(mc_gState->m_NetworkParams->IsProtocolRk())
         {
             int64_t minOutput=MCP_MINIMUM_PER_OUTPUT;
             if(minOutput >= 0)
@@ -166,7 +166,7 @@ public:
         // with default minRelayTxFee.
 /* MCHN START */        
 /*        
-        if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+        if(mc_gState->m_NetworkParams->IsProtocolRk())
         {
             int64_t minOutput=MCP_MINIMUM_PER_OUTPUT;
             if(minOutput >= 0)

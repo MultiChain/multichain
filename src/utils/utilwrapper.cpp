@@ -1,7 +1,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "rk/rk.h"
 #include "crypto/sha256.h"
@@ -267,16 +267,16 @@ int64_t mc_Params::HasOption(const char* strArg)
 
 boost::filesystem::path mc_GetDefaultDataDir()
 {
-    // Windows < Vista: C:\Documents and Settings\Username\Application Data\MultiChain
-    // Windows >= Vista: C:\Users\Username\AppData\Roaming\MultiChain
+    // Windows < Vista: C:\Documents and Settings\Username\Application Data\Rk
+    // Windows >= Vista: C:\Users\Username\AppData\Roaming\Rk
     // Mac and Unix: ~/.rk
 #ifdef WIN32
     // Windows
     if(mc_gState->m_SessionFlags & MC_SSF_COLD)
     {
-        return GetSpecialFolderPath(CSIDL_APPDATA) / "MultiChainCold";
+        return GetSpecialFolderPath(CSIDL_APPDATA) / "RKCold";
     }
-    return GetSpecialFolderPath(CSIDL_APPDATA) / "MultiChain";
+    return GetSpecialFolderPath(CSIDL_APPDATA) / "Rk";
 #else
     // Mac and Unix
     boost::filesystem::path pathRet;
@@ -690,15 +690,15 @@ int mc_ReadGeneralConfigFile(mc_MapStringString *mapConfig,const char *network_n
 }
 
 
-int mc_MultichainParams::SetGlobals()
+int mc_RkParams::SetGlobals()
 {
-    m_IsProtocolMultiChain=1;
+    m_IsProtocolRK=1;
     void *ptr=GetParam("chainprotocol",NULL);
     if(ptr)
     {
         if(strcmp((char*)ptr,"rk"))
         {
-            m_IsProtocolMultiChain=0;
+            m_IsProtocolRK=0;
         }
     }
     m_ProtocolVersion=ProtocolVersion();
@@ -806,13 +806,13 @@ void mc_SHA256::GetHash(unsigned char *hash)
     }        
 }
 
-int mc_MultichainParams::Import(const char *name,const char *source_address)
+int mc_RkParams::Import(const char *name,const char *source_address)
 {
     
     return MC_ERR_NOERROR;
 }
 
-std::string MultichainServerAddress()
+std::string RkServerAddress()
 {
     string result=string(mc_gState->m_NetworkParams->Name());
     unsigned char *ptr;

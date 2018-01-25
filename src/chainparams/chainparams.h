@@ -2,7 +2,7 @@
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef BITCOIN_CHAINPARAMS_H
 #define BITCOIN_CHAINPARAMS_H
@@ -163,10 +163,10 @@ bool SelectParamsFromCommandLine();
 
 /* MCHN START */
 
-bool SelectMultiChainParams(const char *NetworkName);
-bool InitializeMultiChainParams();
-void SetMultiChainParams();
-void SetMultiChainRuntimeParams();
+bool SelectRKParams(const char *NetworkName);
+bool InitializeRKParams();
+void SetRKParams();
+void SetRKRuntimeParams();
 
 
 /* MCHN END */

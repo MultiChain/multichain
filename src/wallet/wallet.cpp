@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "wallet/wallet.h"
 /* MCHN START */
@@ -159,7 +159,7 @@ string CWallet::SetDefaultKeyIfInvalid(std::string init_privkey)
     {
         if(mc_gState->m_NetworkParams->GetParam("privatekeyversion",NULL) == NULL)
         {
-            return "Private key version is not set, please chose seed node running at least MultiChain 1.0 beta 2";            
+            return "Private key version is not set, please chose seed node running at least Rk 1.0 beta 2";            
         }
         return "Invalid private key encoding";
     }
@@ -1130,7 +1130,7 @@ void CWalletTx::GetAmounts(list<COutputEntry>& listReceived,
     }
     else
     {
-        if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+        if(mc_gState->m_NetworkParams->IsProtocolRk())
         {
             if(IsFromMe(filter))
             {
@@ -1188,7 +1188,7 @@ void CWalletTx::GetAmounts(list<COutputEntry>& listReceived,
         {
             // Don't report 'change' txouts
             bool isChange=false;
-            if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+            if(mc_gState->m_NetworkParams->IsProtocolRk())
             {
                 if(!isSelf)
                 {                    
@@ -2144,7 +2144,7 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
             }
 
 /* MCHN START */            
-            if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+            if(mc_gState->m_NetworkParams->IsProtocolRk())
             {
                 for (unsigned int i = 0; i < pcoin->vout.size(); i++) {
                     isminetype mine = IsMine(pcoin->vout[i]);
@@ -2658,7 +2658,7 @@ bool CWallet::CreateTransaction(CScript scriptPubKey, const CAmount& nValue, CSc
     {
         vecSend.push_back(make_pair(scriptOpReturn, 0));
     }
-    return CreateMultiChainTransaction(vecSend, wtxNew, reservekey, nFeeRet, strFailReason, coinControl, addresses, min_conf, min_inputs, max_inputs, lpCoinsToUse, eErrorCode);
+    return CreateRKTransaction(vecSend, wtxNew, reservekey, nFeeRet, strFailReason, coinControl, addresses, min_conf, min_inputs, max_inputs, lpCoinsToUse, eErrorCode);
 }
 
 bool CWallet::CreateTransaction(std::vector<CScript> scriptPubKeys, const CAmount& nValue, CScript scriptOpReturn,
@@ -2682,10 +2682,10 @@ bool CWallet::CreateTransaction(std::vector<CScript> scriptPubKeys, const CAmoun
     {
         vecSend.push_back(make_pair(scriptOpReturn, 0));
     }
-    return CreateMultiChainTransaction(vecSend, wtxNew, reservekey, nFeeRet, strFailReason, coinControl, addresses, min_conf, min_inputs, max_inputs,lpCoinsToUse,eErrorCode);
+    return CreateRKTransaction(vecSend, wtxNew, reservekey, nFeeRet, strFailReason, coinControl, addresses, min_conf, min_inputs, max_inputs,lpCoinsToUse,eErrorCode);
 }
 
-int CWallet::SelectMultiChainCombineCoinsMinConf(int nConfMine, int nConfTheirs, vector<COutput> vCoins, mc_Buffer *in_map, mc_Buffer *in_amounts,
+int CWallet::SelectRKCombineCoinsMinConf(int nConfMine, int nConfTheirs, vector<COutput> vCoins, mc_Buffer *in_map, mc_Buffer *in_amounts,
                                 int in_selected_row,int in_asset_row,
                                 set<pair<const CWalletTx*,unsigned int> >& setCoinsRet,int max_inputs) const
 {
@@ -2779,11 +2779,11 @@ int CWallet::SelectMultiChainCombineCoinsMinConf(int nConfMine, int nConfTheirs,
 }
 
 
-bool CWallet::SelectMultiChainCoinsMinConf(const CAmount& nTargetValue, int nConfMine, int nConfTheirs, vector<COutput> vCoins, mc_Buffer *in_map, mc_Buffer *in_amounts,
+bool CWallet::SelectRKCoinsMinConf(const CAmount& nTargetValue, int nConfMine, int nConfTheirs, vector<COutput> vCoins, mc_Buffer *in_map, mc_Buffer *in_amounts,
                                 int in_selected_row,int in_asset_row,int in_preferred_row,
                                 set<pair<uint256,unsigned int> >& setCoinsRet, CAmount& nValueRet) const
 {
-//    printf("SelectMultiChainCoinsMinConf\n");
+//    printf("SelectRKCoinsMinConf\n");
     setCoinsRet.clear();
     nValueRet = 0;
 
@@ -3030,7 +3030,7 @@ bool CWallet::SelectMultiChainCoinsMinConf(const CAmount& nTargetValue, int nCon
     return true;
 }
 
-bool CWallet::SelectMultiChainCoins(const CAmount& nTargetValue, vector<COutput> &vCoins, mc_Buffer *in_map, mc_Buffer *in_amounts, 
+bool CWallet::SelectRKCoins(const CAmount& nTargetValue, vector<COutput> &vCoins, mc_Buffer *in_map, mc_Buffer *in_amounts, 
                                 int in_selected_row,int in_asset_row,int in_preferred_row,
                                 set<pair<uint256,unsigned int> >& setCoinsRet, CAmount& nValueRet, const CCoinControl* coinControl) const
 {
@@ -3073,9 +3073,9 @@ bool CWallet::SelectMultiChainCoins(const CAmount& nTargetValue, vector<COutput>
     int preferred_row=in_preferred_row;
     for(int attempt=0;attempt<2;attempt++)
     {
-        if((SelectMultiChainCoinsMinConf(nTargetValue, 1, 6, vCoins, in_map, in_amounts, in_selected_row, in_asset_row, preferred_row, setCoinsRet, nValueRet) ||
-            SelectMultiChainCoinsMinConf(nTargetValue, 1, 1, vCoins, in_map, in_amounts, in_selected_row, in_asset_row, preferred_row, setCoinsRet, nValueRet) ||
-            (bSpendZeroConfChange && SelectMultiChainCoinsMinConf(nTargetValue, 0, 1, vCoins, in_map, in_amounts, in_selected_row, in_asset_row, preferred_row, setCoinsRet, nValueRet))))
+        if((SelectRKCoinsMinConf(nTargetValue, 1, 6, vCoins, in_map, in_amounts, in_selected_row, in_asset_row, preferred_row, setCoinsRet, nValueRet) ||
+            SelectRKCoinsMinConf(nTargetValue, 1, 1, vCoins, in_map, in_amounts, in_selected_row, in_asset_row, preferred_row, setCoinsRet, nValueRet) ||
+            (bSpendZeroConfChange && SelectRKCoinsMinConf(nTargetValue, 0, 1, vCoins, in_map, in_amounts, in_selected_row, in_asset_row, preferred_row, setCoinsRet, nValueRet))))
         {
             return true;
         }
@@ -3352,7 +3352,7 @@ bool CWallet::TopUpKeyPool(unsigned int kpSize)
         else
 /* MCHN START */            
         {
-            if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+            if(mc_gState->m_NetworkParams->IsProtocolRk())
             {
                 nTargetSize = max(GetArg("-keypool", 1), (int64_t) 0);
             }
@@ -3447,7 +3447,7 @@ bool CWallet::GetKeyFromPool(CPubKey& result)
 /* MCHN START */
 bool CWallet::GetKeyFromAddressBook(CPubKey& result,uint32_t type,const set<CTxDestination>* addresses,map<uint32_t, uint256>* mapSpecialEntity)
 {
-    if((mc_gState->m_NetworkParams->IsProtocolMultichain() == 0) || 
+    if((mc_gState->m_NetworkParams->IsProtocolRk() == 0) || 
        (type == 0))
     {
         result=vchDefaultKey;

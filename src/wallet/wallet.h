@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef BITCOIN_WALLET_H
 #define BITCOIN_WALLET_H
@@ -472,16 +472,16 @@ public:
     bool CreateTransaction(CScript scriptPubKey, const CAmount& nValue,
                            CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, std::string& strFailReason, const CCoinControl *coinControl = NULL);
 /* MCHN START */    
-    int SelectMultiChainCombineCoinsMinConf(int nConfMine, int nConfTheirs, std::vector<COutput> vCoins, mc_Buffer *in_map, mc_Buffer *in_amounts,
+    int SelectRKCombineCoinsMinConf(int nConfMine, int nConfTheirs, std::vector<COutput> vCoins, mc_Buffer *in_map, mc_Buffer *in_amounts,
                                 int in_selected_row,int in_asset_row,
                                 std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet,int max_inputs) const;    
-    bool SelectMultiChainCoinsMinConf(const CAmount& nTargetValue, int nConfMine, int nConfTheirs, std::vector<COutput> vCoins, mc_Buffer *in_map, mc_Buffer *in_amounts,
+    bool SelectRKCoinsMinConf(const CAmount& nTargetValue, int nConfMine, int nConfTheirs, std::vector<COutput> vCoins, mc_Buffer *in_map, mc_Buffer *in_amounts,
                                 int in_selected_row,int in_asset_row,int in_preferred_row,
                                 std::set<std::pair<uint256,unsigned int> >& setCoinsRet, CAmount& nValueRet) const;
-    bool SelectMultiChainCoins(const CAmount& nTargetValue, std::vector<COutput> &vCoins, mc_Buffer *in_map, mc_Buffer *in_amounts, 
+    bool SelectRKCoins(const CAmount& nTargetValue, std::vector<COutput> &vCoins, mc_Buffer *in_map, mc_Buffer *in_amounts, 
                                 int in_selected_row,int in_asset_row,int in_preferred_row,
                                 std::set<std::pair<uint256,unsigned int> >& setCoinsRet, CAmount& nValueRet, const CCoinControl* coinControl) const;    
-    bool CreateMultiChainTransaction(const std::vector<std::pair<CScript, CAmount> >& vecSend,
+    bool CreateRKTransaction(const std::vector<std::pair<CScript, CAmount> >& vecSend,
                            CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, std::string& strFailReason, const CCoinControl *coinControl = NULL,
                            const std::set<CTxDestination>* addresses = NULL,int min_conf = 1,int min_inputs = -1,int max_inputs = -1, const std::vector<COutPoint> *lpCoinsToUse = NULL, int *eErrorCode = NULL);
     bool CreateTransaction(CScript scriptPubKey, const CAmount& nValue, CScript scriptOpReturn,
@@ -553,7 +553,7 @@ public:
     {
 //        return (GetDebit(tx, ISMINE_ALL) > 0);
 /* MCHN START */        
-        if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+        if(mc_gState->m_NetworkParams->IsProtocolRk())
         {
             BOOST_FOREACH(const CTxIn& txin, tx.vin)
             {
@@ -1107,7 +1107,7 @@ public:
     bool IsFromMe(const isminefilter& filter) const
     {
 /* MCHN START */        
-        if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+        if(mc_gState->m_NetworkParams->IsProtocolRk())
         {
             BOOST_FOREACH(const CTxIn& txin, vin)
             {

@@ -2,7 +2,7 @@
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #if defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
@@ -488,9 +488,9 @@ void CNode::PushVersion()
     
 /* MCHN START */
     std::string subver=FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, std::vector<string>());
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    if(mc_gState->m_NetworkParams->IsProtocolRk())
     {
-        subver=FormatSubVersion("MultiChain", mc_gState->GetProtocolVersion(), std::vector<string>());
+        subver=FormatSubVersion("Rk", mc_gState->GetProtocolVersion(), std::vector<string>());
     }
     PushMessage("version", PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
                 nLocalHostNonce, subver, nBestHeight, true);
@@ -1124,7 +1124,7 @@ void ThreadMapPort()
             }
         }
 
-        string strDesc = "MultiChain " + FormatFullVersion();
+        string strDesc = "Rk " + FormatFullVersion();
 
         try {
             while (true) {
@@ -1388,7 +1388,7 @@ void ThreadOpenConnections()
 
             // if we selected an invalid address, restart
 /* MCHN START */            
-            if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+            if(mc_gState->m_NetworkParams->IsProtocolRk())
             {
                 if (!addr.IsValid() || (IsLocal(addr) && (addr.GetPort() == GetListenPort())))
                 {
@@ -1409,7 +1409,7 @@ void ThreadOpenConnections()
             // stop this loop, and let the outer loop run again (which sleeps, adds seed nodes, recalculates
             // already-connected network ranges, ...) before trying new addrman addresses.
             nTries++;
-            if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+            if(mc_gState->m_NetworkParams->IsProtocolRk())
             {
                 if (nTries > 20)                
                     break;
@@ -1425,7 +1425,7 @@ void ThreadOpenConnections()
 
             // only consider very recently tried nodes after 30 failed attempts
 /* MCHN START */            
-            if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+            if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
             {
 /* MCHN END */            
             if (nANow - addr.nLastTry < 600 && nTries < 30)
@@ -1437,7 +1437,7 @@ void ThreadOpenConnections()
             
             // do not allow non-default ports, unless after 50 invalid addresses selected already
 /* MCHN START */            
-            if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+            if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
             {
 /* MCHN END */            
                 if (addr.GetPort() != Params().GetDefaultPort() && nTries < 50)
@@ -1448,7 +1448,7 @@ void ThreadOpenConnections()
             }
 
 
-            if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+            if(mc_gState->m_NetworkParams->IsProtocolRk())
             {
                 
                 if(setConnectedVerifiedAddresses.count(addr.ToStringIPPort()))
@@ -1755,7 +1755,7 @@ bool BindListenPort(const CService &addrBind, string& strError, bool fWhiteliste
     {
         int nErr = WSAGetLastError();
         if (nErr == WSAEADDRINUSE)
-            strError = strprintf(_("Unable to bind to %s on this computer. MultiChain Core is probably already running."), addrBind.ToString());
+            strError = strprintf(_("Unable to bind to %s on this computer. Rk Core is probably already running."), addrBind.ToString());
         else
             strError = strprintf(_("Unable to bind to %s on this computer (bind returned error %s)"), addrBind.ToString(), NetworkErrorString(nErr));
         LogPrintf("%s\n", strError);

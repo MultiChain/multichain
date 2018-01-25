@@ -1,12 +1,12 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
-#ifndef MULTICHAIN_STATE_H
-#define	MULTICHAIN_STATE_H
+#ifndef RK_STATE_H
+#define	RK_STATE_H
 
 #include "utils/define.h"
 #include "chainparams/params.h"
-#include "protocol/multichainscript.h"
+#include "protocol/rkscript.h"
 #include "permissions/permission.h"
 #include "entities/asset.h"
 
@@ -147,7 +147,7 @@ typedef struct mc_State
     }
     
     mc_Params               *m_Params;
-    mc_MultichainParams     *m_NetworkParams;
+    mc_RkParams     *m_NetworkParams;
     mc_Permissions          *m_Permissions;
     mc_AssetDB              *m_Assets;
     mc_Features             *m_Features;
@@ -170,7 +170,7 @@ typedef struct mc_State
     {
         m_Params=new mc_Params;     
         m_Features=new mc_Features;
-        m_NetworkParams=new mc_MultichainParams;
+        m_NetworkParams=new mc_RkParams;
         m_Permissions=NULL;
         m_Assets=NULL;
         m_TmpScript=new mc_Script;
@@ -256,5 +256,5 @@ typedef struct mc_State
 
 extern mc_State* mc_gState;
 
-#endif	/* MULTICHAIN_STATE_H */
+#endif	/* RK_STATE_H */
 

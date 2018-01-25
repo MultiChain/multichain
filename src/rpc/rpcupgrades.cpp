@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 
 #include "rpc/rpcwallet.h"
@@ -113,7 +113,7 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
                     throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid protocol version, cannot upgrade to future version");                                                                                    
                 }
 
-                if(protocol_version < MULTICHAIN_MIN_DOWNGRADE_PROTOCOL_VERSION)
+                if(protocol_version < RK_MIN_DOWNGRADE_PROTOCOL_VERSION)
                 {
                     throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid protocol version, cannot downgrade to this version");                                                                                    
                 }

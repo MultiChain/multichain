@@ -17,7 +17,7 @@ BEGIN
         BLOCK "040904E4" // U.S. English - multilingual (hex)
         BEGIN
             VALUE "CompanyName",        "Coin Sciences Ltd"
-            VALUE "FileDescription",    "rk-util (Utilities for MultiChain)"
+            VALUE "FileDescription",    "rk-util (Utilities for Rk)"
             VALUE "FileVersion",        VER_FILEVERSION_STR
             VALUE "InternalName",       "rk-util"
             VALUE "LegalCopyright",     COPYRIGHT_STR

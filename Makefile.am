@@ -13,8 +13,8 @@ BITCOIN_WIN_INSTALLER=$(PACKAGE)-$(PACKAGE_VERSION)-win$(WINDOWS_BITS)-setup$(EX
 
 RKD_BIN=$(top_builddir)/src/rkd$(EXEEXT)
 RKD_COLD_BIN=$(top_builddir)/src/rkd-cold$(EXEEXT)
-MULTICHAIN_CLI_BIN=$(top_builddir)/src/rk-cli$(EXEEXT)
-MULTICHAIN_UTIL_BIN=$(top_builddir)/src/rk-util$(EXEEXT)
+RK_CLI_BIN=$(top_builddir)/src/rk-cli$(EXEEXT)
+RK_UTIL_BIN=$(top_builddir)/src/rk-util$(EXEEXT)
 
 # MCHN END
 
@@ -151,10 +151,10 @@ $(RKD_BIN): FORCE
 $(RKD_COLD_BIN): FORCE
 	$(MAKE) -C src $(@F)
 
-$(MULTICHAIN_CLI_BIN): FORCE
+$(RK_CLI_BIN): FORCE
 	$(MAKE) -C src $(@F)
 
-$(MULTICHAIN_UTIL_BIN): FORCE
+$(RK_UTIL_BIN): FORCE
 	$(MAKE) -C src $(@F)
 
 # MCHN END

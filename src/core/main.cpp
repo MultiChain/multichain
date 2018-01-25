@@ -2,7 +2,7 @@
 // Copyright (c) 2009-2016 The Bitcoin developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "core/main.h"
 #include "version/version.h"
@@ -48,7 +48,7 @@ extern mc_WalletTxs* pwalletTxsMain;
 using namespace boost;
 using namespace std;
 
-bool AcceptMultiChainTransaction(const CTransaction& tx, 
+bool AcceptRKTransaction(const CTransaction& tx, 
                                  const CCoinsViewCache &inputs,
                                  int offset,
                                  bool accept,
@@ -62,16 +62,16 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept);
 bool VerifyBlockSignature(CBlock *block,bool force);
 bool VerifyBlockMiner(CBlock *block,CBlockIndex* pindexNew);
 bool CheckBlockPermissions(const CBlock& block,CBlockIndex* prev_block,unsigned char *lpMinerAddress);
-bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,bool *disconnect_flag);
-bool PushMultiChainVerack(CNode* pfrom, bool fIsVerackack);
-bool MultichainNode_CanConnect(CNode *pnode);
-bool MultichainNode_DisconnectRemote(CNode *pnode);
-bool MultichainNode_DisconnectLocal(CNode *pnode);
-bool MultichainNode_RespondToGetData(CNode *pnode);
-bool MultichainNode_SendInv(CNode *pnode);
-bool MultichainNode_AcceptData(CNode *pnode);
-bool MultichainNode_IgnoreIncoming(CNode *pnode);
-bool MultichainNode_IsLocal(CNode *pnode);
+bool ProcessRkVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,bool *disconnect_flag);
+bool PushRKVerack(CNode* pfrom, bool fIsVerackack);
+bool RkNode_CanConnect(CNode *pnode);
+bool RkNode_DisconnectRemote(CNode *pnode);
+bool RkNode_DisconnectLocal(CNode *pnode);
+bool RkNode_RespondToGetData(CNode *pnode);
+bool RkNode_SendInv(CNode *pnode);
+bool RkNode_AcceptData(CNode *pnode);
+bool RkNode_IgnoreIncoming(CNode *pnode);
+bool RkNode_IsLocal(CNode *pnode);
 bool IsTxBanned(uint256 txid);
 
 
@@ -131,7 +131,7 @@ set<uint256> setBlockTransactions[MC_TXSET_BLOCKS];
 /** Constant stuff for coinbase transactions we create: */
 CScript COINBASE_FLAGS;
 
-const string strMessageMagic = "MultiChain Signed Message:\n";
+const string strMessageMagic = "Rk Signed Message:\n";
 
 // Internal stuff
 namespace {
@@ -146,7 +146,7 @@ namespace {
             
 /* MCHN START */
             // Prefer chains we mined long time ago 
-            if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+            if(mc_gState->m_NetworkParams->IsProtocolRk())
             {
                 if((pa->nCanMine > 0) && (pb->nCanMine == 0)) return false;
                 if((pa->nCanMine == 0) && (pb->nCanMine > 0)) return true;
@@ -348,7 +348,7 @@ map<NodeId, CNodeState> mapNodeState;
 
 /* MCHN START */
 
-int MultichainNode_ApplyUpgrades(int current_height)
+int RkNode_ApplyUpgrades(int current_height)
 {
     mc_EntityDetails entity;
     mc_Buffer *permissions;
@@ -392,7 +392,7 @@ int MultichainNode_ApplyUpgrades(int current_height)
                     if(current_height >=applied_height)
                     {
                         version=entity.UpgradeProtocolVersion();
-                        if(version >= MULTICHAIN_MIN_DOWNGRADE_PROTOCOL_VERSION)
+                        if(version >= RK_MIN_DOWNGRADE_PROTOCOL_VERSION)
                         {
                             NewProtocolVersion=version;
                         }
@@ -419,7 +419,7 @@ int MultichainNode_ApplyUpgrades(int current_height)
                 LogPrintf("NODE IS UPGRADED FROM %d TO %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
                 mc_gState->m_NetworkParams->m_ProtocolVersion=mc_gState->m_ProtocolVersionToUpgrade;// UPGRADE CODE HERE
                 mc_gState->m_NetworkParams->SetGlobals();
-                SetMultiChainParams();
+                SetRKParams();
             }        
         }
     }
@@ -431,7 +431,7 @@ int MultichainNode_ApplyUpgrades(int current_height)
     return MC_ERR_NOERROR;
 }
 
-void MultichainNode_UpdateBlockByHeightList(CBlockIndex *pindex)
+void RkNode_UpdateBlockByHeightList(CBlockIndex *pindex)
 {
     if(pindex->nHeight < 0)
     {
@@ -462,7 +462,7 @@ void MultichainNode_UpdateBlockByHeightList(CBlockIndex *pindex)
     }    
 }
 
-bool MultichainNode_IsBlockChainSynced(CNode *pnode)
+bool RkNode_IsBlockChainSynced(CNode *pnode)
 {
     if(pnode->fSyncedOnce)
     {
@@ -1275,7 +1275,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 /* MCHN START */    
     bool check_for_dust=true;
     
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    if(mc_gState->m_NetworkParams->IsProtocolRk())
     {
         check_for_dust=false;
     }
@@ -1526,10 +1526,10 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         
         if(mc_gState->m_Features->Streams())
         {
-            if(!AcceptMultiChainTransaction(tx,view,-1,true,reason, &replay))
+            if(!AcceptRKTransaction(tx,view,-1,true,reason, &replay))
             {
                 return state.DoS(0,
-                                 error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
+                                 error("AcceptToMemoryPool: : AcceptRKTransaction failed %s : %s", hash.ToString(),reason),
                                  REJECT_NONSTANDARD, reason);
             }
         }
@@ -1562,7 +1562,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             {
                 reason=strprintf("Wallet error %d",err);
                 return state.DoS(0,
-                                 error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
+                                 error("AcceptToMemoryPool: : AcceptRKTransaction failed %s : %s", hash.ToString(),reason),
                                  REJECT_INVALID, reason);            
             }
         }
@@ -2283,7 +2283,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             string reason;
             if(mc_gState->m_Features->Streams())
             {
-                if(!AcceptMultiChainTransaction(tx,view,offset,true,reason,NULL))
+                if(!AcceptRKTransaction(tx,view,offset,true,reason,NULL))
                 {
                     return state.DoS(100, error(reason.c_str()),
                                  REJECT_INVALID, "bad-transaction");            
@@ -2291,7 +2291,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 //                unsigned char *root_stream_name;
                 int root_stream_name_size;
                 mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
-                if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+                if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
                 {
                     root_stream_name_size=0;
                 }    
@@ -2355,7 +2355,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     fScriptChecks &= !fJustCheck;                                               // When miner checks the blocks before submission 
                                                                                 // signature verification can fail because of lost send permission
     
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
 /* MCHN END */        
 
@@ -2454,10 +2454,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             {
                 if(mc_gState->m_Features->Streams())
                 {
-                    if(!AcceptMultiChainTransaction(tx,view,offset,true,reason,NULL))
+                    if(!AcceptRKTransaction(tx,view,offset,true,reason,NULL))
                     {
                         return state.DoS(0,
-                                         error("ConnectBlock: : AcceptMultiChainTransaction failed %s : %s", tx.GetHash().ToString(),reason),
+                                         error("ConnectBlock: : AcceptRKTransaction failed %s : %s", tx.GetHash().ToString(),reason),
                                          REJECT_NONSTANDARD, reason);
                     }
                 }
@@ -2509,7 +2509,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             {
                 if(mc_gState->m_Features->Streams())
                 {
-                    if(!AcceptMultiChainTransaction(tx,view,coinbase_offset,true,reason,NULL))
+                    if(!AcceptRKTransaction(tx,view,coinbase_offset,true,reason,NULL))
                     {
                         return false;       
                     }
@@ -2751,7 +2751,7 @@ bool static DisconnectTip(CValidationState &state) {
     mc_gState->m_Permissions->RollBack(old_height-1);
     mc_gState->m_Assets->RollBack(old_height-1);
     
-    MultichainNode_ApplyUpgrades(old_height-1);        
+    RkNode_ApplyUpgrades(old_height-1);        
     if(mc_gState->m_WalletMode & MC_WMD_TXS)
     {
         if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Rolling back wallet             (%s)\n",pwalletTxsMain->Summary());
@@ -2907,7 +2907,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     // ... and about transactions that got confirmed:
 /* MCHN START */        
     VerifyBlockSignature(pblock,false);
-    MultichainNode_ApplyUpgrades(chainActive.Height());    
+    RkNode_ApplyUpgrades(chainActive.Height());    
 /* MCHN END */    
     
     BOOST_FOREACH(const CTransaction &tx, pblock->vtx) {
@@ -3117,7 +3117,7 @@ static void PruneBlockIndexCandidates() {
 
 void UpdateChainMiningStatus(const CBlock &block,CBlockIndex *pindexNew) 
 {
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    if(mc_gState->m_NetworkParams->IsProtocolRk())
     {
         std::vector<unsigned char> vchPubKey=std::vector<unsigned char> (block.vSigner+1, block.vSigner+1+block.vSigner[0]);
         CPubKey pubKeyOut(vchPubKey);
@@ -3828,7 +3828,7 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     if (pindexBestHeader == NULL || pindexBestHeader->nChainWork < pindexNew->nChainWork)
         pindexBestHeader = pindexNew;
 
-    MultichainNode_UpdateBlockByHeightList(pindexNew);
+    RkNode_UpdateBlockByHeightList(pindexNew);
     setDirtyBlockIndex.insert(pindexNew);
 
     return pindexNew;
@@ -3856,7 +3856,7 @@ bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBl
     UpdateChainMiningStatus(block,pindexNew);
 
 /*    
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    if(mc_gState->m_NetworkParams->IsProtocolRk())
     {
         std::vector<unsigned char> vchPubKey=std::vector<unsigned char> (block.vSigner+1, block.vSigner+1+block.vSigner[0]);
         CPubKey pubKeyOut(vchPubKey);
@@ -4190,7 +4190,7 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
             fWaitingForLocked=true;            
         }        
     }
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    if(mc_gState->m_NetworkParams->IsProtocolRk())
     {
         const CBlockIndex *pindexFork;
         pindexFork=chainActive.FindFork(pindexPrev);
@@ -4329,7 +4329,7 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
         CBlockIndex *pindexTmp=NULL;
         if( ((int)vFirstOnThisHeight.size() <= pindexPrev->nHeight) || (vFirstOnThisHeight[pindexPrev->nHeight] == NULL))
         {
-            MultichainNode_UpdateBlockByHeightList(pindexPrev);
+            RkNode_UpdateBlockByHeightList(pindexPrev);
         }
         lpNextForPrev=NULL;
         pindexTmp=vFirstOnThisHeight[pindexPrev->nHeight];
@@ -4925,7 +4925,7 @@ bool static LoadBlockIndexDB()
         if(fDebug)LogPrint("mchn","mchn: Rolling back wallet txs DB to height %d\n",chainActive.Height());
         pwalletTxsMain->RollBack(NULL,chainActive.Height());
     }
-    MultichainNode_ApplyUpgrades(chainActive.Height());        
+    RkNode_ApplyUpgrades(chainActive.Height());        
     
 /* MCHN END */
     LogPrintf("LoadBlockIndexDB(): hashBestChain=%s height=%d date=%s progress=%f\n",
@@ -5285,7 +5285,7 @@ void static ProcessGetData(CNode* pfrom)
     std::deque<CInv>::iterator it = pfrom->vRecvGetData.begin();
 
 /* MCHN START */    
-    if(!MultichainNode_RespondToGetData(pfrom)) 
+    if(!RkNode_RespondToGetData(pfrom)) 
     {
         pfrom->vRecvGetData.erase(pfrom->vRecvGetData.begin(), pfrom->vRecvGetData.end());        
         return;
@@ -5571,7 +5571,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 /* MCHN START */
         pfrom->nVersionNonceReceived=nNonce; 
         pfrom->fVerackackReceived=false;
-        if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+        if(mc_gState->m_NetworkParams->IsProtocolRk())
         {            
             if(GetBoolArg("-bitcoinstylehandshake", false))
             {
@@ -5581,7 +5581,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             }
             else
             {
-                PushMultiChainVerack(pfrom,false);
+                PushRKVerack(pfrom,false);
             }
         }
         else
@@ -5686,7 +5686,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     {
         pfrom->SetRecvVersion(min(pfrom->nVersion, PROTOCOL_VERSION));
 /* MCHN START */
-        if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+        if(mc_gState->m_NetworkParams->IsProtocolRk())
         {
             if(vRecv.size() == 0)
             {
@@ -5715,7 +5715,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 else
                 {
                     bool disconnect_flag=false;
-                    if(!ProcessMultichainVerack(pfrom,vRecv,false,&disconnect_flag))
+                    if(!ProcessRkVerack(pfrom,vRecv,false,&disconnect_flag))
                     {
                         LogPrintf("mchn: Invalid verack message from peer=%d, disconnecting\n", pfrom->id);
                         pfrom->fDisconnect = true;
@@ -5726,7 +5726,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                     {
                         if(!pfrom->fDisconnect)
                         {
-                            pfrom->fDisconnect = !PushMultiChainVerack(pfrom,true);
+                            pfrom->fDisconnect = !PushRKVerack(pfrom,true);
                         }
                         else
                         {
@@ -5746,10 +5746,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
     else if (strCommand == "verackack")
     {
-        if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+        if(mc_gState->m_NetworkParams->IsProtocolRk())
         {
             bool disconnect_flag=true;
-            if(!ProcessMultichainVerack(pfrom,vRecv,true,&disconnect_flag))
+            if(!ProcessRkVerack(pfrom,vRecv,true,&disconnect_flag))
             {
                 pfrom->fDisconnect |= disconnect_flag;
                 if(pfrom->fDisconnect)
@@ -5765,7 +5765,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             }
             else
             {
-                pfrom->fDisconnect |= !PushMultiChainVerack(pfrom,false);       // MCHN |= to avoid setting fDisconnect to false
+                pfrom->fDisconnect |= !PushRKVerack(pfrom,false);       // MCHN |= to avoid setting fDisconnect to false
             }
             if(pfrom->fDisconnect)
             {
@@ -5891,7 +5891,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                     // not a direct successor.
                     pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexBestHeader), inv.hash);
                     CNodeState *nodestate = State(pfrom->GetId());
-                    if(!MultichainNode_IgnoreIncoming(pfrom))
+                    if(!RkNode_IgnoreIncoming(pfrom))
                     {
                         if (chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - Params().TargetSpacing() * 20 &&
                             nodestate->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
@@ -5914,7 +5914,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             }
         }
 
-        if (!vToFetch.empty() && !MultichainNode_IgnoreIncoming(pfrom))      // MCHN
+        if (!vToFetch.empty() && !RkNode_IgnoreIncoming(pfrom))      // MCHN
             pfrom->PushMessage("getdata", vToFetch);
     }
 
@@ -6019,10 +6019,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     }
 
 
-    else if (strCommand == "tx" && MultichainNode_AcceptData(pfrom))            // MCHN
+    else if (strCommand == "tx" && RkNode_AcceptData(pfrom))            // MCHN
     {
 /* MCHN START */        
-        if(!MultichainNode_IgnoreIncoming(pfrom))
+        if(!RkNode_IgnoreIncoming(pfrom))
         {
 /* MCHN END */        
         vector<uint256> vWorkQueue;
@@ -6246,7 +6246,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         }
     }
                                                                                 // MCHN
-    else if (strCommand == "block" && !fImporting && !fReindex && MultichainNode_AcceptData(pfrom)) // Ignore blocks received while importing
+    else if (strCommand == "block" && !fImporting && !fReindex && RkNode_AcceptData(pfrom)) // Ignore blocks received while importing
     {
         CBlock block;
         vRecv >> block;
@@ -6266,7 +6266,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         CInv inv(MSG_BLOCK, block.GetHash());
 
 /* MCHN START */        
-        if(!MultichainNode_IgnoreIncoming(pfrom))
+        if(!RkNode_IgnoreIncoming(pfrom))
         {
 /* MCHN END */        
             
@@ -6373,7 +6373,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     }
 
 
-    else if (strCommand == "mempool" && MultichainNode_SendInv(pfrom))          // MCHN
+    else if (strCommand == "mempool" && RkNode_SendInv(pfrom))          // MCHN
     {
         LOCK2(cs_main, pfrom->cs_filter);
 
@@ -6624,7 +6624,7 @@ bool ProcessMessages(CNode* pfrom)
         
         if(!pfrom->fDisconnect)
         {
-            if(MultichainNode_DisconnectRemote(pfrom))
+            if(RkNode_DisconnectRemote(pfrom))
             {            
                     pfrom->fDisconnect=true;
                     LogPrintf("mchn: Address %s lost connect permission on peer=%d, diconnecting...\n",CBitcoinAddress(pfrom->kAddrRemote).ToString().c_str(), pfrom->id);            
@@ -6632,7 +6632,7 @@ bool ProcessMessages(CNode* pfrom)
             }
             if(!pfrom->fDisconnect)
             {
-                if(pfrom->fCanConnectLocal && MultichainNode_DisconnectLocal(pfrom))
+                if(pfrom->fCanConnectLocal && RkNode_DisconnectLocal(pfrom))
                 {
                         pfrom->fDisconnect=true;
                         LogPrintf("mchn: Local address %s lost connect permission. disconnecting peer %d...\n",CBitcoinAddress(pfrom->kAddrLocal).ToString().c_str(), pfrom->id);            
@@ -6772,7 +6772,7 @@ bool ProcessMessages(CNode* pfrom)
         try
         {
 /* MCHN START */            
-            if(pfrom->fDisconnect || !MultichainNode_DisconnectRemote(pfrom))
+            if(pfrom->fDisconnect || !RkNode_DisconnectRemote(pfrom))
             {
 /* MCHN END */            
             fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime);
@@ -7004,7 +7004,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                     vInv.push_back(inv);
                     if (vInv.size() >= 1000)
                     {
-                        if(MultichainNode_SendInv(pto))                         // MCNN
+                        if(RkNode_SendInv(pto))                         // MCNN
                             pto->PushMessage("inv", vInv);
                         vInv.clear();
                     }
@@ -7013,7 +7013,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             pto->vInventoryToSend = vInvWait;
         }
         if (!vInv.empty())
-            if(MultichainNode_SendInv(pto))                                     // MCNN
+            if(RkNode_SendInv(pto))                                     // MCNN
                 pto->PushMessage("inv", vInv);
 
         // Detect whether we're stalling
@@ -7029,7 +7029,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         bool ignore_incoming=false;
         {
             LOCK(cs_main);
-            ignore_incoming=MultichainNode_IgnoreIncoming(pto);
+            ignore_incoming=RkNode_IgnoreIncoming(pto);
         }
         if(!ignore_incoming)
         {
@@ -7131,14 +7131,14 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         {
             LOCK(cs_main);
             CNode* seed_node;
-            if(!pto->fSyncedOnce && MultichainNode_IsBlockChainSynced(pto))
+            if(!pto->fSyncedOnce && RkNode_IsBlockChainSynced(pto))
             {
                 LogPrintf("mchn: Synced with node %d on block %d - requesting mempool\n",pto->id,mc_gState->m_Permissions->m_Block);
                 pto->PushMessage("mempool");
                 seed_node=(CNode*)(mc_gState->m_pSeedNode);
                 if(seed_node == pto)
                 {
-                    if(!MultichainNode_IsLocal(pto))
+                    if(!RkNode_IsLocal(pto))
                     {
                         LogPrintf("mchn: Synced with seed node on block %d\n",mc_gState->m_Permissions->m_Block);
                         mc_RemoveFile(mc_gState->m_NetworkParams->Name(),"seed",".dat",MC_FOM_RELATIVE_TO_DATADIR);

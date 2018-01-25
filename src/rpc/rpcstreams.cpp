@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 
 #include "rpc/rpcwallet.h"
@@ -28,7 +28,7 @@ void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
                 unsigned char *root_stream_name;
                 int root_stream_name_size;
                 root_stream_name=(unsigned char *)mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
-                if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+                if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
                 {
                     root_stream_name_size=0;
                 }    

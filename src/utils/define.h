@@ -1,8 +1,8 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
-#ifndef MULTICHAIN_DEFINE_H
-#define	MULTICHAIN_DEFINE_H
+#ifndef RK_DEFINE_H
+#define	RK_DEFINE_H
 
 #include <stdio.h>
 #include <time.h>
@@ -70,5 +70,5 @@
 
 #define MC_PRM_NETWORK_NAME_MAX_SIZE    32
 
-#endif	/* MULTICHAIN_DEFINE_H */
+#endif	/* RK_DEFINE_H */
 

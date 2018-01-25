@@ -1,5 +1,5 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "rk/rk.h"
 
@@ -14,7 +14,7 @@ const unsigned char c_DefaultMessageStart[4]={0xfb,0xb4,0xc7,0xde};
 #include "chainparams/paramlist.h"
 
 
-int mc_OneMultichainParam::IsRelevant(int version)
+int mc_OneRkParam::IsRelevant(int version)
 {
     int ret=1;
     
@@ -34,7 +34,7 @@ int mc_OneMultichainParam::IsRelevant(int version)
     return ret;
 }
 
-void mc_MultichainParams::Zero()
+void mc_RkParams::Zero()
 {
     m_lpData = NULL;
     m_lpParams = NULL;        
@@ -42,13 +42,13 @@ void mc_MultichainParams::Zero()
     m_lpCoord=NULL;
     m_Status=MC_PRM_STATUS_EMPTY;
     m_Size=0;
-    m_IsProtocolMultiChain=1;
+    m_IsProtocolRK=1;
     m_ProtocolVersion=0;
     
     m_AssetRefSize=MC_AST_SHORT_TXID_SIZE;
 }
 
-void mc_MultichainParams::Destroy()
+void mc_RkParams::Destroy()
 {
     if(m_lpData)
     {
@@ -73,7 +73,7 @@ void mc_MultichainParams::Destroy()
 }
 
 
-int64_t mc_MultichainParams::GetInt64Param(const char *param)
+int64_t mc_RkParams::GetInt64Param(const char *param)
 {
     int size;
     void* ptr=GetParam(param,&size);
@@ -95,7 +95,7 @@ int64_t mc_MultichainParams::GetInt64Param(const char *param)
     return mc_GetLE(ptr,size);
 }
 
-double mc_MultichainParams::GetDoubleParam(const char *param)
+double mc_RkParams::GetDoubleParam(const char *param)
 {
     int n=(int)mc_gState->m_NetworkParams->GetInt64Param(param);
     if(n < 0)
@@ -106,7 +106,7 @@ double mc_MultichainParams::GetDoubleParam(const char *param)
 }
 
 
-void* mc_MultichainParams::GetParam(const char *param,int* size)
+void* mc_RkParams::GetParam(const char *param,int* size)
 {
     if(m_lpIndex == NULL)
     {
@@ -131,7 +131,7 @@ void* mc_MultichainParams::GetParam(const char *param,int* size)
 }
 
 
-int mc_MultichainParams::SetParam(const char *param,const char* value,int size)
+int mc_RkParams::SetParam(const char *param,const char* value,int size)
 {
     int offset;
     if(m_lpIndex == NULL)
@@ -179,7 +179,7 @@ int mc_MultichainParams::SetParam(const char *param,const char* value,int size)
     return MC_ERR_NOERROR;    
 }
 
-int mc_MultichainParams::SetParam(const char *param,int64_t value)
+int mc_RkParams::SetParam(const char *param,int64_t value)
 {
     int size;
     char buf[8];
@@ -215,7 +215,7 @@ int mc_MultichainParams::SetParam(const char *param,int64_t value)
 }
 
 
-void mc_MultichainParams::Init()
+void mc_RkParams::Init()
 {
     int size,max_size,i;
     
@@ -223,16 +223,16 @@ void mc_MultichainParams::Init()
     
     m_lpIndex=new mc_MapStringIndex;            
     
-    m_Count=sizeof(MultichainParamArray)/sizeof(mc_OneMultichainParam);
+    m_Count=sizeof(RkParamArray)/sizeof(mc_OneRkParam);
     max_size=0;
     
     for(i=0;i<m_Count;i++)
     {
         size=0;
-        switch((MultichainParamArray+i)->m_Type & MC_PRM_DATA_TYPE_MASK)
+        switch((RkParamArray+i)->m_Type & MC_PRM_DATA_TYPE_MASK)
         {
-            case MC_PRM_BINARY  : size=(MultichainParamArray+i)->m_MaxStringSize;   break;
-            case MC_PRM_STRING  : size=(MultichainParamArray+i)->m_MaxStringSize+1; break;
+            case MC_PRM_BINARY  : size=(RkParamArray+i)->m_MaxStringSize;   break;
+            case MC_PRM_STRING  : size=(RkParamArray+i)->m_MaxStringSize+1; break;
             case MC_PRM_BOOLEAN : size=1;                                           break;
             case MC_PRM_INT32   : size=4;                                           break;
             case MC_PRM_INT64   : size=8;                                           break;
@@ -243,11 +243,11 @@ void mc_MultichainParams::Init()
         max_size+=MC_PRM_MAX_PARAM_NAME_SIZE+1+MC_PRM_PARAM_SIZE_BYTES+size;
     }
     
-    m_lpParams=(mc_OneMultichainParam*)mc_New(sizeof(MultichainParamArray));
+    m_lpParams=(mc_OneRkParam*)mc_New(sizeof(RkParamArray));
     m_lpData=(char*)mc_New(max_size);
     m_lpCoord=(int*)mc_New(2*m_Count*sizeof(int));
     
-    memcpy(m_lpParams,MultichainParamArray,sizeof(MultichainParamArray));
+    memcpy(m_lpParams,RkParamArray,sizeof(RkParamArray));
     for(i=0;i<m_Count;i++)
     {
         m_lpIndex->Add((m_lpParams+i)->m_Name,i);
@@ -257,10 +257,10 @@ void mc_MultichainParams::Init()
     
 }
 
-int mc_MultichainParams::Create(const char* name,int version)
+int mc_RkParams::Create(const char* name,int version)
 {
     int size,offset,i,set;
-    mc_OneMultichainParam *param;
+    mc_OneRkParam *param;
     char *ptrData;
     int num_sets;
     uint32_t network_port=MC_DEFAULT_NETWORK_PORT;
@@ -292,20 +292,20 @@ int mc_MultichainParams::Create(const char* name,int version)
                 {
                     case MC_PRM_COMMENT:
                     case MC_PRM_USER:
-                        switch((MultichainParamArray+i)->m_Type & MC_PRM_DATA_TYPE_MASK)
+                        switch((RkParamArray+i)->m_Type & MC_PRM_DATA_TYPE_MASK)
                         {
                             case MC_PRM_BINARY  : 
                                 size=0;   
                                 break;
                             case MC_PRM_STRING  : 
                                 size=1;   
-                                if((MultichainParamArray+i)->m_Type & MC_PRM_SPECIAL)
+                                if((RkParamArray+i)->m_Type & MC_PRM_SPECIAL)
                                 {
                                     if(strcmp(param->m_Name,"chaindescription") == 0)
                                     {
                                         if(strlen(name)+19<=(size_t)(param->m_MaxStringSize))
                                         {
-                                            sprintf(ptrData,"MultiChain %s",name);
+                                            sprintf(ptrData,"Rk %s",name);
                                         }
                                         size=strlen(ptrData)+1;
                                     }                                   
@@ -441,23 +441,23 @@ int mc_MultichainParams::Create(const char* name,int version)
     return MC_ERR_NOERROR;
 }
 
-double mc_MultichainParams::ParamAccuracy()
+double mc_RkParams::ParamAccuracy()
 {
     return 1./(double)MC_PRM_DECIMAL_GRANULARITY;
 }
 
 
-int mc_MultichainParams::Read(const char* name)
+int mc_RkParams::Read(const char* name)
 {
     return Read(name,0,NULL,0);
 }
 
-int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create_version)
+int mc_RkParams::Read(const char* name,int argc, char* argv[],int create_version)
 {
     mc_MapStringString *mapConfig;
     int err;
     int size,offset,i,version,len0,len1,len2;
-    mc_OneMultichainParam *param;
+    mc_OneRkParam *param;
     char *ptrData;
     const char *ptr;
     
@@ -469,7 +469,7 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
     err=MC_ERR_NOERROR;
     offset=0;
     
-    mc_MultichainParams *lpDefaultParams;
+    mc_RkParams *lpDefaultParams;
     
     lpDefaultParams=NULL;
     mapConfig=new mc_MapStringString;
@@ -521,7 +521,7 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
         }
     }
 
-    lpDefaultParams = new mc_MultichainParams;
+    lpDefaultParams = new mc_RkParams;
     
     err=lpDefaultParams->Create(name,version);
  
@@ -550,7 +550,7 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
 
             ptrData=m_lpData+offset+MC_PRM_PARAM_SIZE_BYTES;
             
-            switch((MultichainParamArray+i)->m_Type & MC_PRM_DATA_TYPE_MASK)
+            switch((RkParamArray+i)->m_Type & MC_PRM_DATA_TYPE_MASK)
             {
                 case MC_PRM_BINARY  : 
                     if(strlen(ptr) % 2)
@@ -594,20 +594,20 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
                     break;
                 case MC_PRM_INT32:
                     size=4;
-                    if(((MultichainParamArray+i)->m_Type & MC_PRM_SOURCE_MASK) == MC_PRM_USER)
+                    if(((RkParamArray+i)->m_Type & MC_PRM_SOURCE_MASK) == MC_PRM_USER)
                     {
-                        if(atoll(ptr) > (MultichainParamArray+i)->m_MaxIntegerValue)
+                        if(atoll(ptr) > (RkParamArray+i)->m_MaxIntegerValue)
                         {
                             printf("Invalid parameter value for %s - too high: %s\n",param->m_DisplayName,ptr);                        
                             return MC_ERR_INVALID_PARAMETER_VALUE;                                                
                         }
-                        if(atoll(ptr) < (MultichainParamArray+i)->m_MinIntegerValue)
+                        if(atoll(ptr) < (RkParamArray+i)->m_MinIntegerValue)
                         {
                             printf("Invalid parameter value for %s - too low: %s\n",param->m_DisplayName,ptr);                        
                             return MC_ERR_INVALID_PARAMETER_VALUE;                                                
                         }
                     }
-                    if((MultichainParamArray+i)->m_Type & MC_PRM_DECIMAL)
+                    if((RkParamArray+i)->m_Type & MC_PRM_DECIMAL)
                     {
                         double d=atof(ptr);
                         if(d >= 0)
@@ -626,20 +626,20 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
                     break;
                 case MC_PRM_UINT32:
                     size=4;
-                    if(((MultichainParamArray+i)->m_Type & MC_PRM_SOURCE_MASK) == MC_PRM_USER)
+                    if(((RkParamArray+i)->m_Type & MC_PRM_SOURCE_MASK) == MC_PRM_USER)
                     {
-                        if(atoll(ptr) > (MultichainParamArray+i)->m_MaxIntegerValue)
+                        if(atoll(ptr) > (RkParamArray+i)->m_MaxIntegerValue)
                         {
                             printf("Invalid parameter value for %s - too high: %s\n",param->m_DisplayName,ptr);                        
                             return MC_ERR_INVALID_PARAMETER_VALUE;                                                
                         }
-                        if(atoll(ptr) < (MultichainParamArray+i)->m_MinIntegerValue)
+                        if(atoll(ptr) < (RkParamArray+i)->m_MinIntegerValue)
                         {
                             printf("Invalid parameter value for %s - too low: %s\n",param->m_DisplayName,ptr);                        
                             return MC_ERR_INVALID_PARAMETER_VALUE;                                                
                         }
                     }
-                    if((MultichainParamArray+i)->m_Type & MC_PRM_DECIMAL)
+                    if((RkParamArray+i)->m_Type & MC_PRM_DECIMAL)
                     {
                         *(int32_t*)ptrData=(int32_t)(atof(ptr)*MC_PRM_DECIMAL_GRANULARITY+ParamAccuracy());
                     }
@@ -654,14 +654,14 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
                     }
                     break;
                 case MC_PRM_INT64:
-                    if(((MultichainParamArray+i)->m_Type & MC_PRM_SOURCE_MASK) == MC_PRM_USER)
+                    if(((RkParamArray+i)->m_Type & MC_PRM_SOURCE_MASK) == MC_PRM_USER)
                     {
-                        if(atoll(ptr) > (MultichainParamArray+i)->m_MaxIntegerValue)
+                        if(atoll(ptr) > (RkParamArray+i)->m_MaxIntegerValue)
                         {
                             printf("Invalid parameter value for %s - too high: %s\n",param->m_DisplayName,ptr);                        
                             return MC_ERR_INVALID_PARAMETER_VALUE;                                                
                         }
-                        if(atoll(ptr) < (MultichainParamArray+i)->m_MinIntegerValue)
+                        if(atoll(ptr) < (RkParamArray+i)->m_MinIntegerValue)
                         {
                             printf("Invalid parameter value for %s - too low: %s\n",param->m_DisplayName,ptr);                        
                             return MC_ERR_INVALID_PARAMETER_VALUE;                                                
@@ -684,8 +684,8 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
         }
         else
         {
-            if( ((((MultichainParamArray+i)->m_Type & MC_PRM_SOURCE_MASK) != MC_PRM_CALCULATED) && 
-               (((MultichainParamArray+i)->m_Type & MC_PRM_SOURCE_MASK) != MC_PRM_GENERATED)) ||
+            if( ((((RkParamArray+i)->m_Type & MC_PRM_SOURCE_MASK) != MC_PRM_CALCULATED) && 
+               (((RkParamArray+i)->m_Type & MC_PRM_SOURCE_MASK) != MC_PRM_GENERATED)) ||
                (argc > 0) )     
             {
                 strcpy(m_lpData+offset,param->m_Name);
@@ -740,7 +740,7 @@ exitlbl:
     return err;
 }
 
-int mc_MultichainParams::Set(const char *name,const char *source,int source_size)
+int mc_RkParams::Set(const char *name,const char *source,int source_size)
 {
     int size,offset,i,j,n;
     char *ptrData;
@@ -788,11 +788,11 @@ int mc_MultichainParams::Set(const char *name,const char *source,int source_size
     return MC_ERR_NOERROR;    
 }
 
-int mc_MultichainParams::Clone(const char* name, mc_MultichainParams* source)
+int mc_RkParams::Clone(const char* name, mc_RkParams* source)
 {
     int err;
     int size,offset,i,version;
-    mc_OneMultichainParam *param;
+    mc_OneRkParam *param;
     char *ptrData;
     void *ptr;
     
@@ -802,8 +802,8 @@ int mc_MultichainParams::Clone(const char* name, mc_MultichainParams* source)
         version=mc_gState->GetProtocolVersion();
     }
     
-    mc_MultichainParams *lpDefaultParams;
-    lpDefaultParams = new mc_MultichainParams;
+    mc_RkParams *lpDefaultParams;
+    lpDefaultParams = new mc_RkParams;
     
     err=lpDefaultParams->Create(name,version);
  
@@ -853,7 +853,7 @@ int mc_MultichainParams::Clone(const char* name, mc_MultichainParams* source)
     return MC_ERR_NOERROR;
 }
 
-int mc_MultichainParams::CalculateHash(unsigned char *hash)
+int mc_RkParams::CalculateHash(unsigned char *hash)
 {
     int i;
     int take_it;
@@ -935,7 +935,7 @@ int mc_MultichainParams::CalculateHash(unsigned char *hash)
 }
 
 
-int mc_MultichainParams::Validate()
+int mc_RkParams::Validate()
 {
     int i,size,offset;
     int isGenerated;
@@ -1121,7 +1121,7 @@ int mc_MultichainParams::Validate()
     return MC_ERR_NOERROR;
 }
 
-int mc_MultichainParams::Print(FILE* fileHan)
+int mc_RkParams::Print(FILE* fileHan)
 {
     int i,c,size;
     int version;
@@ -1136,7 +1136,7 @@ int mc_MultichainParams::Print(FILE* fileHan)
     int param_sets[]={MC_PRM_COMMENT, MC_PRM_USER, MC_PRM_GENERATED, MC_PRM_CALCULATED};
     num_sets=sizeof(param_sets)/sizeof(int);    
     
-    fprintf(fileHan,"# ==== MultiChain configuration file ====\n\n");
+    fprintf(fileHan,"# ==== Rk configuration file ====\n\n");
     fprintf(fileHan,"# Created by rk-util \n");
     
     version=ProtocolVersion();
@@ -1447,7 +1447,7 @@ int mc_MultichainParams::Print(FILE* fileHan)
 
 }
 
-int mc_MultichainParams::Write(int overwrite)
+int mc_RkParams::Write(int overwrite)
 {
     FILE *fileHan;
     int create;
@@ -1509,39 +1509,39 @@ int mc_MultichainParams::Write(int overwrite)
 
 
 
-const char* mc_MultichainParams::Name()
+const char* mc_RkParams::Name()
 {
     return (char*)GetParam("chainname",NULL);
 }
 
-const unsigned char* mc_MultichainParams::MessageStart()
+const unsigned char* mc_RkParams::MessageStart()
 {
     return (unsigned char*)GetParam("networkmessagestart",NULL);
 }
 
-const unsigned char* mc_MultichainParams::DefaultMessageStart()
+const unsigned char* mc_RkParams::DefaultMessageStart()
 {
     return c_DefaultMessageStart;
 }
 
 
-const unsigned char* mc_MultichainParams::AddressVersion()
+const unsigned char* mc_RkParams::AddressVersion()
 {
     return (unsigned char*)GetParam("addresspubkeyhashversion",NULL);
 }
 
-const unsigned char* mc_MultichainParams::AddressScriptVersion()
+const unsigned char* mc_RkParams::AddressScriptVersion()
 {
     return (unsigned char*)GetParam("addressscripthashversion",NULL);
 }
 
-const unsigned char* mc_MultichainParams::AddressCheckumValue()
+const unsigned char* mc_RkParams::AddressCheckumValue()
 {
     return (unsigned char*)GetParam("addresschecksumvalue",NULL);
 }
 
 
-int mc_MultichainParams::ProtocolVersion()
+int mc_RkParams::ProtocolVersion()
 {
     if(m_ProtocolVersion)
     {
@@ -1555,9 +1555,9 @@ int mc_MultichainParams::ProtocolVersion()
     return 0;
 }
 
-int mc_MultichainParams::IsProtocolMultichain()
+int mc_RkParams::IsProtocolRk()
 {
-    return m_IsProtocolMultiChain;
+    return m_IsProtocolRK;
 }
 
 
@@ -1593,7 +1593,7 @@ int mc_Features::VerifySizeOfOpDropElements()                                   
     int ret=0;        
     int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
     
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return 1;
     }
@@ -1611,7 +1611,7 @@ int mc_Features::VerifySizeOfOpDropElements()                                   
 
 int mc_Features::PerEntityPermissions()                                         // This test is eliminated from the code as 10002 is not supported
 {
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return 0;
     }
@@ -1632,7 +1632,7 @@ int mc_Features::PerEntityPermissions()                                         
 int mc_Features::FollowOnIssues()                                               // This test is eliminated from the code as 10002 is not supported
 {
     int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return 0;
     }
@@ -1699,7 +1699,7 @@ int mc_Features::UnconfirmedMinersCannotMine()
 int mc_Features::Streams()
 {
     int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return 0;
     }
@@ -1719,7 +1719,7 @@ int mc_Features::Streams()
 int mc_Features::OpDropDetailsScripts()
 {
     int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return 0;
     }
@@ -1739,7 +1739,7 @@ int mc_Features::OpDropDetailsScripts()
 int mc_Features::ShortTxIDInTx()
 {
     int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return 0;
     }
@@ -1759,7 +1759,7 @@ int mc_Features::ShortTxIDInTx()
 int mc_Features::CachedInputScript()
 {
     int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return 0;
     }
@@ -1779,7 +1779,7 @@ int mc_Features::CachedInputScript()
 int mc_Features::AnyoneCanReceiveEmpty()
 {
     int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return 0;
     }
@@ -1802,7 +1802,7 @@ int mc_Features::AnyoneCanReceiveEmpty()
 int mc_Features::FixedIn10007()
 {
     int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return 0;
     }
@@ -1822,7 +1822,7 @@ int mc_Features::FixedIn10007()
 int mc_Features::Upgrades()
 {
     int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return 0;
     }
@@ -1842,7 +1842,7 @@ int mc_Features::Upgrades()
 int mc_Features::FixedIn10008()
 {
     int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return 0;
     }
@@ -1862,7 +1862,7 @@ int mc_Features::FixedIn10008()
 int mc_Features::FixedDestinationExtraction()
 {
     int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return 1;
     }
@@ -1883,7 +1883,7 @@ int mc_Features::FixedDestinationExtraction()
 int mc_Features::FixedIn1000920001()
 {
     int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return 1;
     }

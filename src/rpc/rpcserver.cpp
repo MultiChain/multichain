@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "rpc/rpcserver.h"
 
@@ -323,7 +323,7 @@ Value stop(const Array& params, bool fHelp)
         throw runtime_error("Help message not found\n");
     // Shutdown will take long enough that the response should get back
     StartShutdown();
-    return "MultiChain server stopping";
+    return "Rk server stopping";
 }
 
 /* MCHN START */
@@ -662,13 +662,13 @@ void StartRPCThreads()
             _("To use rkd, you must set an rpcpassword in the configuration file:\n"
               "%s\n"
               "It is recommended you use the following random password:\n"
-              "rpcuser=multichainrpc\n"
+              "rpcuser=rkrpc\n"
               "rpcpassword=%s\n"
               "(you do not need to remember this password)\n"
               "The username and password MUST NOT be the same.\n"
               "If the file does not exist, create it with owner-readable-only file permissions.\n"
               "It is also recommended to set alertnotify so you are notified of problems;\n"
-              "for example: alertnotify=echo %%s | mail -s \"MultiChain Alert\" admin@foo.com\n"),
+              "for example: alertnotify=echo %%s | mail -s \"Rk Alert\" admin@foo.com\n"),
                 GetConfigFile().string(),
                 EncodeBase58(&rand_pwd[0],&rand_pwd[0]+32)),
                 "", CClientUIInterface::MSG_ERROR | CClientUIInterface::SECURE);
@@ -1109,7 +1109,7 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         }
         else
         {
-            throw JSONRPCError(RPC_NOT_SUPPORTED, "Method not available in cold version of MultiChain");            
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Method not available in cold version of Rk");            
         }
     }
 #ifdef ENABLE_WALLET
@@ -1121,7 +1121,7 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
     {
         if( setAllowedWhenWaitingForUpgrade.count(strMethod) == 0 )
         {
-            throw JSONRPCError(RPC_UPGRADE_REQUIRED, strprintf("BlockChain was upgraded to protocol version %d, please upgrade MultiChain",mc_gState->m_ProtocolVersionToUpgrade));
+            throw JSONRPCError(RPC_UPGRADE_REQUIRED, strprintf("BlockChain was upgraded to protocol version %d, please upgrade Rk",mc_gState->m_ProtocolVersionToUpgrade));
         }
     }
     

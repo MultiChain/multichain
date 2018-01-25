@@ -2,7 +2,7 @@
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #if defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
@@ -412,7 +412,7 @@ void PrintExceptionContinue(std::exception* pex, const char* pszThread)
 }
 
 /* MCHN START */
-static boost::filesystem::path pathCachedMultiChain;
+static boost::filesystem::path pathCachedRK;
 static CCriticalSection csPathCached;
 /* MCHN END */
 
@@ -426,14 +426,14 @@ boost::filesystem::path GetDefaultDataDir()
 /* MCHN START */
     LOCK(csPathCached);
     
-    pathCachedMultiChain=fs::path(string(mc_gState->m_Params->DataDir()));
-    fs::path &path =pathCachedMultiChain;
+    pathCachedRK=fs::path(string(mc_gState->m_Params->DataDir()));
+    fs::path &path =pathCachedRK;
     return path;
 //    fs::path &path = fNetSpecific ? pathCachedNetSpecific : pathCached;
 /* MCHN END */
 #ifdef WIN32
     // Windows
-    return GetSpecialFolderPath(CSIDL_APPDATA) / "MultiChain";
+    return GetSpecialFolderPath(CSIDL_APPDATA) / "Rk";
 #else
     fs::path pathRet;
     char* pszHome = getenv("HOME");
@@ -445,7 +445,7 @@ boost::filesystem::path GetDefaultDataDir()
     // Mac
     pathRet /= "Library/Application Support";
     TryCreateDirectory(pathRet);
-    return pathRet / "MultiChain";
+    return pathRet / "Rk";
 #else
     // Unix
     return pathRet / ".rk";
@@ -465,13 +465,13 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific)
     LOCK(csPathCached);
 
 /* MCHN START */
-    fs::path &path =pathCachedMultiChain;
+    fs::path &path =pathCachedRK;
     if (!path.empty())
         return path;
     path=fs::path(string(mc_gState->m_Params->DataDir()));
-    return pathCachedMultiChain;
-//    pathCachedMultiChain=fs::path(string(mc_gState->m_Params->DataDir()));
-//    fs::path &path =pathCachedMultiChain;
+    return pathCachedRK;
+//    pathCachedRK=fs::path(string(mc_gState->m_Params->DataDir()));
+//    fs::path &path =pathCachedRK;
 //    return path;
 //    fs::path &path = fNetSpecific ? pathCachedNetSpecific : pathCached;
 /* MCHN END */

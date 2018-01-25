@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "utils/util.h"
 #include "script/sign.h"
@@ -16,7 +16,7 @@
 
 #include <boost/foreach.hpp>
 
-void MultichainNode_AddSignatureToCache(const std::vector<unsigned char>& vchSig, const CPubKey& pubkey, const uint256& sighash);
+void RkNode_AddSignatureToCache(const std::vector<unsigned char>& vchSig, const CPubKey& pubkey, const uint256& sighash);
 
 using namespace std;
 
@@ -42,7 +42,7 @@ bool Sign1(const CKeyID& address, const CKeyStore& keystore, uint256 hash, int n
         return false;
     if(GetBoolArg("-cachejustsigned",true))
     {
-        MultichainNode_AddSignatureToCache(vchSig,key.GetPubKey(),hash);
+        RkNode_AddSignatureToCache(vchSig,key.GetPubKey(),hash);
     }
     vchSig.push_back((unsigned char)nHashType);
     scriptSigRet << vchSig;

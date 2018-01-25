@@ -1,7 +1,7 @@
 // Copyright (c) 2013-2014 The Bitcoin developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "structs/hash.h"
 #include "crypto/hmac_sha512.h"

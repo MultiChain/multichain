@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 
 #include "rpc/rpcwallet.h"
@@ -606,7 +606,7 @@ Object TxOutEntry(const CTxOut& TxOutIn,int vout,const CTxIn& TxIn,uint256 hash,
         fIsMine=pwalletMain->IsMine(txout);
         string strFailReason;
         int required=0;
-        if(ParseMultichainTxOutToBuffer(hash,txout,amounts,lpScript,NULL,&required,strFailReason))
+        if(ParseRkTxOutToBuffer(hash,txout,amounts,lpScript,NULL,&required,strFailReason))
         {
             if(required & (MC_PTP_ADMIN | MC_PTP_ACTIVATE) )
             {

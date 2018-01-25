@@ -1,5 +1,5 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "rk/rk.h"
 
@@ -1024,7 +1024,7 @@ int mc_Permissions::IsApprovedInternal(const void* lpUpgrade, int check_current_
 
 int mc_Permissions::CanConnect(const void* lpEntity,const void* lpAddress)
 {
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return MC_PTP_CONNECT;
     }
@@ -1055,7 +1055,7 @@ int mc_Permissions::CanSend(const void* lpEntity,const void* lpAddress)
     int result;
     mc_MempoolPermissionRow row;
     
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return MC_PTP_SEND;
     }
@@ -1126,7 +1126,7 @@ int mc_Permissions::CanReceive(const void* lpEntity,const void* lpAddress)
     int result;
     mc_MempoolPermissionRow row;
 
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return MC_PTP_RECEIVE;
     }
@@ -1181,7 +1181,7 @@ int mc_Permissions::CanWrite(const void* lpEntity,const void* lpAddress)
     int result;
     mc_MempoolPermissionRow row;
 
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return 0;
     }
@@ -1319,7 +1319,7 @@ int mc_Permissions::CanMine(const void* lpEntity,const void* lpAddress)
     int result;    
     int32_t last;
         
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return MC_PTP_MINE;
     }
@@ -1373,7 +1373,7 @@ int mc_Permissions::CanMineBlock(const void* lpAddress,uint32_t block)
 //    int diversity;
     uint32_t last;
     
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return MC_PTP_MINE;
     }
@@ -1524,7 +1524,7 @@ int mc_Permissions::CanMineBlockOnFork(const void* lpAddress,uint32_t block,uint
     uint32_t last;
     int result;
     
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return MC_PTP_MINE;
     }

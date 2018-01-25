@@ -2,7 +2,7 @@
 // Copyright (c) 2009-2013 The Bitcoin developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef BITCOIN_STREAMS_H
 #define BITCOIN_STREAMS_H

@@ -2,7 +2,7 @@
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "chainparams/chainparams.h"
 
@@ -91,12 +91,12 @@ static const Checkpoints::CCheckpointData dataTestnet = {
     };
 
 /* MCHN START */
-static Checkpoints::MapCheckpoints mapCheckpointsMultichain =
+static Checkpoints::MapCheckpoints mapCheckpointsRk =
         boost::assign::map_list_of
         ( -1, uint256("0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"))
         ;
-static const Checkpoints::CCheckpointData dataMultichain = {
-        &mapCheckpointsMultichain,
+static const Checkpoints::CCheckpointData dataRk = {
+        &mapCheckpointsRk,
         0,
         0,
         0
@@ -425,9 +425,9 @@ bool SelectParamsFromCommandLine()
 
 /* MCHN START */
 
-class CMultiChainParams : public CMainParams {
+class CRKParams : public CMainParams {
 public:
-    CMultiChainParams() {    };
+    CRKParams() {    };
     
     void SetFixedParams(const char *NetworkName)
     {
@@ -537,15 +537,15 @@ public:
         
 //        convertSeed6(vFixedSeeds, pnSeed6_test, ARRAYLEN(pnSeed6_test));
 
-        SetMultiChainParams();
-        SetMultiChainRuntimeParams();
+        SetRKParams();
+        SetRKRuntimeParams();
         
         fRequireStandard = (mc_gState->m_NetworkParams->GetInt64Param("onlyacceptstdtxs") != 0);
         fRequireStandard=GetBoolArg("-requirestandard", fRequireStandard);
         fTestnetToBeDeprecatedFieldRPC = (mc_gState->m_NetworkParams->GetInt64Param("chainistestnet") != 0);
     }
     
-    void SetMultiChainParams()
+    void SetRKParams()
     {
         fAllowMinDifficultyBlocks=false;
         if(mc_gState->m_Features->FixedIn1000920001())
@@ -554,7 +554,7 @@ public:
         }
     }
     
-    void SetMultiChainRuntimeParams()
+    void SetRKRuntimeParams()
     {
         fMineBlocksOnDemand = GetBoolArg("-mineblocksondemand", false);
         fMiningRequiresPeers = (mc_gState->m_NetworkParams->GetInt64Param("miningrequirespeers") != 0);
@@ -605,7 +605,7 @@ public:
         if(mc_gState->m_Features->Streams())
         {
             root_stream_name=(unsigned char *)mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
-            if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+            if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
             {
                 root_stream_name_size=0;
             }    
@@ -626,7 +626,7 @@ public:
         
         txNew.vout[0].nValue = mc_gState->m_NetworkParams->GetInt64Param("initialblockreward");// * COIN;
         
-        if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+        if(mc_gState->m_NetworkParams->IsProtocolRk())
         {
             ptrPubKeyHash=(unsigned char*)mc_gState->m_NetworkParams->GetParam("genesispubkeyhash",&size);        
             txNew.vout[0].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << vector<unsigned char>(ptrPubKeyHash, ptrPubKeyHash + size) << OP_EQUALVERIFY << OP_CHECKSIG;
@@ -637,7 +637,7 @@ public:
             txNew.vout[0].scriptPubKey = CScript() << vector<unsigned char>(ptrPubKeyHash, ptrPubKeyHash + size) << OP_CHECKSIG;       
         }
         
-        if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+        if(mc_gState->m_NetworkParams->IsProtocolRk())
         {
             mc_Script *lpScript;
             
@@ -746,7 +746,7 @@ public:
         assert(strcmp(storedHash,hashGenesisBlock.GetHex().c_str()) == 0);
         
 /*        
-        mapCheckpointsMultichain =
+        mapCheckpointsRk =
         boost::assign::map_list_of
         ( 0, uint256(storedHash))
         ;        
@@ -757,41 +757,41 @@ public:
     
     const Checkpoints::CCheckpointData& Checkpoints() const 
     {
-        return dataMultichain;
+        return dataRk;
     }
 };
-static CMultiChainParams multiChainParams;
+static CRKParams rKParams;
 
 
-bool SelectMultiChainParams(const char *NetworkName)
+bool SelectRKParams(const char *NetworkName)
 {
-    SelectMultiChainBaseParams(NetworkName,(int)mc_gState->m_NetworkParams->GetInt64Param("defaultrpcport"));
+    SelectRKBaseParams(NetworkName,(int)mc_gState->m_NetworkParams->GetInt64Param("defaultrpcport"));
 
-    multiChainParams.SetFixedParams(NetworkName);
+    rKParams.SetFixedParams(NetworkName);
     
-    multiChainParams.Initialize();
+    rKParams.Initialize();
     
-    pCurrentParams = &multiChainParams;
+    pCurrentParams = &rKParams;
     
     return true;
 }
 
-void SetMultiChainParams()
+void SetRKParams()
 {
-    multiChainParams.SetMultiChainParams();
+    rKParams.SetRKParams();
 }
 
-void SetMultiChainRuntimeParams()
+void SetRKRuntimeParams()
 {
-    multiChainParams.SetMultiChainRuntimeParams();
+    rKParams.SetRKRuntimeParams();
 }
 
-bool InitializeMultiChainParams()
+bool InitializeRKParams()
 {
     
-    multiChainParams.Initialize();
+    rKParams.Initialize();
     
-    multiChainParams.SetGenesis();
+    rKParams.SetGenesis();
     
     return true;
 }

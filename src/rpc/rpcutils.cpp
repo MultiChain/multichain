@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "rpc/rpcutils.h"
 #ifdef ENABLE_WALLET
@@ -438,7 +438,7 @@ Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong)
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     mc_EntityDetails entity;
     
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
     {
         return results;
     }    
@@ -1765,7 +1765,7 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
     set<CBitcoinAddress> setAddress;
     BOOST_FOREACH(const Pair& s, sendTo) 
     {        
-        if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+        if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
         {
             CBitcoinAddress address(s.name_);        
             if (address.IsValid())
@@ -2807,7 +2807,7 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
                     unsigned char *root_stream_name;
                     int root_stream_name_size;
                     root_stream_name=(unsigned char *)mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
-                    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+                    if(mc_gState->m_NetworkParams->IsProtocolRk() == 0)
                     {
                         root_stream_name_size=0;
                     }    

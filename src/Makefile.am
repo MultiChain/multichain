@@ -28,7 +28,7 @@ LIBBITCOIN_COMMON=libbitcoin_common.a
 LIBBITCOIN_CLI=libbitcoin_cli.a
 LIBBITCOIN_UTIL=libbitcoin_util.a
 LIBBITCOIN_CRYPTO=crypto/libbitcoin_crypto.a
-LIBBITCOIN_MULTICHAIN=rk/libbitcoin_multichain.a
+LIBBITCOIN_RK=rk/libbitcoin_rk.a
 LIBBITCOIN_UNIVALUE=univalue/libbitcoin_univalue.a
 LIBBITCOINQT=qt/libbitcoinqt.a
 LIBSECP256K1=secp256k1/libsecp256k1.la
@@ -40,7 +40,7 @@ $(LIBSECP256K1): $(wildcard secp256k1/src/*) $(wildcard secp256k1/include/*)
 # But to build the less dependent modules first, we manually select their order here:
 EXTRA_LIBRARIES = \
   crypto/libbitcoin_crypto.a \
-  rk/libbitcoin_multichain.a \
+  rk/libbitcoin_rk.a \
   libbitcoin_util.a \
   libbitcoin_common.a \
   univalue/libbitcoin_univalue.a \
@@ -176,8 +176,8 @@ libbitcoin_server_a_SOURCES = \
   core/init.cpp \
   storage/leveldbwrapper.cpp \
   core/main.cpp \
-  protocol/multichaintx.cpp \
-  protocol/multichainblock.cpp \
+  protocol/rktx.cpp \
+  protocol/rkblock.cpp \
   protocol/handshake.cpp \
   chain/merkleblock.cpp \
   miner/miner.cpp \
@@ -243,15 +243,15 @@ crypto_libbitcoin_crypto_a_SOURCES = \
   crypto/ripemd160.h
 
 # rk library
-multichain_libbitcoin_multichain_a_CPPFLAGS = $(BITCOIN_CONFIG_INCLUDES)
-multichain_libbitcoin_multichain_a_SOURCES = \
+rk_libbitcoin_rk_a_CPPFLAGS = $(BITCOIN_CONFIG_INCLUDES)
+rk_libbitcoin_rk_a_SOURCES = \
   utils/utility.cpp \
   utils/systemdependent.cpp \
   utils/tools.cpp \
   utils/utilwrapper.cpp \
   version/version.cpp \
   chainparams/params.cpp \
-  protocol/multichainscript.cpp \
+  protocol/rkscript.cpp \
   utils/dbwrapper.cpp \
   wallet/wallettxdb.cpp \
   permissions/permission.cpp \
@@ -331,7 +331,7 @@ nodist_libbitcoin_util_a_SOURCES = $(srcdir)/obj/build.h
   $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_UNIVALUE) \
   $(LIBBITCOIN_WALLET) \
-  $(LIBBITCOIN_MULTICHAIN) \
+  $(LIBBITCOIN_RK) \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBLEVELDB) \
@@ -341,7 +341,7 @@ nodist_libbitcoin_util_a_SOURCES = $(srcdir)/obj/build.h
 #if ENABLE_WALLET
 #bitcoind_LDADD += libbitcoin_wallet.a
 #endif
-#bitcoind_LDADD += rk/libbitcoin_multichain.a
+#bitcoind_LDADD += rk/libbitcoin_rk.a
 #bitcoind_SOURCES = bitcoind.cpp chainparams/buildgenesis.cpp
 #
 
@@ -357,7 +357,7 @@ endif
 #bitcoin_cli_LDADD = \
   $(LIBBITCOIN_CLI) \
   $(LIBBITCOIN_UTIL) \
-  $(LIBBITCOIN_MULTICHAIN) \
+  $(LIBBITCOIN_RK) \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBLEVELDB) \
   $(BOOST_LIBS) \
@@ -374,7 +374,7 @@ endif
 #bitcoin_tx_LDADD = \
   $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_UNIVALUE) \
-  $(LIBBITCOIN_MULTICHAIN) \
+  $(LIBBITCOIN_RK) \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBLEVELDB) \
@@ -400,7 +400,7 @@ rkd_LDADD = \
   $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_UNIVALUE) \
   $(LIBBITCOIN_WALLET) \
-  $(LIBBITCOIN_MULTICHAIN) \
+  $(LIBBITCOIN_RK) \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBLEVELDB) \
@@ -427,7 +427,7 @@ rkd_cold_LDADD = \
   $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_UNIVALUE) \
   $(LIBBITCOIN_WALLET) \
-  $(LIBBITCOIN_MULTICHAIN) \
+  $(LIBBITCOIN_RK) \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBLEVELDB) \
@@ -449,30 +449,30 @@ rkd_cold_CPPFLAGS = $(BITCOIN_INCLUDES)
 rkd_cold_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
 # rk-cli binary #
-multichain_cli_LDADD = \
+rk_cli_LDADD = \
   $(LIBBITCOIN_CLI) \
   $(LIBBITCOIN_UTIL) \
-  $(LIBBITCOIN_MULTICHAIN) \
+  $(LIBBITCOIN_RK) \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBLEVELDB) \
   $(BOOST_LIBS) \
   $(SSL_LIBS) \
   $(CRYPTO_LIBS)
 
-multichain_cli_SOURCES =  rk/rk-cli.cpp
+rk_cli_SOURCES =  rk/rk-cli.cpp
 
-multichain_cli_CPPFLAGS = $(BITCOIN_INCLUDES)
+rk_cli_CPPFLAGS = $(BITCOIN_INCLUDES)
 #
 
 if TARGET_WINDOWS
-multichain_cli_SOURCES += rk-cli-res.rc
+rk_cli_SOURCES += rk-cli-res.rc
 endif
-multichain_cli_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+rk_cli_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
 # rk-util binary #
-multichain_util_LDADD = \
+rk_util_LDADD = \
   $(LIBBITCOIN_UNIVALUE) \
-  $(LIBBITCOIN_MULTICHAIN) \
+  $(LIBBITCOIN_RK) \
   $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CRYPTO) \
@@ -481,14 +481,14 @@ multichain_util_LDADD = \
   $(BOOST_LIBS) \
   $(CRYPTO_LIBS)
 
-multichain_util_SOURCES = rk/rk-util.cpp chainparams/buildgenesis.cpp
+rk_util_SOURCES = rk/rk-util.cpp chainparams/buildgenesis.cpp
 
-multichain_util_CPPFLAGS = $(BITCOIN_INCLUDES)
+rk_util_CPPFLAGS = $(BITCOIN_INCLUDES)
 #
 if TARGET_WINDOWS
-multichain_util_SOURCES += rk-util-res.rc
+rk_util_SOURCES += rk-util-res.rc
 endif
-multichain_util_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+rk_util_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
 
 # MCHN END
@@ -512,7 +512,7 @@ libbitcoinconsensus_la_SOURCES = \
   chainparams/buildgenesis.cpp \
   version/version.cpp \
   chainparams/chainparams.cpp \
-  protocol/multichainscript.cpp \
+  protocol/rkscript.cpp \
   utils/dbwrapper.cpp \
   wallet/wallettxdb.cpp \
   permissions/permission.cpp \

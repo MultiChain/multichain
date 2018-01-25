@@ -2,7 +2,7 @@
 // Copyright (c) 2009-2016 The Bitcoin developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "core/init.h"
 #include "core/main.h"
@@ -16,7 +16,7 @@
 
 using namespace std;
 
-bool MultichainNode_CanConnect(CNode *pnode)
+bool RkNode_CanConnect(CNode *pnode)
 {    
     bool ret=true;
     
@@ -37,7 +37,7 @@ bool MultichainNode_CanConnect(CNode *pnode)
     return ret;
 }
 
-bool MultichainNode_DisconnectRemote(CNode *pnode)
+bool RkNode_DisconnectRemote(CNode *pnode)
 {
     if(pnode->fDisconnect)
     {
@@ -46,13 +46,13 @@ bool MultichainNode_DisconnectRemote(CNode *pnode)
     
     if((mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_VALID) && pnode->fSuccessfullyConnected && pnode->fParameterSetVerified)
     {
-        return !MultichainNode_CanConnect(pnode);
+        return !RkNode_CanConnect(pnode);
     }
     
     return false;
 }
 
-bool MultichainNode_DisconnectLocal(CNode *pnode)
+bool RkNode_DisconnectLocal(CNode *pnode)
 {
     if(pnode->fDisconnect)
     {
@@ -82,27 +82,27 @@ bool MultichainNode_DisconnectLocal(CNode *pnode)
 }
     
 
-bool MultichainNode_RespondToGetData(CNode *pnode)
+bool RkNode_RespondToGetData(CNode *pnode)
 {
     return !(pnode->fDisconnect) && (mc_gState->m_Permissions->CanConnect(NULL,pnode->kAddrRemote.begin()) != 0);    
 }
 
-bool MultichainNode_SendInv(CNode *pnode)
+bool RkNode_SendInv(CNode *pnode)
 {
     return !(pnode->fDisconnect) && (mc_gState->m_Permissions->CanConnect(NULL,pnode->kAddrRemote.begin()) != 0);    
 }
 
-bool MultichainNode_AcceptData(CNode *pnode)
+bool RkNode_AcceptData(CNode *pnode)
 {
     if(mc_gState->m_pSeedNode == (void*)pnode)
     {
         return true;
     }
     
-    return !MultichainNode_DisconnectRemote(pnode);
+    return !RkNode_DisconnectRemote(pnode);
 }
 
-bool MultichainNode_IgnoreIncoming(CNode *pnode)
+bool RkNode_IgnoreIncoming(CNode *pnode)
 {
     if(mc_gState->m_NodePausedState & MC_NPS_INCOMING)
     {
@@ -111,13 +111,13 @@ bool MultichainNode_IgnoreIncoming(CNode *pnode)
     return false;
 }
 
-bool MultichainNode_IsLocal(CNode *pnode)
+bool RkNode_IsLocal(CNode *pnode)
 {
     return (IsLocal(pnode->addr) || pnode->addr.IsRFC1918()) && (pnode->addr.GetPort() == GetListenPort());
 }
 
 
-bool VerifyMultichainVerackHash(string sParameterSetHash,uint64_t nNonce)
+bool VerifyRkVerackHash(string sParameterSetHash,uint64_t nNonce)
 {
     unsigned char* stored_hash=(unsigned char*)mc_gState->m_NetworkParams->GetParam("chainparamshash",NULL);
     CHashWriter ss(SER_GETHASH, 0);
@@ -131,7 +131,7 @@ bool VerifyMultichainVerackHash(string sParameterSetHash,uint64_t nNonce)
     return true;
 }
 
-bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,bool *disconnect_flag)
+bool ProcessRkVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,bool *disconnect_flag)
 {   
     string sParameterSet="";
     string sParameterSetHash="";
@@ -172,7 +172,7 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
     
     if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_VALID)
     {
-        if(!VerifyMultichainVerackHash(sParameterSetHash,nNonce))
+        if(!VerifyRkVerackHash(sParameterSetHash,nNonce))
         {
             if(!fIsVerackack)
             {
@@ -227,7 +227,7 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
         if(fIsVerackack)
         {
             LogPrintf("mchn: Connection from %s received on peer=%d in verackack (%s)\n",CBitcoinAddress(pubKeyHash).ToString().c_str(), pfrom->id,pfrom->addr.ToString());
-            if(!MultichainNode_CanConnect(pfrom))
+            if(!RkNode_CanConnect(pfrom))
             {
                 LogPrintf("mchn: Permission denied for address %s received from peer=%d\n",CBitcoinAddress(pubKeyHash).ToString().c_str(), pfrom->id);
                 pfrom->fVerackackReceived=false;                                // Will resend minimal parameter set
@@ -331,7 +331,7 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
             
             if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_VALID)
             {
-                if(!VerifyMultichainVerackHash(sParameterSetHash,nNonce))
+                if(!VerifyRkVerackHash(sParameterSetHash,nNonce))
                 {
                     LogPrintf("mchn: Parameter set received from peer %d doesn't match received hash\n", pfrom->id);
                     return false;                    
@@ -367,7 +367,7 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
     return true;
 }
 
-bool PushMultiChainVerack(CNode* pfrom, bool fIsVerackack)
+bool PushRKVerack(CNode* pfrom, bool fIsVerackack)
 {
     vector<unsigned char>vParameterSet;
     vector<unsigned char>vParameterSetHash;

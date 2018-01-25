@@ -1,8 +1,8 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
-#ifndef MULTICHAIN_ASSET_H
-#define	MULTICHAIN_ASSET_H
+#ifndef RK_ASSET_H
+#define	RK_ASSET_H
 
 #include "utils/declare.h"
 #include "utils/dbwrapper.h"
@@ -273,5 +273,5 @@ void mc_InitABufferMap(mc_Buffer *buf);
 void mc_InitABufferDefault(mc_Buffer *buf);
 
 
-#endif	/* MULTICHAIN_ASSET_H */
+#endif	/* RK_ASSET_H */
 

@@ -1,8 +1,8 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
-#ifndef MULTICHAIN_PERMISSION_H
-#define	MULTICHAIN_PERMISSION_H
+#ifndef RK_PERMISSION_H
+#define	RK_PERMISSION_H
 
 #include "utils/declare.h"
 #include "utils/dbwrapper.h"
@@ -381,5 +381,5 @@ typedef struct mc_Permissions
 
 
 
-#endif	/* MULTICHAIN_PERMISSION_H */
+#endif	/* RK_PERMISSION_H */
 

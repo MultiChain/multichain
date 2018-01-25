@@ -1,7 +1,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 
 #include "rpc/rpcwallet.h"
@@ -412,7 +412,7 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
             nBytes+=4+36+1+73+1+65+4+8+1+24+4+ask.size()*(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE)+1+32;
             required_fee=pwalletMain->GetMinimumFee(nBytes,1,mempool);
             dust=-1;
-            if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+            if(mc_gState->m_NetworkParams->IsProtocolRk())
             {
                 dust=MCP_MINIMUM_PER_OUTPUT;
             }            

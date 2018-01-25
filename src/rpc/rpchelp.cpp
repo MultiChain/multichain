@@ -1,7 +1,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 
 #include "core/main.h"
@@ -436,7 +436,7 @@ void mc_InitRPCHelpMap03()
     
     mapHelpStrings.insert(std::make_pair("stop",
              "stop\n"
-            "\nShuts down the this blockchain node. Sends stop signal to MultiChain server."
+            "\nShuts down the this blockchain node. Sends stop signal to Rk server."
         ));
     
     mapHelpStrings.insert(std::make_pair("getgenerate",
@@ -650,7 +650,7 @@ void mc_InitRPCHelpMap04()
             "    \"connected\" : true|false,               (boolean) If connected\n"
             "    \"addresses\" : [\n"
             "       {\n"
-            "         \"address\" : \"192.168.0.201:8333\",  (string) The MultiChain server host and port\n"
+            "         \"address\" : \"192.168.0.201:8333\",  (string) The Rk server host and port\n"
             "         \"connected\" : \"outbound\"           (string) connection, inbound or outbound\n"
             "       }\n"
             "       ,...\n"
@@ -743,8 +743,8 @@ void mc_InitRPCHelpMap04()
             "    \"pingwait\": n,                  (numeric) ping wait\n"
             "    \"version\": v,                   (numeric) The peer version, such as 7001\n"
             "    \"subver\": \"/Satoshi:0.8.5/\",    (string) The string version\n"
-            "    \"handshakelocal\": n,            (string) If protocol is Multichain. Address used by local node for handshake.\n"
-            "    \"handshake\": n,                 (string) If protocol is Multichain. Address used by remote node for handshake.\n"
+            "    \"handshakelocal\": n,            (string) If protocol is Rk. Address used by local node for handshake.\n"
+            "    \"handshake\": n,                 (string) If protocol is Rk. Address used by remote node for handshake.\n"
             "    \"inbound\": true|false,          (boolean) Inbound (true) or Outbound (false)\n"
             "    \"startingheight\": n,            (numeric) The starting height (block) of the peer\n"
             "    \"banscore\": n,                  (numeric) The ban score\n"
@@ -1596,7 +1596,7 @@ void mc_InitRPCHelpMap07()
             "\nReveals the private key corresponding to 'address'.\n"
             "Then the importprivkey can be used with this output\n"
             "\nArguments:\n"
-            "1. \"address\"                        (string, required) The MultiChain address for the private key\n"
+            "1. \"address\"                        (string, required) The Rk address for the private key\n"
             "\nResult:\n"
             "\"key\"                               (string) The private key\n"
             "\nExamples:\n"

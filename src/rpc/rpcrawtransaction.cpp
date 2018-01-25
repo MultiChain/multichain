@@ -2,7 +2,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "structs/base58.h"
 #include "primitives/transaction.h"
@@ -138,7 +138,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         out.push_back(Pair("scriptPubKey", o));
         
 /* MCHN START */    
-// TODO too many duplicate code with ListWalletTransactions and may be AccepMultiChainTransaction
+// TODO too many duplicate code with ListWalletTransactions and may be AccepRKTransaction
         const CScript& script1 = tx.vout[i].scriptPubKey;        
         CScript::const_iterator pc1 = script1.begin();
         
@@ -611,7 +611,7 @@ Value listunspent(const Array& params, bool fHelp)
         entry.push_back(Pair("confirmations",out.nDepth));
 
 /* MCHN START */        
-        if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+        if(mc_gState->m_NetworkParams->IsProtocolRk())
         {
             if(OutputCanSend(out))
             {
@@ -737,7 +737,7 @@ Value appendrawchange(const Array& params, bool fHelp)
     asset_amounts->Clear();
     BOOST_FOREACH(const CTxOut& txout, tx.vout)
     {
-        if(ParseMultichainTxOutToBuffer(0,txout,asset_amounts,lpScript,&allowed,&required,strError))
+        if(ParseRkTxOutToBuffer(0,txout,asset_amounts,lpScript,&allowed,&required,strError))
         {
             nAmount+=txout.nValue;
         }
@@ -756,7 +756,7 @@ Value appendrawchange(const Array& params, bool fHelp)
     int i=0;
     BOOST_FOREACH(const CTxOut& txout, input_txouts)
     {
-        if(ParseMultichainTxOutToBuffer(tx.vin[i].prevout.hash,txout,asset_amounts,lpScript,&allowed,&required,strError))
+        if(ParseRkTxOutToBuffer(tx.vin[i].prevout.hash,txout,asset_amounts,lpScript,&allowed,&required,strError))
         {
             nAmount+=txout.nValue;
         }
@@ -832,7 +832,7 @@ Value appendrawchange(const Array& params, bool fHelp)
     
     CAmount change_amount;
     CAmount min_output=-1;                                                              // Calculate minimal output for the change
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    if(mc_gState->m_NetworkParams->IsProtocolRk())
     {
         min_output=MCP_MINIMUM_PER_OUTPUT;
     }            
@@ -1542,7 +1542,7 @@ Value disablerawtransaction(const Array& params, bool fHelp)
 
     RPCTypeCheck(params, list_of(str_type));
 
-    if( (mc_gState->m_NetworkParams->IsProtocolMultichain() == 0) ||
+    if( (mc_gState->m_NetworkParams->IsProtocolRk() == 0) ||
         ( (pwalletMain->lpAssetGroups == NULL) || (pwalletMain->lpAssetGroups == 0) ) )
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "disablerawtransaction supported only for protocol=rk");

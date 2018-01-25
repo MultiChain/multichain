@@ -17,7 +17,7 @@ BEGIN
         BLOCK "040904E4" // U.S. English - multilingual (hex)
         BEGIN
             VALUE "CompanyName",        "Coin Sciences Ltd"
-            VALUE "FileDescription",    "rkd-cold (OSS daemon/client for MultiChain)"
+            VALUE "FileDescription",    "rkd-cold (OSS daemon/client for Rk)"
             VALUE "FileVersion",        VER_FILEVERSION_STR
             VALUE "InternalName",       "rkd-cold"
             VALUE "LegalCopyright",     COPYRIGHT_STR

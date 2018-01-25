@@ -1,7 +1,7 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
-// MultiChain code distributed under the GPLv3 license, see COPYING file.
+// Rk code distributed under the GPLv3 license, see COPYING file.
 
 #include "rpc/rpcserver.h"
 
@@ -99,7 +99,7 @@ Value getpeerinfo(const Array& params, bool fHelp)
         // their ver message.
         obj.push_back(Pair("subver", stats.cleanSubVer));
 /* MCHN START */        
-        if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+        if(mc_gState->m_NetworkParams->IsProtocolRk())
         {
             if(MCP_ANYONE_CAN_CONNECT)
             {
@@ -308,10 +308,10 @@ Value getnetworkinfo(const Array& params, bool fHelp)
     Object obj;
     obj.push_back(Pair("version",       CLIENT_VERSION));
 /* MCHN START */    
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    if(mc_gState->m_NetworkParams->IsProtocolRk())
     {
         obj.push_back(Pair("subversion",
-            FormatSubVersion("MultiChain", mc_gState->GetProtocolVersion(), std::vector<string>())));
+            FormatSubVersion("Rk", mc_gState->GetProtocolVersion(), std::vector<string>())));
     }
     else
     {
