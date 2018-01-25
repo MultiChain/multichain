@@ -21,7 +21,7 @@
 #include <stdint.h>
 
 /* MCHN START */
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 #include "wallet/wallettxs.h"
 std::string BurnAddress(const std::vector<unsigned char>& vchVersion);
 std::string SetBannedTxs(std::string txlist);
@@ -281,7 +281,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
     
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "This API is supported only if protocol=multichain");                
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "This API is supported only if protocol=rk");                
     }
     
     string param_name=params[0].get_str();

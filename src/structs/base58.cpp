@@ -16,7 +16,7 @@
 #include <boost/variant/apply_visitor.hpp>
 #include <boost/variant/static_visitor.hpp>
 
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 
 
 /** All alphanumeric characters except for "0", "I", "O", and "l" */

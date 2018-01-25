@@ -22,7 +22,7 @@ public:
         REGTEST,
         UNITTEST,
 /* MCHN START */      
-        MULTICHAIN,
+        RK,
 /* MCHN END */                
 
         MAX_NETWORK_TYPES

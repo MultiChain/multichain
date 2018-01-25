@@ -14,7 +14,7 @@
 #include "primitives/transaction.h"
 #include "utils/sync.h"
 
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 
 class CAutoFile;
 

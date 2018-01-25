@@ -28,7 +28,7 @@
 #include "keys/pubkey.h"
 #include "keys/key.h"
 #include "wallet/wallet.h"
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 #include "wallet/wallettxs.h"
 #include "script/script.h"
 

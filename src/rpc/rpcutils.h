@@ -17,7 +17,7 @@
 
 #include "json/json_spirit_utils.h"
 #include "json/json_spirit_value.h"
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 #include "utils/utilparse.h"
 
 

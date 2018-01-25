@@ -21,7 +21,7 @@
 #include "keys/pubkey.h"
 #include "wallet/wallet.h"
 extern CWallet* pwalletMain;
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 
 #ifdef WIN32
 #include <string.h>

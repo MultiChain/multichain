@@ -17,7 +17,7 @@
 #include "utils/utilstrencodings.h"
 #include "utils/utiltime.h"
 
-#include "multichain/multichain.h"                                              // MCHN
+#include "rk/rk.h"                                              // MCHN
 
 #include <stdarg.h>
 
@@ -448,7 +448,7 @@ boost::filesystem::path GetDefaultDataDir()
     return pathRet / "MultiChain";
 #else
     // Unix
-    return pathRet / ".multichain";
+    return pathRet / ".rk";
 #endif
 #endif
 }
@@ -541,7 +541,7 @@ void ReadConfigFile(map<string, string>& mapSettingsRet,
 #ifndef WIN32
 boost::filesystem::path GetPidFile()
 {
-    boost::filesystem::path pathPidFile(GetArg("-pid", "multichain.pid"));
+    boost::filesystem::path pathPidFile(GetArg("-pid", "rk.pid"));
     if (!pathPidFile.is_complete()) pathPidFile = GetDataDir() / pathPidFile;
     return pathPidFile;
 }

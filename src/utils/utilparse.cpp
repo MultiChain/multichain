@@ -561,7 +561,7 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
         }
         
     }    
-    else                                                                        // Protocol != multichain
+    else                                                                        // Protocol != rk
     {
         if(allowed)
         {

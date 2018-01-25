@@ -11,7 +11,7 @@
 #include "utils/util.h"
 #include "utils/utilstrencodings.h"
 
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 
 #include <boost/foreach.hpp>
 

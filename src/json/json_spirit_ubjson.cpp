@@ -4,7 +4,7 @@
 //#include "json/json_spirit_ubjson.h"
 #include "json/json_spirit_utils.h"
 #include "json/json_spirit_value.h"
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 using namespace std;
 using namespace json_spirit;
 

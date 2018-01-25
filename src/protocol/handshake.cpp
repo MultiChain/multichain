@@ -8,7 +8,7 @@
 #include "core/main.h"
 #include "utils/util.h"
 #include "wallet/wallet.h"
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 #include "keys/pubkey.h"
 #include "keys/key.h"
 #include "structs/base58.h"

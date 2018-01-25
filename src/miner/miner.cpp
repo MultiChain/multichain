@@ -21,7 +21,7 @@
 #include "wallet/wallet.h"
 #endif
 
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 
 #include <boost/thread.hpp>
 #include <boost/tuple/tuple.hpp>

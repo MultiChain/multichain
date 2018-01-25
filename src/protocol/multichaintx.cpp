@@ -6,7 +6,7 @@
 
 #include "core/main.h"
 #include "utils/util.h"
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 #include "structs/base58.h"
 
 using namespace std;

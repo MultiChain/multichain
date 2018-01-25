@@ -26,7 +26,7 @@
 #include "json/json_spirit_utils.h"
 #include "json/json_spirit_value.h"
 
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 #include "rpc/rpcutils.h"
 
 using namespace boost;
@@ -1545,7 +1545,7 @@ Value disablerawtransaction(const Array& params, bool fHelp)
     if( (mc_gState->m_NetworkParams->IsProtocolMultichain() == 0) ||
         ( (pwalletMain->lpAssetGroups == NULL) || (pwalletMain->lpAssetGroups == 0) ) )
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "disablerawtransaction supported only for protocol=multichain");
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "disablerawtransaction supported only for protocol=rk");
     }    
 
     CTransaction tx;

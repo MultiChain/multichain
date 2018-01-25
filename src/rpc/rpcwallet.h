@@ -18,7 +18,7 @@
 #include "json/json_spirit_value.h"
 
 
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 #include "wallet/wallettxs.h"
 #include "rpc/rpcutils.h"
 

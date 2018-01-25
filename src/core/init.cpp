@@ -34,7 +34,7 @@
 /* MCHN START */
 
 #include "structs/base58.h"
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 #include "wallet/wallettxs.h"
 std::string BurnAddress(const std::vector<unsigned char>& vchVersion);
 std::string SetBannedTxs(std::string txlist);
@@ -308,7 +308,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -blocknotify=<cmd>     " + _("Execute command when the best block changes (%s in cmd is replaced by block hash)") + "\n";
     strUsage += "  -checkblocks=<n>       " + strprintf(_("How many blocks to check at startup (default: %u, 0 = all)"), 288) + "\n";
     strUsage += "  -checklevel=<n>        " + strprintf(_("How thorough the block verification of -checkblocks is (0-4, default: %u)"), 3) + "\n";
-    strUsage += "  -conf=<file>           " + strprintf(_("Specify configuration file (default: %s)"), "multichain.conf") + "\n";
+    strUsage += "  -conf=<file>           " + strprintf(_("Specify configuration file (default: %s)"), "rk.conf") + "\n";
     if (mode == HMM_BITCOIND)
     {
 #if !defined(WIN32)
@@ -321,12 +321,12 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -maxorphantx=<n>       " + strprintf(_("Keep at most <n> unconnectable transactions in memory (default: %u)"), DEFAULT_MAX_ORPHAN_TRANSACTIONS) + "\n";
     strUsage += "  -par=<n>               " + strprintf(_("Set the number of script verification threads (%u to %d, 0 = auto, <0 = leave that many cores free, default: %d)"), -(int)boost::thread::hardware_concurrency(), MAX_SCRIPTCHECK_THREADS, DEFAULT_SCRIPTCHECK_THREADS) + "\n";
 #ifndef WIN32
-    strUsage += "  -pid=<file>            " + strprintf(_("Specify pid file (default: %s)"), "multichain.pid") + "\n";
+    strUsage += "  -pid=<file>            " + strprintf(_("Specify pid file (default: %s)"), "rk.pid") + "\n";
 #endif
     strUsage += "  -reindex               " + _("Rebuild the blockchain and reindex transactions on startup.") + "\n";
 #if !defined(WIN32)
     strUsage += "  -sysperms              " + _("Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)") + "\n";
-    strUsage += "  -shortoutput           " + _("Returns connection string if this node can start or default multichain address otherwise") + "\n";
+    strUsage += "  -shortoutput           " + _("Returns connection string if this node can start or default rk address otherwise") + "\n";
 #endif
 /* MCHN START */    
 /* Default was 0 */    
@@ -504,13 +504,13 @@ std::string HelpMessage(HelpMessageMode mode)                                   
 
 std::string LicenseInfo()
 {
-    return FormatParagraph(_("Copyright (c) Coin Sciences Ltd - www.multichain.com")) + "\n" +
+    return FormatParagraph(_("Copyright (c) Coin Sciences Ltd - www.rk.com")) + "\n" +
            "\n" +
            FormatParagraph(_("You are granted a non-exclusive license to use this software for any legal purpose, and to redistribute it unmodified.")) + "\n" +
            "\n" +
            FormatParagraph(_("The software product under this license is provided free of charge. ")) + "\n" +
            "\n" +
-           FormatParagraph(_("Full terms are shown at: http://www.multichain.com/terms-of-service/")) +
+           FormatParagraph(_("Full terms are shown at: http://www.rk.com/terms-of-service/")) +
            "\n";
     
 /*    
@@ -1023,7 +1023,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     } // (!fDisableWallet)
 
 /* MCHN START*/    
-    uiInterface.InitMessage(_("Initializing multichain..."));
+    uiInterface.InitMessage(_("Initializing rk..."));
     RegisterNodeSignals(GetNodeSignals());
 
     if(GetBoolArg("-offline",false))
@@ -1207,7 +1207,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 if( (mc_gState->m_NetworkParams->GetParam("protocolversion",&size) != NULL) &&
                     (mc_gState->m_Features->MinProtocolVersion() > (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion")) && 
                     (mc_gState->m_NetworkParams->GetParam("chainprotocol",NULL) != NULL) && 
-                    (strcmp((char*)mc_gState->m_NetworkParams->GetParam("chainprotocol",NULL),"multichain") == 0) )
+                    (strcmp((char*)mc_gState->m_NetworkParams->GetParam("chainprotocol",NULL),"rk") == 0) )
                 {
                     seed_error=strprintf("The protocol version (%d) for blockchain %s has been deprecated and was last supported in MultiChain 1.0 beta 1\n",                
                             (int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion"), mc_gState->m_Params->NetworkName());                    
@@ -1489,7 +1489,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             }
         }
 
-        if(pwalletMain == NULL)                                                 // Opening wallet only after multichain parameters were initizalized
+        if(pwalletMain == NULL)                                                 // Opening wallet only after rk parameters were initizalized
         {
             pwalletMain = new CWallet(strWalletFile);
             DBErrors nLoadWalletRetForBuild = pwalletMain->LoadWallet(fFirstRunForBuild);

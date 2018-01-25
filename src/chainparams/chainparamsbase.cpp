@@ -64,8 +64,8 @@ class CBaseMultiChainParams : public CBaseTestNetParams
 public:
     CBaseMultiChainParams()
     {
-        networkID = CBaseChainParams::MULTICHAIN;
-        strDataDir = "multichain";
+        networkID = CBaseChainParams::RK;
+        strDataDir = "rk";
     }
     void setDataDir(std::string NetworkName)
     {

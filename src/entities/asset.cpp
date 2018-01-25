@@ -1,7 +1,7 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 
 #define MC_AST_ASSET_REF_TYPE_OFFSET        32
 #define MC_AST_ASSET_REF_TYPE_SIZE           4

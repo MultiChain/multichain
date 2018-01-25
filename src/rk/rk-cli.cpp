@@ -11,7 +11,7 @@
 #include "utils/utilstrencodings.h"
 
 /* MCHN START */
-#include "multichain/multichain.h"                                              
+#include "rk/rk.h"                                              
 #include "chainparams/globals.h"
 /* MCHN END */
 
@@ -33,7 +33,7 @@ std::string HelpMessageCli()
     string strUsage;
     strUsage += _("Options:") + "\n";
     strUsage += "  -?                       " + _("This help message") + "\n";
-    strUsage += "  -conf=<file>             " + strprintf(_("Specify configuration file (default: %s)"), "multichain.conf") + "\n";
+    strUsage += "  -conf=<file>             " + strprintf(_("Specify configuration file (default: %s)"), "rk.conf") + "\n";
     strUsage += "  -datadir=<dir>           " + _("Specify data directory") + "\n";
     strUsage += "  -cold=<dir>              " + _("Connect to rkd-cold: use rkd-cold default directory if -datadir is not set") + "\n";
 /* MCHN START */    
@@ -216,7 +216,7 @@ Object CallRPC(const string& strMethod, const Array& params)
     if (mapArgs["-rpcuser"] == "" && mapArgs["-rpcpassword"] == "")
         throw runtime_error(strprintf(
             _("No credentials found for chain \"%s\"\n\n"
-              "You must set rpcpassword=<password> in the configuration file:\n%s/multichain.conf\n"
+              "You must set rpcpassword=<password> in the configuration file:\n%s/rk.conf\n"
               "If the file does not exist, create it with owner-readable-only file permissions."),
                 mc_gState->m_Params->NetworkName(),mc_gState->m_Params->DataDir(1,0)));
 
@@ -410,7 +410,7 @@ int main(int argc, char* argv[])
         {
             string str=strprintf(
                 _("No credentials found for chain \"%s\"\n\n"
-                  "You must set rpcpassword=<password> in the configuration file:\n%s/multichain.conf\n"
+                  "You must set rpcpassword=<password> in the configuration file:\n%s/rk.conf\n"
                   "If the file does not exist, create it with owner-readable-only file permissions."),
                     mc_gState->m_Params->NetworkName(),mc_gState->m_Params->DataDir(1,0));
             printf("error: %s\n",str.c_str());

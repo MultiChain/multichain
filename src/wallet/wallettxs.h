@@ -9,7 +9,7 @@
 #include "utils/util.h"
 #include "structs/base58.h"
 #include "wallet/wallet.h"
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 #include "wallet/wallettxdb.h"
 
 #define MC_TDB_MAX_OP_RETURN_SIZE             256

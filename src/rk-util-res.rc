@@ -17,13 +17,13 @@ BEGIN
         BLOCK "040904E4" // U.S. English - multilingual (hex)
         BEGIN
             VALUE "CompanyName",        "Coin Sciences Ltd"
-            VALUE "FileDescription",    "rk-cli (OSS RPC client for MultiChain)"
+            VALUE "FileDescription",    "rk-util (Utilities for MultiChain)"
             VALUE "FileVersion",        VER_FILEVERSION_STR
-            VALUE "InternalName",       "rk-cli"
+            VALUE "InternalName",       "rk-util"
             VALUE "LegalCopyright",     COPYRIGHT_STR
-            VALUE "LegalTrademarks1",   "The software product under this license is provided free of charge. Full terms are shown at: http://www.multichain.com/terms-of-service/."
-            VALUE "OriginalFilename",   "rk-cli.exe"
-            VALUE "ProductName",        "rk-cli"
+            VALUE "LegalTrademarks1",   "The software product under this license is provided free of charge. Full terms are shown at: http://www.rk.com/terms-of-service/."
+            VALUE "OriginalFilename",   "rk-util.exe"
+            VALUE "ProductName",        "rk-util"
             VALUE "ProductVersion",     VER_PRODUCTVERSION_STR
         END
     END

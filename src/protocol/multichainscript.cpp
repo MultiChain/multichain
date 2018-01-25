@@ -1,7 +1,7 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 
 #define MC_DCT_SCRIPT_ALLOC_BUFFER_CHUNK 4096
 #define MC_DCT_SCRIPT_ALLOC_INDEX_CHUNK    16

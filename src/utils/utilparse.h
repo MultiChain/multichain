@@ -5,7 +5,7 @@
 #define	MULTICHAINUTILS_H
 
 #include "structs/base58.h"
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 #include "primitives/transaction.h"
 #include "keys/key.h"
 #include "core/main.h"

@@ -3,7 +3,7 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 #include "crypto/sha256.h"
 #include "structs/base58.h"
 
@@ -269,7 +269,7 @@ boost::filesystem::path mc_GetDefaultDataDir()
 {
     // Windows < Vista: C:\Documents and Settings\Username\Application Data\MultiChain
     // Windows >= Vista: C:\Users\Username\AppData\Roaming\MultiChain
-    // Mac and Unix: ~/.multichain
+    // Mac and Unix: ~/.rk
 #ifdef WIN32
     // Windows
     if(mc_gState->m_SessionFlags & MC_SSF_COLD)
@@ -288,9 +288,9 @@ boost::filesystem::path mc_GetDefaultDataDir()
     
     if(mc_gState->m_SessionFlags & MC_SSF_COLD)
     {
-        return pathRet / ".multichain-cold";        
+        return pathRet / ".rk-cold";        
     }
-    return pathRet / ".multichain";
+    return pathRet / ".rk";
 #endif
 }
 
@@ -348,7 +348,7 @@ void mc_CheckDataDirInConfFile()
     mc_MapStringString *mapConfig;
     
     mapConfig=new mc_MapStringString;
-    if(mc_ReadGeneralConfigFile(mapConfig,NULL,"multichain",".conf") == 0)
+    if(mc_ReadGeneralConfigFile(mapConfig,NULL,"rk",".conf") == 0)
     {
         if(mapConfig->Get("datadir") != NULL)
         {
@@ -544,7 +544,7 @@ size_t mc_ReadFileToBuffer(FILE *fHan,char **lpptr)
 
 boost::filesystem::path mc_GetConfigFile(const char *network_name,const char *file_name,const char *extension)
 {
-    string fileName="multichain";
+    string fileName="rk";
     if(file_name)
     {
         fileName = file_name;
@@ -680,7 +680,7 @@ int mc_ReadConfigFile(
 
 int mc_Params::ReadConfig(const char *network_name)
 {
-    mc_ReadConfigFile(mc_GetConfigFile(network_name,"multichain",".conf"),&mapArgs, &mapMultiArgs,"-");    
+    mc_ReadConfigFile(mc_GetConfigFile(network_name,"rk",".conf"),&mapArgs, &mapMultiArgs,"-");    
     return mc_ReadConfigFile(mc_GetConfigFile(NULL,NULL,".conf"),&mapArgs, &mapMultiArgs,"-");    
 }
 
@@ -696,7 +696,7 @@ int mc_MultichainParams::SetGlobals()
     void *ptr=GetParam("chainprotocol",NULL);
     if(ptr)
     {
-        if(strcmp((char*)ptr,"multichain"))
+        if(strcmp((char*)ptr,"rk"))
         {
             m_IsProtocolMultiChain=0;
         }

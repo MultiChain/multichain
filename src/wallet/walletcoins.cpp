@@ -728,7 +728,7 @@ bool FindRelevantCoins(CWallet *lpWallet,                                       
                        mc_Buffer *in_map,                                       // OUT txid/vout->coin id map (used in coin selection)
                        mc_Buffer *tmp_amounts,                                  // TMP temporary asset-quantity buffer
                        unsigned char *in_row,int in_size,                       // TMP temporary buffer row and its size
-                       mc_Script *lpScript,                                     // TMP temporary multichain script object
+                       mc_Script *lpScript,                                     // TMP temporary rk script object
                        int *in_special_row,                                     // IN  Coordinates of special rows
                        map<uint32_t, uint256>* mapSpecialEntity,
                        std::string& strFailReason)                              // OUT error message
@@ -846,7 +846,7 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
                         mc_Buffer *in_map,                                      // OUT txid/vout->coin id map (used in coin selection)
                         mc_Buffer *tmp_amounts,                                 // TMP temporary asset-quantity buffer
                         unsigned char *in_row,int in_size,                      // TMP temporary buffer row and its size
-                        mc_Script *lpScript,                                    // TMP temporary multichain script object
+                        mc_Script *lpScript,                                    // TMP temporary rk script object
                         int *in_special_row,                                    // IN  Coordinates of special rows
                         std::string& strFailReason)                             // OUT error message
 {
@@ -1058,7 +1058,7 @@ bool CalculateChangeAmounts(CWallet *lpWallet,                                  
                             mc_Buffer *in_amounts,                              // IN  selected asset amounts
                             mc_Buffer *change_amounts,                          // OUT change amounts, asset-quantity buffer with additional field - group
                             mc_Buffer *tmp_amounts,                             // TMP temporary asset-quantity buffer
-                            mc_Script *lpScript,                                // TMP temporary multichain script object
+                            mc_Script *lpScript,                                // TMP temporary rk script object
                             int *in_special_row,                                // IN  Coordinates of special rows
                             map<uint32_t, uint256>* mapSpecialEntity,           // IN  Special permission entry, like issue txid of follow-on issuance  
                             set<CTxDestination>* usedAddresses,                 // OUT List of addresses used in selection.
@@ -1413,7 +1413,7 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
                               int required,                                     // IN  Required special permissions
                               CAmount min_output,                               // IN  minimum native currency value (to be set in change outputs))
                               mc_Buffer *tmp_amounts,                           // TMP temporary asset-quantity buffer
-                              mc_Script *lpScript,                              // TMP temporary multichain script object
+                              mc_Script *lpScript,                              // TMP temporary rk script object
                               int *in_special_row,                              // IN  Coordinates of special rows
                               set<CTxDestination>* usedAddresses,               // In  List of addresses used in selection.
                               uint32_t flags,                                   // In  Coin selection flags

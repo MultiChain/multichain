@@ -5,7 +5,7 @@
 //#include "utils/dbwrapper.h"
 
 #include "leveldb/include/leveldb/c.h"
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 
 int cs_Database::Zero()
 {

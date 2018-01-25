@@ -1,7 +1,7 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 
 #include "chainparams/chainparams.h"
 #include "utils/util.h"
@@ -37,20 +37,20 @@ int mc_GenerateConfFiles(const char *network_name)
     FILE *fileHan;
     char rpcpwd[64];
     
-    fileHan=mc_OpenFile(NULL,"multichain",".conf","r",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR);
+    fileHan=mc_OpenFile(NULL,"rk",".conf","r",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR);
     if(fileHan == NULL)
     {
-        fileHan=mc_OpenFile(NULL,"multichain",".conf","w",MC_FOM_RELATIVE_TO_DATADIR);
+        fileHan=mc_OpenFile(NULL,"rk",".conf","w",MC_FOM_RELATIVE_TO_DATADIR);
     }
     if(fileHan)
     {
         mc_CloseFile(fileHan);
     }
     
-    fileHan=mc_OpenFile(network_name,"multichain",".conf","r",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR);
+    fileHan=mc_OpenFile(network_name,"rk",".conf","r",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR);
     if(fileHan == NULL)
     {
-        fileHan=mc_OpenFile(network_name,"multichain",".conf","w",MC_FOM_RELATIVE_TO_DATADIR);
+        fileHan=mc_OpenFile(network_name,"rk",".conf","w",MC_FOM_RELATIVE_TO_DATADIR);
         if(fileHan)
         {
             fprintf(fileHan,"rpcuser=multichainrpc\n");

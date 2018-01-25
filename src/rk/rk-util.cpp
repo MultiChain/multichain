@@ -1,7 +1,7 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 #include "chainparams/globals.h"
 
 int main(int argc, char* argv[])
@@ -189,10 +189,10 @@ int main(int argc, char* argv[])
     {
         mc_GetFullFileName("<blockchain-name>","params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
         printf("Usage:\n");
-        printf("  rk-util create <blockchain-name>  ( <protocol-version> = %d ) [options]        Creates new multichain configuration file %s with default parameters\n",
+        printf("  rk-util create <blockchain-name>  ( <protocol-version> = %d ) [options]        Creates new rk configuration file %s with default parameters\n",
                 mc_gState->GetProtocolVersion(),fileName);
         mc_GetFullFileName("<new-blockchain-name>","params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
-        printf("  rk-util clone <old-blockchain-name> <new-blockchain-name> [options]               Creates new multichain configuration file %s copying parameters\n",fileName);
+        printf("  rk-util clone <old-blockchain-name> <new-blockchain-name> [options]               Creates new rk configuration file %s copying parameters\n",fileName);
         
         isSetDataDirArg=mc_GetDataDirArg(DataDirArg);
         if(isSetDataDirArg)

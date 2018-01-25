@@ -9,7 +9,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
     { "chainprotocol"                          , "chain-protocol"                          ,
                    MC_PRM_STRING  | MC_PRM_USER | MC_PRM_CLONE | MC_PRM_SPECIAL , 16,         0,          0,         0, 0.0, 10001, 0, "-mc-chainprotocol",
                    "chaindescription","Basic chain parameters",
-                   "Chain protocol: multichain (permissions, native assets) or bitcoin"},
+                   "Chain protocol: rk (permissions, native assets) or bitcoin"},
     { "chaindescription"                       , "chain-description"                       ,
                    MC_PRM_STRING  | MC_PRM_USER | MC_PRM_CLONE | MC_PRM_SPECIAL ,256,         0,          0,         0, 0.0, 10001, 0, "-mc-chaindescription",
                    "rootstreamname","",

@@ -1,7 +1,7 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 
 
 #define MC_PRM_DAT_FILE_LINE_SIZE 39
@@ -320,7 +320,7 @@ int mc_MultichainParams::Create(const char* name,int version)
                                     }                                   
                                     if(strcmp(param->m_Name,"chainprotocol") == 0)
                                     {
-                                        sprintf(ptrData,"multichain");
+                                        sprintf(ptrData,"rk");
                                         size=strlen(ptrData)+1;
                                     }                                   
                                 }
@@ -1073,7 +1073,7 @@ int mc_MultichainParams::Validate()
         else
         {
             protocol_name=GetParam("chainprotocol",NULL);
-            if(strcmp((char*)protocol_name,"multichain") == 0)
+            if(strcmp((char*)protocol_name,"rk") == 0)
             {
                 if(memcmp(hash,stored_hash,32))
                 {
@@ -1191,7 +1191,7 @@ int mc_MultichainParams::Print(FILE* fileHan)
                     switch(param_sets[set])
                     {
                         case MC_PRM_COMMENT:
-                            fprintf(fileHan,"# The following parameters don't influence multichain network configuration. \n");
+                            fprintf(fileHan,"# The following parameters don't influence rk network configuration. \n");
                             fprintf(fileHan,"# They may be edited at any moment. \n");                            
                             break;
                         case MC_PRM_USER:
@@ -1587,7 +1587,7 @@ int mc_Features::LastVersionNotSendingProtocolVersionInHandShake()
     return 10002;
 }
 
-int mc_Features::VerifySizeOfOpDropElements()                                   // This test is still in the code to keep protocol!-multichain untouched
+int mc_Features::VerifySizeOfOpDropElements()                                   // This test is still in the code to keep protocol!-rk untouched
 {
     
     int ret=0;        

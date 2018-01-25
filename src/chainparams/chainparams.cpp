@@ -12,7 +12,7 @@
 
 #include <assert.h>
 
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 
 #include <boost/assign/list_of.hpp>
 
@@ -431,7 +431,7 @@ public:
     
     void SetFixedParams(const char *NetworkName)
     {
-        networkID = CBaseChainParams::MULTICHAIN;
+        networkID = CBaseChainParams::RK;
         strNetworkID=NetworkName;
         nMinerThreads = 0;
         fDefaultCheckMemPool = false;
@@ -467,7 +467,7 @@ public:
         const unsigned char *ucPtr;
         int size;
         
-        networkID = CBaseChainParams::MULTICHAIN;
+        networkID = CBaseChainParams::RK;
         
         strNetworkID = string(mc_gState->m_NetworkParams->Name());
                 

@@ -1,7 +1,7 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 
 unsigned char null_entity[MC_PLS_SIZE_ENTITY];
 unsigned char upgrade_entity[MC_PLS_SIZE_ENTITY];

@@ -15,7 +15,7 @@
 
 #include <stdint.h>
 
-#include "multichain/multichain.h"
+#include "rk/rk.h"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>

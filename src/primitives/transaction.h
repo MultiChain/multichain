@@ -12,7 +12,7 @@
 #include "utils/serialize.h"
 #include "structs/uint256.h"
 
-//#include "multichain/multichain.h"
+//#include "rk/rk.h"
 #include "chainparams/state.h"
 
 /** An outpoint - a combination of a transaction hash and an index n into its vout */
