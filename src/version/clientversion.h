@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2018 RecordsKeeper
 // Rk code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef BITCOIN_CLIENTVERSION_H
@@ -40,7 +41,7 @@
 
 //! Copyright string used in Windows .rc files
 /* MCHN START */
-#define COPYRIGHT_STR "2014-" STRINGIZE(COPYRIGHT_YEAR) " Coin Sciences Ltd"
+#define COPYRIGHT_STR "2014-" STRINGIZE(COPYRIGHT_YEAR) " RecordsKeeper"
 /* MCHN END */
 /**
  * bitcoind-res.rc includes this file, but it cannot cope with real c++ code.

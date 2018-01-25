@@ -16,7 +16,7 @@ BEGIN
     BEGIN
         BLOCK "040904E4" // U.S. English - multilingual (hex)
         BEGIN
-            VALUE "CompanyName",        "Coin Sciences Ltd"
+            VALUE "CompanyName",        "RecordsKeeper"
             VALUE "FileDescription",    "rkd (OSS daemon/client for Rk)"
             VALUE "FileVersion",        VER_FILEVERSION_STR
             VALUE "InternalName",       "rkd"

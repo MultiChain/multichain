@@ -1,4 +1,5 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2018 RecordsKeeper
 // Rk code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef RK_H
