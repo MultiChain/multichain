@@ -1231,7 +1231,7 @@ Value getassetbalances(const Array& params, bool fHelp)
             {
                 if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
                 {
-                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Accounts are not supported with scalable wallet - if you need getassetbalances, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
+                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Accounts are not supported with scalable wallet - if you need getassetbalances, run rkd -walletdbversion=1 -rescan, but the wallet will perform worse");        
                 }            
             }
             BOOST_FOREACH(const PAIRTYPE(CBitcoinAddress, CAddressBookData)& item, pwalletMain->mapAddressBook)
@@ -1833,7 +1833,7 @@ Value getassettransaction(const Array& params, bool fHelp)
     
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"rkd -walletdbversion=2 -rescan\" ");        
     }   
            
     mc_EntityDetails asset_entity;
@@ -1888,7 +1888,7 @@ Value listassettransactions(const Array& params, bool fHelp)
 
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"rkd -walletdbversion=2 -rescan\" ");        
     }   
 
     Array retArray;

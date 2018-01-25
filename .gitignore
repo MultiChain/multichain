@@ -5,10 +5,10 @@ src/bitcoin
 src/bitcoind
 src/bitcoin-cli
 src/bitcoin-tx
-src/multichain-cli
-src/multichain-util
-src/multichaind
-src/multichaind-cold
+src/rk-cli
+src/rk-util
+src/rkd
+src/rkd-cold
 src/test/test_bitcoin
 src/qt/test/test_bitcoin-qt
 

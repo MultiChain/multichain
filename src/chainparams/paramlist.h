@@ -234,7 +234,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
     { "chainname"                              , "chain-name"                              ,
                    MC_PRM_STRING  | MC_PRM_GENERATED | MC_PRM_MINIMAL           , MC_PRM_NETWORK_NAME_MAX_SIZE,         0,          0,         0, 0.0, 10001, 0, "",
                    "protocolversion","",
-                   "Chain name, used as first argument for multichaind and multichain-cli."},                   
+                   "Chain name, used as first argument for rkd and rk-cli."},                   
     { "protocolversion"                   , "protocol-version"                  ,
                    MC_PRM_UINT32  | MC_PRM_GENERATED                            , -1,         0,          0,         0, 0.0, 10001, 0, "",
                    "networkmessagestart","",

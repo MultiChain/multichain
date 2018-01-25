@@ -42,9 +42,9 @@ Compile MultiChain for Ubuntu (64-bit)
 Notes
 -----
 
-* This will build `multichaind`, `multichain-cli` and `multichain-util` in the `src` directory.
+* This will build `rkd`, `rk-cli` and `rk-util` in the `src` directory.
 
-* The release is built with GCC after which `strip multichaind` strings the debug symbols, which reduces the executable size by about 90%.
+* The release is built with GCC after which `strip rkd` strings the debug symbols, which reduces the executable size by about 90%.
 
 
 Windows Build Notes (on Ubuntu 14.04 x64)
@@ -75,7 +75,7 @@ Compile MultiChain for Windows (64-bit)
 Notes
 -----
 
-* This will build `multichaind.exe`, `multichain-cli.exe` and `multitchain-util.exe` in the `src` directory.
+* This will build `rkd.exe`, `rk-cli.exe` and `multitchain-util.exe` in the `src` directory.
 
 
 Mac Build Notes (on MacOS Sierra)
@@ -131,5 +131,5 @@ Clean up
 Notes
 -----
 
-* This will build `multichaind`, `multichain-cli` and `multichain-util` in the `src` directory.
+* This will build `rkd`, `rk-cli` and `rk-util` in the `src` directory.
 

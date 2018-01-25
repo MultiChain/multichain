@@ -101,7 +101,7 @@ bool AppInit(int argc, char* argv[])
     
     if(!mc_DoesParentDataDirExist())
     {
-        fprintf(stderr,"\nError: Data directory %s needs to exist before calling multichaind-cold. Exiting...\n\n",mapArgs["-datadir"].c_str());
+        fprintf(stderr,"\nError: Data directory %s needs to exist before calling rkd-cold. Exiting...\n\n",mapArgs["-datadir"].c_str());
         return false;        
     }
         
@@ -123,7 +123,7 @@ bool AppInit(int argc, char* argv[])
         else
         {
             strUsage += "\n" + _("Usage:") + "\n" +
-                  "  multichaind-cold <blockchain-name> [options]                     " + _("Start MultiChain Offline Daemon") + "\n";
+                  "  rkd-cold <blockchain-name> [options]                     " + _("Start MultiChain Offline Daemon") + "\n";
 
             strUsage += "\n" + HelpMessage_Cold();  
         }
@@ -256,11 +256,11 @@ bool AppInit(int argc, char* argv[])
     {
         if(err == MC_ERR_CORRUPTED)
         {
-            fprintf(stderr,"\nERROR: Couldn't initialize permission database for blockchain %s. Please restart multichaind with reindex=1.\n",mc_gState->m_Params->NetworkName());                        
+            fprintf(stderr,"\nERROR: Couldn't initialize permission database for blockchain %s. Please restart rkd with reindex=1.\n",mc_gState->m_Params->NetworkName());                        
         }
         else
         {
-            fprintf(stderr,"\nERROR: Couldn't initialize permission database for blockchain %s. Probably multichaind for this blockchain is already running. Exiting...\n",mc_gState->m_Params->NetworkName());
+            fprintf(stderr,"\nERROR: Couldn't initialize permission database for blockchain %s. Probably rkd for this blockchain is already running. Exiting...\n",mc_gState->m_Params->NetworkName());
         }
         delete mc_gState;                
         return false;

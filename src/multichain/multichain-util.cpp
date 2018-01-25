@@ -75,8 +75,8 @@ int main(int argc, char* argv[])
                 { 
                     printf("Blockchain parameter set was successfully generated.\n");
                     mc_GetFullFileName(mc_gState->m_Params->m_Arguments[1],"params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
-                    printf("You can edit it in %s before running multichaind for the first time.\n\n",fileName);
-                    printf("To generate blockchain please run \"multichaind %s -daemon\".\n",params->Name());
+                    printf("You can edit it in %s before running rkd for the first time.\n\n",fileName);
+                    printf("To generate blockchain please run \"rkd %s -daemon\".\n",params->Name());
                 }                
                 else
                 {
@@ -137,8 +137,8 @@ int main(int argc, char* argv[])
                     
                     printf("Blockchain parameter set was successfully cloned.\n");
                     mc_GetFullFileName(mc_gState->m_Params->m_Arguments[2],"params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
-                    printf("You can edit it in %s before running multichaind for the first time.\n\n",fileName);
-                    printf("To generate blockchain please run \"multichaind %s -daemon\".\n",params->Name());
+                    printf("You can edit it in %s before running rkd for the first time.\n\n",fileName);
+                    printf("To generate blockchain please run \"rkd %s -daemon\".\n",params->Name());
                 }                
                 else
                 {
@@ -189,10 +189,10 @@ int main(int argc, char* argv[])
     {
         mc_GetFullFileName("<blockchain-name>","params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
         printf("Usage:\n");
-        printf("  multichain-util create <blockchain-name>  ( <protocol-version> = %d ) [options]        Creates new multichain configuration file %s with default parameters\n",
+        printf("  rk-util create <blockchain-name>  ( <protocol-version> = %d ) [options]        Creates new multichain configuration file %s with default parameters\n",
                 mc_gState->GetProtocolVersion(),fileName);
         mc_GetFullFileName("<new-blockchain-name>","params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
-        printf("  multichain-util clone <old-blockchain-name> <new-blockchain-name> [options]               Creates new multichain configuration file %s copying parameters\n",fileName);
+        printf("  rk-util clone <old-blockchain-name> <new-blockchain-name> [options]               Creates new multichain configuration file %s copying parameters\n",fileName);
         
         isSetDataDirArg=mc_GetDataDirArg(DataDirArg);
         if(isSetDataDirArg)

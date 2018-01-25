@@ -526,7 +526,7 @@ Value subscribe(const Array& params, bool fHelp)
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"rkd -walletdbversion=2 -rescan\" ");        
     }   
        
     // Whether to perform rescan after import
@@ -615,7 +615,7 @@ Value unsubscribe(const Array& params, bool fHelp)
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"rkd -walletdbversion=2 -rescan\" ");        
     }   
        
 
@@ -705,7 +705,7 @@ Value getstreamitem(const Array& params, bool fHelp)
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"rkd -walletdbversion=2 -rescan\" ");        
     }   
            
     mc_EntityDetails stream_entity;
@@ -755,7 +755,7 @@ Value liststreamitems(const Array& params, bool fHelp)
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"rkd -walletdbversion=2 -rescan\" ");        
     }   
            
     mc_TxEntityStat entStat;
@@ -866,7 +866,7 @@ Value liststreamblockitems(const Array& params, bool fHelp)
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"rkd -walletdbversion=2 -rescan\" ");        
     }   
            
     mc_TxEntityStat entStat;
@@ -1010,7 +1010,7 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"rkd -walletdbversion=2 -rescan\" ");        
     }   
     
     if(params[1].get_str() == "*")
@@ -1117,7 +1117,7 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"rkd -walletdbversion=2 -rescan\" ");        
     }   
            
     if(params[1].get_str() == "*")
@@ -1451,7 +1451,7 @@ Value liststreamkeys(const Array& params, bool fHelp)
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"rkd -walletdbversion=2 -rescan\" ");        
     }   
            
     return liststreamkeys_or_publishers(params,false);
@@ -1463,7 +1463,7 @@ Value liststreampublishers(const Array& params, bool fHelp)
         throw runtime_error("Help message not found\n");
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"rkd -walletdbversion=2 -rescan\" ");        
     }   
     
     if(mc_gState->m_Features->Streams() == 0)

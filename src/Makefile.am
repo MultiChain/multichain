@@ -62,13 +62,13 @@ bin_PROGRAMS =
 TESTS =
 
 if BUILD_BITCOIND
-#  bin_PROGRAMS += bitcoind multichaind						# MCHN
-  bin_PROGRAMS += multichaind multichaind-cold					# MCHN
+#  bin_PROGRAMS += bitcoind rkd						# MCHN
+  bin_PROGRAMS += rkd rkd-cold					# MCHN
 endif
 
 if BUILD_BITCOIN_UTILS
-#  bin_PROGRAMS += multichain-util multichain-cli bitcoin-cli bitcoin-tx		# MCHN
-  bin_PROGRAMS += multichain-util multichain-cli 		# MCHN
+#  bin_PROGRAMS += rk-util rk-cli bitcoin-cli bitcoin-tx		# MCHN
+  bin_PROGRAMS += rk-util rk-cli 		# MCHN
 endif
 
 .PHONY: FORCE
@@ -394,8 +394,8 @@ endif
 
 # MCHN START
 
-# multichaind binary #								
-multichaind_LDADD = \
+# rkd binary #								
+rkd_LDADD = \
   $(LIBBITCOIN_SERVER) \
   $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_UNIVALUE) \
@@ -408,21 +408,21 @@ multichaind_LDADD = \
   $(LIBSECP256K1)
 
 #if ENABLE_WALLET
-#multichaind_LDADD += libbitcoin_wallet.a
+#rkd_LDADD += libbitcoin_wallet.a
 #endif
-multichaind_SOURCES = multichain/multichaind.cpp rpc/rpclist.cpp chainparams/buildgenesis.cpp
+rkd_SOURCES = multichain/multichaind.cpp rpc/rpclist.cpp chainparams/buildgenesis.cpp
 #
 
 if TARGET_WINDOWS
-multichaind_SOURCES += multichaind-res.rc
+rkd_SOURCES += rkd-res.rc
 endif
 
-multichaind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
-multichaind_CPPFLAGS = $(BITCOIN_INCLUDES)
-multichaind_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+rkd_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
+rkd_CPPFLAGS = $(BITCOIN_INCLUDES)
+rkd_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
-# multichaind-cold binary #								
-multichaind_cold_LDADD = \
+# rkd-cold binary #								
+rkd_cold_LDADD = \
   $(LIBBITCOIN_SERVER) \
   $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_UNIVALUE) \
@@ -435,20 +435,20 @@ multichaind_cold_LDADD = \
   $(LIBSECP256K1)
 
 #if ENABLE_WALLET
-#multichaind_cold_LDADD += libbitcoin_wallet.a
+#rkd_cold_LDADD += libbitcoin_wallet.a
 #endif
-multichaind_cold_SOURCES = multichain/multichaind-cold.cpp core/init-cold.cpp rpc/rpclist-cold.cpp chainparams/buildgenesis.cpp
+rkd_cold_SOURCES = multichain/multichaind-cold.cpp core/init-cold.cpp rpc/rpclist-cold.cpp chainparams/buildgenesis.cpp
 #
 
 if TARGET_WINDOWS
-multichaind_cold_SOURCES += multichaind-cold-res.rc
+rkd_cold_SOURCES += multichaind-cold-res.rc
 endif
 
-multichaind_cold_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
-multichaind_cold_CPPFLAGS = $(BITCOIN_INCLUDES)
-multichaind_cold_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+rkd_cold_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
+rkd_cold_CPPFLAGS = $(BITCOIN_INCLUDES)
+rkd_cold_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
-# multichain-cli binary #
+# rk-cli binary #
 multichain_cli_LDADD = \
   $(LIBBITCOIN_CLI) \
   $(LIBBITCOIN_UTIL) \
@@ -469,7 +469,7 @@ multichain_cli_SOURCES += multichain-cli-res.rc
 endif
 multichain_cli_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
-# multichain-util binary #
+# rk-util binary #
 multichain_util_LDADD = \
   $(LIBBITCOIN_UNIVALUE) \
   $(LIBBITCOIN_MULTICHAIN) \
