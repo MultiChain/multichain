@@ -1779,7 +1779,7 @@ Value liststreammap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& in
     {
         mc_TxEntityRow *lpEntTx;
         string key_string;
-        if(entity_rows)
+        if(entity_rows->GetCount())
         {
             lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
             key_string=pwalletTxsMain->GetSubKey(lpEntTx->m_TxId, NULL,NULL);
