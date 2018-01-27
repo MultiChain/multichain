@@ -2,6 +2,7 @@
 // Copyright (c) 2009-2013 The Bitcoin developers
 // Original code was distributed under the MIT software license.
 // Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2018 RecordsKeeper
 // Rk code distributed under the GPLv3 license, see COPYING file.
 #ifndef UNIVALUE_UTFFILTER_H
 #define UNIVALUE_UTFFILTER_H
