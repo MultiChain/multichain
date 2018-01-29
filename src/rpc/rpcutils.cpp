@@ -1145,10 +1145,10 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
 {
     string strError="";
     unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
-    mc_Buffer *lpBuffer;
-    mc_Buffer *lpFollowonBuffer;
-    lpBuffer=new mc_Buffer;
-    lpFollowonBuffer=new mc_Buffer;
+    mc_Buffer *lpBuffer=mc_gState->m_TmpBuffers->m_RpcABNoMapBuffer1;
+    lpBuffer->Clear();
+    mc_Buffer *lpFollowonBuffer=mc_gState->m_TmpBuffers->m_RpcABNoMapBuffer2;
+    lpFollowonBuffer->Clear();
     int assets_per_opdrop=(MAX_STANDARD_TX_SIZE)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
     int32_t verify_level=-1;
     int asset_error=0;
@@ -1164,9 +1164,6 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
     }
     
     memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
-    
-    mc_InitABufferDefault(lpBuffer);
-    mc_InitABufferDefault(lpFollowonBuffer);
     
     if(mc_gState->m_Features->VerifySizeOfOpDropElements())
     {        
@@ -1569,9 +1566,6 @@ exitlbl:
             break;
     }
                     
-    delete lpBuffer;
-    delete lpFollowonBuffer;
-
     return strError;
     
 }
@@ -1714,6 +1708,11 @@ CScript GetScriptForString(string source)
         destinations.push_back(tok);
     }    
     
+    if(destinations.size() == 0)
+    {
+        throw runtime_error(" Address cannot be empty");        
+    }   
+    
     if(destinations.size() == 1)
     {
         CBitcoinAddress address(destinations[0]);
@@ -1784,8 +1783,8 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
         }
         else
         {
-            mc_Script *lpScript;
-            lpScript=new mc_Script;
+            mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript4;
+            lpScript->Clear();
 //            uint256 offer_hash;
             size_t elem_size;
             const unsigned char *elem;
@@ -1814,7 +1813,6 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
                 else
                     throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
             }                
-            delete lpScript;
         }
 
         vecSend.push_back(make_pair(scriptPubKey, nAmount));

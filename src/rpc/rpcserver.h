@@ -124,6 +124,7 @@ extern std::map<std::string, std::string> mapHelpStrings;
 extern std::map<std::string, int> mapLogParamCounts;
 extern std::set<std::string> setAllowedWhenWaitingForUpgrade;
 extern std::set<std::string> setAllowedWhenOffline;
+extern std::set<std::string> setAllowedWhenLimited;
 extern std::vector<CRPCCommand> vStaticRPCCommands;
 extern std::vector<CRPCCommand> vStaticRPCWalletReadCommands;
 void mc_InitRPCHelpMap();

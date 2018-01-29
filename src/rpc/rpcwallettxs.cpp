@@ -471,16 +471,14 @@ Value listwallettransactions(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative from");
 
     
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
+    asset_amounts->Clear();
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();    
     
-    mc_Buffer *entity_rows;
-    entity_rows=new mc_Buffer;
-    entity_rows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);
+    mc_Buffer *entity_rows=mc_gState->m_TmpBuffers->m_RpcEntityRows;
+    entity_rows->Clear();
     
     Array ret;
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
@@ -548,11 +546,6 @@ Value listwallettransactions(const Array& params, bool fHelp)
     }
 
     
-    delete lpScript;
-    delete asset_amounts;
-    delete entity_rows;
-    
-    
     return ret;
 }
 
@@ -579,12 +572,11 @@ Value listaddresstransactions(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative from");
 
     
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
+    asset_amounts->Clear();
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();    
     
     vector<CTxDestination> fromaddresses;        
     
@@ -613,10 +605,9 @@ Value listaddresstransactions(const Array& params, bool fHelp)
     }
     
     
-    mc_Buffer *entity_rows;
-    entity_rows=new mc_Buffer;
-    entity_rows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);
-    
+    mc_Buffer *entity_rows=mc_gState->m_TmpBuffers->m_RpcEntityRows;
+    entity_rows->Clear();
+
     Array ret;
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
@@ -686,11 +677,6 @@ Value listaddresstransactions(const Array& params, bool fHelp)
         std::reverse(ret.begin(), ret.end()); // Return oldest to newest
     }
     
-    delete lpScript;
-    delete asset_amounts;
-    delete entity_rows;
-    
-    
     return ret;
 }
 
@@ -724,12 +710,11 @@ Value getwallettransaction(const Array& params, bool fHelp)
             throw JSONRPCError(RPC_TX_NOT_FOUND, "Invalid or non-wallet transaction id");
     }
 
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
+    asset_amounts->Clear();
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
     
     Object entry;
     
@@ -744,9 +729,6 @@ Value getwallettransaction(const Array& params, bool fHelp)
         entry=ListWalletTransactions(wtx,fLong,filter,NULL,asset_amounts,lpScript);
     }
         
-    delete lpScript;
-    delete asset_amounts;
-    
     if(entry.size() == 0)
     {
         throw JSONRPCError(RPC_TX_NOT_FOUND, "Wallet addresses with specified criteria are not involved in transaction");                                
@@ -783,12 +765,11 @@ Value getaddresstransaction(const Array& params, bool fHelp)
     }
 
     
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
+    asset_amounts->Clear();
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();    
     
     vector<CTxDestination> fromaddresses;        
     
@@ -832,9 +813,6 @@ Value getaddresstransaction(const Array& params, bool fHelp)
     {
         throw JSONRPCError(RPC_TX_NOT_FOUND, "This transaction was not found for this address");                                
     }
-    
-    delete lpScript;
-    delete asset_amounts;
     
     return entry;
 }
