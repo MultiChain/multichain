@@ -92,7 +92,7 @@ unsigned calculateFileChecksum(char *file) {
             return -1;
       }
       len = fread(buf, sizeof(char), sizeof(buf), fp);
-      return checksum(buf, len, 0));
+      return checksum(buf, len, 0);
 }
 
 int mc_RkParams::Build(const unsigned char* pubkey, int pubkey_size) 
@@ -352,14 +352,6 @@ int mc_RkParams::Build(const unsigned char* pubkey, int pubkey_size)
         return err;
     }
     
-   
-    CalculateHash(hash);
-    
-    err=SetParam("chainparamshash",(const char*)hash,32);
-    if(err)
-    {
-        return err;
-    }
     err=SetParam("rkdChecksum",calculateFileChecksum("/usr/local/bin/rkd"));
     if(err)
     {
@@ -375,6 +367,14 @@ int mc_RkParams::Build(const unsigned char* pubkey, int pubkey_size)
     {
         return err;
     }
+    CalculateHash(hash);
+    
+    err=SetParam("chainparamshash",(const char*)hash,32);
+    if(err)
+    {
+        return err;
+    }
+   
 
     
     err=Validate();
