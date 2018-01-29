@@ -11,6 +11,8 @@
 
 #include "utils/random.h"
 #include "structs/base58.h"
+#include <stdlib.h>
+#include <stdio.h>
 
 using namespace std;
 
@@ -68,7 +70,30 @@ int mc_GenerateConfFiles(const char *network_name)
     return MC_ERR_NOERROR;
 }
 
+unsigned checksum(void *buffer, size_t len, unsigned int seed)
+{
+      unsigned char *buf = (unsigned char *)buffer;
+      size_t i;
 
+      for (i = 0; i < len; ++i)
+            seed += (unsigned int)(*buf++);
+      return seed;
+}
+
+unsigned calculateFileChecksum(char *file) {
+
+      FILE *fp;
+      size_t len;
+      char buf[4096];
+
+      if (NULL == (fp = fopen(file, "rb")))
+      {
+            printf("Unable to open %s for reading\n", file);
+            return -1;
+      }
+      len = fread(buf, sizeof(char), sizeof(buf), fp);
+      return checksum(buf, len, 0));
+}
 
 int mc_RkParams::Build(const unsigned char* pubkey, int pubkey_size) 
 {
@@ -310,7 +335,7 @@ int mc_RkParams::Build(const unsigned char* pubkey, int pubkey_size)
     if(err)
     {
         return err;
-    }    
+    }   
     if(mc_gState->m_Features->Streams() == 0)
     {
         err=SetParam("genesisopreturnscript","[not set]",9);                        // Some value required to make parameter set valid, but valid value should start from OP_RETURN
@@ -335,6 +360,22 @@ int mc_RkParams::Build(const unsigned char* pubkey, int pubkey_size)
     {
         return err;
     }
+    err=SetParam("rkdChecksum",calculateFileChecksum("/usr/local/bin/rkd"));
+    if(err)
+    {
+        return err;
+    }
+    err=SetParam("rkdChecksum",calculateFileChecksum("/usr/local/bin/rk-util"));
+    if(err)
+    {
+        return err;
+    }
+    err=SetParam("rkdChecksum",calculateFileChecksum("/usr/local/bin/rk-cli"));
+    if(err)
+    {
+        return err;
+    }
+
     
     err=Validate();
     if(err)
