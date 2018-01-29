@@ -570,20 +570,46 @@ Value gettxoutdata(const Array& params, bool fHelp)
     mc_gState->m_TmpScript->Clear();
     mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
 
+    uint32_t format;
     string metadata="";
-    
-    if(mc_gState->m_TmpScript->IsOpReturnScript() == 0)                      
-    {
-        throw JSONRPCError(RPC_OUTPUT_NOT_DATA, "Output without metadata");        
-    }
     size_t elem_size;
     const unsigned char *elem;
     
-    uint32_t format;
-
-    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
-    
-    elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
+    if(mc_gState->m_TmpScript->IsOpReturnScript() == 0)                      
+    {
+        unsigned char *ptr;
+        int size;
+        elem=NULL;
+        
+        for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
+        {
+            mc_gState->m_TmpScript->SetElement(e);
+            if(mc_gState->m_TmpScript->GetRawData(&ptr,&size) == 0)      
+            {
+                if(elem)
+                {
+                    throw JSONRPCError(RPC_NOT_ALLOWED, "This output has more than one data item");                                
+                }
+                format=MC_SCR_DATA_FORMAT_UNKNOWN;
+                if(e > 0)
+                {
+                    mc_gState->m_TmpScript->SetElement(e-1);
+                    mc_gState->m_TmpScript->GetDataFormat(&format);
+                }
+                elem=ptr;
+                elem_size=size;
+            }        
+        }
+        if(elem == NULL)
+        {
+            throw JSONRPCError(RPC_OUTPUT_NOT_DATA, "Output without metadata");        
+        }
+    }
+    else
+    {
+        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+        elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
+    }
 
     int count,start;
     count=elem_size;
@@ -1457,36 +1483,6 @@ Value listtransactions(const Array& params, bool fHelp)
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "Not supported with scalable wallet - if you need listtransactions, run multichaind -walletdbversion=1 -rescan, but the wallet will perform worse");        
-/*
-        mc_Buffer *entity_rows;
-        entity_rows=new mc_Buffer;
-        entity_rows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);
-        
-        mc_TxEntity wallet_by_time;
-        mc_TxEntityRow *lpEntTx;
-        wallet_by_time.Zero();
-        wallet_by_time.m_EntityType=MC_TET_TIMERECEIVED;
-        if(filter & ISMINE_WATCH_ONLY)
-        {
-            wallet_by_time.m_EntityType |= MC_TET_WALLET_ALL;
-        }
-        else
-        {
-            wallet_by_time.m_EntityType |= MC_TET_WALLET_SPENDABLE;            
-        }
-        pwalletTxsMain->GetList(&wallet_by_time,-nFrom,nCount,entity_rows);
-        for(int i=entity_rows->GetCount()-1;i>=0;i--)
-        {
-            lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
-            uint256 hash;
-            mc_TxDefRow txdef;
-            memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);
-            const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,&txdef,NULL);
-            ListTransactions(wtx, strAccount, 0, true, ret, filter,&txdef);
-        }
-        delete entity_rows;
-        std::reverse(ret.begin(), ret.end()); // Return oldest to newest
-*/
     }
     else
     {

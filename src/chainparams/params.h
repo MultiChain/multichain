@@ -37,6 +37,8 @@
 #define MC_PRM_NOHASH           0x00040000
 #define MC_PRM_MINIMAL          0x00080000
 #define MC_PRM_DECIMAL          0x00100000
+#define MC_PRM_HIDDEN           0x00200000
+#define MC_PRM_TIME             0x00400000
 
 
 #define MC_PRM_STATUS_EMPTY              0
@@ -45,6 +47,20 @@
 #define MC_PRM_STATUS_GENERATED          3
 #define MC_PRM_STATUS_INVALID            4
 #define MC_PRM_STATUS_VALID              5
+
+#define MC_PSK_APPLIED                   0
+#define MC_PSK_INTERNAL_ERROR            1
+#define MC_PSK_NOT_FOUND                 2
+#define MC_PSK_WRONG_SIZE                3
+#define MC_PSK_OUT_OF_RANGE              4
+#define MC_PSK_FRESH_UPGRADE             5
+#define MC_PSK_DOUBLE_RANGE              6
+#define MC_PSK_NOT_SUPPORTED             7
+#define MC_PSK_NEW_NOT_DOWNGRADABLE      8
+#define MC_PSK_OLD_NOT_DOWNGRADABLE      9
+
+
+
 
 extern int MCP_MAX_STD_OP_RETURN_COUNT;
 extern int64_t MCP_INITIAL_BLOCK_REWARD;
@@ -96,6 +112,7 @@ typedef struct mc_MultichainParams
     int m_Count;
     int m_IsProtocolMultiChain;
     int m_ProtocolVersion;
+    int m_RelevantProtocolVersion;
     
     int m_AssetRefSize;
     
@@ -123,17 +140,24 @@ typedef struct mc_MultichainParams
     int Write(int overwrite);
     int Print(FILE *);
     int SetGlobals();
+    int SetProtocolGlobals();
+    int SetUpgradedParamValue(const mc_OneMultichainParam *param,int64_t value);
     int Import(const char *name,const char *source_address);
     int Set(const char *name,const char *source,int source_size);
     
-    int FindParam(const char *param);
+    const mc_OneMultichainParam *FindParam(const char *param);
     void* GetParam(const char *param,int* size);
     int64_t GetInt64Param(const char *param);
     double GetDoubleParam(const char *param);
+    double Int64ToDecimal(int64_t value);
+    int64_t DecimalToInt64(double value);
+    int GetParamFromScript(char* ptr,int64_t *value,int *size);
     
     int SetParam(const char *param,const char* value,int size);
     int SetParam(const char *param,int64_t value);
     
+    int CanBeUpgradedByVersion(const char *param,int version,int size);
+    int IsParamUpgradeValueInRange(const mc_OneMultichainParam *param,int version,int64_t value);
     
     const char* Name();
     const unsigned char* DefaultMessageStart();

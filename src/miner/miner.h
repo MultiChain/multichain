@@ -27,7 +27,7 @@ void GenerateBitcoins(bool fGenerate, CWallet* pwallet, int nThreads);
 /** Generate a new block, without valid proof-of-work */
 CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn);
 CBlockTemplate* CreateNewBlockWithKey(CReserveKey& reservekey);
-CBlockTemplate* CreateNewBlockWithDefaultKey(CWallet *pwallet,int *canMine, const std::set<CTxDestination>* addresses = NULL);
+CBlockTemplate* CreateNewBlockWithDefaultKey(CWallet *pwallet,int *canMine, const std::set<CTxDestination>* addresses = NULL,CBlockIndex** ppPrev = NULL);
 /** Modify the extranonce in a block */
 /* MCHN START */
 void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce,CWallet *pwallet);

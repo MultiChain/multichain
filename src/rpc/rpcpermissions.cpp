@@ -52,8 +52,8 @@ Value grantoperation(const Array& params)
     if (params.size() > 8 && params[8].type() != null_type && !params[8].get_str().empty())
         wtx.mapValue["to"]      = params[8].get_str();
 
-    mc_Script *lpScript;
-    lpScript=new mc_Script;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
     
     uint32_t type,from,to,timestamp;
 
@@ -117,7 +117,8 @@ Value grantoperation(const Array& params)
         LogPrintf("mchn: Granting %s permission(s) to address %s (%ld-%ld), Entity TxID: %s, Name: %s\n",permission_type,params[1].get_str(),from,to,
                 ((uint256*)entity.GetTxID())->ToString().c_str(),entity.GetName());
         
-        type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),entity.GetEntityType());
+//        type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),entity.GetEntityType());
+        type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),&entity);
         
         if(type == 0)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
@@ -126,7 +127,8 @@ Value grantoperation(const Array& params)
     }
     else
     {
-        type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),MC_ENT_TYPE_NONE);
+        type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),&entity);
+//        type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),MC_ENT_TYPE_NONE);
         
         if(type == 0)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
@@ -300,7 +302,6 @@ Value grantoperation(const Array& params)
 
     SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, scriptOpReturn, fromaddresses);
 
-    delete lpScript;
     return wtx.GetHash().GetHex();
     
 }
@@ -472,7 +473,8 @@ Value listpermissions(const Array& params, bool fHelp)
         lpEntity=entity.GetTxID();
     }
     
-    type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),entity.GetEntityType());
+//    type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),entity.GetEntityType());
+    type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),&entity);
     if(type == 0)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
     

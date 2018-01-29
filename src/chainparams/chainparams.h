@@ -166,6 +166,7 @@ bool SelectParamsFromCommandLine();
 bool SelectMultiChainParams(const char *NetworkName);
 bool InitializeMultiChainParams();
 void SetMultiChainParams();
+void SetMultiChainParam(const char*param_name,int64_t value);
 void SetMultiChainRuntimeParams();
 
 

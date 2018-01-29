@@ -536,7 +536,31 @@ void mc_EntityDetails::Set(mc_EntityLedgerRow* row)
         }
         m_Flags |= MC_ENT_FLAG_OFFSET_IS_SET;
     }
-    
+
+    m_Permissions=0;
+    switch(m_LedgerRow.m_EntityType)
+    {
+        case MC_ENT_TYPE_ASSET:
+            m_Permissions |= MC_PTP_ADMIN | MC_PTP_ISSUE;
+            if(mc_gState->m_Features->PerAssetPermissions())
+            {
+                m_Permissions |= MC_PTP_ACTIVATE;                
+            }
+            break;
+        case MC_ENT_TYPE_STREAM:
+            m_Permissions |= MC_PTP_ADMIN | MC_PTP_ACTIVATE | MC_PTP_WRITE;
+            break;
+        default:
+            if(mc_gState->m_Features->FixedIn10007())
+            {
+                if(m_LedgerRow.m_EntityType <= MC_ENT_TYPE_STREAM_MAX)
+                {
+                    m_Permissions = MC_PTP_WRITE | MC_PTP_ACTIVATE;
+                }
+            }
+            break;            
+    }
+            
     if(script_size)
     {
         value_offset=mc_FindSpecialParamInDetailsScript(m_LedgerRow.m_Script,m_LedgerRow.m_ScriptSize,MC_ENT_SPRM_NAME,&value_size);
@@ -566,6 +590,16 @@ void mc_EntityDetails::Set(mc_EntityLedgerRow* row)
             mc_StringLowerCase(m_Name,value_size);
             m_Flags |= MC_ENT_FLAG_NAME_IS_SET;
         }
+        
+        value_offset=mc_FindSpecialParamInDetailsScript(m_LedgerRow.m_Script,m_LedgerRow.m_ScriptSize,MC_ENT_SPRM_PERMISSIONS,&value_size);
+        if(value_offset <= m_LedgerRow.m_ScriptSize)
+        {
+            if((value_size>0) && (value_size<=4))
+            {
+                m_Permissions |= (uint32_t)mc_GetLE(m_LedgerRow.m_Script+value_offset,value_size);
+            }
+        }
+        
     }
     
     mc_ZeroABRaw(m_FullRef);
@@ -641,18 +675,21 @@ int mc_AssetDB::InsertEntity(const void* txid, int offset, int entity_type, cons
         {
             if(script)
             {
-                value_offset=mc_FindSpecialParamInDetailsScript((unsigned char*)script,script_size,MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,&value_size);
-                if(value_offset == script_size)
+                if(mc_gState->m_Features->ParameterUpgrades() == 0)
                 {
-                    return MC_ERR_ERROR_IN_SCRIPT;                                            
-                }
-                if( (value_size <=0) || (value_size > 4) )
-                {
-                    return MC_ERR_ERROR_IN_SCRIPT;                        
-                }
-                if((int)mc_GetLE((unsigned char*)script+value_offset,value_size) < 0)
-                {
-                    return MC_ERR_ERROR_IN_SCRIPT;                        
+                    value_offset=mc_FindSpecialParamInDetailsScript((unsigned char*)script,script_size,MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,&value_size);
+                    if(value_offset == script_size)
+                    {
+                        return MC_ERR_ERROR_IN_SCRIPT;                                            
+                    }
+                    if( (value_size <=0) || (value_size > 4) )
+                    {
+                        return MC_ERR_ERROR_IN_SCRIPT;                        
+                    }
+                    if((int)mc_GetLE((unsigned char*)script+value_offset,value_size) < 0)
+                    {
+                        return MC_ERR_ERROR_IN_SCRIPT;                        
+                    }
                 }
                 value_offset=mc_FindSpecialParamInDetailsScript((unsigned char*)script,script_size,MC_ENT_SPRM_UPGRADE_START_BLOCK,&value_size);
                 if(value_offset != script_size)
@@ -1585,7 +1622,24 @@ int mc_AssetDB::FindEntityByFollowOn(mc_EntityDetails *entity,const unsigned cha
     return 0;
 }
 
-
+const unsigned char* mc_EntityDetails::GetParamUpgrades(int *size)
+{
+    uint32_t value_offset;
+    size_t value_size;
+    
+    if(m_LedgerRow.m_ScriptSize)
+    {
+        value_offset=mc_FindSpecialParamInDetailsScript(m_LedgerRow.m_Script,m_LedgerRow.m_ScriptSize,MC_ENT_SPRM_UPGRADE_CHAIN_PARAMS,&value_size);
+        if(value_offset != m_LedgerRow.m_ScriptSize)
+        {
+            *size=(int)value_size;
+            return m_LedgerRow.m_Script+value_offset;
+        }
+    }
+    
+    *size=0;
+    return NULL;
+}
 
 const char* mc_EntityDetails::GetName()
 {
@@ -1710,6 +1764,12 @@ int mc_EntityDetails::AllowedFollowOns()
     return 0;
 }
 
+uint32_t mc_EntityDetails::Permissions()
+{
+    return m_Permissions;
+}
+
+
 int mc_EntityDetails::AnyoneCanWrite()
 {
     unsigned char *ptr;
@@ -1744,12 +1804,17 @@ int mc_EntityDetails::UpgradeProtocolVersion()
 {
     unsigned char *ptr;
     size_t bytes;
+    int version;
     ptr=(unsigned char *)GetSpecialParam(MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,&bytes);
     if(ptr)
     {
         if((bytes>0) && (bytes<=4))
         {
-            return (int)mc_GetLE(ptr,bytes);
+            version=(int)mc_GetLE(ptr,bytes);
+            if(version > 0)
+            {
+                return version;
+            }
         }
     }
     return 0;

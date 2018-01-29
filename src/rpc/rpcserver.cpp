@@ -311,7 +311,18 @@ Value help(const Array& params, bool fHelp)
     string strCommand;
     if (params.size() > 0)
         strCommand = params[0].get_str();
-
+    
+    if(strCommand.size())
+    {
+        if(setAllowedWhenLimited.size())
+        {
+            if( setAllowedWhenLimited.count(strCommand) == 0 )
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Method not allowed with current setting of -rpcallowmethod runtime parameter");                
+            }        
+        }
+    }
+    
     return tableRPC.help(strCommand);
 }
 
@@ -357,8 +368,9 @@ uint32_t GetPausedServices(const char *str)
             if(ptr > start)
             {
                 type=0;
-                if(memcmp(start,"incoming",  ptr-start) == 0)type = MC_NPS_INCOMING;
-                if(memcmp(start,"mining",    ptr-start) == 0)type = MC_NPS_MINING;
+                if(memcmp(start,"incoming",    ptr-start) == 0)type = MC_NPS_INCOMING;
+                if(memcmp(start,"mining",      ptr-start) == 0)type = MC_NPS_MINING;
+                if(memcmp(start,"reaccepting", ptr-start) == 0)type = MC_NPS_REACCEPT;
                 
                 if(type == 0)
                 {
@@ -415,6 +427,11 @@ Value resumecmd(const Array& params, bool fHelp)
     LOCK(cs_main);
     
     mc_gState->m_NodePausedState &= (MC_NPS_ALL ^ type);
+    
+    if( type & MC_NPS_REACCEPT )
+    {
+        pwalletMain->ReacceptWalletTransactions();                                                                                            
+    }
     
     LogPrintf("Node paused state is set to %08X\n",mc_gState->m_NodePausedState);
     
@@ -622,9 +639,27 @@ static ip::tcp::endpoint ParseEndpoint(const std::string &strEndpoint, int defau
     return ip::tcp::endpoint(asio::ip::address::from_string(addr), port);
 }
 
+void mc_InitRPCListIfLimited()
+{
+    if (mapArgs.count("-rpcallowmethod")) 
+    {
+        setAllowedWhenLimited.insert("help");
+        BOOST_FOREACH(const std::string& methods, mapMultiArgs["-rpcallowmethod"]) 
+        {
+            stringstream ss(methods); 
+            string tok;
+            while(getline(ss, tok, ',')) 
+            {
+                setAllowedWhenLimited.insert(tok);    
+            }
+        }
+    }
+}
+
 void StartRPCThreads()
 {
     mc_InitRPCList(vStaticRPCCommands,vStaticRPCWalletReadCommands);
+    mc_InitRPCListIfLimited();
     tableRPC.initialize();
 
     rpc_allow_subnets.clear();
@@ -1134,6 +1169,14 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         }        
     }
     
+    if(setAllowedWhenLimited.size())
+    {
+        if( setAllowedWhenLimited.count(strMethod) == 0 )
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Method not allowed with current setting of -rpcallowmethod runtime parameter");                
+        }        
+    }
+    
     // Observe safe mode
     string strWarning = GetWarnings("rpc");
     if (strWarning != "" && !GetBoolArg("-disablesafemode", false) &&
@@ -1232,7 +1275,7 @@ std::string HelpExampleCli(string methodname, string args){
 
 std::string HelpExampleRpc(string methodname, string args){
     return "> curl --user myusername --data-binary '{\"jsonrpc\": \"1.0\", \"id\":\"curltest\", "
-        "\"method\": \"" + std::string(mc_gState->m_NetworkParams->Name()) + " " + methodname + "\", \"params\": [" + args + "] }' -H 'content-type: text/plain;' http://127.0.0.1:"+
+        "\"method\": \"" + methodname + "\", \"params\": [" + args + "] }' -H 'content-type: text/plain;' http://127.0.0.1:"+
             strprintf("%d",(int)mc_gState->m_NetworkParams->GetInt64Param("defaultrpcport")) + "\n";// MCHN was hard-coded 8332 before
 }
 
@@ -1241,6 +1284,7 @@ std::map<std::string, std::string> mapHelpStrings;
 std::map<std::string, int> mapLogParamCounts;
 std::set<std::string> setAllowedWhenWaitingForUpgrade;
 std::set<std::string> setAllowedWhenOffline;
+std::set<std::string> setAllowedWhenLimited;
 
 std::vector<CRPCCommand> vStaticRPCCommands;
 std::vector<CRPCCommand> vStaticRPCWalletReadCommands;

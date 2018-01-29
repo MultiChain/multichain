@@ -58,11 +58,11 @@ static const unsigned int DEFAULT_BLOCK_MIN_SIZE = 0;
 /** The maximum size for transactions we're willing to relay/mine */
 extern unsigned int MAX_STANDARD_TX_SIZE;                                       // MCHN global
 /** The maximum allowed number of signature check operations in a block (network rule) */
-static const unsigned int MAX_BLOCK_SIGOPS = MAX_BLOCK_SIZE/50;
+extern unsigned int MAX_BLOCK_SIGOPS;                                           // MCHN global
+/** The maximum number of sigops we're willing to relay/mine in a single tx */
+extern unsigned int MAX_TX_SIGOPS;                                              // MCHN global
 /** Maximum number of signature check operations in an IsStandard() P2SH script */
 static const unsigned int MAX_P2SH_SIGOPS = 15;
-/** The maximum number of sigops we're willing to relay/mine in a single tx */
-static const unsigned int MAX_TX_SIGOPS = MAX_BLOCK_SIGOPS/5;
 /** Default for -maxorphantx, maximum number of orphan transactions kept in memory */
 /* MCHN START */
 //static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 100;
@@ -73,6 +73,7 @@ static const unsigned int DEFAULT_MAX_SUCCESSORS_FROM_ONE_NODE = 10;
 /* MCHN END */
 extern int MAX_OP_RETURN_SHOWN;
 extern int MAX_FORMATTED_DATA_DEPTH;
+extern int MIN_BLOCKS_BETWEEN_UPGRADES;
 /* MCHN END */
 /** The maximum size of a blk?????.dat file (since 0.8) */
 extern unsigned int MAX_BLOCKFILE_SIZE;                                     // MCHN global
@@ -395,9 +396,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 /** Context-independent validity checks */
 bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool fCheckPOW = true);
 bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
+bool CheckBlockForUpgardableConstraints(const CBlock& block, CValidationState& state, std::string parameter, bool in_sync);
 
 /** Context-dependent validity checks */
-bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex *pindexPrev);
+bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex *pindexPrev, CBlockIndex *pindexChecked = NULL);
 bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIndex *pindexPrev);
 
 /** Check a block is completely valid from start to finish (only works on top of our current best block, with cs_main held) */
@@ -405,7 +407,7 @@ bool TestBlockValidity(CValidationState &state, const CBlock& block, CBlockIndex
 
 /** Store block on disk. If dbp is provided, the file is known to already reside on disk */
 bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex **pindex, CDiskBlockPos* dbp = NULL, int node_id = 0);
-bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex **ppindex= NULL, int node_id = 0);
+bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex **ppindex= NULL, int node_id = 0, CBlockIndex *pindexChecked = NULL);
 
 
 

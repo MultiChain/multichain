@@ -318,6 +318,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -datadir=<dir>         " + _("Specify data directory") + "\n";
     strUsage += "  -dbcache=<n>           " + strprintf(_("Set database cache size in megabytes (%d to %d, default: %d)"), nMinDbCache, nMaxDbCache, nDefaultDbCache) + "\n";
     strUsage += "  -loadblock=<file>      " + _("Imports blocks from external blk000??.dat file") + " " + _("on startup") + "\n";
+    strUsage += "  -loadblockmaxsize=<n>  " + _("Maximal block size in the files specified in -loadblock") + "\n";
     strUsage += "  -maxorphantx=<n>       " + strprintf(_("Keep at most <n> unconnectable transactions in memory (default: %u)"), DEFAULT_MAX_ORPHAN_TRANSACTIONS) + "\n";
     strUsage += "  -par=<n>               " + strprintf(_("Set the number of script verification threads (%u to %d, 0 = auto, <0 = leave that many cores free, default: %d)"), -(int)boost::thread::hardware_concurrency(), MAX_SCRIPTCHECK_THREADS, DEFAULT_SCRIPTCHECK_THREADS) + "\n";
 #ifndef WIN32
@@ -384,6 +385,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -upgradewallet         " + _("Upgrade wallet to latest format") + " " + _("on startup") + "\n";
     strUsage += "  -wallet=<file>         " + _("Specify wallet file (within data directory)") + " " + strprintf(_("(default: %s)"), "wallet.dat") + "\n";
     strUsage += "  -walletnotify=<cmd>    " + _("Execute this command when a transaction is first seen or confirmed, if it relates to an address in the wallet or a subscribed asset or stream. ") + "\n";
+    strUsage += "  -walletnotifynew=<cmd> " + _("Execute this command when a transaction is first seen, if it relates to an address in the wallet or a subscribed asset or stream. ") + "\n";
     strUsage += "                         " + _("(more details and % substitutions online)") + "\n";
 /* MCHN START */    
     strUsage += "  -walletdbversion=1|2   " + _("Specify wallet version, 1 - not scalable, 2 (default) - scalable") + "\n";
@@ -464,6 +466,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -rpcport=<port>        " + strprintf(_("Listen for JSON-RPC connections on <port> (default: %u or testnet: %u)"), 8332, 18332) + "\n";
     strUsage += "  -rpcallowip=<ip>       " + _("Allow JSON-RPC connections from specified source. Valid for <ip> are a single IP (e.g. 1.2.3.4), a network/netmask (e.g. 1.2.3.4/255.255.255.0) or a network/CIDR (e.g. 1.2.3.4/24).") + "\n";
     strUsage += "                         " + _("This option can be specified multiple times") + "\n";
+    strUsage += "  -rpcallowmethod=<methods> " + _("If specified, allow only comma delimited list of JSON-RPC <methods>. This option can be specified multiple times.") + "\n";
     strUsage += "  -rpcthreads=<n>        " + strprintf(_("Set the number of threads to service RPC calls (default: %d)"), 4) + "\n";
     strUsage += "  -rpckeepalive          " + strprintf(_("RPC support for HTTP persistent connections (default: %d)"), 0) + "\n";
 
@@ -1049,6 +1052,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     
     bool fFirstRunForBuild;
     string init_privkey=GetArg("-initprivkey","");
+
+    mc_gState->m_NetworkParams->m_RelevantProtocolVersion=mc_gState->RelevantParamProtocolVersion(); // Caching relevant protocol version
     
     pwalletMain=NULL;
     if(mc_gState->m_NetworkParams->m_Status != MC_PRM_STATUS_VALID)
@@ -1334,6 +1339,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             return InitError(_(seed_error.c_str()));        
         }
         
+        string strBurnAddress=BurnAddress(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS)); // Caching burn address
+        LogPrint("mchn","mchn: Burn address: %s\n",strBurnAddress.c_str());                
+        
         int64_t wallet_mode=GetArg("-walletdbversion",0);
         bool wallet_mode_valid=false;
         if(wallet_mode == 0)
@@ -1385,6 +1393,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                             case MC_TET_STREAM:
                             case MC_TET_STREAM_KEY:
                             case MC_TET_STREAM_PUBLISHER:
+                            case MC_TET_ASSET:
                                 vSubscribedEntities.push_back(stat->m_Entity);
                                 break;
                         }
@@ -1864,7 +1873,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
             if(found_ips > 1)
             {
-                sprintf(bufOutput,"\nThis host has multiple IP addresses, so from some networks:\n\n");
+                sprintf(bufOutput,"This host has multiple IP addresses, so from some networks:\n");
                 bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                 for(int i_ips=0;i_ips<found_ips;i_ips++)
                 {
@@ -1885,7 +1894,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             }
             if (mapArgs.count("-externalip")) 
             {            
-                sprintf(bufOutput,"\nBased on the -externalip setting, this node is reachable at:\n\n");
+                sprintf(bufOutput,"Based on the -externalip setting, this node is reachable at:\n");
                 bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                 BOOST_FOREACH(string strAddr, mapMultiArgs["-externalip"]) 
                 {
@@ -2132,6 +2141,12 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
 
+    if(mapMultiArgs.count("-rpcallowip") == 0)
+    {
+        sprintf(bufOutput,"Listening for API requests on port %d (local only - see rpcallowip setting)\n\n",(int)GetArg("-rpcport", BaseParams().RPCPort()));                            
+        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+    }
+    
 //    int version=mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
     int version=mc_gState->m_NetworkParams->ProtocolVersion();
     LogPrintf("MultiChain protocol version: %d\n",version);
@@ -2143,11 +2158,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
             if(version != original_protocol_version)
             {
-                sprintf(bufOutput,"Protocol version %d (chain created with %d)\n\n",version,original_protocol_version);                            
+                sprintf(bufOutput,"Chain running protocol version %d (chain created with %d)\n\n",version,original_protocol_version);                            
             }
             else
             {
-                sprintf(bufOutput,"Protocol version %d\n\n",version);            
+                sprintf(bufOutput,"Chain running protocol version %d\n\n",version);            
             }
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
         }
@@ -2405,7 +2420,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 /* MCHN START */    
     if(!GetBoolArg("-shortoutput", false))
     {    
-        sprintf(bufOutput,"Node started\n");
+        sprintf(bufOutput,"Node ready.\n\n");
         bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
     }
     mc_InitRPCHelpMap();

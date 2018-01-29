@@ -30,6 +30,7 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
 bool CreateAssetBalanceList(const CTxOut& out,mc_Buffer *amounts,mc_Script *lpScript);
 Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_level);
 Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong);
+Array PerOutputDataEntries(const CTxOut& txout,mc_Script *lpScript,uint256 txid,int vout);
 string EncodeHexTx(const CTransaction& tx);
 int OrphanPoolSize();
 bool paramtobool(Value param);
@@ -514,12 +515,10 @@ Value gettxout(const Array& params, bool fHelp)
     
 /* MCHN START */        
 
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);    
-    
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
+       
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
     
     asset_amounts->Clear();
     CTxOut txout=coins.vout[n];
@@ -556,11 +555,21 @@ Value gettxout(const Array& params, bool fHelp)
             assets.push_back(asset_entry);
         }
 
-        ret.push_back(Pair("assets", assets));
+        if( (assets.size() > 0) || (mc_gState->m_Compatibility & MC_VCM_1_0) )
+        {
+            ret.push_back(Pair("assets", assets));
+        }
     }
     Array permissions=PermissionEntries(txout,lpScript,false);
-    ret.push_back(Pair("permissions", permissions));
-    
+    if( (permissions.size() > 0) || (mc_gState->m_Compatibility & MC_VCM_1_0) )
+    {
+        ret.push_back(Pair("permissions", permissions));
+    }
+    Array data=PerOutputDataEntries(txout,lpScript,hash,n);
+    if(data.size())
+    {
+        ret.push_back(Pair("data", data));
+    }
 /* MCHN END */        
 
     return ret;

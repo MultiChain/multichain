@@ -2214,6 +2214,83 @@ int mc_Script::SetCachedScript(int offset, int *next_offset, int vin, unsigned c
     return MC_ERR_NOERROR;    
 }
 
+int mc_Script::GetRawData(unsigned char **data,int *size)
+{
+    unsigned char *ptr;
+    unsigned char *ptrEnd;
+    
+    if(data)
+    {
+        *data=NULL;
+    }
+        
+    if(m_CurrentElement<0)
+    {
+        return MC_ERR_INVALID_PARAMETER_VALUE;
+    }
+    
+    if(m_lpCoord[m_CurrentElement*2+1] < MC_DCT_SCRIPT_IDENTIFIER_LEN+1+1)
+    {
+        return MC_ERR_WRONG_SCRIPT;
+    }
+    
+    ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
+    ptrEnd=ptr+m_lpCoord[m_CurrentElement*2+1];
+    
+    if(memcmp(ptr,MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
+    {
+        return MC_ERR_WRONG_SCRIPT;
+    }
+    
+    
+    if(ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN] != MC_DCT_SCRIPT_MULTICHAIN_RAW_DATA_PREFIX)
+    {
+        return MC_ERR_WRONG_SCRIPT;            
+    }
+    
+    ptr+=MC_DCT_SCRIPT_IDENTIFIER_LEN+1;
+    
+    if(data)
+    {
+        *data=ptr;
+        *size=ptrEnd-ptr;
+    }
+    
+    return MC_ERR_NOERROR;        
+}
+
+int mc_Script::SetRawData(const unsigned char *data,const int size)
+{
+    int err;
+    unsigned char buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+1];
+    
+    err=AddElement();
+    if(err)
+    {
+        return err;
+    }
+    
+    memcpy(buf,MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_RAW_DATA_PREFIX;        
+    
+    err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+1);
+    if(err)
+    {
+        return err;
+    }
+
+    if(size)
+    {
+        err=SetData(data,size);
+        if(err)
+        {
+            return err;
+        }
+    }
+
+    return MC_ERR_NOERROR;        
+}
+
 int mc_Script::GetDataFormat(uint32_t *format)
 {
     unsigned char *ptr;
