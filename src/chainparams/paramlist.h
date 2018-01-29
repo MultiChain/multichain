@@ -300,6 +300,18 @@ static const mc_OneRkParam RkParamArray[] =
                    MC_PRM_BINARY  | MC_PRM_CALCULATED | MC_PRM_NOHASH           , 32,         0,          0,         0, 0.0, 10001, 0, "",
                    "","",
                    "Hash of blockchain parameters, to prevent accidental changes."},
+    { "rkdChecksum"                      , "rkd-Checksum"                      ,
+                   MC_PRM_BINARY  | MC_PRM_CALCULATED          , 32,         0,          0,         0, 0.0, 10001, 0, "",
+                   "","",
+                   "Hash of rkd, to prevent accidental changes."},
+    { "rkutilChecksum"                      , "rkutil-Checksum"                      ,
+                   MC_PRM_BINARY  | MC_PRM_CALCULATED          , 32,         0,          0,         0, 0.0, 10001, 0, "",
+                   "","",
+                   "Hash of rkdutil, to prevent accidental changes."},
+    { "rkcliChecksum"                      , "rkcli-Checksum"                      ,
+                   MC_PRM_BINARY  | MC_PRM_CALCULATED          , 32,         0,          0,         0, 0.0, 10001, 0, "",
+                   "","",
+                   "Hash of rkdcli, to prevent accidental changes."},
 };
 
 
