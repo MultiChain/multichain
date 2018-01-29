@@ -25,7 +25,8 @@ using namespace std;
 
 void WalletTxNotify(mc_TxImport *imp,const CWalletTx& tx,int block,bool fFound,uint256 block_hash)
 {
-    std::string strNotifyCmd = GetArg("-walletnotify", "");
+//    std::string strNotifyCmd = GetArg("-walletnotify", "");
+    std::string strNotifyCmd = GetArg("-walletnotify", fFound ? "" : GetArg("-walletnotifynew", ""));
     if ( strNotifyCmd.empty() )
     {
         return;
@@ -816,6 +817,7 @@ int mc_WalletTxs::RollBack(mc_TxImport *import,int block)
     mc_Buffer *lpSubKeyEntRowBuffer;
     bool fInBlocks;   
     std::vector<mc_Coin> txouts;
+    std::vector<uint256> removed_coinbases;
     
     if((m_Mode & MC_WMD_TXS) == 0)
     {
@@ -1069,6 +1071,10 @@ int mc_WalletTxs::RollBack(mc_TxImport *import,int block)
                                     }
                                 }                                
                                 if(fDebug)LogPrint("wallet","wtxs: Removing tx %s, block %d, flags: %08X, import %d\n",hash.ToString().c_str(),entrow->m_Block,entrow->m_Flags,imp->m_ImportID);
+                                if(wtx.IsCoinBase())
+                                {
+                                    removed_coinbases.push_back(hash);
+                                }
                             }
                         }
                         else
@@ -1120,6 +1126,11 @@ int mc_WalletTxs::RollBack(mc_TxImport *import,int block)
     if(err == MC_ERR_NOERROR)
     {
         err=m_Database->RollBack(import,block);                                 // Database rollback    
+        for(i=0;i<(int)removed_coinbases.size();i++)
+        {
+            uint256 hash=removed_coinbases[i];
+            m_Database->SaveTxFlag((unsigned char*)&hash,MC_TFL_INVALID,1);
+        }
     }
     if(err)
     {
@@ -2610,7 +2621,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     }
     
     fAlreadyInTheWalletForNotify=false;
-    if(!GetArg("-walletnotify", "").empty())
+    if(!GetArg("-walletnotify", "").empty() || !GetArg("-walletnotifynew", "").empty())
     {
         mc_TxDefRow StoredTxDef;
         if(m_Database->GetTx(&StoredTxDef,(unsigned char*)&hash) == 0)

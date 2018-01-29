@@ -56,9 +56,11 @@
 #define MC_ENT_SPRM_ISSUER                    0x03
 #define MC_ENT_SPRM_ANYONE_CAN_WRITE          0x04
 #define MC_ENT_SPRM_JSON_DETAILS              0x05
+#define MC_ENT_SPRM_PERMISSIONS               0x06
 #define MC_ENT_SPRM_ASSET_MULTIPLE            0x41
 #define MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION  0x42
 #define MC_ENT_SPRM_UPGRADE_START_BLOCK       0x43
+#define MC_ENT_SPRM_UPGRADE_CHAIN_PARAMS      0x44
 
 #define MC_ENT_FLAG_OFFSET_IS_SET     0x00000001
 #define MC_ENT_FLAG_NAME_IS_SET       0x00000010
@@ -135,6 +137,7 @@ typedef struct mc_EntityDetails
     unsigned char m_FullRef[MC_AST_ASSET_QUANTITY_OFFSET];                      // Full Entity reference, derived from short txid from v 10007
     char m_Name[MC_ENT_MAX_NAME_SIZE+6];                                        // Entity name
     uint32_t m_Flags;
+    uint32_t m_Permissions;
     unsigned char m_Reserved[36];   
     mc_EntityLedgerRow m_LedgerRow;
     void Zero();
@@ -145,11 +148,14 @@ typedef struct mc_EntityDetails
     const unsigned char* GetFullRef();    
     const unsigned char* GetShortRef();
     const unsigned char* GetScript();    
+    const unsigned char* GetParamUpgrades(int *size);    
+    
     int IsUnconfirmedGenesis();    
     int GetAssetMultiple();
     int IsFollowOn(); 
 //    int HasFollowOns(); 
     int AllowedFollowOns(); 
+    uint32_t Permissions(); 
     int AnyoneCanWrite(); 
     int UpgradeProtocolVersion(); 
     uint32_t UpgradeStartBlock(); 

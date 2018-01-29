@@ -355,7 +355,7 @@ int ubjson_write_internal(Value json_value,int known_type,mc_Script *lpScript,in
                             ssize=usize;                            
                         }
                     }
-                    value=array_value.size();
+                    value=(int)array_value.size();
                     ubj_type=ubjson_best_type(value,0,NULL,NULL,NULL);
                     if(ssize+(int64_t)array_value.size()+1 <= (int64_t)array_value.size()*UBJ_SIZE[last_type]+UBJ_SIZE[ubj_type]+4)
                     {
@@ -443,7 +443,7 @@ int ubjson_write_internal(Value json_value,int known_type,mc_Script *lpScript,in
                             ssize=usize;                            
                         }
                     }
-                    value=obj_value.size();
+                    value=(int)obj_value.size();
                     ubj_type=ubjson_best_type(value,0,NULL,NULL,NULL);
                     if(ssize+(int64_t)obj_value.size()+1 <= (int64_t)obj_value.size()*UBJ_SIZE[last_type]+UBJ_SIZE[ubj_type]+4)
                     {

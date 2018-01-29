@@ -18,14 +18,20 @@ int mc_OneMultichainParam::IsRelevant(int version)
 {
     int ret=1;
     
-    if(m_ProtocolVersion > version)
+    int relevant_version=mc_gState->RelevantParamProtocolVersion();
+    if(relevant_version == 0)
+    {
+        relevant_version=version;
+    }
+    
+    if(m_ProtocolVersion > relevant_version)
     {
         ret=0;
     }
     
     if(m_Removed > 0)
     {
-        if(m_Removed <= version)
+        if(m_Removed <= relevant_version)
         {
             ret=0;
         }
@@ -44,6 +50,7 @@ void mc_MultichainParams::Zero()
     m_Size=0;
     m_IsProtocolMultiChain=1;
     m_ProtocolVersion=0;
+    m_RelevantProtocolVersion=0;
     
     m_AssetRefSize=MC_AST_SHORT_TXID_SIZE;
 }
@@ -95,6 +102,32 @@ int64_t mc_MultichainParams::GetInt64Param(const char *param)
     return mc_GetLE(ptr,size);
 }
 
+double mc_MultichainParams::Int64ToDecimal(int64_t value)
+{
+    if(value < 0)
+    {
+        return -((double)(-value) / MC_PRM_DECIMAL_GRANULARITY);
+    }
+    return (double)value / MC_PRM_DECIMAL_GRANULARITY;    
+}
+
+int64_t mc_MultichainParams::DecimalToInt64(double value)
+{
+    return (int64_t)(value*MC_PRM_DECIMAL_GRANULARITY+mc_gState->m_NetworkParams->ParamAccuracy());    
+}
+
+int mc_MultichainParams::GetParamFromScript(char* script,int64_t *value,int *size)
+{
+    char *ptr;    
+    ptr=script;
+    ptr+=strlen(ptr)+1;
+    *size=(int)mc_GetLE(ptr,MC_PRM_PARAM_SIZE_BYTES);
+    ptr+=MC_PRM_PARAM_SIZE_BYTES;
+    *value=mc_GetLE(ptr,*size);
+    ptr+=*size;
+    return ptr-script; 
+}
+
 double mc_MultichainParams::GetDoubleParam(const char *param)
 {
     int n=(int)mc_gState->m_NetworkParams->GetInt64Param(param);
@@ -128,6 +161,112 @@ void* mc_MultichainParams::GetParam(const char *param,int* size)
     }
     
     return m_lpData+offset;
+}
+
+int mc_MultichainParams::IsParamUpgradeValueInRange(const mc_OneMultichainParam *param,int version,int64_t value)
+{
+    if(value >= param->m_MinIntegerValue)
+    {
+        if(value <= param->m_MaxIntegerValue)
+        {
+            return 1;
+        }        
+    }
+    return 0;
+}
+
+int mc_MultichainParams::CanBeUpgradedByVersion(const char *param,int version,int size)
+{
+    if(m_lpIndex == NULL)
+    {
+        return -MC_PSK_INTERNAL_ERROR;
+    }
+    int index=m_lpIndex->Get(param);
+    if(index<0)
+    {
+        return -MC_PSK_NOT_FOUND;
+    }   
+    int offset=m_lpCoord[2 * index + 0];
+    if(offset<0)
+    {
+        return -MC_PSK_NOT_FOUND;
+    }   
+    
+    if(size > 0)
+    {
+        if(size != m_lpCoord[2 * index + 1])
+        {
+            return -MC_PSK_WRONG_SIZE;
+        }
+    }
+    
+    if(version == 0)
+    {
+        return m_lpCoord[2 * index + 1];        
+    }
+    
+    if(strcmp(param,"maximumblocksize") == 0)
+    {
+        if(version >= 20002)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    if(strcmp(param,"targetblocktime") == 0)
+    {
+        if(GetInt64Param("targetadjustfreq") >= 0)
+        {
+            if(version >= 20002)
+            {
+                return m_lpCoord[2 * index + 1];
+            }
+        }
+    }
+    
+    if(strcmp(param,"maxstdtxsize") == 0)
+    {
+        if(version >= 20002)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    if(strcmp(param,"maxstdopreturnscount") == 0)
+    {
+        if(version >= 20002)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    if(strcmp(param,"maxstdopreturnsize") == 0)
+    {
+        if(version >= 20002)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    if(strcmp(param,"maxstdopdropscount") == 0)
+    {
+        if(version >= 20002)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    if(strcmp(param,"maxstdelementsize") == 0)
+    {
+        if(version >= 20002)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    
+    
+    return 0;
 }
 
 
@@ -447,6 +586,19 @@ double mc_MultichainParams::ParamAccuracy()
 }
 
 
+const mc_OneMultichainParam *mc_MultichainParams::FindParam(const char* param)
+{
+    int i;
+    for(i=0;i<m_Count;i++)
+    {
+        if(strcmp((MultichainParamArray+i)->m_Name,param) == 0)
+        {
+            return MultichainParamArray+i;
+        }        
+    }    
+    return NULL;
+}
+
 int mc_MultichainParams::Read(const char* name)
 {
     return Read(name,0,NULL,0);
@@ -460,6 +612,7 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
     mc_OneMultichainParam *param;
     char *ptrData;
     const char *ptr;
+    unsigned char custom_param[8];
     
     if(name == NULL)
     {
@@ -694,7 +847,12 @@ int mc_MultichainParams::Read(const char* name,int argc, char* argv[],int create
 
                 ptrData=m_lpData+offset+MC_PRM_PARAM_SIZE_BYTES;
 
-                ptr=(char*)lpDefaultParams->GetParam(param->m_Name,&size);
+                ptr=(char*)custom_get_blockchain_default(param->m_Name,&size,custom_param);
+                if(ptr == NULL)
+                {
+                    ptr=(char*)lpDefaultParams->GetParam(param->m_Name,&size);                    
+                }
+                
                 if(size)
                 {
                     memcpy(ptrData,ptr,size);
@@ -1087,23 +1245,26 @@ int mc_MultichainParams::Validate()
         if(isGenerated)
         {
             m_Status=MC_PRM_STATUS_GENERATED;
-            iv=GetInt64Param("targetblocktime");
-            if(iv>0)
+            dv=2*(double)GetInt64Param("rewardhalvinginterval");
+            dv*=(double)GetInt64Param("initialblockreward");
+            iv=GetInt64Param("firstblockreward");
+            if(iv<0)
             {
-                dv=2*(double)GetInt64Param("rewardhalvinginterval")/(double)iv;
-                dv*=(double)GetInt64Param("initialblockreward");
-                iv=GetInt64Param("firstblockreward");
-                if(iv<0)
-                {
-                    iv=GetInt64Param("initialblockreward");
-                }
-                dv+=(double)iv;
-                if(dv > 9.e+18)
-                {
-                    printf("Total mining reward over blockchain's history is more than 2^63 raw units. Please reduce initial-block-reward or reward-halving-interval.\n");
-                    return MC_ERR_INVALID_PARAMETER_VALUE;                                                                                    
-                }
-           }
+                iv=GetInt64Param("initialblockreward");
+            }
+            dv+=(double)iv;
+            if(dv > 9.e+18)
+            {
+                printf("Total mining reward over blockchain's history is more than 2^63 raw units. Please reduce initial-block-reward or reward-halving-interval.\n");
+                return MC_ERR_INVALID_PARAMETER_VALUE;                                                                                    
+            }
+            
+            GetParam("chaindescription",&size);
+            if(size-1 > 90)                                                     
+            {
+                printf("Invalid parameter value for chain-description - too long: %d\n",size-1);                
+                return MC_ERR_INVALID_PARAMETER_VALUE;                                                                                    
+            }
         }
         else
         {
@@ -1126,7 +1287,7 @@ int mc_MultichainParams::Print(FILE* fileHan)
     int i,c,size;
     int version;
     int header_printed;
-    int set,chars_remaining;
+    int set,chars_remaining,hidden;
     void *ptr;
     char line[MC_PRM_DAT_FILE_LINE_SIZE+1+100];
     char *cptr;
@@ -1184,6 +1345,7 @@ int mc_MultichainParams::Print(FILE* fileHan)
             if( (((m_lpParams+i)->m_Type & MC_PRM_SOURCE_MASK) == param_sets[set]) && 
                     ((m_lpParams+i)->IsRelevant(version) > 0))
             {
+                hidden=0;
                 if(header_printed == 0)
                 {
                     fprintf(fileHan,"\n");
@@ -1344,6 +1506,13 @@ int mc_MultichainParams::Print(FILE* fileHan)
                             else
                             {
                                 sprintf(line+strlen(line),"%ld",mc_GetLE(ptr,4));                                                                
+                                if((m_lpParams+i)->m_Type & MC_PRM_HIDDEN)
+                                {
+                                    if(mc_GetLE(ptr,4) == (m_lpParams+i)->m_DefaultIntegerValue)
+                                    {
+                                        hidden=1;
+                                    }
+                                }
                             }
                             break;
                         case MC_PRM_INT64:
@@ -1358,76 +1527,79 @@ int mc_MultichainParams::Print(FILE* fileHan)
                 {
                     sprintf(line+strlen(line),"[null]");                                                                                    
                 }
-                if(chars_remaining == 0)
+                if(hidden == 0)
                 {
-                    fprintf(fileHan,"%s",line);
-                    chars_remaining=MC_PRM_DAT_FILE_LINE_SIZE-strlen(line)+1;
-                }
-                for(c=0;c<chars_remaining;c++)
-                {
-                    fprintf(fileHan," ");
-                }
-                cptr=(m_lpParams+i)->m_Description;
-                while(*cptr)
-                {
-                    c=0;
-                    
-                    while((c<(int)strlen(cptr)) && (cptr[c]!='\n'))
+                    if(chars_remaining == 0)
                     {
-                        c++;
+                        fprintf(fileHan,"%s",line);
+                        chars_remaining=MC_PRM_DAT_FILE_LINE_SIZE-strlen(line)+1;
                     }
-                    
-                    if(c<(int)strlen(cptr))
+                    for(c=0;c<chars_remaining;c++)
                     {
-                        cptr[c]=0x00;
-                        fprintf(fileHan,"# %s",cptr);
-                        memset(line,0x20,MC_PRM_DAT_FILE_LINE_SIZE);
-                        line[MC_PRM_DAT_FILE_LINE_SIZE]=0x00;
-                        fprintf(fileHan,"\n%s ",line);
-                        cptr+=c+1;
+                        fprintf(fileHan," ");
                     }
-                    else
+                    cptr=(m_lpParams+i)->m_Description;
+                    while(*cptr)
                     {
-                        fprintf(fileHan,"# %s",cptr);
-                        cptr+=c;
-                    }
-                }
+                        c=0;
 
-                switch((m_lpParams+i)->m_Type & MC_PRM_DATA_TYPE_MASK)
-                {
-                    case MC_PRM_INT32:
-                    case MC_PRM_INT64:
-                    case MC_PRM_UINT32:
-                        switch(param_sets[set])
+                        while((c<(int)strlen(cptr)) && (cptr[c]!='\n'))
                         {
-                            case MC_PRM_COMMENT:
-                            case MC_PRM_USER:
-                                if((m_lpParams+i)->m_MinIntegerValue <= (m_lpParams+i)->m_MaxIntegerValue)
-                                {
-                                    if((m_lpParams+i)->m_Type & MC_PRM_DECIMAL)
-                                    {
-                                        d1=0;
-                                        if((m_lpParams+i)->m_MinIntegerValue)
-                                        {
-                                            d1=((double)((m_lpParams+i)->m_MinIntegerValue)+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
-                                        }
-                                        d2=0;
-                                        if((m_lpParams+i)->m_MaxIntegerValue)
-                                        {
-                                            d2=((double)((m_lpParams+i)->m_MaxIntegerValue)+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
-                                        }
-                                        fprintf(fileHan," (%0.6g - %0.6g)",d1,d2);                            
-                                    }
-                                    else
-                                    {
-                                        fprintf(fileHan," (%ld - %ld)",(m_lpParams+i)->m_MinIntegerValue,(m_lpParams+i)->m_MaxIntegerValue);                            
-                                    }
-                                }
-                                break;
+                            c++;
                         }
-                        break;
+
+                        if(c<(int)strlen(cptr))
+                        {
+                            cptr[c]=0x00;
+                            fprintf(fileHan,"# %s",cptr);
+                            memset(line,0x20,MC_PRM_DAT_FILE_LINE_SIZE);
+                            line[MC_PRM_DAT_FILE_LINE_SIZE]=0x00;
+                            fprintf(fileHan,"\n%s ",line);
+                            cptr+=c+1;
+                        }
+                        else
+                        {
+                            fprintf(fileHan,"# %s",cptr);
+                            cptr+=c;
+                        }
+                    }
+
+                    switch((m_lpParams+i)->m_Type & MC_PRM_DATA_TYPE_MASK)
+                    {
+                        case MC_PRM_INT32:
+                        case MC_PRM_INT64:
+                        case MC_PRM_UINT32:
+                            switch(param_sets[set])
+                            {
+                                case MC_PRM_COMMENT:
+                                case MC_PRM_USER:
+                                    if((m_lpParams+i)->m_MinIntegerValue <= (m_lpParams+i)->m_MaxIntegerValue)
+                                    {
+                                        if((m_lpParams+i)->m_Type & MC_PRM_DECIMAL)
+                                        {
+                                            d1=0;
+                                            if((m_lpParams+i)->m_MinIntegerValue)
+                                            {
+                                                d1=((double)((m_lpParams+i)->m_MinIntegerValue)+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
+                                            }
+                                            d2=0;
+                                            if((m_lpParams+i)->m_MaxIntegerValue)
+                                            {
+                                                d2=((double)((m_lpParams+i)->m_MaxIntegerValue)+ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
+                                            }
+                                            fprintf(fileHan," (%0.6g - %0.6g)",d1,d2);                            
+                                        }
+                                        else
+                                        {
+                                            fprintf(fileHan," (%ld - %ld)",(m_lpParams+i)->m_MinIntegerValue,(m_lpParams+i)->m_MaxIntegerValue);                            
+                                        }
+                                    }
+                                    break;
+                            }
+                            break;
+                    }
+                    fprintf(fileHan,"\n");                    
                 }
-                fprintf(fileHan,"\n");                    
             }
             
             if(strlen((m_lpParams+i)->m_Next))
@@ -1543,6 +1715,10 @@ const unsigned char* mc_MultichainParams::AddressCheckumValue()
 
 int mc_MultichainParams::ProtocolVersion()
 {
+    if(mc_gState->m_NetworkParams->m_RelevantProtocolVersion)
+    {
+        return mc_gState->m_NetworkParams->m_RelevantProtocolVersion;
+    }
     if(m_ProtocolVersion)
     {
         return m_ProtocolVersion;
@@ -1952,6 +2128,46 @@ int mc_Features::FixedIsUnspendable()
     if(protocol)
     {
         if(protocol >= 20001)
+        {
+            ret=1;
+        }
+    }
+    
+    return ret;    
+}
+
+int mc_Features::PerAssetPermissions()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 20002)
+        {
+            ret=1;
+        }
+    }
+    
+    return ret;    
+}
+
+int mc_Features::ParameterUpgrades()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 20002)
         {
             ret=1;
         }

@@ -554,6 +554,14 @@ public:
         }
     }
     
+    void SetMultiChainParam(const char*param_name,int64_t value)
+    {
+        if(strcmp(param_name,"targetblocktime") == 0)
+        {
+            nTargetSpacing=value;
+        }
+    }
+    
     void SetMultiChainRuntimeParams()
     {
         fMineBlocksOnDemand = GetBoolArg("-mineblocksondemand", false);
@@ -780,6 +788,12 @@ void SetMultiChainParams()
 {
     multiChainParams.SetMultiChainParams();
 }
+
+void SetMultiChainParam(const char*param_name,int64_t value)
+{
+    multiChainParams.SetMultiChainParam(param_name,value);
+}
+
 
 void SetMultiChainRuntimeParams()
 {

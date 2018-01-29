@@ -201,13 +201,12 @@ Value sendfromaddress(const Array& params, bool fHelp)
     vector<CTxDestination> addresses;    
     addresses.push_back(address.Get());
         
-    mc_Script *lpScript;
-    
-    lpScript=NULL;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
     
     if (params[2].type() == obj_type)
     {
-        lpScript=new mc_Script;
+        lpScript->Clear();
         uint256 offer_hash;
 
         if (params[2].type() != obj_type)
@@ -275,11 +274,6 @@ Value sendfromaddress(const Array& params, bool fHelp)
     
     SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(), fromaddresses);
     
-    if(lpScript)
-    {
-        delete lpScript;
-    }
-    
     return wtx.GetHash().GetHex();
 }
 
@@ -307,13 +301,12 @@ Value sendwithmetadatafrom(const Array& params, bool fHelp)
     vector<CTxDestination> addresses;    
     addresses.push_back(address.Get());
         
-    mc_Script *lpScript;
-    
-    lpScript=NULL;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;    
+    lpScript->Clear();
     
     if (params[2].type() == obj_type)
     {
-        lpScript=new mc_Script;
+        lpScript->Clear();
         uint256 offer_hash;
 
         if (params[2].type() != obj_type)
@@ -401,11 +394,6 @@ Value sendwithmetadatafrom(const Array& params, bool fHelp)
     LOCK (pwalletMain->cs_wallet_send);
     
     SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, scriptOpReturn, fromaddresses);
-    
-    if(lpScript)
-    {
-        delete lpScript;
-    }
     
     return wtx.GetHash().GetHex();
 }
@@ -623,8 +611,9 @@ Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp)
     vector<CTxDestination> addresses;    
     addresses.push_back(CTxDestination(pkey.GetID()));
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
+    
     CAmount nAmount=0;
     uint256 offer_hash;
     bool lock_it=true;
@@ -703,8 +692,6 @@ Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp)
         }        
     }
     
-    delete lpScript;
-            
     
     if(lock_it)
     {
@@ -737,8 +724,9 @@ Value preparelockunspent(const json_spirit::Array& params, bool fHelp)
     vector<CTxDestination> addresses;    
     addresses.push_back(CTxDestination(pkey.GetID()));
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
+    
     CAmount nAmount=0;
     uint256 offer_hash;
     bool lock_it=true;
@@ -820,9 +808,6 @@ Value preparelockunspent(const json_spirit::Array& params, bool fHelp)
         }        
     }
     
-    delete lpScript;
-            
-    
     if(lock_it)
     {
         COutPoint outpt(wtx.GetHash(),vout);
@@ -866,8 +851,8 @@ Value sendassetfrom(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Destination address doesn't have receive permission");        
     }
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
     
     unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
     memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
@@ -902,18 +887,13 @@ Value sendassetfrom(const Array& params, bool fHelp)
     
     mc_SetABQuantity(buf,quantity);
     
-    mc_Buffer *lpBuffer;
-    lpBuffer=new mc_Buffer;
-    
-    mc_InitABufferDefault(lpBuffer);
+    mc_Buffer *lpBuffer=mc_gState->m_TmpBuffers->m_RpcABNoMapBuffer1;
+    lpBuffer->Clear();
     
     lpBuffer->Add(buf);
     
     lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);
     
-    delete lpBuffer;
-    
-
     vector<CTxDestination> addresses;    
     addresses.push_back(address.Get());
     
@@ -961,8 +941,6 @@ Value sendassetfrom(const Array& params, bool fHelp)
     
     SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(),fromaddresses);
 
-    delete lpScript;
-    
     return wtx.GetHash().GetHex();
 }
 
@@ -1004,8 +982,8 @@ Value sendassettoaddress(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Destination address doesn't have receive permission");        
     }
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
     
     unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
     memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
@@ -1040,8 +1018,8 @@ Value sendassettoaddress(const Array& params, bool fHelp)
     
     mc_SetABQuantity(buf,quantity);
     
-    mc_Buffer *lpBuffer;
-    lpBuffer=new mc_Buffer;
+    mc_Buffer *lpBuffer=mc_gState->m_TmpBuffers->m_RpcABNoMapBuffer1;
+    lpBuffer->Clear();
     
     mc_InitABufferDefault(lpBuffer);
     
@@ -1049,9 +1027,6 @@ Value sendassettoaddress(const Array& params, bool fHelp)
     
     lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);
     
-    delete lpBuffer;
-    
-
     vector<CTxDestination> addresses;    
     addresses.push_back(address.Get());
     
@@ -1061,8 +1036,6 @@ Value sendassettoaddress(const Array& params, bool fHelp)
     LOCK (pwalletMain->cs_wallet_send);
     
     SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(),fromaddresses);
-    
-    delete lpScript;
     
     return wtx.GetHash().GetHex();
 }

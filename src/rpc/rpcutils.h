@@ -85,6 +85,7 @@ int ParseAssetKeyToFullAssetRef(const char* asset_key,unsigned char *full_asset_
 Array AddressEntries(const CTxIn& txin,txnouttype& typeRet,mc_Script *lpScript);
 Array AddressEntries(const CTxOut& txout,txnouttype& typeRet);
 Value PermissionForFieldEntry(mc_EntityDetails *lpEntity);
+Array PerOutputDataEntries(const CTxOut& txout,mc_Script *lpScript,uint256 txid,int vout);
 Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong);
 Object StreamEntry(const unsigned char *txid,uint32_t output_level);
 Object UpgradeEntry(const unsigned char *txid);
@@ -107,7 +108,7 @@ void ParseRawAction(string action,bool& lock_it, bool& sign_it,bool& send_it);
 bool paramtobool(Value param);
 int paramtoint(Value param,bool check_for_min,int min_value,string error_message);
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
-vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,int *errorCode,string *strError);
+vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,bool allow_formatted,int *errorCode,string *strError);
 void ParseRawDetails(const Value *value,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError);
 bool mc_IsJsonObjectForMerge(const Value *value,int level);
 Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int level,int *error);

@@ -102,12 +102,11 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     entry.push_back(Pair("vin", vin));
 
 /* MCHN START */    
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer2;
+    asset_amounts->Clear();
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript4;
+    lpScript->Clear();    
 /* MCHN END */    
     
     Array vdata;
@@ -355,6 +354,11 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         {
             out.push_back(Pair("permissions", permissions));
         }
+        Array peroutputdata=PerOutputDataEntries(txout,lpScript,tx.GetHash(),i);
+        if(peroutputdata.size())
+        {
+            out.push_back(Pair("data", peroutputdata));
+        }
         
         Array items;
         Value data_item_entry=DataItemEntry(tx,i,streams_already_seen, 0x03);
@@ -482,10 +486,6 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         entry.push_back(Pair("data", aFullFormatMetaData));
     }
 
-    delete lpScript;
-    delete asset_amounts;
-    
-    
     if (hashBlock != 0) {
         entry.push_back(Pair("blockhash", hashBlock.GetHex()));
         BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
@@ -559,6 +559,9 @@ Value listunspent(const Array& params, bool fHelp)
         nMaxDepth = params[1].get_int64();
 
     set<CBitcoinAddress> setAddress;
+    set<uint160> setAddressUints;
+    set<uint160> *lpSetAddressUint=NULL;
+    CTxDestination dest;
     if (params.size() > 2) {
         Array inputs = params[2].get_array();
         BOOST_FOREACH(Value& input, inputs) {
@@ -567,17 +570,36 @@ Value listunspent(const Array& params, bool fHelp)
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid address: ")+input.get_str());
             if (setAddress.count(address))
                 throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ")+input.get_str());
-           setAddress.insert(address);
+            setAddress.insert(address);
+
+            dest=address.Get();
+            const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
+            const CScriptID *lpScriptID=boost::get<CScriptID> (&dest);
+            if(lpKeyID)
+            {
+                setAddressUints.insert(*(uint160*)lpKeyID);
+            }
+            else
+            {
+                if(lpScriptID)
+                {
+                    setAddressUints.insert(*(uint160*)lpScriptID);
+                }
+           }
+        }
+        
+        if(setAddressUints.size())
+        {
+            lpSetAddressUint=&setAddressUints;
         }
     }
 /* MCHN START */        
 
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
+    asset_amounts->Clear();
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();    
     
     {
         LOCK(pwalletMain->cs_wallet);
@@ -589,7 +611,7 @@ Value listunspent(const Array& params, bool fHelp)
     vector<COutput> vecOutputs;
     assert(pwalletMain != NULL);
 //    pwalletMain->AvailableCoins(vecOutputs, false);
-    pwalletMain->AvailableCoins(vecOutputs, false, NULL, true, true);
+    pwalletMain->AvailableCoins(vecOutputs, false, NULL, true, true, 0, lpSetAddressUint);
     BOOST_FOREACH(const COutput& out, vecOutputs) {
         if (out.nDepth < nMinDepth || out.nDepth > nMaxDepth)
             continue;
@@ -689,6 +711,13 @@ Value listunspent(const Array& params, bool fHelp)
         }
         Array permissions=PermissionEntries(txout,lpScript,false);
         entry.push_back(Pair("permissions", permissions));
+        
+        Array peroutputdata=PerOutputDataEntries(txout,lpScript,hash,out.i);
+        if(peroutputdata.size())
+        {
+            entry.push_back(Pair("data", peroutputdata));
+        }
+        
 //        entry.push_back(Pair("spendable", out.fSpendable));
 /* MCHN END */                
         results.push_back(entry);
@@ -696,9 +725,6 @@ Value listunspent(const Array& params, bool fHelp)
 
 /* MCHN START */        
 
-    delete lpScript;
-    delete asset_amounts;
-    
 /* MCHN END */        
     return results;
 }
@@ -749,15 +775,13 @@ Value appendrawchange(const Array& params, bool fHelp)
         }        
     }
     
-    mc_Buffer *asset_amounts;
-    asset_amounts=new mc_Buffer;
-    mc_InitABufferMap(asset_amounts);
-    mc_Buffer *amounts;
-    amounts=new mc_Buffer;
-    mc_InitABufferMap(amounts);
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
+    asset_amounts->Clear();
+    mc_Buffer *amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer2;
+    amounts->Clear();
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();    
 
     int allowed=0;
     int required=0;
@@ -933,10 +957,6 @@ Value appendrawchange(const Array& params, bool fHelp)
         }                    
     }        
     
-    delete lpScript;
-    delete asset_amounts;    
-    delete amounts;    
-
     
     return EncodeHexTx(txNew);    
 }
@@ -1093,9 +1113,7 @@ void AddCacheInputScriptIfNeeded(CMutableTransaction& rawTx,Array inputs, bool f
     
     if(fNewOutputs)
     {
-        mc_Script *lpDetails;
-        lpDetails=new mc_Script;
-    
+        mc_Script *lpDetails=mc_gState->m_TmpBuffers->m_RpcScript4;
         lpDetails->Clear();
         for(int i=0;i<(int)cache_array.size();i++)
         {

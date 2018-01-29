@@ -446,6 +446,42 @@ Value PermissionForFieldEntry(mc_EntityDetails *lpEntity)
     return Value::null;
 }
 
+Array PerOutputDataEntries(const CTxOut& txout,mc_Script *lpScript,uint256 txid,int vout)
+{
+    Array results;
+    unsigned char *ptr;
+    int size;
+    
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return results;
+    }    
+    
+    const CScript& script1 = txout.scriptPubKey;        
+    CScript::const_iterator pc1 = script1.begin();
+
+    lpScript->Clear();
+    lpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+    
+    for (int e = 0; e < lpScript->GetNumElements(); e++)
+    {
+        lpScript->SetElement(e);
+        if(lpScript->GetRawData(&ptr,&size) == 0)      
+        {
+            uint32_t format=MC_SCR_DATA_FORMAT_UNKNOWN;
+            if(e > 0)
+            {
+                lpScript->SetElement(e-1);
+                lpScript->GetDataFormat(&format);
+            }
+            results.push_back(OpReturnFormatEntry(ptr,size,txid,vout,format,NULL));            
+        }        
+    }
+    
+    return results;
+}
+
+
 Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong)
 {
     Array results;
@@ -486,7 +522,8 @@ Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong)
             {                
                 Object entry;
                 entry.push_back(Pair("for", PermissionForFieldEntry(&entity)));            
-                full_type=mc_gState->m_Permissions->GetPossiblePermissionTypes(entity.GetEntityType());
+//                full_type=mc_gState->m_Permissions->GetPossiblePermissionTypes(entity.GetEntityType());
+                full_type=mc_gState->m_Permissions->GetPossiblePermissionTypes(&entity);
                 if(full_type & MC_PTP_CONNECT)entry.push_back(Pair("connect", (type & MC_PTP_CONNECT) ? true : false));
                 if(full_type & MC_PTP_SEND)entry.push_back(Pair("send", (type & MC_PTP_SEND) ? true : false));
                 if(full_type & MC_PTP_RECEIVE)entry.push_back(Pair("receive", (type & MC_PTP_RECEIVE) ? true : false));
@@ -715,6 +752,64 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
     return entry;
 }
 
+map<string, Value> ParamsToUpgrade(mc_EntityDetails *entity,int version)   
+{
+    map<string, Value> result;
+    int size=0;
+    const mc_OneMultichainParam *param;
+    char* ptr=(char*)entity->GetParamUpgrades(&size);
+    char* ptrEnd;
+    string param_name;
+    int param_size,given_size;
+    int64_t param_value;
+    if(ptr)
+    {
+        ptrEnd=ptr+size;
+        while(ptr<ptrEnd)
+        {
+            param=mc_gState->m_NetworkParams->FindParam(ptr);
+            ptr+=mc_gState->m_NetworkParams->GetParamFromScript(ptr,&param_value,&given_size);
+            
+            if(strcmp(ptr,"protocolversion"))
+            {        
+                if(param)
+                {
+                    param_size=mc_gState->m_NetworkParams->CanBeUpgradedByVersion(param->m_Name,version,0);
+                    if( (param_size > 0) && (param_size == given_size) )
+                    {
+                        param_name=string(param->m_DisplayName);
+                        if(result.find(param_name) == result.end())
+                        {
+                            if(param->m_Type & MC_PRM_DECIMAL)
+                            {
+                                result.insert(make_pair(param_name, mc_gState->m_NetworkParams->Int64ToDecimal(param_value)));
+                            }
+                            else
+                            {
+                                switch(param->m_Type & MC_PRM_DATA_TYPE_MASK)
+                                {
+                                    case MC_PRM_BOOLEAN:
+                                        result.insert(make_pair(param_name, (param_value != 0) ));
+                                        break;
+                                    case MC_PRM_INT32:
+                                        result.insert(make_pair(param_name, (int)param_value));
+                                    case MC_PRM_UINT32:
+                                    case MC_PRM_INT64:
+                                        result.insert(make_pair(param_name, param_value));
+                                        break;
+                                }                                
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+        
+    return result;    
+}
+
+
 Object UpgradeEntry(const unsigned char *txid)
 {
     Object entry;
@@ -740,7 +835,15 @@ Object UpgradeEntry(const unsigned char *txid)
         }
         entry.push_back(Pair("createtxid", hash.GetHex()));
         Object fields;
-        fields.push_back(Pair("protocol-version",entity.UpgradeProtocolVersion()));                    
+        map<string, Value> params_to_upgrade=ParamsToUpgrade(&entity,0);
+        if(entity.UpgradeProtocolVersion())
+        {
+            fields.push_back(Pair("protocol-version",entity.UpgradeProtocolVersion()));                    
+        }
+        for(map<string,Value>::iterator it = params_to_upgrade.begin(); it != params_to_upgrade.end(); ++it) 
+        {
+            fields.push_back(Pair(it->first, it->second));  
+        }
         entry.push_back(Pair("params",fields));      
         entry.push_back(Pair("startblock",(int64_t)entity.UpgradeStartBlock()));                    
         
@@ -1005,7 +1108,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
 // output_level constants
 // 0x0000 minimal: name, assetref, non-negative qty, negative actual issueqty    
 // 0x0001 raw 
-// 0x0002 multiple, units, open, details
+// 0x0002 multiple, units, open, details, permissions
 // 0x0004 issuetxid,     
 // 0x0008 subscribed/synchronized    
 // 0x0020 issuers
@@ -1071,9 +1174,11 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         uint64_t multiple=1;
         const unsigned char *ptr;
         double units=1.;
+        uint32_t permissions;
 
         ptr=entity.GetScript();
         multiple=genesis_entity.GetAssetMultiple();
+        permissions=genesis_entity.Permissions();
         units= 1./(double)multiple;
         if(output_level & 0x0002)
         {
@@ -1088,6 +1193,13 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                 else
                 {
                     entry.push_back(Pair("open",false));                                            
+                }
+                if(mc_gState->m_Features->PerAssetPermissions())
+                {
+                    Object pObject;
+                    pObject.push_back(Pair("send",(permissions & MC_PTP_SEND) ? true : false));
+                    pObject.push_back(Pair("receive",(permissions & MC_PTP_RECEIVE) ? true : false));
+                    entry.push_back(Pair("restrict",pObject));                                            
                 }
             }
         }
@@ -1284,10 +1396,10 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
 {
     string strError="";
     unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
-    mc_Buffer *lpBuffer;
-    mc_Buffer *lpFollowonBuffer;
-    lpBuffer=new mc_Buffer;
-    lpFollowonBuffer=new mc_Buffer;
+    mc_Buffer *lpBuffer=mc_gState->m_TmpBuffers->m_RpcABNoMapBuffer1;
+    lpBuffer->Clear();
+    mc_Buffer *lpFollowonBuffer=mc_gState->m_TmpBuffers->m_RpcABNoMapBuffer2;
+    lpFollowonBuffer->Clear();
     int assets_per_opdrop=(MAX_STANDARD_TX_SIZE)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
     int32_t verify_level=-1;
     int asset_error=0;
@@ -1304,9 +1416,6 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
     
     memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
     
-    mc_InitABufferDefault(lpBuffer);
-    mc_InitABufferDefault(lpFollowonBuffer);
-    
     if(mc_gState->m_Features->VerifySizeOfOpDropElements())
     {        
         if(mc_gState->m_Features->VerifySizeOfOpDropElements())
@@ -1317,7 +1426,8 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
     
     BOOST_FOREACH(const Pair& a, param.get_obj()) 
     {
-        if(a.value_.type() == obj_type)
+        if( (a.value_.type() == obj_type) ||
+            (( (a.value_.type() == str_type) || (a.value_.type() == array_type) ) && (a.name_== "data")) )
         {
             bool parsed=false;
             
@@ -1455,6 +1565,47 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                 lpScript->SetAssetQuantities(lpFollowonBuffer,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);                
                 parsed=true;
             }
+
+            if(!parsed && (a.name_ == "data"))
+            {
+                Array arr;
+                if( (a.value_.type() == str_type) || (a.value_.type() == obj_type) )
+                {
+                    arr.push_back(a.value_);
+                }
+                else
+                {
+                    if(a.value_.type() == array_type)
+                    {
+                        arr=a.value_.get_array();
+                    }
+                }
+                
+                for(int i=0;i<(int)arr.size();i++)
+                {
+                    uint32_t data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
+                    int errorCode=RPC_INVALID_PARAMETER;
+
+                    mc_gState->m_TmpScript->Clear();
+
+                    vector<unsigned char> vData=ParseRawFormattedData(&(arr[i]),&data_format,mc_gState->m_TmpScript,true,&errorCode,&strError);
+                    if(strError.size())
+                    {
+                        if(eErrorCode)
+                        {
+                            *eErrorCode=errorCode;
+                        }
+                        goto exitlbl;
+                    }
+
+                    if(data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
+                    {
+                        lpScript->SetDataFormat(data_format);                    
+                    }
+                    lpScript->SetRawData(&(vData[0]),(int)vData.size());                    
+                }
+                parsed=true;
+            }
             
             if(!parsed && (a.name_ == "permissions"))
             {
@@ -1570,7 +1721,8 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                 
                 if(type_string.size())
                 {
-                    type=mc_gState->m_Permissions->GetPermissionType(type_string.c_str(),entity.GetEntityType());
+                    type=mc_gState->m_Permissions->GetPermissionType(type_string.c_str(),&entity);
+//                    type=mc_gState->m_Permissions->GetPermissionType(type_string.c_str(),entity.GetEntityType());
                     if(entity.GetEntityType() == MC_ENT_TYPE_NONE)
                     {
                         if(required)
@@ -1708,9 +1860,6 @@ exitlbl:
             break;
     }
                     
-    delete lpBuffer;
-    delete lpFollowonBuffer;
-
     return strError;
     
 }
@@ -1853,6 +2002,11 @@ CScript GetScriptForString(string source)
         destinations.push_back(tok);
     }    
     
+    if(destinations.size() == 0)
+    {
+        throw runtime_error(" Address cannot be empty");        
+    }   
+    
     if(destinations.size() == 1)
     {
         CBitcoinAddress address(destinations[0]);
@@ -1923,8 +2077,8 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
         }
         else
         {
-            mc_Script *lpScript;
-            lpScript=new mc_Script;
+            mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript4;
+            lpScript->Clear();
 //            uint256 offer_hash;
             size_t elem_size;
             const unsigned char *elem;
@@ -1953,7 +2107,6 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
                 else
                     throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
             }                
-            delete lpScript;
         }
 
         vecSend.push_back(make_pair(scriptPubKey, nAmount));

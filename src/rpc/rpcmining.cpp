@@ -171,7 +171,8 @@ Value setgenerate(const Array& params, bool fHelp)
         while (nHeight < nHeightEnd)
         {
             int canMine=0;
-            auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithDefaultKey(pwalletMain,&canMine,lpMinerAddresses));
+            CBlockIndex *pindexPrev;
+            auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithDefaultKey(pwalletMain,&canMine,lpMinerAddresses,&pindexPrev));
 //            auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey));
             if (!pblocktemplate.get())
             {
@@ -196,7 +197,7 @@ Value setgenerate(const Array& params, bool fHelp)
             {
                 LOCK(cs_main);
 /* MCHN START */                
-                IncrementExtraNonce(pblock, chainActive.Tip(), nExtraNonce,pwalletMain);
+                IncrementExtraNonce(pblock, pindexPrev, nExtraNonce,pwalletMain);
 //                IncrementExtraNonce(pblock, chainActive.Tip(), nExtraNonce);
 /* MCHN START */                
             }

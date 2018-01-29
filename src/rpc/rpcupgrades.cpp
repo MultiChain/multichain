@@ -6,6 +6,8 @@
 
 
 #include "rpc/rpcwallet.h"
+bool AddParamNameValueToScript(const string  param_name,const Value param_value,mc_Script *lpDetailsScript,int version,int *errorCode,string *strError);
+int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,vector<mc_UpgradeStatus> *vUpgrades);
 
 Value createupgradefromcmd(const Array& params, bool fHelp)
 {
@@ -22,16 +24,18 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
 
     CWalletTx wtx;
     
-    mc_Script *lpScript;
-    
-    mc_Script *lpDetailsScript;
-    lpDetailsScript=NULL;
-    
-    mc_Script *lpDetails;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;    
+    lpScript->Clear();
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
+    lpDetailsScript->Clear();
+    mc_Script *lpDetails=mc_gState->m_TmpBuffers->m_RpcScript2;
+    lpDetails->Clear();
     
     int ret,type;
     string upgrade_name="";
-
+    string strError="";
+    int errorCode=RPC_INVALID_PARAMETER;
+    
     if (params[2].type() != str_type)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid upgrade name, should be string");
             
@@ -71,100 +75,6 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
         }        
     }
 
-    lpScript=new mc_Script;
-    
-    lpDetails=new mc_Script;
-    lpDetails->AddElement();
-    if(upgrade_name.size())
-    {        
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(unsigned char*)(upgrade_name.c_str()),upgrade_name.size());//+1);
-    }
-    
-    if(params[3].type() != bool_type)
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid open flag, should be boolean");
-    if(params[3].get_bool())
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid open flag, should be false");
-    
-    
-    bool protocol_version_found=false;
-    int protocol_version;
-    int start_block;
-
-    if(params[4].type() == obj_type)
-    {
-        Object objParams = params[4].get_obj();
-        BOOST_FOREACH(const Pair& s, objParams) 
-        {  
-            if(s.name_ == "protocol-version")
-            {
-                if(s.value_.type() != int_type)
-                {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid protocol version, expecting integer");                                                                
-                }
-                protocol_version_found=true;
-                protocol_version=s.value_.get_int();
-                if( (protocol_version < mc_gState->MinProtocolVersion()) || 
-                    ( -mc_gState->VersionInfo(protocol_version) != mc_gState->GetNumericVersion() ) )
-                {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid value for protocol version. Valid range: %s\n",mc_SupportedProtocols().c_str()));                                                                                    
-                }
-                
-                if( protocol_version < mc_gState->MinProtocolDowngradeVersion() )
-                {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid protocol version, cannot downgrade to this version");                                                                                                        
-                }
-                lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,(unsigned char*)&protocol_version,4);        
-            }
-            else
-            {
-                if(s.name_ == "startblock")
-                {
-                    if(s.value_.type() != int_type)
-                    {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start block, expecting integer");                                                                
-                    }
-                    start_block=s.value_.get_int();
-                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_START_BLOCK,(unsigned char*)&start_block,4);        
-                }                    
-                else
-                {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter name");                                                                
-//                    lpDetails->SetParamValue(s.name_.c_str(),s.name_.size(),(unsigned char*)s.value_.get_str().c_str(),s.value_.get_str().size());                                        
-                }
-            }                
-        }
-    }
-    else
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields, expecting object");                                        
-    }
-
-    if(!protocol_version_found)
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "protocol-version is required");                                                
-    }
-    
-    
-    size_t bytes;
-    const unsigned char *script;
-    script=lpDetails->GetData(0,&bytes);
-    
-    lpDetailsScript=new mc_Script;
-
-    int err;
-    size_t elem_size;
-    const unsigned char *elem;
-    CScript scriptOpReturn=CScript();
-    
-    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_UPGRADE,0,script,bytes);
-    if(err)
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or upgrade name, too long");                                                        
-    }
-
-    elem = lpDetailsScript->GetData(0,&elem_size);
-    scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;        
-    
     vector<CTxDestination> addresses;    
     
     vector<CTxDestination> fromaddresses;        
@@ -224,19 +134,157 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
         }        
     }
     
+    lpScript->Clear();
+    
+    lpDetails->Clear();
+    lpDetails->AddElement();
+    if(upgrade_name.size())
+    {        
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(unsigned char*)(upgrade_name.c_str()),upgrade_name.size());//+1);
+    }
+    
+    if(params[3].type() != bool_type)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid open flag, should be boolean");
+    if(params[3].get_bool())
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid open flag, should be false");
+    
+    
+    bool protocol_version_found=false;
+    int protocol_version;
+    int start_block;
+    CScript scriptOpReturn=CScript();
+    
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();                   
+
+    if(params[4].type() == obj_type)
+    {
+        Object objParams = params[4].get_obj();
+        BOOST_FOREACH(const Pair& s, objParams) 
+        {  
+            if(s.name_ == "protocol-version")
+            {
+                if(s.value_.type() != int_type)
+                {
+                    strError="Invalid protocol version, expecting integer";
+                    goto exitlbl;
+                }
+                protocol_version_found=true;
+                protocol_version=s.value_.get_int();
+                if( (protocol_version < mc_gState->MinProtocolVersion()) || 
+                    ( -mc_gState->VersionInfo(protocol_version) != mc_gState->GetNumericVersion() ) )
+                {
+                    strError=strprintf("Invalid value for protocol version. Valid range: %s\n",mc_SupportedProtocols().c_str());
+                    goto exitlbl;
+                }
+                
+                if( protocol_version < mc_gState->MinProtocolDowngradeVersion() )
+                {
+                    strError="Invalid protocol version, cannot downgrade to this version";
+                    goto exitlbl;
+                }
+                if( mc_gState->m_NetworkParams->ProtocolVersion() >= mc_gState->MinProtocolForbiddenDowngradeVersion() )
+                {
+                    if(protocol_version < mc_gState->m_NetworkParams->ProtocolVersion())
+                    {
+                        strError="Invalid protocol version, cannot downgrade from current version";
+                        errorCode=RPC_NOT_ALLOWED;
+                        goto exitlbl;
+                    }                    
+                }
+                lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,(unsigned char*)&protocol_version,4);        
+            }
+            else
+            {
+                if(s.name_ == "startblock")
+                {
+                    if(s.value_.type() != int_type)
+                    {
+                        strError="Invalid start block, expecting integer";
+                        goto exitlbl;
+                    }
+                    start_block=s.value_.get_int();
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_START_BLOCK,(unsigned char*)&start_block,4);        
+                }                    
+                else
+                {
+                    if(mc_gState->m_Features->ParameterUpgrades())
+                    {                        
+                        if(!AddParamNameValueToScript(s.name_,s.value_,lpDetailsScript,0,&errorCode,&strError))
+                        {
+                            goto exitlbl;
+                        }
+                    }
+                    else
+                    {
+                        strError="Some upgrade parameters are not supported by the current protocol, please upgrade protocol separately first.";
+                        goto exitlbl;
+                    }
+//                    lpDetails->SetParamValue(s.name_.c_str(),s.name_.size(),(unsigned char*)s.value_.get_str().c_str(),s.value_.get_str().size());                                        
+                }
+            }                
+        }
+        
+    }
+    else
+    {
+        strError="Invalid custom fields, expecting object";
+        goto exitlbl;
+    }
+
+    size_t bytes;
+    const unsigned char *script;
+    
+    script = lpDetailsScript->GetData(0,&bytes);
+    if( !protocol_version_found && (bytes == 0) )
+    {        
+        strError="Missing protocol-version";
+        if(mc_gState->m_Features->ParameterUpgrades())
+        {
+            strError+=" or other parameters";
+        }
+        
+        goto exitlbl;
+    }
+    
+    if(bytes)
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_CHAIN_PARAMS,script,bytes);                                                        
+    }
+    
+    
+    script=lpDetails->GetData(0,&bytes);
+    
+
+    int err;
+    size_t elem_size;
+    const unsigned char *elem;
+    
+    lpDetailsScript->Clear();
+    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_UPGRADE,0,script,bytes);
+    if(err)
+    {
+        strError="Invalid custom fields or upgrade name, too long";
+        goto exitlbl;
+    }
+
+    elem = lpDetailsScript->GetData(0,&elem_size);
+    scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;        
+    
     
     EnsureWalletIsUnlocked();
-    LOCK (pwalletMain->cs_wallet_send);
-    
-    SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn,fromaddresses);
-
-    if(lpDetailsScript)
     {
-        delete lpDetailsScript;
+        LOCK (pwalletMain->cs_wallet_send);
+
+        SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn,fromaddresses);
     }
-    delete lpDetails;
-    delete lpScript;
-  
+        
+exitlbl:
+
+    if(strError.size())
+    {
+        throw JSONRPCError(errorCode, strError);                        
+    }
     return wtx.GetHash().GetHex();    
 }
 
@@ -267,6 +315,17 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
     mc_EntityDetails entity;
     entity.Zero();
     ParseEntityIdentifier(entity_identifier,&entity, MC_ENT_TYPE_UPGRADE);           
+
+    if( mc_gState->m_NetworkParams->ProtocolVersion() >= mc_gState->MinProtocolForbiddenDowngradeVersion() )
+    {
+        if(entity.UpgradeProtocolVersion())
+        {
+            if(entity.UpgradeProtocolVersion() < mc_gState->m_NetworkParams->ProtocolVersion())
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid protocol version, cannot downgrade from current version");
+            }                    
+        }
+    }
     
     if(mc_gState->m_Permissions->IsApproved(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,0))
     {
@@ -298,8 +357,8 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Please use raw transactions to approve upgrades from P2SH addresses");                                                
     }
     
-    mc_Script *lpScript;
-    lpScript=new mc_Script;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
     
     lpScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);        
     lpScript->SetApproval(approval, timestamp);
@@ -325,7 +384,6 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
 
     SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn, fromaddresses);
 
-    delete lpScript;
     return wtx.GetHash().GetHex();
     
 }
@@ -337,6 +395,203 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
 
     Array results;
     mc_Buffer *upgrades;
+    
+    set<uint160> inputUpgrades;
+    
+    upgrades=NULL;
+    
+   
+    vector<string> inputStrings;
+    if (params.size() > 0 && params[0].type() != null_type && ((params[0].type() != str_type) || (params[0].get_str() !="*" ) ) )
+    {        
+        if(params[0].type() == str_type)
+        {
+            inputStrings.push_back(params[0].get_str());
+            if(params[0].get_str() == "")
+            {
+                return results;                
+            }
+        }
+        else
+        {
+            inputStrings=ParseStringList(params[0]);        
+            if(inputStrings.size() == 0)
+            {
+                return results;
+            }
+        }
+    }
+    
+    for(int is=0;is<(int)inputStrings.size();is++)
+    {
+        string param=inputStrings[is];
+
+        mc_EntityDetails upgrade_entity;
+        ParseEntityIdentifier(param,&upgrade_entity, MC_ENT_TYPE_UPGRADE);           
+
+        uint160 hash=0;
+        memcpy(&hash,upgrade_entity.GetTxID() + MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+        inputUpgrades.insert(hash);
+    }
+
+    vector<mc_UpgradedParameter> vParams;
+    vector<mc_UpgradeStatus> vUpgrades;
+    uint32_t current_height=chainActive.Height();
+    CreateUpgradeLists(chainActive.Height(),&vParams,&vUpgrades);
+
+    for(int u=0;u<(int)vUpgrades.size();u++)
+    {
+        Object entry;
+        Object applied_params;
+        Object skipped_params;
+        mc_PermissionDetails *plsRow;
+        mc_PermissionDetails *plsDet;
+        mc_EntityDetails upgrade_entity;
+        int flags,consensus,remaining;
+        Value null_value;
+        string param_name;
+        
+        uint160 hash=0;
+        memcpy(&hash,vUpgrades[u].m_EntityShortTxID,sizeof(uint160));
+        
+        if( (inputUpgrades.size() == 0) || (inputUpgrades.count(hash) > 0) )
+        {
+            upgrade_entity.Zero();
+            mc_gState->m_Assets->FindEntityByShortTxID(&upgrade_entity,vUpgrades[u].m_EntityShortTxID);
+            entry=UpgradeEntry(upgrade_entity.GetTxID());
+
+            entry.push_back(Pair("approved", (vUpgrades[u].m_ApprovedBlock <= current_height+1)));            
+
+            for(uint32_t p=vUpgrades[u].m_FirstParam;p<vUpgrades[u].m_LastParam;p++)
+            {
+                param_name=string(vParams[p].m_Param->m_DisplayName);
+                if(vParams[p].m_Skipped == MC_PSK_APPLIED)
+                {                
+                    if(vParams[p].m_Param->m_Type & MC_PRM_DECIMAL)
+                    {
+                        applied_params.push_back(Pair(param_name,mc_gState->m_NetworkParams->Int64ToDecimal(vParams[p].m_Value)));            
+                    }
+                    else
+                    {
+                        switch(vParams[p].m_Param->m_Type & MC_PRM_DATA_TYPE_MASK)
+                        {
+                            case MC_PRM_BOOLEAN:
+                                applied_params.push_back(Pair(param_name,(vParams[p].m_Value != 0)));            
+                                break;
+                            case MC_PRM_INT32:
+                                applied_params.push_back(Pair(param_name,(int)vParams[p].m_Value));            
+                            case MC_PRM_UINT32:
+                            case MC_PRM_INT64:
+                                applied_params.push_back(Pair(param_name,vParams[p].m_Value));            
+                                break;
+                        }                                
+                    }
+                }
+                else
+                {
+                    string param_err;
+                    switch(vParams[p].m_Skipped)
+                    {
+                        case MC_PSK_INTERNAL_ERROR:         param_err="Parameter not applied because of internal error, please report this"; break;
+                        case MC_PSK_NOT_FOUND:              param_err="Parameter name not recognized"; break;
+                        case MC_PSK_WRONG_SIZE:             param_err="Parameter is encoded with wrong size"; break;
+                        case MC_PSK_OUT_OF_RANGE:           param_err="Parameter value is out of range"; break;
+                        case MC_PSK_FRESH_UPGRADE:          param_err=strprintf("Parameter is upgraded less than %d blocks ago",MIN_BLOCKS_BETWEEN_UPGRADES); break;
+                        case MC_PSK_DOUBLE_RANGE:           param_err="New parameter value must be between half and double previous value"; break;
+                        case MC_PSK_NOT_SUPPORTED:          param_err="This parameter cannot be upgraded in this protocol version"; break;
+                        case MC_PSK_NEW_NOT_DOWNGRADABLE:   param_err="Cannot downgrade to this version"; break;
+                        case MC_PSK_OLD_NOT_DOWNGRADABLE:   param_err="Downgrades are not allowed in this protocol version"; break;
+                        default:                            param_err="Parameter not applied because of internal error, please report this"; break;
+                    }
+                    skipped_params.push_back(Pair(param_name,param_err));            
+                }
+            }
+
+            if(vUpgrades[u].m_AppliedBlock <= current_height)
+            {
+                entry.push_back(Pair("appliedblock", (int64_t)vUpgrades[u].m_AppliedBlock));                  
+                entry.push_back(Pair("appliedparams", applied_params));                  
+                entry.push_back(Pair("skippedparams", skipped_params));                  
+            }
+            else
+            {
+                entry.push_back(Pair("appliedblock", null_value));                  
+                entry.push_back(Pair("appliedparams", null_value));                              
+                entry.push_back(Pair("skippedparams", null_value));                  
+            }
+
+            upgrades=mc_gState->m_Permissions->GetUpgradeList(upgrade_entity.GetTxID() + MC_AST_SHORT_TXID_OFFSET,upgrades);
+            if(upgrades->GetCount())
+            {
+                plsRow=(mc_PermissionDetails *)(upgrades->GetRow(upgrades->GetCount()-1));
+                flags=plsRow->m_Flags;
+                consensus=plsRow->m_RequiredAdmins;
+                if(plsRow->m_Type != MC_PTP_UPGRADE)
+                {
+                    plsRow->m_BlockTo=0;
+                }
+
+                Array admins;
+                Array pending;
+                mc_Buffer *details;
+
+                if(plsRow->m_Type == MC_PTP_UPGRADE)
+                {
+                    details=mc_gState->m_Permissions->GetPermissionDetails(plsRow);                            
+                }
+                else
+                {
+                    details=NULL;
+                }
+
+                if(details)
+                {             
+                    for(int j=0;j<details->GetCount();j++)
+                    {
+                        plsDet=(mc_PermissionDetails *)(details->GetRow(j));
+                        remaining=plsDet->m_RequiredAdmins;
+                        if(plsDet->m_BlockFrom < plsDet->m_BlockTo)
+                        {
+                            uint160 addr;
+                            memcpy(&addr,plsDet->m_LastAdmin,sizeof(uint160));
+                            CKeyID lpKeyID=CKeyID(addr);
+                            admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                        }
+                    }                    
+                    consensus=plsRow->m_RequiredAdmins;
+                }
+                if(admins.size() == 0)
+                {
+                    if(plsRow->m_BlockFrom < plsRow->m_BlockTo)
+                    {
+                        uint160 addr;
+                        memcpy(&addr,plsRow->m_LastAdmin,sizeof(uint160));
+                        CKeyID lpKeyID=CKeyID(addr);
+                        admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                                    
+                    }                
+                }
+
+                entry.push_back(Pair("admins", admins));
+                entry.push_back(Pair("required", (int64_t)(consensus-admins.size())));
+            }
+            upgrades->Clear();
+            results.push_back(entry);
+        }
+    }
+    
+    mc_gState->m_Permissions->FreePermissionList(upgrades);
+     
+    return results;
+}
+
+Value listupgrades_old(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 1)
+        throw runtime_error("Help message not found\n");
+
+    Array results;
+    mc_Buffer *upgrades;
+    int latest_version;
     
     upgrades=NULL;
     
@@ -420,6 +675,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
         }
     }    
     
+    latest_version=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
     BOOST_FOREACH(PAIRTYPE(const uint64_t, int)& item, map_sorted)
     {
         int i=item.second;
@@ -454,7 +710,23 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
             }
             if(current_height >=applied_height)
             {
-                entry.push_back(Pair("appliedblock",(int64_t)applied_height));                            
+                if(upgrade_entity.UpgradeProtocolVersion())
+                {
+                    if((latest_version < mc_gState->MinProtocolForbiddenDowngradeVersion()) || (upgrade_entity.UpgradeProtocolVersion() >= latest_version))
+                    {
+                        latest_version=upgrade_entity.UpgradeProtocolVersion();
+                        entry.push_back(Pair("appliedblock",(int64_t)applied_height));                            
+                    }
+                    else
+                    {
+                        Value null_value;
+                        entry.push_back(Pair("appliedblock",null_value));                                                
+                    }
+                }
+                else
+                {
+                    entry.push_back(Pair("appliedblock",(int64_t)applied_height));                                                
+                }
             }
             else
             {

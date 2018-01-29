@@ -179,6 +179,7 @@ libbitcoin_server_a_SOURCES = \
   core/main.cpp \
   protocol/multichaintx.cpp \
   protocol/multichainblock.cpp \
+  custom/custom_server.cpp \
   protocol/handshake.cpp \
   chain/merkleblock.cpp \
   miner/miner.cpp \
@@ -252,6 +253,8 @@ multichain_libbitcoin_multichain_a_SOURCES = \
   utils/tools.cpp \
   utils/utilwrapper.cpp \
   version/version.cpp \
+  custom/custom.cpp \
+  custom/custom_multichain.cpp \
   chainparams/params.cpp \
   protocol/multichainscript.cpp \
   utils/dbwrapper.cpp \
@@ -513,6 +516,8 @@ libbitcoinconsensus_la_SOURCES = \
   utils/utilwrapper.cpp \
   chainparams/buildgenesis.cpp \
   version/version.cpp \
+  custom/custom.cpp \
+  custom/custom_multichain.cpp \
   chainparams/chainparams.cpp \
   protocol/multichainscript.cpp \
   utils/dbwrapper.cpp \

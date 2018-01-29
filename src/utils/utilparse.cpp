@@ -27,6 +27,100 @@ const unsigned char* GetAddressIDPtr(const CTxDestination& address)
     return aptr;
 }
 
+bool mc_ExtractOutputAssetQuantities(mc_Buffer *assets,string& reason,bool with_followons)
+{
+    int err;
+    uint32_t script_type=MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER;
+    if(with_followons)
+    {        
+        script_type |= MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON;
+    }
+    for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
+    {
+        mc_gState->m_TmpScript->SetElement(e);
+        err=mc_gState->m_TmpScript->GetAssetQuantities(assets,script_type);
+        if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
+        {
+            reason="Asset transfer script rejected - error in output transfer script";
+            return false;                                
+        }
+    }
+
+    return true;
+}
+
+bool mc_VerifyAssetPermissions(mc_Buffer *assets, vector<CTxDestination> addressRets, int required_permissions, uint32_t permission, string& reason)
+{
+    mc_EntityDetails entity;
+    int asset_count=-1;
+    
+    for(int i=0;i<assets->GetCount();i++)
+    {
+        if(mc_gState->m_Assets->FindEntityByFullRef(&entity,assets->GetRow(i)))
+        {
+            if( entity.Permissions() & (MC_PTP_SEND | MC_PTP_RECEIVE) )
+            {
+                if( (addressRets.size() != 1) || (required_permissions > 1) )
+                {
+                    reason="Sending restricted asset to non-standard and multisig addresses not allowed";
+                    return false;                                                    
+                }
+                if(assets->GetCount() > 1)
+                {
+                    if(asset_count < 0)
+                    {
+                        asset_count=0;
+                        for(int j=0;j<assets->GetCount();j++)
+                        {
+                            if(mc_GetABRefType(assets->GetRow(j)) != MC_AST_ASSET_REF_TYPE_SPECIAL)
+                            {
+                                asset_count++;
+                            }                            
+                        }
+                    }
+                    if(asset_count > 1)
+                    {
+                        if(permission == MC_PTP_SEND)
+                        {
+                            reason="One of multiple assets in input has per-asset permissions";
+                        }
+                        if(permission == MC_PTP_RECEIVE)
+                        {
+                            reason="One of multiple assets in output has per-asset permissions";
+                        }
+                        return false;                                
+                    }
+                }
+                if(entity.Permissions() & permission)
+                {
+                    int found=required_permissions;
+                    for(int j=0;j<(int)addressRets.size();j++)
+                    {
+                        if(mc_gState->m_Permissions->GetPermission(entity.GetTxID(),GetAddressIDPtr(addressRets[j]),permission))
+                        {
+                            found--;
+                        }
+                    }
+                    if(found > 0)
+                    {
+                        if(permission == MC_PTP_SEND)
+                        {
+                            reason="One of the inputs doesn't have per-asset send permission";
+                        }
+                        if(permission == MC_PTP_RECEIVE)
+                        {
+                            reason="One of the outputs doesn't have per-asset receive permission";
+                        }                    
+                        return false;                                
+                    }
+                }
+            }
+        }        
+    }
+    
+    return true;
+}
+
 
 /* 
  * Parses txout script into asset-quantity buffer

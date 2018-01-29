@@ -72,6 +72,7 @@ bool MultichainNode_AcceptData(CNode *pnode);
 bool MultichainNode_IgnoreIncoming(CNode *pnode);
 bool MultichainNode_IsLocal(CNode *pnode);
 bool IsTxBanned(uint256 txid);
+int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,vector<mc_UpgradeStatus> *vUpgrades);
 
 
 
@@ -347,7 +348,126 @@ map<NodeId, CNodeState> mapNodeState;
 
 /* MCHN START */
 
+int SetUpgradedParamValue(const mc_OneMultichainParam *param,int64_t value)
+{
+    if(mc_gState->m_Features->ParameterUpgrades() == 0)
+    {
+        return MC_ERR_NOERROR;        
+    }
+    
+    if(strcmp(param->m_Name,"maximumblocksize") == 0)
+    {
+        MAX_BLOCK_SIZE=(unsigned int)value;    
+        DEFAULT_BLOCK_MAX_SIZE=MAX_BLOCK_SIZE;    
+        while(MAX_BLOCK_SIZE>MAX_BLOCKFILE_SIZE)
+        {
+            MAX_BLOCKFILE_SIZE *= 2;
+        }
+        while(MAX_BLOCK_SIZE>MAX_SIZE)
+        {
+            MAX_SIZE *= 2;
+        }
+        MAX_BLOCK_SIGOPS = MAX_BLOCK_SIZE/50;
+        MAX_TX_SIGOPS = MAX_BLOCK_SIGOPS/5;        
+    }
+
+    if(strcmp(param->m_Name,"targetblocktime") == 0)
+    {
+        MCP_TARGET_BLOCK_TIME=value;
+        SetMultiChainParam("targetblocktime",value);
+    }   
+    
+    if(strcmp(param->m_Name,"maxstdtxsize") == 0)
+    {
+        MAX_STANDARD_TX_SIZE=value;
+    }   
+    
+    if(strcmp(param->m_Name,"maxstdopreturnscount") == 0)
+    {
+        MCP_MAX_STD_OP_RETURN_COUNT=value;
+    }   
+    
+    if(strcmp(param->m_Name,"maxstdopreturnsize") == 0)
+    {
+        MAX_OP_RETURN_RELAY=value;    
+        MAX_OP_RETURN_RELAY=GetArg("-datacarriersize", MAX_OP_RETURN_RELAY);
+    }   
+    
+    if(strcmp(param->m_Name,"maxstdopdropscount") == 0)
+    {
+        MCP_STD_OP_DROP_COUNT=value;
+        pwalletMain->InitializeUnspentList();        
+    }   
+    
+    if(strcmp(param->m_Name,"maxstdelementsize") == 0)
+    {
+        MAX_SCRIPT_ELEMENT_SIZE=value;
+        pwalletMain->InitializeUnspentList();        
+    }   
+    
+    return MC_ERR_NOERROR;
+}
+
 int MultichainNode_ApplyUpgrades(int current_height)
+{
+    vector<mc_UpgradedParameter> vParams;
+    int err=MC_ERR_NOERROR;
+    
+    err=CreateUpgradeLists(current_height,&vParams,NULL);
+    
+    int OriginalProtocolVersion=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
+    int CurrentProtocolVersion=mc_gState->m_NetworkParams->ProtocolVersion();//mc_gState->m_ProtocolVersionToUpgrade;
+    
+    mc_gState->m_NetworkParams->m_ProtocolVersion=OriginalProtocolVersion;
+    mc_gState->m_NetworkParams->SetGlobals();
+    for(int p=0;p<(int)vParams.size();p++)
+    {
+        if(vParams[p].m_Skipped == MC_PSK_APPLIED)
+        {
+            if(strcmp(vParams[p].m_Param->m_Name,"protocolversion") == 0)
+            {
+                mc_gState->m_NetworkParams->m_ProtocolVersion=(int)vParams[p].m_Value;
+                mc_gState->m_NetworkParams->SetProtocolGlobals();
+            }
+            else
+            {
+                SetUpgradedParamValue(vParams[p].m_Param,vParams[p].m_Value);
+            }
+        }
+    }
+    SetMultiChainParams();            
+    mc_gState->m_ProtocolVersionToUpgrade=mc_gState->m_NetworkParams->m_ProtocolVersion;
+    
+    
+    if(mc_gState->m_ProtocolVersionToUpgrade != CurrentProtocolVersion)
+    {
+        LogPrintf("New protocol upgrade version: %d (was %d)\n",mc_gState->m_ProtocolVersionToUpgrade,CurrentProtocolVersion);
+        if( (err == MC_ERR_NOT_SUPPORTED) || ((mc_gState->m_ProtocolVersionToUpgrade > 0) && (mc_gState->IsSupported(mc_gState->m_ProtocolVersionToUpgrade) == 0)) )
+        {
+            mc_gState->m_NetworkParams->m_ProtocolVersion=CurrentProtocolVersion;
+            LogPrintf("NODE SHOULD BE UPGRADED FROM %d TO %d\n",mc_gState->GetProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
+        }
+        else
+        {
+            LogPrintf("NODE IS UPGRADED FROM %d TO %d\n",CurrentProtocolVersion,mc_gState->m_ProtocolVersionToUpgrade);
+/*            
+            if(mc_gState->m_ProtocolVersionToUpgrade != mc_gState->m_NetworkParams->ProtocolVersion())
+            {
+                LogPrintf("NODE IS UPGRADED FROM %d TO %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
+            }        
+ */ 
+        }
+    }
+    else
+    {
+        mc_gState->m_ProtocolVersionToUpgrade=0;        
+    }
+    
+    return MC_ERR_NOERROR;
+}
+
+
+int MultichainNode_ApplyUpgrades_Old(int current_height)
 {
     mc_EntityDetails entity;
     mc_Buffer *permissions;
@@ -393,7 +513,10 @@ int MultichainNode_ApplyUpgrades(int current_height)
                         version=entity.UpgradeProtocolVersion();
                         if(version >= mc_gState->MinProtocolDowngradeVersion())
                         {
-                            NewProtocolVersion=version;
+                            if((NewProtocolVersion < mc_gState->MinProtocolForbiddenDowngradeVersion()) || (version >= NewProtocolVersion))
+                            {
+                                NewProtocolVersion=version;
+                            }
                         }
                     }
                 }
@@ -2225,6 +2348,15 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             return false;
     }
 
+    if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-size",true))
+    {
+        return false;
+    }
+    if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-sigops",true))
+    {
+        return false;
+    }
+    
 /* MCHN START */    
     uint256 block_hash;
     unsigned char miner_address[20];
@@ -3258,8 +3390,11 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
         if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Reaccepting wallet transactions\n");
         if(pwalletMain)
         {
-            pwalletMain->ReacceptWalletTransactions();                          // Some wallet transactions may become invalid in reorg            
+            if( (mc_gState->m_NodePausedState & MC_NPS_REACCEPT) == 0 )
+            {
+                pwalletMain->ReacceptWalletTransactions();                      // Some wallet transactions may become invalid in reorg            
                                                                                 // Some may become invalid if not confirmed in time
+            }
         }
         if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Best chain activation completed\n");
 
@@ -3471,7 +3606,6 @@ string SetLastBlock(uint256 hash,bool *fNotFound)
 
         CBlockIndex *pindex;
         pindex=pblockindex;
-        
         while(pindex != pindexFork)
         {
             if (pblockindex->nStatus & BLOCK_FAILED_MASK)
@@ -3503,12 +3637,16 @@ string SetLastBlock(uint256 hash,bool *fNotFound)
             pindex=pindex->pprev;
         }
         
-        if(!ActivateBestChainStep(state,pblockindex,&block))
+        while(pblockindex != chainActive.Tip())
         {
-            string error=state.GetRejectReason();
-            ActivateBestChain(state);
-            return error;
-        }        
+            if(!ActivateBestChainStep(state,pblockindex,NULL))
+            {
+                string error=state.GetRejectReason();
+                ActivateBestChain(state);
+                return error;
+            }        
+        }
+        
         setBlockIndexCandidates.insert(pblockindex);
 
         LogPrintf("Set active chain tip: %s\n",hash.GetHex().c_str());
@@ -4046,6 +4184,34 @@ bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool f
 }
 
 /* MCHN START */
+
+bool CheckBlockForUpgardableConstraints(const CBlock& block, CValidationState& state, string parameter, bool in_sync)
+{
+    if(!in_sync)
+    {
+        return true;
+    }
+    
+    if(parameter == "maximum-block-size")
+    {
+        if (block.vtx.empty() || block.vtx.size() > MAX_BLOCK_SIZE || ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
+            return state.DoS(100, error("CheckBlock() : size limits failed"),
+                             REJECT_INVALID, "bad-blk-length");        
+    }
+    if(parameter == "maximum-block-sigops")
+    {
+        unsigned int nSigOps = 0;
+        BOOST_FOREACH(const CTransaction& tx, block.vtx)
+        {
+            nSigOps += GetLegacySigOpCount(tx);
+        }
+        if (nSigOps > MAX_BLOCK_SIGOPS)
+            return state.DoS(100, error("CheckBlock() : out-of-bounds SigOpCount"),
+                             REJECT_INVALID, "bad-blk-sigops", true);        
+    }
+    return true;
+}
+
 //bool CheckBlock(CBlock& block, CValidationState& state, bool fCheckPOW, bool fCheckMerkleRoot)
 bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bool fCheckMerkleRoot)
 /* MCHN END */
@@ -4078,10 +4244,16 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     // because we receive the wrong transactions for it.
 
     // Size limits
+    if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-size",false))
+    {
+        return false;
+    }
+/*    
     if (block.vtx.empty() || block.vtx.size() > MAX_BLOCK_SIZE || ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
         return state.DoS(100, error("CheckBlock() : size limits failed"),
                          REJECT_INVALID, "bad-blk-length");
-
+*/
+    
     // First transaction must be coinbase, the rest must not be
     if (block.vtx.empty() || !block.vtx[0].IsCoinBase())
         return state.DoS(100, error("CheckBlock() : first tx is not coinbase"),
@@ -4111,7 +4283,12 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
         }
     }
     
+    if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-sigops",false))
+    {
+        return false;
+    }
     
+/*    
     unsigned int nSigOps = 0;
     BOOST_FOREACH(const CTransaction& tx, block.vtx)
     {
@@ -4120,7 +4297,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     if (nSigOps > MAX_BLOCK_SIGOPS)
         return state.DoS(100, error("CheckBlock() : out-of-bounds SigOpCount"),
                          REJECT_INVALID, "bad-blk-sigops", true);
-
+*/
     return true;
 }
 
@@ -4152,7 +4329,7 @@ bool CheckBranchForInvalidBlocks(CBlockIndex * const pindexPrev)
 
 
 
-bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex * const pindexPrev)
+bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex * const pindexPrev, CBlockIndex *pindexChecked)
 {
     uint256 hash = block.GetHash();
     if (hash == Params().HashGenesisBlock())
@@ -4225,11 +4402,14 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
             }
         }
     }
-    
-    if(!CheckBranchForInvalidBlocks(pindexPrev))
+
+    if(pindexChecked != pindexPrev)                                         
     {
-        return state.Invalid(error("%s : %s rejected - invalid branch", __func__,block.GetHash().ToString().c_str()),
-                             REJECT_INVALID, "reorg-invalid branch");                                
+        if(!CheckBranchForInvalidBlocks(pindexPrev))
+        {
+            return state.Invalid(error("%s : %s rejected - invalid branch", __func__,block.GetHash().ToString().c_str()),
+                                 REJECT_INVALID, "reorg-invalid branch");                                
+        }
     }
 
     
@@ -4282,7 +4462,7 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
     return true;
 }
 
-bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex** ppindex, int node_id)
+bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex** ppindex, int node_id, CBlockIndex *pindexChecked)
 {
     AssertLockHeld(cs_main);
     // Check for duplicate
@@ -4296,10 +4476,13 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
             *ppindex = pindex;
         if (pindex->nStatus & BLOCK_FAILED_MASK)
             return state.Invalid(error("%s : block is marked invalid", __func__), 0, "duplicate");
-        if(!CheckBranchForInvalidBlocks(pindex->pprev))
+        if(pindexChecked != pindex->pprev)                                         
         {
-            return state.Invalid(error("%s : %s rejected - invalid branch", __func__,block.GetHash().ToString().c_str()),
-                                 REJECT_INVALID, "reorg-invalid branch");                                
+            if(!CheckBranchForInvalidBlocks(pindex->pprev))
+            {
+                return state.Invalid(error("%s : %s rejected - invalid branch", __func__,block.GetHash().ToString().c_str()),
+                                     REJECT_INVALID, "reorg-invalid branch");                                
+            }
         }
         return true;
     }
@@ -4318,7 +4501,7 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
             return state.DoS(10, error("%s : prev block invalid", __func__), REJECT_INVALID, "bad-prevblk");// MCHN was 100 before, softened for reorgs due to mining diversity change
     }
 
-    if (!ContextualCheckBlockHeader(block, state, pindexPrev))
+    if (!ContextualCheckBlockHeader(block, state, pindexPrev, pindexChecked))
         return false;
 
     int successor=0;
@@ -5099,10 +5282,12 @@ bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp)
     static std::multimap<uint256, CDiskBlockPos> mapBlocksUnknownParent;
     int64_t nStart = GetTimeMillis();
 
+    uint32_t effective_max_block_size=GetArg("-loadblockmaxsize",2*MAX_BLOCK_SIZE);
+    
     int nLoaded = 0;
     try {
         // This takes over fileIn and calls fclose() on it in the CBufferedFile destructor
-        CBufferedFile blkdat(fileIn, 2*MAX_BLOCK_SIZE, MAX_BLOCK_SIZE+8, SER_DISK, CLIENT_VERSION);
+        CBufferedFile blkdat(fileIn, 2*effective_max_block_size, effective_max_block_size+8, SER_DISK, CLIENT_VERSION);
         uint64_t nRewind = blkdat.GetPos();
         while (!blkdat.eof()) {
             boost::this_thread::interruption_point();
@@ -6223,7 +6408,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 Misbehaving(pfrom->GetId(), 20);
                 return error("non-continuous headers sequence");
             }
-            if (!AcceptBlockHeader(header, state, &pindexLast, pfrom->GetId())) {
+            if (!AcceptBlockHeader(header, state, &pindexLast, pfrom->GetId(),pindexLast)) {
                 int nDoS;
                 if (state.IsInvalid(nDoS)) {
                     if (nDoS > 0)

@@ -99,6 +99,9 @@ typedef struct mc_Script
     int GetCachedScript(int offset, int *next_offset, int* vin, unsigned char** script, int *script_size);
     int SetCachedScript(int offset, int *next_offset, int vin, unsigned char* script, int script_size);
 
+    int GetRawData(unsigned char **data,int *size);
+    int SetRawData(const unsigned char *data,const int size);
+    
     int GetDataFormat(uint32_t *format);
     int SetDataFormat(const uint32_t format);
     

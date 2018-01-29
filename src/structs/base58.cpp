@@ -262,81 +262,90 @@ std::string BurnAddress(const std::vector<unsigned char>& vchVersion)
     char res[100];    
     
     int shift=nDataBytes / nVersionBytes;
-    vch.resize(nDataBytes + nVersionBytes + nHashBytes);
-    int p;
-    for(int i=2;i<nDataBytes + nVersionBytes + nHashBytes;i++)
-    {
-        vch[i]=0x00;
-    }
-    vch[0]=vchVersion[0];
-    vch[1]=0x80;
-
-    
-    strcpy(res,EncodeBase58(vch).c_str());
-    memset(res+1,'X',strlen(res)-1);
-    DecodeBase58(res,vch);
-    while((int)vch.size() > nDataBytes + nVersionBytes + nHashBytes)
-    {
-        res[strlen(res)-1]=0x00;
-        DecodeBase58(res,vch);
-    }
-
-    p=0;
-    while(p<nDataBytes + nVersionBytes)
-    {
-        if( (p % (shift+1)) == 0)
-        {
-            if(vch[p] != vchVersion[p / (shift+1)])
-            {
-                memset(&vch[p+2],0x00,vch.size()-p-2);
-                vch[p] = vchVersion[p / (shift+1)];
-                vch[p+1] = 0x80;
-                strcpy(test,EncodeBase58(vch).c_str());
-                if(strlen(test) != strlen(res))
-                {
-                    if(strlen(test) > strlen(res))
-                    {
-                        res[strlen(res)+1]=0x00;
-                        res[strlen(res)]='X';
-                    }                        
-                    if(strlen(test) < strlen(res))
-                    {
-                        res[strlen(res)-1]=0x00;
-                    }                        
-                }
-                int j=0;
-                while( (j<(int)strlen(res)) && (res[j] == test[j]) )
-                {
-                    j++;
-                }
-                int k=0;
-                while( (k<3) && (j<(int)strlen(res)) && ((vch[p] != vchVersion[p / (shift+1)])  || (k ==0)))
-                {
-                    res[j]=test[j];
-                    DecodeBase58(res,vch);
-                    k++;
-                    j++;
-                }                
-            }
-        }
-        p++;
-    }
-    
-//    strcpy(test,EncodeBase58(vch).c_str());
-  
-    
-    for(int i=0;i<(int)nVersionBytes;i++)
-    {
-        int size=shift;
-        if(i == (int)(nVersionBytes-1))
-        {
-            size=nDataBytes-i*shift;
-        }
-        memcpy(data+i*shift,&vch[i*(shift+1)+1],size);
-    }
-    
     CKeyID kBurn;
-    memcpy(&kBurn,data,nDataBytes);
+    int p;
+    
+    if(*(uint160*)(mc_gState->m_BurnAddress) == 0)
+    {
+        vch.resize(nDataBytes + nVersionBytes + nHashBytes);
+        for(int i=2;i<nDataBytes + nVersionBytes + nHashBytes;i++)
+        {
+            vch[i]=0x00;
+        }
+        vch[0]=vchVersion[0];
+        vch[1]=0x80;
+
+
+        strcpy(res,EncodeBase58(vch).c_str());
+        memset(res+1,'X',strlen(res)-1);
+        DecodeBase58(res,vch);
+        while((int)vch.size() > nDataBytes + nVersionBytes + nHashBytes)
+        {
+            res[strlen(res)-1]=0x00;
+            DecodeBase58(res,vch);
+        }
+
+        p=0;
+        while(p<nDataBytes + nVersionBytes)
+        {
+            if( (p % (shift+1)) == 0)
+            {
+                if(vch[p] != vchVersion[p / (shift+1)])
+                {
+                    memset(&vch[p+2],0x00,vch.size()-p-2);
+                    vch[p] = vchVersion[p / (shift+1)];
+                    vch[p+1] = 0x80;
+                    strcpy(test,EncodeBase58(vch).c_str());
+                    if(strlen(test) != strlen(res))
+                    {
+                        if(strlen(test) > strlen(res))
+                        {
+                            res[strlen(res)+1]=0x00;
+                            res[strlen(res)]='X';
+                        }                        
+                        if(strlen(test) < strlen(res))
+                        {
+                            res[strlen(res)-1]=0x00;
+                        }                        
+                    }
+                    int j=0;
+                    while( (j<(int)strlen(res)) && (res[j] == test[j]) )
+                    {
+                        j++;
+                    }
+                    int k=0;
+                    while( (k<3) && (j<(int)strlen(res)) && ((vch[p] != vchVersion[p / (shift+1)])  || (k ==0)))
+                    {
+                        res[j]=test[j];
+                        DecodeBase58(res,vch);
+                        k++;
+                        j++;
+                    }                
+                }
+            }
+            p++;
+        }
+
+    //    strcpy(test,EncodeBase58(vch).c_str());
+
+
+        for(int i=0;i<(int)nVersionBytes;i++)
+        {
+            int size=shift;
+            if(i == (int)(nVersionBytes-1))
+            {
+                size=nDataBytes-i*shift;
+            }
+            memcpy(data+i*shift,&vch[i*(shift+1)+1],size);
+        }
+
+        memcpy(&kBurn,data,nDataBytes);
+        memcpy(mc_gState->m_BurnAddress,data,nDataBytes);
+    }
+    else
+    {
+        memcpy(&kBurn,mc_gState->m_BurnAddress,nDataBytes);        
+    }
   
     CBitcoinAddress ba;
     ba.Set(kBurn,vchVersion);

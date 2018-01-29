@@ -9,6 +9,7 @@
 #include "protocol/multichainscript.h"
 #include "permissions/permission.h"
 #include "entities/asset.h"
+#include "wallet/wallettxdb.h"
 
 #define MC_FAT_UNKNOWN     1
 #define MC_FAT_COMMAND     2
@@ -32,6 +33,7 @@
 #define MC_NPS_NETWORK   0x00000001
 #define MC_NPS_INCOMING  0x00000002
 #define MC_NPS_MINING    0x00000004
+#define MC_NPS_REACCEPT  0x00000008
 #define MC_NPS_ALL       0xFFFFFFFF
 
 #define MC_WMD_NONE                  0x00000000
@@ -106,6 +108,23 @@ typedef struct mc_Params
     
 } mc_Params;
 
+typedef struct mc_UpgradeStatus
+{    
+    unsigned char m_EntityShortTxID[MC_ENT_KEY_SIZE];                                
+    uint32_t m_ApprovedBlock;
+    uint32_t m_AppliedBlock;
+    uint32_t m_FirstParam;
+    uint32_t m_LastParam;    
+} mc_UpgradeStatus;
+
+typedef struct mc_UpgradedParameter
+{    
+    const mc_OneMultichainParam *m_Param;
+    int64_t m_Value;    
+    uint32_t m_Block;
+    int32_t m_Skipped; 
+} mc_UpgradedParameter;
+
 typedef struct mc_Features
 {    
     int MinProtocolVersion();
@@ -130,6 +149,8 @@ typedef struct mc_Features
     int FixedIn1000920001();
     int MultipleStreamKeys();
     int FixedIsUnspendable();
+    int PerAssetPermissions();
+    int ParameterUpgrades();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo
@@ -139,6 +160,64 @@ typedef struct mc_BlockHeaderInfo
     int32_t m_Next;
     
 } mc_BlockHeaderInfo;
+
+typedef struct mc_TmpBuffers
+{
+    mc_TmpBuffers()
+    {
+        Init();
+    }
+    
+    ~mc_TmpBuffers()
+    {
+        Destroy();
+    }
+    
+    mc_Script               *m_RpcScript1;
+    mc_Script               *m_RpcScript2;
+    mc_Script               *m_RpcScript3;
+    mc_Script               *m_RpcScript4;
+    mc_Buffer               *m_RpcABBuffer1;
+    mc_Buffer               *m_RpcABBuffer2;
+    mc_Buffer               *m_RpcBuffer1;
+    mc_Buffer               *m_RpcABNoMapBuffer1;
+    mc_Buffer               *m_RpcABNoMapBuffer2;
+    mc_Buffer               *m_RpcEntityRows;
+    
+    void  Init()
+    {
+        m_RpcScript1=new mc_Script();
+        m_RpcScript2=new mc_Script();
+        m_RpcScript3=new mc_Script();
+        m_RpcScript4=new mc_Script();
+        m_RpcABBuffer1=new mc_Buffer;
+        mc_InitABufferMap(m_RpcABBuffer1);
+        m_RpcABBuffer2=new mc_Buffer;
+        mc_InitABufferMap(m_RpcABBuffer2);
+        m_RpcBuffer1=new mc_Buffer;
+        m_RpcABNoMapBuffer1=new mc_Buffer;
+        mc_InitABufferDefault(m_RpcABNoMapBuffer1);
+        m_RpcABNoMapBuffer2=new mc_Buffer;
+        mc_InitABufferDefault(m_RpcABNoMapBuffer2);
+        m_RpcEntityRows=new mc_Buffer;
+        m_RpcEntityRows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);        
+    }    
+
+    void  Destroy()
+    {
+        delete m_RpcScript1;
+        delete m_RpcScript2;
+        delete m_RpcScript3;
+        delete m_RpcScript4;
+        delete m_RpcABBuffer1;
+        delete m_RpcABBuffer2;
+        delete m_RpcBuffer1;
+        delete m_RpcABNoMapBuffer1;
+        delete m_RpcABNoMapBuffer2;
+        delete m_RpcEntityRows;
+    }
+    
+} mc_TmpBuffers;
 
 typedef struct mc_State
 {    
@@ -165,13 +244,17 @@ typedef struct mc_State
     void *m_pSeedNode;
     uint32_t m_Compatibility;
     uint32_t m_SessionFlags;
+    unsigned char m_BurnAddress[20];
     
     mc_Script               *m_TmpScript;
     mc_Script               *m_TmpScript1;
     mc_Buffer               *m_TmpAssetsOut;
     mc_Buffer               *m_TmpAssetsIn;
+    mc_Buffer               *m_TmpAssetsTmp;
     
     mc_Buffer               *m_BlockHeaderSuccessors;
+    
+    mc_TmpBuffers           *m_TmpBuffers;
     
     void  InitDefaults()
     {
@@ -186,6 +269,7 @@ typedef struct mc_State
         m_NodePausedState=MC_NPS_NONE;
         m_ProtocolVersionToUpgrade=0;
         m_SessionFlags=MC_SSF_DEFAULT;
+        memset(m_BurnAddress,0,20);
         
         m_IPv4Address=0;
         m_WalletMode=0;
@@ -193,6 +277,8 @@ typedef struct mc_State
         mc_InitABufferMap(m_TmpAssetsOut);
         m_TmpAssetsIn=new mc_Buffer;
         mc_InitABufferMap(m_TmpAssetsIn);
+        m_TmpAssetsTmp=new mc_Buffer;
+        mc_InitABufferMap(m_TmpAssetsTmp);
         m_Compatibility=MC_VCM_NONE;
         
         m_BlockHeaderSuccessors=new mc_Buffer;
@@ -200,6 +286,8 @@ typedef struct mc_State
         mc_BlockHeaderInfo bhi;
         memset(&bhi,0,sizeof(mc_BlockHeaderInfo));
         m_BlockHeaderSuccessors->Add(&bhi);
+        
+        m_TmpBuffers=new mc_TmpBuffers;
         
         m_pSeedNode=NULL;
     }
@@ -242,9 +330,17 @@ typedef struct mc_State
         {
             delete m_TmpAssetsIn;
         }
+        if(m_TmpAssetsTmp)
+        {
+            delete m_TmpAssetsTmp;
+        }
         if(m_BlockHeaderSuccessors)
         {
             delete m_BlockHeaderSuccessors;
+        }
+        if(m_TmpBuffers)
+        {
+            delete m_TmpBuffers;
         }
     }
     
@@ -254,6 +350,8 @@ typedef struct mc_State
     int GetProtocolVersion();
     int MinProtocolVersion();
     int MinProtocolDowngradeVersion();
+    int MinProtocolForbiddenDowngradeVersion();
+    int RelevantParamProtocolVersion();
     int IsSupported(int version);
     int IsDeprecated(int version);
     const char* GetSeedNode();
