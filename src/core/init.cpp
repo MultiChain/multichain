@@ -1273,20 +1273,20 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 sprintf(bufOutput, "1. mc_gState->m_NetworkParams->m_Status : %d", mc_gState->m_NetworkParams->m_Status);
                 bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                 mc_gState->m_NetworkParams->SetGlobals();                           // Needed to update IsProtocolRk flag in case of bitcoin
+                sprintf(bufOutput, "2. mc_gState->m_NetworkParams->m_Status : %d", mc_gState->m_NetworkParams->m_Status);
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                 if(mc_gState->m_NetworkParams->Build(pubKey,pubKeySize))
                 {
                     return InitError(_("Cannot build new blockchain"));
                 }
                 LogPrintf("mchn: Genesis block found\n");
-                sprintf(bufOutput, "2. mc_gState->m_NetworkParams->m_Status : %d", mc_gState->m_NetworkParams->m_Status);
+                sprintf(bufOutput, "3. mc_gState->m_NetworkParams->m_Status : %d", mc_gState->m_NetworkParams->m_Status);
                 bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                 if(!GetBoolArg("-shortoutput", false))
                 {    
                     sprintf(bufOutput,"Genesis block found\n\n");
                     bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                
                 }
-                sprintf(bufOutput, "3. mc_gState->m_NetworkParams->m_Status : %d", mc_gState->m_NetworkParams->m_Status);
-                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                 
                 mc_gState->m_NetworkParams->Validate();        
                 
