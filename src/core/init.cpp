@@ -1246,6 +1246,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         {
             if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_GENERATED)
             {
+                sprintf(bufOutput, "1. mc_gState->m_NetworkParams->m_Status : %d", mc_gState->m_NetworkParams->m_Status);
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                 if(init_privkey.size())
                 {
                     if(mc_gState->m_NetworkParams->GetParam("privatekeyversion",NULL) == NULL)
@@ -1259,6 +1261,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     }
                     init_privkey="";
                 }
+                sprintf(bufOutput, "2. mc_gState->m_NetworkParams->m_Status : %d", mc_gState->m_NetworkParams->m_Status);
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                 const unsigned char *pubKey=pwalletMain->vchDefaultKey.begin();
                 int pubKeySize=pwalletMain->vchDefaultKey.size();
 
@@ -1268,6 +1272,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     sprintf(bufOutput,"Looking for genesis block...\n");
                     bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                
                 }
+                sprintf(bufOutput, "3. mc_gState->m_NetworkParams->m_Status : %d", mc_gState->m_NetworkParams->m_Status);
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                 mc_gState->m_NetworkParams->SetGlobals();                           // Needed to update IsProtocolRk flag in case of bitcoin
                 if(mc_gState->m_NetworkParams->Build(pubKey,pubKeySize))
                 {
@@ -1279,13 +1285,12 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     sprintf(bufOutput,"Genesis block found\n\n");
                     bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                
                 }
-                sprintf(bufOutput, "mc_gState->m_NetworkParams->m_Status : %d", mc_gState->m_NetworkParams->m_Status);
+                sprintf(bufOutput, "4. mc_gState->m_NetworkParams->m_Status : %d", mc_gState->m_NetworkParams->m_Status);
                 bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                 
                 mc_gState->m_NetworkParams->Validate();        
                 
-                sprintf(bufOutput, "mc_gState->m_NetworkParams->m_Status : %d", mc_gState->m_NetworkParams->m_Status);
-                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+
                 if(mc_gState->m_NetworkParams->m_Status != MC_PRM_STATUS_VALID)
                 {
                     
