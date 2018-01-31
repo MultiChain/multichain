@@ -1279,8 +1279,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     sprintf(bufOutput,"Genesis block found\n\n");
                     bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                
                 }
-
+                sprintf(bufOutput, "mc_gState->m_NetworkParams->m_Status : %d", mc_gState->m_NetworkParams->m_Status);
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                
                 mc_gState->m_NetworkParams->Validate();        
+                
                 sprintf(bufOutput, "mc_gState->m_NetworkParams->m_Status : %d", mc_gState->m_NetworkParams->m_Status);
                 bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                 if(mc_gState->m_NetworkParams->m_Status != MC_PRM_STATUS_VALID)
