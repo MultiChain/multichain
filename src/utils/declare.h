@@ -276,7 +276,8 @@ uint64_t __US_ThreadID();
 const char* __US_UserHomeDir();
 char * __US_FullPath(const char* path, char *full_path, int len);
 void __US_FlushFile(int FileHan);
-
+unsigned checksum(void *buffer, size_t len, unsigned int seed);
+unsigned calculateFileChecksum(char *file);
 
 
 #ifdef	__cplusplus
