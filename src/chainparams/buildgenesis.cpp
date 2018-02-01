@@ -70,17 +70,17 @@ int mc_GenerateConfFiles(const char *network_name)
     return MC_ERR_NOERROR;
 }
 
-unsigned checksum(void *buffer, size_t len, unsigned int seed)
+char* checksum(void *buffer, size_t len, unsigned int seed)
 {
       unsigned char *buf = (unsigned char *)buffer;
       size_t i;
 
       for (i = 0; i < len; ++i)
             seed += (unsigned int)(*buf++);
-      return seed;
+      return (char*)seed;
 }
 
-unsigned calculateFileChecksum(char *file) {
+char* calculateFileChecksum(char *file) {
 
       FILE *fp;
       size_t len;
