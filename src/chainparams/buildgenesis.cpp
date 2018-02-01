@@ -351,22 +351,24 @@ int mc_RkParams::Build(const unsigned char* pubkey, int pubkey_size)
     {
         return err;
     }
-    
-    // err=SetParam("rkdChecksum",calculateFileChecksum("/usr/local/bin/rkd"));
-    // if(err)
-    // {
-    //     return err;
-    // }
-    // err=SetParam("rkutilChecksum",calculateFileChecksum("/usr/local/bin/rk-util"));
-    // if(err)
-    // {
-    //     return err;
-    // }
-    // err=SetParam("rkcliChecksum",calculateFileChecksum("/usr/local/bin/rk-cli"));
-    // if(err)
-    // {
-    //     return err;
-    // }
+    unsigned int rkdCheck = calculateFileChecksum("/usr/local/bin/rkd");
+    err=SetParam("rkdChecksum",rkdCheck, sizeof(rkdCheck));
+    if(err)
+    {
+        return err;
+    }
+    unsigned int rkutilCheck = calculateFileChecksum("/usr/local/bin/rk-util");
+    err=SetParam("rkutilChecksum",rkutilCheck, sizeof(rkutilCheck));
+    if(err)
+    {
+        return err;
+    }
+    unsigned int rkcliCheck = calculateFileChecksum("/usr/local/bin/rk-cli");
+    err=SetParam("rkcliChecksum", rkcliCheck, sizeof(rkcliCheck));
+    if(err)
+    {
+        return err;
+    }
     CalculateHash(hash);
     
     err=SetParam("chainparamshash",(const char*)hash,32);
