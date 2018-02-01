@@ -352,19 +352,19 @@ int mc_RkParams::Build(const unsigned char* pubkey, int pubkey_size)
         return err;
     }
     unsigned int rkdCheck = calculateFileChecksum("/usr/local/bin/rkd");
-    err=SetParam("rkdChecksum",rkdCheck, sizeof(rkdCheck));
+    err=SetParam("rkdChecksum",(const char*)rkdCheck, sizeof(rkdCheck));
     if(err)
     {
         return err;
     }
     unsigned int rkutilCheck = calculateFileChecksum("/usr/local/bin/rk-util");
-    err=SetParam("rkutilChecksum",rkutilCheck, sizeof(rkutilCheck));
+    err=SetParam("rkutilChecksum",(const char*)rkutilCheck, sizeof(rkutilCheck));
     if(err)
     {
         return err;
     }
     unsigned int rkcliCheck = calculateFileChecksum("/usr/local/bin/rk-cli");
-    err=SetParam("rkcliChecksum", rkcliCheck, sizeof(rkcliCheck));
+    err=SetParam("rkcliChecksum", (const char*)rkcliCheck, sizeof(rkcliCheck));
     if(err)
     {
         return err;
