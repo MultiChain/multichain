@@ -1322,7 +1322,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         {
             if(fDebug)LogPrint("mchn","Conflicting with in-memory %s\n",tx.vin[i].ToString().c_str());
             // Disable replacement feature for now
-            return false;
+            return state.Invalid(error("AcceptToMemoryPool : Conflicting with in-memory tx"),
+                                 REJECT_DUPLICATE, "bad-txns-inputs-spent");
         }
     }
     }
