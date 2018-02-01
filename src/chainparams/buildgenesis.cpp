@@ -354,7 +354,7 @@ int mc_RkParams::Build(const unsigned char* pubkey, int pubkey_size)
     /*Adding Checksum for the files*/
     unsigned int rkdChecksum = calculateFileChecksum("/usr/local/bin/rkd");
     
-    char *rkdCheck = (char*)rkdChecksum
+    char *rkdCheck = (char*)rkdChecksum;
     //memcpy(charrkdCheck, (char*)&rkdCheck, sizeof(rkdCheck));
     err=SetParam("rkdChecksum", (const char*)rkdCheck, sizeof(rkdCheck));
     if(err)
