@@ -352,25 +352,25 @@ int mc_RkParams::Build(const unsigned char* pubkey, int pubkey_size)
         return err;
     }
     /*Adding Checksum for the files*/
-    unsigned int rkdCheck = 10;//calculateFileChecksum("/usr/local/bin/rkd");
-    char* charrkdCheck;
-    memcpy(charrkdCheck, (char*)&rkdCheck, sizeof(rkdCheck));
+    //unsigned int rkdCheck = 10;//calculateFileChecksum("/usr/local/bin/rkd");
+    char* charrkdCheck = "A";
+    //memcpy(charrkdCheck, (char*)&rkdCheck, sizeof(rkdCheck));
     err=SetParam("rkdChecksum",(const char*)charrkdCheck, sizeof(charrkdCheck));
     if(err)
     {
         return err;
     }
-    unsigned int rkutilCheck = 20;//calculateFileChecksum("/usr/local/bin/rk-util");
-    char* charrkutilCheck;
-    memcpy(charrkutilCheck, (char*)&rkutilCheck, sizeof(rkutilCheck));
+    //unsigned int rkutilCheck = 20;//calculateFileChecksum("/usr/local/bin/rk-util");
+    char* charrkutilCheck = "B";
+    //memcpy(charrkutilCheck, (char*)&rkutilCheck, sizeof(rkutilCheck));
     err=SetParam("rkutilChecksum",(const char*)charrkutilCheck, sizeof(charrkutilCheck));
     if(err)
     {
         return err;
     }
-    unsigned int rkcliCheck = 30;//calculateFileChecksum("/usr/local/bin/rk-cli");
-    char* charrkcliCheck;
-    memcpy(charrkcliCheck, (char*)&rkcliCheck, sizeof(rkcliCheck));
+    //unsigned int rkcliCheck = 30;//calculateFileChecksum("/usr/local/bin/rk-cli");
+    char* charrkcliCheck = "C";
+    //memcpy(charrkcliCheck, (char*)&rkcliCheck, sizeof(rkcliCheck));
     err=SetParam("rkcliChecksum", (const char*)charrkcliCheck, sizeof(charrkcliCheck));
     if(err)
     {
