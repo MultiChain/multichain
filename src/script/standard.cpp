@@ -577,13 +577,17 @@ bool CScript::IsUnspendable() const
 }
 
 
-bool ExtractDestinations10008(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet)
+bool ExtractDestinations10008(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet, bool no_clear, bool *not_cleared)
 {
     addressRet.clear();
     typeRet = TX_NONSTANDARD;
     opcodetype opcode;
     vector<unsigned char> vch;
 
+    if(not_cleared)
+    {
+        *not_cleared=false;
+    }
     nRequiredRet=1;
     
     CScript::const_iterator pc = scriptPubKey.begin();
@@ -665,7 +669,17 @@ bool ExtractDestinations10008(const CScript& scriptPubKey, txnouttype& typeRet, 
         return true;
     }
     
-    addressRet.clear();
+    if(!no_clear)
+    {
+        addressRet.clear();
+    }
+    else
+    {
+        if(not_cleared)
+        {
+            *not_cleared=true;
+        }        
+    }
     typeRet = TX_NONSTANDARD;
     return true;
 }
@@ -691,7 +705,7 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
 {
     if(mc_gState->m_Features->FixedDestinationExtraction() == 0)
     {
-        return ExtractDestinations10008(scriptPubKey,typeRet,addressRet,nRequiredRet);
+        return ExtractDestinations10008(scriptPubKey,typeRet,addressRet,nRequiredRet,false,NULL);
     }
     
     addressRet.clear();
