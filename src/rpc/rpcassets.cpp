@@ -9,11 +9,6 @@
 
 void mergeGenesisWithAssets(mc_Buffer *genesis_amounts, mc_Buffer *asset_amounts)
 {
-    if(mc_gState->m_Features->ShortTxIDInTx() == 0)
-    {
-        return; 
-    }
-    
     unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
     int64_t quantity;
     memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
@@ -189,12 +184,9 @@ Value issuefromcmd(const Array& params, bool fHelp)
         }
     }
     
-    if(mc_gState->m_Features->Streams())
+    if(asset_name == "*")
     {
-        if(asset_name == "*")
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset name: *");                                                                                            
-        }
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset name: *");                                                                                            
     }
     
     unsigned char buf_a[MC_AST_ASSET_REF_SIZE];    
@@ -222,14 +214,11 @@ Value issuefromcmd(const Array& params, bool fHelp)
     lpDetails->Clear();
     lpDetails->AddElement();
     
-    if(mc_gState->m_Features->OpDropDetailsScripts())
+    if(asset_name.size())
     {
-        if(asset_name.size())
-        {
-            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(asset_name.c_str()),asset_name.size());//+1);
-        }        
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,4);
-    }
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(asset_name.c_str()),asset_name.size());//+1);
+    }        
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,4);
     
     if(is_open)
     {
@@ -285,32 +274,16 @@ Value issuefromcmd(const Array& params, bool fHelp)
     script=lpDetails->GetData(0,&bytes);
     lpDetailsScript->Clear();
         
-    if(mc_gState->m_Features->OpDropDetailsScripts())
+    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
+    if(err)
     {
-        err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
-        if(err)
-        {
-            strError= "Invalid custom fields or asset name, too long";
-            goto exitlbl;
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or asset name, too long");                                                        
-        }
-
-        elem = lpDetailsScript->GetData(0,&elem_size);
-        scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;                    
+        strError= "Invalid custom fields or asset name, too long";
+        goto exitlbl;
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or asset name, too long");                                                        
     }
-    else
-    {
-        err=lpDetailsScript->SetAssetDetails(asset_name.c_str(),multiple,script,bytes);
-        if(err)
-        {
-            strError= "Invalid custom fields or asset name, too long";
-            goto exitlbl;
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or asset name, too long");                                                    
-        }
 
-        elem = lpDetailsScript->GetData(0,&elem_size);
-        scriptOpReturn << OP_RETURN << vector<unsigned char>(elem, elem + elem_size);
-    }
+    elem = lpDetailsScript->GetData(0,&elem_size);
+    scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;                    
         
     
 
@@ -428,13 +401,6 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     {        
         ParseEntityIdentifier(params[2],&entity, MC_ENT_TYPE_ASSET);           
         memcpy(buf,entity.GetFullRef(),MC_AST_ASSET_FULLREF_SIZE);
-        if(mc_gState->m_Features->ShortTxIDInTx() == 0)
-        {
-            if(entity.IsUnconfirmedGenesis())
-            {
-                throw JSONRPCError(RPC_UNCONFIRMED_ENTITY, string("Unconfirmed asset: ")+params[2].get_str());            
-            }
-        }
         multiple=entity.GetAssetMultiple();        
     }
     else
@@ -519,29 +485,18 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     script=lpDetails->GetData(0,&bytes);
     if(bytes > 0)
     {
-//        mc_DumpSize("script",script,bytes,bytes);
-        if(mc_gState->m_Features->OpDropDetailsScripts())
+        lpDetailsScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
+        err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
+        if(err)
         {
-            lpDetailsScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
-            err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
-            if(err)
-            {
-                strError= "Invalid custom fields, too long";
-                goto exitlbl;
-//                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields, too long");                                                        
-            }
+            strError= "Invalid custom fields, too long";
+            goto exitlbl;
+        }
 
-            elem = lpDetailsScript->GetData(0,&elem_size);
-            scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
-            elem = lpDetailsScript->GetData(1,&elem_size);
-            scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;                
-        }
-        else
-        {
-            lpDetailsScript->SetGeneralDetails(script,bytes);
-            elem = lpDetailsScript->GetData(0,&elem_size);
-            scriptOpReturn << OP_RETURN << vector<unsigned char>(elem, elem + elem_size);
-        }
+        elem = lpDetailsScript->GetData(0,&elem_size);
+        scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
+        elem = lpDetailsScript->GetData(1,&elem_size);
+        scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;                
     }
         
     
@@ -1217,26 +1172,19 @@ Value getaddressbalances(const Array& params, bool fHelp)
                     quantity=mc_GetABQuantity(asset_amounts->GetRow(a));
                     if(mc_gState->m_Assets->FindEntityByTxID(&entity,(unsigned char*)&hash))
                     {
-                        if((entity.IsUnconfirmedGenesis() != 0) && (mc_gState->m_Features->ShortTxIDInTx() == 0) )
+                        ptr=(unsigned char *)entity.GetFullRef();
+                        memcpy(buf,ptr,MC_AST_ASSET_FULLREF_SIZE);
+                        int row=asset_amounts->Seek(buf);
+                        if(row >= 0)
                         {
-                            is_genesis=true;                                
+                            int64_t last=mc_GetABQuantity(asset_amounts->GetRow(row));
+                            quantity+=last;
+                            mc_SetABQuantity(asset_amounts->GetRow(row),quantity);
                         }
                         else
                         {
-                            ptr=(unsigned char *)entity.GetFullRef();
-                            memcpy(buf,ptr,MC_AST_ASSET_FULLREF_SIZE);
-                            int row=asset_amounts->Seek(buf);
-                            if(row >= 0)
-                            {
-                                int64_t last=mc_GetABQuantity(asset_amounts->GetRow(row));
-                                quantity+=last;
-                                mc_SetABQuantity(asset_amounts->GetRow(row),quantity);
-                            }
-                            else
-                            {
-                                mc_SetABQuantity(buf,quantity);
-                                asset_amounts->Add(buf);                        
-                            }
+                            mc_SetABQuantity(buf,quantity);
+                            asset_amounts->Add(buf);                        
                         }
                     }                
                     
@@ -1440,26 +1388,19 @@ Value getassetbalances(const Array& params, bool fHelp)
                     quantity=mc_GetABQuantity(asset_amounts->GetRow(a));
                     if(mc_gState->m_Assets->FindEntityByTxID(&entity,(unsigned char*)&hash))
                     {
-                        if((entity.IsUnconfirmedGenesis() != 0) && (mc_gState->m_Features->ShortTxIDInTx() == 0) )
+                        ptr=(unsigned char *)entity.GetFullRef();
+                        memcpy(buf,ptr,MC_AST_ASSET_FULLREF_SIZE);
+                        int row=asset_amounts->Seek(buf);
+                        if(row >= 0)
                         {
-                            is_genesis=true;
+                            int64_t last=mc_GetABQuantity(asset_amounts->GetRow(row));
+                            quantity+=last;
+                            mc_SetABQuantity(asset_amounts->GetRow(row),quantity);
                         }
                         else
                         {
-                            ptr=(unsigned char *)entity.GetFullRef();
-                            memcpy(buf,ptr,MC_AST_ASSET_FULLREF_SIZE);
-                            int row=asset_amounts->Seek(buf);
-                            if(row >= 0)
-                            {
-                                int64_t last=mc_GetABQuantity(asset_amounts->GetRow(row));
-                                quantity+=last;
-                                mc_SetABQuantity(asset_amounts->GetRow(row),quantity);
-                            }
-                            else
-                            {
-                                mc_SetABQuantity(buf,quantity);
-                                asset_amounts->Add(buf);                        
-                            }
+                            mc_SetABQuantity(buf,quantity);
+                            asset_amounts->Add(buf);                        
                         }
                     }                
                     

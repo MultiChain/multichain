@@ -168,15 +168,7 @@ Value liststreams(const Array& params, bool fHelp)
     
     int root_stream_name_size;
     mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
-    if( (root_stream_name_size <= 1) && (inputStrings.size() == 0) && (mc_gState->m_Features->FixedIn10008() == 0) )            // Patch, to be removed in 10008
-    {
-        mc_AdjustStartAndCount(&count,&start,streams->GetCount()-1);        
-        start++;            
-    }
-    else
-    {
-        mc_AdjustStartAndCount(&count,&start,streams->GetCount());        
-    }
+    mc_AdjustStartAndCount(&count,&start,streams->GetCount());        
     
     
     Array partial_results;
@@ -238,10 +230,6 @@ Value liststreams(const Array& params, bool fHelp)
     {
         return_partial=true;
     }
-    if( (root_stream_name_size <= 1) && (inputStrings.size() == 0)  && (mc_gState->m_Features->FixedIn10008() == 0) )            // Patch, to be removed in 10008
-    {
-        return_partial=true;        
-    }
     mc_gState->m_Assets->FreeEntityList(streams);
     if(return_partial)
     {
@@ -260,11 +248,6 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     if (fHelp || params.size() < 4)
         throw runtime_error("Help message not found\n");
 
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
-    
     if (strcmp(params[1].get_str().c_str(),"stream"))
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type, should be stream");
 
@@ -291,12 +274,9 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     if(params[3].type() != bool_type)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid open flag, should be boolean");
     
-    if(mc_gState->m_Features->Streams())
+    if(stream_name == "*")
     {
-        if(stream_name == "*")
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid stream name: *");                                                                                            
-        }
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid stream name: *");                                                                                            
     }
 
     unsigned char buf_a[MC_AST_ASSET_REF_SIZE];    
@@ -381,54 +361,16 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     size_t elem_size;
     const unsigned char *elem;
     
-    if(mc_gState->m_Features->OpDropDetailsScripts())
+    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
+    if(err)
     {
-        err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
-        if(err)
-        {
-            strError= "Invalid custom fields or stream name, too long";
-            goto exitlbl;
+        strError= "Invalid custom fields or stream name, too long";
+        goto exitlbl;
 //            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or stream name, too long");                                                        
-        }
-        
-        elem = lpDetailsScript->GetData(0,&elem_size);
-        scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;        
     }
-    else
-    {
-        lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM);
 
-        err=lpDetailsScript->SetGeneralDetails(script,bytes);
-        if(err)
-        {
-            strError= "Invalid custom fields or stream name, too long";
-            goto exitlbl;
-//            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields or stream name, too long");                                                    
-        }
-
-        for(int e=0;e<lpDetailsScript->GetNumElements();e++)
-        {
-            elem = lpDetailsScript->GetData(e,&elem_size);
-            if(e == (lpDetailsScript->GetNumElements() - 1) )
-            {
-                if(elem_size > 0)
-                {
-                    scriptOpReturn << OP_RETURN << vector<unsigned char>(elem, elem + elem_size);
-                }
-                else
-                {
-                    scriptOpReturn << OP_RETURN;
-                }
-            }
-            else
-            {
-                if(elem_size > 0)
-                {
-                    scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
-                }                
-            }
-        }    
-    }
+    elem = lpDetailsScript->GetData(0,&elem_size);
+    scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;        
     
     
     if(params[0].get_str() != "*")
@@ -501,10 +443,6 @@ Value createfromcmd(const Array& params, bool fHelp)
     if (fHelp || params.size() < 4)
         throw runtime_error("Help message not found\n");
     
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
     if (strcmp(params[1].get_str().c_str(),"stream") == 0)
     {
         return createstreamfromcmd(params,fHelp);    
@@ -522,11 +460,6 @@ Value createcmd(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 3)
         throw runtime_error("Help message not found\n");
-
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
     
     Array ext_params;
     ext_params.push_back("*");
@@ -542,12 +475,7 @@ Value publish(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 3 || params.size() > 4)
         throw runtime_error("Help message not found\n");
-    
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
-    
+        
     Array ext_params;
     ext_params.push_back("*");
     BOOST_FOREACH(const Value& value, params)
@@ -563,11 +491,6 @@ Value publishfrom(const Array& params, bool fHelp)
     if (fHelp || params.size() != 4)
         throw runtime_error("Help message not found\n");
 
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
-           
     mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
     lpScript->Clear();
     
@@ -722,10 +645,6 @@ Value subscribe(const Array& params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error("Help message not found\n");
 
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
@@ -811,10 +730,6 @@ Value unsubscribe(const Array& params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error("Help message not found\n");
 
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
@@ -898,10 +813,6 @@ Value liststreamtxitems(const Array& params, bool fHelp)
     if (fHelp || params.size() < 2 || params.size() > 3)
         throw runtime_error("Help message not found\n");
    
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
@@ -1002,10 +913,6 @@ Value liststreamitems(const Array& params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 5)
         throw runtime_error("Help message not found\n");
 
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
@@ -1113,10 +1020,6 @@ Value liststreamblockitems(const Array& params, bool fHelp)
     if (fHelp || params.size() < 2 || params.size() > 5)
         throw runtime_error("Help message not found\n");
 
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
@@ -1258,10 +1161,6 @@ void getSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity
 
 Value getstreamsummary(const Array& params, bool fPublisher)
 {
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
@@ -1527,10 +1426,6 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
     if (fHelp || params.size() < 2 || params.size() > 6)
         throw runtime_error("Help message not found\n");
 
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
@@ -1633,10 +1528,6 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
     if (fHelp || params.size() < 2 || params.size() > 6)
         throw runtime_error("Help message not found\n");
 
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
@@ -1968,10 +1859,6 @@ Value liststreamkeys(const Array& params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 6)
         throw runtime_error("Help message not found\n");
     
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
@@ -1989,11 +1876,6 @@ Value liststreampublishers(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
     }   
     
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
-           
     return liststreamkeys_or_publishers(params,true);
 }
 

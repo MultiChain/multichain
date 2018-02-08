@@ -559,46 +559,21 @@ void DebugPrintAssetTxOut(uint256 hash,int index,unsigned char* assetrefbin,int6
 {
     string txid=hash.GetHex();
     
-    
-    if(mc_gState->m_Features->ShortTxIDInTx())
+    if(debug_print)
     {
-        if(debug_print)
+        printf("TxOut: %s-%d ",txid.c_str(),index);        
+        if(mc_GetABRefType(assetrefbin) == MC_AST_ASSET_REF_TYPE_SPECIAL)
         {
-            printf("TxOut: %s-%d ",txid.c_str(),index);        
-            if(mc_GetABRefType(assetrefbin) == MC_AST_ASSET_REF_TYPE_SPECIAL)
-            {
-                printf("Special:        %08x%08x",(uint32_t)mc_GetLE(assetrefbin,4),(uint32_t)mc_GetLE(assetrefbin+4,4));
-            }
-            else
-            {
-                for(int i=MC_AST_SHORT_TXID_OFFSET+MC_AST_SHORT_TXID_SIZE-1;i>=MC_AST_SHORT_TXID_OFFSET;i--)
-                {
-                    printf("%02x",assetrefbin[i]);
-                }
-            }
-            printf(" %ld\n",quantity);        
-        }
-    }
-    else
-    {
-        string assetref="";
-        if(mc_GetABRefType(assetrefbin) == MC_AST_ASSET_REF_TYPE_SHORT_TXID)
-        {
-            for(int i=0;i<8;i++)
-            {
-                assetref += strprintf("%02x",assetrefbin[MC_AST_SHORT_TXID_OFFSET+MC_AST_SHORT_TXID_SIZE-i-1]);
-            }
+            printf("Special:        %08x%08x",(uint32_t)mc_GetLE(assetrefbin,4),(uint32_t)mc_GetLE(assetrefbin+4,4));
         }
         else
         {
-            assetref += itostr((int)mc_GetLE(assetrefbin,4));
-            assetref += "-";
-            assetref += itostr((int)mc_GetLE(assetrefbin+4,4));
-            assetref += "-";
-            assetref += itostr((int)mc_GetLE(assetrefbin+8,2));
+            for(int i=MC_AST_SHORT_TXID_OFFSET+MC_AST_SHORT_TXID_SIZE-1;i>=MC_AST_SHORT_TXID_OFFSET;i--)
+            {
+                printf("%02x",assetrefbin[i]);
+            }
         }
-        
-        if(debug_print)printf("TxOut: %s-%d %s %ld\n",txid.c_str(),index,assetref.c_str(),quantity);
+        printf(" %ld\n",quantity);        
     }
 }
 
@@ -1641,12 +1616,9 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
             txNew.vout.push_back(txout);
         }
 
-        int assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
+        int assets_per_opdrop;
         
-        if(mc_gState->m_Features->VerifySizeOfOpDropElements())
-        {
-            assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
-        }
+        assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
  
         size_t elem_size;
         const unsigned char *elem;
@@ -2703,12 +2675,9 @@ bool CWallet::InitializeUnspentList()
 
     lpAssetGroups=new CAssetGroupTree;
 
-    int assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
+    int assets_per_opdrop;
 
-    if(mc_gState->m_Features->VerifySizeOfOpDropElements())
-    {
-        assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
-    }
+    assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
 
     int max_assets_per_group=assets_per_opdrop*MCP_STD_OP_DROP_COUNT;
 

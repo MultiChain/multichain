@@ -128,22 +128,8 @@ typedef struct mc_UpgradedParameter
 typedef struct mc_Features
 {    
     int MinProtocolVersion();
-    int ActivatePermission();
     int LastVersionNotSendingProtocolVersionInHandShake();
-    int VerifySizeOfOpDropElements();
-    int PerEntityPermissions();
-    int FollowOnIssues();
-    int SpecialParamsInDetailsScript();
-    int FixedGrantsInTheSameTx();
-    int UnconfirmedMinersCannotMine();
-    int Streams();
-    int OpDropDetailsScripts();
-    int ShortTxIDInTx();
-    int CachedInputScript();
     int AnyoneCanReceiveEmpty();
-    int FixedIn10007();
-    int Upgrades();
-    int FixedIn10008();
     int FormattedData();
     int FixedDestinationExtraction();
     int FixedIn1000920001();

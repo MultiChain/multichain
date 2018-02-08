@@ -1417,22 +1417,10 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, int block, int *e
         for(unsigned int i=0;i<vStreamsToImport.size();i++)
         {     
             bool take_it=false;
-            if( ( (vStreamsToImport[i].m_EntityType & MC_TET_TYPE_MASK) == MC_TET_ASSET ) &&
-                ( mc_gState->m_Features->ShortTxIDInTx() == 0) )    
+            if(mc_gState->m_Assets->FindEntityByShortTxID(&stream_entity,vStreamsToImport[i].m_EntityID))
             {
-                if(mc_gState->m_Assets->FindEntityByRef(&stream_entity,vStreamsToImport[i].m_EntityID))
-                {
-                    take_it=true;
-                }   
-            }
-            else
-            {
-                if(mc_gState->m_Assets->FindEntityByShortTxID(&stream_entity,vStreamsToImport[i].m_EntityID))
-                {
-                    take_it=true;
-                }                
-            }
-//            if(mc_gState->m_Assets->FindEntityByShortTxID(&stream_entity,vStreamsToImport[i].m_EntityID))
+                take_it=true;
+            }                
             if(take_it)
             {
                 entity.Zero();            

@@ -2440,25 +2440,8 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     if(fNewAsset)
     {
         entity.Zero();
-        if(mc_gState->m_Features->ShortTxIDInTx())
-        {
-            entity.m_EntityType=MC_TET_ASSET | MC_TET_CHAINPOS;
-            memcpy(entity.m_EntityID,(unsigned char*)&hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-        }
-        else
-        {
-            if(block >= 0)
-            {
-                entity.m_EntityType=MC_TET_ASSET | MC_TET_CHAINPOS;
-                int tx_offset=sizeof(CBlockHeader)+block_pos->nTxOffset;
-                mc_PutLE(entity.m_EntityID,&block,4);
-                mc_PutLE(entity.m_EntityID+4,&tx_offset,4);
-                for(i=0;i<MC_ENT_REF_PREFIX_SIZE;i++)
-                {
-                    entity.m_EntityID[8+i]=*((unsigned char*)&hash+MC_ENT_KEY_SIZE-1-i);
-                }
-            }
-        }
+        entity.m_EntityType=MC_TET_ASSET | MC_TET_CHAINPOS;
+        memcpy(entity.m_EntityID,(unsigned char*)&hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
         if(entity.m_EntityType)
         {
             if(imp->FindEntity(&entity) >= 0)    
@@ -2493,14 +2476,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     {
         ptrOut=mc_gState->m_TmpAssetsOut->GetRow(i);
         entity.Zero();
-        if(mc_gState->m_Features->ShortTxIDInTx())
-        {
-            memcpy(entity.m_EntityID,ptrOut+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-        }
-        else
-        {
-            memcpy(entity.m_EntityID,ptrOut,MC_AST_ASSET_REF_SIZE);            
-        }
+        memcpy(entity.m_EntityID,ptrOut+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
         entity.m_EntityType=MC_TET_ASSET | MC_TET_CHAINPOS;
         fRelevantEntity=false;
         if(imp->FindEntity(&entity) >= 0)    

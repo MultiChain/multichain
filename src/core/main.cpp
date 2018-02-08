@@ -1099,13 +1099,7 @@ bool IsStandardTx(const CTransaction& tx, string& reason,bool check_for_dust)
     }
 
     // only one OP_RETURN txout is permitted
-/* MCHN START */    
-    int max_op_returns=1;
-    if(mc_gState->m_Features->Streams())
-    {
-        max_op_returns=MCP_MAX_STD_OP_RETURN_COUNT;
-    }
-/* MCHN END */    
+    int max_op_returns=MCP_MAX_STD_OP_RETURN_COUNT;
     
     if ((int)nDataOut > max_op_returns) {
         reason = "multi-op-return";
@@ -1417,24 +1411,6 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     uint256 hash = tx.GetHash();
     if (pool.exists(hash))
         return false;
-
-/* MCHN START */
-    if(mc_gState->m_Features->Streams() == 0)
-    {
-        if(!AcceptPermissionsAndCheckForDust(tx,false,reason))
-        {
-            return state.DoS(0,
-                             error("AcceptToMemoryPool: : AcceptPermissionsAndCheckForDust failed %s : %s", hash.ToString(),reason),
-                             REJECT_NONSTANDARD, reason);
-        }
-        if(!AcceptAssetGenesis(tx,-1,false,reason))
-        {
-            return state.DoS(0,
-                             error("AcceptToMemoryPool: : AcceptAssetGenesis failed %s : %s", hash.ToString(),reason),
-                             REJECT_INVALID, reason);
-        }
-    }    
-/* MCHN END */
     
     // Check for conflicts with in-memory transactions
     {
@@ -1649,35 +1625,11 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         int permissions_from,permissions_to;
         permissions_from=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
         
-        if(mc_gState->m_Features->Streams())
+        if(!AcceptMultiChainTransaction(tx,view,-1,true,reason, &replay))
         {
-            if(!AcceptMultiChainTransaction(tx,view,-1,true,reason, &replay))
-            {
-                return state.DoS(0,
-                                 error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
-                                 REJECT_NONSTANDARD, reason);
-            }
-        }
-        else
-        {
-            if(!AcceptPermissionsAndCheckForDust(tx,true,reason))
-            {
-                return state.DoS(0,
-                                 error("AcceptToMemoryPool: : AcceptPermissionChanges failed when adding to permission db %s - %s", hash.ToString(),reason),
-                                 REJECT_INVALID, reason);
-            }
-            if(!AcceptAssetGenesis(tx,-1,true,reason))
-            {
-                return state.DoS(0,
-                                 error("AcceptToMemoryPool: : AcceptAssetGenesis failed when adding to asset db %s : %s", hash.ToString(),reason),
-                                 REJECT_INVALID, reason);
-            }        
-            if(!AcceptAssetTransfers(tx, view, reason))
-            {
-                return state.DoS(0,
-                                 error("AcceptToMemoryPool: : AcceptAssetTransfers failed %s : %s", hash.ToString(),reason),
-                                 REJECT_INVALID, reason);
-            }
+            return state.DoS(0,
+                             error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
+                             REJECT_NONSTANDARD, reason);
         }
         
         if(fAddToWallet)
@@ -2415,55 +2367,43 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         {
             const CTransaction &tx = block.vtx[i];
             string reason;
-            if(mc_gState->m_Features->Streams())
+            if(!AcceptMultiChainTransaction(tx,view,offset,true,reason,NULL))
             {
-                if(!AcceptMultiChainTransaction(tx,view,offset,true,reason,NULL))
-                {
-                    return state.DoS(100, error(reason.c_str()),
-                                 REJECT_INVALID, "bad-transaction");            
-                }
+                return state.DoS(100, error(reason.c_str()),
+                             REJECT_INVALID, "bad-transaction");            
+            }
 //                unsigned char *root_stream_name;
-                int root_stream_name_size;
-                mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
-                if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+            int root_stream_name_size;
+            mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
+            if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+            {
+                root_stream_name_size=0;
+            }    
+            if(root_stream_name_size > 1)
+            {
+                if(pwalletTxsMain)
                 {
-                    root_stream_name_size=0;
-                }    
-                if(root_stream_name_size > 1)
-                {
-                    if(pwalletTxsMain)
-                    {
-                        if(mc_gState->m_WalletMode & MC_WMD_TXS)
-                        {                        
-                            mc_TxEntity entity;
-                            uint256 genesis_hash=block.vtx[0].GetHash();
-                            entity.Zero();
+                    if(mc_gState->m_WalletMode & MC_WMD_TXS)
+                    {                        
+                        mc_TxEntity entity;
+                        uint256 genesis_hash=block.vtx[0].GetHash();
+                        entity.Zero();
 
-                            memcpy(entity.m_EntityID,(unsigned char*)&genesis_hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-                            entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
-                            pwalletTxsMain->AddEntity(&entity,0);
-                            entity.m_EntityType=MC_TET_STREAM | MC_TET_TIMERECEIVED;
-                            pwalletTxsMain->AddEntity(&entity,0);
-                            entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_CHAINPOS;
-                            pwalletTxsMain->AddEntity(&entity,0);
-                            entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_TIMERECEIVED;
-                            pwalletTxsMain->AddEntity(&entity,0);
-                            entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS;
-                            pwalletTxsMain->AddEntity(&entity,0);
-                            entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_TIMERECEIVED;
-                            pwalletTxsMain->AddEntity(&entity,0);
-                        }
+                        memcpy(entity.m_EntityID,(unsigned char*)&genesis_hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+                        entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
+                        pwalletTxsMain->AddEntity(&entity,0);
+                        entity.m_EntityType=MC_TET_STREAM | MC_TET_TIMERECEIVED;
+                        pwalletTxsMain->AddEntity(&entity,0);
+                        entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_CHAINPOS;
+                        pwalletTxsMain->AddEntity(&entity,0);
+                        entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_TIMERECEIVED;
+                        pwalletTxsMain->AddEntity(&entity,0);
+                        entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS;
+                        pwalletTxsMain->AddEntity(&entity,0);
+                        entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_TIMERECEIVED;
+                        pwalletTxsMain->AddEntity(&entity,0);
                     }
                 }
-            }
-            else
-            {
-                if(!AcceptPermissionsAndCheckForDust(tx,true,reason))
-                {
-                    return state.DoS(100, error(reason.c_str()),
-                                 REJECT_INVALID, "bad-transaction");            
-                    return false;
-                }            
             }
             offset+=tx.GetSerializeSize(SER_NETWORK,tx.nVersion);
         }
@@ -2586,35 +2526,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             string reason;
             if(!fJustCheck)
             {
-                if(mc_gState->m_Features->Streams())
+                if(!AcceptMultiChainTransaction(tx,view,offset,true,reason,NULL))
                 {
-                    if(!AcceptMultiChainTransaction(tx,view,offset,true,reason,NULL))
-                    {
-                        return state.DoS(0,
-                                         error("ConnectBlock: : AcceptMultiChainTransaction failed %s : %s", tx.GetHash().ToString(),reason),
-                                         REJECT_NONSTANDARD, reason);
-                    }
-                }
-                else
-                {
-                    if(!AcceptPermissionsAndCheckForDust(tx,true,reason))
-                    {
-                        return state.DoS(0,
-                                         error("ConnectBlock: AcceptPermissionChanges failed when adding to permission db %s - %s", tx.GetHash().ToString(),reason),
-                                         REJECT_INVALID, reason);
-                    }
-                    if(!AcceptAssetGenesis(tx,offset,true,reason))
-                    {
-                        return state.DoS(0,
-                                         error("ConnectBlock: AcceptAssetGenesis failed when adding to asset db %s : %s", tx.GetHash().ToString(),reason),
-                                         REJECT_INVALID, reason);
-                    }        
-                    if(!AcceptAssetTransfers(tx, view, reason))
-                    {
-                        return state.DoS(0,
-                                         error("ConnectBlock: AcceptAssetTransfers failed %s : %s", tx.GetHash().ToString(),reason),
-                                         REJECT_INVALID, reason);
-                    }
+                    return state.DoS(0,
+                                     error("ConnectBlock: : AcceptMultiChainTransaction failed %s : %s", tx.GetHash().ToString(),reason),
+                                     REJECT_NONSTANDARD, reason);
                 }
             }
 /* MCHN END */                    
@@ -2641,19 +2557,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             string reason;
             if(!fJustCheck)
             {
-                if(mc_gState->m_Features->Streams())
+                if(!AcceptMultiChainTransaction(tx,view,coinbase_offset,true,reason,NULL))
                 {
-                    if(!AcceptMultiChainTransaction(tx,view,coinbase_offset,true,reason,NULL))
-                    {
-                        return false;       
-                    }
-                }
-                else
-                {
-                    if(!AcceptPermissionsAndCheckForDust(tx,true,reason))
-                    {
-                        return false;
-                    }
+                    return false;       
                 }
             }
         }            

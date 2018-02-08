@@ -29,12 +29,6 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
             this_param_type=MC_DATA_API_PARAM_TYPE_NONE;   
             if(d.name_ == "inputcache")
             {
-                if( mc_gState->m_Features->CachedInputScript() == 0 )
-                {
-                    *errorCode=RPC_NOT_SUPPORTED;
-                    *strError=string("Cached input scripts are not supported by this protocol version");       
-                    goto exitlbl;
-                }
                 this_param_type=MC_DATA_API_PARAM_TYPE_CIS;
             }            
             if(d.name_ == "create")
@@ -43,12 +37,6 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                 {
                     if(d.value_.get_str() == "stream")
                     {
-                        if( mc_gState->m_Features->Streams() == 0 )
-                        {
-                            *errorCode=RPC_NOT_SUPPORTED;
-                            *strError=string("Streams are not supported by this protocol version");       
-                            goto exitlbl;
-                        }
                         this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_STREAM;
                     }
                     if(d.value_.get_str() == "asset")
@@ -57,12 +45,6 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     }
                     if(d.value_.get_str() == "upgrade")
                     {
-                        if( mc_gState->m_Features->Upgrades() == 0 )
-                        {
-                            *errorCode=RPC_NOT_SUPPORTED;
-                            *strError=string("Upgrades are not supported by this protocol version");       
-                            goto exitlbl;
-                        }
                         this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_UPGRADE;
                     }
                 }
@@ -93,22 +75,10 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                 }                
                 if(entity->GetEntityType() == MC_ENT_TYPE_STREAM)
                 {
-                    if( mc_gState->m_Features->Streams() == 0 )
-                    {
-                        *errorCode=RPC_NOT_SUPPORTED;
-                        *strError=string("Upgrades are not supported by this protocol version");       
-                        goto exitlbl;
-                    }
                     this_param_type=MC_DATA_API_PARAM_TYPE_PUBLISH;                
                 }
                 if(entity->GetEntityType() == MC_ENT_TYPE_UPGRADE)
                 {
-                    if( mc_gState->m_Features->Upgrades() == 0 )
-                    {
-                        *errorCode=RPC_NOT_SUPPORTED;
-                        *strError=string("Upgrades are not supported by this protocol version");       
-                        goto exitlbl;
-                    }
                     this_param_type=MC_DATA_API_PARAM_TYPE_APPROVAL;                
                 }
                 if(this_param_type == MC_DATA_API_PARAM_TYPE_NONE)
@@ -117,25 +87,6 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     goto exitlbl;                        
                 }
             }
-/*            
-            if(d.name_ == "data")
-            {
-                if(!missing_data)
-                {
-                    *strError=string("data field can appear only once in the object");                                                                                        
-                    goto exitlbl;                    
-                }
-                missing_data=false;
-                if(d.value_.type() != str_type)
-                {
-                    if(d.value_.type() != obj_type)
-                    {
-                        *strError=string("data should be string or object");                                                                                        
-                        goto exitlbl;                                            
-                    }
-                }
-            }
- */ 
             if( (d.name_ == "text") || (d.name_ == "json") )
             {
                 if( mc_gState->m_Features->FormattedData() == 0 )
@@ -151,54 +102,11 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                 }
                 missing_data=false;
             }
-/*            
-            if(d.name_ == "format")
-            {
-                if( mc_gState->m_Features->FormattedData() == 0 )
-                {
-                    *errorCode=RPC_NOT_SUPPORTED;
-                    *strError=string("Formatted data is not supported by this protocol version");       
-                    goto exitlbl;
-                }
-                if(*data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
-                {
-                    *strError=string("format field can appear only once in the object");                                                                                        
-                    goto exitlbl;                    
-                }
-                if(d.value_.type() != null_type && !d.value_.get_str().empty())
-                {
-                    if(d.value_.get_str() == "hex")
-                    {
-                        *data_format=MC_SCR_DATA_FORMAT_RAW;                        
-                    }
-                    if(d.value_.get_str() == "text")
-                    {
-                        *data_format=MC_SCR_DATA_FORMAT_UTF8;                        
-                    }
-                    if(d.value_.get_str() == "json")
-                    {
-                        *data_format=MC_SCR_DATA_FORMAT_UBJSON;                        
-                    }
-                }
-                if(*data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
-                {
-                    *strError=string("Invalid format");                                                    
-                }
-            }
- */ 
             if(this_param_type != MC_DATA_API_PARAM_TYPE_NONE)
             {
                 if(param_type != MC_DATA_API_PARAM_TYPE_NONE)
                 {                
-                    *strError=string("Only one of the following keywords can appear in the object: create, update");                                                                                        
-                    if(mc_gState->m_Features->Streams())
-                    {
-                        *strError += string(", for");
-                    }
-                    if(mc_gState->m_Features->Streams())
-                    {
-                        *strError += string(", json, text");
-                    }
+                    *strError=string("Only one of the following keywords can appear in the object: create, update, for, json, text");                                                                                        
                     goto exitlbl;
                 }
             }
@@ -375,50 +283,6 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
         }
     }
     
-/*    
-    switch(data_format)
-    {
-        case MC_SCR_DATA_FORMAT_RAW:
-        case MC_SCR_DATA_FORMAT_UNKNOWN:
-            if(value->type() != null_type && (value->type()==str_type))
-            {
-                bool fIsHex;
-                vValue=ParseHex(value->get_str().c_str(),fIsHex);    
-                if(!fIsHex)
-                {
-                    *strError=string("value should be hexadecimal string");                            
-                }
-            }
-            else
-            {
-                *strError=string("Invalid value in data field for this format");                            
-            }
-            break;
-        case MC_SCR_DATA_FORMAT_UTF8:
-            if(value->type() != null_type && (value->type()==str_type))
-            {
-                vValue=vector<unsigned char> (value->get_str().begin(),value->get_str().end());    
-            }
-            else
-            {
-                *strError=string("Invalid value in data field for this format");                            
-            }
-            break;
-        case MC_SCR_DATA_FORMAT_UBJSON:
-            size_t bytes;
-            int err;
-            const unsigned char *script;
-            lpDetailsScript->Clear();
-            lpDetailsScript->AddElement();
-            if((err = ubjson_write(*value,lpDetailsScript,MAX_FORMATTED_DATA_DEPTH)) != MC_ERR_NOERROR)
-            {
-                *strError=string("Couldn't transfer JSON object to internal UBJSON format");    
-            }
-            script = lpDetailsScript->GetData(0,&bytes);
-            vValue=vector<unsigned char> (script,script+bytes);                                            
-            break;
-    }
-*/
     return vValue;
 }
 
@@ -552,10 +416,7 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
                 entity_name=d.value_.get_str();
                 if(entity_name.size())
                 {
-                    if(mc_gState->m_Features->OpDropDetailsScripts())
-                    {
-                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());
-                    }
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());
                 }
             }
             else
@@ -580,10 +441,7 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
                 }
                 else
                 {
-                    if(mc_gState->m_Features->OpDropDetailsScripts())                    
-                    {
-                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,4);
-                    }
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,4);
                 }
             }
             else
@@ -663,37 +521,17 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
     if(strError->size() == 0)
     {
         lpDetailsScript->Clear();
-        if(mc_gState->m_Features->OpDropDetailsScripts())
+        script=lpDetails->GetData(0,&bytes);
+        err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
+        if(err)
         {
-            script=lpDetails->GetData(0,&bytes);
-            err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
-            if(err)
-            {
-                *strError=string("Invalid custom fields, too long");                                                            
-            }
-            else
-            {
-                script = lpDetailsScript->GetData(0,&bytes);
-                scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
-            }
+            *strError=string("Invalid custom fields, too long");                                                            
         }
         else
         {
-            script=lpDetails->GetData(0,&bytes);
-            err=lpDetailsScript->SetAssetDetails(entity_name.c_str(),multiple,script,bytes);                
             script = lpDetailsScript->GetData(0,&bytes);
-            if(err)
-            {
-                *strError=string("Invalid custom fields, too long");                                                            
-            }
-            else
-            {
-                if(bytes > 0)
-                {
-                    scriptOpReturn << OP_RETURN << vector<unsigned char>(script, script + bytes);
-                }                    
-            }
-        }        
+            scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+        }
     }
     
     return scriptOpReturn;
@@ -731,44 +569,22 @@ CScript RawDataScriptFollowOn(Value *param,mc_EntityDetails *entity,mc_Script *l
         }
     }    
     
-    if(mc_gState->m_Features->OpDropDetailsScripts())
-    {
-        int err;
-        lpDetailsScript->Clear();
-        lpDetailsScript->SetEntity(entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET);
-        script = lpDetailsScript->GetData(0,&bytes);
-        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
+    lpDetailsScript->Clear();
+    lpDetailsScript->SetEntity(entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET);
+    script = lpDetailsScript->GetData(0,&bytes);
+    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
 
-        lpDetailsScript->Clear();
-        script=lpDetails->GetData(0,&bytes);
-        err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
-        if(err)
-        {
-            *strError=string("Invalid custom fields, too long");                                                            
-        }
-        else
-        {
-            script = lpDetailsScript->GetData(0,&bytes);
-            scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
-        }
+    lpDetailsScript->Clear();
+    script=lpDetails->GetData(0,&bytes);
+    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
+    if(err)
+    {
+        *strError=string("Invalid custom fields, too long");                                                            
     }
     else
     {
-        lpDetailsScript->Clear();
-        script=lpDetails->GetData(0,&bytes);
-        err=lpDetailsScript->SetGeneralDetails(script,bytes);                
-        if(err)
-        {
-            *strError=string("Invalid custom fields, too long");                                                            
-        }
-        else
-        {
-            script = lpDetailsScript->GetData(0,&bytes);
-            if(bytes > 0)
-            {
-                scriptOpReturn << OP_RETURN << vector<unsigned char>(script, script + bytes);
-            }                    
-        }
+        script = lpDetailsScript->GetData(0,&bytes);
+        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
     }
     
     return scriptOpReturn;
@@ -853,42 +669,17 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
     if(strError->size() == 0)
     {
         lpDetailsScript->Clear();
-        if(mc_gState->m_Features->OpDropDetailsScripts())
+        script=lpDetails->GetData(0,&bytes);
+        err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
+        if(err)
         {
-            script=lpDetails->GetData(0,&bytes);
-            err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
-            if(err)
-            {
-                *strError=string("Invalid custom fields, too long");                                                            
-            }
-            else
-            {
-                script = lpDetailsScript->GetData(0,&bytes);
-                scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
-            }
+            *strError=string("Invalid custom fields, too long");                                                            
         }
         else
         {
-            lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM);
             script = lpDetailsScript->GetData(0,&bytes);
-            scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
-
-            lpDetailsScript->Clear();
-            script=lpDetails->GetData(0,&bytes);
-            err=lpDetailsScript->SetGeneralDetails(script,bytes);                
-            if(err)
-            {
-                *strError=string("Invalid custom fields, too long");                                                            
-            }
-            else
-            {
-                script = lpDetailsScript->GetData(0,&bytes);
-                if(bytes > 0)
-                {
-                    scriptOpReturn << OP_RETURN << vector<unsigned char>(script, script + bytes);
-                }
-            }
-        }        
+            scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+        }
     }
     
     return scriptOpReturn;

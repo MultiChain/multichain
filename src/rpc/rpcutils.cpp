@@ -275,22 +275,15 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
 int ParseAssetKeyToFullAssetRef(const char* asset_key,unsigned char *full_asset_ref,int *multiple,int *type,int entity_type)
 {
     int ret;
-    if(mc_gState->m_Features->ShortTxIDInTx())
+    unsigned char txid[MC_ENT_KEY_SIZE];
+    ret=ParseAssetKey(asset_key,txid,NULL,NULL,multiple,type,entity_type);
+    if(ret == MC_ASSET_KEY_UNCONFIRMED_GENESIS)
     {
-        unsigned char txid[MC_ENT_KEY_SIZE];
-        ret=ParseAssetKey(asset_key,txid,NULL,NULL,multiple,type,entity_type);
-        if(ret == MC_ASSET_KEY_UNCONFIRMED_GENESIS)
-        {
-            ret=0;
-        }
-        memcpy(full_asset_ref+MC_AST_SHORT_TXID_OFFSET,txid+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-        
-        mc_SetABRefType(full_asset_ref,MC_AST_ASSET_REF_TYPE_SHORT_TXID);        
+        ret=0;
     }
-    else
-    {
-        ret=ParseAssetKey(asset_key,NULL,full_asset_ref,NULL,multiple,type,entity_type);        
-    }
+    memcpy(full_asset_ref+MC_AST_SHORT_TXID_OFFSET,txid+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+
+    mc_SetABRefType(full_asset_ref,MC_AST_ASSET_REF_TYPE_SHORT_TXID);        
     return ret;
 }
 
@@ -527,11 +520,8 @@ Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong)
                 if(full_type & MC_PTP_CONNECT)entry.push_back(Pair("connect", (type & MC_PTP_CONNECT) ? true : false));
                 if(full_type & MC_PTP_SEND)entry.push_back(Pair("send", (type & MC_PTP_SEND) ? true : false));
                 if(full_type & MC_PTP_RECEIVE)entry.push_back(Pair("receive", (type & MC_PTP_RECEIVE) ? true : false));
-                if(mc_gState->m_Features->Streams())
-                {
-                    if(full_type & MC_PTP_WRITE)entry.push_back(Pair("write", (type & MC_PTP_WRITE) ? true : false));                
-                    if(full_type & MC_PTP_CREATE)entry.push_back(Pair("create", (type & MC_PTP_CREATE) ? true : false));                
-                }
+                if(full_type & MC_PTP_WRITE)entry.push_back(Pair("write", (type & MC_PTP_WRITE) ? true : false));                
+                if(full_type & MC_PTP_CREATE)entry.push_back(Pair("create", (type & MC_PTP_CREATE) ? true : false));                
                 if(full_type & MC_PTP_ISSUE)entry.push_back(Pair("issue", (type & MC_PTP_ISSUE) ? true : false));
                 if(full_type & MC_PTP_MINE)entry.push_back(Pair("mine", (type & MC_PTP_MINE) ? true : false));
                 if(full_type & MC_PTP_ADMIN)entry.push_back(Pair("admin", (type & MC_PTP_ADMIN) ? true : false));
@@ -1416,13 +1406,7 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
     
     memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
     
-    if(mc_gState->m_Features->VerifySizeOfOpDropElements())
-    {        
-        if(mc_gState->m_Features->VerifySizeOfOpDropElements())
-        {
-            assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
-        }
-    }
+    assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
     
     BOOST_FOREACH(const Pair& a, param.get_obj()) 
     {
@@ -2188,92 +2172,85 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
             if(d.name_ == "inputcache")
             {
                 new_type=-3;
-                if( ((allowed_objects & 0x0200) == 0) || (mc_gState->m_Features->CachedInputScript() == 0) )
+                if(d.value_.type() != array_type)
                 {
-                    strError=string("Keyword not allowed in this API");                                                
+                    strError=string("Array should be specified for inputcache");                                                
                 }
                 else
                 {
-                    if(d.value_.type() != array_type)
+                    int cs_offset,cs_vin,cs_size;
+                    string cs_script="";
+                    Array csa=d.value_.get_array();
+                    lpDetails->Clear();
+                    lpDetails->SetCachedScript(0,&cs_offset,-1,NULL,-1);
+                    for(int csi=0;csi<(int)csa.size();csi++)
                     {
-                        strError=string("Array should be specified for inputcache");                                                
-                    }
-                    else
-                    {
-                        int cs_offset,cs_vin,cs_size;
-                        string cs_script="";
-                        Array csa=d.value_.get_array();
-                        lpDetails->Clear();
-                        lpDetails->SetCachedScript(0,&cs_offset,-1,NULL,-1);
-                        for(int csi=0;csi<(int)csa.size();csi++)
+                        if(strError.size() == 0)
                         {
-                            if(strError.size() == 0)
+                            if(csa[csi].type() != obj_type)
                             {
-                                if(csa[csi].type() != obj_type)
+                                strError=string("Elements of inputcache should be objects");                                                
+                            }
+                            cs_vin=-1;
+                            cs_size=-1;
+                            BOOST_FOREACH(const Pair& csf, csa[csi].get_obj())                                 
+                            {              
+                                bool cs_parsed=false;
+                                if(csf.name_ == "vin")
                                 {
-                                    strError=string("Elements of inputcache should be objects");                                                
-                                }
-                                cs_vin=-1;
-                                cs_size=-1;
-                                BOOST_FOREACH(const Pair& csf, csa[csi].get_obj())                                 
-                                {              
-                                    bool cs_parsed=false;
-                                    if(csf.name_ == "vin")
+                                    cs_parsed=true;
+                                    if(csf.value_.type() != int_type)
                                     {
-                                        cs_parsed=true;
-                                        if(csf.value_.type() != int_type)
-                                        {
-                                            strError=string("vin should be integer");                                                                                            
-                                        }
-                                        else
-                                        {
-                                            cs_vin=csf.value_.get_int();
-                                        } 
+                                        strError=string("vin should be integer");                                                                                            
                                     }
-                                    if(csf.name_ == "scriptPubKey")
-                                    {
-                                        cs_parsed=true;
-                                        if(csf.value_.type() != str_type)
-                                        {
-                                            strError=string("scriptPubKey should be string");                                                                                            
-                                        }
-                                        else
-                                        {
-                                            cs_script=csf.value_.get_str();
-                                            cs_size=cs_script.size()/2;
-                                        } 
-                                    }
-                                    if(!cs_parsed)
-                                    {
-                                        strError=string("Invalid field: ") + csf.name_;                                                                                    
-                                    }
-                                }
-                                if(strError.size() == 0)
-                                {
-                                    if(cs_vin<0)
-                                    {
-                                        strError=string("Missing vin field");                                                                                                                            
-                                    }
-                                }
-                                if(strError.size() == 0)
-                                {
-                                    if(cs_size<0)
-                                    {
-                                        strError=string("Missing scriptPubKey field");                                                                                                                            
-                                    }
-                                }                                
-                                if(strError.size() == 0)
-                                {
-                                    bool fIsHex;
-                                    vector<unsigned char> dataData(ParseHex(cs_script.c_str(),fIsHex));    
-                                    if(!fIsHex)
-                                    {
-                                        strError=string("scriptPubKey should be hexadecimal string");                                                                                                                            
-                                    }                                    
                                     else
                                     {
-                                        lpDetails->SetCachedScript(cs_offset,&cs_offset,cs_vin,&dataData[0],cs_size);                                        
+                                        cs_vin=csf.value_.get_int();
+                                    } 
+                                }
+                                if(csf.name_ == "scriptPubKey")
+                                {
+                                    cs_parsed=true;
+                                    if(csf.value_.type() != str_type)
+                                    {
+                                        strError=string("scriptPubKey should be string");                                                                                            
                                     }
+                                    else
+                                    {
+                                        cs_script=csf.value_.get_str();
+                                        cs_size=cs_script.size()/2;
+                                    } 
+                                }
+                                if(!cs_parsed)
+                                {
+                                    strError=string("Invalid field: ") + csf.name_;                                                                                    
+                                }
+                            }
+                            if(strError.size() == 0)
+                            {
+                                if(cs_vin<0)
+                                {
+                                    strError=string("Missing vin field");                                                                                                                            
+                                }
+                            }
+                            if(strError.size() == 0)
+                            {
+                                if(cs_size<0)
+                                {
+                                    strError=string("Missing scriptPubKey field");                                                                                                                            
+                                }
+                            }                                
+                            if(strError.size() == 0)
+                            {
+                                bool fIsHex;
+                                vector<unsigned char> dataData(ParseHex(cs_script.c_str(),fIsHex));    
+                                if(!fIsHex)
+                                {
+                                    strError=string("scriptPubKey should be hexadecimal string");                                                                                                                            
+                                }                                    
+                                else
+                                {
+                                    lpDetails->SetCachedScript(cs_offset,&cs_offset,cs_vin,&dataData[0],cs_size);                                        
                                 }
                             }
                         }
@@ -2723,17 +2700,11 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
                     }            
                     if(multiple_is_set)
                     {
-                        if(mc_gState->m_Features->OpDropDetailsScripts())
-                        {
-                            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,4);
-                        }
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,4);
                     }
                     if(entity_name.size())
                     {
-                        if(mc_gState->m_Features->OpDropDetailsScripts())
-                        {
-                            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());//+1);
-                        }
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());//+1);
                     }
                     if(vKey.size())
                     {
@@ -2812,69 +2783,32 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
         {
             if(new_type == MC_ENT_TYPE_UPGRADE)
             {
-                if(mc_gState->m_Features->Upgrades())
+                if((allowed_objects & 0x0040) == 0)
                 {
-                    if((allowed_objects & 0x0040) == 0)
-                    {
-                        strError=string("Creating new upgrades not allowed in this API");                                                
-                    }
-                    else
-                    {
-                        if(lpDetails->m_Size)
-                        {
-                            strError=string("Invalid fields in details object");                                                            
-                        }
-                        if(entity_name.size())
-                        {
-                            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());//+1);
-                        }
-                        if(protocol_version > 0)
-                        {
-                            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,(unsigned char*)&protocol_version,4);                                
-                        }
-                        else
-                        {
-                            strError=string("Missing protocol-version");                                                                                    
-                        }
-                        if(startblock > 0)
-                        {
-                            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_START_BLOCK,(unsigned char*)&startblock,4);        
-                        }                    
-                        if(multiple_is_set)
-                        {
-                            strError=string("Invalid field: multiple");                                                            
-                        }
-                        if(open_is_set)
-                        {
-                            strError=string("Invalid field: open");                                                            
-                        }
-                        if(vKey.size())
-                        {
-                            strError=string("Invalid field: key");                                                            
-                        }
-                        if(vValue.size())
-                        {
-                            strError=string("Invalid field: value");                                                            
-                        }
-                    }
+                    strError=string("Creating new upgrades not allowed in this API");                                                
                 }
                 else
                 {
-                    strError=string("Upgrades are not supported by this protocol version"); 
-                }
-            }
-        }
-        
-        if(strError.size() == 0)
-        {
-            if(new_type == -5)
-            {
-                if(mc_gState->m_Features->Upgrades())
-                {
                     if(lpDetails->m_Size)
                     {
-                        strError=string("Invalid field: details");                                                            
+                        strError=string("Invalid fields in details object");                                                            
                     }
+                    if(entity_name.size())
+                    {
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());//+1);
+                    }
+                    if(protocol_version > 0)
+                    {
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,(unsigned char*)&protocol_version,4);                                
+                    }
+                    else
+                    {
+                        strError=string("Missing protocol-version");                                                                                    
+                    }
+                    if(startblock > 0)
+                    {
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_START_BLOCK,(unsigned char*)&startblock,4);        
+                    }                    
                     if(multiple_is_set)
                     {
                         strError=string("Invalid field: multiple");                                                            
@@ -2892,9 +2826,32 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
                         strError=string("Invalid field: value");                                                            
                     }
                 }
-                else
+            }
+        }
+        
+        if(strError.size() == 0)
+        {
+            if(new_type == -5)
+            {
+                if(lpDetails->m_Size)
                 {
-                    strError=string("Upgrades are not supported by this protocol version"); 
+                    strError=string("Invalid field: details");                                                            
+                }
+                if(multiple_is_set)
+                {
+                    strError=string("Invalid field: multiple");                                                            
+                }
+                if(open_is_set)
+                {
+                    strError=string("Invalid field: open");                                                            
+                }
+                if(vKey.size())
+                {
+                    strError=string("Invalid field: key");                                                            
+                }
+                if(vValue.size())
+                {
+                    strError=string("Invalid field: value");                                                            
                 }
             }
         }
@@ -2907,64 +2864,32 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
             
             if(new_type == MC_ENT_TYPE_ASSET)
             {
-                if(mc_gState->m_Features->OpDropDetailsScripts())
+                script=lpDetails->GetData(0,&bytes);
+                err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
+                if(err)
                 {
-                    script=lpDetails->GetData(0,&bytes);
-                    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
-                    if(err)
-                    {
-                        strError=string("Invalid custom fields, too long");                                                            
-                    }
-                    else
-                    {
-                        script = lpDetailsScript->GetData(0,&bytes);
-                        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
-                    }
+                    strError=string("Invalid custom fields, too long");                                                            
                 }
                 else
                 {
-                    script=lpDetails->GetData(0,&bytes);
-                    lpDetailsScript->SetAssetDetails(entity_name.c_str(),multiple,script,bytes);                
                     script = lpDetailsScript->GetData(0,&bytes);
-                    if(bytes > 0)
-                    {
-                        scriptOpReturn << OP_RETURN << vector<unsigned char>(script, script + bytes);
-                    }                    
+                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
                 }
             }
             
             if(new_type == MC_ENT_TYPE_STREAM)
             {
-                if(mc_gState->m_Features->OpDropDetailsScripts())
+                int err;
+                script=lpDetails->GetData(0,&bytes);
+                err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
+                if(err)
                 {
-                    int err;
-                    script=lpDetails->GetData(0,&bytes);
-                    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
-                    if(err)
-                    {
-                        strError=string("Invalid custom fields, too long");                                                            
-                    }
-                    else
-                    {
-                        script = lpDetailsScript->GetData(0,&bytes);
-                        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
-                    }
+                    strError=string("Invalid custom fields, too long");                                                            
                 }
                 else
                 {
-                    lpDetailsScript->Clear();
-                    lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM);
                     script = lpDetailsScript->GetData(0,&bytes);
-                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
-                    
-                    lpDetailsScript->Clear();
-                    script=lpDetails->GetData(0,&bytes);
-                    lpDetailsScript->SetGeneralDetails(script,bytes);                
-                    script = lpDetailsScript->GetData(0,&bytes);
-                    if(bytes > 0)
-                    {
-                        scriptOpReturn << OP_RETURN << vector<unsigned char>(script, script + bytes);
-                    }
+                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
                 }
             }
             
@@ -2986,37 +2911,23 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
             
             if(new_type == -2)
             {
-                if(mc_gState->m_Features->OpDropDetailsScripts())
-                {
-                    int err;
-                    lpDetailsScript->Clear();
-                    lpDetailsScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
-                    script = lpDetailsScript->GetData(0,&bytes);
-                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
+                int err;
+                lpDetailsScript->Clear();
+                lpDetailsScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
+                script = lpDetailsScript->GetData(0,&bytes);
+                scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
 
-                    lpDetailsScript->Clear();
-                    script=lpDetails->GetData(0,&bytes);
-                    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
-                    if(err)
-                    {
-                        strError=string("Invalid custom fields, too long");                                                            
-                    }
-                    else
-                    {
-                        script = lpDetailsScript->GetData(0,&bytes);
-                        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
-                    }
+                lpDetailsScript->Clear();
+                script=lpDetails->GetData(0,&bytes);
+                err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
+                if(err)
+                {
+                    strError=string("Invalid custom fields, too long");                                                            
                 }
                 else
                 {
-                    lpDetailsScript->Clear();
-                    script=lpDetails->GetData(0,&bytes);
-                    lpDetailsScript->SetGeneralDetails(script,bytes);                
                     script = lpDetailsScript->GetData(0,&bytes);
-                    if(bytes > 0)
-                    {
-                        scriptOpReturn << OP_RETURN << vector<unsigned char>(script, script + bytes);
-                    }                    
+                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
                 }
             }
                 

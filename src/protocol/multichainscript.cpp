@@ -934,29 +934,22 @@ int mc_Script::SetScript(const unsigned char* src,const size_t bytes,int type)
         {
             if(lastSize == 0)
             {
-                if(mc_gState->m_Features->FixedIn10007())
+                if(opcode > MC_DCT_SCRIPT_OP_16)                            // Not push data
                 {
-                    if(opcode > MC_DCT_SCRIPT_OP_16)                            // Not push data
-                    {
-                        lastSize=-1;                                                    
-                    }
-                    else
-                    {
-                        if(opcode > MC_DCT_SCRIPT_OP_PUSHDATA4)
-                        {
-                            if(mc_gState->m_Features->FormattedData())
-                            {
-                                if( (m_ScriptType & MC_DCT_SCRIPT_TYPE_OP_RETURN ) == 0) 
-                                {
-                                    m_ScriptType |= MC_DCT_SCRIPT_TYPE_DIRTY_OP_RETURN;                                
-                                }
-                            }
-                        }
-                    }
+                    lastSize=-1;                                                    
                 }
                 else
                 {
-                    lastSize=-1;                                                                    
+                    if(opcode > MC_DCT_SCRIPT_OP_PUSHDATA4)
+                    {
+                        if(mc_gState->m_Features->FormattedData())
+                        {
+                            if( (m_ScriptType & MC_DCT_SCRIPT_TYPE_OP_RETURN ) == 0) 
+                            {
+                                m_ScriptType |= MC_DCT_SCRIPT_TYPE_DIRTY_OP_RETURN;                                
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1777,20 +1770,10 @@ int mc_Script::GetNewEntityType(uint32_t *type)
         return MC_ERR_INVALID_PARAMETER_VALUE;
     }
     
-    if(mc_gState->m_Features->OpDropDetailsScripts())
+    if(m_lpCoord[m_CurrentElement*2+1] < MC_DCT_SCRIPT_IDENTIFIER_LEN+1+1)
     {
-        if(m_lpCoord[m_CurrentElement*2+1] < MC_DCT_SCRIPT_IDENTIFIER_LEN+1+1)
-        {
-            return MC_ERR_WRONG_SCRIPT;
-        }        
-    }
-    else
-    {
-        if(m_lpCoord[m_CurrentElement*2+1] != MC_DCT_SCRIPT_IDENTIFIER_LEN+1+1)
-        {
-            return MC_ERR_WRONG_SCRIPT;
-        }
-    }
+        return MC_ERR_WRONG_SCRIPT;
+    }        
         
     ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
     
@@ -1881,13 +1864,8 @@ int mc_Script::GetFullRef(unsigned char *ref,uint32_t *script_type)
     }
     
     new_ref=1;
-    shift=0;
-    ref_type=MC_AST_ASSET_REF_TYPE_REF;
-    if(mc_gState->m_Features->ShortTxIDInTx())
-    {
-        shift=MC_AST_SHORT_TXID_OFFSET;
-        ref_type=MC_AST_ASSET_REF_TYPE_SHORT_TXID;
-    }
+    shift=MC_AST_SHORT_TXID_OFFSET;
+    ref_type=MC_AST_ASSET_REF_TYPE_SHORT_TXID;
     memset(ref,0,MC_AST_ASSET_FULLREF_SIZE);
     
     for(i=0;i<items;i++)
@@ -1968,13 +1946,8 @@ int mc_Script::GetAssetQuantities(mc_Buffer *amounts,uint32_t script_type)
             
     ptr+=MC_DCT_SCRIPT_IDENTIFIER_LEN+1;
 
-    shift=0;
-    ref_type=MC_AST_ASSET_REF_TYPE_REF;
-    if(mc_gState->m_Features->ShortTxIDInTx())
-    {
-        shift=MC_AST_SHORT_TXID_OFFSET;
-        ref_type=MC_AST_ASSET_REF_TYPE_SHORT_TXID;
-    }
+    shift=MC_AST_SHORT_TXID_OFFSET;
+    ref_type=MC_AST_ASSET_REF_TYPE_SHORT_TXID;
     
     items=(m_lpCoord[m_CurrentElement*2+1] - (MC_DCT_SCRIPT_IDENTIFIER_LEN+1)) / (mc_gState->m_NetworkParams->m_AssetRefSize + MC_AST_ASSET_QUANTITY_SIZE);
 
@@ -2064,11 +2037,7 @@ int mc_Script::SetAssetQuantities(mc_Buffer *amounts,uint32_t script_type)
         return err;
     }
 
-    shift=0;
-    if(mc_gState->m_Features->ShortTxIDInTx())
-    {
-        shift=MC_AST_SHORT_TXID_OFFSET;
-    }
+    shift=MC_AST_SHORT_TXID_OFFSET;
     
     
     for(i=0;i<amounts->GetCount();i++)
@@ -2294,7 +2263,6 @@ int mc_Script::SetRawData(const unsigned char *data,const int size)
 int mc_Script::GetDataFormat(uint32_t *format)
 {
     unsigned char *ptr;
-    unsigned char *ptrEnd;
     unsigned char f;
     
     if(format)
@@ -2313,7 +2281,6 @@ int mc_Script::GetDataFormat(uint32_t *format)
     }
     
     ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
-    ptrEnd=ptr+m_lpCoord[m_CurrentElement*2+1];
     
     if(memcmp(ptr,MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
     {

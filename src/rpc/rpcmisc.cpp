@@ -1058,7 +1058,6 @@ Value createmultisig(const Array& params, bool fHelp)
 /* MCHN START */    
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-//        if(MCP_ALLOW_ARBITRARY_OUTPUTS == 0)
         if((MCP_ALLOW_ARBITRARY_OUTPUTS == 0) || (mc_gState->m_Features->FixedDestinationExtraction() == 0) )
         {
             if(MCP_ALLOW_P2SH_OUTPUTS == 0)
