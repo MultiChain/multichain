@@ -2141,8 +2141,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
     if(mapMultiArgs.count("-rpcallowip") == 0)
     {
-        sprintf(bufOutput,"Listening for API requests on port %d (local only - see rpcallowip setting)\n\n",(int)GetArg("-rpcport", BaseParams().RPCPort()));                            
-        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+        if(!GetBoolArg("-shortoutput", false))
+        {    
+            sprintf(bufOutput,"Listening for API requests on port %d (local only - see rpcallowip setting)\n\n",(int)GetArg("-rpcport", BaseParams().RPCPort()));                            
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+        }
     }
     
 //    int version=mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
