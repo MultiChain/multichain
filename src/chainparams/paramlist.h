@@ -127,7 +127,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
     { "adminconsensuscreate"                , "admin-consensus-create"              , 
                    MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE | MC_PRM_DECIMAL , -1,         0,          0,   1000000, 0.0, 10006, 0, "-mc-adminconsensuscreate",            
                    "adminconsensusissue","",
-                   "<admin-consensus-issue>*<active admins> to change create permissions."},
+                   "<admin-consensus-create>*<active admins> to change create permissions."},
     { "adminconsensusissue"                , "admin-consensus-issue"              , 
                    MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE | MC_PRM_DECIMAL , -1,         0,          0,   1000000, 0.0, 10003, 0, "-mc-adminconsensusissue",            
                    "lockadminminerounds","",
