@@ -137,6 +137,7 @@ typedef struct mc_Features
     int FixedIsUnspendable();
     int PerAssetPermissions();
     int ParameterUpgrades();
+    int OffChainData();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo

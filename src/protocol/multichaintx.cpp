@@ -559,6 +559,43 @@ void MultiChainTransaction_FillAdminPermissionsBeforeTx(const CTransaction& tx,
     }
 }
 
+bool MultiChainTransaction_VerifyAndDeleteDataFormatElements(string& reason)
+{
+    int elem,err;
+    
+    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);                   // Format scripts are eliminated for protocol checks    
+    
+    if(mc_gState->m_Features->OffChainData() == 0)
+    {
+        return true;
+    }
+    
+    if(mc_gState->m_TmpScript->m_NumElements < 2)
+    {        
+        return true;
+    }
+        
+    elem=mc_gState->m_TmpScript->m_NumElements-2;
+    
+    while( (elem >= 0 ) && ((err=mc_gState->m_TmpScript->GetChunkDef(NULL,NULL,NULL,NULL)) == MC_ERR_NOERROR) )
+    {
+        mc_gState->m_TmpScript->DeleteElement(elem);
+        elem--;
+        if(elem < 0)
+        {
+            err=MC_ERR_WRONG_SCRIPT;
+        }
+    }
+        
+    if(err != MC_ERR_WRONG_SCRIPT)
+    {
+        reason="Error in data format script";
+        return false;            
+    }
+    
+    return true;        
+}
+
 bool MultiChainTransaction_CheckOpReturnScript(const CTransaction& tx, 
                                                const CCoinsViewCache &inputs,   
                                                int vout,
@@ -570,7 +607,11 @@ bool MultiChainTransaction_CheckOpReturnScript(const CTransaction& tx,
     vector<CTxDestination> addressRets;
     CTxDestination single_address;
     
-    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);                   // Format scripts are eliminated for protocol checks    
+//    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);                   // Format scripts are eliminated for protocol checks    
+    if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason))
+    {
+        return false;
+    }
     
     if(!details->fScriptHashAllFound)             
     {
@@ -825,7 +866,11 @@ bool MultiChainTransaction_CheckEntityItem(const CTransaction& tx,
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     mc_EntityDetails entity;
     
-    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);                   // Format scripts are eliminated for protocol checks    
+//    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);                   // Format scripts are eliminated for protocol checks    
+    if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason))
+    {
+        return false;
+    }
     
     mc_gState->m_TmpScript->SetElement(0);
                                                                                 // Should be spke

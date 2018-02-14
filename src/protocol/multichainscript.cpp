@@ -6,6 +6,8 @@
 #define MC_DCT_SCRIPT_ALLOC_BUFFER_CHUNK 4096
 #define MC_DCT_SCRIPT_ALLOC_INDEX_CHUNK    16
 
+#define MC_DCT_SCRIPT_CHUNK_HASH_SIZE      32
+
 #define MC_DCT_SCRIPT_OP_PUSHDATA1       0x4c
 #define MC_DCT_SCRIPT_OP_PUSHDATA2       0x4d
 #define MC_DCT_SCRIPT_OP_PUSHDATA4       0x4e
@@ -33,11 +35,13 @@
 #define MC_DCT_SCRIPT_MULTICHAIN_DATA_FORMAT_PREFIX 'f'
 #define MC_DCT_SCRIPT_MULTICHAIN_RAW_DATA_PREFIX 'd'
 
+#define MC_DCT_SCRIPT_EXTENDED_TYPE_DATA_FORMAT               1
+#define MC_DCT_SCRIPT_EXTENDED_TYPE_CHUNK_DEF                 2
+
 #define MC_DCT_SCRIPT_TYPE_REGULAR                         0x00
 #define MC_DCT_SCRIPT_TYPE_OP_RETURN                       0x01
 #define MC_DCT_SCRIPT_TYPE_OP_DROP                         0x02
 #define MC_DCT_SCRIPT_TYPE_DIRTY_OP_RETURN                 0x04
-
 
 
 int mc_Script::Zero()
@@ -2341,6 +2345,197 @@ int mc_Script::SetDataFormat(const uint32_t format)
     return MC_ERR_NOERROR;    
 }
 
+int mc_Script::GetChunkDef(uint32_t *format,unsigned char** hashes,uint64_t *size,uint32_t *chunk_size_log)
+{
+    unsigned char *ptr;
+    unsigned char *ptrEnd;
+    unsigned char l,f,extended_type;
+    uint64_t s,c,t;
+    int format_found=0;
+    int chunkdef_found=0;
+    
+    if(format)
+    {
+        *format=MC_SCR_DATA_FORMAT_UNKNOWN;
+    }
+        
+    if(m_CurrentElement<0)
+    {
+        return MC_ERR_INVALID_PARAMETER_VALUE;
+    }
+    
+    if(m_lpCoord[m_CurrentElement*2+1] < MC_DCT_SCRIPT_IDENTIFIER_LEN+1+1+1)
+    {
+        return MC_ERR_WRONG_SCRIPT;
+    }
+    
+    ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
+    ptrEnd=ptr+m_lpCoord[m_CurrentElement*2+1];
+    
+    if(memcmp(ptr,MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
+    {
+        return MC_ERR_WRONG_SCRIPT;
+    }
+    
+    
+    if(ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN] != MC_DCT_SCRIPT_MULTICHAIN_DATA_FORMAT_PREFIX)
+    {
+        return MC_ERR_WRONG_SCRIPT;            
+    }
+    
+    ptr+=MC_DCT_SCRIPT_IDENTIFIER_LEN+1;
+
+    f=(unsigned char)(*ptr);
+
+    if( (f & MC_SCR_DATA_FORMAT_EXTENDED_MASK) == 0)
+    {
+        return MC_ERR_WRONG_SCRIPT;            
+    }
+    
+    ptr++;
+    while(ptr < ptrEnd)
+    {
+        extended_type=(unsigned char)(*ptr);
+        ptr++;
+        switch(extended_type)
+        {
+            case MC_DCT_SCRIPT_EXTENDED_TYPE_DATA_FORMAT:
+                if(format_found)
+                {
+                    return MC_ERR_ERROR_IN_SCRIPT;                                                    
+                }
+                format_found=1;
+                if(ptr<ptrEnd)
+                {
+                    if(format)
+                    {
+                        *format=(uint32_t)(*ptr);
+                    }                    
+                }
+                else
+                {
+                    return MC_ERR_ERROR_IN_SCRIPT;                                
+                }
+                ptr++;
+                break;
+            case MC_DCT_SCRIPT_EXTENDED_TYPE_CHUNK_DEF:
+                if(chunkdef_found)
+                {
+                    return MC_ERR_ERROR_IN_SCRIPT;                                                    
+                }
+                chunkdef_found=1;
+                if(ptr<ptrEnd)
+                {
+                    if(ptr+9 <= ptrEnd)
+                    {
+                        l=(unsigned char)(*ptr);
+                        ptr++;
+                        if(l>63)                                   
+                        {
+                            return MC_ERR_ERROR_IN_SCRIPT;                                                            
+                        }
+                        c=1 << l;
+                        s=mc_GetLE(ptr,8);
+                        ptr+=8;
+                        t=0;
+                        if(s)
+                        {
+                            t=(s-1)/c + 1;
+                        }
+                        if( (t >> 24) != 0 )
+                        {
+                            return MC_ERR_ERROR_IN_SCRIPT;                                                                                        
+                        }
+                        if(ptr+t*MC_DCT_SCRIPT_CHUNK_HASH_SIZE <= ptrEnd)
+                        {
+                            if(size)
+                            {
+                                *size=s;
+                            }
+                            if(chunk_size_log)
+                            {
+                                *chunk_size_log=l;
+                            }
+                            if(hashes)
+                            {
+                                *hashes=ptr;
+                            }
+                            ptr+=t*MC_DCT_SCRIPT_CHUNK_HASH_SIZE;
+                        }
+                        else
+                        {
+                            return MC_ERR_ERROR_IN_SCRIPT;                                                                                                                    
+                        }
+                    }
+                    else
+                    {
+                        return MC_ERR_ERROR_IN_SCRIPT;                                
+                    }
+                }
+                else
+                {
+                    return MC_ERR_ERROR_IN_SCRIPT;                                
+                }
+                break;
+        }
+    }    
+    
+    return MC_ERR_NOERROR;    
+}
+
+int mc_Script::SetChunkDef(const uint32_t format,unsigned char* hashes,uint64_t size,uint32_t chunk_size_log)
+{
+    int err;
+    unsigned char buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+14];
+    uint64_t t,c;
+    
+    if(chunk_size_log>63)                                   
+    {
+        return MC_ERR_INVALID_PARAMETER_VALUE;                                                            
+    }
+    c=1 << chunk_size_log;
+    t=0;
+    if(size)
+    {
+        t=(size-1)/c + 1;
+    }
+    if( (t >> 24) != 0 )
+    {
+        return MC_ERR_INVALID_PARAMETER_VALUE;                                                                                        
+    }
+    
+    err=AddElement();
+    if(err)
+    {
+        return err;
+    }
+    
+    memcpy(buf,MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_DATA_FORMAT_PREFIX;        
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+1]=MC_SCR_DATA_FORMAT_EXTENDED_MASK;
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+2]=(unsigned char)MC_DCT_SCRIPT_EXTENDED_TYPE_DATA_FORMAT;
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+3]=(unsigned char)format;
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+4]=(unsigned char)MC_DCT_SCRIPT_EXTENDED_TYPE_CHUNK_DEF;
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+5]=(unsigned char)chunk_size_log;
+    mc_PutLE(buf+MC_DCT_SCRIPT_IDENTIFIER_LEN+6,&size,8);
+            
+    err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+14);
+    if(err)
+    {
+        return err;
+    }
+
+    err=SetData(hashes,t*MC_DCT_SCRIPT_CHUNK_HASH_SIZE);
+    if(err)
+    {
+        return err;
+    }
+
+    
+    return MC_ERR_NOERROR;        
+}
+
+
 int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format)
 {
     int elem,err;
@@ -2365,7 +2560,10 @@ int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format)
     SetElement(elem);
     if( (err=GetDataFormat(format)) != MC_ERR_WRONG_SCRIPT  )
     {
-        DeleteElement(elem);
+        if( (mc_gState->m_Features->OffChainData() == 0) || (GetChunkDef(NULL,NULL,NULL,NULL) == MC_ERR_WRONG_SCRIPT) )
+        {
+            DeleteElement(elem);            
+        }
         return err;
     }        
     
