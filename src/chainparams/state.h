@@ -138,6 +138,7 @@ typedef struct mc_Features
     int PerAssetPermissions();
     int ParameterUpgrades();
     int OffChainData();
+    int Chunks();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo

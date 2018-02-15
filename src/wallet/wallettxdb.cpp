@@ -14,7 +14,7 @@ void sprintf_hex(char *hex,const unsigned char *bin,int size)
         sprintf(hex+(i*2),"%02x",bin[size-1-i]);
     }
     
-    hex[64]=0;      
+    hex[size*2]=0;      
 }
 
 void mc_TxEntityRowExtension::Zero()

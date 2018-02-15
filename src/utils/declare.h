@@ -235,6 +235,7 @@ void mc_GetCompoundHash160(void *result,const void  *hash1,const void  *hash2);
 int mc_SetIPv4ServerAddress(const char* host);
 int mc_FindIPv4ServerAddress(uint32_t *all_ips,int max_ips);
 int mc_GenerateConfFiles(const char *network_name);
+void mc_CreateDir(const char *dir_name);
 void mc_RemoveDataDir(const char *network_name);
 void mc_RemoveDir(const char *network_name,const char *dir_name);
 int mc_GetDataDirArg(char *buf);

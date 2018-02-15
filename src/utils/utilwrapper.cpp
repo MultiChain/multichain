@@ -387,6 +387,11 @@ const boost::filesystem::path mc_GetDataDir(const char *network_name,int create)
     return path;
 }
 
+void mc_CreateDir(const char *dir_name)
+{
+    boost::filesystem::create_directories(boost::filesystem::path(dir_name));    
+}
+
 void mc_RemoveDataDir(const char *network_name)
 {
     boost::filesystem::path path;

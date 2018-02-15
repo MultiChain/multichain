@@ -207,6 +207,7 @@ void mc_WalletTxs::Zero()
 {
     int i;
     m_Database=NULL;
+    m_ChunkDB=NULL;
     m_lpWallet=NULL;
     for(i=0;i<MC_TDB_MAX_IMPORTS;i++)
     {
@@ -240,12 +241,19 @@ int mc_WalletTxs::Initialize(
 {
     int err,i;
     
+    m_ChunkDB=new mc_ChunkDB;
+
+    err=m_ChunkDB->Initialize(name,mode);
+
+    if(err)
+    {
+        return err;
+    }
     
     m_Database=new mc_TxDB;
-    
     m_Mode=mode;
     err=m_Database->Initialize(name,mode);
-    
+            
     if(err == MC_ERR_NOERROR)
     {
         m_Mode=m_Database->m_DBStat.m_InitMode;
@@ -290,6 +298,11 @@ int mc_WalletTxs::Destroy()
     {
         delete m_Database;
     }
+    
+    if(m_ChunkDB)
+    {
+        delete m_ChunkDB;
+    }
 
     Zero();
     return MC_ERR_NOERROR;    
@@ -324,8 +337,22 @@ int mc_WalletTxs::AddEntity(mc_TxEntity *entity,uint32_t flags)
         return MC_ERR_INTERNAL_ERROR;
     }
     m_Database->Lock(1,0);
-    err=m_Database->AddEntity(entity,flags);
+    err=m_Database->AddEntity(entity,flags);    
     m_Database->UnLock();
+    
+    if(err == MC_ERR_NOERROR)
+    {
+        if(mc_gState->m_Features->Chunks())
+        {
+            switch(entity->m_EntityType & MC_TET_TYPE_MASK)
+            {
+                case MC_TET_STREAM:
+                    err=m_ChunkDB->AddEntity(entity,flags);
+                    break;
+            }
+        }
+    }
+    
     return err;
 }
 
