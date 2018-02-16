@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/RecordsKeeper/recordskeeper-core.svg?branch=1.0.x-release)](https://travis-ci.org/RecordsKeeper/recordskeeper-core)
 MultiChain
 ==========
 
