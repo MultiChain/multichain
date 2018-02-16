@@ -130,26 +130,26 @@ Generate Key Pairs
     Should be True     ${addLength}>0
 
 
-Check Address Balance
-    [Tags]  post
-    Create Session  reckordskeeper  ${base_url}
-    ${param_list}=  Create List     ${dummy_user}
-    &{data}=  Create Dictionary  jsonrpc=1.0   id=curltext   method=getaddressbalances  params=${param_list}
-    ${resp}=    Post Request    reckordskeeper  /  data=${data}  headers=${headers}
-    Should Be Equal As Strings  ${resp.status_code}  200
-    Should be True     ${resp.json()['result'][0]['qty']}==0
-
-    ${send_param_list}=  Create List     ${dummy_user}
-    ${balance} =    Evaluate    (100)
-    Append to List     ${send_param_list}   ${balance}
-    &{data}=  Create Dictionary  jsonrpc=1.0   id=curltext   method=send  params=${send_param_list}
-    ${resp}=    Post Request    reckordskeeper  /  data=${data}  headers=${headers}
-    Should Be Equal As Strings  ${resp.status_code}  200
-
-    &{data}=  Create Dictionary  jsonrpc=1.0   id=curltext   method=getaddressbalances  params=${param_list}
-    ${resp}=    Post Request    reckordskeeper  /  data=${data}  headers=${headers}
-    Should Be Equal As Strings  ${resp.status_code}  200
-    Should be True     ${resp.json()['result'][0]['qty']}==100
+#Check Address Balance
+#    [Tags]  post
+#    Create Session  reckordskeeper  ${base_url}
+#    ${param_list}=  Create List     ${dummy_user}
+#    &{data}=  Create Dictionary  jsonrpc=1.0   id=curltext   method=getaddressbalances  params=${param_list}
+#    ${resp}=    Post Request    reckordskeeper  /  data=${data}  headers=${headers}
+#    Should Be Equal As Strings  ${resp.status_code}  200
+#    Should be True     ${resp.json()['result'][0]['qty']}==0
+#
+#    ${send_param_list}=  Create List     ${dummy_user}
+#    ${balance} =    Evaluate    (100)
+#    Append to List     ${send_param_list}   ${balance}
+#    &{data}=  Create Dictionary  jsonrpc=1.0   id=curltext   method=send  params=${send_param_list}
+#    ${resp}=    Post Request    reckordskeeper  /  data=${data}  headers=${headers}
+#    Should Be Equal As Strings  ${resp.status_code}  200
+#
+#    &{data}=  Create Dictionary  jsonrpc=1.0   id=curltext   method=getaddressbalances  params=${param_list}
+#    ${resp}=    Post Request    reckordskeeper  /  data=${data}  headers=${headers}
+#    Should Be Equal As Strings  ${resp.status_code}  200
+#    Should be True     ${resp.json()['result'][0]['qty']}==100
 
 
 Publishing to Stream should not be allowed
