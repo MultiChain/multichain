@@ -457,6 +457,13 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
     m_RawUpdatePool=new mc_Buffer;    
     err=m_RawUpdatePool->Initialize(MC_TDB_TXID_SIZE,m_Database->m_TotalSize,MC_BUF_MODE_MAP);        
     
+    m_Semaphore=__US_SemCreate();
+    if(m_Semaphore == NULL)
+    {
+        LogString("Initialize: Cannot initialize semaphore");
+        return MC_ERR_INTERNAL_ERROR;
+    }
+    
     Dump("Initialize");
     sprintf(msg, "Initialized. Chain height: %d, Txs: %d",m_DBStat.m_Block,m_DBStat.m_Count);
     LogString(msg);
