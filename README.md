@@ -5,9 +5,10 @@ RecordsKeeper Core
 
 [Recordskeeper](http://recordskeeper.co/) is an open source platform for private blockchains, which offers a rich set of features including extensive configurability, rapid deployment, permissions management, native assets and data streams. Although it is designed to enable private blockchains, Recordskeeper provides maximal compatibility with the bitcoin ecosystem, including the peer-to-peer protocol, transaction/block formats and [Bitcoin Core](https://bitcoin.org/en/bitcoin-core/) APIs/runtime parameters.
 
-    Copyright (c) 2014-2017 Coin Sciences Ltd
+    Copyright (c) 2017-2018 Recordskeeper 
     License: GNU General Public License version 3, see COPYING
-
+    
+    Portions copyright (c) 2014-2017 Coin Sciences Ltd
     Portions copyright (c) 2009-2016 The Bitcoin Core developers
     Portions copyright many others - see individual files
 
