@@ -808,6 +808,7 @@ int mc_MultichainParams::SetGlobals()
     MCP_ANYONE_CAN_CONNECT=mc_gState->m_NetworkParams->GetInt64Param("anyonecanconnect");
     MCP_ANYONE_CAN_SEND=mc_gState->m_NetworkParams->GetInt64Param("anyonecansend");
     MCP_ANYONE_CAN_RECEIVE=mc_gState->m_NetworkParams->GetInt64Param("anyonecanreceive");
+    MCP_ANYONE_CAN_CREATE=mc_gState->m_NetworkParams->GetInt64Param("anyonecancreate");
     MCP_ANYONE_CAN_ACTIVATE=mc_gState->m_NetworkParams->GetInt64Param("anyonecanactivate");
     MCP_MINIMUM_PER_OUTPUT=mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
     MCP_ALLOW_MULTISIG_OUTPUTS=mc_gState->m_NetworkParams->GetInt64Param("allowmultisigoutputs");

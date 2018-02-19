@@ -139,6 +139,7 @@ typedef struct mc_Features
     int ParameterUpgrades();
     int OffChainData();
     int Chunks();
+    int FixedIn1001020003();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo

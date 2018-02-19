@@ -1228,9 +1228,19 @@ int mc_Permissions::CanCreate(const void* lpEntity,const void* lpAddress)
 //    if(lpEntity == NULL)
     if(mc_IsNullEntity(lpEntity))
     {
-        if(MCP_ANYONE_CAN_RECEIVE)
+        if(mc_gState->m_Features->FixedIn1001020003())
         {
-            return MC_PTP_CREATE;
+            if(MCP_ANYONE_CAN_CREATE)
+            {
+                return MC_PTP_CREATE;
+            }            
+        }
+        else
+        {
+            if(MCP_ANYONE_CAN_RECEIVE)
+            {
+                return MC_PTP_CREATE;
+            }
         }
     }
     
