@@ -3,7 +3,7 @@ RecordsKeeper Core
 
 [![Build Status](https://travis-ci.org/RecordsKeeper/recordskeeper-core.svg?branch=1.0.x-release)](https://travis-ci.org/RecordsKeeper/recordskeeper-core)
 
-[MultiChain](http://www.multichain.com/) is an open source platform for private blockchains, which offers a rich set of features including extensive configurability, rapid deployment, permissions management, native assets and data streams. Although it is designed to enable private blockchains, MultiChain provides maximal compatibility with the bitcoin ecosystem, including the peer-to-peer protocol, transaction/block formats and [Bitcoin Core](https://bitcoin.org/en/bitcoin-core/) APIs/runtime parameters.
+[Recordskeeper](http://recordskeeper.co/) is an open source platform for private blockchains, which offers a rich set of features including extensive configurability, rapid deployment, permissions management, native assets and data streams. Although it is designed to enable private blockchains, Recordskeeper provides maximal compatibility with the bitcoin ecosystem, including the peer-to-peer protocol, transaction/block formats and [Bitcoin Core](https://bitcoin.org/en/bitcoin-core/) APIs/runtime parameters.
 
     Copyright (c) 2014-2017 Coin Sciences Ltd
     License: GNU General Public License version 3, see COPYING
@@ -34,7 +34,7 @@ Install dependencies
     sudo apt-get update
     sudo apt-get install libdb4.8-dev libdb4.8++-dev
 
-Compile MultiChain for Ubuntu (64-bit)
+Compile Recordskeeper for Ubuntu (64-bit)
 -----------------------------
 
     ./autogen.sh
@@ -64,7 +64,7 @@ Install dependencies
     sudo apt-get update
     sudo apt-get install libdb4.8-dev libdb4.8++-dev
 
-Compile MultiChain for Windows (64-bit)
+Compile Recordskeeper for Windows (64-bit)
 ------------------------------
 
     ./autogen.sh
@@ -77,7 +77,7 @@ Compile MultiChain for Windows (64-bit)
 Notes
 -----
 
-* This will build `rkd.exe`, `rk-cli.exe` and `multitchain-util.exe` in the `src` directory.
+* This will build `rkd.exe`, `rk-cli.exe` and `rk-util.exe` in the `src` directory.
 
 
 Mac Build Notes (on MacOS Sierra)
@@ -95,7 +95,7 @@ Prepare for static linking
 --------------------------
 Apple does not support statically linked binaries as [documented here](https://developer.apple.com/library/content/qa/qa1118/_index.html), however, it is convenient for end-users to launch a binary without having to first install brew, a third-party system designed for developers.
 
-To create a statically linked MultiChain which only depends on default MacOS dylibs, the following steps are taken:
+To create a statically linked Recordskeeper Blockchain which only depends on default MacOS dylibs, the following steps are taken:
 
 1. Hide the brew boost dylibs from the build system:
     rename -e 's/.dylib/.dylib.hidden/' /usr/local/opt/boost/lib/*.dylib
@@ -113,7 +113,7 @@ The default brew cookbook for berkeley-db and boost builds static libraries, but
         In 'def configure_args' change 'shared' to 'no-shared'
     brew install openssl --force
 
-Compile MultiChain for Mac (64-bit)
+Compile Recordskeeper for Mac (64-bit)
 --------------------------
 
     export LDFLAGS=-L/usr/local/opt/openssl/lib
