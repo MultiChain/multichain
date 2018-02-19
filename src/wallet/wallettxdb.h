@@ -29,6 +29,7 @@
 #define MC_TET_STREAM_KEY                       0x00000006
 #define MC_TET_STREAM_PUBLISHER                 0x00000007
 #define MC_TET_ASSET                            0x00000008
+#define MC_TET_AUTHOR                           0x00000009
 #define MC_TET_SUBKEY_STREAM_KEY                0x00000046
 #define MC_TET_SUBKEY_STREAM_PUBLISHER          0x00000047
 #define MC_TET_SUBKEY                           0x00000040

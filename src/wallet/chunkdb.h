@@ -11,17 +11,15 @@
 #define MC_CDB_ROW_SIZE              80
 #define MC_CDB_HEADER_SIZE           40
 
-#define MC_TDB_TXID_SIZE             32
-#define MC_TDB_ENTITY_KEY_SIZE       32
-#define MC_TDB_ENTITY_ID_SIZE        20
-#define MC_TDB_ENTITY_TYPE_SIZE       4
-#define MC_TDB_GENERATION_SIZE        4
-#define MC_TDB_POS_SIZE               4
-#define MC_TDB_ROW_SIZE              80
 
-#define MC_CDB_TYPE_DB_STAT           0 
-#define MC_CDB_TYPE_SUBSCRIPTION      1 
-#define MC_CDB_TYPE_FILE              2 
+#define MC_CDB_TYPE_DB_STAT           0x00000000 
+#define MC_CDB_TYPE_SUBSCRIPTION      0x01000000 
+#define MC_CDB_TYPE_FILE              0x02000000 
+
+#define MC_CDB_MAX_FILE_SIZE             0x40000000                             // Maximal data file size, 1GB
+#define MC_CDB_MAX_CHUNK_DATA_POOL_SIZE  0x8000000                              // Maximal size of chunk pool before commit, 128MB
+#define MC_CDB_MAX_CHUNK_EXTRA_SIZE      1024 
+#define MC_CDB_MAX_MEMPOOL_SIZE          1024 
 
 
 /** File DB Row*/
@@ -50,14 +48,17 @@ typedef struct mc_SubscriptionDBRow
     uint32_t m_Zero;                                                            // Should be Zero
     uint32_t m_RecordType;                                                      // Should be MC_CDB_TYPE_SUBSCRIPTION    
     uint32_t m_Zero1;                                                           // Should be Zero
+    uint32_t m_Zero2;                                                           // Should be Zero
     mc_TxEntity m_Entity;                                                       // Parent Entity
     uint32_t m_Flags;                                                           // Flags passed from higher level
-    uint32_t m_SubscriptionID;                                                  // Subscription ID
+    int32_t  m_SubscriptionID;                                                  // Subscription ID
     uint32_t m_Count;                                                           // Total chunk count
-    uint32_t m_FirstFileID;                                                     // First data file ID/Reserved
+    int32_t  m_FirstFileID;                                                     // First data file ID/Reserved
     uint32_t m_FirstFileOffset;                                                 // First data file offset/Reserved
-    uint32_t m_LastFileID;                                                      // Last data file ID
+    int32_t  m_LastFileID;                                                      // Last data file ID
     uint32_t m_LastFileSize;                                                    // Last data file size
+    uint32_t m_TmpFlags;           
+    uint64_t m_FullSize;                                                        // Total tx size
 
     char m_DirName[MC_DCT_DB_MAX_PATH];                                         // Full file name
     
@@ -69,14 +70,16 @@ typedef struct mc_ChunkDBStat
     uint32_t m_Zero;                                                            // Should be Zero
     uint32_t m_RecordType;                                                      // Should be MC_CDB_TYPE_DB_STAT    
     uint32_t m_Zero1;                                                           // Should be Zero
+    uint32_t m_Zero2;                                                           // Should be Zero
     mc_TxEntity m_ZeroEntity;                                                   // Zero Entity
     uint32_t m_InitMode;
     uint32_t m_ChunkDBVersion;
-    uint32_t m_Count;                                                           // Total tx count
-    uint32_t m_FullSize;                                                        // Total tx size
-    uint32_t m_LastSubscription; 
+    int32_t  m_LastSubscription; 
     uint32_t m_Reserved1; 
+    uint32_t m_Count;                                                           // Total tx count
+    uint64_t m_FullSize;                                                        // Total tx size
     uint32_t m_Reserved2; 
+    uint32_t m_Reserved3; 
     void Zero();
 } mc_ChunkDBStat;
 
@@ -85,15 +88,19 @@ typedef struct mc_ChunkDBStat
 
 typedef struct mc_ChunkDBRow
 {
-    uint32_t m_SubscriptionID;                                                  // Subscription ID
     unsigned char m_Hash[MC_CDB_CHUNK_HASH_SIZE];                               // Chunk hash
+    int32_t  m_SubscriptionID;                                                  // Subscription ID
+    uint32_t m_Pos;                                                             // Position of this record for subscription/hash
     uint32_t m_Size;                                                            // Chunk Size
     uint32_t m_Flags;                                                           // Flags passed from higher level
+    uint32_t m_HeaderSize;                                                      // Header size
     uint32_t m_StorageFlags;                                                    // Internal flags
-    uint32_t m_InternalFileID;                                                  // Data file ID
+    int32_t  m_ItemCount;                                                        // Number of times this chunk appears in subscription (if m_Pos=0)
+    int32_t  m_TmpOnDiskItems;
+    int32_t  m_InternalFileID;                                                   // Data file ID
     uint32_t m_InternalFileOffset;                                              // Offset in the data file
-    uint32_t m_PrevSubscriptionID;                                              // Prev Subscription ID for this hash
-    uint32_t m_NextSubscriptionID;                                              // Next Subscription ID for this hash
+    int32_t  m_PrevSubscriptionID;                                              // Prev Subscription ID for this hash
+    int32_t  m_NextSubscriptionID;                                              // Next Subscription ID for this hash
     
     void Zero();
 } mc_ChunkDBRow;
@@ -118,6 +125,12 @@ typedef struct mc_ChunkDB
     char m_LogFileName[MC_DCT_DB_MAX_PATH];                                     // Full log file name    
     
     mc_Buffer *m_Subscriptions;                                                 // List of import entities (mc_TxEntityStat)
+    mc_Buffer *m_MemPool;
+    mc_Script *m_ChunkData;
+    mc_Script *m_TmpScript;
+
+    void *m_Semaphore;                                                          // mc_TxDB object semaphore
+    uint64_t m_LockedBy;                                                        // ID of the thread locking it
     
     mc_ChunkDB()
     {
@@ -135,34 +148,85 @@ typedef struct mc_ChunkDB
     
     int AddSubscription(mc_SubscriptionDBRow *subscription);                          
     int AddEntity(mc_TxEntity *entity,uint32_t flags);                          // Adds entity
+    int AddEntityInternal(mc_TxEntity *entity,uint32_t flags);                  
     
-    mc_SubscriptionDBRow *FindSubscription(mc_TxEntity *entity);                // Finds subscription
+    mc_SubscriptionDBRow *FindSubscription(const mc_TxEntity *entity);                // Finds subscription
+    int FindSubscription(const mc_TxEntity *entity,mc_SubscriptionDBRow *subscription);   // Finds subscription
     
     int AddChunk(                                                               // Adds chunk to mempool
                  const unsigned char *hash,                                     // Chunk hash (before chopping)    
                  const mc_TxEntity *entity,                                     // Parent entity
+                 const unsigned char *txid,
+                 const int vout,
                  const unsigned char *chunk,                                    // Chunk data
-                 const unsigned char *metadata,                                 // Chunk metadata
+                 const unsigned char *details,                                  // Chunk metadata
                  const uint32_t chunk_size,                                     // Chunk size
-                 const uint32_t metadata_size,                                  // Chunk metadata size
+                 const uint32_t details_size,                                   // Chunk metadata size
                  const uint32_t flags);                                         // Flags
-    
-    int GetChunk(                                                               
+
+    int AddChunkInternal(                                                               // Adds chunk to mempool
                  const unsigned char *hash,                                     // Chunk hash (before chopping)    
-                 const unsigned char *entity,                                   // Parent entity
-                 unsigned char **chunk,                                         // Chunk data
-                 unsigned char **metadata,                                      // Metadata
-                 uint32_t *size,                                                // Chunk Size
-                 uint32_t *metadata_size,                                       // Chunk Size
+                 const mc_TxEntity *entity,                                     // Parent entity
+                 const unsigned char *txid,
+                 const int vout,
+                 const unsigned char *chunk,                                    // Chunk data
+                 const unsigned char *details,                                  // Chunk metadata
+                 const uint32_t chunk_size,                                     // Chunk size
+                 const uint32_t details_size,                                   // Chunk metadata size
                  const uint32_t flags);                                         // Flags
+
+    int GetChunkDefInternal(
+                    mc_ChunkDBRow *chunk_def,
+                    const unsigned char *hash,                                  // Chunk hash (before chopping)    
+                    const void *entity,
+                    const unsigned char *txid,
+                    const int vout,
+                    int *mempool_entity_row);
+            
     
-    int Commit();                                                               // Commit mempool to disk
+    int GetChunkDef(
+                    mc_ChunkDBRow *chunk_def,
+                    const unsigned char *hash,                                  // Chunk hash (before chopping)    
+                    const void *entity,
+                    const unsigned char *txid,
+                    const int vout);
+    
+    unsigned char *GetChunkInternal(mc_ChunkDBRow *chunk_def,
+                                    int32_t offset,
+                                    int32_t len,
+                                    size_t *bytes);
+
+    unsigned char *GetChunk(mc_ChunkDBRow *chunk_def,
+                                    int32_t offset,
+                                    int32_t len,
+                                    size_t *bytes);
+    
+    void SetFileName(char *FileName,
+                     mc_SubscriptionDBRow *subscription,
+                     uint32_t fileid);
+    
+    int FlushDataFile(mc_SubscriptionDBRow *subscription,
+                                  uint32_t fileid);
+    
+    
+    int AddToFile(const void *chunk,                  
+                          uint32_t size,
+                          mc_SubscriptionDBRow *subscription,
+                          uint32_t fileid,
+                          uint32_t offset);
+    
+    int Commit(int block);                                                               // Commit mempool to disk
+    int CommitInternal(int block); 
     
     void Zero();    
     int Destroy();
     void Dump(const char *message);
     
     void LogString(const char *message);
+    
+    int Lock();
+    int Lock(int write_mode, int allow_secondary);
+    void UnLock();
     
 } mc_ChunkDB;
 

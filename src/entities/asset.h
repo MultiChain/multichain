@@ -62,6 +62,13 @@
 #define MC_ENT_SPRM_UPGRADE_START_BLOCK       0x43
 #define MC_ENT_SPRM_UPGRADE_CHAIN_PARAMS      0x44
 
+#define MC_ENT_SPRM_TIMESTAMP                 0x81
+#define MC_ENT_SPRM_SOURCE_TXID               0x82
+#define MC_ENT_SPRM_SOURCE_VOUT               0x83
+#define MC_ENT_SPRM_CHUNK_DETAILS             0x84
+#define MC_ENT_SPRM_CHUNK_DATA                0x85
+
+
 #define MC_ENT_FLAG_OFFSET_IS_SET     0x00000001
 #define MC_ENT_FLAG_NAME_IS_SET       0x00000010
 
