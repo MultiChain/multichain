@@ -66,6 +66,8 @@ extern int MCP_MAX_STD_OP_RETURN_COUNT;
 extern int64_t MCP_INITIAL_BLOCK_REWARD;
 extern int64_t MCP_FIRST_BLOCK_REWARD;
 extern int MCP_TARGET_BLOCK_TIME;
+extern int MAX_CHUNK_SIZE; 
+extern int MAX_CHUNK_COUNT; 
 extern int MCP_ANYONE_CAN_ADMIN;
 extern int MCP_ANYONE_CAN_MINE;
 extern int MCP_ANYONE_CAN_CONNECT;

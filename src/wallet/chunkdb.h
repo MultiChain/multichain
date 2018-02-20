@@ -53,11 +53,11 @@ typedef struct mc_SubscriptionDBRow
     uint32_t m_Flags;                                                           // Flags passed from higher level
     int32_t  m_SubscriptionID;                                                  // Subscription ID
     uint32_t m_Count;                                                           // Total chunk count
+    uint32_t m_TmpFlags;           
     int32_t  m_FirstFileID;                                                     // First data file ID/Reserved
     uint32_t m_FirstFileOffset;                                                 // First data file offset/Reserved
     int32_t  m_LastFileID;                                                      // Last data file ID
     uint32_t m_LastFileSize;                                                    // Last data file size
-    uint32_t m_TmpFlags;           
     uint64_t m_FullSize;                                                        // Total tx size
 
     char m_DirName[MC_DCT_DB_MAX_PATH];                                         // Full file name
@@ -73,13 +73,14 @@ typedef struct mc_ChunkDBStat
     uint32_t m_Zero2;                                                           // Should be Zero
     mc_TxEntity m_ZeroEntity;                                                   // Zero Entity
     uint32_t m_InitMode;
-    uint32_t m_ChunkDBVersion;
     int32_t  m_LastSubscription; 
-    uint32_t m_Reserved1; 
     uint32_t m_Count;                                                           // Total tx count
-    uint64_t m_FullSize;                                                        // Total tx size
+    uint32_t m_ChunkDBVersion;
+    uint32_t m_Reserved1; 
     uint32_t m_Reserved2; 
     uint32_t m_Reserved3; 
+    uint32_t m_Reserved4; 
+    uint64_t m_FullSize;                                                        // Total tx size
     void Zero();
 } mc_ChunkDBStat;
 

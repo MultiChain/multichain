@@ -478,6 +478,13 @@ int mc_WalletTxs::Commit(mc_TxImport *import)
     {        
         imp=import;
     }    
+    if(mc_gState->m_Features->Chunks())
+    {
+        if(imp->m_ImportID == 0)
+        {
+            err=m_ChunkDB->Commit(imp->m_Block+1);
+        }
+    }    
     m_Database->Lock(1,0);
     
     if(err == MC_ERR_NOERROR)

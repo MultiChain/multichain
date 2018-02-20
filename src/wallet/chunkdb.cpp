@@ -189,8 +189,6 @@ int mc_ChunkDB::AddSubscription(mc_SubscriptionDBRow *subscription)
     }
     
     return m_Subscriptions->PutRow(subscription->m_SubscriptionID,subscription,(char*)subscription+m_ValueOffset);    
-    
-//    return m_Subscriptions->Add(subscription,(char*)subscription+m_ValueOffset);    
 }
 
 mc_SubscriptionDBRow *mc_ChunkDB::FindSubscription(const mc_TxEntity* entity)
@@ -407,11 +405,23 @@ int mc_ChunkDB::Initialize(const char *name,uint32_t mode)
     }
     else
     {
-        m_Subscriptions->SetCount(m_DBStat.m_LastSubscription+1);
+        m_Subscriptions->SetCount(m_DBStat.m_LastSubscription+2);
         subscription.Zero();
         AddSubscription(&subscription);
         
+        subscription.m_Entity.m_EntityType=MC_TET_AUTHOR;
+        subscription.m_SubscriptionID=1;
+        AddSubscription(&subscription);
+        
+        m_DBStat.m_LastSubscription=1;
+        
         err=m_DB->Write((char*)&m_DBStat+m_KeyOffset,m_KeySize,(char*)&m_DBStat+m_ValueOffset,m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+        if(err)
+        {
+            return err;
+        }        
+        
+        err=m_DB->Write((char*)&subscription+m_KeyOffset,m_KeySize,(char*)&subscription+m_ValueOffset,m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
         if(err)
         {
             return err;
@@ -460,7 +470,7 @@ void mc_ChunkDB::Dump(const char *message)
     mc_ChunkDBRow dbrow;
     
     unsigned char *ptr;
-    int dbvalue_len,err;
+    int dbvalue_len,err,i;
     char ShortName[65];                                     
     char FileName[MC_DCT_DB_MAX_PATH];                      
     FILE *fHan;
@@ -474,9 +484,9 @@ void mc_ChunkDB::Dump(const char *message)
         return;
     }
 
-    mc_LogString(fHan,message);  
+    mc_LogString(fHan,message);     
     
-    fprintf(fHan,"Entities\n");
+    fprintf(fHan,"\nDB\n");
     dbrow.Zero();    
     ptr=(unsigned char*)m_DB->Read((char*)&dbrow+m_KeyOffset,m_KeySize,&dbvalue_len,MC_OPT_DB_DATABASE_SEEK_ON_READ,&err);
     if(err)
@@ -497,36 +507,20 @@ void mc_ChunkDB::Dump(const char *message)
             }
         }
     }
+
+    fprintf(fHan,"\nMempool\n");
+    if(m_MemPool->GetCount())
+    {
+        mc_MemoryDumpCharSizeToFile(fHan,m_MemPool->GetRow(0),0,m_MemPool->GetCount()*m_TotalSize,m_TotalSize);    
+    }
     
-/*    
-    for(i=0;i<MC_TDB_MAX_IMPORTS;i++)
+    fprintf(fHan,"\nSubscriptions\n");
+    
+    for(i=0;i<m_Subscriptions->GetCount();i++)
     {
-        if(m_RawMemPools[i])
-        {
-            if(m_RawMemPools[i]->GetCount())
-            {
-                fprintf(fHan,"RawMemPool %d\n",m_Imports[i].m_ImportID);
-                mc_MemoryDumpCharSizeToFile(fHan,m_RawMemPools[i]->GetRow(0),0,m_RawMemPools[i]->GetCount()*m_Database->m_TotalSize,m_Database->m_TotalSize);    
-            }
-        }
-        if(m_MemPools[i])
-        {
-            if(m_MemPools[i]->GetCount())
-            {
-                fprintf(fHan,"MemPool %d\n",m_Imports[i].m_ImportID);
-                mc_MemoryDumpCharSizeToFile(fHan,m_MemPools[i]->GetRow(0),0,m_MemPools[i]->GetCount()*m_Database->m_TotalSize,m_Database->m_TotalSize);    
-            }
-        }
+        mc_MemoryDumpCharSizeToFile(fHan,m_Subscriptions->GetRow(i),0,m_TotalSize,m_TotalSize);    
     }
-    if(m_RawUpdatePool)
-    {
-        if(m_RawUpdatePool->GetCount())
-        {
-            fprintf(fHan,"RawUpdatePool\n");
-            mc_MemoryDumpCharSizeToFile(fHan,m_RawUpdatePool->GetRow(0),0,m_RawUpdatePool->GetCount()*m_Database->m_TotalSize,m_Database->m_TotalSize);    
-        }
-    }
-*/    
+    
     fprintf(fHan,"\n<<<<<< \tChain height: %6d\t%s\n\n",mc_gState->m_Permissions->m_Block,message);
     fclose(fHan);
 }
