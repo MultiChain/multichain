@@ -355,8 +355,11 @@ bool CWallet::ChangeWalletPassphrase(const SecureString& strOldWalletPassphrase,
 
 void CWallet::SetBestChain(const CBlockLocator& loc)
 {
-    CWalletDB walletdb(strWalletFile);
-    walletdb.WriteBestBlock(loc);
+    if( (mc_gState->m_WalletMode & MC_WMD_TXS) == 0 )
+    {                
+        CWalletDB walletdb(strWalletFile);
+        walletdb.WriteBestBlock(loc);
+    }
 }
 
 bool CWallet::SetMinVersion(enum WalletFeature nVersion, CWalletDB* pwalletdbIn, bool fExplicit)
