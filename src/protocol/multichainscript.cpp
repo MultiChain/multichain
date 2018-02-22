@@ -2490,7 +2490,7 @@ int mc_Script::SetChunkDefHeader(const uint32_t format,int chunk_count)
     return MC_ERR_NOERROR;        
 }
 
-int mc_Script::SetChunkDefHash(const uint32_t format,unsigned char *hash,int size)
+int mc_Script::SetChunkDefHash(unsigned char *hash,int size)
 {
     int err,shift;
     unsigned char buf[16];
@@ -2514,6 +2514,8 @@ int mc_Script::SetChunkDefHash(const uint32_t format,unsigned char *hash,int siz
 
 int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format)
 {
+    return ExtractAndDeleteDataFormat(format,NULL,NULL,NULL);
+/*    
     int elem,err;
     
     if(format)
@@ -2544,6 +2546,82 @@ int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format)
     }        
     
     return MC_ERR_NOERROR;
+ */ 
+}
+
+int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashes,int *chunk_count,uint64_t *total_size)
+{
+    int elem,err;
+    
+    if(format)
+    {
+        *format=MC_SCR_DATA_FORMAT_UNKNOWN;
+    }
+
+    if(hashes)
+    {
+        *hashes=NULL;
+    }
+
+    if(mc_gState->m_Features->FormattedData() == 0)
+    {
+        return MC_ERR_NOERROR;
+    }
+    
+    if(m_NumElements < 2)
+    {        
+        return MC_ERR_NOERROR;
+    }
+        
+    
+    elem=m_NumElements-2;
+        
+    SetElement(elem);
+    if( (err=GetDataFormat(format)) != MC_ERR_WRONG_SCRIPT  )
+    {
+        if( (mc_gState->m_Features->OffChainData() == 0) || (GetChunkDef(NULL,NULL,NULL,NULL) == MC_ERR_WRONG_SCRIPT) )
+        {
+            DeleteElement(elem);            
+        }
+        if(err)
+        {
+            return err;
+        }
+    }        
+    
+    if(mc_gState->m_Features->OffChainData() == 0)
+    {
+        return MC_ERR_NOERROR;
+    }
+    
+    if(m_NumElements < 2)
+    {        
+        return MC_ERR_NOERROR;
+    }
+        
+    elem=m_NumElements-2;
+    
+    SetElement(elem);
+    while( (elem >= 0 ) && ((err=GetChunkDef(format,hashes,chunk_count,total_size)) == MC_ERR_NOERROR) )
+    {
+        DeleteElement(elem);
+        elem--;
+        if(elem < 0)
+        {
+            err=MC_ERR_WRONG_SCRIPT;
+        }
+        else
+        {
+            SetElement(elem);            
+        }
+    }
+        
+    if(err != MC_ERR_WRONG_SCRIPT)
+    {
+        return err;            
+    }
+    
+    return MC_ERR_NOERROR;        
 }
 
 int mc_Script::DeleteDuplicatesInRange(int from,int to)

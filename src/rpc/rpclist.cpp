@@ -241,6 +241,7 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "liststreamblockitems",   &liststreamblockitems,    false,      false,      false },
     { "wallet",             "getstreamkeysummary",    &getstreamkeysummary,        false,     false,      true },
     { "wallet",             "getstreampublishersummary",   &getstreampublishersummary,        false,     false,      true },
+    { "wallet",             "storechunk",             &storechunk,                false,     false,      true },
     
 /* MCHN END */    
     { "wallet",             "setaccount",             &setaccount,             true,      false,      true },

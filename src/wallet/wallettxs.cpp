@@ -209,6 +209,7 @@ void mc_WalletTxs::Zero()
     m_Database=NULL;
     m_ChunkDB=NULL;
     m_lpWallet=NULL;
+    m_ChunkBuffer=NULL;
     for(i=0;i<MC_TDB_MAX_IMPORTS;i++)
     {
         m_UTXOs[i].clear();
@@ -281,6 +282,8 @@ int mc_WalletTxs::Initialize(
         }
         LoadUnconfirmedSends(m_Database->m_DBStat.m_Block,m_Database->m_DBStat.m_Block);
     }    
+    
+    m_ChunkBuffer=(unsigned char*)mc_New(MAX_CHUNK_SIZE);
     return err;
 }
 
@@ -304,6 +307,10 @@ int mc_WalletTxs::Destroy()
         delete m_ChunkDB;
     }
 
+    if(m_ChunkBuffer)
+    {
+        mc_Delete(m_ChunkBuffer);
+    }
     Zero();
     return MC_ERR_NOERROR;    
     
@@ -2276,7 +2283,13 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
         }
         else
         {
-            mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);
+            unsigned char *chunk_hashes;
+            unsigned char *chunk_found;
+            int chunk_count,chunk_err;
+            int chunk_size,chunk_shift;
+            size_t chunk_bytes;
+            
+            mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL,&chunk_hashes,&chunk_count,NULL);
             if(mc_gState->m_TmpScript->GetNumElements() >= 3) // 2 OP_DROPs + OP_RETURN - item key
             {
                 mc_gState->m_TmpScript->DeleteDuplicatesInRange(1,mc_gState->m_TmpScript->GetNumElements()-1);
@@ -2291,6 +2304,46 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                     entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
                     if(imp->FindEntity(&entity) >= 0)    
                     {
+                        mc_ChunkDBRow chunk_def;
+                        mc_TxEntity chunk_entity;
+                        chunk_entity.Zero();
+                        memcpy(entity.m_EntityID,short_txid,MC_AST_SHORT_TXID_SIZE);
+                        entity.m_EntityType=MC_TET_STREAM;            
+                        if(chunk_hashes)
+                        {
+                            for(int chunk=0;chunk<chunk_count;chunk++)
+                            {
+                                chunk_size=(int)mc_GetVarInt(chunk_hashes,MC_CDB_CHUNK_HASH_SIZE+16,-1,&chunk_shift);
+                                chunk_hashes+=chunk_shift;
+                                if(m_ChunkDB->GetChunkDef(&chunk_def,chunk_hashes,&entity,(unsigned char*)&hash,i) != MC_ERR_NOERROR)
+                                {
+                                    if(m_ChunkDB->GetChunkDef(&chunk_def,chunk_hashes,NULL,NULL,-1) == MC_ERR_NOERROR)
+                                    {
+                                        chunk_found=m_ChunkDB->GetChunk(&chunk_def,0,-1,&chunk_bytes);
+                                        if(chunk_found)
+                                        {
+                                            memcpy(m_ChunkBuffer,chunk_found,chunk_size);
+                                            chunk_err=m_ChunkDB->AddChunk(chunk_hashes,&entity,(unsigned char*)&hash,i,m_ChunkBuffer,NULL,chunk_size,0,0);
+                                            if(chunk_err)
+                                            {
+                                                err=chunk_err;
+                                                goto exitlbl;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            err=MC_ERR_CORRUPTED;
+                                            goto exitlbl;      
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // Feeding async chunk retriever here
+                                    }
+                                }
+                                chunk_hashes+=MC_CDB_CHUNK_HASH_SIZE;
+                            }
+                        }
 //                        if(imp->m_TmpEntities->Seek(&entity) < 0)
                         {
                             extension.Zero();

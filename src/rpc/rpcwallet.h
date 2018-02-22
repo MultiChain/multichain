@@ -20,6 +20,7 @@
 
 #include "multichain/multichain.h"
 #include "wallet/wallettxs.h"
+#include "wallet/chunkdb.h"
 #include "rpc/rpcutils.h"
 
 void SendMoneyToSeveralAddresses(const std::vector<CTxDestination> addresses, CAmount nValue, CWalletTx& wtxNew,mc_Script *dropscript,CScript scriptOpReturn,const std::vector<CTxDestination>& fromaddresses);

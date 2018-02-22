@@ -514,7 +514,75 @@ Value listaddresses(const Array& params, bool fHelp)
 
 
 
+Value storechunk(const Array& params, bool fHelp)
+{
+    int err;
+    
+    if (fHelp || params.size() != 1) 
+        throw runtime_error("Help message not found\n");
+    
+    if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+    }   
+    
+    vector<unsigned char> vValue;
+    if(params[0].type() != str_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "data should be hexadecimal string");                                                                                                                
+    }
+    
+    bool fIsHex;
+    vValue=ParseHex(params[0].get_str().c_str(),fIsHex);    
+    if(!fIsHex)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "data should be hexadecimal string");                                                                                                                
+    }        
+    
+    if(vValue.size() == 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "data should be non-empty hexadecimal string");                                                                                                                        
+    }
 
+    if((int)vValue.size() > MAX_CHUNK_SIZE)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "data is too long");                                                                                                                        
+    }
+    
+    uint256 hash;
+    mc_SHA256 *hasher;
+    
+    hasher=new mc_SHA256;    
+    hasher->Write(&vValue[0],(int)vValue.size());
+    hasher->GetHash((unsigned char*)&hash);
+    hasher->Reset();
+    hasher->Write((unsigned char*)&hash,32);
+    hasher->GetHash((unsigned char*)&hash);
+    
+    delete hasher;
+    
+    mc_TxEntity entity;
+    entity.Zero();
+    entity.m_EntityType=MC_TET_AUTHOR;
+    
+    err=pwalletTxsMain->m_ChunkDB->AddChunk((unsigned char*)&hash,&entity,NULL,-1,(unsigned char*)&vValue[0],NULL,(int)vValue.size(),0,0);
+    
+    if(err)
+    {
+        switch(err)
+        {
+            case MC_ERR_FOUND:
+                break;
+            default:
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Internal error: couldn't store chunk");                                                                                                                                
+                break;
+        }
+    }
+    
+    pwalletTxsMain->m_ChunkDB->Dump("storechunk");
+    
+    return hash.GetHex();
+}
 
 
 

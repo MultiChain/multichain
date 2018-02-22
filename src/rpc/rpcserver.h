@@ -262,6 +262,7 @@ extern json_spirit::Value listblocks(const json_spirit::Array& params, bool fHel
 extern json_spirit::Value liststreamblockitems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getstreamkeysummary(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getstreampublishersummary(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value storechunk(const json_spirit::Array& params, bool fHelp);
 
 extern json_spirit::Value purehelpitem(const json_spirit::Array& params, bool fHelp);
 /* MCHN END */    

@@ -191,8 +191,12 @@ CScript RawDataScriptRawHex(Value *param,int *errorCode,string *strError)
     return scriptOpReturn;
 }
 
-vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,bool allow_formatted,int *errorCode,string *strError)
+vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,uint32_t in_options,uint32_t* out_options,int *errorCode,string *strError)
 {
+    if(out_options)
+    {
+        *out_options=MC_RFD_OPTION_NONE;
+    }
     vector<unsigned char> vValue;
     if(value->type() == str_type)
     {
@@ -210,7 +214,9 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
     }
     else
     {
-        if(allow_formatted || (mc_gState->m_Features->FormattedData() != 0) )
+        if( (in_options & MC_RFD_OPTION_INLINE) || 
+            (mc_gState->m_Features->FormattedData() != 0) || 
+            (mc_gState->m_Features->OffChainData() != 0) )
         {
             if(value->type() == obj_type) 
             {
@@ -222,18 +228,6 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
                 {
                     BOOST_FOREACH(const Pair& d, value->get_obj()) 
                     {
-    /*                    
-                        if(d.name_ == "raw")
-                        {
-                            bool fIsHex;
-                            vValue=ParseHex(d.value_.get_str().c_str(),fIsHex);    
-                            if(!fIsHex)
-                            {
-                                *strError=string("value in data object should be hexadecimal string");                            
-                            }
-                            *data_format=MC_SCR_DATA_FORMAT_RAW;                    
-                        }
-    */ 
                         if(d.name_ == "text")
                         {
                             if(d.value_.type() == str_type)
@@ -261,10 +255,68 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
                             vValue=vector<unsigned char> (script,script+bytes);                                            
                             *data_format=MC_SCR_DATA_FORMAT_UBJSON;                    
                         }
-                        if(*data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
+                        if(d.name_ == "chunks")
                         {
-                            throw JSONRPCError(RPC_NOT_SUPPORTED, "Unsupported item data type: " + d.name_);                                    
-                        }                    
+                            if(mc_gState->m_Features->OffChainData())
+                            {
+                                if(d.value_.type() == array_type)
+                                {
+                                    Array arr=d.value_.get_array();
+                                    for(int i=0;i<(int)arr.size();i++)
+                                    {
+                                        if(strError->size() == 0)
+                                        {
+                                            if(arr[i].type() == str_type)
+                                            {
+                                                vector<unsigned char> vHash;
+                                                bool fIsHex;
+                                                vHash=ParseHex(arr[i].get_str().c_str(),fIsHex);    
+                                                if(!fIsHex)
+                                                {
+                                                    *strError=string("Chunk hash should be hexadecimal string");                            
+                                                }
+                                                else
+                                                {
+                                                    if(vHash.size() != MC_CDB_CHUNK_HASH_SIZE)
+                                                    {
+                                                        *strError=strprintf("Chunk hash should be %d bytes long",MC_CDB_CHUNK_HASH_SIZE);                                                                                    
+                                                    }
+                                                    else
+                                                    {                                                        
+                                                        uint256 hash;
+                                                        hash.SetHex(arr[i].get_str());
+                                                        
+                                                        vValue.insert(vValue.end(),(unsigned char*)&hash,(unsigned char*)&hash+MC_CDB_CHUNK_HASH_SIZE);
+                                                    }
+                                                }                                                
+                                            }                                            
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    *strError=string("value in data object should be array");                            
+                                }
+                                
+                                if(out_options)
+                                {
+                                    *out_options |= MC_RFD_OPTION_OFFCHAIN;
+                                }    
+                                *data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
+                            }
+                            else
+                            {
+                                *errorCode=RPC_NOT_SUPPORTED;
+                                *strError="Unsupported item data type: " + d.name_;
+                            }
+                        }
+                        else
+                        {
+                            if(*data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
+                            {
+                                throw JSONRPCError(RPC_NOT_SUPPORTED, "Unsupported item data type: " + d.name_);                                    
+                            }                    
+                        }
                     }                
                 }
             }   
@@ -336,25 +388,13 @@ CScript RawDataScriptFormatted(Value *param,uint32_t *data_format,mc_Script *lpD
     BOOST_FOREACH(const Pair& d, param->get_obj()) 
     {
         field_parsed=false;
-/*        
-        if(d.name_ == "data")        
-        {
-            if(!missing_data)
-            {
-                *strError=string("data field can appear only once in the object");                                                                                                        
-            }
-            vValue=ParseRawFormattedData(&(d.value_),data_format,lpDetailsScript,errorCode,strError);
-            field_parsed=true;
-            missing_data=false;
-        }
- */ 
         if( (d.name_ == "text") || (d.name_ == "json") )      
         {
             if(!missing_data)
             {
                 *strError=string("data object should have single key - json or text");                                                                                                        
             }
-            vValue=ParseRawFormattedData(param,data_format,lpDetailsScript,false,errorCode,strError);
+            vValue=ParseRawFormattedData(param,data_format,lpDetailsScript,MC_RFD_OPTION_NONE,NULL,errorCode,strError);
             field_parsed=true;
             missing_data=false;
         }
@@ -948,7 +988,8 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
     return scriptOpReturn;
 }
 
-CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *data_format,mc_Script *lpDetailsScript,int *errorCode,string *strError)
+
+CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *data_format,mc_Script *lpDetailsScript,vector<unsigned char>* vChunkHashes,int *errorCode,string *strError)
 {
     CScript scriptOpReturn=CScript();
     vector<unsigned char> vValue;
@@ -959,6 +1000,9 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
     bool field_parsed;
     bool missing_data=true;
     bool missing_key=true;
+    uint32_t in_options,out_options;
+    in_options=MC_RFD_OPTION_NONE;
+    out_options=MC_RFD_OPTION_NONE;
     vKeys.clear();
     BOOST_FOREACH(const Pair& d, param->get_obj()) 
     {
@@ -1013,10 +1057,36 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
             {
                 *strError=string("data field can appear only once in the object");                                                                                                        
             }
-            vValue=ParseRawFormattedData(&(d.value_),data_format,lpDetailsScript,false,errorCode,strError);
+            vValue=ParseRawFormattedData(&(d.value_),data_format,lpDetailsScript,MC_RFD_OPTION_NONE,&out_options,errorCode,strError);
             field_parsed=true;
             missing_data=false;
         }
+        if(d.name_ == "options")
+        {
+            if( mc_gState->m_Features->OffChainData() == 0 )
+            {
+                *errorCode=RPC_NOT_SUPPORTED;
+                *strError=string("Format options are not supported by this protocol version");       
+                goto exitlbl;
+            }
+            if(d.value_.type() != null_type && (d.value_.type()==str_type))
+            {
+                if(d.value_.get_str() == "offchain")
+                {
+                    in_options |= MC_RFD_OPTION_OFFCHAIN;
+                }
+                else
+                {
+                    *strError=string("Invalid options");                                                
+                }
+            }
+            else
+            {
+                *strError=string("Invalid options");                            
+            }
+            field_parsed=true;
+            missing_key=false;
+        }        
         if(d.name_ == "for")field_parsed=true;
 //        if(d.name_ == "format")field_parsed=true;
         if(!field_parsed)
@@ -1070,21 +1140,40 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
             }
         }
 
-        if(*data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
+        if(in_options & MC_RFD_OPTION_OFFCHAIN)
         {
-            lpDetailsScript->Clear();
-            lpDetailsScript->SetDataFormat(*data_format);
+            AppendOffChainFormatData(*data_format,out_options,lpDetailsScript,vValue,vChunkHashes,errorCode,strError);
+            if(strError->size())
+            {
+                goto exitlbl;                                
+            }
             script = lpDetailsScript->GetData(0,&bytes);
             scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;                    
-        }
-
-        if(vValue.size())
-        {
-            scriptOpReturn << OP_RETURN << vValue;                            
+            scriptOpReturn << OP_RETURN;                                        
         }
         else
         {
-            scriptOpReturn << OP_RETURN;                                        
+            if(out_options & MC_RFD_OPTION_OFFCHAIN)
+            {
+                *strError=string("chunks data type is not allowed with missing options field");                                            
+                goto exitlbl;                
+            }
+            if(*data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
+            {
+                lpDetailsScript->Clear();
+                lpDetailsScript->SetDataFormat(*data_format);
+                script = lpDetailsScript->GetData(0,&bytes);
+                scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;                    
+            }
+
+            if(vValue.size())
+            {
+                scriptOpReturn << OP_RETURN << vValue;                            
+            }
+            else
+            {
+                scriptOpReturn << OP_RETURN;                                        
+            }
         }
     }
     
@@ -1270,6 +1359,7 @@ CScript RawDataScriptInputCache(Value *param,mc_Script *lpDetails,int *errorCode
 
 CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *given_entity,mc_EntityDetails *found_entity)
 {
+    vector<unsigned char> vChunkHashes;
     string strError="";
     int errorCode=RPC_INVALID_PARAMETER;
     uint32_t data_format;
@@ -1325,7 +1415,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             scriptOpReturn=RawDataScriptCreateStream(&param,lpDetails,lpDetailsScript,&errorCode,&strError);
             break;
         case MC_DATA_API_PARAM_TYPE_PUBLISH:
-            scriptOpReturn=RawDataScriptPublish(&param,&entity,&data_format,lpDetailsScript,&errorCode,&strError);
+            scriptOpReturn=RawDataScriptPublish(&param,&entity,&data_format,lpDetailsScript,&vChunkHashes,&errorCode,&strError);
             break;
         case MC_DATA_API_PARAM_TYPE_CREATE_UPGRADE:
             scriptOpReturn=RawDataScriptCreateUpgrade(&param,lpDetails,lpDetailsScript,&errorCode,&strError);

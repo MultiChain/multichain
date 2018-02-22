@@ -732,3 +732,55 @@ Object TxOutEntry(const CTxOut& TxOutIn,int vout,const CTxIn& TxIn,uint256 hash,
     return txout_entry;
 }
 
+void AppendOffChainFormatData(uint32_t data_format,
+                              uint32_t out_options,
+                              mc_Script *lpDetailsScript,
+                              vector<unsigned char>& vValue,
+                              vector<unsigned char>* vChunkHashes,
+                              int *errorCode,
+                              string *strError)
+{
+    if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
+    {
+        *strError="Offchain data is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\"";
+        *errorCode=RPC_NOT_SUPPORTED;
+        return;
+    }   
+    mc_ChunkDBRow chunk_def;
+    lpDetailsScript->Clear();
+    
+    int chunk_count;
+    int err;
+    mc_TxEntity entity;
+    entity.Zero();
+    entity.m_EntityType=MC_TET_AUTHOR;    
+    
+    if(out_options & MC_RFD_OPTION_OFFCHAIN)
+    {
+        chunk_count=(int)vValue.size()/MC_CDB_CHUNK_HASH_SIZE;
+        if(chunk_count > MAX_CHUNK_COUNT)
+        {
+            *strError="Too many chunks in the script";
+            return; 
+        }
+        
+        lpDetailsScript->SetChunkDefHeader(data_format,chunk_count);
+        for(int i=0;i<chunk_count;i++)
+        {
+            err=pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,(unsigned char*)&vValue[i*MC_CDB_CHUNK_HASH_SIZE],&entity,NULL,-1);
+            if(err)
+            {
+                *strError="Chunk not found in this wallet";
+                return; 
+            }
+            lpDetailsScript->SetChunkDefHash((unsigned char*)&vValue[i*MC_CDB_CHUNK_HASH_SIZE],chunk_def.m_Size);
+        }
+    }
+    else
+    {
+        
+    }
+    
+//            err=pwalletTxsMain->m_ChunkDB->AddChunk((unsigned char*)&hash,&entity,NULL,-1,(unsigned char*)&vValue[0],NULL,(int)vValue.size(),0,0);
+}                             
+

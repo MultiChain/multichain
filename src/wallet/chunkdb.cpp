@@ -6,6 +6,7 @@
 
 #define MC_CDB_TMP_FLAG_SHOULD_COMMIT           0x00000001
 
+unsigned char null_txid[MC_TDB_TXID_SIZE];
 
 void sprintf_hex(char *hex,const unsigned char *bin,int size);
 /*
@@ -42,6 +43,18 @@ void mc_ChunkDBStat::Zero()
 void mc_ChunkDBRow::Zero()
 {
     memset(this,0,sizeof(mc_ChunkDBRow));        
+}
+
+void mc_ChunkDBRow::SwapPosBytes()
+{
+    unsigned char *ptr=(unsigned char *)&m_Pos;
+    unsigned char t;
+    t=ptr[0];
+    ptr[0]=ptr[3];
+    ptr[3]=t;
+    t=ptr[1];
+    ptr[1]=ptr[2];
+    ptr[2]=t;
 }
 
 void mc_ChunkDB::LogString(const char *message)
@@ -161,7 +174,7 @@ int mc_ChunkDB::AddSubscription(mc_SubscriptionDBRow *subscription)
             sprintf(dir_name,"chunks/data/stream-%s",enthex);
             break;
         case MC_TET_AUTHOR:
-            sprintf(dir_name,"chunks/data/author");
+            sprintf(dir_name,"chunks/data/publisher");
             break;
         case MC_TET_NONE:
             break;            
@@ -435,6 +448,7 @@ int mc_ChunkDB::Initialize(const char *name,uint32_t mode)
         }        
     }
  
+    m_DBStat.m_InitMode &= MC_WMD_MODE_MASK;
     m_DBStat.m_InitMode |= mode;
     
     m_MemPool=new mc_Buffer;                                                // Key - entity with m_Pos set to 0 + txid
@@ -445,6 +459,8 @@ int mc_ChunkDB::Initialize(const char *name,uint32_t mode)
    
     m_TmpScript=new mc_Script;
     m_TmpScript->Clear();
+    
+    memset(null_txid,0,MC_TDB_TXID_SIZE);    
     
     m_Semaphore=__US_SemCreate();
     if(m_Semaphore == NULL)
@@ -553,7 +569,7 @@ int mc_ScriptMatchesTxIDAndVOut(unsigned char *ptr,size_t bytes,const unsigned c
         }
     }
 
-    return MC_ERR_NOERROR;
+    return MC_ERR_NOT_FOUND;
 }
 
 int mc_ChunkDB::GetChunkDefInternal(
@@ -581,7 +597,12 @@ int mc_ChunkDB::GetChunkDefInternal(
     {
         return MC_ERR_NOT_FOUND;
     }
-    
+
+    if(mempool_row)
+    {
+        *mempool_row=-1;
+    }
+
     memcpy(chunk_def->m_Hash,hash,MC_CDB_CHUNK_HASH_SIZE);
     chunk_def->m_SubscriptionID=subscription->m_SubscriptionID;
     chunk_def->m_Pos=0;
@@ -655,7 +676,9 @@ int mc_ChunkDB::GetChunkDefInternal(
     }
     else
     {
+        chunk_def->SwapPosBytes();
         ptr=(unsigned char*)m_DB->Read((char*)chunk_def+m_KeyOffset,m_KeySize,&value_len,0,&err);
+        chunk_def->SwapPosBytes();
         if(err)
         {
             return err;
@@ -678,7 +701,9 @@ int mc_ChunkDB::GetChunkDefInternal(
                     
                     if(chunk_def->m_Pos < total_items)
                     {
+                        chunk_def->SwapPosBytes();
                         ptr=(unsigned char*)m_DB->Read((char*)chunk_def+m_KeyOffset,m_KeySize,&value_len,0,&err);
+                        chunk_def->SwapPosBytes();
                         if(err)
                         {
                             return err;
@@ -694,6 +719,10 @@ int mc_ChunkDB::GetChunkDefInternal(
                             chunk_def->m_Pos=total_items;
                         }
                     }
+                    else
+                    {
+                        ptr=NULL;
+                    }
                 }
                 err=MC_ERR_NOT_FOUND;            
             }
@@ -706,7 +735,9 @@ int mc_ChunkDB::GetChunkDefInternal(
                         while(chunk_def->m_NextSubscriptionID)
                         {
                             chunk_def->m_SubscriptionID=chunk_def->m_NextSubscriptionID;
+                            chunk_def->SwapPosBytes();
                             ptr=(unsigned char*)m_DB->Read((char*)chunk_def+m_KeyOffset,m_KeySize,&value_len,0,&err);
+                            chunk_def->SwapPosBytes();
                             if(err)
                             {
                                 return err;
@@ -845,13 +876,16 @@ int mc_ChunkDB::AddChunkInternal(
         if(err == MC_ERR_NOT_FOUND)
         {
             add_null_row=1;
-        }        
-        if(err != MC_ERR_NOERROR)
-        {
-            return err; 
+        }  
+        else
+        {      
+            if(err != MC_ERR_NOERROR)
+            {
+                return err; 
+            }
         }
     }
-    
+        
     chunk_def.Zero();
     memcpy(chunk_def.m_Hash,hash,MC_CDB_CHUNK_HASH_SIZE);
     chunk_def.m_InternalFileID=-1;
@@ -862,14 +896,21 @@ int mc_ChunkDB::AddChunkInternal(
     
     timestamp=mc_TimeNowAsUInt();
     m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_TIMESTAMP,(unsigned char*)&timestamp,sizeof(timestamp));
+    m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_CHUNK_HASH,hash,MC_CDB_CHUNK_HASH_SIZE);
     if(txid)
     {
-        m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_SOURCE_TXID,hash,MC_CDB_CHUNK_HASH_SIZE);
+        m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_SOURCE_TXID,txid,MC_TDB_TXID_SIZE);
         if(vout >= 0)
         {
-            m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_SOURCE_TXID,(unsigned char*)&vout,sizeof(vout));            
+            m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_SOURCE_VOUT,(unsigned char*)&vout,sizeof(vout));            
         }
     }
+    else
+    {
+        m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_SOURCE_TXID,null_txid,MC_TDB_TXID_SIZE);
+        m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_SOURCE_VOUT,(unsigned char*)&vout,sizeof(vout));                    
+    }
+    m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_CHUNK_SIZE,(unsigned char*)&chunk_size,sizeof(chunk_size));
     if(details_size)
     {
         m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_CHUNK_DETAILS,details,details_size);        
@@ -902,7 +943,7 @@ int mc_ChunkDB::AddChunkInternal(
         chunk_def.m_NextSubscriptionID=subscription->m_SubscriptionID;
         m_MemPool->Add(&chunk_def,(char*)&chunk_def+m_ValueOffset);        
     }
-    
+
     chunk_def.m_SubscriptionID=subscription->m_SubscriptionID;
     chunk_def.m_Pos=total_items-on_disk_items;
     chunk_def.m_ItemCount=total_items+1;
@@ -928,7 +969,6 @@ int mc_ChunkDB::AddChunkInternal(
     
     m_MemPool->Add(&chunk_def,(char*)&chunk_def+m_ValueOffset);
     
-    
     if(mempool_entity_row >= 0)
     {
         ((mc_ChunkDBRow *)m_MemPool->GetRow(mempool_entity_row))->m_ItemCount += 1;        
@@ -938,7 +978,7 @@ int mc_ChunkDB::AddChunkInternal(
     {
         if(add_entity_row)
         {
-            ((mc_ChunkDBRow *)m_MemPool->GetRow(mempool_entity_row))->m_NextSubscriptionID = subscription->m_SubscriptionID;                    
+            ((mc_ChunkDBRow *)m_MemPool->GetRow(mempool_last_null_row))->m_NextSubscriptionID = subscription->m_SubscriptionID;                    
         }
     }
     
@@ -982,6 +1022,7 @@ unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
 {
     unsigned char *ptr;
     size_t bytes_to_read;
+    int subscription_id;
     mc_SubscriptionDBRow *subscription;
     char FileName[MC_DCT_DB_MAX_PATH];    
     int FileHan;
@@ -1010,11 +1051,15 @@ unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
     }
     else
     {
-        subscription=(mc_SubscriptionDBRow *)m_Subscriptions->GetRow(chunk_def->m_SubscriptionID);
+        subscription_id=chunk_def->m_SubscriptionID;
+        if(subscription_id == 0)
+        {
+            subscription_id=chunk_def->m_NextSubscriptionID;
+        }
+        subscription=(mc_SubscriptionDBRow *)m_Subscriptions->GetRow(subscription_id);
         SetFileName(FileName,subscription,chunk_def->m_InternalFileID);
      
         FileHan=open(FileName,_O_BINARY | O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-
         if(FileHan<=0)
         {
             return NULL;
@@ -1053,7 +1098,7 @@ unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
         {
             *bytes=bytes_to_read;
         }
-    }
+}
 
 exitlbl:
         
@@ -1090,7 +1135,6 @@ int mc_ChunkDB::AddToFile(const void* chunk,
     
     SetFileName(FileName,subscription,fileid);
     err=MC_ERR_NOERROR;
-    
     FileHan=open(FileName,_O_BINARY | O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
     
     if(FileHan<=0)
@@ -1140,10 +1184,15 @@ int mc_ChunkDB::CommitInternal(int block)
     int err;
     int last_file_id, last_file_offset;
     uint32_t size;
+    int value_len;
+    unsigned char *ptr;
     char msg[256];
 
     mc_SubscriptionDBRow *subscription;
     mc_ChunkDBRow *chunk_def;
+    mc_ChunkDBRow entity_chunk_def;
+    
+    err=MC_ERR_NOERROR;
     
     Dump("Before Commit");
     if(m_MemPool->GetCount() == 0)
@@ -1189,7 +1238,6 @@ int mc_ChunkDB::CommitInternal(int block)
             chunk_def->m_InternalFileID=subscription->m_LastFileID;
             chunk_def->m_InternalFileOffset=subscription->m_LastFileSize;
             chunk_def->m_Pos+=chunk_def->m_TmpOnDiskItems;
-            chunk_def->m_TmpOnDiskItems=0;
             
             if(chunk_def->m_SubscriptionID == 0)
             {
@@ -1209,11 +1257,43 @@ int mc_ChunkDB::CommitInternal(int block)
             chunk_def->m_InternalFileID=last_file_id;
             chunk_def->m_InternalFileOffset=last_file_offset;
             chunk_def->m_Pos+=chunk_def->m_TmpOnDiskItems;
-            chunk_def->m_TmpOnDiskItems=0;
             last_file_id=-1;
         }
+
+        if(chunk_def->m_TmpOnDiskItems)
+        {
+            if(chunk_def->m_SubscriptionID)
+            {
+                entity_chunk_def.Zero();
+                memcpy(&entity_chunk_def,chunk_def,sizeof(mc_ChunkDBRow));
+                entity_chunk_def.m_Pos=0;
+                entity_chunk_def.m_TmpOnDiskItems=0;
+                entity_chunk_def.SwapPosBytes();
+                ptr=(unsigned char*)m_DB->Read((char*)&entity_chunk_def+m_KeyOffset,m_KeySize,&value_len,0,&err);
+                entity_chunk_def.SwapPosBytes();
+                if(err)
+                {
+                    goto exitlbl;
+                }
+                if(ptr)
+                {
+                    memcpy((char*)&entity_chunk_def+m_ValueOffset,ptr,m_ValueSize);
+                    entity_chunk_def.m_ItemCount=chunk_def->m_ItemCount;
+                    entity_chunk_def.SwapPosBytes();
+                    err=m_DB->Write((char*)&entity_chunk_def+m_KeyOffset,m_KeySize,(char*)&entity_chunk_def+m_ValueOffset,m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+                    entity_chunk_def.SwapPosBytes();
+                    if(err)
+                    {
+                        goto exitlbl;
+                    }                                                            
+                }
+            }
+        }
         
+        chunk_def->m_TmpOnDiskItems=0;
+        chunk_def->SwapPosBytes();
         err=m_DB->Write((char*)chunk_def+m_KeyOffset,m_KeySize,(char*)chunk_def+m_ValueOffset,m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+        chunk_def->SwapPosBytes();
         if(err)
         {
             goto exitlbl;

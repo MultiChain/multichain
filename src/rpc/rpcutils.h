@@ -19,7 +19,7 @@
 #include "json/json_spirit_value.h"
 #include "multichain/multichain.h"
 #include "utils/utilparse.h"
-
+#include "wallet/chunkdb.h"
 
 using namespace std;
 using namespace json_spirit;
@@ -56,6 +56,10 @@ using namespace json_spirit;
 #define MC_VMM_TAKE_FIRST                      0x00000008
 #define MC_VMM_TAKE_FIRST_FOR_FIELD            0x00000010
 #define MC_VMM_OMIT_NULL                       0x00000020
+
+#define MC_RFD_OPTION_NONE                     0x00000000
+#define MC_RFD_OPTION_INLINE                   0x00000001
+#define MC_RFD_OPTION_OFFCHAIN                 0x00000002
 
 
 // codes for allowed_objects fields    
@@ -108,11 +112,12 @@ void ParseRawAction(string action,bool& lock_it, bool& sign_it,bool& send_it);
 bool paramtobool(Value param);
 int paramtoint(Value param,bool check_for_min,int min_value,string error_message);
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
-vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,bool allow_formatted,int *errorCode,string *strError);
+vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,uint32_t in_options,uint32_t *out_options,int *errorCode,string *strError);
 void ParseRawDetails(const Value *value,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError);
 bool mc_IsJsonObjectForMerge(const Value *value,int level);
 Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int level,int *error);
 Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total);
+void AppendOffChainFormatData(uint32_t data_format,uint32_t out_options,mc_Script *lpDetailsScript,vector<unsigned char>& vValue,vector<unsigned char>* vChunkHashes,int *errorCode,string *strError);
 
 
 #endif	/* RPCMULTICHAINUTILS_H */

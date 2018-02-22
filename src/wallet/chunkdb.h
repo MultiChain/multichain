@@ -104,6 +104,7 @@ typedef struct mc_ChunkDBRow
     int32_t  m_NextSubscriptionID;                                              // Next Subscription ID for this hash
     
     void Zero();
+    void SwapPosBytes();
 } mc_ChunkDBRow;
 
 

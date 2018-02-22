@@ -561,6 +561,13 @@ void MultiChainTransaction_FillAdminPermissionsBeforeTx(const CTransaction& tx,
 
 bool MultiChainTransaction_VerifyAndDeleteDataFormatElements(string& reason)
 {
+    if(mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL))
+    {
+        reason="Error in data format script";
+        return false;                    
+    }
+
+/*    
     int elem,err;
     
     mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);                   // Format scripts are eliminated for protocol checks    
@@ -577,6 +584,7 @@ bool MultiChainTransaction_VerifyAndDeleteDataFormatElements(string& reason)
         
     elem=mc_gState->m_TmpScript->m_NumElements-2;
     
+    mc_gState->m_TmpScript->SetElement(elem);
     while( (elem >= 0 ) && ((err=mc_gState->m_TmpScript->GetChunkDef(NULL,NULL,NULL,NULL)) == MC_ERR_NOERROR) )
     {
         mc_gState->m_TmpScript->DeleteElement(elem);
@@ -585,6 +593,10 @@ bool MultiChainTransaction_VerifyAndDeleteDataFormatElements(string& reason)
         {
             err=MC_ERR_WRONG_SCRIPT;
         }
+        else
+        {
+            mc_gState->m_TmpScript->SetElement(elem);            
+        }
     }
         
     if(err != MC_ERR_WRONG_SCRIPT)
@@ -592,6 +604,7 @@ bool MultiChainTransaction_VerifyAndDeleteDataFormatElements(string& reason)
         reason="Error in data format script";
         return false;            
     }
+ */ 
     
     return true;        
 }

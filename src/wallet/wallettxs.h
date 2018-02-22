@@ -54,7 +54,8 @@ typedef struct mc_WalletTxs
     std::map<uint256,CWalletTx> m_UnconfirmedSends;
     std::vector<uint256> m_UnconfirmedSendsHashes;
     std::map<uint256, CWalletTx> vAvailableCoins;    
-    
+ 
+    unsigned char* m_ChunkBuffer;
     mc_WalletTxs()
     {
         Zero();
