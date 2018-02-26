@@ -117,7 +117,7 @@ void ParseRawDetails(const Value *value,mc_Script *lpDetails,mc_Script *lpDetail
 bool mc_IsJsonObjectForMerge(const Value *value,int level);
 Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int level,int *error);
 Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total);
-void AppendOffChainFormatData(uint32_t data_format,uint32_t out_options,mc_Script *lpDetailsScript,vector<unsigned char>& vValue,vector<unsigned char>* vChunkHashes,int *errorCode,string *strError);
+void AppendOffChainFormatData(uint32_t data_format,uint32_t out_options,mc_Script *lpDetailsScript,vector<unsigned char>& vValue,vector<uint256>* vChunkHashes,int *errorCode,string *strError);
 
 
 #endif	/* RPCMULTICHAINUTILS_H */

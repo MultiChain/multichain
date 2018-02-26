@@ -736,7 +736,7 @@ void AppendOffChainFormatData(uint32_t data_format,
                               uint32_t out_options,
                               mc_Script *lpDetailsScript,
                               vector<unsigned char>& vValue,
-                              vector<unsigned char>* vChunkHashes,
+                              vector<uint256>* vChunkHashes,
                               int *errorCode,
                               string *strError)
 {
@@ -750,7 +750,9 @@ void AppendOffChainFormatData(uint32_t data_format,
     lpDetailsScript->Clear();
     
     int chunk_count;
+    int tail_size,size;
     int err;
+    uint256 hash;
     mc_TxEntity entity;
     entity.Zero();
     entity.m_EntityType=MC_TET_AUTHOR;    
@@ -774,11 +776,51 @@ void AppendOffChainFormatData(uint32_t data_format,
                 return; 
             }
             lpDetailsScript->SetChunkDefHash((unsigned char*)&vValue[i*MC_CDB_CHUNK_HASH_SIZE],chunk_def.m_Size);
+            if(vChunkHashes)
+            {
+                vChunkHashes->push_back(*(uint256*)&vValue[i*MC_CDB_CHUNK_HASH_SIZE]);
+            }
         }
     }
     else
     {
-        
+        chunk_count=0;
+        tail_size=0;
+        if(vValue.size())
+        {
+            chunk_count=((int)vValue.size()-1)/MAX_CHUNK_SIZE+1;
+            tail_size=(int)vValue.size()-(chunk_count-1)*MAX_CHUNK_SIZE;
+            lpDetailsScript->SetChunkDefHeader(data_format,chunk_count);
+            for(int i=0;i<chunk_count;i++)
+            {
+                size=MAX_CHUNK_SIZE;
+                if(i == chunk_count-1)
+                {
+                    size=tail_size;
+                }
+                mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash((unsigned char*)&vValue[i*MAX_CHUNK_SIZE],size,&hash);
+                
+                err=pwalletTxsMain->m_ChunkDB->AddChunk((unsigned char*)&hash,&entity,NULL,-1,(unsigned char*)&vValue[i*MAX_CHUNK_SIZE],NULL,size,0,0);   
+                if(err)
+                {
+                    switch(err)
+                    {
+                        case MC_ERR_FOUND:
+                            break;
+                        default:
+                            *strError="Internal error: couldn't store chunk";
+                            return; 
+                    }
+                }
+    
+                pwalletTxsMain->m_ChunkDB->Dump("storechunk");
+                lpDetailsScript->SetChunkDefHash((unsigned char*)&hash,size);
+                if(vChunkHashes)
+                {
+                    vChunkHashes->push_back(*(uint256*)&hash);
+                }
+            }
+        }
     }
     
 //            err=pwalletTxsMain->m_ChunkDB->AddChunk((unsigned char*)&hash,&entity,NULL,-1,(unsigned char*)&vValue[0],NULL,(int)vValue.size(),0,0);

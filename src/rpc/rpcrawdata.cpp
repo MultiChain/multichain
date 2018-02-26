@@ -989,7 +989,7 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
 }
 
 
-CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *data_format,mc_Script *lpDetailsScript,vector<unsigned char>* vChunkHashes,int *errorCode,string *strError)
+CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *data_format,mc_Script *lpDetailsScript,vector<uint256>* vChunkHashes,int *errorCode,string *strError)
 {
     CScript scriptOpReturn=CScript();
     vector<unsigned char> vValue;
@@ -1359,7 +1359,7 @@ CScript RawDataScriptInputCache(Value *param,mc_Script *lpDetails,int *errorCode
 
 CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *given_entity,mc_EntityDetails *found_entity)
 {
-    vector<unsigned char> vChunkHashes;
+    vector<uint256> vChunkHashes;
     string strError="";
     int errorCode=RPC_INVALID_PARAMETER;
     uint32_t data_format;

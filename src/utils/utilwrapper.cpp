@@ -865,6 +865,16 @@ void mc_SHA256::GetHash(unsigned char *hash)
     }        
 }
 
+void mc_SHA256::DoubleHash(const void *lpData,int size,void *hash)
+{
+    Reset();
+    Write(lpData,size);
+    GetHash((unsigned char *)hash);
+    Reset();
+    Write((unsigned char *)hash,32);
+    GetHash((unsigned char *)hash);    
+}
+
 int mc_MultichainParams::Import(const char *name,const char *source_address)
 {
     

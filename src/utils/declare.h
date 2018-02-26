@@ -138,6 +138,8 @@ typedef struct mc_SHA256
     void Write(const void *lpData,int size);
     void GetHash(unsigned char *hash);
     
+    void DoubleHash(const void *lpData,int size,void *hash);
+    
     mc_SHA256()
     {
         Init();

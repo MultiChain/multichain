@@ -550,9 +550,12 @@ Value storechunk(const Array& params, bool fHelp)
     }
     
     uint256 hash;
+    mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(&vValue[0],(int)vValue.size(),&hash);
+/*    
     mc_SHA256 *hasher;
     
     hasher=new mc_SHA256;    
+    hasher->Reset();
     hasher->Write(&vValue[0],(int)vValue.size());
     hasher->GetHash((unsigned char*)&hash);
     hasher->Reset();
@@ -560,7 +563,7 @@ Value storechunk(const Array& params, bool fHelp)
     hasher->GetHash((unsigned char*)&hash);
     
     delete hasher;
-    
+*/    
     mc_TxEntity entity;
     entity.Zero();
     entity.m_EntityType=MC_TET_AUTHOR;

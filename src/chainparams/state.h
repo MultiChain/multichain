@@ -172,6 +172,7 @@ typedef struct mc_TmpBuffers
     mc_Buffer               *m_RpcABNoMapBuffer1;
     mc_Buffer               *m_RpcABNoMapBuffer2;
     mc_Buffer               *m_RpcEntityRows;
+    mc_SHA256               *m_RpcHasher1;
     
     void  Init()
     {
@@ -189,7 +190,8 @@ typedef struct mc_TmpBuffers
         m_RpcABNoMapBuffer2=new mc_Buffer;
         mc_InitABufferDefault(m_RpcABNoMapBuffer2);
         m_RpcEntityRows=new mc_Buffer;
-        m_RpcEntityRows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);        
+        m_RpcEntityRows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);     
+        m_RpcHasher1=new mc_SHA256();
     }    
 
     void  Destroy()
@@ -204,6 +206,7 @@ typedef struct mc_TmpBuffers
         delete m_RpcABNoMapBuffer1;
         delete m_RpcABNoMapBuffer2;
         delete m_RpcEntityRows;
+        delete m_RpcHasher1;
     }
     
 } mc_TmpBuffers;

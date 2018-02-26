@@ -801,6 +801,10 @@ int mc_ChunkDB::AddChunkInternal(
     uint32_t timestamp;
     size_t bytes;
     const unsigned char *ptr;
+    char chunk_hex[65];
+    char msg[256];
+    char enthex[65];
+    
     
     mc_ChunkDBRow chunk_def;
     mc_ChunkDBRow entity_chunk_def;
@@ -981,7 +985,11 @@ int mc_ChunkDB::AddChunkInternal(
             ((mc_ChunkDBRow *)m_MemPool->GetRow(mempool_last_null_row))->m_NextSubscriptionID = subscription->m_SubscriptionID;                    
         }
     }
-    
+ 
+    sprintf_hex(enthex,entity->m_EntityID,MC_TDB_ENTITY_ID_SIZE);
+    sprintf_hex(chunk_hex,hash,MC_CDB_CHUNK_HASH_SIZE);    
+    sprintf(msg,"New Chunk %s, size %d, flags %08X, entity (%08X, %s)",chunk_hex,chunk_size,flags,entity->m_EntityType,enthex);
+    LogString(msg);
     return MC_ERR_NOERROR;
 }
 
