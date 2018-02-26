@@ -61,6 +61,14 @@ using namespace json_spirit;
 #define MC_RFD_OPTION_INLINE                   0x00000001
 #define MC_RFD_OPTION_OFFCHAIN                 0x00000002
 
+#define MC_OST_UNDEFINED                       0x00000000
+#define MC_OST_UNKNOWN                         0x00000001
+#define MC_OST_ON_CHAIN                        0x00000002
+#define MC_OST_RETRIEVED                       0x00000004
+#define MC_OST_STATUS_MASK                     0x0000FFFF
+#define MC_OST_ERROR                           0x00010000
+#define MC_OST_MULTIPLE                        0x00020000
+
 
 // codes for allowed_objects fields    
 // 0x0001 - create    
@@ -93,7 +101,9 @@ Array PerOutputDataEntries(const CTxOut& txout,mc_Script *lpScript,uint256 txid,
 Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong);
 Object StreamEntry(const unsigned char *txid,uint32_t output_level);
 Object UpgradeEntry(const unsigned char *txid);
+uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,size_t *elem_size,unsigned char* hashes,int chunk_count);
 Value OpReturnEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout);
+Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out,uint32_t status);
 Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out);
 Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format);
 Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uint32_t stream_output_level);

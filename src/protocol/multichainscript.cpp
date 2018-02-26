@@ -2350,12 +2350,12 @@ int mc_Script::GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_co
     unsigned char *ptrEnd;
     unsigned char f;
     int c,count,shift,size;
-    
+/*    
     if(format)
     {
         *format=MC_SCR_DATA_FORMAT_UNKNOWN;
     }
-        
+*/        
     if(m_CurrentElement<0)
     {
         return MC_ERR_INVALID_PARAMETER_VALUE;

@@ -897,13 +897,93 @@ int mc_IsUTF8(const unsigned char *elem,size_t elem_size)
     return 1;
 }
 
-Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out)
+uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,size_t *elem_size,unsigned char* hashes,int chunk_count)
+{
+    uint32_t status;  
+    mc_ChunkDBRow chunk_def;
+    int size,shift;
+    unsigned char *ptr;
+    unsigned char *ptrEnd;
+    
+    status=MC_OST_UNKNOWN;
+    
+    *elem = lpScript->GetData(lpScript->GetNumElements()-1,elem_size);
+    if(hashes == NULL)
+    {
+        return MC_OST_ON_CHAIN;
+    }
+    if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
+    {
+        return status;
+    }
+    if(chunk_count > 1)
+    {
+        return status;        
+    }    
+    
+    ptr=hashes;
+    ptrEnd=ptr+MC_CDB_CHUNK_HASH_SIZE+16;
+    
+    size=(int)mc_GetVarInt(ptr,ptrEnd-ptr,-1,&shift);
+
+    if(size<0)
+    {
+        status |= MC_OST_ERROR;
+        return status;
+    }
+        
+    if(size > MAX_CHUNK_SIZE)
+    {
+        status |= MC_OST_ERROR;
+        return status;
+    }
+        
+    ptr+=shift;
+    
+    if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,ptr,NULL,NULL,-1) == MC_ERR_NOERROR)
+    {
+        *elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,elem_size);
+        if(*elem)
+        {
+            status=MC_OST_RETRIEVED;
+        }
+        else
+        {
+            status |= MC_OST_ERROR;            
+        }
+    }
+    
+    return status;
+}
+
+
+Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out,uint32_t status)
 {
     string metadata="";
     Object metadata_object;
     Value metadata_value;
+    bool available;
+    string status_str;    
     int err;
-    if( ((int)elem_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)) || (txid == 0) )
+    
+    available=true;
+    status_str="";
+    switch(status & MC_OST_STATUS_MASK) 
+    {
+        case MC_OST_ON_CHAIN:
+            status_str="on-chain";
+            break;
+        case MC_OST_RETRIEVED:
+            status_str="retrieved";
+            break;            
+        case MC_OST_UNKNOWN:
+            status_str="unknown";
+            available=false;
+            break;            
+    }    
+    
+    
+    if( (((int)elem_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)) || (txid == 0)) && available && ((status & MC_OST_MULTIPLE) == 0) )
     {
         if(format_text_out)
         {
@@ -954,7 +1034,17 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
     metadata_object.push_back(Pair("vout", vout));
     metadata_object.push_back(Pair("format", OpReturnFormatToText(format)));
     metadata_object.push_back(Pair("size", (int)elem_size));
+    if(status != MC_OST_UNDEFINED)
+    {
+        metadata_object.push_back(Pair("available", available));        
+        metadata_object.push_back(Pair("status", status_str));        
+    }
     return metadata_object;    
+}
+
+Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out)
+{
+    return OpReturnFormatEntry(elem,elem_size,txid,vout,format,format_text_out,MC_OST_UNDEFINED);
 }
 
 Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format)

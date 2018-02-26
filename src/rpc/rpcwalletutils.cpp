@@ -442,6 +442,9 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
     int item_key_size;
     Value item_value;
     uint32_t format;
+    unsigned char *chunk_hashes;
+    int chunk_count;   
+    uint32_t retrieve_status;
     Value format_item_value;
     string format_text_str;
     int start_from=first_output;
@@ -470,7 +473,9 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
                 {
                     if(mc_gState->m_TmpScript->GetNumElements()) // 2 OP_DROPs + OP_RETURN - item key
                     {
-                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,NULL);
+//                        chunk_hashes=NULL;
+//                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
 
                         unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
                         mc_gState->m_TmpScript->SetElement(0);
@@ -511,9 +516,10 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
                                 size_t elem_size;
                                 const unsigned char *elem;
 
-                                elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
+//                                elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
+                                retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&elem_size,chunk_hashes,chunk_count);
                                 item_value=OpReturnEntry(elem,elem_size,wtx.GetHash(),j);
-                                format_item_value=OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),j,format,&format_text_str);
+                                format_item_value=OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),j,format,&format_text_str,retrieve_status);
                             }
                         }
                     }                        

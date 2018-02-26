@@ -2304,18 +2304,18 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                     entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
                     if(imp->FindEntity(&entity) >= 0)    
                     {
-                        mc_ChunkDBRow chunk_def;
-                        mc_TxEntity chunk_entity;
-                        chunk_entity.Zero();
-                        memcpy(entity.m_EntityID,short_txid,MC_AST_SHORT_TXID_SIZE);
-                        entity.m_EntityType=MC_TET_STREAM;            
                         if(chunk_hashes)
                         {
+                            mc_ChunkDBRow chunk_def;
+                            mc_TxEntity chunk_entity;
+                            chunk_entity.Zero();
+                            memcpy(chunk_entity.m_EntityID,short_txid,MC_AST_SHORT_TXID_SIZE);
+                            chunk_entity.m_EntityType=MC_TET_STREAM;            
                             for(int chunk=0;chunk<chunk_count;chunk++)
                             {
                                 chunk_size=(int)mc_GetVarInt(chunk_hashes,MC_CDB_CHUNK_HASH_SIZE+16,-1,&chunk_shift);
                                 chunk_hashes+=chunk_shift;
-                                if(m_ChunkDB->GetChunkDef(&chunk_def,chunk_hashes,&entity,(unsigned char*)&hash,i) != MC_ERR_NOERROR)
+                                if(m_ChunkDB->GetChunkDef(&chunk_def,chunk_hashes,&chunk_entity,(unsigned char*)&hash,i) != MC_ERR_NOERROR)
                                 {
                                     if(m_ChunkDB->GetChunkDef(&chunk_def,chunk_hashes,NULL,NULL,-1) == MC_ERR_NOERROR)
                                     {
@@ -2323,7 +2323,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                         if(chunk_found)
                                         {
                                             memcpy(m_ChunkBuffer,chunk_found,chunk_size);
-                                            chunk_err=m_ChunkDB->AddChunk(chunk_hashes,&entity,(unsigned char*)&hash,i,m_ChunkBuffer,NULL,chunk_size,0,0);
+                                            chunk_err=m_ChunkDB->AddChunk(chunk_hashes,&chunk_entity,(unsigned char*)&hash,i,m_ChunkBuffer,NULL,chunk_size,0,0);
                                             if(chunk_err)
                                             {
                                                 err=chunk_err;
