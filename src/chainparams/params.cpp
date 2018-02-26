@@ -1910,3 +1910,32 @@ int mc_Features::FixedIn1000920001()
 
 
 
+int mc_Features::FixedIn1001020003()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 1;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol < 20000)
+        {
+            if(protocol >= 10010)
+            {
+                ret=1;
+            }
+        }
+        else
+        {
+            if(protocol >= 20003)
+            {
+                ret=1;
+            }            
+        }
+    }
+    
+    return ret;    
+}

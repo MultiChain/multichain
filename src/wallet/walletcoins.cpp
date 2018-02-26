@@ -1088,7 +1088,9 @@ bool CalculateChangeAmounts(CWallet *lpWallet,                                  
                 CTxOut txout;
                 uint256 hash=out.GetHashAndTxOut(txout);
                 out_i=out.i;
-                tmp_amounts->Clear();                                           
+                tmp_amounts->Clear();                                     
+                allowed=expected_required;
+                required=expected_required;
                 if(ParseMultichainTxOutToBuffer(hash,txout,tmp_amounts,lpScript,&allowed,&required,mapSpecialEntity,strError))
                 {
                     for(int i=0;i<tmp_amounts->GetCount();i++)
@@ -2125,7 +2127,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                     goto exitlbl;
                 }
                 
-    
+
                 if(!SelectCoinsToUse(lpCoinsToUse,in_map,in_amounts,in_special_row,strFailReason))
                 {
                     goto exitlbl;
@@ -2271,7 +2273,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
             this_time=mc_TimeNowAsDouble();
             if(csperf_debug_print)if(vecSend.size())printf("Address                 : %8.6f\n",this_time-last_time);
             last_time=this_time;
-    
+
             missing_amount=BuildAssetTransaction(lpWallet,wtxNew,change_address,nFeeRet,vecSend,vCoins,in_amounts,change_amounts,required,min_output,tmp_amounts,lpScript,in_special_row,&usedAddresses,flags,strFailReason);
             if(missing_amount<0)                                                // Error
             {
