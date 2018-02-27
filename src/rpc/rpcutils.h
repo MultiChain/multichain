@@ -100,6 +100,7 @@ Array PerOutputDataEntries(const CTxOut& txout,mc_Script *lpScript,uint256 txid,
 Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong);
 Object StreamEntry(const unsigned char *txid,uint32_t output_level);
 Object UpgradeEntry(const unsigned char *txid);
+const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t start,int64_t count);
 uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t total_size);
 Value OpReturnEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout);
 Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out,uint32_t status);
@@ -120,6 +121,7 @@ Array AssetArrayFromAmounts(mc_Buffer *asset_amounts,int issue_asset_id,uint256 
 void ParseRawAction(string action,bool& lock_it, bool& sign_it,bool& send_it);
 bool paramtobool(Value param);
 int paramtoint(Value param,bool check_for_min,int min_value,string error_message);
+int64_t paramtoint64(Value param,bool check_for_min,int64_t min_value,string error_message);
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
 vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,uint32_t in_options,uint32_t *out_options,int *errorCode,string *strError);
 void ParseRawDetails(const Value *value,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError);

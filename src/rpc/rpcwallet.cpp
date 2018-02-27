@@ -642,7 +642,10 @@ Value gettxoutdata(const Array& params, bool fHelp)
     mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
 
     uint32_t format;
-    string metadata="";
+    unsigned char *chunk_hashes;
+    int chunk_count;   
+    int64_t total_chunk_size,out_size;
+    uint32_t retrieve_status;
     size_t elem_size;
     const unsigned char *elem;
     
@@ -669,6 +672,7 @@ Value gettxoutdata(const Array& params, bool fHelp)
                 }
                 elem=ptr;
                 elem_size=size;
+                out_size=elem_size;
             }        
         }
         if(elem == NULL)
@@ -678,38 +682,49 @@ Value gettxoutdata(const Array& params, bool fHelp)
     }
     else
     {
-        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
-        elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
+//        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
+        retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
+        elem_size=(size_t)out_size;
+        switch(retrieve_status & MC_OST_STATUS_MASK) 
+        {
+            case MC_OST_ON_CHAIN:
+            case MC_OST_RETRIEVED:
+                break;
+            default:
+                throw JSONRPCError(RPC_OUTPUT_NOT_FOUND, "Data for this output is not available");        
+        }            
+//        elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
     }
 
-    int count,start;
-    count=elem_size;
+    int64_t count,start;
+    count=out_size;
     start=0;
     
     if (params.size() > 2)    
     {
-        count=paramtoint(params[2],true,0,"Invalid count");
+        count=paramtoint64(params[2],true,0,"Invalid count");
     }
     if (params.size() > 3)    
     {
-        start=paramtoint(params[3],false,0,"Invalid start");
+        start=paramtoint64(params[3],false,0,"Invalid start");
     }
 
 
     if(start < 0)
     {
-        start=elem_size+start;
+        start=out_size+start;
         if(start<0)
         {
             start=0;
         }        
     }
 
-    if(start > (int)elem_size)
+    if(start > out_size)
     {
         start=elem_size;
     }
-    if(start+count > (int)elem_size)
+    if(start+count > out_size)
     {
         count=elem_size-start;
     }
@@ -720,20 +735,24 @@ Value gettxoutdata(const Array& params, bool fHelp)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start, must be 0 for text and JSON data");                                                                            
         }
-        if(count != (int)elem_size)
+        if(count != out_size)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, must include all text or JSON data");                                                                            
         }
     }
-/*
-    if(mc_gState->m_Compatibility & MC_VCM_1_0)
+    if(count > 0x4000000)
     {
-        if( format == MC_SCR_DATA_FORMAT_UNKNOWN )
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, must be below 64MB");                                                                            
+    }
+
+    if(chunk_count > 1)
+    {
+        if(elem == NULL)
         {
-            return HexStr(elem+start,elem+start+count);
+            elem=GetChunkDataInRange(&out_size,chunk_hashes,chunk_count,start,count);
         }
     }
-*/    
+    
     return OpReturnFormatEntry(elem+start,count,0,0,format,NULL);        
 }
 
