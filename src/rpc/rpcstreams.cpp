@@ -488,7 +488,7 @@ Value publish(const Array& params, bool fHelp)
 
 Value publishfrom(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() != 4)
+    if (fHelp || params.size() < 4 || params.size() > 5)
         throw runtime_error("Help message not found\n");
 
     mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
@@ -501,6 +501,11 @@ Value publishfrom(const Array& params, bool fHelp)
     // Wallet comments
     CWalletTx wtx;
             
+    uint32_t in_options,out_options;
+    
+    in_options=MC_RFD_OPTION_NONE;
+    out_options=MC_RFD_OPTION_NONE;
+    
     vector<CTxDestination> addresses;    
     
     vector<CTxDestination> fromaddresses;        
@@ -559,7 +564,27 @@ Value publishfrom(const Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid item-key-string: *");                
         }
     }
-    
+
+    if(params.size() > 4 )
+    {
+        if(params[4].type() != str_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid options");                                                                                                                            
+        }
+        if( mc_gState->m_Features->OffChainData() == 0 )
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Format options are not supported by this protocol version");                                                                                                                            
+        }        
+        if(params[4].get_str() == "offchain")
+        {
+            in_options |= MC_RFD_OPTION_OFFCHAIN;
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid options");                                                                                                                            
+        }
+    }
+
     if(keys.size() > 1)
     {
         if( mc_gState->m_Features->MultipleStreamKeys() == 0 )
@@ -578,12 +603,18 @@ Value publishfrom(const Array& params, bool fHelp)
 
     string strError;
     int errorCode=RPC_INVALID_PARAMETER;
-    dataData=ParseRawFormattedData(&(params[3]),&data_format,lpDetailsScript,MC_RFD_OPTION_NONE,NULL,&errorCode,&strError);
+    vector<uint256> vChunkHashes;
+    
+    dataData=ParseRawFormattedData(&(params[3]),&data_format,lpDetailsScript,MC_RFD_OPTION_NONE,&out_options,&errorCode,&strError);
 
     if(strError.size())
     {
         throw JSONRPCError(errorCode, strError);                                                                                                                
     }
+    
+    size_t elem_size;
+    const unsigned char *elem;
+    CScript scriptOpReturn=CScript();
     
     lpDetailsScript->Clear();
     lpDetailsScript->SetEntity(stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
@@ -591,45 +622,59 @@ Value publishfrom(const Array& params, bool fHelp)
     {
         lpDetailsScript->SetItemKey((unsigned char*)keys[k].get_str().c_str(),keys[k].get_str().size());
     }
-    if( data_format != MC_SCR_DATA_FORMAT_UNKNOWN )
-    {
-        lpDetailsScript->SetDataFormat(data_format);
-    }
-    
-    lpDetailsScript->AddElement();
-    if(dataData.size())
-    {
-        lpDetailsScript->SetData(&dataData[0],dataData.size());
-    }
 
-    size_t elem_size;
-    const unsigned char *elem;
-    CScript scriptOpReturn=CScript();
+    if( (in_options & MC_RFD_OPTION_OFFCHAIN) == 0)
+    {
+        if( data_format != MC_SCR_DATA_FORMAT_UNKNOWN )
+        {
+            lpDetailsScript->SetDataFormat(data_format);
+        }        
+    }
     
     for(int e=0;e<lpDetailsScript->GetNumElements();e++)
     {
         elem = lpDetailsScript->GetData(e,&elem_size);
-        if(e == (lpDetailsScript->GetNumElements() - 1) )
+        if(elem_size > 0)
         {
-            if(elem_size > 0)
-            {
-                scriptOpReturn << OP_RETURN << vector<unsigned char>(elem, elem + elem_size);
-            }
-            else
-            {
-                scriptOpReturn << OP_RETURN;
-            }
+            scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
+        }                
+    }    
+    
+    lpDetailsScript->Clear();
+    if(in_options & MC_RFD_OPTION_OFFCHAIN)        
+    {
+        AppendOffChainFormatData(data_format,out_options,lpDetailsScript,dataData,&vChunkHashes,&errorCode,&strError);
+        if(strError.size())
+        {
+            throw JSONRPCError(errorCode, strError);                                                                                                                
+        }
+        elem = lpDetailsScript->GetData(0,&elem_size);
+        scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;                    
+        scriptOpReturn << OP_RETURN;                                                
+    }
+    else
+    {
+        if(out_options & MC_RFD_OPTION_OFFCHAIN)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "chunks data type is not allowed with missing options field");                
+        }
+        lpDetailsScript->AddElement();
+        if(dataData.size())
+        {
+            lpDetailsScript->SetData(&dataData[0],dataData.size());
+        }
+        elem = lpDetailsScript->GetData(0,&elem_size);
+        if(elem_size > 0)
+        {
+            scriptOpReturn << OP_RETURN << vector<unsigned char>(elem, elem + elem_size);
         }
         else
         {
-            if(elem_size > 0)
-            {
-                scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
-            }                
+            scriptOpReturn << OP_RETURN;
         }
-    }    
+    }
     
-    
+
     lpScript->Clear();
          
     EnsureWalletIsUnlocked();
