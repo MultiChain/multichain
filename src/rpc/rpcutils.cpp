@@ -897,13 +897,20 @@ int mc_IsUTF8(const unsigned char *elem,size_t elem_size)
     return 1;
 }
 
-uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,size_t *elem_size,unsigned char* hashes,int chunk_count)
+uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,size_t *elem_size,unsigned char* hashes,int chunk_count,int64_t total_size)
 {
     uint32_t status;  
     mc_ChunkDBRow chunk_def;
-    int size,shift;
+    int size,shift,chunk;
     unsigned char *ptr;
     unsigned char *ptrEnd;
+    bool use_tmp_buf=false;
+    
+    if( (chunk_count >1) && ( total_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)) )
+    {
+        use_tmp_buf=true;
+    }
+    
     
     status=MC_OST_UNKNOWN;
     
@@ -916,41 +923,60 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,size_t 
     {
         return status;
     }
-    if(chunk_count > 1)
+    
+    if(use_tmp_buf)
     {
-        return status;        
-    }    
+        mc_gState->m_TmpBuffers->m_RpcChunkScript1->Clear();
+        mc_gState->m_TmpBuffers->m_RpcChunkScript1->AddElement();
+    }
     
     ptr=hashes;
     ptrEnd=ptr+MC_CDB_CHUNK_HASH_SIZE+16;
-    
-    size=(int)mc_GetVarInt(ptr,ptrEnd-ptr,-1,&shift);
+    for(chunk=0;chunk<chunk_count;chunk++)
+    {
+        size=(int)mc_GetVarInt(ptr,ptrEnd-ptr,-1,&shift);
 
-    if(size<0)
-    {
-        status |= MC_OST_ERROR;
-        return status;
-    }
-        
-    if(size > MAX_CHUNK_SIZE)
-    {
-        status |= MC_OST_ERROR;
-        return status;
-    }
-        
-    ptr+=shift;
-    
-    if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,ptr,NULL,NULL,-1) == MC_ERR_NOERROR)
-    {
-        *elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,elem_size);
-        if(*elem)
+        if(size<0)
         {
-            status=MC_OST_RETRIEVED;
+            status |= MC_OST_ERROR;
+            return status;
+        }
+        
+        if(size > MAX_CHUNK_SIZE)
+        {
+            status |= MC_OST_ERROR;
+            return status;
+        }
+        
+        ptr+=shift;
+        if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,ptr,NULL,NULL,-1) == MC_ERR_NOERROR)
+        {
+            *elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,elem_size);
+            if(*elem)
+            {
+                status=MC_OST_RETRIEVED;
+                if(use_tmp_buf)
+                {
+                    mc_gState->m_TmpBuffers->m_RpcChunkScript1->SetData(*elem,*elem_size);
+                }
+            }
+            else
+            {
+                status = MC_OST_UNKNOWN | MC_OST_ERROR;            
+                return status;
+            }
         }
         else
         {
-            status |= MC_OST_ERROR;            
+            status=MC_OST_UNKNOWN;
+            return status;            
         }
+        ptr+=MC_CDB_CHUNK_HASH_SIZE;
+    }
+    
+    if(use_tmp_buf)
+    {
+        *elem = mc_gState->m_TmpBuffers->m_RpcChunkScript1->GetData(0,elem_size);
     }
     
     return status;
@@ -983,7 +1009,7 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
     }    
     
     
-    if( (((int)elem_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)) || (txid == 0)) && available && ((status & MC_OST_MULTIPLE) == 0) )
+    if( (((int)elem_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)) || (txid == 0)) && available && ((status & MC_OST_ERROR) == 0) )
     {
         if(format_text_out)
         {

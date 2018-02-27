@@ -444,6 +444,7 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
     uint32_t format;
     unsigned char *chunk_hashes;
     int chunk_count;   
+    int64_t total_chunk_size;
     uint32_t retrieve_status;
     Value format_item_value;
     string format_text_str;
@@ -473,7 +474,7 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
                 {
                     if(mc_gState->m_TmpScript->GetNumElements()) // 2 OP_DROPs + OP_RETURN - item key
                     {
-                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,NULL);
+                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
 //                        chunk_hashes=NULL;
 //                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
 
@@ -517,7 +518,7 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
                                 const unsigned char *elem;
 
 //                                elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
-                                retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&elem_size,chunk_hashes,chunk_count);
+                                retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&elem_size,chunk_hashes,chunk_count,total_chunk_size);
                                 item_value=OpReturnEntry(elem,elem_size,wtx.GetHash(),j);
                                 format_item_value=OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),j,format,&format_text_str,retrieve_status);
                             }

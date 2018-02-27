@@ -105,12 +105,12 @@ typedef struct mc_Script
     int GetDataFormat(uint32_t *format);
     int SetDataFormat(const uint32_t format);
     
-    int GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_count,uint64_t *total_size);
+    int GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_count,int64_t *total_size);
     int SetChunkDefHeader(const uint32_t format,int chunk_count);
     int SetChunkDefHash(unsigned char *hash,int size);
     
     int ExtractAndDeleteDataFormat(uint32_t *format);
-    int ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashes,int *chunk_count,uint64_t *total_size);
+    int ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashes,int *chunk_count,int64_t *total_size);
     int DeleteDuplicatesInRange(int from,int to);
     
     

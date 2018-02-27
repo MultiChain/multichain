@@ -2344,7 +2344,7 @@ int mc_Script::SetDataFormat(const uint32_t format)
     return MC_ERR_NOERROR;    
 }
 
-int mc_Script::GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_count,uint64_t *total_size)
+int mc_Script::GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_count,int64_t *total_size)
 {
     unsigned char *ptr;
     unsigned char *ptrEnd;
@@ -2549,7 +2549,7 @@ int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format)
  */ 
 }
 
-int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashes,int *chunk_count,uint64_t *total_size)
+int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashes,int *chunk_count,int64_t *total_size)
 {
     int elem,err;
     

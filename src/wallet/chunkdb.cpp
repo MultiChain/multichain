@@ -530,6 +530,13 @@ void mc_ChunkDB::Dump(const char *message)
         mc_MemoryDumpCharSizeToFile(fHan,m_MemPool->GetRow(0),0,m_MemPool->GetCount()*m_TotalSize,m_TotalSize);    
     }
     
+    fprintf(fHan,"\nData\n");
+    if(m_ChunkData->m_Size)
+    {
+        mc_MemoryDumpCharSizeToFile(fHan,m_ChunkData->m_lpData,0,m_ChunkData->m_Size,m_TotalSize);    
+    }
+    
+    
     fprintf(fHan,"\nSubscriptions\n");
     
     for(i=0;i<m_Subscriptions->GetCount();i++)
@@ -930,6 +937,7 @@ int mc_ChunkDB::AddChunkInternal(
     
     ptr=m_TmpScript->GetData(0,&bytes);
     
+    m_ChunkData->SetElement(m_ChunkData->m_NumElements-1);
     m_ChunkData->AddElement();
     err=m_ChunkData->SetData(ptr,bytes);
     if(err)
