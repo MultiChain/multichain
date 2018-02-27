@@ -897,24 +897,29 @@ int mc_IsUTF8(const unsigned char *elem,size_t elem_size)
     return 1;
 }
 
-uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,size_t *elem_size,unsigned char* hashes,int chunk_count,int64_t total_size)
+uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t total_size)
 {
     uint32_t status;  
     mc_ChunkDBRow chunk_def;
     int size,shift,chunk;
     unsigned char *ptr;
     unsigned char *ptrEnd;
-    bool use_tmp_buf=false;
-    
-    if( (chunk_count >1) && ( total_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)) )
+    bool use_tmp_buf=false;    
+    size_t elem_size;
+        
+    if(chunk_count > 1) 
     {
-        use_tmp_buf=true;
+        if(total_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN))
+        {
+            use_tmp_buf=true;
+        }
     }
     
     
     status=MC_OST_UNKNOWN;
     
-    *elem = lpScript->GetData(lpScript->GetNumElements()-1,elem_size);
+    *elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
+    *out_size=elem_size;
     if(hashes == NULL)
     {
         return MC_OST_ON_CHAIN;
@@ -951,13 +956,13 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,size_t 
         ptr+=shift;
         if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,ptr,NULL,NULL,-1) == MC_ERR_NOERROR)
         {
-            *elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,elem_size);
+            *elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&elem_size);
             if(*elem)
             {
                 status=MC_OST_RETRIEVED;
                 if(use_tmp_buf)
                 {
-                    mc_gState->m_TmpBuffers->m_RpcChunkScript1->SetData(*elem,*elem_size);
+                    mc_gState->m_TmpBuffers->m_RpcChunkScript1->SetData(*elem,elem_size);
                 }
             }
             else
@@ -976,14 +981,23 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,size_t 
     
     if(use_tmp_buf)
     {
-        *elem = mc_gState->m_TmpBuffers->m_RpcChunkScript1->GetData(0,elem_size);
+        *elem = mc_gState->m_TmpBuffers->m_RpcChunkScript1->GetData(0,&elem_size);
+    }
+    
+    if(chunk_count > 1) 
+    {
+        *out_size=total_size;
+    }   
+    else
+    {
+        *out_size=elem_size;
     }
     
     return status;
 }
 
 
-Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out,uint32_t status)
+Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out,uint32_t status)
 {
     string metadata="";
     Object metadata_object;
@@ -1059,7 +1073,7 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
     metadata_object.push_back(Pair("txid", txid.ToString()));
     metadata_object.push_back(Pair("vout", vout));
     metadata_object.push_back(Pair("format", OpReturnFormatToText(format)));
-    metadata_object.push_back(Pair("size", (int)elem_size));
+    metadata_object.push_back(Pair("size", elem_size));
     if(status != MC_OST_UNDEFINED)
     {
         metadata_object.push_back(Pair("available", available));        
@@ -1096,8 +1110,12 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     const unsigned char *ptr;
     unsigned char item_key[MC_ENT_MAX_ITEM_KEY_SIZE+1];    
     int item_key_size;
-    Value item_value;
+//    Value item_value;
     uint32_t format;
+    unsigned char *chunk_hashes;
+    int chunk_count;   
+    int64_t total_chunk_size,out_size;
+    uint32_t retrieve_status;
     Value format_item_value;
     string format_text_str;
     
@@ -1121,7 +1139,8 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
         return Value::null;
     }
     
-    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+//    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
     
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     mc_gState->m_TmpScript->SetElement(0);
@@ -1157,12 +1176,12 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
         keys.push_back(string(item_key,item_key+item_key_size));
     }
 
-    size_t elem_size;
     const unsigned char *elem;
 
-    elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
-    item_value=OpReturnEntry(elem,elem_size,tx.GetHash(),n);
-	format_item_value=OpReturnFormatEntry(elem,elem_size,tx.GetHash(),n,format,&format_text_str);
+//    elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
+    retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
+//    item_value=OpReturnEntry(elem,elem_size,tx.GetHash(),n);
+	format_item_value=OpReturnFormatEntry(elem,out_size,tx.GetHash(),n,format,&format_text_str,retrieve_status);
     
     already_seen.insert(hash);
     

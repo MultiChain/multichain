@@ -2618,6 +2618,14 @@ int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashe
         
     if(err != MC_ERR_WRONG_SCRIPT)
     {
+        if(hashes)
+        {
+            *hashes=NULL;
+        }
+        if(chunk_count)
+        {
+            *chunk_count=0;
+        }
         return err;            
     }
     

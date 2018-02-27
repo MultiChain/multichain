@@ -440,11 +440,11 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
     const unsigned char *ptr;
     unsigned char item_key[MC_ENT_MAX_ITEM_KEY_SIZE+1];
     int item_key_size;
-    Value item_value;
+//    Value item_value;
     uint32_t format;
     unsigned char *chunk_hashes;
     int chunk_count;   
-    int64_t total_chunk_size;
+    int64_t total_chunk_size,out_size;
     uint32_t retrieve_status;
     Value format_item_value;
     string format_text_str;
@@ -514,13 +514,12 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
                                     }
                                 }
 
-                                size_t elem_size;
                                 const unsigned char *elem;
 
 //                                elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
-                                retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&elem_size,chunk_hashes,chunk_count,total_chunk_size);
-                                item_value=OpReturnEntry(elem,elem_size,wtx.GetHash(),j);
-                                format_item_value=OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),j,format,&format_text_str,retrieve_status);
+                                retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
+//                                item_value=OpReturnEntry(elem,elem_size,wtx.GetHash(),j);
+                                format_item_value=OpReturnFormatEntry(elem,out_size,wtx.GetHash(),j,format,&format_text_str,retrieve_status);
                             }
                         }
                     }                        
