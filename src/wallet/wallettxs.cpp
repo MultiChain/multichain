@@ -297,6 +297,7 @@ int mc_WalletTxs::SetMode(uint32_t mode, uint32_t mask)
 
 int mc_WalletTxs::Destroy()
 {
+    
     if(m_Database)
     {
         delete m_Database;
@@ -304,6 +305,7 @@ int mc_WalletTxs::Destroy()
     
     if(m_ChunkDB)
     {
+        m_ChunkDB->Commit(-1);
         delete m_ChunkDB;
     }
 
