@@ -722,11 +722,11 @@ Value gettxoutdata(const Array& params, bool fHelp)
 
     if(start > out_size)
     {
-        start=elem_size;
+        start=out_size;
     }
     if(start+count > out_size)
     {
-        count=elem_size-start;
+        count=out_size-start;
     }
 
     if( (format == MC_SCR_DATA_FORMAT_UBJSON) || (format == MC_SCR_DATA_FORMAT_UTF8) )
