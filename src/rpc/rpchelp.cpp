@@ -2949,7 +2949,7 @@ void mc_InitRPCHelpMap13()
         ));
     
     mapHelpStrings.insert(std::make_pair("publish",
-            "publish \"stream-identifier\" \"key\"|keys \"data-hex\"|data-obj \n"
+            "publish \"stream-identifier\" \"key\"|keys \"data-hex\"|data-obj \"options\" \n"
             "\nPublishes stream item\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -2968,6 +2968,12 @@ void mc_InitRPCHelpMap13()
             "    {\n"
             "      \"text\" : \"data-text\"          (string, required) Data string\n" 
             "    }\n"                                
+            " or\n"
+            "3. data-chunks                      (object, required) Offchain chunk hashes\n"
+            "    {\n"
+            "      \"chunks\" : chunk-hashes       (array, required) Array of chunk hashes created by storechunk\n" 
+            "    }\n"                                
+            "4. \"options\"                        (string, optional) Should be \"offchain\" or omitted\n"
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -2976,7 +2982,7 @@ void mc_InitRPCHelpMap13()
         ));
     
     mapHelpStrings.insert(std::make_pair("publishfrom",
-            "publishfrom \"from-address\" \"stream-identifier\" \"key\"|keys \"data-hex\"|data-obj \n"
+            "publishfrom \"from-address\" \"stream-identifier\" \"key\"|keys \"data-hex\"|data-obj \"options\" \n"
             "\nPublishes stream item from specific address\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -2996,6 +3002,12 @@ void mc_InitRPCHelpMap13()
             "    {\n"
             "      \"text\" : \"data-text\"          (string, required) Data string\n" 
             "    }\n"                                
+            " or\n"
+            "4. data-chunks                      (object, required) Offchain chunk hashes\n"
+            "    {\n"
+            "      \"chunks\" : chunk-hashes       (array, required) Array of chunk hashes created by storechunk\n" 
+            "    }\n"                                
+            "5. \"options\"                        (string, optional) Should be \"offchain\" or omitted\n"
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -3737,6 +3749,7 @@ void mc_InitRPCHelpMap16()
             "publish-new-stream-item               (object, required) A json object with stream item\n"
             "    {\n"                
             "      \"for\" : \"stream-identifier\"     (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "      \"options\" : \"options\"           (string, optional) Should be \"offchain\" or omitted\n"
             "      \"key\" : \"key\"                   (string, optional, default: \"\") Item key\n"
             "        or\n"
             "      \"keys\" : keys                   (array, optional) Item keys, array of strings\n"
@@ -3747,9 +3760,14 @@ void mc_InitRPCHelpMap16()
             "          \"json\" : data-json          (object, required) Valid JSON string\n" 
             "        }\n"                                
             "        or\n"
-            "      \"data\" :                        (object, required) JSON data object\n"
+            "      \"data\" :                        (object, required) Text data object\n"
             "        {\n"
             "          \"text\" : \"data-text\"        (string, required) Data string\n" 
+            "        }\n"                                
+            "        or\n"
+            "      \"data\" :                        (object, required) Offchain chunk hashes\n"
+            "        {\n"
+            "          \"chunks\" : chunk-hashes     (array, required) Array of chunk hashes created by storechunk\n" 
             "        }\n"                                
             "    }\n"                                
             " or\n"
@@ -3796,6 +3814,7 @@ void mc_InitRPCHelpMap16()
             "publish-new-stream-item               (object, required) A json object with stream item\n"
             "    {\n"                
             "      \"for\" : \"stream-identifier\"     (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "      \"options\" : \"options\"           (string, optional) Should be \"offchain\" or omitted\n"
             "      \"key\" : \"key\"                   (string, optional, default: \"\") Item key\n"
             "        or\n"
             "      \"keys\" : keys                   (array, optional) Item keys, array of strings\n"
@@ -3809,6 +3828,11 @@ void mc_InitRPCHelpMap16()
             "      \"data\" :                        (object, required) JSON data object\n"
             "        {\n"
             "          \"text\" : \"data-text\"        (string, required) Data string\n" 
+            "        }\n"                                
+            "        or\n"
+            "      \"data\" :                        (object, required) Text chunk hashes\n"
+            "        {\n"
+            "          \"chunks\" : chunk-hashes     (array, required) Array of chunk hashes created by storechunk\n" 
             "        }\n"                                
             "    }\n"                                
         ));
@@ -3921,7 +3945,19 @@ void mc_InitRPCHelpMap17()
             + HelpExampleRpc("liststreampublisheritems", "\"test-stream\", \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"jsonobjectmerge,ignore,recursive\"")
         ));
     
-  
+     mapHelpStrings.insert(std::make_pair("storechunk",
+            "storechunk \"data-hex\" \n"
+            "\nStores chunk of data in local wallet. Returns hash of the data, which can be used later when publishing offchain stream items.\n"
+            "\nArguments:\n"
+            "1. \"data-hex\"                       (string, required) The hex string of the data chunk\n"
+            "\nResult:\n"
+            "\"hex\"                               (string) The chunk hash in hex\n"
+            "\nExamples:\n"
+            + HelpExampleCli("storechunk", "\"f4c3dd510dd55761015c9d96bff7793b0d501dd6f01a959fd7\"") 
+            + HelpExampleRpc("storechunk", "\"f4c3dd510dd55761015c9d96bff7793b0d501dd6f01a959fd7\"")
+        ));
+    
+ 
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
