@@ -60,6 +60,7 @@ using namespace json_spirit;
 #define MC_RFD_OPTION_NONE                     0x00000000
 #define MC_RFD_OPTION_INLINE                   0x00000001
 #define MC_RFD_OPTION_OFFCHAIN                 0x00000002
+#define MC_RFD_OPTION_CACHE                    0x00000004
 
 #define MC_OST_UNDEFINED                       0x00000000
 #define MC_OST_UNKNOWN                         0x00000001
@@ -129,6 +130,8 @@ bool mc_IsJsonObjectForMerge(const Value *value,int level);
 Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int level,int *error);
 Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total);
 void AppendOffChainFormatData(uint32_t data_format,uint32_t out_options,mc_Script *lpDetailsScript,vector<unsigned char>& vValue,vector<uint256>* vChunkHashes,int *errorCode,string *strError);
+int mc_BinaryCacheFile(string id,int mode);
+void mc_RemoveBinaryCacheFile(string id);
 
 
 #endif	/* RPCMULTICHAINUTILS_H */

@@ -3964,3 +3964,42 @@ Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int l
     
     return result;
 }
+
+int mc_BinaryCacheFile(string id,int mode)
+{
+    char dir_name[MC_DCT_DB_MAX_PATH];                   
+    char file_name[MC_DCT_DB_MAX_PATH];                   
+    int flags;
+    
+    
+    string str_file_name=strprintf("cache/%s",id);
+    
+    mc_GetFullFileName(mc_gState->m_Params->NetworkName(),"cache","",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,dir_name);
+    mc_CreateDir(dir_name);
+    mc_GetFullFileName(mc_gState->m_Params->NetworkName(),str_file_name.c_str(),"",MC_FOM_RELATIVE_TO_DATADIR,file_name);
+    
+    flags=O_RDONLY;
+    if(mode)
+    {
+       flags=O_CREAT | O_RDWR; 
+    }
+    return open(file_name,_O_BINARY | flags, S_IRUSR | S_IWUSR);
+}
+
+void mc_RemoveBinaryCacheFile(string id)
+{
+    char file_name[MC_DCT_DB_MAX_PATH];                   
+    
+    if(id == "*")
+    {
+        mc_RemoveDir(mc_gState->m_Params->NetworkName(),"cache");
+        return; 
+    }
+    
+    string str_file_name=strprintf("cache/%s",id);
+    
+    mc_GetFullFileName(mc_gState->m_Params->NetworkName(),str_file_name.c_str(),"",MC_FOM_RELATIVE_TO_DATADIR,file_name);
+
+    unlink(file_name);
+}
+

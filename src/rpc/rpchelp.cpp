@@ -2969,10 +2969,16 @@ void mc_InitRPCHelpMap13()
             "      \"text\" : \"data-text\"          (string, required) Data string\n" 
             "    }\n"                                
             " or\n"
+            "3. data-cached                      (object, required) Binary raw data created with appendbinarycache\n"
+            "    {\n"
+            "      \"cache\" : \"identifier\"        (string, required) Binary cache identifier\n" 
+            "    }\n"                                    
+/*    
             "3. data-chunks                      (object, required) Offchain chunk hashes\n"
             "    {\n"
             "      \"chunks\" : chunk-hashes       (array, required) Array of chunk hashes created by storechunk\n" 
             "    }\n"                                
+ */ 
             "4. \"options\"                        (string, optional) Should be \"offchain\" or omitted\n"
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
@@ -3003,10 +3009,16 @@ void mc_InitRPCHelpMap13()
             "      \"text\" : \"data-text\"          (string, required) Data string\n" 
             "    }\n"                                
             " or\n"
+            "4. data-cached                      (object, required) Binary raw data created with appendbinarycache\n"
+            "    {\n"
+            "      \"cache\" : \"identifier\"        (string, required) Binary cache identifier\n" 
+            "    }\n"                                
+/*    
             "4. data-chunks                      (object, required) Offchain chunk hashes\n"
             "    {\n"
             "      \"chunks\" : chunk-hashes       (array, required) Array of chunk hashes created by storechunk\n" 
             "    }\n"                                
+ */ 
             "5. \"options\"                        (string, optional) Should be \"offchain\" or omitted\n"
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
@@ -3710,6 +3722,11 @@ void mc_InitRPCHelpMap16()
             "      \"text\" : \"data-text\"            (string, required) Data string\n" 
             "    }\n"                                
             " or\n"
+            "data-cached                           (object, required) Binary raw data created with appendbinarycache\n"
+            "    {\n"
+            "      \"cache\" : \"identifier\"          (string, required) Binary cache identifier\n" 
+            "    }\n"                                
+            " or\n"
             "issue-details                         (object, required) A json object with issue metadata\n"
             "    {\n"
             "      \"create\" : \"asset\"              (string, required) asset\n" 
@@ -3765,10 +3782,16 @@ void mc_InitRPCHelpMap16()
             "          \"text\" : \"data-text\"        (string, required) Data string\n" 
             "        }\n"                                
             "        or\n"
+            "      \"data\"                          (object, required) Binary raw data created with appendbinarycache\n"
+            "        {\n"
+            "          \"cache\" : \"identifier\"      (string, required) Binary cache identifier\n" 
+            "        }\n"                              
+/*    
             "      \"data\" :                        (object, required) Offchain chunk hashes\n"
             "        {\n"
             "          \"chunks\" : chunk-hashes     (array, required) Array of chunk hashes created by storechunk\n" 
             "        }\n"                                
+ */ 
             "    }\n"                                
             " or\n"
             "create-new-upgrade                    (object, required) A json object with new upgrade details\n"
@@ -3811,6 +3834,11 @@ void mc_InitRPCHelpMap16()
             "      \"text\" : \"data-text\"            (string, required) Data string\n" 
             "    }\n"                                
             " or\n"
+            "data-cached                           (object, required) Binary raw data created with appendbinarycache\n"
+            "    {\n"
+            "      \"cache\" : \"identifier\"          (string, required) Binary cache identifier\n" 
+            "    }\n"                                    
+            " or\n"
             "publish-new-stream-item               (object, required) A json object with stream item\n"
             "    {\n"                
             "      \"for\" : \"stream-identifier\"     (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
@@ -3830,10 +3858,16 @@ void mc_InitRPCHelpMap16()
             "          \"text\" : \"data-text\"        (string, required) Data string\n" 
             "        }\n"                                
             "        or\n"
+            "     \"data\" :                         (object, required) Binary raw data created with appendbinarycache\n"
+            "        {\n"
+            "          \"cache\" : \"identifier\"      (string, required) Binary cache identifier\n" 
+            "        }\n"                                    
+/*    
             "      \"data\" :                        (object, required) Text chunk hashes\n"
             "        {\n"
             "          \"chunks\" : chunk-hashes     (array, required) Array of chunk hashes created by storechunk\n" 
             "        }\n"                                
+ */ 
             "    }\n"                                
         ));
 
@@ -3891,6 +3925,11 @@ void mc_InitRPCHelpMap16()
             "            {\n"
             "              \"text\" : \"data-text\"     (string, required) Data string\n" 
             "            }\n"                                
+            "             or\n"
+            "          data-cached                  (object, required) Binary raw data created with appendbinarycache\n"
+            "            {\n"
+            "              \"cache\" : \"identifier\"   (string, required) Binary cache identifier\n" 
+            "            }\n"                                    
             "        }\n"                    
             "   }\n"                    
      
@@ -3955,6 +3994,41 @@ void mc_InitRPCHelpMap17()
             "\nExamples:\n"
             + HelpExampleCli("storechunk", "\"f4c3dd510dd55761015c9d96bff7793b0d501dd6f01a959fd7\"") 
             + HelpExampleRpc("storechunk", "\"f4c3dd510dd55761015c9d96bff7793b0d501dd6f01a959fd7\"")
+        ));
+    
+     mapHelpStrings.insert(std::make_pair("createbinarycache",
+            "createbinarycache \n"
+            "\nReturns random string, which can be used as binary cache item identifier\n"
+            "\nArguments:\n"
+            "\nResult:\n"
+            "\"identifier\"                               (string) Binary cache item identifier\n"
+            "\nExamples:\n"
+            + HelpExampleCli("createbinarycache","") 
+            + HelpExampleRpc("createbinarycache","")
+        ));
+    
+     mapHelpStrings.insert(std::make_pair("appendbinarycache",
+            "appendbinarycache \"identifier\" \"data-hex\" \n"
+            "\nAppends data to binary cache.\n"
+            "\nArguments:\n"
+            "1. \"identifier\"                     (string, required) Binary cache item identifier\n"
+            "2. \"data-hex\"                       (string, required) The hex string to be added to binary cache item\n"
+            "\nResult:\n"
+            "size                                (numeric) Size of the binary cache item\n"
+            "\nExamples:\n"
+            + HelpExampleCli("appendbinarycache", "\"TjnVWwHYEg4\" \"f4c3dd510dd55761015c9d96bff7793b0d501dd6f01a959fd7\"") 
+            + HelpExampleRpc("appendbinarycache", "\"TjnVWwHYEg4\",\"f4c3dd510dd55761015c9d96bff7793b0d501dd6f01a959fd7\"")
+        ));
+    
+     mapHelpStrings.insert(std::make_pair("clearbinarycache",
+            "clearbinarycache \"identifier\"  \n"
+            "\nClear binary cache item\n"
+            "\nArguments:\n"
+            "1. \"identifier\"                     (string, required) Binary cache item identifier, \"*\" - to clear all items\n"
+            "\nResult:\n"
+            "\nExamples:\n"
+            + HelpExampleCli("clearbinarycache", "\"TjnVWwHYEg4\"") 
+            + HelpExampleRpc("clearbinarycache", "\"TjnVWwHYEg4\"")
         ));
     
  

@@ -756,8 +756,11 @@ void AppendOffChainFormatData(uint32_t data_format,
     lpDetailsScript->Clear();
     
     int chunk_count;
-    int tail_size,size;
+    int tail_size,size,max_chunk_size;
+    int64_t total_size;
+    int fHan;
     int err;
+    unsigned char *ptr;
     uint256 hash;
     mc_TxEntity entity;
     entity.Zero();
@@ -792,10 +795,45 @@ void AppendOffChainFormatData(uint32_t data_format,
     {
         chunk_count=0;
         tail_size=0;
+        ptr=NULL;
+        fHan=-1;
         if(vValue.size())
         {
-            chunk_count=((int)vValue.size()-1)/MAX_CHUNK_SIZE+1;
-            tail_size=(int)vValue.size()-(chunk_count-1)*MAX_CHUNK_SIZE;
+            if(out_options & MC_RFD_OPTION_CACHE)
+            {            
+                fHan=mc_BinaryCacheFile((char*)&vValue[0],0);
+                if(fHan <= 0)
+                {
+                    *strError="Binary cache item with this identifier not found";
+                    return;                     
+                }
+                total_size=lseek64(fHan,0,SEEK_END);
+                if(lseek64(fHan,0,SEEK_SET) != 0)
+                {
+                    *strError="Cannot read binary cache item";
+                    close(fHan);
+                    return;                                         
+                }
+                if(total_size)
+                {
+                    chunk_count=(int)((total_size-1)/MAX_CHUNK_SIZE)+1;                    
+                }
+                tail_size=(int)(total_size-(int64_t)(chunk_count-1)*MAX_CHUNK_SIZE);            
+            }
+            else
+            {
+                chunk_count=((int)vValue.size()-1)/MAX_CHUNK_SIZE+1;            
+                tail_size=(int)vValue.size()-(chunk_count-1)*MAX_CHUNK_SIZE;            
+            }
+            max_chunk_size=tail_size;
+            if(chunk_count > 1)
+            {
+                max_chunk_size=MAX_CHUNK_SIZE;
+            }
+            mc_gState->m_TmpBuffers->m_RpcChunkScript1->Clear();
+            mc_gState->m_TmpBuffers->m_RpcChunkScript1->Resize(max_chunk_size,1);
+            ptr=mc_gState->m_TmpBuffers->m_RpcChunkScript1->m_lpData;
+            
             lpDetailsScript->SetChunkDefHeader(data_format,chunk_count);
             for(int i=0;i<chunk_count;i++)
             {
@@ -804,9 +842,24 @@ void AppendOffChainFormatData(uint32_t data_format,
                 {
                     size=tail_size;
                 }
-                mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash((unsigned char*)&vValue[i*MAX_CHUNK_SIZE],size,&hash);
+                if(fHan > 0)
+                {
+                    if(read(fHan,ptr,size) != size)
+                    {
+                        *errorCode=RPC_INTERNAL_ERROR;
+                        *strError="Cannot read binary cache item";
+                        close(fHan);
+                        return;                     
+                    }
+                }
+                else
+                {
+                    ptr=(unsigned char*)&vValue[i*MAX_CHUNK_SIZE];
+                }
                 
-                err=pwalletTxsMain->m_ChunkDB->AddChunk((unsigned char*)&hash,&entity,NULL,-1,(unsigned char*)&vValue[i*MAX_CHUNK_SIZE],NULL,size,0,0);   
+                mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(ptr,size,&hash);
+                
+                err=pwalletTxsMain->m_ChunkDB->AddChunk((unsigned char*)&hash,&entity,NULL,-1,ptr,NULL,size,0,0);   
                 if(err)
                 {
                     switch(err)
@@ -815,6 +868,10 @@ void AppendOffChainFormatData(uint32_t data_format,
                             break;
                         default:
                             *strError="Internal error: couldn't store chunk";
+                            if(fHan > 0)
+                            {
+                                close(fHan);
+                            }
                             return; 
                     }
                 }
@@ -826,6 +883,11 @@ void AppendOffChainFormatData(uint32_t data_format,
                     vChunkHashes->push_back(*(uint256*)&hash);
                 }
             }
+        }
+        if(fHan > 0)
+        {
+            close(fHan);
+            fHan=0;
         }
     }
     

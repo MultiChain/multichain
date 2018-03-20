@@ -87,7 +87,7 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     goto exitlbl;                        
                 }
             }
-            if( (d.name_ == "text") || (d.name_ == "json") )
+            if( (d.name_ == "text") || (d.name_ == "json")  || (d.name_ == "cache") )
             {
                 if( mc_gState->m_Features->FormattedData() == 0 )
                 {
@@ -255,67 +255,138 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
                             vValue=vector<unsigned char> (script,script+bytes);                                            
                             *data_format=MC_SCR_DATA_FORMAT_UBJSON;                    
                         }
-                        if(d.name_ == "chunks")
+                        if(d.name_ == "cache")
                         {
-                            if(mc_gState->m_Features->OffChainData())
+                            if(d.value_.type() == str_type)
                             {
-                                if(d.value_.type() == array_type)
+                                vValue=vector<unsigned char> (d.value_.get_str().begin(),d.value_.get_str().end());  
+                                vValue.push_back(0);
+                                if(in_options & MC_RFD_OPTION_OFFCHAIN)
                                 {
-                                    Array arr=d.value_.get_array();
-                                    for(int i=0;i<(int)arr.size();i++)
+                                    if(out_options)
                                     {
-                                        if(strError->size() == 0)
-                                        {
-                                            if(arr[i].type() == str_type)
-                                            {
-                                                vector<unsigned char> vHash;
-                                                bool fIsHex;
-                                                vHash=ParseHex(arr[i].get_str().c_str(),fIsHex);    
-                                                if(!fIsHex)
-                                                {
-                                                    *strError=string("Chunk hash should be hexadecimal string");                            
-                                                }
-                                                else
-                                                {
-                                                    if(vHash.size() != MC_CDB_CHUNK_HASH_SIZE)
-                                                    {
-                                                        *strError=strprintf("Chunk hash should be %d bytes long",MC_CDB_CHUNK_HASH_SIZE);                                                                                    
-                                                    }
-                                                    else
-                                                    {                                                        
-                                                        uint256 hash;
-                                                        hash.SetHex(arr[i].get_str());
-                                                        
-                                                        vValue.insert(vValue.end(),(unsigned char*)&hash,(unsigned char*)&hash+MC_CDB_CHUNK_HASH_SIZE);
-                                                    }
-                                                }                                                
-                                            }                                            
-                                        }
-                                    }
+                                        *out_options |= MC_RFD_OPTION_CACHE;
+                                    }    
                                 }
                                 else
                                 {
-                                    *strError=string("value in data object should be array");                            
+                                    int fHan=mc_BinaryCacheFile((char*)&vValue[0],0);
+                                    if(fHan <= 0)
+                                    {
+                                        *strError="Binary cache item with this identifier not found";
+                                    }
+                                    int64_t total_size=0;
+                                    if(strError->size() == 0)
+                                    {
+                                        total_size=lseek64(fHan,0,SEEK_END);
+                                        if(lseek64(fHan,0,SEEK_SET) != 0)
+                                        {
+                                            *strError="Cannot read binary cache item";
+                                            *errorCode=RPC_INTERNAL_ERROR;
+                                            close(fHan);
+                                        }
+                                    }
+                                    if(strError->size() == 0)
+                                    {
+                                        if(total_size > MAX_OP_RETURN_RELAY)
+                                        {
+                                            *strError="Cannot read binary cache item";
+                                            *errorCode=RPC_NOT_SUPPORTED;
+                                            close(fHan);                                        
+                                        }
+                                    }
+                                    if(strError->size() == 0)
+                                    {
+                                        if(total_size)
+                                        {
+                                            mc_gState->m_TmpBuffers->m_RpcChunkScript1->Clear();
+                                            mc_gState->m_TmpBuffers->m_RpcChunkScript1->Resize(total_size,1);
+                                            unsigned char* ptr=mc_gState->m_TmpBuffers->m_RpcChunkScript1->m_lpData;
+                                            if(read(fHan,ptr,total_size) != total_size)
+                                            {
+                                                *errorCode=RPC_INTERNAL_ERROR;
+                                                *strError="Cannot read binary cache item";
+                                            }
+                                            close(fHan);
+                                            vValue=vector<unsigned char> (ptr,ptr+total_size);                                              
+                                        }
+                                        else
+                                        {
+                                            vValue.clear();
+                                        }
+                                    }
                                 }
-                                
-                                if(out_options)
-                                {
-                                    *out_options |= MC_RFD_OPTION_OFFCHAIN;
-                                }    
-                                *data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
                             }
                             else
                             {
-                                *errorCode=RPC_NOT_SUPPORTED;
-                                *strError="Unsupported item data type: " + d.name_;
+                                *strError=string("cache identifier in data object should be string");                            
                             }
+                            *data_format=MC_SCR_DATA_FORMAT_UNKNOWN;                                                
                         }
                         else
-                        {
-                            if(*data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
+                        {    
+                            if(d.name_ == "chunks")
                             {
-                                throw JSONRPCError(RPC_NOT_SUPPORTED, "Unsupported item data type: " + d.name_);                                    
-                            }                    
+                                if(mc_gState->m_Features->OffChainData())
+                                {
+                                    if(d.value_.type() == array_type)
+                                    {
+                                        Array arr=d.value_.get_array();
+                                        for(int i=0;i<(int)arr.size();i++)
+                                        {
+                                            if(strError->size() == 0)
+                                            {
+                                                if(arr[i].type() == str_type)
+                                                {
+                                                    vector<unsigned char> vHash;
+                                                    bool fIsHex;
+                                                    vHash=ParseHex(arr[i].get_str().c_str(),fIsHex);    
+                                                    if(!fIsHex)
+                                                    {
+                                                        *strError=string("Chunk hash should be hexadecimal string");                            
+                                                    }
+                                                    else
+                                                    {
+                                                        if(vHash.size() != MC_CDB_CHUNK_HASH_SIZE)
+                                                        {
+                                                            *strError=strprintf("Chunk hash should be %d bytes long",MC_CDB_CHUNK_HASH_SIZE);                                                                                    
+                                                        }
+                                                        else
+                                                        {                                                        
+                                                            uint256 hash;
+                                                            hash.SetHex(arr[i].get_str());
+
+                                                            vValue.insert(vValue.end(),(unsigned char*)&hash,(unsigned char*)&hash+MC_CDB_CHUNK_HASH_SIZE);
+                                                        }
+                                                    }                                                
+                                                }                                            
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        *strError=string("value in data object should be array");                            
+                                    }
+
+                                    if(out_options)
+                                    {
+                                        *out_options |= MC_RFD_OPTION_OFFCHAIN;
+                                    }    
+                                    *data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
+                                }
+                                else
+                                {
+                                    *errorCode=RPC_NOT_SUPPORTED;
+                                    *strError="Unsupported item data type: " + d.name_;
+                                }
+                            }
+                            else
+                            {
+                                if(*data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
+                                {
+                                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Unsupported item data type: " + d.name_);                                    
+                                }                    
+                            }
                         }
                     }                
                 }
@@ -388,7 +459,7 @@ CScript RawDataScriptFormatted(Value *param,uint32_t *data_format,mc_Script *lpD
     BOOST_FOREACH(const Pair& d, param->get_obj()) 
     {
         field_parsed=false;
-        if( (d.name_ == "text") || (d.name_ == "json") )      
+        if( (d.name_ == "text") || (d.name_ == "json")  || (d.name_ == "cache") )      
         {
             if(!missing_data)
             {
@@ -1006,6 +1077,39 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
     vKeys.clear();
     BOOST_FOREACH(const Pair& d, param->get_obj()) 
     {
+        if(d.name_ == "options")
+        {
+            if( mc_gState->m_Features->OffChainData() == 0 )
+            {
+                *errorCode=RPC_NOT_SUPPORTED;
+                *strError=string("Format options are not supported by this protocol version");       
+                goto exitlbl;
+            }
+            if(d.value_.type() != null_type && (d.value_.type()==str_type))
+            {
+                if(d.value_.get_str() == "offchain")
+                {
+                    in_options |= MC_RFD_OPTION_OFFCHAIN;
+                }
+                else
+                {
+                    if(d.value_.get_str().size())
+                    {
+                        *strError=string("Stream item options must be offchain or empty");                                                
+                    }
+                }
+            }
+            else
+            {
+                *strError=string("Stream item options must be offchain or empty");                            
+            }
+            field_parsed=true;
+            missing_key=false;
+        }                
+    }
+    
+    BOOST_FOREACH(const Pair& d, param->get_obj()) 
+    {
         field_parsed=false;
         if(d.name_ == "key")
         {
@@ -1057,38 +1161,13 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
             {
                 *strError=string("data field can appear only once in the object");                                                                                                        
             }
-            vValue=ParseRawFormattedData(&(d.value_),data_format,lpDetailsScript,MC_RFD_OPTION_NONE,&out_options,errorCode,strError);
+            vValue=ParseRawFormattedData(&(d.value_),data_format,lpDetailsScript,in_options,&out_options,errorCode,strError);
             field_parsed=true;
             missing_data=false;
         }
         if(d.name_ == "options")
         {
-            if( mc_gState->m_Features->OffChainData() == 0 )
-            {
-                *errorCode=RPC_NOT_SUPPORTED;
-                *strError=string("Format options are not supported by this protocol version");       
-                goto exitlbl;
-            }
-            if(d.value_.type() != null_type && (d.value_.type()==str_type))
-            {
-                if(d.value_.get_str() == "offchain")
-                {
-                    in_options |= MC_RFD_OPTION_OFFCHAIN;
-                }
-                else
-                {
-                    if(d.value_.get_str().size())
-                    {
-                        *strError=string("Stream item options must be offchain or empty");                                                
-                    }
-                }
-            }
-            else
-            {
-                *strError=string("Stream item options must be offchain or empty");                            
-            }
             field_parsed=true;
-            missing_key=false;
         }        
         if(d.name_ == "for")field_parsed=true;
 //        if(d.name_ == "format")field_parsed=true;
