@@ -37,7 +37,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
     { "maximumchunksize"                       , "maximum-chunk-size"               , 
                    MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE                  , -1,  16777216,        256,  67108864, 0.0, 20003, 0, "-mc-maximumchunksize",
                    "maximumchunkcount","",
-                   "Maximum chunk size in bytes."},
+                   "Maximum chunk size for off-chain items in bytes."},
     { "maximumchunkcount"                       , "maximum-chunk-count"               , 
                    MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE                  , -1,       128,         16,      1024, 0.0, 20003, 0, "-mc-maximumchunkcount",
                    "timingupgrademingap","",

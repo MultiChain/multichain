@@ -1077,12 +1077,15 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
                 }
                 else
                 {
-                    *strError=string("Invalid options");                                                
+                    if(d.value_.get_str().size())
+                    {
+                        *strError=string("Stream item options must be offchain or empty");                                                
+                    }
                 }
             }
             else
             {
-                *strError=string("Invalid options");                            
+                *strError=string("Stream item options must be offchain or empty");                            
             }
             field_parsed=true;
             missing_key=false;

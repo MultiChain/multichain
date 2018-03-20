@@ -1049,6 +1049,7 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
         else
         {
             status=MC_OST_UNKNOWN;
+            *out_size=total_size;
             return status;            
         }
         ptr+=MC_CDB_CHUNK_HASH_SIZE;
