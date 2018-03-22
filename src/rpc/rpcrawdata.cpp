@@ -1104,7 +1104,6 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
                 *strError=string("Stream item options must be offchain or empty");                            
             }
             field_parsed=true;
-            missing_key=false;
         }                
     }
     

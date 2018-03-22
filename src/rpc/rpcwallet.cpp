@@ -648,6 +648,8 @@ Value gettxoutdata(const Array& params, bool fHelp)
     uint32_t retrieve_status;
     size_t elem_size;
     const unsigned char *elem;
+    string error_str;
+    int errorCode;
     
     if(mc_gState->m_TmpScript->IsOpReturnScript() == 0)                      
     {
@@ -685,13 +687,16 @@ Value gettxoutdata(const Array& params, bool fHelp)
 //        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
         mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
         retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
-        elem_size=(size_t)out_size;
-        switch(retrieve_status & MC_OST_STATUS_MASK) 
+        if(retrieve_status & MC_OST_ERROR_MASK)
         {
-            case MC_OST_ON_CHAIN:
-            case MC_OST_RETRIEVED:
-                break;
-            default:
+            error_str=OffChainError(retrieve_status,&errorCode);
+            throw JSONRPCError(errorCode, error_str);                    
+        }
+        
+        elem_size=(size_t)out_size;
+        if( ( (retrieve_status & MC_OST_STATUS_MASK) != MC_OST_RETRIEVED ) && 
+            ( (retrieve_status & MC_OST_STORAGE_MASK) != MC_OST_ON_CHAIN ) )
+        {
                 throw JSONRPCError(RPC_OUTPUT_NOT_FOUND, "Data for this output is not available");        
         }            
 //        elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);

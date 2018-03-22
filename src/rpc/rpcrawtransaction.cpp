@@ -216,7 +216,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
 //                    elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
                     retrieve_status = GetFormattedData(lpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
 //                    vdata.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
-                    aFormatMetaData.push_back(OpReturnFormatEntry(elem,out_size,tx.GetHash(),i,format,NULL,retrieve_status));
+                    aFormatMetaData.push_back(OpReturnFormatEntry(elem,out_size,tx.GetHash(),i,format,NULL,retrieve_status | MC_OST_CONTROL_NO_DATA));
                     if(mc_gState->m_Compatibility & MC_VCM_1_0)
                     {
                         aFullFormatMetaData.push_back(aFormatMetaData[0]);
@@ -232,7 +232,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                     if(out_size)
                     {
 //                        vdata.push_back(OpReturnEntry(elem,elem_size,tx.GetHash(),i));
-                        aFullFormatMetaData.push_back(OpReturnFormatEntry(elem,out_size,tx.GetHash(),i,format,NULL,retrieve_status));
+                        aFullFormatMetaData.push_back(OpReturnFormatEntry(elem,out_size,tx.GetHash(),i,format,NULL,retrieve_status | MC_OST_CONTROL_NO_DATA));
                     }
                 }
                 lpScript->SetElement(0);
@@ -350,7 +350,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         }
         
         Array items;
-        Value data_item_entry=DataItemEntry(tx,i,streams_already_seen, 0x03);
+        Value data_item_entry=DataItemEntry(tx,i,streams_already_seen, 0x0103);
         if(!data_item_entry.is_null())
         {
             items.push_back(data_item_entry);

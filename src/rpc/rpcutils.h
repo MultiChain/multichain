@@ -65,9 +65,16 @@ using namespace json_spirit;
 #define MC_OST_UNDEFINED                       0x00000000
 #define MC_OST_UNKNOWN                         0x00000001
 #define MC_OST_ON_CHAIN                        0x00000002
-#define MC_OST_RETRIEVED                       0x00000004
-#define MC_OST_STATUS_MASK                     0x0000FFFF
-#define MC_OST_ERROR                           0x00010000
+#define MC_OST_OFF_CHAIN                       0x00000003
+#define MC_OST_STORAGE_MASK                    0x000000FF                  
+#define MC_OST_RETRIEVED                       0x00000100
+#define MC_OST_STATUS_MASK                     0x0000FF00                  
+#define MC_OST_ERROR_SCRIPT                    0x00010000
+#define MC_OST_ERROR_WRONG_SIZES               0x00020000
+#define MC_OST_ERROR_CORRUPTED                 0x00030000
+#define MC_OST_ERROR_NOT_SUPPORTED             0x00040000
+#define MC_OST_ERROR_MASK                      0x00FF0000
+#define MC_OST_CONTROL_NO_DATA                 0x01000000
 
 
 // codes for allowed_objects fields    
@@ -132,6 +139,7 @@ Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total);
 void AppendOffChainFormatData(uint32_t data_format,uint32_t out_options,mc_Script *lpDetailsScript,vector<unsigned char>& vValue,vector<uint256>* vChunkHashes,int *errorCode,string *strError);
 int mc_BinaryCacheFile(string id,int mode);
 void mc_RemoveBinaryCacheFile(string id);
+string OffChainError(uint32_t status,int *errorCode); 
 
 
 #endif	/* RPCMULTICHAINUTILS_H */

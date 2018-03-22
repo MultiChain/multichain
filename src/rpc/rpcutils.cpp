@@ -988,8 +988,6 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
     }
     
     
-    status=MC_OST_UNKNOWN;
-    
     *elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
     *out_size=elem_size;
     if(hashes == NULL)
@@ -998,7 +996,7 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
-        return status;
+        return MC_OST_OFF_CHAIN | MC_OST_ERROR_NOT_SUPPORTED;
     }
     
     if(use_tmp_buf)
@@ -1006,6 +1004,8 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
         mc_gState->m_TmpBuffers->m_RpcChunkScript1->Clear();
         mc_gState->m_TmpBuffers->m_RpcChunkScript1->AddElement();
     }
+    
+    status=MC_OST_OFF_CHAIN;
     
     ptr=hashes;
     ptrEnd=ptr+MC_CDB_CHUNK_HASH_SIZE+16;
@@ -1015,20 +1015,25 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
 
         if(size<0)
         {
-            status |= MC_OST_ERROR;
+            status |= MC_OST_ERROR_SCRIPT;
             return status;
         }
         
         if(size > MAX_CHUNK_SIZE)
         {
-            status |= MC_OST_ERROR;
+            status |= MC_OST_ERROR_SCRIPT;
             return status;
         }
         
         ptr+=shift;
         if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,ptr,NULL,NULL,-1) == MC_ERR_NOERROR)
         {
-            status=MC_OST_RETRIEVED;
+            if(size != (int)chunk_def.m_Size)
+            {
+                status = MC_OST_OFF_CHAIN | MC_OST_RETRIEVED | MC_OST_ERROR_WRONG_SIZES;            
+                return status;                
+            }
+            status |= MC_OST_RETRIEVED;
             if(!skip_read)
             {
                 *elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&elem_size);
@@ -1041,14 +1046,14 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
                 }
                 else
                 {
-                    status = MC_OST_UNKNOWN | MC_OST_ERROR;            
+                    status = MC_OST_OFF_CHAIN | MC_OST_ERROR_CORRUPTED;            
                     return status;
                 }
             }
         }
         else
         {
-            status=MC_OST_UNKNOWN;
+            status=MC_OST_OFF_CHAIN;
             *out_size=total_size;
             return status;            
         }
@@ -1079,34 +1084,77 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
     return status;
 }
 
+string OffChainError(uint32_t status,int *errorCode) 
+{
+    string error_str="";
+    switch(status & MC_OST_ERROR_MASK)
+    {
+        case MC_OST_ERROR_SCRIPT:
+            error_str="Error in script";
+            *errorCode=RPC_VERIFY_ERROR;
+            break;
+        case MC_OST_ERROR_WRONG_SIZES:
+            error_str="Chunk sizes don't match output script";
+            *errorCode=RPC_VERIFY_ERROR;
+            break;
+        case MC_OST_ERROR_CORRUPTED:
+            error_str="Internal error";
+            *errorCode=RPC_INTERNAL_ERROR;
+            break;
+        case MC_OST_ERROR_NOT_SUPPORTED:
+            error_str="Not supported";
+            *errorCode=RPC_NOT_SUPPORTED;
+            break;
+    }
+    return  error_str;
+}
 
 Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out,uint32_t status)
 {
     string metadata="";
     Object metadata_object;
     Value metadata_value;
-    bool available;
-    string status_str;    
+    bool available,offchain;
+    string status_str,error_str;    
+    int errorCode;
     int err;
     
-    available=true;
+    available=false;
+    offchain=true;
     status_str="";
-    switch(status & MC_OST_STATUS_MASK) 
+    
+    if( status == MC_OST_UNDEFINED )
     {
-        case MC_OST_ON_CHAIN:
-            status_str="on-chain";
-            break;
-        case MC_OST_RETRIEVED:
+        available=true;               
+    }
+    
+    if( (status & MC_OST_STORAGE_MASK) == MC_OST_ON_CHAIN )
+    {
+        status_str="on-chain";
+        available=true;       
+        offchain=false;
+    }
+    
+    if( (status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN )
+    {
+        if( (status & MC_OST_STATUS_MASK) == MC_OST_RETRIEVED )
+        {
             status_str="retrieved";
-            break;            
-        case MC_OST_UNKNOWN:
-            status_str="unknown";
+            available=true;        
+        }
+        
+        if( status & MC_OST_CONTROL_NO_DATA )
+        {
             available=false;
-            break;            
-    }    
+        }   
+    }
     
-    
-    if( (((int)elem_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)) || (txid == 0)) && available && ((status & MC_OST_ERROR) == 0) && (elem != NULL) )
+    if(status & MC_OST_ERROR_MASK)
+    {
+        error_str=OffChainError(status,&errorCode);
+    }
+     
+    if( (((int)elem_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)) || (txid == 0)) && available && ((status & MC_OST_ERROR_MASK) == 0) && (elem != NULL) )
     {
         if(format_text_out)
         {
@@ -1157,10 +1205,18 @@ Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 tx
     metadata_object.push_back(Pair("vout", vout));
     metadata_object.push_back(Pair("format", OpReturnFormatToText(format)));
     metadata_object.push_back(Pair("size", elem_size));
-    if(status != MC_OST_UNDEFINED)
+    metadata_object.push_back(Pair("offchain", offchain));
+    if( ( status & MC_OST_CONTROL_NO_DATA ) == 0)
     {
-        metadata_object.push_back(Pair("available", available));        
-        metadata_object.push_back(Pair("status", status_str));        
+        if( (status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN )
+        {
+            if(status & MC_OST_ERROR_MASK)
+            {
+                metadata_object.push_back(Pair("error", error_str));        
+            }
+            metadata_object.push_back(Pair("available", available));        
+            metadata_object.push_back(Pair("status", status_str));        
+        }
     }
     return metadata_object;    
 }
@@ -1186,6 +1242,8 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
 
 Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uint32_t stream_output_level)
 {
+    // 0x0100 No offchain data
+    
     Object entry;
     Array publishers;
     set<uint160> publishers_set;
@@ -1264,6 +1322,10 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
 //    elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
     retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
 //    item_value=OpReturnEntry(elem,elem_size,tx.GetHash(),n);
+    if(stream_output_level & 0x0100)
+    {
+        retrieve_status |= MC_OST_CONTROL_NO_DATA;
+    }
 	format_item_value=OpReturnFormatEntry(elem,out_size,tx.GetHash(),n,format,&format_text_str,retrieve_status);
     
     already_seen.insert(hash);

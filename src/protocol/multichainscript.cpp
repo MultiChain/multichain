@@ -2348,7 +2348,7 @@ int mc_Script::GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_co
 {
     unsigned char *ptr;
     unsigned char *ptrEnd;
-    unsigned char f;
+    unsigned char f,s;
     int c,count,shift,size;
 /*    
     if(format)
@@ -2391,7 +2391,7 @@ int mc_Script::GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_co
     
     ptr++;
     
-    if(ptr+2 > ptrEnd)
+    if(ptr+3 > ptrEnd)
     {
         return MC_ERR_ERROR_IN_SCRIPT;                                                            
     }
@@ -2402,7 +2402,16 @@ int mc_Script::GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_co
     }   
     
     ptr++;
-        
+
+    s=(uint32_t)(*ptr);
+ 
+    if(s != 0)
+    {
+        return MC_ERR_ERROR_IN_SCRIPT;                                          // Salt length should be 0
+    }
+    
+    ptr++;
+    
     count=(int)mc_GetVarInt(ptr,ptrEnd-ptr,-1,&shift);
     
     if(count<0)
@@ -2479,9 +2488,10 @@ int mc_Script::SetChunkDefHeader(const uint32_t format,int chunk_count)
     buf[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_DATA_FORMAT_PREFIX;        
     buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+1]=MC_DCT_SCRIPT_EXTENDED_TYPE_CHUNK_DEF;
     buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+2]=(unsigned char)format;
-    shift=mc_PutVarInt(buf+MC_DCT_SCRIPT_IDENTIFIER_LEN+3,11,chunk_count);
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+3]=0;                                      // Salt length    
+    shift=mc_PutVarInt(buf+MC_DCT_SCRIPT_IDENTIFIER_LEN+4,11,chunk_count);
     
-    err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+3+shift);
+    err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+4+shift);
     if(err)
     {
         return err;
