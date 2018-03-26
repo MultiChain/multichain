@@ -1876,3 +1876,14 @@ void mc_AdjustStartAndCount(int *count,int *start,int size)
     }    
 }
 
+void sprintf_hex(char *hex,const unsigned char *bin,int size)
+{
+    int i;
+    for(i=0;i<size;i++)
+    {
+        sprintf(hex+(i*2),"%02x",bin[size-1-i]);
+    }
+    
+    hex[size*2]=0;      
+}
+

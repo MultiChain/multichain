@@ -8,19 +8,6 @@
 
 unsigned char null_txid[MC_TDB_TXID_SIZE];
 
-void sprintf_hex(char *hex,const unsigned char *bin,int size);
-/*
-{
-    int i;
-    for(i=0;i<size;i++)
-    {
-        sprintf(hex+(i*2),"%02x",bin[size-1-i]);
-    }
-    
-    hex[size*2]=0;      
-}
-*/
-
 void mc_SubscriptionFileDBRow::Zero()
 {
     memset(this,0,sizeof(mc_SubscriptionFileDBRow));    
@@ -174,7 +161,7 @@ int mc_ChunkDB::AddSubscription(mc_SubscriptionDBRow *subscription)
             sprintf(dir_name,"chunks/data/stream-%s",enthex);
             break;
         case MC_TET_AUTHOR:
-            sprintf(dir_name,"chunks/data/publisher");
+            sprintf(dir_name,"chunks/data/source");
             break;
         case MC_TET_NONE:
             break;            
@@ -998,6 +985,12 @@ int mc_ChunkDB::AddChunkInternal(
     sprintf_hex(chunk_hex,hash,MC_CDB_CHUNK_HASH_SIZE);    
     sprintf(msg,"New Chunk %s, size %d, flags %08X, entity (%08X, %s)",chunk_hex,chunk_size,flags,entity->m_EntityType,enthex);
     LogString(msg);
+    
+    if(entity->m_EntityType == MC_TET_AUTHOR)
+    {
+        CommitInternal(-2);
+    }
+    
     return MC_ERR_NOERROR;
 }
 
@@ -1210,11 +1203,11 @@ int mc_ChunkDB::CommitInternal(int block)
     
     err=MC_ERR_NOERROR;
     
-    Dump("Before Commit");
     if(m_MemPool->GetCount() == 0)
     {
         goto exitlbl;
     }
+    Dump("Before Commit");
         
     last_file_id=-1;
     last_file_offset=0;
@@ -1355,8 +1348,11 @@ exitlbl:
     }
     else
     {
-        sprintf(msg,"NewBlock %d, Chunks: %d,",block,m_MemPool->GetCount());
-        LogString(msg);   
+        if(block >= -1)
+        {
+            sprintf(msg,"NewBlock %d, Chunks: %d,",block,m_MemPool->GetCount());
+            LogString(msg);   
+        }
         m_MemPool->Clear();
         m_ChunkData->Clear();
     }

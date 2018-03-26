@@ -6,17 +6,6 @@
 
 #define MC_TDB_MAX_TXS_FILE_SIZE             0x8000000                          // Maximal data file size, 128MB
 
-void sprintf_hex(char *hex,const unsigned char *bin,int size)
-{
-    int i;
-    for(i=0;i<size;i++)
-    {
-        sprintf(hex+(i*2),"%02x",bin[size-1-i]);
-    }
-    
-    hex[size*2]=0;      
-}
-
 void mc_TxEntityRowExtension::Zero()
 {
     memset(this,0,sizeof(mc_TxEntityRowExtension));    

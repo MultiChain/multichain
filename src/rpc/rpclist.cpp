@@ -133,7 +133,7 @@ static const CRPCCommand vRPCCommands[] =
     
     { "util",               "createbinarycache",      &createbinarycache,      true,      false,       false },
     { "util",               "appendbinarycache",      &appendbinarycache,      true,      false,       false },
-    { "util",               "clearbinarycache",       &clearbinarycache,       true,      false,       false },
+    { "util",               "deletebinarycache",      &deletebinarycache,       true,      false,       false },
 
     /* Not shown in help */
     { "hidden",             "invalidateblock",        &invalidateblock,        true,      true,       false },

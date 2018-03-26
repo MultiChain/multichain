@@ -445,7 +445,7 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
     unsigned char *chunk_hashes;
     int chunk_count;   
     int64_t total_chunk_size,out_size;
-    uint32_t retrieve_status;
+    uint32_t retrieve_status=0;
     Value format_item_value;
     string format_text_str;
     int start_from=first_output;
@@ -603,6 +603,8 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
         entry.push_back(Pair("key", keys[0]));        
     }
     entry.push_back(Pair("data", format_item_value));        
+    entry.push_back(Pair("offchain", (retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN));        
+    
     if(verbose)
     {
         WalletTxToJSON(wtx, entry, true, stream_output);

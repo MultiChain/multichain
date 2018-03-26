@@ -569,19 +569,22 @@ Value publishfrom(const Array& params, bool fHelp)
     {
         if(params[4].type() != str_type)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid options");                                                                                                                            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream item options must be offchain or empty");                                                                                                                            
         }
         if( mc_gState->m_Features->OffChainData() == 0 )
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Format options are not supported by this protocol version");                                                                                                                            
         }        
-        if(params[4].get_str() == "offchain")
+        if(params[4].get_str().size())
         {
-            in_options |= MC_RFD_OPTION_OFFCHAIN;
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid options");                                                                                                                            
+            if(params[4].get_str() == "offchain")
+            {
+                in_options |= MC_RFD_OPTION_OFFCHAIN;
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream item options must be offchain or empty");                                                                                                                            
+            }
         }
     }
 

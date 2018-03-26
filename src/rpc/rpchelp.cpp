@@ -4020,15 +4020,15 @@ void mc_InitRPCHelpMap17()
             + HelpExampleRpc("appendbinarycache", "\"TjnVWwHYEg4\",\"f4c3dd510dd55761015c9d96bff7793b0d501dd6f01a959fd7\"")
         ));
     
-     mapHelpStrings.insert(std::make_pair("clearbinarycache",
-            "clearbinarycache \"identifier\"  \n"
+     mapHelpStrings.insert(std::make_pair("deletebinarycache",
+            "deletebinarycache \"identifier\"  \n"
             "\nClear binary cache item\n"
             "\nArguments:\n"
             "1. \"identifier\"                     (string, required) Binary cache item identifier, \"*\" - to clear all items\n"
             "\nResult:\n"
             "\nExamples:\n"
-            + HelpExampleCli("clearbinarycache", "\"TjnVWwHYEg4\"") 
-            + HelpExampleRpc("clearbinarycache", "\"TjnVWwHYEg4\"")
+            + HelpExampleCli("deletebinarycache", "\"TjnVWwHYEg4\"") 
+            + HelpExampleRpc("deletebinarycache", "\"TjnVWwHYEg4\"")
         ));
     
  

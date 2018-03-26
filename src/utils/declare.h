@@ -280,6 +280,7 @@ uint64_t __US_ThreadID();
 const char* __US_UserHomeDir();
 char * __US_FullPath(const char* path, char *full_path, int len);
 void __US_FlushFile(int FileHan);
+void sprintf_hex(char *hex,const unsigned char *bin,int size);
 
 
 

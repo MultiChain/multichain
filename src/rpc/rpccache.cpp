@@ -24,9 +24,19 @@ Value createbinarycache(const Array& params, bool fHelp)
         }
         else
         {
+            fHan=mc_BinaryCacheFile(str,1);
+            if(fHan > 0)
+            {
+                close(fHan);
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot store binary cache item"); 
+            }
             return str;
         }
     }
+    
 
     return Value::null;
 }
@@ -56,7 +66,7 @@ Value appendbinarycache(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "data should be hexadecimal string");                                                                                                                
     }        
     
-    int fHan=mc_BinaryCacheFile(params[0].get_str(),1);
+    int fHan=mc_BinaryCacheFile(params[0].get_str(),2);
     if(fHan <= 0)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Binary cache item with this identifier not found");                                                                                                                        
@@ -80,7 +90,7 @@ Value appendbinarycache(const Array& params, bool fHelp)
     return size;
 }
 
-Value clearbinarycache(const Array& params, bool fHelp)
+Value deletebinarycache(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)  
         throw runtime_error("Help message not found\n");
@@ -88,6 +98,12 @@ Value clearbinarycache(const Array& params, bool fHelp)
     if(params[0].type() != str_type)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "cache identifier should be string");                                                                                                                
+    }
+    
+    int fHan=mc_BinaryCacheFile(params[0].get_str(),0);
+    if(fHan <= 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Binary cache item with this identifier not found");                                                                                                                        
     }
     
     mc_RemoveBinaryCacheFile(params[0].get_str());

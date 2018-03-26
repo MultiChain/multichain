@@ -1114,13 +1114,13 @@ Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 tx
     string metadata="";
     Object metadata_object;
     Value metadata_value;
-    bool available,offchain;
+    bool available;//,offchain;
     string status_str,error_str;    
     int errorCode;
     int err;
     
     available=false;
-    offchain=true;
+//    offchain=true;
     status_str="";
     
     if( status == MC_OST_UNDEFINED )
@@ -1132,7 +1132,7 @@ Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 tx
     {
         status_str="on-chain";
         available=true;       
-        offchain=false;
+//        offchain=false;
     }
     
     if( (status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN )
@@ -1205,18 +1205,15 @@ Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 tx
     metadata_object.push_back(Pair("vout", vout));
     metadata_object.push_back(Pair("format", OpReturnFormatToText(format)));
     metadata_object.push_back(Pair("size", elem_size));
-    metadata_object.push_back(Pair("offchain", offchain));
+//    metadata_object.push_back(Pair("offchain", offchain));
     if( ( status & MC_OST_CONTROL_NO_DATA ) == 0)
     {
-        if( (status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN )
+        if(status & MC_OST_ERROR_MASK)
         {
-            if(status & MC_OST_ERROR_MASK)
-            {
-                metadata_object.push_back(Pair("error", error_str));        
-            }
-            metadata_object.push_back(Pair("available", available));        
-            metadata_object.push_back(Pair("status", status_str));        
+            metadata_object.push_back(Pair("error", error_str));        
         }
+        metadata_object.push_back(Pair("available", available));        
+//        metadata_object.push_back(Pair("status", status_str));        
     }
     return metadata_object;    
 }
@@ -1369,6 +1366,7 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
         entry.push_back(Pair("key", keys[0]));        
     }
     entry.push_back(Pair("data", format_item_value));        
+    entry.push_back(Pair("offchain", (retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN));        
     return entry;
 }
 
@@ -4041,9 +4039,13 @@ int mc_BinaryCacheFile(string id,int mode)
     mc_GetFullFileName(mc_gState->m_Params->NetworkName(),str_file_name.c_str(),"",MC_FOM_RELATIVE_TO_DATADIR,file_name);
     
     flags=O_RDONLY;
-    if(mode)
+    if(mode & 1)
     {
-       flags=O_CREAT | O_RDWR; 
+       flags=O_CREAT; 
+    }
+    if(mode & 2)
+    {
+       flags=O_RDWR; 
     }
     return open(file_name,_O_BINARY | flags, S_IRUSR | S_IWUSR);
 }
