@@ -117,7 +117,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     unsigned char details_script[MC_ENT_MAX_SCRIPT_SIZE];
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     char asset_name[MC_ENT_MAX_NAME_SIZE+1];
-    int multiple;
+    int multiple=1;
     int details_script_size=0;
     int err;
     bool detals_script_found=false;

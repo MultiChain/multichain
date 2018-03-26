@@ -261,6 +261,7 @@ multichain_libbitcoin_multichain_a_SOURCES = \
   utils/dbwrapper.cpp \
   wallet/wallettxdb.cpp \
   wallet/chunkdb.cpp \
+  wallet/chunkcollector.cpp \
   permissions/permission.cpp \
   entities/asset.cpp
 
@@ -525,6 +526,7 @@ libbitcoinconsensus_la_SOURCES = \
   utils/dbwrapper.cpp \
   wallet/wallettxdb.cpp \
   wallet/chunkdb.cpp \
+  wallet/chunkcollector.cpp \
   permissions/permission.cpp \
   entities/asset.cpp \
   structs/hash.cpp \

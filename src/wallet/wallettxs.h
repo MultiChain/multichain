@@ -12,6 +12,7 @@
 #include "multichain/multichain.h"
 #include "wallet/wallettxdb.h"
 #include "wallet/chunkdb.h"
+#include "wallet/chunkcollector.h"
 
 #define MC_TDB_MAX_OP_RETURN_SIZE             256
 
@@ -48,6 +49,7 @@ typedef struct mc_WalletTxs
 {
     mc_TxDB *m_Database;
     mc_ChunkDB *m_ChunkDB;
+    mc_ChunkCollector *m_ChunkCollector;
     CWallet *m_lpWallet;
     uint32_t m_Mode;
     std::map<COutPoint, mc_Coin> m_UTXOs[MC_TDB_MAX_IMPORTS];    

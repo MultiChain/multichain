@@ -208,6 +208,7 @@ void mc_WalletTxs::Zero()
     int i;
     m_Database=NULL;
     m_ChunkDB=NULL;
+    m_ChunkCollector=NULL;
     m_lpWallet=NULL;
     m_ChunkBuffer=NULL;
     for(i=0;i<MC_TDB_MAX_IMPORTS;i++)
@@ -250,6 +251,14 @@ int mc_WalletTxs::Initialize(
     {
         return err;
     }
+    
+    m_ChunkCollector=new mc_ChunkCollector;
+    
+    err=m_ChunkCollector->Initialize(m_ChunkDB,name,mode);
+    if(err)
+    {
+        return err;
+    }   
     
     m_Database=new mc_TxDB;
     m_Mode=mode;
@@ -302,6 +311,12 @@ int mc_WalletTxs::Destroy()
     {
         delete m_Database;
     }
+
+    if(m_ChunkCollector)
+    {
+        m_ChunkCollector->Commit();
+        delete m_ChunkCollector;
+    }    
     
     if(m_ChunkDB)
     {
@@ -491,7 +506,15 @@ int mc_WalletTxs::Commit(mc_TxImport *import)
     {
         if(imp->m_ImportID == 0)
         {
-            err=m_ChunkDB->Commit(imp->m_Block+1);
+            if(m_ChunkCollector)
+            {
+                err=m_ChunkCollector->Commit();
+            }    
+            
+            if(err == MC_ERR_NOERROR)
+            {
+                err=m_ChunkDB->Commit(imp->m_Block+1);
+            }
         }
     }    
     m_Database->Lock(1,0);
@@ -2340,6 +2363,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                     }
                                     else
                                     {
+                                        m_ChunkCollector->InsertChunk(chunk_hashes,&chunk_entity,(unsigned char*)&hash,i,chunk_size);
                                         // Feeding async chunk retriever here
                                     }
                                 }
