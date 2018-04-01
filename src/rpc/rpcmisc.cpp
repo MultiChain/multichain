@@ -477,16 +477,16 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
             if(autosubscribe=="streams")
             {
                 mode |= MC_WMD_AUTOSUBSCRIBE_STREAMS;
-            }
-            if(autosubscribe=="assets")
+            } else if (autosubscribe=="assets")
             {
                 mode |= MC_WMD_AUTOSUBSCRIBE_ASSETS;
-            }
-            if( (autosubscribe=="assets,streams") || (autosubscribe=="streams,assets"))
+            } else if ( (autosubscribe=="assets,streams") || (autosubscribe=="streams,assets"))
             {
                 mode |= MC_WMD_AUTOSUBSCRIBE_STREAMS;
                 mode |= MC_WMD_AUTOSUBSCRIBE_ASSETS;
-            }                
+            } else {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Should be 'assets', 'streams' or 'assets,streams'");
+            }
             
             if(pwalletTxsMain)
             {
