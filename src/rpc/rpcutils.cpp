@@ -970,7 +970,6 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
     mc_ChunkDBRow chunk_def;
     int size,shift,chunk;
     unsigned char *ptr;
-    unsigned char *ptrEnd;
     bool use_tmp_buf=false;    
     bool skip_read=false;    
     size_t elem_size;
@@ -1008,10 +1007,10 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
     status=MC_OST_OFF_CHAIN;
     
     ptr=hashes;
-    ptrEnd=ptr+MC_CDB_CHUNK_HASH_SIZE+16;
+
     for(chunk=0;chunk<chunk_count;chunk++)
     {
-        size=(int)mc_GetVarInt(ptr,ptrEnd-ptr,-1,&shift);
+        size=(int)mc_GetVarInt(ptr,MC_CDB_CHUNK_HASH_SIZE+16,-1,&shift);
 
         if(size<0)
         {
@@ -1030,10 +1029,9 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
         {
             if(size != (int)chunk_def.m_Size)
             {
-                status = MC_OST_OFF_CHAIN | MC_OST_RETRIEVED | MC_OST_ERROR_WRONG_SIZES;            
+                status |= MC_OST_ERROR_WRONG_SIZES;            
                 return status;                
             }
-            status |= MC_OST_RETRIEVED;
             if(!skip_read)
             {
                 *elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&elem_size);
@@ -1059,6 +1057,8 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
         }
         ptr+=MC_CDB_CHUNK_HASH_SIZE;
     }
+    
+    status |= MC_OST_RETRIEVED;
     
     if(use_tmp_buf)
     {
