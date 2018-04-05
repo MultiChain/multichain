@@ -180,6 +180,7 @@ libbitcoin_server_a_SOURCES = \
   protocol/multichaintx.cpp \
   protocol/multichainblock.cpp \
   custom/custom_server.cpp \
+  protocol/relay.cpp \
   protocol/handshake.cpp \
   chain/merkleblock.cpp \
   miner/miner.cpp \

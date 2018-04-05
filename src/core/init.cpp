@@ -36,6 +36,8 @@
 #include "structs/base58.h"
 #include "multichain/multichain.h"
 #include "wallet/wallettxs.h"
+#include "protocol/relay.h"
+
 std::string BurnAddress(const std::vector<unsigned char>& vchVersion);
 std::string SetBannedTxs(std::string txlist);
 std::string SetLockedBlock(std::string hash);
@@ -63,6 +65,7 @@ using namespace std;
 CWallet* pwalletMain = NULL;
 mc_WalletTxs* pwalletTxsMain = NULL;
 #endif
+mc_RelayManager* pRelayManager = NULL;
 bool fFeeEstimatesInitialized = false;
 
 #ifdef WIN32
@@ -215,6 +218,11 @@ void Shutdown()
     {
         delete pwalletTxsMain;
         pwalletTxsMain=NULL;
+    }
+    if(pRelayManager)
+    {
+        delete pRelayManager;
+        pRelayManager=NULL;        
     }
 /* MCHN END */  
 #endif
@@ -1854,6 +1862,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             return InitError(_("Failed to listen on any port. Use -listen=0 if you want this."));
     }
 /* MCHN START */    
+    pRelayManager=new mc_RelayManager;
+    
     int max_ips=64;
     uint32_t all_ips[64];
     int found_ips=1;
@@ -1861,6 +1871,12 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     {
         found_ips=mc_FindIPv4ServerAddress(all_ips,max_ips);
     }
+    else
+    {
+        all_ips[0]=mc_gState->m_IPv4Address;
+    }
+    pRelayManager->SetMyIPs(all_ips,found_ips);
+    
     if(!GetBoolArg("-shortoutput", false))
     {
         if(fListen && !GetBoolArg("-offline",false))
