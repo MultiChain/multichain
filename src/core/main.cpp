@@ -30,10 +30,11 @@
 #include "multichain/multichain.h"
 #include "wallet/wallettxs.h"
 #include "script/script.h"
+#include "protocol/relay.h"
 
 
 extern mc_WalletTxs* pwalletTxsMain;
-
+extern mc_RelayManager* pRelayManager;
 
 /* MCHN END */
 
@@ -61,6 +62,7 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept);
 bool VerifyBlockSignature(CBlock *block,bool force);
 bool VerifyBlockMiner(CBlock *block,CBlockIndex* pindexNew);
 bool CheckBlockPermissions(const CBlock& block,CBlockIndex* prev_block,unsigned char *lpMinerAddress);
+bool ProcessMultichainRelay(CNode* pfrom, CDataStream& vRecv, CValidationState &state);
 bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,bool *disconnect_flag);
 bool PushMultiChainVerack(CNode* pfrom, bool fIsVerackack);
 bool MultichainNode_CanConnect(CNode *pnode);
@@ -5777,6 +5779,21 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         return false;
     }
 
+    else if (strCommand == "relay")
+    {
+        CValidationState state;        
+        if(pRelayManager)
+        {
+            if(!pRelayManager->ProcessRelay(pfrom,vRecv,state,MC_VRA_DEFAULT))
+            {
+                int nDos = 0;
+                if (state.IsInvalid(nDos) && nDos > 0)
+                {
+                    Misbehaving(pfrom->GetId(), nDos);
+                }
+            }
+        }
+    }
 
     else if (strCommand == "verack")
     {

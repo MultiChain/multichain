@@ -3,6 +3,32 @@
 
 #include "protocol/relay.h"
 
+bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
+                             uint32_t msg_type_in, uint32_t  flags, vector<unsigned char>& vPayloadIn,vector<CKeyID>&  vAddrIn,
+                             uint32_t* msg_type_response,uint32_t  *flags_response,vector<unsigned char>& vPayloadResponse,vector<CKeyID>&  vAddrResponse,
+                             uint32_t* msg_type_relay,uint32_t  *flags_relay,vector<unsigned char>& vPayloadRelay,vector<CKeyID>&  vAddrRelay,string& strError)
+{
+    strError="";
+    switch(msg_type_in)
+    {
+        case MC_RMT_GLOBAL_PING:
+            if(msg_type_stored)
+            {
+                strError="Invalid response message type";
+                goto exitlbl;
+            }
+            break;
+    }
+    
+exitlbl:
+            
+    if(strError.size())
+    {
+        return false;
+    }
+    return true;
+}
+
 void mc_Limiter::Zero()
 {
     memset(this,0,sizeof(mc_Limiter));    
@@ -219,17 +245,73 @@ void mc_RelayManager::MsgTypeSettings(uint32_t msg_type,int latency,int seconds,
     }
 }
 
+int64_t mc_RelayManager::AggregateNonce(uint32_t timestamp,uint32_t nonce)
+{
+    return ((int64_t)nonce<<32)+(int64_t)timestamp;
+}
+
+void mc_RelayManager::Zero()
+{
+    m_Semaphore=NULL;
+    m_LockedBy=0;         
+}
+
+void mc_RelayManager::Destroy()
+{
+    if(m_Semaphore)
+    {
+        __US_SemDestroy(m_Semaphore);
+    }
+    
+    Zero();    
+}
+
+int mc_RelayManager::Intialize()
+{
+    m_Semaphore=__US_SemCreate();
+    return MC_ERR_NOERROR;    
+}
+
+int mc_RelayManager::Lock(int write_mode,int allow_secondary)
+{        
+    uint64_t this_thread;
+    this_thread=__US_ThreadID();
+    
+    if(this_thread == m_LockedBy)
+    {
+        return allow_secondary;
+    }
+    
+    __US_SemWait(m_Semaphore); 
+    m_LockedBy=this_thread;
+    
+    return 0;
+}
+
+void mc_RelayManager::UnLock()
+{    
+    m_LockedBy=0;
+    __US_SemPost(m_Semaphore);
+}
+
+int mc_RelayManager::Lock()
+{        
+    return Lock(1,0);
+}
+
 void mc_RelayManager::SetDefaults()
 {
     MsgTypeSettings(MC_RMT_NONE           , 0,10,1000,100*1024*1024);
     MsgTypeSettings(MC_RMT_GLOBAL_PING    ,10,10, 100,  1*1024*1024);
     MsgTypeSettings(MC_RMT_GLOBAL_PONG    , 0,10, 100,  1*1024*1024);
     MsgTypeSettings(MC_RMT_GLOBAL_REJECT  , 0,10,1000,  1*1024*1024);
-    MsgTypeSettings(MC_RMT_GLOBAL_BUSY    , 0,10,1000,  1*1024*1024);
     MsgTypeSettings(MC_RMT_CHUNK_QUERY    ,10,10, 100,  1*1024*1024);
     MsgTypeSettings(MC_RMT_CHUNK_QUERY_HIT,30,10, 100,  1*1024*1024);
     MsgTypeSettings(MC_RMT_CHUNK_REQUEST  ,30,10, 100,  1*1024*1024);
     MsgTypeSettings(MC_RMT_CHUNK_RESPONSE , 0,10, 100,100*1024*1024);
+    
+    m_MinTimeShift=180;
+    m_MaxTimeShift=180;
 }
 
 void mc_RelayManager::CheckTime()
@@ -253,7 +335,7 @@ void mc_RelayManager::CheckTime()
     }        
 }
 
-void mc_RelayManager::SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,int64_t nonce)
+void mc_RelayManager::SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,uint32_t timestamp,uint32_t nonce)
 {
     map<uint32_t, int>::iterator itlat = m_Latency.find(msg_type);
     if (itlat == m_Latency.end())
@@ -270,7 +352,7 @@ void mc_RelayManager::SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,i
     {
         pto_id=pto->GetId();
     }
-    const mc_RelayRecordKey key=mc_RelayRecordKey(nonce,pto_id);
+    const mc_RelayRecordKey key=mc_RelayRecordKey(timestamp,nonce,pto_id);
     mc_RelayRecordValue value;
     value.m_NodeFrom=0;
     if(pfrom)
@@ -291,7 +373,7 @@ void mc_RelayManager::SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,i
     }    
 }
 
-int mc_RelayManager::GetRelayRecord(CNode *pfrom,int64_t nonce,uint32_t* msg_type,CNode **pto)
+int mc_RelayManager::GetRelayRecord(CNode *pfrom,uint32_t timestamp,uint32_t nonce,uint32_t* msg_type,CNode **pto)
 {
     NodeId pfrom_id,pto_id;
     
@@ -300,7 +382,7 @@ int mc_RelayManager::GetRelayRecord(CNode *pfrom,int64_t nonce,uint32_t* msg_typ
     {
         pfrom_id=pfrom->GetId();
     }
-    const mc_RelayRecordKey key=mc_RelayRecordKey(nonce,pfrom_id);
+    const mc_RelayRecordKey key=mc_RelayRecordKey(timestamp,nonce,pfrom_id);
     map<mc_RelayRecordKey, mc_RelayRecordValue>::iterator it = m_RelayRecords.find(key);
     if (it == m_RelayRecords.end())
     {
@@ -342,111 +424,75 @@ int mc_RelayManager::GetRelayRecord(CNode *pfrom,int64_t nonce,uint32_t* msg_typ
     return MC_ERR_NOT_ALLOWED;
 }
 
-void mc_RelayManager::PushRelay(CNode*    pto, 
+uint32_t mc_RelayManager::GenerateNonce()
+{
+    uint32_t nonce;     
+    
+    GetRandBytes((unsigned char*)&nonce, sizeof(nonce));
+    
+    return nonce;
+}
+
+int64_t mc_RelayManager::PushRelay(CNode*    pto, 
+                                uint32_t  msg_format,        
+                                unsigned char hop_count,
                                 uint32_t  msg_type,
-                                int64_t   nonce_to_send,
-                                int64_t   response_to_nonce,
-                                mc_NodeFullAddress *origin_to_relay,
-                                mc_NodeFullAddress *destination_to_relay,
+                                uint32_t  timestamp_to_send,
+                                uint32_t  nonce_to_send,
+                                uint32_t  timestamp_to_respond,
+                                uint32_t  nonce_to_respond,
                                 uint32_t  flags,
                                 vector<unsigned char>& payload,
-                                uint256   message_hash_to_relay,
                                 vector<CScript>&  sigScripts_to_relay,
-                                vector<CAddress>& path,
                                 CNode*    pfrom, 
                                 uint32_t  action)
 {
     vector <unsigned char> vOriginAddress;
     vector <unsigned char> vDestinationAddress;
     vector<CScript>  sigScripts;
-    vector<unsigned char>vSigScript;
     CScript sigScript;
     uint256 message_hash;
-    int64_t nonce;     
-    mc_NodeFullAddress origin_to_send;
-    mc_NodeFullAddress *origin;
-    mc_NodeFullAddress destination_to_send;
-    mc_NodeFullAddress *destination;
+    uint32_t timestamp;     
+    uint32_t nonce;     
     
     nonce=nonce_to_send;
+    timestamp=timestamp_to_send;
+    
+    if(action & MC_PRA_GENERATE_TIMESTAMP)
+    {
+        timestamp=mc_TimeNowAsUInt();
+    }
     
     if(action & MC_PRA_GENERATE_NONCE)
     {
-        GetRandBytes((unsigned char*)&nonce, sizeof(nonce));
-    }
-
-    if(action & (MC_PRA_MY_ORIGIN_MC_ADDRESS | MC_PRA_MY_ORIGIN_NT_ADDRESS) )
-    {
-        InitNodeAddress(&origin_to_send,pto,action);
-        origin=&origin_to_send;
-    }    
-    else
-    {
-        if(origin_to_relay)
-        {
-            origin=origin_to_relay;
-        }
-        else
-        {
-            origin=&origin_to_send;            
-        }
+        nonce=GenerateNonce();
     }
     
-    destination=&destination_to_send;
-    if(action & MC_PRA_USE_DESTINATION_ADDRESS)
-    {
-        if(destination_to_relay)
-        {
-            destination=destination_to_relay;
-        }
-    }
+    int64_t aggr_nonce=AggregateNonce(timestamp,nonce);
     
-    if(MCP_ANYONE_CAN_CONNECT == 0)
-    {
-        vOriginAddress.resize(sizeof(CKeyID));
-        memcpy(&vOriginAddress[0],&(origin->m_Address),sizeof(CKeyID));    
-        if(destination->m_Address != 0)
-        {
-            vDestinationAddress.resize(sizeof(CKeyID));
-            memcpy(&vOriginAddress[0],&(origin->m_Address),sizeof(CKeyID));        
-        }
-    }    
-    
-    message_hash=message_hash_to_relay;
-    
-    if(action & MC_PRA_CALCULATE_MESSAGE_HASH)
+    if( (action & MC_PRA_SIGN_WITH_HANDSHAKE_ADDRESS) && (MCP_ANYONE_CAN_CONNECT == 0) )
     {
         CHashWriter ssHash(SER_GETHASH, 0);
+        ssHash << msg_type;        
+        ssHash << timestamp;
         ssHash << nonce;
-        ssHash << msg_type;
-        ssHash << vOriginAddress;
-        ssHash << origin->m_NetAddresses;
-        ssHash << vDestinationAddress;
-        ssHash << destination->m_NetAddresses;
-        ssHash << response_to_nonce;
+        ssHash << timestamp_to_respond;
+        ssHash << nonce_to_respond;
         ssHash << flags;
         ssHash << payload;
-        message_hash=ssHash.GetHash();        
-    }
-    
-    if( (action & (MC_PRA_SIGN | MC_PRA_SIGN_WITH_HANDSHAKE_ADDRESS)) && (MCP_ANYONE_CAN_CONNECT == 0) )
-    {
+        
+        message_hash=ssHash.GetHash();    
+        
         CHashWriter ssSig(SER_GETHASH, 0);
+        
         ssSig << message_hash;
-        ssSig << vector<unsigned char>((unsigned char*)&response_to_nonce, (unsigned char*)&response_to_nonce+sizeof(response_to_nonce));
+        ssSig << vector<unsigned char>((unsigned char*)&aggr_nonce, (unsigned char*)&aggr_nonce+sizeof(aggr_nonce));
         uint256 signed_hash=ssSig.GetHash();
         CKey key;
         CKeyID keyID;
         CPubKey pkey;            
 
-        keyID=origin->m_Address;
-        if(action & MC_PRA_SIGN_WITH_HANDSHAKE_ADDRESS)
-        {
-            if(MCP_ANYONE_CAN_CONNECT == 0)
-            {
-                keyID=pto->kAddrLocal;
-            }
-        }                    
+        keyID=pto->kAddrLocal;
         
         if(pwalletMain->GetKey(keyID, key))
         {
@@ -477,21 +523,24 @@ void mc_RelayManager::PushRelay(CNode*    pto,
     }
     
     pto->PushMessage("relay",
+                        msg_format,
+                        hop_count,
                         msg_type,
+                        timestamp,
                         nonce,
-                        vOriginAddress,
-                        origin->m_NetAddresses,
-                        vDestinationAddress,
-                        destination->m_NetAddresses,
-                        response_to_nonce,
+                        timestamp_to_respond,
+                        nonce_to_respond,
                         flags,
                         payload,
-                        message_hash,
-                        path,
                         sigScripts);        
     
-    SetRelayRecord(pto,NULL,msg_type,nonce);
-    SetRelayRecord(pto,pfrom,msg_type,nonce);
+    SetRelayRecord(pto,NULL,msg_type,timestamp,nonce);
+    if(pfrom)
+    {
+        SetRelayRecord(pto,pfrom,msg_type,timestamp,nonce);
+    }
+    
+    return aggr_nonce;
 }
     
 bool mc_RelayManager::ProcessRelay( CNode* pfrom, 
@@ -501,56 +550,70 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
 {
     uint32_t  msg_type_in;
     uint32_t verify_flags;
-    int64_t   nonce_received;
-    int64_t   response_to_nonce;
-    vector<unsigned char> vOriginMCAddressIn;
-    vector<unsigned char> vDestinationMCAddressIn;
-    vector<CAddress> vOriginNetAddressIn;
-    vector<CAddress> vDestinationNetAddressIn;
+    uint32_t   timestamp_received;
+    uint32_t   nonce_received;
+    uint32_t   timestamp_to_respond;
+    uint32_t   nonce_to_respond;
     vector<unsigned char> vPayloadIn;
     vector<CScript> vSigScripts;
-    uint256   message_hash,message_hash_in;
-    uint32_t  flags_in;
-    CKeyID   origin_mc_address;
-    CKeyID   destination_mc_address;
+    vector<CScript> vSigScriptsEmpty;
+    uint256   message_hash;
+    uint32_t  flags_in,flags_response,flags_relay;
     vector<unsigned char> vchSigOut;
     vector<unsigned char> vchPubKey;
     CPubKey pubkey;
     vector<CAddress> path;    
-    mc_NodeFullAddress origin_to_relay;
-    mc_NodeFullAddress destination_to_relay;
-    vector<unsigned char> vPayloadResponse;
-    vector<CScript>  vSigScriptsResponse;
-    vector<CAddress> vPathResponse;
     CNode *pto_stored;
     uint32_t msg_type_stored;
+    uint32_t msg_format;
+    unsigned char hop_count;
+    uint32_t msg_type_response,msg_type_relay;
+    uint32_t *msg_type_relay_ptr;
+    uint32_t *msg_type_response_ptr;
+    vector<unsigned char> vPayloadResponse;
+    vector<unsigned char> vPayloadRelay;
+    vector<CKeyID>  vAddrIn;    
+    vector<CKeyID>  vAddrResponse;    
+    vector<CKeyID>  vAddrRelay;    
+    string strError;    
     
     msg_type_stored=MC_RMT_NONE;
+    msg_type_response=MC_RMT_NONE;
+    msg_type_relay=MC_RMT_NONE;
     pto_stored=NULL;
     
     verify_flags=verify_flags_in;
+    vRecv >> msg_format;
+    if(msg_format != 0)
+    {
+        LogPrintf("ProcessRelay() : Unsupported message format %08X\n",msg_format);     
+        return false;        
+    }
+        
+    vRecv >> hop_count;
     vRecv >> msg_type_in;
     switch(msg_type_in)
     {
         case MC_RMT_GLOBAL_PING:
+            verify_flags |= MC_VRA_IS_NOT_RESPONSE;
             break;
         case MC_RMT_GLOBAL_PONG:
-            verify_flags |= MC_VRA_ORIGIN_MC_ADDRESS | MC_VRA_ORIGIN_NT_ADDRESS | MC_VRA_RESPONSE_TO_NONCE | MC_VRA_MESSAGE_HASH | MC_VRA_SIGNATURE_ORIGIN;
+            verify_flags |= MC_VRA_IS_RESPONSE | MC_VRA_SIGNATURE_ORIGIN;
             break;
         case MC_RMT_GLOBAL_REJECT:
-        case MC_RMT_GLOBAL_BUSY:
-            verify_flags |= MC_VRA_ORIGIN_MC_ADDRESS | MC_VRA_RESPONSE_TO_NONCE | MC_VRA_MESSAGE_HASH | MC_VRA_SIGNATURE_ORIGIN;
+            verify_flags |= MC_VRA_IS_RESPONSE | MC_VRA_SIGNATURE_ORIGIN;
             break;
         case MC_RMT_CHUNK_QUERY:
-            verify_flags |= MC_VRA_ORIGIN_MC_ADDRESS | MC_VRA_MESSAGE_HASH;
+            verify_flags |= MC_VRA_IS_NOT_RESPONSE;
             break;
         case MC_RMT_CHUNK_QUERY_HIT:
-            verify_flags |= MC_VRA_ORIGIN_MC_ADDRESS | MC_VRA_ORIGIN_NT_ADDRESS | MC_VRA_DESTINATION_MC_ADDRESS | MC_VRA_RESPONSE_TO_NONCE | MC_VRA_MESSAGE_HASH | 
-                            MC_VRA_SIGNATURE_ORIGIN;
+            verify_flags |= MC_VRA_IS_RESPONSE | MC_VRA_SIGNATURE_ORIGIN | MC_VRA_PROCESS_ONCE;
+            break;            
         case MC_RMT_CHUNK_REQUEST:
+            verify_flags |= MC_VRA_IS_RESPONSE | MC_VRA_DOUBLE_HOP | MC_VRA_SIGNATURE_ORIGIN;
+            break;
         case MC_RMT_CHUNK_RESPONSE:
-            verify_flags |= MC_VRA_ORIGIN_MC_ADDRESS | MC_VRA_ORIGIN_NT_ADDRESS | MC_VRA_DESTINATION_MC_ADDRESS | MC_VRA_RESPONSE_TO_NONCE | MC_VRA_MESSAGE_HASH | 
-                            MC_VRA_SIGNATURE_ORIGIN | MC_VRA_SINGLE_HOP;
+            verify_flags |= MC_VRA_IS_RESPONSE | MC_VRA_DOUBLE_HOP | MC_VRA_SIGNATURE_ORIGIN | MC_VRA_PROCESS_ONCE;
             break;
         default:
             if(verify_flags & MC_VRA_MESSAGE_TYPE)    
@@ -561,79 +624,100 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
             break;
     }
     
+    if(verify_flags & MC_VRA_SINGLE_HOP)
+    {
+        if(hop_count)
+        {
+            LogPrintf("ProcessRelay() : Unsupported hop count %d for msg type %d\n",hop_count,msg_type_in);     
+            return false;            
+        }
+    }
+    
+    if(verify_flags & MC_VRA_DOUBLE_HOP)
+    {
+        if(hop_count > 1)
+        {
+            LogPrintf("ProcessRelay() : Unsupported hop count %d for msg type %d\n",hop_count,msg_type_in);     
+            return false;            
+        }
+    }
+        
     CheckTime();
     
-    vRecv >> nonce_received;
+    vRecv >> timestamp_received;
     
-    if(verify_flags & MC_VRA_ALREADY_PROCESSED)
+    if(verify_flags & MC_VRA_TIMESTAMP)
     {
-        if(GetRelayRecord(NULL,nonce_received,NULL,NULL) == MC_ERR_NOERROR)
+        if(timestamp_received+m_MinTimeShift < m_LastTime)
         {
+            LogPrintf("ProcessRelay() : Timestamp too far in the past: %d\n",timestamp_received);     
+            return false;                        
+        }
+        if(timestamp_received > m_LastTime + m_MaxTimeShift)
+        {
+            LogPrintf("ProcessRelay() : Timestamp too far in the future: %d\n",timestamp_received);     
+            return false;                        
+        }
+    }    
+    
+    vRecv >> nonce_received;    
+    msg_type_relay_ptr=&msg_type_relay;
+    msg_type_response_ptr=&msg_type_response;
+    
+    if( verify_flags & (MC_VRA_PROCESS_ONCE | MC_VRA_BROADCAST_ONCE))
+    {
+        if(GetRelayRecord(NULL,timestamp_received,nonce_received,NULL,NULL) == MC_ERR_NOERROR)
+        {
+            if(verify_flags & MC_VRA_PROCESS_ONCE)
+            {
+                return false;
+            }
+            if(verify_flags & MC_VRA_BROADCAST_ONCE)
+            {
+                msg_type_relay_ptr=NULL;
+            }
+        }
+    }
+    
+        
+    vRecv >> timestamp_to_respond;
+    vRecv >> nonce_to_respond;
+    
+    if( verify_flags & MC_VRA_IS_NOT_RESPONSE ) 
+    {
+        if( (timestamp_to_respond != 0) || (nonce_to_respond != 0) )
+        {
+            return state.DoS(100, error("ProcessRelay() : This message should not be response"),REJECT_INVALID, "bad-nonce");                
+        }
+    }
+    
+    int64_t aggr_nonce=AggregateNonce(timestamp_to_respond,nonce_to_respond);
+    
+    if( verify_flags & MC_VRA_IS_RESPONSE ) 
+    {
+        if( timestamp_to_respond == 0 )
+        {
+            return state.DoS(100, error("ProcessRelay() : This message should be response"),REJECT_INVALID, "bad-nonce");                
+        }
+        
+        if(GetRelayRecord(pfrom,timestamp_to_respond,nonce_to_respond,&msg_type_stored,&pto_stored))
+        {
+            LogPrintf("ProcessRelay() : Response without request from peer %d\n",pfrom->GetId());     
             return false;
         }
     }
     
-    vRecv >> vOriginMCAddressIn;
-    vRecv >> vOriginNetAddressIn;
-    vRecv >> vDestinationMCAddressIn;
-    vRecv >> vDestinationNetAddressIn;
-    vRecv >> response_to_nonce;
-    vRecv >> flags_in;
-    vRecv >> vPayloadIn;
-    vRecv >> message_hash_in;
-    vRecv >> path;
-    vRecv >> vSigScripts;
-    
-    
-    if(vOriginMCAddressIn.size() == sizeof(uint160))
+    if(timestamp_to_respond)
     {
-        origin_mc_address=CKeyID(*(uint160*)&vOriginMCAddressIn[0]);                
-    }
-    else
-    {        
-        if(verify_flags & MC_VRA_ORIGIN_MC_ADDRESS)
+        if(pto_stored)
         {
-            if(MCP_ANYONE_CAN_CONNECT == 0)
-            {
-                return state.DoS(100, error("ProcessRelay() : Bad origin address"),REJECT_INVALID, "bad-origin-address");                                
-            }        
+            msg_type_response_ptr=NULL;        
+        }
+        else
+        {
+            msg_type_relay_ptr=NULL;
         }
     }
-    
-    if(verify_flags & MC_VRA_ORIGIN_NT_ADDRESS)
-    {
-        if(vOriginNetAddressIn.size() == 0)
-        {
-            return state.DoS(100, error("ProcessRelay() : No origin network address"),REJECT_INVALID, "bad-origin-net-address");                            
-        }        
-    }    
-    
-    InitNodeAddress(&origin_to_relay,origin_mc_address,vOriginNetAddressIn);
-    
-    if(vDestinationMCAddressIn.size() == sizeof(uint160))
-    {
-        destination_mc_address=CKeyID(*(uint160*)&vDestinationMCAddressIn[0]);                
-    }
-    else
-    {        
-        if(verify_flags & MC_VRA_DESTINATION_MC_ADDRESS)
-        {
-            if(MCP_ANYONE_CAN_CONNECT == 0)
-            {
-                return state.DoS(100, error("ProcessRelay() : Bad destination address"),REJECT_INVALID, "bad-destination-address");                                
-            }        
-        }
-    }
-    
-    if(verify_flags & MC_VRA_DESTINATION_NT_ADDRESS)
-    {
-        if(vDestinationNetAddressIn.size() == 0)
-        {
-            return state.DoS(100, error("ProcessRelay() : No destination network address"),REJECT_INVALID, "bad-destination-net-address");                            
-        }        
-    }    
-    
-    InitNodeAddress(&destination_to_relay,destination_mc_address,vDestinationNetAddressIn);
     
     map<uint32_t, mc_Limiter>::iterator itlim_all = m_Limiters.find(MC_RMT_NONE);
     map<uint32_t, mc_Limiter>::iterator itlim_msg = m_Limiters.find(msg_type_in);
@@ -645,8 +729,6 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
         {
             if(itlim_all->second.Disallowed(m_LastTime))
             {
-                PushRelay(pfrom,MC_RMT_GLOBAL_BUSY,0,nonce_received,NULL,NULL,0,vPayloadResponse,0,vSigScriptsResponse,vPathResponse,NULL,
-                                MC_PRA_GENERATE_NONCE | MC_PRA_MY_ORIGIN_MC_ADDRESS | MC_PRA_CALCULATE_MESSAGE_HASH | MC_PRA_SIGN | MC_PRA_SIGN_WITH_HANDSHAKE_ADDRESS);
                 return false;
             }
         }        
@@ -659,94 +741,76 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
         {
             if(itlim_msg->second.Disallowed(m_LastTime))
             {
-                PushRelay(pfrom,MC_RMT_GLOBAL_BUSY,0,nonce_received,NULL,NULL,0,vPayloadResponse,0,vSigScriptsResponse,vPathResponse,NULL,
-                                MC_PRA_GENERATE_NONCE | MC_PRA_MY_ORIGIN_MC_ADDRESS | MC_PRA_CALCULATE_MESSAGE_HASH | MC_PRA_SIGN | MC_PRA_SIGN_WITH_HANDSHAKE_ADDRESS);
                 return false;
             }
         }        
     }
     
-    
-    if( verify_flags & MC_VRA_RESPONSE_TO_NONCE ) 
-    {
-        if(response_to_nonce == 0)
-        {
-            return state.DoS(100, error("ProcessRelay() : Missing response_to_nonce"),REJECT_INVALID, "bad-nonce");                
-        }
-        if(GetRelayRecord(pfrom,response_to_nonce,&msg_type_stored,&pto_stored))
-        {
-            LogPrintf("ProcessRelay() : Response without request from peer %d\n",pfrom->GetId());     
-            return false;
-        }
-    }
-    
-    if( verify_flags & (MC_VRA_MESSAGE_HASH | MC_VRA_SIGNATURE_ORIGIN | MC_VRA_SIGNATURE_ALL) )
+    vRecv >> flags_in;
+    vRecv >> vPayloadIn;
+    vRecv >> vSigScripts;
+            
+    if( verify_flags & MC_VRA_SIGNATURES )
     {
         CHashWriter ssHash(SER_GETHASH, 0);
+        ssHash << msg_type_in;        
+        ssHash << timestamp_received;
         ssHash << nonce_received;
-        ssHash << msg_type_in;
-        ssHash << vOriginMCAddressIn;
-        ssHash << vOriginNetAddressIn;
-        ssHash << vDestinationMCAddressIn;
-        ssHash << vDestinationNetAddressIn;
-        ssHash << response_to_nonce;
+        ssHash << timestamp_to_respond;
+        ssHash << nonce_to_respond;
         ssHash << flags_in;
         ssHash << vPayloadIn;
+        
         message_hash=ssHash.GetHash();                
-        if(message_hash != message_hash_in)
-        {
-            return state.DoS(100, error("ProcessRelay() : Payload hash mismatch"),REJECT_INVALID, "bad-payload-hash");                            
-        }
-    }    
     
-    message_hash=message_hash_in;
-    
-    if( verify_flags & MC_VRA_SIGNATURE_ORIGIN )
-    {
-        if(vSigScripts.size() < 1)
+        if( verify_flags & MC_VRA_SIGNATURE_ORIGIN )
         {
-            return state.DoS(100, error("ProcessRelay() : Missing sigScript"),REJECT_INVALID, "bad-sigscript");                            
-        }
-        if(vSigScripts[0].size())
-        {
-            CScript scriptSig=vSigScripts[0];
-
-            opcodetype opcode;
-
-            CScript::const_iterator pc = scriptSig.begin();
-
-            if (!scriptSig.GetOp(pc, opcode, vchSigOut))
+            if(vSigScripts.size() < 1)
             {
-                return state.DoS(100, error("ProcessRelay() : Cannot extract signature from sigScript"),REJECT_INVALID, "bad-sigscript-signature");                
+                return state.DoS(100, error("ProcessRelay() : Missing sigScript"),REJECT_INVALID, "bad-sigscript");                            
             }
-
-            vchSigOut.resize(vchSigOut.size()-1);
-            if (!scriptSig.GetOp(pc, opcode, vchPubKey))
+            if(vSigScripts[0].size())
             {
-                return state.DoS(100, error("ProcessRelay() : Cannot extract pubkey from sigScript"),REJECT_INVALID, "bad-sigscript-pubkey");                
+                CScript scriptSig=vSigScripts[0];
+
+                opcodetype opcode;
+
+                CScript::const_iterator pc = scriptSig.begin();
+
+                if (!scriptSig.GetOp(pc, opcode, vchSigOut))
+                {
+                    return state.DoS(100, error("ProcessRelay() : Cannot extract signature from sigScript"),REJECT_INVALID, "bad-sigscript-signature");                
+                }
+
+                vchSigOut.resize(vchSigOut.size()-1);
+                if (!scriptSig.GetOp(pc, opcode, vchPubKey))
+                {
+                    return state.DoS(100, error("ProcessRelay() : Cannot extract pubkey from sigScript"),REJECT_INVALID, "bad-sigscript-pubkey");                
+                }
+
+                CPubKey pubKeyOut(vchPubKey);
+                if (!pubKeyOut.IsValid())
+                {
+                    return state.DoS(100, error("ProcessRelay() : Invalid pubkey"),REJECT_INVALID, "bad-sigscript-pubkey");                
+                }        
+
+                pubkey=pubKeyOut;
+
+                CHashWriter ss(SER_GETHASH, 0);
+                
+                ss << vector<unsigned char>((unsigned char*)&message_hash, (unsigned char*)&message_hash+32);
+                ss << vector<unsigned char>((unsigned char*)&aggr_nonce, (unsigned char*)&aggr_nonce+sizeof(aggr_nonce));
+                uint256 signed_hash=ss.GetHash();
+
+                if(!pubkey.Verify(signed_hash,vchSigOut))
+                {
+                    return state.DoS(100, error("ProcessRelay() : Wrong signature"),REJECT_INVALID, "bad-signature");                            
+                }        
             }
-
-            CPubKey pubKeyOut(vchPubKey);
-            if (!pubKeyOut.IsValid())
+            else
             {
-                return state.DoS(100, error("ProcessRelay() : Invalid pubkey"),REJECT_INVALID, "bad-sigscript-pubkey");                
-            }        
-
-            pubkey=pubKeyOut;
-            
-            CHashWriter ss(SER_GETHASH, 0);
-            ss << vector<unsigned char>((unsigned char*)&message_hash, (unsigned char*)&message_hash+32);
-            ss << vector<unsigned char>((unsigned char*)&response_to_nonce, (unsigned char*)&response_to_nonce+sizeof(response_to_nonce));
-            uint256 signed_hash=ss.GetHash();
-
-            if(!pubkey.Verify(signed_hash,vchSigOut))
-            {
-                return state.DoS(100, error("ProcessRelay() : Wrong signature"),REJECT_INVALID, "bad-signature");                            
-            }        
-        }
-        else
-        {
-            return state.DoS(100, error("ProcessRelay() : Empty sigScript"),REJECT_INVALID, "bad-sigscript");                
+                return state.DoS(100, error("ProcessRelay() : Empty sigScript"),REJECT_INVALID, "bad-sigscript");                
+            }
         }
     }
     
@@ -759,8 +823,258 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     {
         itlim_msg->second.Increment();        
     }    
+
+    if(pto_stored)
+    {
+        PushRelay(pto_stored,msg_format,hop_count+1,msg_type_in,timestamp_received,nonce_received,timestamp_to_respond,nonce_to_respond,flags_in,
+                  vPayloadIn,vSigScripts,pfrom,MC_PRA_NONE);
+    }
+    else
+    {
+        if( (msg_type_relay_ptr != NULL) || (msg_type_response_ptr != NULL) )
+        {
+            if(MultichainRelayResponse(msg_type_stored,pto_stored,
+                                       msg_type_in,flags_in,vPayloadIn,vAddrIn,
+                                       msg_type_response_ptr,&flags_response,vPayloadResponse,vAddrResponse,
+                                       msg_type_relay_ptr,&flags_relay,vPayloadRelay,vAddrRelay,strError))
+            {
+                if(msg_type_response_ptr && *msg_type_response_ptr)
+                {
+                    if(*msg_type_response_ptr != MC_RMT_ADD_RESPONSE)
+                    {
+                        PushRelay(pfrom,0,0,*msg_type_response_ptr,m_LastTime,0,timestamp_received,nonce_received,flags_response,
+                                  vPayloadResponse,vSigScriptsEmpty,NULL,MC_PRA_GENERATE_NONCE);                    
+                    }
+                    else
+                    {
+                        map<int64_t, mc_RelayRequest>::iterator itreq = m_Requests.find(AggregateNonce(timestamp_to_respond,nonce_to_respond));
+                        if(itreq != m_Requests.end())
+                        {
+                            Lock();
+                            AddResponse(itreq->second.m_Nonce,pfrom,NULL,hop_count,AggregateNonce(timestamp_received,nonce_received),msg_type_in,flags_in,vPayloadIn,MC_RST_SUCCESS);
+                            UnLock();
+                        }                        
+                    }
+                }
+                if(msg_type_relay_ptr && *msg_type_relay_ptr)
+                {
+                    LOCK(cs_vNodes);
+                    BOOST_FOREACH(CNode* pnode, vNodes)
+                    {
+                        if(pnode != pfrom)
+                        {
+                            PushRelay(pnode,msg_format,hop_count+1,*msg_type_relay_ptr,timestamp_received,nonce_received,timestamp_to_respond,nonce_to_respond,flags_relay,
+                                      vPayloadRelay,vSigScriptsEmpty,pfrom,MC_PRA_NONE);
+                        }
+                    }
+                }                
+            }
+            else
+            {
+                LogPrintf("ProcessRelay() : Error processing request %08X from peer %d: %s\n",msg_type_in,pfrom->GetId(),strError.c_str());     
+                return false;                
+            }
+        }        
+    }
     
     return true;
+}
+
+/*
+typedef struct mc_RelayResponse
+{
+    int64_t m_Nonce;
+    uint32_t m_MsgType;
+    uint32_t m_Flags;
+    CNode *m_NodeFrom;
+    int m_HopCount;
+    mc_NodeFullAddress m_Source;
+    uint32_t m_LastTryTimestamp;
+    vector <unsigned char> m_Payload;
+    vector <mc_RelayRequest> m_Requests;
+    
+    void Zero();
+} mc_RelayResponse;
+
+typedef struct mc_RelayRequest
+{
+    int64_t m_Nonce;
+    uint32_t m_MsgType;
+    uint32_t m_Flags;
+    int64_t m_ParentNonce;
+    int m_ParentResponseID;
+    uint32_t m_LastTryTimestamp;
+    int m_TryCount;
+    uint32_t m_Status;
+    vector <unsigned char> m_Payload;   
+    vector <mc_RelayResponse> m_Responses;
+    
+    void Zero();
+} mc_RelayRequest;
+*/
+
+void mc_RelayResponse::Zero()
+{
+    m_Nonce=0;
+    m_MsgType=MC_RMT_NONE;
+    m_Flags=0;
+    m_NodeFrom=NULL;
+    m_HopCount=0;
+    m_Source.Zero();
+    m_LastTryTimestamp=0;
+    m_Status=MC_RST_NONE;
+    m_Payload.clear();
+    m_Requests.clear();    
+}
+
+void mc_RelayRequest::Zero()
+{
+    m_Nonce=0;
+    m_MsgType=MC_RMT_NONE;
+    m_Flags=0;
+    m_NodeTo=NULL;
+    m_ParentNonce=0;
+    m_ParentResponseID=-1;
+    m_LastTryTimestamp=0;
+    m_TryCount=0;
+    m_Status=MC_RST_NONE;
+    m_Payload.clear();   
+    m_Responses.clear();
+}
+
+int mc_RelayManager::AddRequest(int64_t parent_nonce,int parent_response_id,CNode *pto,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status)
+{    
+    int err=MC_ERR_NOERROR;
+ 
+    Lock();
+    map<int64_t, mc_RelayRequest>::iterator itreq_this = m_Requests.find(nonce);
+    if(itreq_this == m_Requests.end())
+    {    
+        mc_RelayRequest request;
+
+        request.m_Nonce=nonce;
+        request.m_MsgType=msg_type;
+        request.m_Flags=flags;
+        request.m_NodeTo=pto;
+        request.m_ParentNonce=parent_nonce;
+        request.m_ParentResponseID=parent_response_id;
+        request.m_LastTryTimestamp=0;
+        request.m_TryCount=0;
+        request.m_Status=status;
+        request.m_Payload=payload;   
+        request.m_Responses.clear();
+
+        if(parent_nonce)
+        {
+            map<int64_t, mc_RelayRequest>::iterator itreq = m_Requests.find(parent_nonce);
+            if(itreq != m_Requests.end())
+            {
+                if(parent_response_id < (int)(itreq->second.m_Responses.size()))
+                {
+                    itreq->second.m_Responses[parent_response_id].m_Requests.push_back(request);
+                }
+            }    
+            else
+            {
+                err=MC_ERR_NOT_FOUND;            
+            }
+        }
+
+        m_Requests.insert(make_pair(nonce,request));
+    }
+    else
+    {
+        err=MC_ERR_FOUND;
+    }    
+    
+    UnLock();
+    return err;            
+}
+
+int mc_RelayManager::AddResponse(int64_t request,CNode *pfrom,mc_NodeFullAddress *source,int hop_count,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status)
+{
+    if(request == 0)
+    {
+        return MC_ERR_NOERROR;
+    }
+    
+    mc_RelayResponse response;
+    response.m_Nonce=nonce;
+    response.m_MsgType=msg_type;
+    response.m_Flags=flags;
+    response.m_NodeFrom=pfrom;
+    response.m_HopCount=hop_count;
+    response.m_Source=*source;
+    response.m_LastTryTimestamp=0;
+    response.m_Status=status;
+    response.m_Payload=payload;
+    response.m_Requests.clear();    
+    
+    if(request)
+    {
+        map<int64_t, mc_RelayRequest>::iterator itreq = m_Requests.find(request);
+        if(itreq == m_Requests.end())
+        {    
+            itreq->second.m_Responses.push_back(response);
+            if(status & MC_RST_SUCCESS)
+            {
+                itreq->second.m_Status |= MC_RST_SUCCESS;
+            }
+            else
+            {
+                return MC_ERR_NOT_FOUND;
+            }
+        }
+    }
+    
+    return MC_ERR_NOERROR; 
+}
+
+int mc_RelayManager::DeleteRequest(int64_t request)
+{
+    int err=MC_ERR_NOERROR;
+
+    Lock();
+    map<int64_t, mc_RelayRequest>::iterator itreq = m_Requests.find(request);
+    if(itreq != m_Requests.end())
+    {
+        m_Requests.erase(itreq);       
+    }    
+    else
+    {
+        err= MC_ERR_NOT_FOUND;
+    }
+    
+    UnLock();
+    return err;     
+}
+
+
+int64_t mc_RelayManager::SendRequest(CNode* pto,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload)
+{
+    uint32_t timestamp=mc_TimeNowAsUInt();
+    uint32_t nonce=GenerateNonce();
+    int64_t aggr_nonce=AggregateNonce(timestamp,nonce);
+    
+    vector<CScript> vSigScriptsEmpty;
+
+    {
+        LOCK(cs_vNodes);
+        BOOST_FOREACH(CNode* pnode, vNodes)
+        {
+            if( (pto == NULL) && (pnode == pto) )
+            {
+                PushRelay(NULL,0,0,msg_type,timestamp,nonce,0,0,flags,payload,vSigScriptsEmpty,NULL,0);                    
+            }
+        }
+    }
+
+    if(AddRequest(0,0,pto,aggr_nonce,msg_type,flags,payload,MC_RST_NONE) != MC_ERR_NOERROR)
+    {
+        return 0;
+    }
+    
+    return aggr_nonce;
 }
 
 /*
@@ -1090,4 +1404,164 @@ bool ProcessMultichainRelay(CNode* pfrom, CDataStream& vRecv, CValidationState &
     return true;
 }
 
+/*
+void mc_RelayManager::PushRelay(CNode*    pto, 
+                                uint32_t  msg_format,        
+                                unsigned char hop_count,
+                                uint32_t  msg_type,
+                                uint32_t  timestamp_to_send,
+                                uint32_t  nonce_to_send,
+                                uint32_t  timestamp_to_respond,
+                                uint32_t  nonce_to_respond,
+                                uint32_t  flags,
+                                vector<unsigned char>& payload,
+                                vector<CScript>&  sigScripts_to_relay,
+                                CNode*    pfrom, 
+                                uint32_t  action)
+{
+    vector <unsigned char> vOriginAddress;
+    vector <unsigned char> vDestinationAddress;
+    vector<CScript>  sigScripts;
+    vector<unsigned char>vSigScript;
+    CScript sigScript;
+    uint256 message_hash;
+    uint32_t timestamp;     
+    uint32_t nonce;     
+    mc_NodeFullAddress origin_to_send;
+    mc_NodeFullAddress *origin;
+    mc_NodeFullAddress destination_to_send;
+    mc_NodeFullAddress *destination;
+    
+    nonce=nonce_to_send;
+    timestamp=timestamp_to_send;
+    
+    if(action & MC_PRA_GENERATE_TIMSTAMP)
+    {
+        timestamp=mc_TimeNowAsUInt();
+    }
+    
+    if(action & MC_PRA_GENERATE_NONCE)
+    {
+        GetRandBytes((unsigned char*)&nonce, sizeof(nonce));
+    }
 
+    if(action & (MC_PRA_MY_ORIGIN_MC_ADDRESS | MC_PRA_MY_ORIGIN_NT_ADDRESS) )
+    {
+        InitNodeAddress(&origin_to_send,pto,action);
+        origin=&origin_to_send;
+    }    
+    else
+    {
+        if(origin_to_relay)
+        {
+            origin=origin_to_relay;
+        }
+        else
+        {
+            origin=&origin_to_send;            
+        }
+    }
+    
+    destination=&destination_to_send;
+    if(action & MC_PRA_USE_DESTINATION_ADDRESS)
+    {
+        if(destination_to_relay)
+        {
+            destination=destination_to_relay;
+        }
+    }
+    
+    if(MCP_ANYONE_CAN_CONNECT == 0)
+    {
+        vOriginAddress.resize(sizeof(CKeyID));
+        memcpy(&vOriginAddress[0],&(origin->m_Address),sizeof(CKeyID));    
+        if(destination->m_Address != 0)
+        {
+            vDestinationAddress.resize(sizeof(CKeyID));
+            memcpy(&vOriginAddress[0],&(origin->m_Address),sizeof(CKeyID));        
+        }
+    }    
+    
+    message_hash=message_hash_to_relay;
+    
+    if(action & MC_PRA_CALCULATE_MESSAGE_HASH)
+    {
+        CHashWriter ssHash(SER_GETHASH, 0);
+        ssHash << nonce;
+        ssHash << msg_type;        
+        ssHash << vOriginAddress;
+        ssHash << origin->m_NetAddresses;
+        ssHash << vDestinationAddress;
+        ssHash << destination->m_NetAddresses;
+        ssHash << response_to_nonce;
+        ssHash << flags;
+        ssHash << payload;
+        message_hash=ssHash.GetHash();        
+    }
+    
+    if( (action & (MC_PRA_SIGN | MC_PRA_SIGN_WITH_HANDSHAKE_ADDRESS)) && (MCP_ANYONE_CAN_CONNECT == 0) )
+    {
+        CHashWriter ssSig(SER_GETHASH, 0);
+        ssSig << message_hash;
+        ssSig << vector<unsigned char>((unsigned char*)&response_to_nonce, (unsigned char*)&response_to_nonce+sizeof(response_to_nonce));
+        uint256 signed_hash=ssSig.GetHash();
+        CKey key;
+        CKeyID keyID;
+        CPubKey pkey;            
+
+        keyID=origin->m_Address;
+        if(action & MC_PRA_SIGN_WITH_HANDSHAKE_ADDRESS)
+        {
+            if(MCP_ANYONE_CAN_CONNECT == 0)
+            {
+                keyID=pto->kAddrLocal;
+            }
+        }                    
+        
+        if(pwalletMain->GetKey(keyID, key))
+        {
+            pkey=key.GetPubKey();
+            vector<unsigned char> vchSig;
+            sigScript.clear();
+            if (key.Sign(signed_hash, vchSig))
+            {
+                vchSig.push_back(0x00);
+                sigScript << vchSig;
+                sigScript << ToByteVector(pkey);
+            }
+            else
+            {
+                LogPrintf("PushRelay(): Internal error: Cannot sign\n");                
+            }
+        }
+        else
+        {
+            LogPrintf("PushRelay(): Internal error: Cannot find key for signature\n");
+        }
+        sigScripts.push_back(sigScript);
+    }    
+    
+    for(unsigned int i=0;i<sigScripts_to_relay.size();i++)
+    {
+        sigScripts.push_back(sigScripts_to_relay[i]);
+    }
+    
+    pto->PushMessage("relay",
+                        msg_type,
+                        nonce,
+                        vOriginAddress,
+                        origin->m_NetAddresses,
+                        vDestinationAddress,
+                        destination->m_NetAddresses,
+                        response_to_nonce,
+                        flags,
+                        payload,
+                        message_hash,
+                        path,
+                        sigScripts);        
+    
+    SetRelayRecord(pto,NULL,msg_type,nonce);
+    SetRelayRecord(pto,pfrom,msg_type,nonce);
+}
+    
+*/
