@@ -643,6 +643,7 @@ int CNetMessage::readHeader(const char *pch, unsigned int nBytes)
     nHdrPos += nCopy;
     
 //    mc_Dump("HEAD",pch,nCopy);
+//    mc_Dump("HEAD",pch,nBytes);
 
     // if header incomplete, exit
     if (nHdrPos < 24)
@@ -1475,9 +1476,12 @@ void ThreadOpenConnections()
         }
 
 /* MCHN START */        
-        if (addrConnect.IsValid())
+        if(!GetBoolArg("-addnodeonly",false))
         {
-            OpenNetworkConnection(addrConnect, &grant);
+            if (addrConnect.IsValid())
+            {
+                OpenNetworkConnection(addrConnect, &grant);
+            }
         }
 /* MCHN END */        
     }
@@ -1551,7 +1555,14 @@ void ThreadOpenAddedConnections()
             OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), &grant);
             MilliSleep(500);
         }
-        MilliSleep(120000); // Retry every 2 minutes
+        if(GetBoolArg("-addnodeonly",false))
+        {
+            MilliSleep(1000); // Retry every 1 second
+        }
+        else
+        {
+            MilliSleep(120000); // Retry every 2 minutes
+        }
     }
 }
 
