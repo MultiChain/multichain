@@ -5779,7 +5779,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         return false;
     }
 
-    else if (strCommand == "relay")
+    else if (strCommand == "offchain")
     {
         CValidationState state;        
         if(pRelayManager)

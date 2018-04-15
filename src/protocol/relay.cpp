@@ -2,21 +2,139 @@
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "protocol/relay.h"
+#include "structs/base58.h"
+
+bool mc_RelayProcess_Address_Query(unsigned char *ptrStart,unsigned char *ptrEnd,vector<unsigned char>* payload_response,vector<unsigned char>* payload_relay,string& strError)
+{
+    unsigned char *ptr;
+    unsigned char *ptrOut;
+    unsigned char buf[16];
+    int shift;
+    CKey key;
+    
+    ptr=ptrStart;
+    while(ptr<ptrEnd)
+    {
+        switch(*ptr)
+        {
+            case MC_RDT_MC_ADDRESS:
+                ptr++;
+                if(sizeof(CKeyID) != (ptrEnd-ptr))
+                {
+                    strError="Bad address query request";
+                    return false;
+                }
+
+                if(pwalletMain->GetKey(*(CKeyID*)ptr, key))
+                {
+                    if(payload_response)
+                    {
+                        shift=mc_PutVarInt(buf,16,pRelayManager->m_MyAddress.m_NetAddresses.size());
+                        payload_response->resize(1+sizeof(CKeyID)+1+shift+sizeof(CAddress)*pRelayManager->m_MyAddress.m_NetAddresses.size());
+                        ptrOut=&(*payload_response)[0];
+                        
+                        *ptrOut=MC_RDT_MC_ADDRESS;
+                        ptrOut++;
+                        *(CKeyID*)ptrOut=pRelayManager->m_MyAddress.m_Address;
+                        ptrOut+=sizeof(CKeyID);
+                        
+                        *ptrOut=MC_RDT_NET_ADDRESS;
+                        ptrOut++;
+                        memcpy(ptrOut,buf,shift);
+                        ptrOut+=shift;
+                        for(int i=0;i<(int)pRelayManager->m_MyAddress.m_NetAddresses.size();i++)
+                        {
+                            memcpy(ptrOut,&(pRelayManager->m_MyAddress.m_NetAddresses[i]),sizeof(CAddress));
+                            ptrOut+=sizeof(CAddress);
+                        }                        
+                    }
+                }
+                else
+                {
+                    if(payload_relay)
+                    {
+                        payload_relay->resize(ptrEnd-ptrStart);
+                        memcpy(&(*payload_relay)[0],ptrStart,ptrEnd-ptrStart);                    
+                    }
+                }
+                
+                ptr+=sizeof(CKeyID);
+                break;
+            default:
+                strError=strprintf("Unsupported request format (%d, %d)",MC_RMT_MC_ADDRESS_QUERY,*ptr);
+                return false;
+        }
+    }
+    
+    return true;
+}
 
 bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
                              uint32_t msg_type_in, uint32_t  flags, vector<unsigned char>& vPayloadIn,vector<CKeyID>&  vAddrIn,
                              uint32_t* msg_type_response,uint32_t  *flags_response,vector<unsigned char>& vPayloadResponse,vector<CKeyID>&  vAddrResponse,
                              uint32_t* msg_type_relay,uint32_t  *flags_relay,vector<unsigned char>& vPayloadRelay,vector<CKeyID>&  vAddrRelay,string& strError)
 {
+    unsigned char *ptr;
+    unsigned char *ptrEnd;
+    vector<unsigned char> *payload_relay_ptr=NULL;
+    vector<unsigned char> *payload_response_ptr=NULL;
+    
+    if(msg_type_response)
+    {
+        payload_response_ptr=&vPayloadResponse;
+    }
+    
+    if(msg_type_relay)
+    {
+        payload_relay_ptr=&vPayloadRelay;
+    }
+    
+    ptr=&vPayloadIn[0];
+    ptrEnd=ptr+vPayloadIn.size();
+            
     strError="";
     switch(msg_type_in)
     {
-        case MC_RMT_GLOBAL_PING:
+        case MC_RMT_MC_ADDRESS_QUERY:
             if(msg_type_stored)
             {
-                strError="Invalid response message type";
+                strError=strprintf("Unexpected response message type (%d,%d)",msg_type_stored,msg_type_in);;
                 goto exitlbl;
+            } 
+            if(payload_response_ptr == NULL)
+            {
+                if(payload_relay_ptr)
+                {
+                    vPayloadRelay=vPayloadIn;
+                    *msg_type_relay=msg_type_in;                    
+                }
             }
+            else
+            {
+                if(mc_RelayProcess_Address_Query(ptr,ptrEnd,payload_response_ptr,payload_relay_ptr,strError))
+                {
+                    if(payload_response_ptr && (payload_response_ptr->size() != 0))
+                    {
+                        *msg_type_response=MC_RMT_NODE_DETAILS;
+                    }
+                    if(payload_relay_ptr && (payload_relay_ptr->size() != 0))
+                    {
+                        *msg_type_relay=MC_RMT_MC_ADDRESS_QUERY;
+                    }
+                }
+            }
+            break;
+        case MC_RMT_NODE_DETAILS:
+            if(msg_type_stored != MC_RMT_MC_ADDRESS_QUERY)
+            {
+                strError=strprintf("Unexpected response message type (%d,%d)",msg_type_stored,msg_type_in);;
+                goto exitlbl;
+            } 
+            if(payload_response_ptr)
+            {
+                *msg_type_response=MC_RMT_ADD_RESPONSE;
+            }
+
             break;
     }
     
@@ -26,6 +144,7 @@ exitlbl:
     {
         return false;
     }
+
     return true;
 }
 
@@ -34,7 +153,7 @@ void mc_Limiter::Zero()
     memset(this,0,sizeof(mc_Limiter));    
 }
 
-int mc_Limiter::Intitialize(int seconds,int measures)
+int mc_Limiter::Initialize(int seconds,int measures)
 {
     Zero();
     
@@ -174,26 +293,60 @@ void mc_RelayManager::InitNodeAddress(mc_NodeFullAddress *node_address,CNode* pt
 {
     uint32_t pto_address_local;
     in_addr addr;
+    CKey key;
+    CPubKey pkey;            
+    bool key_found=false;
     
     if(action & MC_PRA_MY_ORIGIN_MC_ADDRESS)
     {
-        node_address->m_Address=pto->kAddrLocal;        
+        if(pto)
+        {
+            node_address->m_Address=pto->kAddrLocal;        
+        }
     }
     else
     {
-        node_address->m_Address=CKeyID(0);                
+        if(pto == NULL)
+        {
+            if(mapArgs.count("-handshakelocal"))
+            {
+                CBitcoinAddress address(mapArgs["-handshakelocal"]);
+                if (address.IsValid())    
+                {
+                    CTxDestination dst=address.Get();
+                    CKeyID *lpKeyID=boost::get<CKeyID> (&dst);
+                    if(lpKeyID)
+                    {
+                        if(pwalletMain->GetKey(*lpKeyID, key))
+                        {
+                            node_address->m_Address=*lpKeyID;
+                            key_found=true;
+                        }
+                    }
+                }        
+            }
+
+            if(!key_found)
+            {
+                if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_CONNECT))
+                {
+                    pkey=pwalletMain->vchDefaultKey;
+                }
+                node_address->m_Address=pkey.GetID();
+            }  
+        }
     }
     
     node_address->m_NetAddresses.clear();
     
+    pto_address_local=0;
     if(action & MC_PRA_MY_ORIGIN_NT_ADDRESS)
     {
         node_address->m_NetAddresses.push_back(CAddress(pto->addrLocal));
 
-        pto_address_local=0;
         if(pto->addrLocal.IsIPv4())
         {
-            pto_address_local=(pto->addrLocal.GetByte(3)<<24)+(pto->addrLocal.GetByte(2)<<16)+(pto->addrLocal.GetByte(1)<<8)+pto->addrLocal.GetByte(0);            
+            pto_address_local=(pto->addrLocal.GetByte(0)<<24)+(pto->addrLocal.GetByte(1)<<16)+(pto->addrLocal.GetByte(2)<<8)+pto->addrLocal.GetByte(3);            
             addr.s_addr=pto_address_local;
             node_address->m_NetAddresses.push_back(CAddress(CService(addr,GetListenPort())));
         }
@@ -230,7 +383,7 @@ void mc_RelayManager::MsgTypeSettings(uint32_t msg_type,int latency,int seconds,
         itlat->second=latency;
     }
     
-    limiter.Intitialize(seconds,2);
+    limiter.Initialize(seconds,2);
     limiter.SetLimit(0,serves_per_second);
     limiter.SetLimit(1,bytes_per_second);
     
@@ -266,9 +419,11 @@ void mc_RelayManager::Destroy()
     Zero();    
 }
 
-int mc_RelayManager::Intialize()
+int mc_RelayManager::Initialize()
 {
     m_Semaphore=__US_SemCreate();
+    InitNodeAddress(&m_MyAddress,NULL,MC_PRA_NONE);
+    SetDefaults();
     return MC_ERR_NOERROR;    
 }
 
@@ -301,17 +456,21 @@ int mc_RelayManager::Lock()
 
 void mc_RelayManager::SetDefaults()
 {
-    MsgTypeSettings(MC_RMT_NONE           , 0,10,1000,100*1024*1024);
-    MsgTypeSettings(MC_RMT_GLOBAL_PING    ,10,10, 100,  1*1024*1024);
-    MsgTypeSettings(MC_RMT_GLOBAL_PONG    , 0,10, 100,  1*1024*1024);
-    MsgTypeSettings(MC_RMT_GLOBAL_REJECT  , 0,10,1000,  1*1024*1024);
-    MsgTypeSettings(MC_RMT_CHUNK_QUERY    ,10,10, 100,  1*1024*1024);
-    MsgTypeSettings(MC_RMT_CHUNK_QUERY_HIT,30,10, 100,  1*1024*1024);
-    MsgTypeSettings(MC_RMT_CHUNK_REQUEST  ,30,10, 100,  1*1024*1024);
-    MsgTypeSettings(MC_RMT_CHUNK_RESPONSE , 0,10, 100,100*1024*1024);
+    MsgTypeSettings(MC_RMT_NONE            , 0,10,1000,100*1024*1024);
+    MsgTypeSettings(MC_RMT_MC_ADDRESS_QUERY,10,10, 100,  1*1024*1024);
+    MsgTypeSettings(MC_RMT_NODE_DETAILS    , 0,10, 100,  1*1024*1024);
+    MsgTypeSettings(MC_RMT_REJECT          , 0,10,1000,  1*1024*1024);
+    MsgTypeSettings(MC_RMT_CHUNK_QUERY     ,10,10, 100,  1*1024*1024);
+    MsgTypeSettings(MC_RMT_CHUNK_QUERY_HIT ,30,10, 100,  1*1024*1024);
+    MsgTypeSettings(MC_RMT_CHUNK_REQUEST   ,30,10, 100,  1*1024*1024);
+    MsgTypeSettings(MC_RMT_CHUNK_RESPONSE  , 0,10, 100,100*1024*1024);
+    MsgTypeSettings(MC_RMT_ERROR_IN_MESSAGE,30,10,1000,  1*1024*1024);
+    MsgTypeSettings(MC_RMT_NEW_REQUEST     ,30,10,1000,  1*1024*1024);
+    
     
     m_MinTimeShift=180;
     m_MaxTimeShift=180;
+    m_MaxResponses=16;
 }
 
 void mc_RelayManager::CheckTime()
@@ -333,6 +492,7 @@ void mc_RelayManager::CheckTime()
             it++;
         }
     }        
+    m_LastTime=time_now;
 }
 
 void mc_RelayManager::SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,uint32_t timestamp,uint32_t nonce)
@@ -361,6 +521,7 @@ void mc_RelayManager::SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,u
     }
     value.m_MsgType=msg_type;
     value.m_Timestamp=m_LastTime+itlat->second;
+    value.m_Count=1;
     
     map<const mc_RelayRecordKey, mc_RelayRecordValue>::iterator it = m_RelayRecords.find(key);
     if (it == m_RelayRecords.end())
@@ -369,8 +530,11 @@ void mc_RelayManager::SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,u
     }                    
     else
     {
+        value.m_Timestamp=(it->second).m_Timestamp;
+        value.m_Count=(it->second).m_Count;
         it->second=value;
     }    
+    printf("setrr: %d, ts: %u, nc: %u, mt: %d\n",pto_id,value.m_Timestamp,nonce,msg_type);
 }
 
 int mc_RelayManager::GetRelayRecord(CNode *pfrom,uint32_t timestamp,uint32_t nonce,uint32_t* msg_type,CNode **pto)
@@ -382,11 +546,17 @@ int mc_RelayManager::GetRelayRecord(CNode *pfrom,uint32_t timestamp,uint32_t non
     {
         pfrom_id=pfrom->GetId();
     }
+    printf("getrr: %d, ts: %u, nc: %u\n",pfrom_id,timestamp,nonce);
     const mc_RelayRecordKey key=mc_RelayRecordKey(timestamp,nonce,pfrom_id);
     map<mc_RelayRecordKey, mc_RelayRecordValue>::iterator it = m_RelayRecords.find(key);
     if (it == m_RelayRecords.end())
     {
         return MC_ERR_NOT_FOUND;
+    }
+    
+    if(it->second.m_MsgType == MC_RMT_ERROR_IN_MESSAGE)
+    {
+        return MC_ERR_ERROR_IN_SCRIPT;
     }
     
     if(msg_type)
@@ -418,6 +588,11 @@ int mc_RelayManager::GetRelayRecord(CNode *pfrom,uint32_t timestamp,uint32_t non
     }
     else
     {
+        it->second.m_Count+=1;
+        if(it->second.m_Count > m_MaxResponses)
+        {
+            return MC_ERR_NOT_ALLOWED;            
+        }
         return MC_ERR_NOERROR;                    
     }
     
@@ -449,6 +624,7 @@ int64_t mc_RelayManager::PushRelay(CNode*    pto,
 {
     vector <unsigned char> vOriginAddress;
     vector <unsigned char> vDestinationAddress;
+    vector <int32_t> vHops;
     vector<CScript>  sigScripts;
     CScript sigScript;
     uint256 message_hash;
@@ -522,9 +698,15 @@ int64_t mc_RelayManager::PushRelay(CNode*    pto,
         sigScripts.push_back(sigScripts_to_relay[i]);
     }
     
-    pto->PushMessage("relay",
+    if(pfrom)
+    {
+        vHops.push_back((int32_t)pfrom->GetId());
+    }
+    
+    printf("send: %d, to: %d, from: %d, size: %d, ts: %u, nc: %u\n",msg_type,pto->GetId(),pfrom ? pfrom->GetId() : 0,(int)payload.size(),timestamp,nonce);
+    pto->PushMessage("offchain",
                         msg_format,
-                        hop_count,
+                        vHops,
                         msg_type,
                         timestamp,
                         nonce,
@@ -534,11 +716,8 @@ int64_t mc_RelayManager::PushRelay(CNode*    pto,
                         payload,
                         sigScripts);        
     
-    SetRelayRecord(pto,NULL,msg_type,timestamp,nonce);
-    if(pfrom)
-    {
-        SetRelayRecord(pto,pfrom,msg_type,timestamp,nonce);
-    }
+//    SetRelayRecord(pto,NULL,msg_type,timestamp,nonce);
+    SetRelayRecord(pto,pfrom,msg_type,timestamp,nonce);
     
     return aggr_nonce;
 }
@@ -557,6 +736,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     vector<unsigned char> vPayloadIn;
     vector<CScript> vSigScripts;
     vector<CScript> vSigScriptsEmpty;
+    vector <int32_t> vHops;
     uint256   message_hash;
     uint32_t  flags_in,flags_response,flags_relay;
     vector<unsigned char> vchSigOut;
@@ -590,17 +770,18 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
         return false;        
     }
         
-    vRecv >> hop_count;
+    vRecv >> vHops;
+    hop_count=(int)vHops.size();
     vRecv >> msg_type_in;
     switch(msg_type_in)
     {
-        case MC_RMT_GLOBAL_PING:
+        case MC_RMT_MC_ADDRESS_QUERY:
             verify_flags |= MC_VRA_IS_NOT_RESPONSE;
             break;
-        case MC_RMT_GLOBAL_PONG:
+        case MC_RMT_NODE_DETAILS:
             verify_flags |= MC_VRA_IS_RESPONSE | MC_VRA_SIGNATURE_ORIGIN;
             break;
-        case MC_RMT_GLOBAL_REJECT:
+        case MC_RMT_REJECT:
             verify_flags |= MC_VRA_IS_RESPONSE | MC_VRA_SIGNATURE_ORIGIN;
             break;
         case MC_RMT_CHUNK_QUERY:
@@ -643,7 +824,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     }
         
     CheckTime();
-    
+        
     vRecv >> timestamp_received;
     
     if(verify_flags & MC_VRA_TIMESTAMP)
@@ -661,21 +842,30 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     }    
     
     vRecv >> nonce_received;    
+    
+    
     msg_type_relay_ptr=&msg_type_relay;
     msg_type_response_ptr=&msg_type_response;
     
     if( verify_flags & (MC_VRA_PROCESS_ONCE | MC_VRA_BROADCAST_ONCE))
     {
-        if(GetRelayRecord(NULL,timestamp_received,nonce_received,NULL,NULL) == MC_ERR_NOERROR)
+        switch(GetRelayRecord(NULL,timestamp_received,nonce_received,NULL,NULL))
         {
-            if(verify_flags & MC_VRA_PROCESS_ONCE)
-            {
-                return false;
-            }
-            if(verify_flags & MC_VRA_BROADCAST_ONCE)
-            {
-                msg_type_relay_ptr=NULL;
-            }
+            case MC_ERR_NOERROR:
+                if(verify_flags & MC_VRA_PROCESS_ONCE)
+                {
+                    return false;
+                }
+                if(verify_flags & MC_VRA_BROADCAST_ONCE)
+                {
+                    msg_type_relay_ptr=NULL;
+                }
+                break;
+            case MC_ERR_ERROR_IN_SCRIPT:                                        // We already processed this message, it has errors
+                return false;                                        
+            case MC_ERR_NOT_ALLOWED:
+                LogPrintf("ProcessRelay() : Processing this message is not allowed by current limits or requesting peer was disconnected\n");     
+                return false;                                        
         }
     }
     
@@ -706,6 +896,8 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
             return false;
         }
     }
+    
+    SetRelayRecord(NULL,pfrom,MC_RMT_ERROR_IN_MESSAGE,timestamp_received,nonce_received);
     
     if(timestamp_to_respond)
     {
@@ -750,6 +942,8 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     vRecv >> vPayloadIn;
     vRecv >> vSigScripts;
             
+    printf("recv: %d, from: %d, to: %d, size: %d, ts: %u, nc: %u\n",msg_type_in,pfrom->GetId(),pto_stored ? pto_stored->GetId() : 0,(int)vPayloadIn.size(),timestamp_received,nonce_received);
+    
     if( verify_flags & MC_VRA_SIGNATURES )
     {
         CHashWriter ssHash(SER_GETHASH, 0);
@@ -851,9 +1045,14 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
                         if(itreq != m_Requests.end())
                         {
                             Lock();
-                            AddResponse(itreq->second.m_Nonce,pfrom,NULL,hop_count,AggregateNonce(timestamp_received,nonce_received),msg_type_in,flags_in,vPayloadIn,MC_RST_SUCCESS);
+                            AddResponse(itreq->second.m_Nonce,pfrom,vHops.size() ? vHops[0] : 0,hop_count,AggregateNonce(timestamp_received,nonce_received),msg_type_in,flags_in,vPayloadIn,MC_RST_SUCCESS);
                             UnLock();
                         }                        
+                        else
+                        {
+                            LogPrintf("ProcessRelay() : Response without stored request from peer %d\n",pfrom->GetId());     
+                            return false;                            
+                        }
                     }
                 }
                 if(msg_type_relay_ptr && *msg_type_relay_ptr)
@@ -875,6 +1074,15 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
                 return false;                
             }
         }        
+    }
+    
+    if(timestamp_to_respond)
+    {
+        SetRelayRecord(NULL,pfrom,msg_type_in,timestamp_received,nonce_received);        
+    }
+    else
+    {
+        SetRelayRecord(NULL,pfrom,MC_RMT_NEW_REQUEST,timestamp_received,nonce_received);
     }
     
     return true;
@@ -920,7 +1128,7 @@ void mc_RelayResponse::Zero()
     m_Flags=0;
     m_NodeFrom=NULL;
     m_HopCount=0;
-    m_Source.Zero();
+    m_Source=0;
     m_LastTryTimestamp=0;
     m_Status=MC_RST_NONE;
     m_Payload.clear();
@@ -980,6 +1188,7 @@ int mc_RelayManager::AddRequest(int64_t parent_nonce,int parent_response_id,CNod
             }
         }
 
+        printf("rqst: %lu, mt: %d, node: %d, size: %d, pr: %lu\n",nonce,msg_type,pto ? pto->GetId() : 0,(int)payload.size(),parent_nonce);
         m_Requests.insert(make_pair(nonce,request));
     }
     else
@@ -991,8 +1200,9 @@ int mc_RelayManager::AddRequest(int64_t parent_nonce,int parent_response_id,CNod
     return err;            
 }
 
-int mc_RelayManager::AddResponse(int64_t request,CNode *pfrom,mc_NodeFullAddress *source,int hop_count,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status)
+int mc_RelayManager::AddResponse(int64_t request,CNode *pfrom,int32_t source,int hop_count,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status)
 {
+    printf("resp: %lu, mt: %d, node: %d, size: %d, rn: %lu\n",request,msg_type,pfrom ? pfrom->GetId() : 0,(int)payload.size(),nonce);
     if(request == 0)
     {
         return MC_ERR_NOERROR;
@@ -1004,7 +1214,7 @@ int mc_RelayManager::AddResponse(int64_t request,CNode *pfrom,mc_NodeFullAddress
     response.m_Flags=flags;
     response.m_NodeFrom=pfrom;
     response.m_HopCount=hop_count;
-    response.m_Source=*source;
+    response.m_Source=source;
     response.m_LastTryTimestamp=0;
     response.m_Status=status;
     response.m_Payload=payload;
@@ -1013,17 +1223,17 @@ int mc_RelayManager::AddResponse(int64_t request,CNode *pfrom,mc_NodeFullAddress
     if(request)
     {
         map<int64_t, mc_RelayRequest>::iterator itreq = m_Requests.find(request);
-        if(itreq == m_Requests.end())
+        if(itreq != m_Requests.end())
         {    
             itreq->second.m_Responses.push_back(response);
             if(status & MC_RST_SUCCESS)
             {
                 itreq->second.m_Status |= MC_RST_SUCCESS;
             }
-            else
-            {
-                return MC_ERR_NOT_FOUND;
-            }
+        }
+        else
+        {
+            return MC_ERR_NOT_FOUND;
         }
     }
     
@@ -1049,6 +1259,19 @@ int mc_RelayManager::DeleteRequest(int64_t request)
     return err;     
 }
 
+mc_RelayRequest *mc_RelayManager::FindRequest(int64_t request)
+{
+    Lock();
+    map<int64_t, mc_RelayRequest>::iterator itreq = m_Requests.find(request);
+    if(itreq != m_Requests.end())
+    {
+        return &(itreq->second);
+    }    
+    
+    UnLock();
+    return NULL;    
+}
+
 
 int64_t mc_RelayManager::SendRequest(CNode* pto,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload)
 {
@@ -1062,9 +1285,9 @@ int64_t mc_RelayManager::SendRequest(CNode* pto,uint32_t msg_type,uint32_t flags
         LOCK(cs_vNodes);
         BOOST_FOREACH(CNode* pnode, vNodes)
         {
-            if( (pto == NULL) && (pnode == pto) )
+            if( (pto == NULL) || (pnode == pto) )
             {
-                PushRelay(NULL,0,0,msg_type,timestamp,nonce,0,0,flags,payload,vSigScriptsEmpty,NULL,0);                    
+                PushRelay(pnode,0,0,msg_type,timestamp,nonce,0,0,flags,payload,vSigScriptsEmpty,NULL,0);                    
             }
         }
     }
@@ -1279,6 +1502,7 @@ bool MultichainRelayResponse(uint32_t msg_type_in,vector<CAddress>& path,vector<
                              uint32_t* msg_type_response,vector<unsigned char>& vPayloadResponse,
                              uint32_t* msg_type_relay,vector<unsigned char>& vPayloadRelay)
 {
+/*    
     switch(msg_type_in)
     {
         case MC_RMT_GLOBAL_PING:
@@ -1299,6 +1523,7 @@ bool MultichainRelayResponse(uint32_t msg_type_in,vector<CAddress>& path,vector<
             LogPrintf("PONG : %s\n",str_path.c_str());
             break;
     }
+ */ 
     return true;
 }
 

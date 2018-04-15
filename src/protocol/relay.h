@@ -42,14 +42,20 @@
 #define MC_VRA_DEFAULT                       0x03970000
 
 #define MC_RMT_NONE                                   0
-#define MC_RMT_GLOBAL_REJECT                 0x00000001
-#define MC_RMT_GLOBAL_PING                   0x00000002
-#define MC_RMT_GLOBAL_PONG                   0x00000003
+#define MC_RMT_REJECT                        0x00000001
+#define MC_RMT_MC_ADDRESS_QUERY              0x00000002
+#define MC_RMT_NODE_DETAILS                  0x00000003
 #define MC_RMT_CHUNK_QUERY                   0x00000101
 #define MC_RMT_CHUNK_QUERY_HIT               0x00000102
 #define MC_RMT_CHUNK_REQUEST                 0x00000103
 #define MC_RMT_CHUNK_RESPONSE                0x00000104
 #define MC_RMT_ADD_RESPONSE                  0x01000001
+#define MC_RMT_ERROR_IN_MESSAGE              0x01000002
+#define MC_RMT_NEW_REQUEST                   0x01000003
+
+#define MC_RDT_UNKNOWN                                0
+#define MC_RDT_MC_ADDRESS                             1
+#define MC_RDT_NET_ADDRESS                            2
 
 #define MC_LIM_MAX_SECONDS                60
 #define MC_LIM_MAX_MEASURES                4
@@ -82,7 +88,7 @@ typedef struct mc_Limiter
     int64_t m_Event[MC_LIM_MAX_MEASURES];
     int64_t m_Measures[MC_LIM_MAX_MEASURES*MC_LIM_MAX_SECONDS];
     void Zero();
-    int Intitialize(int seconds,int measures);
+    int Initialize(int seconds,int measures);
     int SetLimit(int meausure,int64_t limit);
     
     void CheckTime();
@@ -141,6 +147,7 @@ typedef struct mc_RelayRecordValue
     uint32_t m_MsgType;
     NodeId m_NodeFrom;
     uint32_t m_Timestamp;
+    int m_Count;
     
 } mc_RelayRecordValue;
 
@@ -153,7 +160,7 @@ typedef struct mc_RelayResponse
     uint32_t m_Flags;
     CNode *m_NodeFrom;
     int m_HopCount;
-    mc_NodeFullAddress m_Source;
+    int32_t m_Source;
     uint32_t m_LastTryTimestamp;
     uint32_t m_Status;
     vector <unsigned char> m_Payload;
@@ -192,13 +199,15 @@ typedef struct mc_RelayRequest
 typedef struct mc_RelayManager
 {
     uint32_t m_MyIPs[64];
+    int m_MaxResponses;
     int m_MyIPCount;
     uint32_t m_LastTime;    
     uint32_t m_MinTimeShift;
     uint32_t m_MaxTimeShift;
     void *m_Semaphore;                                                          
     uint64_t m_LockedBy;                                                        
-    
+    mc_NodeFullAddress m_MyAddress;
+            
     mc_RelayManager()
     {
         Zero();        
@@ -219,7 +228,7 @@ typedef struct mc_RelayManager
     int Lock();
     int Lock(int write_mode, int allow_secondary);
     void UnLock();        
-    int Intialize();
+    int Initialize();
     
     int64_t AggregateNonce(uint32_t timestamp,uint32_t nonce);
     uint32_t GenerateNonce();
@@ -252,8 +261,10 @@ typedef struct mc_RelayManager
                                 uint32_t verify_flags_in);
 
     int AddRequest(int64_t parent_nonce,int parent_response_id,CNode *pto,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status);
-    int AddResponse(int64_t request,CNode *pfrom,mc_NodeFullAddress *source,int hop_count,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status);
+    int AddResponse(int64_t request,CNode *pfrom,int32_t source,int hop_count,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status);
     int DeleteRequest(int64_t request);
+    mc_RelayRequest *FindRequest(int64_t request);
+    
     
     int64_t SendRequest(CNode* pto,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload);
 }   mc_RelayManager;

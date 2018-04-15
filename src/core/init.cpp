@@ -2382,6 +2382,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     if (!strErrors.str().empty())
         return InitError(strErrors.str());
 
+    pRelayManager->Initialize();
+    
 //    RandAddSeedPerfmon();
 
     //// debug print
