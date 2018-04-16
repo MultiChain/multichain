@@ -223,8 +223,8 @@ Value offchain(const Array& params, bool fHelp)
         }
         
         request_id=pRelayManager->SendRequest(pto,request_type,0,payload);
-        request_str+=strprintf(". Request ID: %lu",request_id);
-        printf("%s\n",request_str.c_str());        
+        printf("%s",request_str.c_str());        
+        printf(". Request ID: %lu\n",request_id);
     }    
 
     uint32_t time_now;
@@ -282,7 +282,7 @@ Value offchain(const Array& params, bool fHelp)
                                             }
                                             else
                                             {
-                                                for(int a;a<count;a++)
+                                                for(int a=0;a<count;a++)
                                                 {
                                                     node_addr.m_NetAddresses.push_back(*(CAddress*)ptr);
                                                     ptr+=sizeof(CAddress);
@@ -299,7 +299,7 @@ Value offchain(const Array& params, bool fHelp)
                                 {
                                     Array addresses;
                                     res.push_back(Pair("handshake",CBitcoinAddress(node_addr.m_Address).ToString()));
-                                    for(int a;a<(int)node_addr.m_NetAddresses.size();a++)
+                                    for(int a=0;a<(int)node_addr.m_NetAddresses.size();a++)
                                     {
                                         addresses.push_back(node_addr.m_NetAddresses[a].ToStringIPPort());                                        
                                     }                                    

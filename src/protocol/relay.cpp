@@ -346,7 +346,7 @@ void mc_RelayManager::InitNodeAddress(mc_NodeFullAddress *node_address,CNode* pt
 
         if(pto->addrLocal.IsIPv4())
         {
-            pto_address_local=(pto->addrLocal.GetByte(0)<<24)+(pto->addrLocal.GetByte(1)<<16)+(pto->addrLocal.GetByte(2)<<8)+pto->addrLocal.GetByte(3);            
+            pto_address_local=(pto->addrLocal.GetByte(3)<<24)+(pto->addrLocal.GetByte(2)<<16)+(pto->addrLocal.GetByte(1)<<8)+pto->addrLocal.GetByte(0);            
             addr.s_addr=pto_address_local;
             node_address->m_NetAddresses.push_back(CAddress(CService(addr,GetListenPort())));
         }
@@ -357,7 +357,7 @@ void mc_RelayManager::InitNodeAddress(mc_NodeFullAddress *node_address,CNode* pt
     {
         if(m_MyIPs[i] != pto_address_local)
         {
-            addr.s_addr=m_MyIPs[i];
+            addr.s_addr=htonl(m_MyIPs[i]);
             node_address->m_NetAddresses.push_back(CAddress(CService(addr,GetListenPort())));
         }
     }        
@@ -610,7 +610,7 @@ uint32_t mc_RelayManager::GenerateNonce()
 
 int64_t mc_RelayManager::PushRelay(CNode*    pto, 
                                 uint32_t  msg_format,        
-                                unsigned char hop_count,
+                                vector <int32_t> &vHops,
                                 uint32_t  msg_type,
                                 uint32_t  timestamp_to_send,
                                 uint32_t  nonce_to_send,
@@ -623,8 +623,7 @@ int64_t mc_RelayManager::PushRelay(CNode*    pto,
                                 uint32_t  action)
 {
     vector <unsigned char> vOriginAddress;
-    vector <unsigned char> vDestinationAddress;
-    vector <int32_t> vHops;
+    vector <unsigned char> vDestinationAddress;    
     vector<CScript>  sigScripts;
     CScript sigScript;
     uint256 message_hash;
@@ -703,7 +702,7 @@ int64_t mc_RelayManager::PushRelay(CNode*    pto,
         vHops.push_back((int32_t)pfrom->GetId());
     }
     
-    printf("send: %d, to: %d, from: %d, size: %d, ts: %u, nc: %u\n",msg_type,pto->GetId(),pfrom ? pfrom->GetId() : 0,(int)payload.size(),timestamp,nonce);
+    printf("send: %d, to: %d, from: %d, hc: %d, size: %d, ts: %u, nc: %u\n",msg_type,pto->GetId(),pfrom ? pfrom->GetId() : 0,(int)vHops.size(),(int)payload.size(),timestamp,nonce);
     pto->PushMessage("offchain",
                         msg_format,
                         vHops,
@@ -737,6 +736,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     vector<CScript> vSigScripts;
     vector<CScript> vSigScriptsEmpty;
     vector <int32_t> vHops;
+    vector <int32_t> vEmptyHops;
     uint256   message_hash;
     uint32_t  flags_in,flags_response,flags_relay;
     vector<unsigned char> vchSigOut;
@@ -869,6 +869,14 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
         }
     }
     
+    if(verify_flags & MC_VRA_DOUBLE_HOP)
+    {
+        if(hop_count)
+        {
+            msg_type_relay_ptr=NULL;
+        }
+    }
+    
         
     vRecv >> timestamp_to_respond;
     vRecv >> nonce_to_respond;
@@ -942,7 +950,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     vRecv >> vPayloadIn;
     vRecv >> vSigScripts;
             
-    printf("recv: %d, from: %d, to: %d, size: %d, ts: %u, nc: %u\n",msg_type_in,pfrom->GetId(),pto_stored ? pto_stored->GetId() : 0,(int)vPayloadIn.size(),timestamp_received,nonce_received);
+    printf("recv: %d, from: %d, to: %d, hc: %d, size: %d, ts: %u, nc: %u\n",msg_type_in,pfrom->GetId(),pto_stored ? pto_stored->GetId() : 0,hop_count,(int)vPayloadIn.size(),timestamp_received,nonce_received);
     
     if( verify_flags & MC_VRA_SIGNATURES )
     {
@@ -1020,7 +1028,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
 
     if(pto_stored)
     {
-        PushRelay(pto_stored,msg_format,hop_count+1,msg_type_in,timestamp_received,nonce_received,timestamp_to_respond,nonce_to_respond,flags_in,
+        PushRelay(pto_stored,msg_format,vHops,msg_type_in,timestamp_received,nonce_received,timestamp_to_respond,nonce_to_respond,flags_in,
                   vPayloadIn,vSigScripts,pfrom,MC_PRA_NONE);
     }
     else
@@ -1036,7 +1044,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
                 {
                     if(*msg_type_response_ptr != MC_RMT_ADD_RESPONSE)
                     {
-                        PushRelay(pfrom,0,0,*msg_type_response_ptr,m_LastTime,0,timestamp_received,nonce_received,flags_response,
+                        PushRelay(pfrom,0,vEmptyHops,*msg_type_response_ptr,m_LastTime,0,timestamp_received,nonce_received,flags_response,
                                   vPayloadResponse,vSigScriptsEmpty,NULL,MC_PRA_GENERATE_NONCE);                    
                     }
                     else
@@ -1062,7 +1070,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
                     {
                         if(pnode != pfrom)
                         {
-                            PushRelay(pnode,msg_format,hop_count+1,*msg_type_relay_ptr,timestamp_received,nonce_received,timestamp_to_respond,nonce_to_respond,flags_relay,
+                            PushRelay(pnode,msg_format,vHops,*msg_type_relay_ptr,timestamp_received,nonce_received,timestamp_to_respond,nonce_to_respond,flags_relay,
                                       vPayloadRelay,vSigScriptsEmpty,pfrom,MC_PRA_NONE);
                         }
                     }
@@ -1278,6 +1286,7 @@ int64_t mc_RelayManager::SendRequest(CNode* pto,uint32_t msg_type,uint32_t flags
     uint32_t timestamp=mc_TimeNowAsUInt();
     uint32_t nonce=GenerateNonce();
     int64_t aggr_nonce=AggregateNonce(timestamp,nonce);
+    vector <int32_t> vEmptyHops;
     
     vector<CScript> vSigScriptsEmpty;
 
@@ -1287,7 +1296,7 @@ int64_t mc_RelayManager::SendRequest(CNode* pto,uint32_t msg_type,uint32_t flags
         {
             if( (pto == NULL) || (pnode == pto) )
             {
-                PushRelay(pnode,0,0,msg_type,timestamp,nonce,0,0,flags,payload,vSigScriptsEmpty,NULL,0);                    
+                PushRelay(pnode,0,vEmptyHops,msg_type,timestamp,nonce,0,0,flags,payload,vSigScriptsEmpty,NULL,0);                    
             }
         }
     }

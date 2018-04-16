@@ -243,7 +243,7 @@ typedef struct mc_RelayManager
     
     int64_t PushRelay          (   CNode*    pto, 
                                 uint32_t  msg_format,        
-                                unsigned char hop_count,
+                                vector <int32_t> &vHops,
                                 uint32_t  msg_type,
                                 uint32_t  timestamp_to_send,
                                 uint32_t  nonce_to_send,
