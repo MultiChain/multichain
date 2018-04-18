@@ -4,6 +4,17 @@
 #include "multichain/multichain.h"
 #include "wallet/chunkcollector.h"
 
+void mc_ChunkEntityKey::Zero()
+{
+    memset(this,0, sizeof(mc_ChunkEntityKey));    
+}
+
+void mc_ChunkEntityValue::Zero()
+{
+    memset(this,0, sizeof(mc_ChunkEntityValue));    
+}
+
+
 void mc_ChunkCollectorRow::Zero()
 {
     memset(this,0, sizeof(mc_ChunkCollectorRow));
@@ -214,10 +225,10 @@ int mc_ChunkCollector::Initialize(mc_ChunkDB *chunk_db,const char *name,uint32_t
             {
                 return MC_ERR_CORRUPTED;            
             }
-            collect_row.m_Flags |= MC_CCF_INSERTED;
-            if(m_ChunkDB->GetChunkDef(&chunk_def,collect_row.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
+            collect_row.m_State.m_Status |= MC_CCF_INSERTED;
+            if(m_ChunkDB->GetChunkDef(&chunk_def,collect_row.m_ChunkDef.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
             {
-                collect_row.m_Flags |= MC_CCF_DELETED;
+                collect_row.m_State.m_Status |= MC_CCF_DELETED;
             }
             m_MemPool->Add(&collect_row);
             if(ptr)
@@ -272,12 +283,12 @@ int mc_ChunkCollector::InsertChunkInternal(
     int mprow;
     
     collect_row.Zero();
-    memcpy(collect_row.m_Hash,hash,MC_CDB_CHUNK_HASH_SIZE);
-    memcpy(&collect_row.m_Entity,entity,sizeof(mc_TxEntity));
+    memcpy(collect_row.m_ChunkDef.m_Hash,hash,MC_CDB_CHUNK_HASH_SIZE);
+    memcpy(&collect_row.m_ChunkDef.m_Entity,entity,sizeof(mc_TxEntity));
     memcpy(collect_row.m_TxID,txid,MC_TDB_TXID_SIZE);
     collect_row.m_Vout=vout;
-    collect_row.m_Size=chunk_size;
-    collect_row.m_Flags=MC_CCF_NEW;
+    collect_row.m_ChunkDef.m_Size=chunk_size;
+    collect_row.m_State.m_Status=MC_CCF_NEW;
     
     mprow=m_MemPool->Seek(&collect_row);
     if(mprow<0)
@@ -303,11 +314,11 @@ int mc_ChunkCollector::MarkAndClear(uint32_t flag, int unmark)
             row=(mc_ChunkCollectorRow *)m_MemPool->GetRow(mprow);
             if(unmark)
             {
-                row->m_Flags &= ~flag;
+                row->m_State.m_Status &= ~flag;
             }
             else
             {
-                row->m_Flags |= flag;
+                row->m_State.m_Status |= flag;
             }
         }
     }
@@ -333,7 +344,7 @@ int mc_ChunkCollector::CopyFlags()
         if(mprow >= 0)
         {
             row=(mc_ChunkCollectorRow *)m_MemPool->GetRow(mprow);
-            row->m_Flags=mark_row->m_Flags;
+            row->m_State.m_Status=mark_row->m_State.m_Status;
         }
     }
     
@@ -355,7 +366,7 @@ int mc_ChunkCollector::FillMarkPoolByHash(const unsigned char *hash)
     for(i=0;i<m_MemPool->GetCount();i++)
     {
         row=(mc_ChunkCollectorRow *)m_MemPool->GetRow(i);        
-        if(memcmp(row->m_Hash,hash,MC_CDB_CHUNK_HASH_SIZE) == 0)
+        if(memcmp(row->m_ChunkDef.m_Hash,hash,MC_CDB_CHUNK_HASH_SIZE) == 0)
         {
             m_MarkPool->Add(row);
         }
@@ -378,9 +389,9 @@ int mc_ChunkCollector::FillMarkPoolByFlag(uint32_t flag, uint32_t not_flag)
     for(i=0;i<m_MemPool->GetCount();i++)
     {
         row=(mc_ChunkCollectorRow *)m_MemPool->GetRow(i);        
-        if(row->m_Flags & flag)
+        if(row->m_State.m_Status & flag)
         {
-            if( (row->m_Flags & not_flag) == 0)
+            if( (row->m_State.m_Status & not_flag) == 0)
             {
                 m_MarkPool->Add(row);
             }
@@ -428,9 +439,9 @@ int mc_ChunkCollector::CommitInternal()
     {
         row=(mc_ChunkCollectorRow *)m_MemPool->GetRow(i);        
         
-        if(row->m_Flags & MC_CCF_DELETED)
+        if(row->m_State.m_Status & MC_CCF_DELETED)
         {
-            if(row->m_Flags & MC_CCF_INSERTED)
+            if(row->m_State.m_Status & MC_CCF_INSERTED)
             {
                 commit_required=1;
                 m_DB->Delete((char*)row+m_KeyOffset,m_KeySize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
@@ -438,7 +449,7 @@ int mc_ChunkCollector::CommitInternal()
         }
         else
         {
-            if( (row->m_Flags & MC_CCF_INSERTED) == 0 )
+            if( (row->m_State.m_Status & MC_CCF_INSERTED) == 0 )
             {
                 commit_required=1;
                 m_DB->Write((char*)row+m_KeyOffset,m_KeySize,(char*)row+m_ValueOffset,m_ValueDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
@@ -464,3 +475,4 @@ int mc_ChunkCollector::CommitInternal()
     
     return err;
 }
+

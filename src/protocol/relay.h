@@ -56,6 +56,8 @@
 #define MC_RDT_UNKNOWN                                0
 #define MC_RDT_MC_ADDRESS                             1
 #define MC_RDT_NET_ADDRESS                            2
+#define MC_RDT_CHUNK_IDS                             11
+#define MC_RDT_CHUNKS                                12
 
 #define MC_LIM_MAX_SECONDS                60
 #define MC_LIM_MAX_MEASURES                4
@@ -65,8 +67,11 @@
 #define MC_RST_SUCCESS                       0x00000002
 #define MC_RST_PERMANENT_FAILURE             0x00000004
 #define MC_RST_TEMPORARY_FAILURE             0x00000008
+#define MC_RST_DISCONNECTED                  0x00000010
 
 using namespace std;
+
+struct mc_ChunkCollector;
 
 bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
                              uint32_t msg_type_in, uint32_t  flags, vector<unsigned char>& vPayloadIn,vector<CKeyID>&  vAddrIn,
@@ -74,7 +79,7 @@ bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
                              uint32_t* msg_type_relay,uint32_t  *flags_relay,vector<unsigned char>& vPayloadRelay,vector<CKeyID>&  vAddrRelay,
                              string& strError);
 
-
+int MultichainCollectChunks(mc_ChunkCollector* collector);
 
 
 
@@ -158,8 +163,9 @@ typedef struct mc_RelayResponse
     int64_t m_Nonce;
     uint32_t m_MsgType;
     uint32_t m_Flags;
-    CNode *m_NodeFrom;
+    NodeId m_NodeFrom;
     int m_HopCount;
+    int m_TryCount;
     int32_t m_Source;
     uint32_t m_LastTryTimestamp;
     uint32_t m_Status;
@@ -179,7 +185,7 @@ typedef struct mc_RelayRequest
     int64_t m_Nonce;
     uint32_t m_MsgType;
     uint32_t m_Flags;
-    CNode *m_NodeTo;
+    NodeId m_NodeTo;
     int64_t m_ParentNonce;
     int m_ParentResponseID;
     uint32_t m_LastTryTimestamp;
@@ -231,6 +237,8 @@ typedef struct mc_RelayManager
     int Initialize();
     
     int64_t AggregateNonce(uint32_t timestamp,uint32_t nonce);
+    uint32_t Timestamp(int64_t aggr_nonce);
+    uint32_t Nonce(int64_t aggr_nonce);
     uint32_t GenerateNonce();
     void SetDefaults();
     void SetMyIPs(uint32_t *ips,int ip_count);
@@ -263,10 +271,12 @@ typedef struct mc_RelayManager
     int AddRequest(int64_t parent_nonce,int parent_response_id,CNode *pto,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status);
     int AddResponse(int64_t request,CNode *pfrom,int32_t source,int hop_count,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status);
     int DeleteRequest(int64_t request);
+    int ProcessRequest(int64_t request);
     mc_RelayRequest *FindRequest(int64_t request);
-    
+    void InvalidateResponsesFromDisconnected();
     
     int64_t SendRequest(CNode* pto,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload);
+    int64_t SendNextRequest(mc_RelayResponse* response,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload);
 }   mc_RelayManager;
 
 

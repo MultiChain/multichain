@@ -12,17 +12,47 @@
 #define MC_CCF_NEW                        0x00000000 
 #define MC_CCF_INSERTED                   0x00000001 
 #define MC_CCF_DELETED                    0x00000002 
+#define MC_CCF_SELECTED                   0x00000004 
+#define MC_CCF_WRONG_SIZE                 0x00010000 
+#define MC_CCF_ERROR_MASK                 0x00FF0000 
 #define MC_CCF_ALL                        0xFFFFFFFF
 
+#define MC_CCW_TIMEOUT_QUERY                      60
+#define MC_CCW_TIMEOUT_REQUEST                     5
+#define MC_CCW_MAX_CHUNKS_PER_QUERY               64
+#define MC_CCW_WORST_RESPONSE_SCORE             1000
 
-typedef struct mc_ChunkCollectorRow
+
+typedef struct mc_ChunkEntityKey
 {
     unsigned char m_Hash[MC_CDB_CHUNK_HASH_SIZE];                               // Chunk hash
     mc_TxEntity m_Entity;
-    unsigned char m_TxID[MC_TDB_TXID_SIZE];                               
-    int m_Vout;
     uint32_t m_Size;
     uint32_t m_Flags;
+    
+    void Zero();
+} mc_ChunkEntityKey;
+
+typedef struct mc_ChunkEntityValue
+{
+    int64_t m_Query;
+    uint32_t m_QueryTimeStamp;
+    uint32_t m_QueryAttempts;
+    uint32_t m_QueryNextAttempt;
+    int64_t m_Request;
+    uint32_t m_RequestTimeStamp;
+    uint32_t m_RequestPos;
+    uint32_t m_Status;
+    
+    void Zero();
+} mc_ChunkEntityValue;
+
+typedef struct mc_ChunkCollectorRow
+{
+    mc_ChunkEntityKey m_ChunkDef;
+    unsigned char m_TxID[MC_TDB_TXID_SIZE];                               
+    int m_Vout;
+    mc_ChunkEntityValue m_State;
     
     void Zero();
 } mc_ChunkCollectorRow;
@@ -88,7 +118,7 @@ typedef struct mc_ChunkCollector
     int CopyFlags();    
     int FillMarkPoolByHash(const unsigned char *hash);    
     int FillMarkPoolByFlag(uint32_t flag, uint32_t not_flag);    
-    
+        
     int Commit();                                                      
     int CommitInternal(); 
     

@@ -304,6 +304,7 @@ Value offchain(const Array& params, bool fHelp)
                                         addresses.push_back(node_addr.m_NetAddresses[a].ToStringIPPort());                                        
                                     }                                    
                                     res.push_back(Pair("addresses",addresses));
+                                    res.push_back(Pair("neighbour",response->m_Source ? false : true));
                                     res_found=true;
                                 }
                             }
