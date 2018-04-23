@@ -134,24 +134,27 @@ void mc_ChunkCollector::Dump(const char *message)
 
     mc_LogString(fHan,message);     
     
-    fprintf(fHan,"\nDB\n");
-    dbrow.Zero();    
-    ptr=(unsigned char*)m_DB->Read((char*)&dbrow+m_KeyOffset,m_KeySize,&dbvalue_len,MC_OPT_DB_DATABASE_SEEK_ON_READ,&err);
-    if(err)
+    if(m_DB)
     {
-        return;
-    }
-
-    if(ptr)
-    {
-        memcpy((char*)&dbrow+m_ValueOffset,ptr,m_ValueDBSize);
-        while(ptr)
+        fprintf(fHan,"\nDB\n");
+        dbrow.Zero();    
+        ptr=(unsigned char*)m_DB->Read((char*)&dbrow+m_KeyOffset,m_KeySize,&dbvalue_len,MC_OPT_DB_DATABASE_SEEK_ON_READ,&err);
+        if(err)
         {
-            mc_MemoryDumpCharSizeToFile(fHan,(char*)&dbrow+m_KeyOffset,0,m_TotalDBSize,56);        
-            ptr=(unsigned char*)m_DB->MoveNext(&err);
-            if(ptr)
+            return;
+        }
+
+        if(ptr)
+        {
+            memcpy((char*)&dbrow+m_ValueOffset,ptr,m_ValueDBSize);
+            while(ptr)
             {
-                memcpy((char*)&dbrow+m_KeyOffset,ptr,m_TotalDBSize);            
+                mc_MemoryDumpCharSizeToFile(fHan,(char*)&dbrow+m_KeyOffset,0,m_TotalDBSize,56);        
+                ptr=(unsigned char*)m_DB->MoveNext(&err);
+                if(ptr)
+                {
+                    memcpy((char*)&dbrow+m_KeyOffset,ptr,m_TotalDBSize);            
+                }
             }
         }
     }
@@ -173,21 +176,24 @@ int mc_ChunkCollector::Initialize(mc_ChunkDB *chunk_db,const char *name,uint32_t
     mc_ChunkDBRow chunk_def;
     unsigned char *ptr;
     
-    strcpy(m_Name,name);
-    
-    m_DB=new mc_Database;
-    
-    mc_GetFullFileName(name,"chunks/collect",".db",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,m_DBName);
-    
-    m_DB->SetOption("KeySize",0,m_KeySize);
-    m_DB->SetOption("ValueSize",0,m_ValueDBSize);
-    
-    
-    err=m_DB->Open(m_DBName,MC_OPT_DB_DATABASE_CREATE_IF_MISSING | MC_OPT_DB_DATABASE_TRANSACTIONAL | MC_OPT_DB_DATABASE_LEVELDB);
-    
-    if(err)
+    if(name)
     {
-        return err;
+        strcpy(m_Name,name);
+
+        m_DB=new mc_Database;
+
+        mc_GetFullFileName(name,"chunks/collect",".db",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,m_DBName);
+
+        m_DB->SetOption("KeySize",0,m_KeySize);
+        m_DB->SetOption("ValueSize",0,m_ValueDBSize);
+
+
+        err=m_DB->Open(m_DBName,MC_OPT_DB_DATABASE_CREATE_IF_MISSING | MC_OPT_DB_DATABASE_TRANSACTIONAL | MC_OPT_DB_DATABASE_LEVELDB);
+
+        if(err)
+        {
+            return err;
+        }
     }
 
     m_InitMode=mode;
@@ -205,50 +211,53 @@ int mc_ChunkCollector::Initialize(mc_ChunkDB *chunk_db,const char *name,uint32_t
     
     collect_row.Zero();
     
-    ptr=(unsigned char*)m_DB->Read((char*)&collect_row+m_KeyOffset,m_KeySize,&value_len,MC_OPT_DB_DATABASE_SEEK_ON_READ,&err);
-    if(err)
+    if(m_DB)
     {
-        return err;
-    }
-
-    if(ptr)                                                                     
-    {   
-        ptr=(unsigned char*)m_DB->MoveNext(&err);
-        if(ptr)
+        ptr=(unsigned char*)m_DB->Read((char*)&collect_row+m_KeyOffset,m_KeySize,&value_len,MC_OPT_DB_DATABASE_SEEK_ON_READ,&err);
+        if(err)
         {
-            memcpy((char*)&collect_row,ptr,m_TotalDBSize);
+            return err;
         }
-        while(ptr)
-        {
+
+        if(ptr)                                                                     
+        {   
             ptr=(unsigned char*)m_DB->MoveNext(&err);
-            if(err)
-            {
-                return MC_ERR_CORRUPTED;            
-            }
-            collect_row.m_State.m_Status |= MC_CCF_INSERTED;
-            if(m_ChunkDB->GetChunkDef(&chunk_def,collect_row.m_ChunkDef.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
-            {
-                collect_row.m_State.m_Status |= MC_CCF_DELETED;
-            }
-            m_MemPool->Add(&collect_row);
             if(ptr)
             {
                 memcpy((char*)&collect_row,ptr,m_TotalDBSize);
             }
-        }        
-    }
-    else
-    {
-        err=m_DB->Write((char*)&collect_row+m_KeyOffset,m_KeySize,(char*)&collect_row+m_ValueOffset,m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
-        if(err)
+            while(ptr)
+            {
+                ptr=(unsigned char*)m_DB->MoveNext(&err);
+                if(err)
+                {
+                    return MC_ERR_CORRUPTED;            
+                }
+                collect_row.m_State.m_Status |= MC_CCF_INSERTED;
+                if(m_ChunkDB->GetChunkDef(&chunk_def,collect_row.m_ChunkDef.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
+                {
+                    collect_row.m_State.m_Status |= MC_CCF_DELETED;
+                }
+                m_MemPool->Add(&collect_row);
+                if(ptr)
+                {
+                    memcpy((char*)&collect_row,ptr,m_TotalDBSize);
+                }
+            }        
+        }
+        else
         {
-            return err;     
-        }              
-        err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
-        if(err)
-        {
-            return err;
-        }                
+            err=m_DB->Write((char*)&collect_row+m_KeyOffset,m_KeySize,(char*)&collect_row+m_ValueOffset,m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+            if(err)
+            {
+                return err;     
+            }              
+            err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
+            if(err)
+            {
+                return err;
+            }                
+        }
     }
     
     Dump("Initialize");
@@ -421,6 +430,11 @@ int mc_ChunkCollector::CommitInternal()
     int err,commit_required;
 
     err=MC_ERR_NOERROR;
+    
+    if(m_DB == NULL)
+    {
+        return MC_ERR_NOT_ALLOWED;
+    }
     
     if(m_MemPool == m_MemPool1)
     {

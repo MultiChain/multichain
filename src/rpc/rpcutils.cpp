@@ -1325,6 +1325,24 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     }
 	format_item_value=OpReturnFormatEntry(elem,out_size,tx.GetHash(),n,format,&format_text_str,retrieve_status);
     
+    if(retrieve_status & MC_OST_CONTROL_NO_DATA)
+    {
+        if(format_item_value.type() == obj_type)
+        {
+            int chunk_shift;
+            mc_GetVarInt(chunk_hashes,MC_CDB_CHUNK_HASH_SIZE+16,-1,&chunk_shift);
+            chunk_hashes+=chunk_shift;
+            Array chunks;
+
+            for(int chunk=0;chunk<chunk_count;chunk++)
+            {
+                chunks.push_back(((uint256*)chunk_hashes)->ToString());
+                chunk_hashes+=MC_CDB_CHUNK_HASH_SIZE;
+            }        
+            format_item_value.get_obj().push_back(Pair("chunks", chunks));
+        }
+    }
+    
     already_seen.insert(hash);
     
     publishers_set.clear();

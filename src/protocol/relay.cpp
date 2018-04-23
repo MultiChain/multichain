@@ -41,6 +41,7 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
     mc_RelayRequest *request;
     mc_RelayResponse *response;
     request=pRelayManager->FindRequest(response_pair->request_id);
+    
     if(request == NULL)
     {
         return false;
@@ -68,7 +69,7 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
     
     ptr=ptrStart;
     ptrEnd=ptr+request->m_Payload.size();
-    
+        
     while(ptr<ptrEnd)
     {
         switch(*ptr)
@@ -92,6 +93,7 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
         }
     }
     
+
     if(response->m_Payload.size() != 1+shift+total_size)
     {
         goto exitlbl;        
@@ -102,6 +104,7 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
     {
         goto exitlbl;                
     }
+    
     ptrOut++;
     countOut=(int)mc_GetVarInt(ptrOut,1+shift+total_size,-1,&shiftOut);
     if( (countOut != count) || (shift != shiftOut) )
@@ -121,7 +124,7 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
         {
             collect_row=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(itreq->second);
             uint256 hash;
-            mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(&ptrOut,sizeOut,&hash);
+            mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(ptrOut,sizeOut,&hash);
             if(memcmp(&hash,chunk->m_Hash,sizeof(uint256)))
             {
                 goto exitlbl;                                        
@@ -254,6 +257,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                 {
                     response_pair.request_id=collect_row->m_State.m_Request;
                     response_pair.response_id=0;
+                    printf("coll new rsp: row: %d, id: %lu, %d\n",row,collect_row->m_State.m_Request,collect_row->m_State.m_RequestPos);
                     map<CRelayResponsePair,CRelayRequestPairs>::iterator itrsp = responses_to_process.find(response_pair);
                     if (itrsp == responses_to_process.end())
                     {
@@ -265,11 +269,12 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                     {
                         itrsp->second.m_Pairs.insert(make_pair(collect_row->m_State.m_RequestPos,row));
                     }                    
-                }
+                }            
                 pRelayManager->UnLock();
             }
             else
             {
+                query=NULL;
                 if(collect_row->m_State.m_Query)
                 {
                     query=pRelayManager->FindRequest(collect_row->m_State.m_Query);
@@ -278,6 +283,9 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                         collect_row->m_State.m_Query=0;
                         collect_row->m_State.m_QueryNextAttempt=time_now+MultichainNextChunkQueryAttempt(collect_row->m_State.m_QueryAttempts);                                                
                     }
+                }
+                if(query)
+                {
                     best_response=-1;
                     best_score=MC_CCW_WORST_RESPONSE_SCORE;
                     for(int i=0;i<(int)query->m_Responses.size();i++)
@@ -289,6 +297,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                             best_response=i;
                         }
                     }
+                    printf("coll new req: row: %d, id:  %lu, rsps: %d, score (%d,%d)\n",row,collect_row->m_State.m_Query,(int)query->m_Responses.size(),best_score,best_response);
                     if(best_response >= 0)
                     {
                         response_pair.request_id=collect_row->m_State.m_Query;
@@ -306,6 +315,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                         }                    
                     }
                 }
+                pRelayManager->UnLock();
             }
         }        
     }
@@ -321,6 +331,10 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         shift=mc_PutVarInt(buf,16,requests_to_send.size());
         payload.resize(1+shift+sizeof(mc_ChunkEntityKey)*requests_to_send.size());
         ptrOut=&(payload[0]);
+        *ptrOut=MC_RDT_CHUNK_IDS;
+        ptrOut++;
+        memcpy(ptrOut,buf,shift);
+        ptrOut+=shift;
         count=0;
         BOOST_FOREACH(PAIRTYPE(const int, int)& chunk_row, item.second.m_Pairs)    
         {                
@@ -343,6 +357,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         {                
             collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(chunk_row.first);
             collect_subrow->m_State.m_Request=request_id;
+            collect_row->m_State.m_RequestTimeStamp=time_now+MC_CCW_TIMEOUT_REQUEST;
         }
     }
 
@@ -373,7 +388,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                 ptrOut+=shift;
                 for(int r=last_row;r<row;r++)
                 {
-                    collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(row);
+                    collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(r);
                     if(collect_subrow->m_State.m_Status & MC_CCF_SELECTED)
                     {
                         memcpy(ptrOut,&(collect_subrow->m_ChunkDef),sizeof(mc_ChunkEntityKey));
@@ -383,9 +398,10 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                 query_id=pRelayManager->SendRequest(NULL,MC_RMT_CHUNK_QUERY,0,payload);
                 for(int r=last_row;r<row;r++)
                 {
-                    collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(row);
+                    collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(r);
                     if(collect_subrow->m_State.m_Status & MC_CCF_SELECTED)
                     {
+                        printf("coll new qry: row: %d, id: %lu: att: %d\n",r,query_id,collect_subrow->m_State.m_QueryAttempts);
                         collect_subrow->m_State.m_Status -= MC_CCF_SELECTED;
                         collect_subrow->m_State.m_Query=query_id;
                         collect_subrow->m_State.m_QueryAttempts+=1;
@@ -606,6 +622,7 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
                 }
                 
                 chunk_found=mc_gState->m_TmpBuffers->m_RelayTmpBuffer->GetData(0,&chunk_bytes);
+                shift=mc_PutVarInt(buf,16,count);
                 payload_response->resize(1+shift+chunk_bytes);
                 ptrOut=&(*payload_response)[0];
                 
@@ -714,6 +731,7 @@ bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
     ptr=&vPayloadIn[0];
     ptrEnd=ptr+vPayloadIn.size();
             
+//    mc_DumpSize("H",ptr,ptrEnd-ptr,32);
     strError="";
     switch(msg_type_in)
     {
@@ -828,7 +846,7 @@ bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
             }            
             break;
         case MC_RMT_CHUNK_RESPONSE:
-            if(msg_type_stored != MC_RMT_CHUNK_QUERY_HIT)
+            if(msg_type_stored != MC_RMT_CHUNK_REQUEST)
             {
                 strError=strprintf("Unexpected response message type (%d,%d)",msg_type_stored,msg_type_in);;
                 goto exitlbl;

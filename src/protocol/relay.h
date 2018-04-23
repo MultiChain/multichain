@@ -52,6 +52,9 @@
 #define MC_RMT_ADD_RESPONSE                  0x01000001
 #define MC_RMT_ERROR_IN_MESSAGE              0x01000002
 #define MC_RMT_NEW_REQUEST                   0x01000003
+#define MC_RMT_SPECIAL_MASK                  0x10000000
+#define MC_RMT_SPECIAL_COLLECT_CHUNKS        0x10000001
+#define MC_RMT_SPECIAL_VIEW_CHUNKS           0x10000002
 
 #define MC_RDT_UNKNOWN                                0
 #define MC_RDT_MC_ADDRESS                             1

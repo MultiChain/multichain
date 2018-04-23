@@ -1,9 +1,12 @@
 // Copyright (c) 2014-2017 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
+#include "core/init.h"
 #include "rpc/rpcutils.h"
 #include "protocol/relay.h"
+#include "wallet/wallettxs.h"
 #include "net/net.h"
+void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity);
 
 
 Value createbinarycache(const Array& params, bool fHelp)
@@ -127,7 +130,9 @@ Value offchain(const Array& params, bool fHelp)
     string request_str="";
     mc_RelayRequest *request;
     mc_RelayResponse *response;
+    int attempts,delay; 
     Object res;
+    mc_ChunkCollector collector;
     bool res_found=false;
             
     if(params[0].type() == str_type)
@@ -137,6 +142,15 @@ Value offchain(const Array& params, bool fHelp)
             request_type=MC_RMT_MC_ADDRESS_QUERY;
             request_str="query for address ";
         }
+        if(params[0].get_str() == "getchunks")
+        {            
+            request_type=MC_RMT_SPECIAL_COLLECT_CHUNKS;
+            request_str="query for address ";
+        }        
+        if(params[0].get_str() == "viewchunks")
+        {            
+            request_type=MC_RMT_SPECIAL_VIEW_CHUNKS;
+        }        
     }
     
     if(request_type == MC_RMT_NONE)
@@ -146,34 +160,184 @@ Value offchain(const Array& params, bool fHelp)
     
     if(params[1].type() != obj_type)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid request datails, should be object");                    
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid request details, should be object");                    
     }
     
-    switch(request_type)
+    if(request_type & MC_RMT_SPECIAL_MASK)
     {
-        case MC_RMT_MC_ADDRESS_QUERY:
-            string addr_to_find="";
-            BOOST_FOREACH(const Pair& d, params[1].get_obj()) 
-            {
-                if(d.name_ == "address")
+        switch(request_type)
+        {
+            case MC_RMT_SPECIAL_COLLECT_CHUNKS:
+                collector.Initialize(NULL,NULL,0);
+                attempts=10;
+                delay=1000;
+                BOOST_FOREACH(const Pair& d, params[1].get_obj()) 
                 {
-                    if(d.value_.type() ==str_type)
+                    if(d.name_ == "attempts")
                     {
-                        addr_to_find=d.value_.get_str();
-                        request_str+=addr_to_find;
+                        if(d.value_.type() == int_type)
+                        {
+                            attempts=d.value_.get_int();
+                        }
                     }
-                }            
-            }    
-            
-            CBitcoinAddress address(addr_to_find);
-            CKeyID keyID;
-            if (!address.GetKeyID(keyID))
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+                    if(d.name_ == "delay")
+                    {
+                        if(d.value_.type() == int_type)
+                        {
+                            delay=d.value_.get_int();
+                        }
+                    }
+                    if(d.name_ == "chunks")
+                    {
+                        if(d.value_.type() == array_type)
+                        {
+                            for(int c=0;c<(int)d.value_.get_array().size();c++)
+                            {
+                                Value cd=d.value_.get_array()[c];
+                                if(cd.type() != obj_type)
+                                {
+                                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid chunk");                                
+                                }
+                                uint256 chunk_hash=0;
+                                int chunk_size=0;
+                                mc_EntityDetails stream_entity;
+                                
+                                mc_TxEntity entity;
+                                entity.Zero();
+                                BOOST_FOREACH(const Pair& dd, cd.get_obj()) 
+                                {
+                                    if(dd.name_ == "stream")
+                                    {
+                                        parseStreamIdentifier(dd.value_.get_str(),&stream_entity);           
+                                        memcpy(&entity,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+                                        entity.m_EntityType=MC_TET_STREAM;
+                                    }
+                                    if(dd.name_ == "hash")
+                                    {
+                                        chunk_hash = ParseHashV(dd.value_.get_str(), "hash");
+                                    }
+                                    if(dd.name_ == "size")
+                                    {
+                                        if(dd.value_.type() != int_type)
+                                        {
+                                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid size");                                                                        
+                                        }
+                                        chunk_size=dd.value_.get_int();
+                                    }
+                                }
+                                if(chunk_hash == 0)
+                                {
+                                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing hash");
+                                }
+                                if(chunk_size == 0)
+                                {
+                                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing size");
+                                }
+                                if(entity.m_EntityType == MC_TET_NONE)
+                                {
+                                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing stream");                                    
+                                }
+                                uint256 txid=0;
+                                collector.InsertChunk((unsigned char*)&chunk_hash,&entity,(unsigned char*)&txid,0,chunk_size);
+                            }
+                        }
+                    }            
+                }    
 
-            payload.resize(1+sizeof(CKeyID));
-            payload[0]=MC_RDT_MC_ADDRESS;
-            memcpy(&payload[1],&keyID,sizeof(CKeyID));            
-            break;
+                if(collector.m_MemPool->GetCount() == 0)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing chunks");                
+                }
+
+                break;
+            case MC_RMT_SPECIAL_VIEW_CHUNKS:
+                Array arr_res;
+                BOOST_FOREACH(const Pair& d, params[1].get_obj()) 
+                {
+                    if(d.name_ == "chunks")
+                    {
+                        if(d.value_.type() == array_type)
+                        {
+                            for(int c=0;c<(int)d.value_.get_array().size();c++)
+                            {
+                                Value cd=d.value_.get_array()[c];
+                                if(cd.type() != obj_type)
+                                {
+                                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid chunk");                                
+                                }
+                                uint256 chunk_hash=0;                                
+                                BOOST_FOREACH(const Pair& dd, cd.get_obj()) 
+                                {
+                                    if(dd.name_ == "hash")
+                                    {
+                                        chunk_hash = ParseHashV(dd.value_.get_str(), "hash");
+                                    }
+                                }
+                                if(chunk_hash == 0)
+                                {
+                                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing hash");
+                                }
+                                
+                                unsigned char *chunk_found;
+                                size_t chunk_bytes;
+                                mc_ChunkDBRow chunk_def;
+                                
+                                Object chunk_obj;
+                                chunk_obj.push_back(Pair("hash",chunk_hash.ToString()));
+                                
+                                if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,(unsigned char *)&chunk_hash,NULL,NULL,-1) == MC_ERR_NOERROR)
+                                {
+                                    chunk_found=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&chunk_bytes);
+                                    if(chunk_found)
+                                    {
+                                        chunk_obj.push_back(Pair("size",chunk_bytes));
+                                        chunk_obj.push_back(Pair("data",HexStr(chunk_found,chunk_found+chunk_bytes)));
+                                    }
+                                    else
+                                    {
+                                        chunk_obj.push_back(Pair("error","Internal error"));
+                                    }
+                                }
+                                else
+                                {
+                                    chunk_obj.push_back(Pair("error","Chunk not found"));
+                                }
+                                arr_res.push_back(chunk_obj);
+                            }
+                        }
+                    }                    
+                }     
+                return arr_res;
+        }        
+    }
+    else
+    {
+        switch(request_type)
+        {
+            case MC_RMT_MC_ADDRESS_QUERY:
+                string addr_to_find="";
+                BOOST_FOREACH(const Pair& d, params[1].get_obj()) 
+                {
+                    if(d.name_ == "address")
+                    {
+                        if(d.value_.type() ==str_type)
+                        {
+                            addr_to_find=d.value_.get_str();
+                            request_str+=addr_to_find;
+                        }
+                    }            
+                }    
+
+                CBitcoinAddress address(addr_to_find);
+                CKeyID keyID;
+                if (!address.GetKeyID(keyID))
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+
+                payload.resize(1+sizeof(CKeyID));
+                payload[0]=MC_RDT_MC_ADDRESS;
+                memcpy(&payload[1],&keyID,sizeof(CKeyID));            
+                break;
+        }
     }
     
     if(params.size() > 2)
@@ -192,34 +356,54 @@ Value offchain(const Array& params, bool fHelp)
         }
     }
     
+    if(request_type & MC_RMT_SPECIAL_MASK)
     {
-        LOCK(cs_vNodes);
-        if(params.size() > 3)
+        int remaining=0;
+        for(int a=0;a<attempts;a++)
         {
-            if(params[3].type() != str_type)
+            if(a)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid destination");                                            
+                __US_Sleep(delay);
             }
-
-            BOOST_FOREACH(CNode* pnode, vNodes) 
+            remaining=MultichainCollectChunks(&collector);
+            if(remaining == 0)
             {
-                CNodeStats stats;
-                pnode->copyStats(stats);
-                if( (params[3].get_str() == stats.addrName) || 
-                    (params[3].get_str() == CBitcoinAddress(stats.kAddrRemote).ToString()) )
+                return 0;
+            }
+        }
+        return remaining;
+    }
+    else        
+    {
+        {
+            LOCK(cs_vNodes);
+            if(params.size() > 3)
+            {
+                if(params[3].type() != str_type)
                 {
-                    pto=pnode;
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid destination");                                            
+                }
+
+                BOOST_FOREACH(CNode* pnode, vNodes) 
+                {
+                    CNodeStats stats;
+                    pnode->copyStats(stats);
+                    if( (params[3].get_str() == stats.addrName) || 
+                        (params[3].get_str() == CBitcoinAddress(stats.kAddrRemote).ToString()) )
+                    {
+                        pto=pnode;
+                    }
                 }
             }
-        }
-        
-        if(pto)
-        {
-            request_str="Sending " + request_str + strprintf(" to node %d",pto->GetId());
-        }
-        else
-        {
-            request_str="Broadcasting " + request_str;
+
+            if(pto)
+            {
+                request_str="Sending " + request_str + strprintf(" to node %d",pto->GetId());
+            }
+            else
+            {
+                request_str="Broadcasting " + request_str;
+            }
         }
         
         request_id=pRelayManager->SendRequest(pto,request_type,0,payload);
