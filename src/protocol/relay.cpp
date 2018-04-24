@@ -132,7 +132,10 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
             chunk_err=pwalletTxsMain->m_ChunkDB->AddChunk(chunk->m_Hash,&(chunk->m_Entity),(unsigned char*)collect_row->m_TxID,collect_row->m_Vout,ptrOut,NULL,sizeOut,0,0);
             if(chunk_err)
             {
-                goto exitlbl;
+                if(chunk_err != MC_ERR_FOUND)
+                {
+                    goto exitlbl;                    
+                }
             }
             collect_row->m_State.m_Status |= MC_CCF_DELETED;
         }        
@@ -158,7 +161,6 @@ int MultichainResponseScore(mc_RelayResponse *response,mc_ChunkCollectorRow *col
     int shift,count,size;
     mc_ChunkEntityKey *chunk;
     int c;
-
     if( (response->m_Status & MC_RST_SUCCESS) == 0 )
     {
         return MC_CCW_WORST_RESPONSE_SCORE;
@@ -231,7 +233,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     for(row=0;row<collector->m_MemPool->GetCount();row++)
     {
         collect_row=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(row);
-        if( collect_row->m_State.m_Status != MC_CCF_DELETED )
+        if( (collect_row->m_State.m_Status & MC_CCF_DELETED ) == 0 )
         {
             if(collect_row->m_State.m_RequestTimeStamp <= time_now)
             {
@@ -257,7 +259,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                 {
                     response_pair.request_id=collect_row->m_State.m_Request;
                     response_pair.response_id=0;
-                    printf("coll new rsp: row: %d, id: %lu, %d\n",row,collect_row->m_State.m_Request,collect_row->m_State.m_RequestPos);
+//                    printf("coll new rsp: row: %d, id: %lu, %d\n",row,collect_row->m_State.m_Request,collect_row->m_State.m_RequestPos);
                     map<CRelayResponsePair,CRelayRequestPairs>::iterator itrsp = responses_to_process.find(response_pair);
                     if (itrsp == responses_to_process.end())
                     {
@@ -282,6 +284,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                     {
                         collect_row->m_State.m_Query=0;
                         collect_row->m_State.m_QueryNextAttempt=time_now+MultichainNextChunkQueryAttempt(collect_row->m_State.m_QueryAttempts);                                                
+                        collect_row->m_State.m_Status |= MC_CCF_UPDATED;
                     }
                 }
                 if(query)
@@ -297,7 +300,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                             best_response=i;
                         }
                     }
-                    printf("coll new req: row: %d, id:  %lu, rsps: %d, score (%d,%d)\n",row,collect_row->m_State.m_Query,(int)query->m_Responses.size(),best_score,best_response);
+//                    printf("coll new req: row: %d, id:  %lu, rsps: %d, score (%d,%d)\n",row,collect_row->m_State.m_Query,(int)query->m_Responses.size(),best_score,best_response);
                     if(best_response >= 0)
                     {
                         response_pair.request_id=collect_row->m_State.m_Query;
@@ -353,6 +356,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
 
         response=&(request->m_Responses[item.first.response_id]);
         request_id=pRelayManager->SendNextRequest(response,MC_RMT_CHUNK_REQUEST,0,payload);
+        if(fDebug)LogPrint("chunks","New chunk request %ld, response: %ld, chunks: %d\n",request_id,response->m_Nonce,item.second.m_Pairs.size());
         BOOST_FOREACH(PAIRTYPE(const int, int)& chunk_row, item.second.m_Pairs)    
         {                
             collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(chunk_row.first);
@@ -396,16 +400,18 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                     }
                 }
                 query_id=pRelayManager->SendRequest(NULL,MC_RMT_CHUNK_QUERY,0,payload);
+                if(fDebug)LogPrint("chunks","New chunk query: %ld, chunks: %d\n",query_id,last_count);
                 for(int r=last_row;r<row;r++)
                 {
                     collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(r);
                     if(collect_subrow->m_State.m_Status & MC_CCF_SELECTED)
                     {
-                        printf("coll new qry: row: %d, id: %lu: att: %d\n",r,query_id,collect_subrow->m_State.m_QueryAttempts);
+//                        printf("coll new qry: row: %d, id: %lu: att: %d\n",r,query_id,collect_subrow->m_State.m_QueryAttempts);
                         collect_subrow->m_State.m_Status -= MC_CCF_SELECTED;
                         collect_subrow->m_State.m_Query=query_id;
                         collect_subrow->m_State.m_QueryAttempts+=1;
                         collect_subrow->m_State.m_QueryTimeStamp=time_now+MC_CCW_TIMEOUT_QUERY;
+                        collect_subrow->m_State.m_Status |= MC_CCF_UPDATED;
                     }
                 }
                 last_row=row;
@@ -416,7 +422,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         
         if(collect_row)
         {
-            if(collect_row->m_State.m_Status != MC_CCF_DELETED)
+            if( (collect_row->m_State.m_Status & MC_CCF_DELETED ) == 0 )
             {
                 if(collect_row->m_State.m_QueryTimeStamp <= time_now)
                 {
@@ -433,7 +439,8 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                             query_to_delete.insert(make_pair(collect_row->m_State.m_Query,true));
                         }       
                         collect_row->m_State.m_Query=0;
-                        collect_row->m_State.m_QueryNextAttempt=time_now+MultichainNextChunkQueryAttempt(collect_row->m_State.m_QueryAttempts);                        
+                        collect_row->m_State.m_QueryNextAttempt=time_now+MultichainNextChunkQueryAttempt(collect_row->m_State.m_QueryAttempts);      
+                        collect_row->m_State.m_Status |= MC_CCF_UPDATED;
                     }
                     if(collect_row->m_State.m_QueryNextAttempt <= time_now)
                     {
@@ -454,7 +461,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     for(row=0;row<collector->m_MemPool->GetCount();row++)
     {
         collect_row=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(row);
-        if( collect_row->m_State.m_Status != MC_CCF_DELETED )
+        if( (collect_row->m_State.m_Status & MC_CCF_DELETED ) == 0 )
         {
             if(collect_row->m_State.m_Query)
             {
@@ -1266,7 +1273,7 @@ void mc_RelayManager::SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,u
         value.m_Count=(it->second).m_Count;
         it->second=value;
     }    
-    printf("setrr: %d, ts: %u, nc: %u, mt: %d\n",pto_id,value.m_Timestamp,nonce,msg_type);
+//    printf("setrr: %d, ts: %u, nc: %u, mt: %d\n",pto_id,value.m_Timestamp,nonce,msg_type);
 }
 
 int mc_RelayManager::GetRelayRecord(CNode *pfrom,uint32_t timestamp,uint32_t nonce,uint32_t* msg_type,CNode **pto)
@@ -1278,7 +1285,7 @@ int mc_RelayManager::GetRelayRecord(CNode *pfrom,uint32_t timestamp,uint32_t non
     {
         pfrom_id=pfrom->GetId();
     }
-    printf("getrr: %d, ts: %u, nc: %u\n",pfrom_id,timestamp,nonce);
+//    printf("getrr: %d, ts: %u, nc: %u\n",pfrom_id,timestamp,nonce);
     const mc_RelayRecordKey key=mc_RelayRecordKey(timestamp,nonce,pfrom_id);
     map<mc_RelayRecordKey, mc_RelayRecordValue>::iterator it = m_RelayRecords.find(key);
     if (it == m_RelayRecords.end())
@@ -1336,6 +1343,8 @@ uint32_t mc_RelayManager::GenerateNonce()
     uint32_t nonce;     
     
     GetRandBytes((unsigned char*)&nonce, sizeof(nonce));
+    
+    nonce &= 0x7FFFFFFF;
     
     return nonce;
 }
@@ -1434,7 +1443,9 @@ int64_t mc_RelayManager::PushRelay(CNode*    pto,
         vHops.push_back((int32_t)pfrom->GetId());
     }
     
-    printf("send: %d, to: %d, from: %d, hc: %d, size: %d, ts: %u, nc: %u\n",msg_type,pto->GetId(),pfrom ? pfrom->GetId() : 0,(int)vHops.size(),(int)payload.size(),timestamp,nonce);
+//    printf("send: %d, to: %d, from: %d, hc: %d, size: %d, ts: %u, nc: %u\n",msg_type,pto->GetId(),pfrom ? pfrom->GetId() : 0,(int)vHops.size(),(int)payload.size(),timestamp,nonce);
+    if(fDebug)LogPrint("offchain","Offchain send: %ld, request: %ld, to: %d, from: %d, msg: %d, hops: %d\n",
+            AggregateNonce(timestamp,nonce),AggregateNonce(timestamp_to_respond,nonce_to_respond),pto->GetId(),pfrom ? pfrom->GetId() : 0,msg_type,(int)vHops.size());
     pto->PushMessage("offchain",
                         msg_format,
                         vHops,
@@ -1682,7 +1693,9 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     vRecv >> vPayloadIn;
     vRecv >> vSigScripts;
             
-    printf("recv: %d, from: %d, to: %d, hc: %d, size: %d, ts: %u, nc: %u\n",msg_type_in,pfrom->GetId(),pto_stored ? pto_stored->GetId() : 0,hop_count,(int)vPayloadIn.size(),timestamp_received,nonce_received);
+//    printf("recv: %d, from: %d, to: %d, hc: %d, size: %d, ts: %u, nc: %u\n",msg_type_in,pfrom->GetId(),pto_stored ? pto_stored->GetId() : 0,hop_count,(int)vPayloadIn.size(),timestamp_received,nonce_received);
+    if(fDebug)LogPrint("offchain","Offchain recv: %ld, request: %ld, from: %d, to: %d, msg: %d, hops: %d\n",
+            AggregateNonce(timestamp_received,nonce_received),AggregateNonce(timestamp_to_respond,nonce_to_respond),pfrom->GetId(),pto_stored ? pto_stored->GetId() : 0,msg_type_in,hop_count);
     
     if( verify_flags & MC_VRA_SIGNATURES )
     {
@@ -1929,7 +1942,8 @@ int mc_RelayManager::AddRequest(int64_t parent_nonce,int parent_response_id,CNod
             }
         }
 
-        printf("rqst: %lu, mt: %d, node: %d, size: %d, pr: %lu\n",nonce,msg_type,pto ? pto->GetId() : 0,(int)payload.size(),parent_nonce);
+//        printf("rqst: %lu, mt: %d, node: %d, size: %d, pr: %lu\n",nonce,msg_type,pto ? pto->GetId() : 0,(int)payload.size(),parent_nonce);
+        if(fDebug)LogPrint("offchain","Offchain rqst: %ld, to: %d, msg: %d, size: %d\n",nonce,pto ? pto->GetId() : 0,msg_type,(int)payload.size());
         m_Requests.insert(make_pair(nonce,request));
     }
     else
@@ -1943,7 +1957,8 @@ int mc_RelayManager::AddRequest(int64_t parent_nonce,int parent_response_id,CNod
 
 int mc_RelayManager::AddResponse(int64_t request,CNode *pfrom,int32_t source,int hop_count,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status)
 {
-    printf("resp: %lu, mt: %d, node: %d, size: %d, rn: %lu\n",request,msg_type,pfrom ? pfrom->GetId() : 0,(int)payload.size(),nonce);
+//    printf("resp: %lu, mt: %d, node: %d, size: %d, rn: %lu\n",request,msg_type,pfrom ? pfrom->GetId() : 0,(int)payload.size(),nonce);
+    if(fDebug)LogPrint("offchain","Offchain resp: %ld, request: %ld, from: %d, msg: %d, size: %d\n",nonce,request,pfrom ? pfrom->GetId() : 0,msg_type,(int)payload.size());
     if(request == 0)
     {
         return MC_ERR_NOERROR;

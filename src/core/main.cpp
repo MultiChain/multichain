@@ -73,6 +73,7 @@ bool MultichainNode_SendInv(CNode *pnode);
 bool MultichainNode_AcceptData(CNode *pnode);
 bool MultichainNode_IgnoreIncoming(CNode *pnode);
 bool MultichainNode_IsLocal(CNode *pnode);
+bool MultichainNode_CollectChunks();
 bool IsTxBanned(uint256 txid);
 int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,vector<mc_UpgradeStatus> *vUpgrades);
 
@@ -7295,6 +7296,21 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
 /* MCHN START */        
         }
         pto->fLastIgnoreIncoming=ignore_incoming;
+        
+        if(MultichainNode_CollectChunks())
+        {
+            if(pwalletTxsMain->m_ChunkCollector)
+            {
+                int64_t time_millis_now=GetTimeMillis();
+
+                if(pwalletTxsMain->m_ChunkCollector->m_NextTryTimestamp < time_millis_now)
+                {
+                    MultichainCollectChunks(pwalletTxsMain->m_ChunkCollector);
+//                    if(fDebug)LogPrint("chunks", "Chunks to collect: %d\n", still_to_collect);
+                    pwalletTxsMain->m_ChunkCollector->m_NextTryTimestamp=time_millis_now+100;
+                }
+            }
+        }
 /* MCHN END */                
     }
     return true;

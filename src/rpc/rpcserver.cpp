@@ -371,6 +371,7 @@ uint32_t GetPausedServices(const char *str)
                 if(memcmp(start,"incoming",    ptr-start) == 0)type = MC_NPS_INCOMING;
                 if(memcmp(start,"mining",      ptr-start) == 0)type = MC_NPS_MINING;
                 if(memcmp(start,"reaccepting", ptr-start) == 0)type = MC_NPS_REACCEPT;
+                if(memcmp(start,"offchain",    ptr-start) == 0)type = MC_NPS_OFFCHAIN;
                 
                 if(type == 0)
                 {

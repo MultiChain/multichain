@@ -25,14 +25,15 @@ void mc_ChunkCollector::Zero()
     m_DB=NULL;
     m_ChunkDB=NULL;
     m_KeyOffset=0;
-    m_KeySize=MC_CDB_CHUNK_HASH_SIZE+MC_TDB_TXID_SIZE+sizeof(mc_TxEntity)+4;
+    m_KeySize=MC_TDB_TXID_SIZE+sizeof(int)+sizeof(mc_ChunkEntityKey);
     m_ValueOffset=m_KeySize;
-    m_ValueSize=8;
-    m_ValueDBSize=4;
+    m_ValueSize=sizeof(mc_ChunkEntityValue);
+    m_ValueDBSize=28;
     m_TotalSize=m_KeySize+m_ValueSize;
     m_TotalDBSize=m_KeySize+m_ValueDBSize;
     m_Name[0]=0;
     m_DBName[0]=0;
+    m_NextTryTimestamp=0;
 
     m_MarkPool=NULL;
     m_MemPool=NULL;
@@ -149,7 +150,7 @@ void mc_ChunkCollector::Dump(const char *message)
             memcpy((char*)&dbrow+m_ValueOffset,ptr,m_ValueDBSize);
             while(ptr)
             {
-                mc_MemoryDumpCharSizeToFile(fHan,(char*)&dbrow+m_KeyOffset,0,m_TotalDBSize,56);        
+                mc_MemoryDumpCharSizeToFile(fHan,(char*)&dbrow+m_KeyOffset,0,m_TotalDBSize,64);        
                 ptr=(unsigned char*)m_DB->MoveNext(&err);
                 if(ptr)
                 {
@@ -162,7 +163,7 @@ void mc_ChunkCollector::Dump(const char *message)
     fprintf(fHan,"\nMempool\n");
     for(i=0;i<m_MemPool->GetCount();i++)
     {
-        mc_MemoryDumpCharSizeToFile(fHan,m_MemPool->GetRow(i),0,m_TotalSize,56);    
+        mc_MemoryDumpCharSizeToFile(fHan,m_MemPool->GetRow(i),0,m_TotalSize,64);    
     }
     
     fprintf(fHan,"\n<<<<<< \tChain height: %6d\t%s\n\n",mc_gState->m_Permissions->m_Block,message);
@@ -222,6 +223,7 @@ int mc_ChunkCollector::Initialize(mc_ChunkDB *chunk_db,const char *name,uint32_t
         if(ptr)                                                                     
         {   
             ptr=(unsigned char*)m_DB->MoveNext(&err);
+            collect_row.Zero();
             if(ptr)
             {
                 memcpy((char*)&collect_row,ptr,m_TotalDBSize);
@@ -233,12 +235,13 @@ int mc_ChunkCollector::Initialize(mc_ChunkDB *chunk_db,const char *name,uint32_t
                 {
                     return MC_ERR_CORRUPTED;            
                 }
-                collect_row.m_State.m_Status |= MC_CCF_INSERTED;
-                if(m_ChunkDB->GetChunkDef(&chunk_def,collect_row.m_ChunkDef.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
+                collect_row.m_State.m_Status |= MC_CCF_INSERTED;                
+                if(m_ChunkDB->GetChunkDef(&chunk_def,collect_row.m_ChunkDef.m_Hash,&(collect_row.m_ChunkDef.m_Entity),collect_row.m_TxID,collect_row.m_Vout) == MC_ERR_NOERROR)
                 {
                     collect_row.m_State.m_Status |= MC_CCF_DELETED;
                 }
                 m_MemPool->Add(&collect_row);
+                collect_row.Zero();
                 if(ptr)
                 {
                     memcpy((char*)&collect_row,ptr,m_TotalDBSize);
@@ -436,6 +439,8 @@ int mc_ChunkCollector::CommitInternal()
         return MC_ERR_NOT_ALLOWED;
     }
     
+    Dump("Before Commit");
+    
     if(m_MemPool == m_MemPool1)
     {
         m_MemPoolNext=m_MemPool2;
@@ -463,10 +468,12 @@ int mc_ChunkCollector::CommitInternal()
         }
         else
         {
-            if( (row->m_State.m_Status & MC_CCF_INSERTED) == 0 )
+            if( ((row->m_State.m_Status & MC_CCF_INSERTED) == 0 ) || (row->m_State.m_Status & MC_CCF_UPDATED) )
             {
                 commit_required=1;
+                row->m_State.m_Status &= MC_CCF_ERROR_MASK;
                 m_DB->Write((char*)row+m_KeyOffset,m_KeySize,(char*)row+m_ValueOffset,m_ValueDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+                row->m_State.m_Status |= MC_CCF_INSERTED;
             }            
             m_MemPoolNext->Add(row);
         }
@@ -483,7 +490,6 @@ int mc_ChunkCollector::CommitInternal()
     
     m_MemPool->Clear();
     m_MemPool=m_MemPoolNext;
-    m_MemPoolNext->Clear();
     
     Dump("Commit");
     

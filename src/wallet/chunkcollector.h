@@ -13,6 +13,7 @@
 #define MC_CCF_INSERTED                   0x00000001 
 #define MC_CCF_DELETED                    0x00000002 
 #define MC_CCF_SELECTED                   0x00000004 
+#define MC_CCF_UPDATED                    0x00000008 
 #define MC_CCF_WRONG_SIZE                 0x00010000 
 #define MC_CCF_ERROR_MASK                 0x00FF0000 
 #define MC_CCF_ALL                        0xFFFFFFFF
@@ -35,14 +36,17 @@ typedef struct mc_ChunkEntityKey
 
 typedef struct mc_ChunkEntityValue
 {
-    int64_t m_Query;
-    uint32_t m_QueryTimeStamp;
     uint32_t m_QueryAttempts;
     uint32_t m_QueryNextAttempt;
+    uint32_t m_Status;
+    int64_t m_Reserved1;
+    int64_t m_Reserved2;    
+    int64_t m_Query;
+    uint32_t m_QueryTimeStamp;
+    uint32_t m_Reserved3;
     int64_t m_Request;
     uint32_t m_RequestTimeStamp;
     uint32_t m_RequestPos;
-    uint32_t m_Status;
     
     void Zero();
 } mc_ChunkEntityValue;
@@ -69,7 +73,7 @@ typedef struct mc_ChunkCollector
     uint32_t m_TotalSize;                                                       
     uint32_t m_ValueDBSize;                                                       
     uint32_t m_TotalDBSize;                                                       
-    
+    int64_t m_NextTryTimestamp;
     
     char m_Name[MC_PRM_NETWORK_NAME_MAX_SIZE+1];                                // Chain name
     char m_DBName[MC_DCT_DB_MAX_PATH];                                          // Full database name

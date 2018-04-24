@@ -111,6 +111,16 @@ bool MultichainNode_IgnoreIncoming(CNode *pnode)
     return false;
 }
 
+bool MultichainNode_CollectChunks()
+{
+    if(mc_gState->m_NodePausedState & MC_NPS_OFFCHAIN)
+    {
+        return false;
+    }
+    return true;
+}
+
+
 bool MultichainNode_IsLocal(CNode *pnode)
 {
     return (IsLocal(pnode->addr) || pnode->addr.IsRFC1918()) && (pnode->addr.GetPort() == GetListenPort());
