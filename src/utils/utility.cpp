@@ -89,6 +89,20 @@ int64_t mc_GetLE(void *src,int size)
     return result;                                                              // Assuming all systems are little endian
 }
 
+uint32_t mc_SwapBytes32(uint32_t src)
+{
+    uint32_t res=0;
+    unsigned char *pr;
+    unsigned char *ps;
+    pr=(unsigned char*)&res;
+    ps=(unsigned char*)&src;
+    for(int i=0;i<4;i++)
+    {
+        pr[3-i]=ps[i];        
+    }
+    return res;
+}
+
 void mc_print(const char *message)
 {
     printf("%s\n",message);

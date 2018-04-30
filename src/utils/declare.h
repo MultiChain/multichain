@@ -206,6 +206,7 @@ void *mc_New(int Size);
 void mc_Delete(void *ptr);
 void mc_PutLE(void *dest,void *src,int dest_size);
 int64_t mc_GetLE(void *src,int size);
+uint32_t mc_SwapBytes32(uint32_t src);
 int mc_BackupFile(const char *network_name,const char *filename, const char *extension,int options);
 int mc_RecoverFile(const char *network_name,const char *filename, const char *extension,int options);
 FILE *mc_OpenFile(const char *network_name,const char *filename, const char *extension,const char *mode, int options);        

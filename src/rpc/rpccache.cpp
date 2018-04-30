@@ -125,7 +125,7 @@ Value offchain(const Array& params, bool fHelp)
     uint32_t request_type=MC_RMT_NONE;
     int timeout=5;
     vector <unsigned char> payload;
-    int64_t request_id;      
+    mc_OffchainMessageID request_id;      
     CNode *pto=NULL;
     string request_str="";
     mc_RelayRequest *request;
@@ -408,7 +408,7 @@ Value offchain(const Array& params, bool fHelp)
         
         request_id=pRelayManager->SendRequest(pto,request_type,0,payload);
         printf("%s",request_str.c_str());        
-        printf(". Request ID: %lu\n",request_id);
+        printf(". Request ID: %s\n",request_id.ToString().c_str());
     }    
 
     uint32_t time_now;

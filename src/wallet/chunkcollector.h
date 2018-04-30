@@ -5,6 +5,7 @@
 #define MULTICHAIN_CHUNKCOLLECTOR_H
 
 #include "utils/declare.h"
+#include "protocol/relay.h"
 #include "wallet/chunkdb.h"
 #include "wallet/wallettxdb.h"
 
@@ -18,10 +19,11 @@
 #define MC_CCF_ERROR_MASK                 0x00FF0000 
 #define MC_CCF_ALL                        0xFFFFFFFF
 
-#define MC_CCW_TIMEOUT_QUERY                      60
-#define MC_CCW_TIMEOUT_REQUEST                     5
+#define MC_CCW_TIMEOUT_QUERY                      14
+#define MC_CCW_TIMEOUT_REQUEST                     3
 #define MC_CCW_MAX_CHUNKS_PER_QUERY               64
 #define MC_CCW_WORST_RESPONSE_SCORE             1000
+#define MC_CCW_DEFAULT_MEMPOOL_SIZE             1000
 
 
 typedef struct mc_ChunkEntityKey
@@ -39,23 +41,43 @@ typedef struct mc_ChunkEntityValue
     uint32_t m_QueryAttempts;
     uint32_t m_QueryNextAttempt;
     uint32_t m_Status;
-    int64_t m_Reserved1;
-    int64_t m_Reserved2;    
-    int64_t m_Query;
+    uint32_t m_Reserved1;
+    mc_OffchainMessageID m_Query;
+    mc_OffchainMessageID m_Request;
     uint32_t m_QueryTimeStamp;
-    uint32_t m_Reserved3;
-    int64_t m_Request;
+    uint32_t m_Reserved2;
     uint32_t m_RequestTimeStamp;
     uint32_t m_RequestPos;
     
     void Zero();
 } mc_ChunkEntityValue;
 
+typedef struct mc_ChunkCollectorDBRow
+{
+    uint32_t m_QueryNextAttempt;
+    int m_Vout;
+    unsigned char m_TxID[MC_TDB_TXID_SIZE];                               
+    mc_TxEntity m_Entity;
+    unsigned char m_Hash[MC_CDB_CHUNK_HASH_SIZE];                               // Chunk hash
+    
+    uint32_t m_Size;
+    uint32_t m_Flags;
+    uint32_t m_QueryAttempts;
+    uint32_t m_Status;
+    int64_t m_Reserved1;
+    int64_t m_Reserved2;        
+    
+    void Zero();
+} mc_ChunkCollectorDBRow;
+
 typedef struct mc_ChunkCollectorRow
 {
     mc_ChunkEntityKey m_ChunkDef;
-    unsigned char m_TxID[MC_TDB_TXID_SIZE];                               
+    uint32_t m_DBNextAttempt;
     int m_Vout;
+    unsigned char m_TxID[MC_TDB_TXID_SIZE];                               
+    uint32_t m_Reserved1;
+    uint32_t m_Reserved2;        
     mc_ChunkEntityValue m_State;
     
     void Zero();
@@ -67,13 +89,17 @@ typedef struct mc_ChunkCollector
     mc_Database *m_DB;                                                          // Database object
     mc_ChunkDB *m_ChunkDB;
     uint32_t m_KeyOffset;                                                       
+    uint32_t m_KeyDBOffset;                                                       
     uint32_t m_KeySize;                                                         
+    uint32_t m_KeyDBSize;                                                         
     uint32_t m_ValueOffset;                                                     
+    uint32_t m_ValueDBOffset;                                                     
     uint32_t m_ValueSize;                                                       
-    uint32_t m_TotalSize;                                                       
     uint32_t m_ValueDBSize;                                                       
+    uint32_t m_TotalSize;                                                       
     uint32_t m_TotalDBSize;                                                       
     int64_t m_NextTryTimestamp;
+    int m_MaxMemPoolSize;
     
     char m_Name[MC_PRM_NETWORK_NAME_MAX_SIZE+1];                                // Chain name
     char m_DBName[MC_DCT_DB_MAX_PATH];                                          // Full database name
@@ -83,6 +109,9 @@ typedef struct mc_ChunkCollector
     mc_Buffer *m_MemPoolNext;
     mc_Buffer *m_MemPool1;
     mc_Buffer *m_MemPool2;
+    
+    mc_ChunkCollectorDBRow m_DBRow;
+    mc_ChunkCollectorDBRow m_LastDBRow;
     
     void *m_Semaphore;                                                          // mc_TxDB object semaphore
     uint64_t m_LockedBy;                                                        // ID of the thread locking it
@@ -99,6 +128,14 @@ typedef struct mc_ChunkCollector
         Destroy();
     }
 
+    void SetDBRow(mc_ChunkCollectorRow *collect_row);
+    void GetDBRow(mc_ChunkCollectorRow *collect_row);
+    int DeleteDBRow(mc_ChunkCollectorRow *collect_row);
+    int UpdateDBRow(mc_ChunkCollectorRow *collect_row);
+    int InsertDBRow(mc_ChunkCollectorRow *collect_row);
+    int SeekDB(void *dbrow);
+    int ReadFromDB(mc_Buffer *mempool,int rows);
+    
     int Initialize(                                                             // Initialization
               mc_ChunkDB *chunk_db,
               const char *name,                                                 // Chain name

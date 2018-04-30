@@ -506,15 +506,14 @@ int mc_WalletTxs::Commit(mc_TxImport *import)
     {
         if(imp->m_ImportID == 0)
         {
-            if(m_ChunkCollector)
-            {
-                err=m_ChunkCollector->Commit();
-            }    
-            
             if(err == MC_ERR_NOERROR)
             {
                 err=m_ChunkDB->Commit(imp->m_Block+1);
             }
+            if(m_ChunkCollector)
+            {
+                err=m_ChunkCollector->Commit();
+            }                
         }
     }    
     m_Database->Lock(1,0);

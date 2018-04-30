@@ -20,7 +20,7 @@ uint32_t MultichainNextChunkQueryAttempt(uint32_t attempts)
 
 typedef struct CRelayResponsePair
 {
-    int64_t request_id;
+    mc_OffchainMessageID request_id;
     int response_id;
     
     friend bool operator<(const CRelayResponsePair& a, const CRelayResponsePair& b)
@@ -56,6 +56,7 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
     int shiftOut,countOut,sizeOut;
     int chunk_err;
     mc_ChunkEntityKey *chunk;
+    mc_ChunkEntityKey *chunkOut;
     unsigned char *ptrOut;
     bool result=false;
     mc_ChunkCollectorRow *collect_row;
@@ -84,7 +85,7 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
                 }                
                 for(int c=0;c<count;c++)
                 {
-                    total_size+=((mc_ChunkEntityKey*)ptr)->m_Size;
+                    total_size+=((mc_ChunkEntityKey*)ptr)->m_Size+size;
                     ptr+=size;
                 }
                 break;
@@ -118,6 +119,19 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
     {
         sizeOut=((mc_ChunkEntityKey*)ptr)->m_Size;
         chunk=(mc_ChunkEntityKey*)ptr;
+        chunkOut=(mc_ChunkEntityKey*)ptrOut;
+        if(chunk->m_Size != chunkOut->m_Size)
+        {
+            goto exitlbl;                                        
+        }
+        if(memcmp(chunk->m_Hash,chunkOut->m_Hash,sizeof(uint256)))
+        {
+            goto exitlbl;                                                    
+        }
+        if(memcmp(&(chunk->m_Entity),&(chunkOut->m_Entity),sizeof(uint256)))
+        {
+            goto exitlbl;                                                    
+        }
         sizeOut=chunk->m_Size;
         map <int,int>::iterator itreq = request_pairs->find(c);
         if (itreq != request_pairs->end())
@@ -214,8 +228,8 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     unsigned char buf[16];
     int shift,count;
     unsigned char *ptrOut;
-    int64_t query_id,request_id;
-    map <int64_t,bool> query_to_delete;
+    mc_OffchainMessageID query_id,request_id;
+    map <mc_OffchainMessageID,bool> query_to_delete;
     map <CRelayResponsePair,CRelayRequestPairs> requests_to_send;    
     map <CRelayResponsePair,CRelayRequestPairs> responses_to_process;    
     mc_RelayRequest *request;
@@ -237,14 +251,14 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         {
             if(collect_row->m_State.m_RequestTimeStamp <= time_now)
             {
-                if(collect_row->m_State.m_Request)
+                if(!collect_row->m_State.m_Request.IsZero())
                 {
                     pRelayManager->DeleteRequest(collect_row->m_State.m_Request);
                     collect_row->m_State.m_Request=0;                    
                 }                
             }
             request=NULL;
-            if(collect_row->m_State.m_Request)
+            if(!collect_row->m_State.m_Request.IsZero())
             {
                 request=pRelayManager->FindRequest(collect_row->m_State.m_Request);
                 if(request == NULL)
@@ -259,7 +273,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                 {
                     response_pair.request_id=collect_row->m_State.m_Request;
                     response_pair.response_id=0;
-//                    printf("coll new rsp: row: %d, id: %lu, %d\n",row,collect_row->m_State.m_Request,collect_row->m_State.m_RequestPos);
+                    printf("coll new rsp: row: %d, id: %s, %d\n",row,collect_row->m_State.m_Request.ToString().c_str(),collect_row->m_State.m_RequestPos);
                     map<CRelayResponsePair,CRelayRequestPairs>::iterator itrsp = responses_to_process.find(response_pair);
                     if (itrsp == responses_to_process.end())
                     {
@@ -277,7 +291,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
             else
             {
                 query=NULL;
-                if(collect_row->m_State.m_Query)
+                if(!collect_row->m_State.m_Query.IsZero())
                 {
                     query=pRelayManager->FindRequest(collect_row->m_State.m_Query);
                     if(query == NULL)
@@ -300,20 +314,20 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                             best_response=i;
                         }
                     }
-//                    printf("coll new req: row: %d, id:  %lu, rsps: %d, score (%d,%d)\n",row,collect_row->m_State.m_Query,(int)query->m_Responses.size(),best_score,best_response);
                     if(best_response >= 0)
                     {
                         response_pair.request_id=collect_row->m_State.m_Query;
                         response_pair.response_id=best_response;                        
-                        map<CRelayResponsePair,CRelayRequestPairs>::iterator itrsp = requests_to_send.find(response_pair);
+                        map<CRelayResponsePair,CRelayRequestPairs>::iterator itrsp = requests_to_send.find(response_pair);                                                
                         if (itrsp == requests_to_send.end())
-                        {
+                        {                            
                             request_pairs.m_Pairs.clear();
                             request_pairs.m_Pairs.insert(make_pair(row,0));
                             requests_to_send.insert(make_pair(response_pair,request_pairs));
                         }       
                         else
                         {
+                    printf("coll new req: row: %d, id:  %s, rsps: %d, score (%d,%d)\n",row,collect_row->m_State.m_Query.ToString().c_str(),(int)query->m_Responses.size(),best_score,best_response);
                             itrsp->second.m_Pairs.insert(make_pair(row,0));
                         }                    
                     }
@@ -331,8 +345,8 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     BOOST_FOREACH(PAIRTYPE(const CRelayResponsePair, CRelayRequestPairs)& item, requests_to_send)    
     {
         payload.clear();
-        shift=mc_PutVarInt(buf,16,requests_to_send.size());
-        payload.resize(1+shift+sizeof(mc_ChunkEntityKey)*requests_to_send.size());
+        shift=mc_PutVarInt(buf,16,item.second.m_Pairs.size());
+        payload.resize(1+shift+sizeof(mc_ChunkEntityKey)*item.second.m_Pairs.size());
         ptrOut=&(payload[0]);
         *ptrOut=MC_RDT_CHUNK_IDS;
         ptrOut++;
@@ -340,14 +354,15 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         ptrOut+=shift;
         count=0;
         BOOST_FOREACH(PAIRTYPE(const int, int)& chunk_row, item.second.m_Pairs)    
-        {                
+        {                            
             collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(chunk_row.first);
+            printf("S %d\n",chunk_row.first);
             collect_subrow->m_State.m_RequestPos=count;
             memcpy(ptrOut,&(collect_subrow->m_ChunkDef),sizeof(mc_ChunkEntityKey));
             ptrOut+=sizeof(mc_ChunkEntityKey);
             count++;
         }
-        
+//        mc_DumpSize("req",&(payload[0]),1+shift+sizeof(mc_ChunkEntityKey)*item.second.m_Pairs.size(),64);
         request=pRelayManager->FindRequest(item.first.request_id);
         if(request == NULL)
         {
@@ -356,7 +371,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
 
         response=&(request->m_Responses[item.first.response_id]);
         request_id=pRelayManager->SendNextRequest(response,MC_RMT_CHUNK_REQUEST,0,payload);
-        if(fDebug)LogPrint("chunks","New chunk request %ld, response: %ld, chunks: %d\n",request_id,response->m_Nonce,item.second.m_Pairs.size());
+        if(fDebug)LogPrint("chunks","New chunk request %s, response: %s, chunks: %d\n",request_id.ToString().c_str(),response->m_MsgID.ToString().c_str(),item.second.m_Pairs.size());
         BOOST_FOREACH(PAIRTYPE(const int, int)& chunk_row, item.second.m_Pairs)    
         {                
             collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(chunk_row.first);
@@ -400,7 +415,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                     }
                 }
                 query_id=pRelayManager->SendRequest(NULL,MC_RMT_CHUNK_QUERY,0,payload);
-                if(fDebug)LogPrint("chunks","New chunk query: %ld, chunks: %d\n",query_id,last_count);
+                if(fDebug)LogPrint("chunks","New chunk query: %s, chunks: %d\n",query_id.ToString().c_str(),last_count);
                 for(int r=last_row;r<row;r++)
                 {
                     collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(r);
@@ -426,14 +441,14 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
             {
                 if(collect_row->m_State.m_QueryTimeStamp <= time_now)
                 {
-                    if(collect_row->m_State.m_Request)
+                    if(!collect_row->m_State.m_Request.IsZero())
                     {
                         pRelayManager->DeleteRequest(collect_row->m_State.m_Request);
                         collect_row->m_State.m_Request=0;
                     }
-                    if(collect_row->m_State.m_Query)
+                    if(!collect_row->m_State.m_Query.IsZero())
                     {
-                        map<int64_t, bool>::iterator itqry = query_to_delete.find(collect_row->m_State.m_Query);
+                        map<mc_OffchainMessageID, bool>::iterator itqry = query_to_delete.find(collect_row->m_State.m_Query);
                         if (itqry == query_to_delete.end())
                         {
                             query_to_delete.insert(make_pair(collect_row->m_State.m_Query,true));
@@ -463,9 +478,9 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         collect_row=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(row);
         if( (collect_row->m_State.m_Status & MC_CCF_DELETED ) == 0 )
         {
-            if(collect_row->m_State.m_Query)
+            if(!collect_row->m_State.m_Query.IsZero())
             {
-                map<int64_t, bool>::iterator itqry = query_to_delete.find(collect_row->m_State.m_Query);
+                map<mc_OffchainMessageID, bool>::iterator itqry = query_to_delete.find(collect_row->m_State.m_Query);
                 if (itqry != query_to_delete.end())
                 {
                     itqry->second=false;
@@ -475,7 +490,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         }
     }
 
-    BOOST_FOREACH(PAIRTYPE(const int64_t, bool)& item, query_to_delete)    
+    BOOST_FOREACH(PAIRTYPE(const mc_OffchainMessageID, bool)& item, query_to_delete)    
     {
         if(item.second)
         {
@@ -544,11 +559,13 @@ bool mc_RelayProcess_Chunk_Query(unsigned char *ptrStart,unsigned char *ptrEnd,v
                 for(int c=0;c<count;c++)
                 {
                     chunk=*(mc_ChunkEntityKey*)ptr;
+                    LogPrintf("chnk qry: %d %s\n",c,(*(uint256*)(chunk.m_Hash)).ToString().c_str());
                     if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,chunk.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
                     {
                         if(chunk_def.m_Size != chunk.m_Size)
                         {
                             chunk.m_Flags |= MC_CCF_WRONG_SIZE;
+                            chunk.m_Size=chunk_def.m_Size;
                         }
                         vToRespond.push_back(chunk);
                     }                    
@@ -605,6 +622,7 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
                 for(int c=0;c<count;c++)
                 {
                     chunk=*(mc_ChunkEntityKey*)ptr;
+                    LogPrintf("chnk req: %d %s\n",c,(*(uint256*)(chunk.m_Hash)).ToString().c_str());
                     if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,chunk.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
                     {
                         if(chunk_def.m_Size != chunk.m_Size)
@@ -618,6 +636,7 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
                             return false;                                                
                         }
                         chunk_found=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&chunk_bytes);
+                        mc_gState->m_TmpBuffers->m_RelayTmpBuffer->SetData((unsigned char*)&chunk,size);
                         mc_gState->m_TmpBuffers->m_RelayTmpBuffer->SetData(chunk_found,chunk_bytes);
                     }                    
                     else
@@ -1126,20 +1145,6 @@ void mc_RelayManager::MsgTypeSettings(uint32_t msg_type,int latency,int seconds,
     }
 }
 
-int64_t mc_RelayManager::AggregateNonce(uint32_t timestamp,uint32_t nonce)
-{
-    return ((int64_t)nonce<<32)+(int64_t)timestamp;
-}
-
-uint32_t mc_RelayManager::Timestamp(int64_t aggr_nonce)
-{
-    return aggr_nonce & 0xFFFFFFFF;
-}
-
-uint32_t mc_RelayManager::Nonce(int64_t aggr_nonce)
-{
-    return (aggr_nonce >> 32) & 0xFFFFFFFF;    
-}
 
 
 void mc_RelayManager::Zero()
@@ -1198,7 +1203,6 @@ void mc_RelayManager::SetDefaults()
     MsgTypeSettings(MC_RMT_NONE            , 0,10,1000,100*1024*1024);
     MsgTypeSettings(MC_RMT_MC_ADDRESS_QUERY,10,10, 100,  1*1024*1024);
     MsgTypeSettings(MC_RMT_NODE_DETAILS    , 0,10, 100,  1*1024*1024);
-    MsgTypeSettings(MC_RMT_REJECT          , 0,10,1000,  1*1024*1024);
     MsgTypeSettings(MC_RMT_CHUNK_QUERY     ,10,10, 100,  1*1024*1024);
     MsgTypeSettings(MC_RMT_CHUNK_QUERY_HIT ,30,10, 100,  1*1024*1024);
     MsgTypeSettings(MC_RMT_CHUNK_REQUEST   ,30,10, 100,  1*1024*1024);
@@ -1207,8 +1211,8 @@ void mc_RelayManager::SetDefaults()
     MsgTypeSettings(MC_RMT_NEW_REQUEST     ,30,10,1000,  1*1024*1024);
     
     
-    m_MinTimeShift=180;
-    m_MaxTimeShift=180;
+    m_MinTimeShift=2 * 6 * Params().TargetSpacing();
+    m_MaxTimeShift=2 * 6 * Params().TargetSpacing();
     m_MaxResponses=16;
 }
 
@@ -1234,7 +1238,7 @@ void mc_RelayManager::CheckTime()
     m_LastTime=time_now;
 }
 
-void mc_RelayManager::SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,uint32_t timestamp,uint32_t nonce)
+void mc_RelayManager::SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,mc_OffchainMessageID msg_id)
 {
     map<uint32_t, int>::iterator itlat = m_Latency.find(msg_type);
     if (itlat == m_Latency.end())
@@ -1251,7 +1255,7 @@ void mc_RelayManager::SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,u
     {
         pto_id=pto->GetId();
     }
-    const mc_RelayRecordKey key=mc_RelayRecordKey(timestamp,nonce,pto_id);
+    const mc_RelayRecordKey key=mc_RelayRecordKey(msg_id,pto_id);
     mc_RelayRecordValue value;
     value.m_NodeFrom=0;
     if(pfrom)
@@ -1276,7 +1280,7 @@ void mc_RelayManager::SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,u
 //    printf("setrr: %d, ts: %u, nc: %u, mt: %d\n",pto_id,value.m_Timestamp,nonce,msg_type);
 }
 
-int mc_RelayManager::GetRelayRecord(CNode *pfrom,uint32_t timestamp,uint32_t nonce,uint32_t* msg_type,CNode **pto)
+int mc_RelayManager::GetRelayRecord(CNode *pfrom,mc_OffchainMessageID msg_id,uint32_t* msg_type,CNode **pto)
 {
     NodeId pfrom_id,pto_id;
     
@@ -1286,7 +1290,7 @@ int mc_RelayManager::GetRelayRecord(CNode *pfrom,uint32_t timestamp,uint32_t non
         pfrom_id=pfrom->GetId();
     }
 //    printf("getrr: %d, ts: %u, nc: %u\n",pfrom_id,timestamp,nonce);
-    const mc_RelayRecordKey key=mc_RelayRecordKey(timestamp,nonce,pfrom_id);
+    const mc_RelayRecordKey key=mc_RelayRecordKey(msg_id,pfrom_id);
     map<mc_RelayRecordKey, mc_RelayRecordValue>::iterator it = m_RelayRecords.find(key);
     if (it == m_RelayRecords.end())
     {
@@ -1338,6 +1342,19 @@ int mc_RelayManager::GetRelayRecord(CNode *pfrom,uint32_t timestamp,uint32_t non
     return MC_ERR_NOT_ALLOWED;
 }
 
+mc_OffchainMessageID mc_RelayManager::GenerateMsgID(uint32_t timestamp)
+{
+    mc_OffchainMessageID msg_id;
+    msg_id.m_TimeStamp=timestamp;
+    GetRandBytes((unsigned char*)&(msg_id.m_Nonce), sizeof(msg_id.m_Nonce));
+    return msg_id;
+}
+
+mc_OffchainMessageID mc_RelayManager::GenerateMsgID()
+{
+    return GenerateMsgID(mc_TimeNowAsUInt());
+}
+
 uint32_t mc_RelayManager::GenerateNonce()
 {
     uint32_t nonce;     
@@ -1349,14 +1366,13 @@ uint32_t mc_RelayManager::GenerateNonce()
     return nonce;
 }
 
-int64_t mc_RelayManager::PushRelay(CNode*    pto, 
+mc_OffchainMessageID mc_RelayManager::PushRelay(CNode*    pto, 
                                 uint32_t  msg_format,        
                                 vector <int32_t> &vHops,
+                                vector <int32_t> &vSendPaths,                                
                                 uint32_t  msg_type,
-                                uint32_t  timestamp_to_send,
-                                uint32_t  nonce_to_send,
-                                uint32_t  timestamp_to_respond,
-                                uint32_t  nonce_to_respond,
+                                mc_OffchainMessageID msg_id,
+                                mc_OffchainMessageID msg_id_to_respond,
                                 uint32_t  flags,
                                 vector<unsigned char>& payload,
                                 vector<CScript>&  sigScripts_to_relay,
@@ -1368,32 +1384,15 @@ int64_t mc_RelayManager::PushRelay(CNode*    pto,
     vector<CScript>  sigScripts;
     CScript sigScript;
     uint256 message_hash;
-    uint32_t timestamp;     
-    uint32_t nonce;     
-    
-    nonce=nonce_to_send;
-    timestamp=timestamp_to_send;
-    
-    if(action & MC_PRA_GENERATE_TIMESTAMP)
-    {
-        timestamp=mc_TimeNowAsUInt();
-    }
-    
-    if(action & MC_PRA_GENERATE_NONCE)
-    {
-        nonce=GenerateNonce();
-    }
-    
-    int64_t aggr_nonce=AggregateNonce(timestamp,nonce);
     
     if( (action & MC_PRA_SIGN_WITH_HANDSHAKE_ADDRESS) && (MCP_ANYONE_CAN_CONNECT == 0) )
     {
         CHashWriter ssHash(SER_GETHASH, 0);
         ssHash << msg_type;        
-        ssHash << timestamp;
-        ssHash << nonce;
-        ssHash << timestamp_to_respond;
-        ssHash << nonce_to_respond;
+        ssHash << msg_id.m_TimeStamp;
+        ssHash << msg_id.m_Nonce;
+        ssHash << msg_id_to_respond.m_TimeStamp;
+        ssHash << msg_id_to_respond.m_Nonce;
         ssHash << flags;
         ssHash << payload;
         
@@ -1402,7 +1401,7 @@ int64_t mc_RelayManager::PushRelay(CNode*    pto,
         CHashWriter ssSig(SER_GETHASH, 0);
         
         ssSig << message_hash;
-        ssSig << vector<unsigned char>((unsigned char*)&aggr_nonce, (unsigned char*)&aggr_nonce+sizeof(aggr_nonce));
+        ssSig << vector<unsigned char>((unsigned char*)&msg_id_to_respond, (unsigned char*)&msg_id_to_respond+sizeof(msg_id_to_respond));
         uint256 signed_hash=ssSig.GetHash();
         CKey key;
         CKeyID keyID;
@@ -1444,24 +1443,25 @@ int64_t mc_RelayManager::PushRelay(CNode*    pto,
     }
     
 //    printf("send: %d, to: %d, from: %d, hc: %d, size: %d, ts: %u, nc: %u\n",msg_type,pto->GetId(),pfrom ? pfrom->GetId() : 0,(int)vHops.size(),(int)payload.size(),timestamp,nonce);
-    if(fDebug)LogPrint("offchain","Offchain send: %ld, request: %ld, to: %d, from: %d, msg: %d, hops: %d\n",
-            AggregateNonce(timestamp,nonce),AggregateNonce(timestamp_to_respond,nonce_to_respond),pto->GetId(),pfrom ? pfrom->GetId() : 0,msg_type,(int)vHops.size());
+    if(fDebug)LogPrint("offchain","Offchain send: %s, request: %s, to: %d, from: %d, msg: %d, hops: %d, size: %d\n",
+            msg_id.ToString().c_str(),msg_id_to_respond.ToString().c_str(),pto->GetId(),pfrom ? pfrom->GetId() : 0,msg_type,(int)vHops.size(),(int)payload.size());
     pto->PushMessage("offchain",
                         msg_format,
                         vHops,
+                        vSendPaths,
                         msg_type,
-                        timestamp,
-                        nonce,
-                        timestamp_to_respond,
-                        nonce_to_respond,
+                        msg_id.m_TimeStamp,
+                        msg_id.m_Nonce,
+                        msg_id_to_respond.m_TimeStamp,
+                        msg_id_to_respond.m_Nonce,
                         flags,
                         payload,
                         sigScripts);        
     
 //    SetRelayRecord(pto,NULL,msg_type,timestamp,nonce);
-    SetRelayRecord(pto,pfrom,msg_type,timestamp,nonce);
+    SetRelayRecord(pto,pfrom,msg_type,msg_id);
     
-    return aggr_nonce;
+    return msg_id;
 }
     
 bool mc_RelayManager::ProcessRelay( CNode* pfrom, 
@@ -1471,14 +1471,13 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
 {
     uint32_t  msg_type_in;
     uint32_t verify_flags;
-    uint32_t   timestamp_received;
-    uint32_t   nonce_received;
-    uint32_t   timestamp_to_respond;
-    uint32_t   nonce_to_respond;
+    mc_OffchainMessageID msg_id_received;
+    mc_OffchainMessageID msg_id_to_respond;
     vector<unsigned char> vPayloadIn;
     vector<CScript> vSigScripts;
     vector<CScript> vSigScriptsEmpty;
     vector <int32_t> vHops;
+    vector <int32_t> vSendPaths;
     vector <int32_t> vEmptyHops;
     uint256   message_hash;
     uint32_t  flags_in,flags_response,flags_relay;
@@ -1515,6 +1514,12 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
         
     vRecv >> vHops;
     hop_count=(int)vHops.size();
+    vRecv >> vSendPaths;
+    if(vSendPaths.size())
+    {
+        LogPrintf("ProcessRelay() : Unsupported send path\n");     
+        return false;                
+    }
     vRecv >> msg_type_in;
     switch(msg_type_in)
     {
@@ -1522,9 +1527,6 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
             verify_flags |= MC_VRA_IS_NOT_RESPONSE;
             break;
         case MC_RMT_NODE_DETAILS:
-            verify_flags |= MC_VRA_IS_RESPONSE | MC_VRA_SIGNATURE_ORIGIN;
-            break;
-        case MC_RMT_REJECT:
             verify_flags |= MC_VRA_IS_RESPONSE | MC_VRA_SIGNATURE_ORIGIN;
             break;
         case MC_RMT_CHUNK_QUERY:
@@ -1568,23 +1570,23 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
         
     CheckTime();
         
-    vRecv >> timestamp_received;
+    vRecv >> msg_id_received.m_TimeStamp;
     
     if(verify_flags & MC_VRA_TIMESTAMP)
     {
-        if(timestamp_received+m_MinTimeShift < m_LastTime)
+        if(msg_id_received.m_TimeStamp+m_MinTimeShift < m_LastTime)
         {
-            LogPrintf("ProcessRelay() : Timestamp too far in the past: %d\n",timestamp_received);     
+            LogPrintf("ProcessRelay() : Timestamp too far in the past: %d\n",msg_id_received.m_TimeStamp);     
             return false;                        
         }
-        if(timestamp_received > m_LastTime + m_MaxTimeShift)
+        if(msg_id_received.m_TimeStamp > m_LastTime + m_MaxTimeShift)
         {
-            LogPrintf("ProcessRelay() : Timestamp too far in the future: %d\n",timestamp_received);     
+            LogPrintf("ProcessRelay() : Timestamp too far in the future: %d\n",msg_id_received.m_TimeStamp);     
             return false;                        
         }
     }    
     
-    vRecv >> nonce_received;    
+    vRecv >> msg_id_received.m_Nonce;    
     
     
     msg_type_relay_ptr=&msg_type_relay;
@@ -1592,7 +1594,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     
     if( verify_flags & (MC_VRA_PROCESS_ONCE | MC_VRA_BROADCAST_ONCE))
     {
-        switch(GetRelayRecord(NULL,timestamp_received,nonce_received,NULL,NULL))
+        switch(GetRelayRecord(NULL,msg_id_received,NULL,NULL))
         {
             case MC_ERR_NOERROR:
                 if(verify_flags & MC_VRA_PROCESS_ONCE)
@@ -1621,36 +1623,34 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     }
     
         
-    vRecv >> timestamp_to_respond;
-    vRecv >> nonce_to_respond;
+    vRecv >> msg_id_to_respond.m_TimeStamp;
+    vRecv >> msg_id_to_respond.m_Nonce;
     
     if( verify_flags & MC_VRA_IS_NOT_RESPONSE ) 
     {
-        if( (timestamp_to_respond != 0) || (nonce_to_respond != 0) )
+        if( (msg_id_to_respond.m_TimeStamp != 0) || (msg_id_to_respond.m_Nonce != 0) )
         {
             return state.DoS(100, error("ProcessRelay() : This message should not be response"),REJECT_INVALID, "bad-nonce");                
         }
     }
-    
-    int64_t aggr_nonce=AggregateNonce(timestamp_to_respond,nonce_to_respond);
-    
+        
     if( verify_flags & MC_VRA_IS_RESPONSE ) 
     {
-        if( timestamp_to_respond == 0 )
+        if( msg_id_to_respond.m_TimeStamp == 0 )
         {
             return state.DoS(100, error("ProcessRelay() : This message should be response"),REJECT_INVALID, "bad-nonce");                
         }
         
-        if(GetRelayRecord(pfrom,timestamp_to_respond,nonce_to_respond,&msg_type_stored,&pto_stored))
+        if(GetRelayRecord(pfrom,msg_id_to_respond,&msg_type_stored,&pto_stored))
         {
             LogPrintf("ProcessRelay() : Response without request from peer %d\n",pfrom->GetId());     
             return false;
         }
     }
     
-    SetRelayRecord(NULL,pfrom,MC_RMT_ERROR_IN_MESSAGE,timestamp_received,nonce_received);
+    SetRelayRecord(NULL,pfrom,MC_RMT_ERROR_IN_MESSAGE,msg_id_received);
     
-    if(timestamp_to_respond)
+    if(msg_id_to_respond.m_TimeStamp)
     {
         if(pto_stored)
         {
@@ -1694,17 +1694,17 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     vRecv >> vSigScripts;
             
 //    printf("recv: %d, from: %d, to: %d, hc: %d, size: %d, ts: %u, nc: %u\n",msg_type_in,pfrom->GetId(),pto_stored ? pto_stored->GetId() : 0,hop_count,(int)vPayloadIn.size(),timestamp_received,nonce_received);
-    if(fDebug)LogPrint("offchain","Offchain recv: %ld, request: %ld, from: %d, to: %d, msg: %d, hops: %d\n",
-            AggregateNonce(timestamp_received,nonce_received),AggregateNonce(timestamp_to_respond,nonce_to_respond),pfrom->GetId(),pto_stored ? pto_stored->GetId() : 0,msg_type_in,hop_count);
+    if(fDebug)LogPrint("offchain","Offchain recv: %s, request: %s, from: %d, to: %d, msg: %d, hops: %d, size: %d\n",
+            msg_id_received.ToString().c_str(),msg_id_to_respond.ToString().c_str(),pfrom->GetId(),pto_stored ? pto_stored->GetId() : 0,msg_type_in,hop_count,(int)vPayloadIn.size());
     
     if( verify_flags & MC_VRA_SIGNATURES )
     {
         CHashWriter ssHash(SER_GETHASH, 0);
         ssHash << msg_type_in;        
-        ssHash << timestamp_received;
-        ssHash << nonce_received;
-        ssHash << timestamp_to_respond;
-        ssHash << nonce_to_respond;
+        ssHash << msg_id_received.m_TimeStamp;
+        ssHash << msg_id_received.m_Nonce;
+        ssHash << msg_id_to_respond.m_TimeStamp;
+        ssHash << msg_id_to_respond.m_Nonce;
         ssHash << flags_in;
         ssHash << vPayloadIn;
         
@@ -1746,7 +1746,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
                 CHashWriter ss(SER_GETHASH, 0);
                 
                 ss << vector<unsigned char>((unsigned char*)&message_hash, (unsigned char*)&message_hash+32);
-                ss << vector<unsigned char>((unsigned char*)&aggr_nonce, (unsigned char*)&aggr_nonce+sizeof(aggr_nonce));
+                ss << vector<unsigned char>((unsigned char*)&msg_id_to_respond, (unsigned char*)&msg_id_to_respond+sizeof(msg_id_to_respond));
                 uint256 signed_hash=ss.GetHash();
 
                 if(!pubkey.Verify(signed_hash,vchSigOut))
@@ -1773,7 +1773,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
 
     if(pto_stored)
     {
-        PushRelay(pto_stored,msg_format,vHops,msg_type_in,timestamp_received,nonce_received,timestamp_to_respond,nonce_to_respond,flags_in,
+        PushRelay(pto_stored,msg_format,vHops,vSendPaths,msg_type_in,msg_id_received,msg_id_to_respond,flags_in,
                   vPayloadIn,vSigScripts,pfrom,MC_PRA_NONE);
     }
     else
@@ -1789,16 +1789,16 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
                 {
                     if(*msg_type_response_ptr != MC_RMT_ADD_RESPONSE)
                     {
-                        PushRelay(pfrom,0,vEmptyHops,*msg_type_response_ptr,m_LastTime,0,timestamp_received,nonce_received,flags_response,
-                                  vPayloadResponse,vSigScriptsEmpty,NULL,MC_PRA_GENERATE_NONCE);                    
+                        PushRelay(pfrom,0,vEmptyHops,vSendPaths,*msg_type_response_ptr,GenerateMsgID(m_LastTime),msg_id_received,flags_response,
+                                  vPayloadResponse,vSigScriptsEmpty,NULL,MC_PRA_NONE);                    
                     }
                     else
                     {
-                        map<int64_t, mc_RelayRequest>::iterator itreq = m_Requests.find(AggregateNonce(timestamp_to_respond,nonce_to_respond));
+                        map<mc_OffchainMessageID, mc_RelayRequest>::iterator itreq = m_Requests.find(msg_id_to_respond);
                         if(itreq != m_Requests.end())
                         {
                             Lock();
-                            AddResponse(itreq->second.m_Nonce,pfrom,vHops.size() ? vHops[0] : 0,hop_count,AggregateNonce(timestamp_received,nonce_received),msg_type_in,flags_in,vPayloadIn,MC_RST_SUCCESS);
+                            AddResponse(itreq->second.m_MsgID,pfrom,vHops.size() ? vHops[0] : 0,hop_count,msg_id_received,msg_type_in,flags_in,vPayloadIn,MC_RST_SUCCESS);
                             UnLock();
                         }                        
                         else
@@ -1815,7 +1815,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
                     {
                         if(pnode != pfrom)
                         {
-                            PushRelay(pnode,msg_format,vHops,*msg_type_relay_ptr,timestamp_received,nonce_received,timestamp_to_respond,nonce_to_respond,flags_relay,
+                            PushRelay(pnode,msg_format,vHops,vSendPaths,*msg_type_relay_ptr,msg_id_received,msg_id_to_respond,flags_relay,
                                       vPayloadRelay,vSigScriptsEmpty,pfrom,MC_PRA_NONE);
                         }
                     }
@@ -1829,54 +1829,21 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
         }        
     }
     
-    if(timestamp_to_respond)
+    if(msg_id_to_respond.m_TimeStamp)
     {
-        SetRelayRecord(NULL,pfrom,msg_type_in,timestamp_received,nonce_received);        
+        SetRelayRecord(NULL,pfrom,msg_type_in,msg_id_received);        
     }
     else
     {
-        SetRelayRecord(NULL,pfrom,MC_RMT_NEW_REQUEST,timestamp_received,nonce_received);
+        SetRelayRecord(NULL,pfrom,MC_RMT_NEW_REQUEST,msg_id_received);
     }
     
     return true;
 }
 
-/*
-typedef struct mc_RelayResponse
-{
-    int64_t m_Nonce;
-    uint32_t m_MsgType;
-    uint32_t m_Flags;
-    CNode *m_NodeFrom;
-    int m_HopCount;
-    mc_NodeFullAddress m_Source;
-    uint32_t m_LastTryTimestamp;
-    vector <unsigned char> m_Payload;
-    vector <mc_RelayRequest> m_Requests;
-    
-    void Zero();
-} mc_RelayResponse;
-
-typedef struct mc_RelayRequest
-{
-    int64_t m_Nonce;
-    uint32_t m_MsgType;
-    uint32_t m_Flags;
-    int64_t m_ParentNonce;
-    int m_ParentResponseID;
-    uint32_t m_LastTryTimestamp;
-    int m_TryCount;
-    uint32_t m_Status;
-    vector <unsigned char> m_Payload;   
-    vector <mc_RelayResponse> m_Responses;
-    
-    void Zero();
-} mc_RelayRequest;
-*/
-
 void mc_RelayResponse::Zero()
 {
-    m_Nonce=0;
+    m_MsgID=0;
     m_MsgType=MC_RMT_NONE;
     m_Flags=0;
     m_NodeFrom=0;
@@ -1891,12 +1858,10 @@ void mc_RelayResponse::Zero()
 
 void mc_RelayRequest::Zero()
 {
-    m_Nonce=0;
+    m_MsgID=0;
     m_MsgType=MC_RMT_NONE;
     m_Flags=0;
     m_NodeTo=0;
-    m_ParentNonce=0;
-    m_ParentResponseID=-1;
     m_LastTryTimestamp=0;
     m_TryCount=0;
     m_Status=MC_RST_NONE;
@@ -1904,47 +1869,28 @@ void mc_RelayRequest::Zero()
     m_Responses.clear();
 }
 
-int mc_RelayManager::AddRequest(int64_t parent_nonce,int parent_response_id,CNode *pto,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status)
+int mc_RelayManager::AddRequest(CNode *pto,mc_OffchainMessageID msg_id,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status)
 {    
     int err=MC_ERR_NOERROR;
  
     Lock();
-    map<int64_t, mc_RelayRequest>::iterator itreq_this = m_Requests.find(nonce);
+    map<mc_OffchainMessageID, mc_RelayRequest>::iterator itreq_this = m_Requests.find(msg_id);
     if(itreq_this == m_Requests.end())
     {    
         mc_RelayRequest request;
 
-        request.m_Nonce=nonce;
+        request.m_MsgID=msg_id;
         request.m_MsgType=msg_type;
         request.m_Flags=flags;
         request.m_NodeTo=pto ? pto->GetId() : 0;
-        request.m_ParentNonce=parent_nonce;
-        request.m_ParentResponseID=parent_response_id;
         request.m_LastTryTimestamp=0;
         request.m_TryCount=0;
         request.m_Status=status;
         request.m_Payload=payload;   
         request.m_Responses.clear();
 
-        if(parent_nonce)
-        {
-            map<int64_t, mc_RelayRequest>::iterator itreq = m_Requests.find(parent_nonce);
-            if(itreq != m_Requests.end())
-            {
-                if(parent_response_id < (int)(itreq->second.m_Responses.size()))
-                {
-                    itreq->second.m_Responses[parent_response_id].m_Requests.push_back(request);
-                }
-            }    
-            else
-            {
-                err=MC_ERR_NOT_FOUND;            
-            }
-        }
-
-//        printf("rqst: %lu, mt: %d, node: %d, size: %d, pr: %lu\n",nonce,msg_type,pto ? pto->GetId() : 0,(int)payload.size(),parent_nonce);
-        if(fDebug)LogPrint("offchain","Offchain rqst: %ld, to: %d, msg: %d, size: %d\n",nonce,pto ? pto->GetId() : 0,msg_type,(int)payload.size());
-        m_Requests.insert(make_pair(nonce,request));
+        if(fDebug)LogPrint("offchain","Offchain rqst: %s, to: %d, msg: %d, size: %d\n",msg_id.ToString().c_str(),pto ? pto->GetId() : 0,msg_type,(int)payload.size());
+        m_Requests.insert(make_pair(msg_id,request));
     }
     else
     {
@@ -1955,17 +1901,18 @@ int mc_RelayManager::AddRequest(int64_t parent_nonce,int parent_response_id,CNod
     return err;            
 }
 
-int mc_RelayManager::AddResponse(int64_t request,CNode *pfrom,int32_t source,int hop_count,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status)
+int mc_RelayManager::AddResponse(mc_OffchainMessageID request,CNode *pfrom,int32_t source,int hop_count,mc_OffchainMessageID msg_id,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status)
 {
 //    printf("resp: %lu, mt: %d, node: %d, size: %d, rn: %lu\n",request,msg_type,pfrom ? pfrom->GetId() : 0,(int)payload.size(),nonce);
-    if(fDebug)LogPrint("offchain","Offchain resp: %ld, request: %ld, from: %d, msg: %d, size: %d\n",nonce,request,pfrom ? pfrom->GetId() : 0,msg_type,(int)payload.size());
-    if(request == 0)
+    if(fDebug)LogPrint("offchain","Offchain resp: %s, request: %s, from: %d, msg: %d, size: %d\n",
+            msg_id.ToString().c_str(),request.ToString().c_str(),pfrom ? pfrom->GetId() : 0,msg_type,(int)payload.size());
+    if(request.IsZero())
     {
         return MC_ERR_NOERROR;
     }
     
     mc_RelayResponse response;
-    response.m_Nonce=nonce;
+    response.m_MsgID=msg_id;
     response.m_MsgType=msg_type;
     response.m_Flags=flags;
     response.m_NodeFrom=pfrom ? pfrom->GetId() : 0;
@@ -1976,9 +1923,9 @@ int mc_RelayManager::AddResponse(int64_t request,CNode *pfrom,int32_t source,int
     response.m_Payload=payload;
     response.m_Requests.clear();    
     
-    if(request)
+    if(!request.IsZero())
     {
-        map<int64_t, mc_RelayRequest>::iterator itreq = m_Requests.find(request);
+        map<mc_OffchainMessageID, mc_RelayRequest>::iterator itreq = m_Requests.find(request);
         if(itreq != m_Requests.end())
         {    
             itreq->second.m_Responses.push_back(response);
@@ -1996,12 +1943,12 @@ int mc_RelayManager::AddResponse(int64_t request,CNode *pfrom,int32_t source,int
     return MC_ERR_NOERROR; 
 }
 
-int mc_RelayManager::DeleteRequest(int64_t request)
+int mc_RelayManager::DeleteRequest(mc_OffchainMessageID request)
 {
     int err=MC_ERR_NOERROR;
 
     Lock();
-    map<int64_t, mc_RelayRequest>::iterator itreq = m_Requests.find(request);
+    map<mc_OffchainMessageID, mc_RelayRequest>::iterator itreq = m_Requests.find(request);
     if(itreq != m_Requests.end())
     {
         m_Requests.erase(itreq);       
@@ -2015,10 +1962,10 @@ int mc_RelayManager::DeleteRequest(int64_t request)
     return err;     
 }
 
-mc_RelayRequest *mc_RelayManager::FindRequest(int64_t request)
+mc_RelayRequest *mc_RelayManager::FindRequest(mc_OffchainMessageID request)
 {
     Lock();
-    map<int64_t, mc_RelayRequest>::iterator itreq = m_Requests.find(request);
+    map<mc_OffchainMessageID, mc_RelayRequest>::iterator itreq = m_Requests.find(request);
     if(itreq != m_Requests.end())
     {
         return &(itreq->second);
@@ -2029,58 +1976,60 @@ mc_RelayRequest *mc_RelayManager::FindRequest(int64_t request)
 }
 
 
-int64_t mc_RelayManager::SendRequest(CNode* pto,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload)
+mc_OffchainMessageID mc_RelayManager::SendRequest(CNode* pto,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload)
 {
-    uint32_t timestamp=mc_TimeNowAsUInt();
-    uint32_t nonce=GenerateNonce();
-    int64_t aggr_nonce=AggregateNonce(timestamp,nonce);
+    mc_OffchainMessageID msg_id;
     vector <int32_t> vEmptyHops;
-    
+    vector <int32_t> vEmptySendPaths;
     vector<CScript> vSigScriptsEmpty;
 
+    msg_id=GenerateMsgID();
+    
     {
         LOCK(cs_vNodes);
         BOOST_FOREACH(CNode* pnode, vNodes)
         {
             if( (pto == NULL) || (pnode == pto) )
             {
-                PushRelay(pnode,0,vEmptyHops,msg_type,timestamp,nonce,0,0,flags,payload,vSigScriptsEmpty,NULL,0);                    
+                PushRelay(pnode,0,vEmptyHops,vEmptySendPaths,msg_type,msg_id,mc_OffchainMessageID(),flags,payload,vSigScriptsEmpty,NULL,0);                    
             }
         }
     }
 
-    if(AddRequest(0,0,pto,aggr_nonce,msg_type,flags,payload,MC_RST_NONE) != MC_ERR_NOERROR)
+    if(AddRequest(pto,msg_id,msg_type,flags,payload,MC_RST_NONE) != MC_ERR_NOERROR)
     {
-        return 0;
+        return mc_OffchainMessageID();
     }
     
-    return aggr_nonce;
+    return msg_id;
 }
 
-int64_t mc_RelayManager::SendNextRequest(mc_RelayResponse* response,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload)
+mc_OffchainMessageID mc_RelayManager::SendNextRequest(mc_RelayResponse* response,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload)
 {
-    int64_t aggr_nonce;
+    mc_OffchainMessageID msg_id;
     vector <int32_t> vEmptyHops;
+    vector <int32_t> vEmptySendPaths;
     vector<CScript> vSigScriptsEmpty;
+    
+    msg_id=GenerateMsgID();
 
-    aggr_nonce=0;
     {
         LOCK(cs_vNodes);
         BOOST_FOREACH(CNode* pnode, vNodes)
         {
             if( pnode->GetId() == response->m_NodeFrom )
             {
-                aggr_nonce=PushRelay(pnode,0,vEmptyHops,msg_type,0,0,Timestamp(response->m_Nonce),Nonce(response->m_Nonce),
-                                     flags,payload,vSigScriptsEmpty,NULL,MC_PRA_GENERATE_TIMESTAMP | MC_PRA_GENERATE_NONCE);                    
-                if(AddRequest(0,0,pnode,aggr_nonce,msg_type,flags,payload,MC_RST_NONE) != MC_ERR_NOERROR)
-                {
-                    return 0;
+                msg_id=PushRelay(pnode,0,vEmptyHops,vEmptySendPaths,msg_type,msg_id,response->m_MsgID,
+                                     flags,payload,vSigScriptsEmpty,NULL,MC_PRA_NONE);                    
+                if(AddRequest(pnode,msg_id,msg_type,flags,payload,MC_RST_NONE) != MC_ERR_NOERROR)
+                {                    
+                    return mc_OffchainMessageID();
                 }
             }
         }
     }
     
-    return aggr_nonce;
+    return msg_id;
 }
 
 
@@ -2089,7 +2038,7 @@ void mc_RelayManager::InvalidateResponsesFromDisconnected()
     LOCK(cs_vNodes);
     int m=(int)vNodes.size();
     Lock();
-    BOOST_FOREACH(PAIRTYPE(const int64_t,mc_RelayRequest)& item, m_Requests)    
+    BOOST_FOREACH(PAIRTYPE(const mc_OffchainMessageID,mc_RelayRequest)& item, m_Requests)    
     {
         for(int i=0;i<(int)item.second.m_Responses.size();i++)
         {

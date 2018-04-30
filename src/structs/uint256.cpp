@@ -216,6 +216,14 @@ unsigned int base_uint<BITS>::bits() const
     return 0;
 }
 
+// Explicit instantiations for base_uint<96>
+template int base_uint<96>::CompareTo(const base_uint<96>&) const;
+template bool base_uint<96>::EqualTo(uint64_t) const;
+template std::string base_uint<96>::GetHex() const;
+template std::string base_uint<96>::ToString() const;
+
+
+
 // Explicit instantiations for base_uint<160>
 template base_uint<160>::base_uint(const std::string&);
 template base_uint<160>::base_uint(const std::vector<unsigned char>&);

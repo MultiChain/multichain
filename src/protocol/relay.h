@@ -19,8 +19,6 @@
 #define MC_PRA_MY_ORIGIN_NT_ADDRESS          0x00000002
 #define MC_PRA_USE_DESTINATION_ADDRESS       0x00000004
 #define MC_PRA_SIGN_WITH_HANDSHAKE_ADDRESS   0x00000020
-#define MC_PRA_GENERATE_TIMESTAMP            0x00000040
-#define MC_PRA_GENERATE_NONCE                0x00000080
 
 #define MC_VRA_NONE                          0x00000000
 #define MC_VRA_IS_RESPONSE                   0x00000002
@@ -42,25 +40,24 @@
 #define MC_VRA_DEFAULT                       0x03970000
 
 #define MC_RMT_NONE                                   0
-#define MC_RMT_REJECT                        0x00000001
-#define MC_RMT_MC_ADDRESS_QUERY              0x00000002
-#define MC_RMT_NODE_DETAILS                  0x00000003
-#define MC_RMT_CHUNK_QUERY                   0x00000101
-#define MC_RMT_CHUNK_QUERY_HIT               0x00000102
-#define MC_RMT_CHUNK_REQUEST                 0x00000103
-#define MC_RMT_CHUNK_RESPONSE                0x00000104
-#define MC_RMT_ADD_RESPONSE                  0x01000001
-#define MC_RMT_ERROR_IN_MESSAGE              0x01000002
-#define MC_RMT_NEW_REQUEST                   0x01000003
-#define MC_RMT_SPECIAL_MASK                  0x10000000
-#define MC_RMT_SPECIAL_COLLECT_CHUNKS        0x10000001
-#define MC_RMT_SPECIAL_VIEW_CHUNKS           0x10000002
+#define MC_RMT_MC_ADDRESS_QUERY              0x7971616d     //maqy
+#define MC_RMT_NODE_DETAILS                  0x7464646e     //nddt
+#define MC_RMT_CHUNK_QUERY                   0x79716863     //chqy
+#define MC_RMT_CHUNK_QUERY_HIT               0x68716883     //chqh
+#define MC_RMT_CHUNK_REQUEST                 0x71726863     //chrq
+#define MC_RMT_CHUNK_RESPONSE                0x73726863     //chrs
+#define MC_RMT_ADD_RESPONSE                  0x00800001
+#define MC_RMT_ERROR_IN_MESSAGE              0x00800002
+#define MC_RMT_NEW_REQUEST                   0x00800003
+#define MC_RMT_SPECIAL_MASK                  0x80000000
+#define MC_RMT_SPECIAL_COLLECT_CHUNKS        0x80000001
+#define MC_RMT_SPECIAL_VIEW_CHUNKS           0x80000002
 
 #define MC_RDT_UNKNOWN                                0
-#define MC_RDT_MC_ADDRESS                             1
-#define MC_RDT_NET_ADDRESS                            2
-#define MC_RDT_CHUNK_IDS                             11
-#define MC_RDT_CHUNKS                                12
+#define MC_RDT_MC_ADDRESS                          0x01
+#define MC_RDT_NET_ADDRESS                         0x02
+#define MC_RDT_CHUNK_IDS                           0x11
+#define MC_RDT_CHUNKS                              0x12
 
 #define MC_LIM_MAX_SECONDS                60
 #define MC_LIM_MAX_MEASURES                4
@@ -113,6 +110,60 @@ typedef struct mc_Limiter
     
 } mc_Limiter;
 
+typedef struct mc_OffchainMessageID
+{
+    uint32_t m_TimeStamp;
+    uint96 m_Nonce;
+    
+    mc_OffchainMessageID()
+    {
+        m_TimeStamp=0;
+        m_Nonce=0;
+    }
+       
+    
+    friend bool operator<(const mc_OffchainMessageID& a, const mc_OffchainMessageID& b)
+    {
+        return ((a.m_TimeStamp < b.m_TimeStamp) || 
+                (a.m_TimeStamp == b.m_TimeStamp && a.m_Nonce < b.m_Nonce));
+    }
+
+    friend bool operator==(const mc_OffchainMessageID& a, const mc_OffchainMessageID& b)
+    {
+        return (a.m_TimeStamp == b.m_TimeStamp && a.m_Nonce == b.m_Nonce);
+    }
+    
+    friend bool operator!=(const mc_OffchainMessageID& a, const mc_OffchainMessageID& b)
+    {
+        return (a.m_TimeStamp != b.m_TimeStamp || a.m_Nonce != b.m_Nonce);
+    }
+    
+    
+    mc_OffchainMessageID& operator=(const mc_OffchainMessageID& b)
+    {
+        m_TimeStamp=b.m_TimeStamp;
+        m_Nonce=b.m_Nonce;
+        return *this;
+    }
+    
+    mc_OffchainMessageID& operator=(const uint32_t& b)
+    {
+        m_TimeStamp=b;
+        m_Nonce=0;
+        return *this;
+    }
+    
+    bool IsZero()
+    {
+        return (m_TimeStamp == 0 && m_Nonce == 0);        
+    }
+    
+    std::string ToString()
+    {
+        return strprintf("%s-%d",m_Nonce.ToString().c_str(),m_TimeStamp);
+    }
+} mc_OffchainMessageID;
+
 
 typedef struct mc_NodeFullAddress
 {
@@ -130,22 +181,19 @@ typedef struct mc_NodeFullAddress
 
 typedef struct mc_RelayRecordKey
 {
-    uint32_t  m_TimeStamp;
-    uint32_t  m_Nonce;
+    mc_OffchainMessageID m_ID;
     NodeId m_NodeTo;
 
-    mc_RelayRecordKey(uint32_t timestamp,uint32_t nonce,NodeId node)
+    mc_RelayRecordKey(mc_OffchainMessageID msg_id,NodeId node)
     {
-        m_TimeStamp=timestamp;
-        m_Nonce=nonce;
+        m_ID=msg_id;
         m_NodeTo=node;
     }
     
     friend bool operator<(const mc_RelayRecordKey& a, const mc_RelayRecordKey& b)
     {
-        return ((a.m_TimeStamp < b.m_TimeStamp) || 
-                (a.m_TimeStamp == b.m_TimeStamp && a.m_Nonce < b.m_Nonce) || 
-                (a.m_TimeStamp == b.m_TimeStamp && a.m_Nonce == b.m_Nonce && a.m_NodeTo < b.m_NodeTo));
+        return ((a.m_ID < b.m_ID) || 
+                (a.m_ID == b.m_ID && a.m_NodeTo < b.m_NodeTo));
     }
     
 } mc_RelayRecordKey;
@@ -163,7 +211,7 @@ struct mc_RelayRequest;
 
 typedef struct mc_RelayResponse
 {
-    int64_t m_Nonce;
+    mc_OffchainMessageID m_MsgID;
     uint32_t m_MsgType;
     uint32_t m_Flags;
     NodeId m_NodeFrom;
@@ -185,12 +233,10 @@ typedef struct mc_RelayResponse
 
 typedef struct mc_RelayRequest
 {
-    int64_t m_Nonce;
+    mc_OffchainMessageID m_MsgID;
     uint32_t m_MsgType;
     uint32_t m_Flags;
     NodeId m_NodeTo;
-    int64_t m_ParentNonce;
-    int m_ParentResponseID;
     uint32_t m_LastTryTimestamp;
     int m_TryCount;
     uint32_t m_Status;
@@ -230,7 +276,7 @@ typedef struct mc_RelayManager
     map<uint32_t,int> m_Latency;
     map<uint32_t,mc_Limiter> m_Limiters;
     map<const mc_RelayRecordKey,mc_RelayRecordValue> m_RelayRecords;
-    map<int64_t,mc_RelayRequest> m_Requests;
+    map<mc_OffchainMessageID,mc_RelayRequest> m_Requests;
     
     void Zero();
     void Destroy();
@@ -239,27 +285,25 @@ typedef struct mc_RelayManager
     void UnLock();        
     int Initialize();
     
-    int64_t AggregateNonce(uint32_t timestamp,uint32_t nonce);
-    uint32_t Timestamp(int64_t aggr_nonce);
-    uint32_t Nonce(int64_t aggr_nonce);
     uint32_t GenerateNonce();
+    mc_OffchainMessageID GenerateMsgID(uint32_t timestamp);
+    mc_OffchainMessageID GenerateMsgID();
     void SetDefaults();
     void SetMyIPs(uint32_t *ips,int ip_count);
     void MsgTypeSettings(uint32_t msg_type,int latency,int seconds,int64_t serves_per_second,int64_t bytes_per_second); 
     void InitNodeAddress(mc_NodeFullAddress* node_address,CNode* pto,uint32_t action);
     void InitNodeAddress(mc_NodeFullAddress* node_address,CKeyID& mc_address, vector<CAddress>& net_addresses);
     void CheckTime();
-    void SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,uint32_t timestamp,uint32_t nonce);
-    int GetRelayRecord(CNode *pfrom,uint32_t timestamp,uint32_t nonce,uint32_t *msg_type,CNode **pto);
+    void SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,mc_OffchainMessageID msg_id);
+    int GetRelayRecord(CNode *pfrom,mc_OffchainMessageID msg_id,uint32_t *msg_type,CNode **pto);
     
-    int64_t PushRelay          (   CNode*    pto, 
+    mc_OffchainMessageID PushRelay(CNode*    pto, 
                                 uint32_t  msg_format,        
                                 vector <int32_t> &vHops,
+                                vector <int32_t> &vSendPaths,                                
                                 uint32_t  msg_type,
-                                uint32_t  timestamp_to_send,
-                                uint32_t  nonce_to_send,
-                                uint32_t  timestamp_to_respond,
-                                uint32_t  nonce_to_respond,
+                                mc_OffchainMessageID msg_id,
+                                mc_OffchainMessageID msg_id_to_respond,
                                 uint32_t  flags,
                                 vector<unsigned char>& payload,
                                 vector<CScript>&  sigScripts_to_relay,
@@ -271,15 +315,19 @@ typedef struct mc_RelayManager
                                 CValidationState &state, 
                                 uint32_t verify_flags_in);
 
-    int AddRequest(int64_t parent_nonce,int parent_response_id,CNode *pto,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status);
-    int AddResponse(int64_t request,CNode *pfrom,int32_t source,int hop_count,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status);
-    int DeleteRequest(int64_t request);
-    int ProcessRequest(int64_t request);
-    mc_RelayRequest *FindRequest(int64_t request);
+    int AddRequest(CNode *pto,mc_OffchainMessageID msg_id,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status);
+//    int AddRequest(int64_t parent_nonce,int parent_response_id,CNode *pto,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status);
+    int AddResponse(mc_OffchainMessageID request,CNode *pfrom,int32_t source,int hop_count,mc_OffchainMessageID msg_id,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status);
+    //int AddResponse(int64_t request,CNode *pfrom,int32_t source,int hop_count,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status);
+    int DeleteRequest(mc_OffchainMessageID request);
+    int ProcessRequest(mc_OffchainMessageID request);
+    mc_RelayRequest *FindRequest(mc_OffchainMessageID request);
     void InvalidateResponsesFromDisconnected();
     
-    int64_t SendRequest(CNode* pto,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload);
-    int64_t SendNextRequest(mc_RelayResponse* response,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload);
+    mc_OffchainMessageID SendRequest(CNode* pto,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload);
+//    int64_t SendRequest(CNode* pto,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload);
+    mc_OffchainMessageID SendNextRequest(mc_RelayResponse* response,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload);
+//    int64_t SendNextRequest(mc_RelayResponse* response,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload);
 }   mc_RelayManager;
 
 
