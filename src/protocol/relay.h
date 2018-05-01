@@ -43,7 +43,7 @@
 #define MC_RMT_MC_ADDRESS_QUERY              0x7971616d     //maqy
 #define MC_RMT_NODE_DETAILS                  0x7464646e     //nddt
 #define MC_RMT_CHUNK_QUERY                   0x79716863     //chqy
-#define MC_RMT_CHUNK_QUERY_HIT               0x68716883     //chqh
+#define MC_RMT_CHUNK_QUERY_HIT               0x68716863     //chqh
 #define MC_RMT_CHUNK_REQUEST                 0x71726863     //chrq
 #define MC_RMT_CHUNK_RESPONSE                0x73726863     //chrs
 #define MC_RMT_ADD_RESPONSE                  0x00800001

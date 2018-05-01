@@ -53,6 +53,7 @@ void mc_ChunkCollector::Zero()
     m_TotalDBSize=m_KeyDBSize+m_ValueDBSize;
     m_Name[0]=0;
     m_DBName[0]=0;
+    m_NextAutoCommitTimestamp=0;
     m_NextTryTimestamp=0;
     m_MarkPool=NULL;
     m_MemPool=NULL;
@@ -61,6 +62,7 @@ void mc_ChunkCollector::Zero()
     m_MemPool2=NULL;
     
     m_MaxMemPoolSize=MC_CCW_DEFAULT_MEMPOOL_SIZE;
+    m_AutoCommitDelay=MC_CCW_DEFAULT_AUTOCOMMIT_DELAY;
     
     m_Semaphore=NULL;
     m_LockedBy=0;     
@@ -147,7 +149,7 @@ void mc_ChunkCollector::GetDBRow(mc_ChunkCollectorRow* collect_row)
 {
     collect_row->Zero();
     collect_row->m_DBNextAttempt=mc_SwapBytes32(m_DBRow.m_QueryNextAttempt);
-    collect_row->m_State.m_QueryAttempts=collect_row->m_DBNextAttempt;    
+    collect_row->m_State.m_QueryNextAttempt=collect_row->m_DBNextAttempt;    
     collect_row->m_Vout=m_DBRow.m_Vout;
     memcpy(collect_row->m_TxID,m_DBRow.m_TxID,MC_TDB_TXID_SIZE);
     memcpy(&(collect_row->m_ChunkDef.m_Entity),&(m_DBRow.m_Entity),sizeof(mc_TxEntity));
@@ -178,13 +180,13 @@ int mc_ChunkCollector::UpdateDBRow(mc_ChunkCollectorRow *collect_row)
     int err;    
     collect_row->m_State.m_Status &= MC_CCF_ERROR_MASK;
     SetDBRow(collect_row);
-    err=m_DB->Delete((char*)&m_DBRow+m_KeyOffset,m_KeySize,MC_OPT_DB_DATABASE_TRANSACTIONAL);    
+    err=m_DB->Delete((char*)&m_DBRow+m_KeyDBOffset,m_KeyDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);    
     if(err)
     {
         return err;
     }
     collect_row->m_DBNextAttempt=collect_row->m_State.m_QueryNextAttempt;
-    err=m_DBRow.m_QueryNextAttempt=mc_SwapBytes32(collect_row->m_DBNextAttempt);
+    m_DBRow.m_QueryNextAttempt=mc_SwapBytes32(collect_row->m_DBNextAttempt);
     collect_row->m_State.m_Status |= MC_CCF_INSERTED;    
     return m_DB->Write((char*)&m_DBRow+m_KeyDBOffset,m_KeyDBSize,(char*)&m_DBRow+m_ValueDBOffset,m_ValueDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
 }
@@ -210,7 +212,7 @@ int mc_ChunkCollector::SeekDB(void *dbrow)
 
 int mc_ChunkCollector::ReadFromDB(mc_Buffer *mempool,int rows)
 {
-    int err;   
+    int err,mprow;   
     mc_ChunkCollectorRow collect_row;
     mc_ChunkDBRow chunk_def;
     unsigned char *ptr;
@@ -240,8 +242,12 @@ int mc_ChunkCollector::ReadFromDB(mc_Buffer *mempool,int rows)
             {
                 collect_row.m_State.m_Status |= MC_CCF_DELETED;
             }
-            mempool->Add(&collect_row);
-            row++;
+            mprow=mempool->Seek(&collect_row);
+            if(mprow < 0)
+            {
+                mempool->Add(&collect_row);
+                row++;
+            }
         }
         else
         {
@@ -326,7 +332,7 @@ int mc_ChunkCollector::Initialize(mc_ChunkDB *chunk_db,const char *name,uint32_t
 
         mc_GetFullFileName(name,"chunks/collect",".db",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,m_DBName);
 
-        m_DB->SetOption("KeySize",0,m_KeySize);
+        m_DB->SetOption("KeySize",0,m_KeyDBSize);
         m_DB->SetOption("ValueSize",0,m_ValueDBSize);
 
 
@@ -604,6 +610,7 @@ int mc_ChunkCollector::CommitInternal()
     int i;    
     mc_ChunkCollectorRow *row;
     int err,commit_required;
+    uint32_t time_now;
 
     err=MC_ERR_NOERROR;
     
@@ -613,6 +620,8 @@ int mc_ChunkCollector::CommitInternal()
     }
     
     Dump("Before Commit");
+    
+    time_now=mc_TimeNowAsUInt();
     
     if(m_MemPool == m_MemPool1)
     {
@@ -664,7 +673,10 @@ int mc_ChunkCollector::CommitInternal()
                 row->m_State.m_Status |= MC_CCF_INSERTED;
             }            
  */ 
-            m_MemPoolNext->Add(row);
+            if(!row->m_State.m_Query.IsZero() || (row->m_State.m_QueryNextAttempt <= time_now))
+            {
+                m_MemPoolNext->Add(row);                
+            }
         }
     }    
 
@@ -679,8 +691,9 @@ int mc_ChunkCollector::CommitInternal()
    
     if(m_MemPoolNext->GetCount() < m_MaxMemPoolSize)
     {
+        m_LastDBRow.Zero();
         err=SeekDB(&m_LastDBRow);
-        if(err != MC_ERR_NOERROR)
+        if(err == MC_ERR_NOERROR)
         {
             ReadFromDB(m_MemPoolNext,m_MaxMemPoolSize);
         }

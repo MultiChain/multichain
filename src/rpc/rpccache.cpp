@@ -202,6 +202,8 @@ Value offchain(const Array& params, bool fHelp)
                                 int chunk_size=0;
                                 mc_EntityDetails stream_entity;
                                 
+                                uint256 txid=0;
+                                int vout=0;
                                 mc_TxEntity entity;
                                 entity.Zero();
                                 BOOST_FOREACH(const Pair& dd, cd.get_obj()) 
@@ -215,6 +217,18 @@ Value offchain(const Array& params, bool fHelp)
                                     if(dd.name_ == "hash")
                                     {
                                         chunk_hash = ParseHashV(dd.value_.get_str(), "hash");
+                                    }
+                                    if(dd.name_ == "txid")
+                                    {
+                                        txid = ParseHashV(dd.value_.get_str(), "hash");
+                                    }
+                                    if(dd.name_ == "vout")
+                                    {
+                                        if(dd.value_.type() != int_type)
+                                        {
+                                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid vout");                                                                        
+                                        }
+                                        vout=dd.value_.get_int();
                                     }
                                     if(dd.name_ == "size")
                                     {
@@ -237,8 +251,7 @@ Value offchain(const Array& params, bool fHelp)
                                 {
                                     throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing stream");                                    
                                 }
-                                uint256 txid=0;
-                                collector.InsertChunk((unsigned char*)&chunk_hash,&entity,(unsigned char*)&txid,0,chunk_size);
+                                collector.InsertChunk((unsigned char*)&chunk_hash,&entity,(unsigned char*)&txid,vout,chunk_size);
                             }
                         }
                     }            

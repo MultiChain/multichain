@@ -18,6 +18,13 @@ uint32_t MultichainNextChunkQueryAttempt(uint32_t attempts)
     return 86400*365*10;
 }
 
+string mc_MsgTypeStr(uint32_t msg_type)
+{
+    char *ptr;
+    ptr=(char*)&msg_type;
+    return strprintf("%c%c%c%c",ptr[0],ptr[1],ptr[2],ptr[3]);
+}
+
 typedef struct CRelayResponsePair
 {
     mc_OffchainMessageID request_id;
@@ -41,7 +48,6 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
     mc_RelayRequest *request;
     mc_RelayResponse *response;
     request=pRelayManager->FindRequest(response_pair->request_id);
-    
     if(request == NULL)
     {
         return false;
@@ -59,6 +65,7 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
     mc_ChunkEntityKey *chunkOut;
     unsigned char *ptrOut;
     bool result=false;
+    string strError="";
     mc_ChunkCollectorRow *collect_row;
         
     uint32_t total_size=0;
@@ -97,12 +104,14 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
 
     if(response->m_Payload.size() != 1+shift+total_size)
     {
+        strError="Total size mismatch";
         goto exitlbl;        
     }
 
     ptrOut=&(response->m_Payload[0]);
     if(*ptrOut != MC_RDT_CHUNKS)
     {
+        strError="Unsupported payload format";
         goto exitlbl;                
     }
     
@@ -110,6 +119,7 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
     countOut=(int)mc_GetVarInt(ptrOut,1+shift+total_size,-1,&shiftOut);
     if( (countOut != count) || (shift != shiftOut) )
     {
+        strError="Chunk count mismatch";
         goto exitlbl;                        
     }
     ptrOut+=shift;
@@ -120,16 +130,20 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
         sizeOut=((mc_ChunkEntityKey*)ptr)->m_Size;
         chunk=(mc_ChunkEntityKey*)ptr;
         chunkOut=(mc_ChunkEntityKey*)ptrOut;
+        ptrOut+=size;
         if(chunk->m_Size != chunkOut->m_Size)
         {
+            strError="Chunk info size mismatch";
             goto exitlbl;                                        
         }
         if(memcmp(chunk->m_Hash,chunkOut->m_Hash,sizeof(uint256)))
         {
+            strError="Chunk info hash mismatch";
             goto exitlbl;                                                    
         }
-        if(memcmp(&(chunk->m_Entity),&(chunkOut->m_Entity),sizeof(uint256)))
+        if(memcmp(&(chunk->m_Entity),&(chunkOut->m_Entity),sizeof(mc_TxEntity)))
         {
+            strError="Chunk info entity mismatch";
             goto exitlbl;                                                    
         }
         sizeOut=chunk->m_Size;
@@ -141,6 +155,7 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
             mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(ptrOut,sizeOut,&hash);
             if(memcmp(&hash,chunk->m_Hash,sizeof(uint256)))
             {
+                strError="Chunk data hash mismatch";
                 goto exitlbl;                                        
             }
             chunk_err=pwalletTxsMain->m_ChunkDB->AddChunk(chunk->m_Hash,&(chunk->m_Entity),(unsigned char*)collect_row->m_TxID,collect_row->m_Vout,ptrOut,NULL,sizeOut,0,0);
@@ -148,6 +163,7 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
             {
                 if(chunk_err != MC_ERR_FOUND)
                 {
+                    strError=strprintf("Internal chunk DB error: %d",chunk_err);
                     goto exitlbl;                    
                 }
             }
@@ -164,6 +180,10 @@ exitlbl:
                 
     pRelayManager->UnLock();
                 
+    if(strError.size())
+    {
+        if(fDebug)LogPrint("chunks","Bad response from peer %d: %s\n",response->m_NodeFrom,strError.c_str());
+    }
     return result;
 }
 
@@ -273,7 +293,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                 {
                     response_pair.request_id=collect_row->m_State.m_Request;
                     response_pair.response_id=0;
-                    printf("coll new rsp: row: %d, id: %s, %d\n",row,collect_row->m_State.m_Request.ToString().c_str(),collect_row->m_State.m_RequestPos);
+//                    printf("coll new rsp: row: %d, id: %s, %d\n",row,collect_row->m_State.m_Request.ToString().c_str(),collect_row->m_State.m_RequestPos);
                     map<CRelayResponsePair,CRelayRequestPairs>::iterator itrsp = responses_to_process.find(response_pair);
                     if (itrsp == responses_to_process.end())
                     {
@@ -321,13 +341,14 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                         map<CRelayResponsePair,CRelayRequestPairs>::iterator itrsp = requests_to_send.find(response_pair);                                                
                         if (itrsp == requests_to_send.end())
                         {                            
+//                    printf("coll new req: row: %d, id:  %s, rsps: %d, score (%d,%d)\n",row,collect_row->m_State.m_Query.ToString().c_str(),(int)query->m_Responses.size(),best_score,best_response);
                             request_pairs.m_Pairs.clear();
                             request_pairs.m_Pairs.insert(make_pair(row,0));
                             requests_to_send.insert(make_pair(response_pair,request_pairs));
                         }       
                         else
                         {
-                    printf("coll new req: row: %d, id:  %s, rsps: %d, score (%d,%d)\n",row,collect_row->m_State.m_Query.ToString().c_str(),(int)query->m_Responses.size(),best_score,best_response);
+//                    printf("coll old req: row: %d, id:  %s, rsps: %d, score (%d,%d)\n",row,collect_row->m_State.m_Query.ToString().c_str(),(int)query->m_Responses.size(),best_score,best_response);
                             itrsp->second.m_Pairs.insert(make_pair(row,0));
                         }                    
                     }
@@ -356,7 +377,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         BOOST_FOREACH(PAIRTYPE(const int, int)& chunk_row, item.second.m_Pairs)    
         {                            
             collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(chunk_row.first);
-            printf("S %d\n",chunk_row.first);
+//            printf("S %d\n",chunk_row.first);
             collect_subrow->m_State.m_RequestPos=count;
             memcpy(ptrOut,&(collect_subrow->m_ChunkDef),sizeof(mc_ChunkEntityKey));
             ptrOut+=sizeof(mc_ChunkEntityKey);
@@ -371,12 +392,13 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
 
         response=&(request->m_Responses[item.first.response_id]);
         request_id=pRelayManager->SendNextRequest(response,MC_RMT_CHUNK_REQUEST,0,payload);
-        if(fDebug)LogPrint("chunks","New chunk request %s, response: %s, chunks: %d\n",request_id.ToString().c_str(),response->m_MsgID.ToString().c_str(),item.second.m_Pairs.size());
+        if(fDebug)LogPrint("chunks","New chunk request: %s, response: %s, chunks: %d\n",request_id.ToString().c_str(),response->m_MsgID.ToString().c_str(),item.second.m_Pairs.size());
         BOOST_FOREACH(PAIRTYPE(const int, int)& chunk_row, item.second.m_Pairs)    
         {                
             collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(chunk_row.first);
             collect_subrow->m_State.m_Request=request_id;
-            collect_row->m_State.m_RequestTimeStamp=time_now+MC_CCW_TIMEOUT_REQUEST;
+            collect_subrow->m_State.m_RequestTimeStamp=time_now+MC_CCW_TIMEOUT_REQUEST;
+//            printf("T %d %d %s\n",chunk_row.first,collect_subrow->m_State.m_RequestPos,collect_subrow->m_State.m_Request.ToString().c_str());
         }
     }
 
@@ -392,7 +414,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
             collect_row=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(row);
         }
         
-        if( (collect_row == NULL)|| (last_count >= MC_CCW_MAX_CHUNKS_PER_QUERY) || (total_size+collect_row->m_ChunkDef.m_Size > MAX_SIZE-48) )
+        if( (collect_row == NULL)|| (last_count >= MC_CCW_MAX_CHUNKS_PER_QUERY) || (total_size+collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey)> MAX_SIZE-48) )
         {
             if(last_count)
             {
@@ -415,7 +437,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                     }
                 }
                 query_id=pRelayManager->SendRequest(NULL,MC_RMT_CHUNK_QUERY,0,payload);
-                if(fDebug)LogPrint("chunks","New chunk query: %s, chunks: %d\n",query_id.ToString().c_str(),last_count);
+                if(fDebug)LogPrint("chunks","New chunk query: %s, chunks: %d, rows [%d-%d)\n",query_id.ToString().c_str(),last_count,last_row,row);
                 for(int r=last_row;r<row;r++)
                 {
                     collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(r);
@@ -499,6 +521,15 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     }    
     
     collector->UnLock();
+    if(not_processed < collector->m_MaxMemPoolSize/2)
+    {
+        if(collector->m_NextAutoCommitTimestamp < GetTimeMillis())
+        {
+            collector->Commit();
+            collector->m_NextAutoCommitTimestamp=GetTimeMillis()+collector->m_AutoCommitDelay;
+        }
+    }
+    
     
     return not_processed;
 }
@@ -559,7 +590,7 @@ bool mc_RelayProcess_Chunk_Query(unsigned char *ptrStart,unsigned char *ptrEnd,v
                 for(int c=0;c<count;c++)
                 {
                     chunk=*(mc_ChunkEntityKey*)ptr;
-                    LogPrintf("chnk qry: %d %s\n",c,(*(uint256*)(chunk.m_Hash)).ToString().c_str());
+LogPrintf("chnk qry: %d %s\n",c,(*(uint256*)(chunk.m_Hash)).ToString().c_str());
                     if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,chunk.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
                     {
                         if(chunk_def.m_Size != chunk.m_Size)
@@ -622,7 +653,7 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
                 for(int c=0;c<count;c++)
                 {
                     chunk=*(mc_ChunkEntityKey*)ptr;
-                    LogPrintf("chnk req: %d %s\n",c,(*(uint256*)(chunk.m_Hash)).ToString().c_str());
+LogPrintf("chnk req: %d %s\n",c,(*(uint256*)(chunk.m_Hash)).ToString().c_str());
                     if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,chunk.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
                     {
                         if(chunk_def.m_Size != chunk.m_Size)
@@ -630,7 +661,8 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
                             strError="Bad chunk size";
                             return false;                    
                         }
-                        if(total_size + chunk_def.m_Size > MAX_SIZE-48)
+                        total_size+=chunk_def.m_Size+size;
+                        if(total_size > MAX_SIZE-48)
                         {
                             strError="Total size of requested chunks is too big";
                             return false;                                                
@@ -1443,8 +1475,8 @@ mc_OffchainMessageID mc_RelayManager::PushRelay(CNode*    pto,
     }
     
 //    printf("send: %d, to: %d, from: %d, hc: %d, size: %d, ts: %u, nc: %u\n",msg_type,pto->GetId(),pfrom ? pfrom->GetId() : 0,(int)vHops.size(),(int)payload.size(),timestamp,nonce);
-    if(fDebug)LogPrint("offchain","Offchain send: %s, request: %s, to: %d, from: %d, msg: %d, hops: %d, size: %d\n",
-            msg_id.ToString().c_str(),msg_id_to_respond.ToString().c_str(),pto->GetId(),pfrom ? pfrom->GetId() : 0,msg_type,(int)vHops.size(),(int)payload.size());
+    if(fDebug)LogPrint("offchain","Offchain send: %s, request: %s, to: %d, from: %d, msg: %s, hops: %d, size: %d\n",
+            msg_id.ToString().c_str(),msg_id_to_respond.ToString().c_str(),pto->GetId(),pfrom ? pfrom->GetId() : 0,mc_MsgTypeStr(msg_type).c_str(),(int)vHops.size(),(int)payload.size());
     pto->PushMessage("offchain",
                         msg_format,
                         vHops,
@@ -1544,7 +1576,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
         default:
             if(verify_flags & MC_VRA_MESSAGE_TYPE)    
             {
-                LogPrintf("ProcessRelay() : Unsupported relay message type %d\n",msg_type_in);     
+                LogPrintf("ProcessRelay() : Unsupported relay message type %s\n",mc_MsgTypeStr(msg_type_in).c_str());     
                 return false;
             }
             break;
@@ -1554,7 +1586,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     {
         if(hop_count)
         {
-            LogPrintf("ProcessRelay() : Unsupported hop count %d for msg type %d\n",hop_count,msg_type_in);     
+            LogPrintf("ProcessRelay() : Unsupported hop count %d for msg type %s\n",hop_count,mc_MsgTypeStr(msg_type_in).c_str());     
             return false;            
         }
     }
@@ -1563,7 +1595,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     {
         if(hop_count > 1)
         {
-            LogPrintf("ProcessRelay() : Unsupported hop count %d for msg type %d\n",hop_count,msg_type_in);     
+            LogPrintf("ProcessRelay() : Unsupported hop count %d for msg type %s\n",hop_count,mc_MsgTypeStr(msg_type_in).c_str());     
             return false;            
         }
     }
@@ -1694,8 +1726,8 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     vRecv >> vSigScripts;
             
 //    printf("recv: %d, from: %d, to: %d, hc: %d, size: %d, ts: %u, nc: %u\n",msg_type_in,pfrom->GetId(),pto_stored ? pto_stored->GetId() : 0,hop_count,(int)vPayloadIn.size(),timestamp_received,nonce_received);
-    if(fDebug)LogPrint("offchain","Offchain recv: %s, request: %s, from: %d, to: %d, msg: %d, hops: %d, size: %d\n",
-            msg_id_received.ToString().c_str(),msg_id_to_respond.ToString().c_str(),pfrom->GetId(),pto_stored ? pto_stored->GetId() : 0,msg_type_in,hop_count,(int)vPayloadIn.size());
+    if(fDebug)LogPrint("offchain","Offchain recv: %s, request: %s, from: %d, to: %d, msg: %s, hops: %d, size: %d\n",
+            msg_id_received.ToString().c_str(),msg_id_to_respond.ToString().c_str(),pfrom->GetId(),pto_stored ? pto_stored->GetId() : 0,mc_MsgTypeStr(msg_type_in).c_str(),hop_count,(int)vPayloadIn.size());
     
     if( verify_flags & MC_VRA_SIGNATURES )
     {
@@ -1823,7 +1855,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
             }
             else
             {
-                LogPrintf("ProcessRelay() : Error processing request %08X from peer %d: %s\n",msg_type_in,pfrom->GetId(),strError.c_str());     
+                LogPrintf("ProcessRelay() : Error processing %s (request %s) from peer %d: %s\n",mc_MsgTypeStr(msg_type_in).c_str(),pfrom->GetId(),strError.c_str());     
                 return false;                
             }
         }        
@@ -1889,7 +1921,7 @@ int mc_RelayManager::AddRequest(CNode *pto,mc_OffchainMessageID msg_id,uint32_t 
         request.m_Payload=payload;   
         request.m_Responses.clear();
 
-        if(fDebug)LogPrint("offchain","Offchain rqst: %s, to: %d, msg: %d, size: %d\n",msg_id.ToString().c_str(),pto ? pto->GetId() : 0,msg_type,(int)payload.size());
+        if(fDebug)LogPrint("offchain","Offchain rqst: %s, to: %d, msg: %s, size: %d\n",msg_id.ToString().c_str(),pto ? pto->GetId() : 0,mc_MsgTypeStr(msg_type).c_str(),(int)payload.size());
         m_Requests.insert(make_pair(msg_id,request));
     }
     else
@@ -1904,8 +1936,8 @@ int mc_RelayManager::AddRequest(CNode *pto,mc_OffchainMessageID msg_id,uint32_t 
 int mc_RelayManager::AddResponse(mc_OffchainMessageID request,CNode *pfrom,int32_t source,int hop_count,mc_OffchainMessageID msg_id,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status)
 {
 //    printf("resp: %lu, mt: %d, node: %d, size: %d, rn: %lu\n",request,msg_type,pfrom ? pfrom->GetId() : 0,(int)payload.size(),nonce);
-    if(fDebug)LogPrint("offchain","Offchain resp: %s, request: %s, from: %d, msg: %d, size: %d\n",
-            msg_id.ToString().c_str(),request.ToString().c_str(),pfrom ? pfrom->GetId() : 0,msg_type,(int)payload.size());
+    if(fDebug)LogPrint("offchain","Offchain resp: %s, request: %s, from: %d, msg: %s, size: %d\n",
+            msg_id.ToString().c_str(),request.ToString().c_str(),pfrom ? pfrom->GetId() : 0,mc_MsgTypeStr(msg_type).c_str(),(int)payload.size());
     if(request.IsZero())
     {
         return MC_ERR_NOERROR;

@@ -21,7 +21,8 @@
 
 #define MC_CCW_TIMEOUT_QUERY                      14
 #define MC_CCW_TIMEOUT_REQUEST                     3
-#define MC_CCW_MAX_CHUNKS_PER_QUERY               64
+#define MC_CCW_MAX_CHUNKS_PER_QUERY                4
+#define MC_CCW_DEFAULT_AUTOCOMMIT_DELAY          200
 #define MC_CCW_WORST_RESPONSE_SCORE             1000
 #define MC_CCW_DEFAULT_MEMPOOL_SIZE             1000
 
@@ -98,6 +99,8 @@ typedef struct mc_ChunkCollector
     uint32_t m_ValueDBSize;                                                       
     uint32_t m_TotalSize;                                                       
     uint32_t m_TotalDBSize;                                                       
+    int64_t m_AutoCommitDelay;
+    int64_t m_NextAutoCommitTimestamp;
     int64_t m_NextTryTimestamp;
     int m_MaxMemPoolSize;
     
