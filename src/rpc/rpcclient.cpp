@@ -36,8 +36,8 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "send", 1 },
 /* MCHN START */    
 //    { "setruntimeparam", 1 },                                                             
-    { "offchain", 1 },                                                             
-    { "offchain", 2 },                                                             
+    { "debug", 1 },                                                             
+    { "debug", 2 },                                                             
     { "createkeypairs", 0 },                                                             
     { "combineunspent", 1 },                                                             
     { "combineunspent", 2 },                                                             

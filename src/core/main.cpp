@@ -5785,12 +5785,15 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         CValidationState state;        
         if(pRelayManager)
         {
-            if(!pRelayManager->ProcessRelay(pfrom,vRecv,state,MC_VRA_DEFAULT))
+            if( (mc_gState->m_NodePausedState & MC_NPS_OFFCHAIN) == 0 )
             {
-                int nDos = 0;
-                if (state.IsInvalid(nDos) && nDos > 0)
+                if(!pRelayManager->ProcessRelay(pfrom,vRecv,state,MC_VRA_DEFAULT))
                 {
-                    Misbehaving(pfrom->GetId(), nDos);
+                    int nDos = 0;
+                    if (state.IsInvalid(nDos) && nDos > 0)
+                    {
+                        Misbehaving(pfrom->GetId(), nDos);
+                    }
                 }
             }
         }

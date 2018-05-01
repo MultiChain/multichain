@@ -290,7 +290,7 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
                                     {
                                         if(total_size > MAX_OP_RETURN_RELAY)
                                         {
-                                            *strError="Cannot read binary cache item";
+                                            *strError="Binary cache item too big";
                                             *errorCode=RPC_NOT_SUPPORTED;
                                             close(fHan);                                        
                                         }

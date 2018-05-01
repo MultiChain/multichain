@@ -608,7 +608,7 @@ Value publishfrom(const Array& params, bool fHelp)
     int errorCode=RPC_INVALID_PARAMETER;
     vector<uint256> vChunkHashes;
     
-    dataData=ParseRawFormattedData(&(params[3]),&data_format,lpDetailsScript,MC_RFD_OPTION_NONE,&out_options,&errorCode,&strError);
+    dataData=ParseRawFormattedData(&(params[3]),&data_format,lpDetailsScript,in_options,&out_options,&errorCode,&strError);
 
     if(strError.size())
     {

@@ -117,6 +117,10 @@ bool MultichainNode_CollectChunks()
     {
         return false;
     }
+    if(mc_gState->m_NodePausedState & MC_NPS_CHUNKS)
+    {
+        return false;
+    }
     return true;
 }
 

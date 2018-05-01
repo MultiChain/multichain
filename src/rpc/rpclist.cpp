@@ -121,7 +121,7 @@ static const CRPCCommand vRPCCommands[] =
     { "rawtransactions",    "appendrawchange",        &appendrawchange,        false,     false,      true },
     { "hidden",             "appendrawmetadata",      &appendrawmetadata,      false,     false,      true },
     { "rawtransactions",    "appendrawdata",          &appendrawmetadata,      false,     false,      true },
-    { "hidden",             "offchain",               &offchain,               false,     true,       true },
+    { "hidden",             "debug",                  &debug,               false,     true,       true },
 /* MCHN END */    
 
     /* Utility functions */
