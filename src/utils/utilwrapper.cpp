@@ -201,6 +201,10 @@ const char *mc_Params::SeedNode()
 const char* mc_State::GetSeedNode()
 {
     const char *seed_node;
+    if(GetBoolArg("-addnodeonly",false))
+    {
+        return NULL;
+    }
     seed_node=mc_gState->m_Params->SeedNode();
     if(seed_node == NULL)
     {
