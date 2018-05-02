@@ -791,6 +791,10 @@ int mc_MultichainParams::SetGlobals()
     {
         MAX_SIZE *= 2;
     }
+    while(MAX_CHUNK_SIZE+OFFCHAIN_MSG_PADDING>MAX_SIZE)
+    {
+        MAX_SIZE *= 2;
+    }
     MIN_BLOCKS_BETWEEN_UPGRADES=(unsigned int)GetInt64Param("timingupgrademingap"); 
     MAX_STANDARD_TX_SIZE=(unsigned int)GetInt64Param("maxstdtxsize");    
     MAX_SCRIPT_ELEMENT_SIZE=(unsigned int)GetInt64Param("maxstdelementsize");

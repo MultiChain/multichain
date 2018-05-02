@@ -74,6 +74,7 @@ static const unsigned int DEFAULT_MAX_SUCCESSORS_FROM_ONE_NODE = 10;
 extern int MAX_OP_RETURN_SHOWN;
 extern int MAX_FORMATTED_DATA_DEPTH;
 extern int MIN_BLOCKS_BETWEEN_UPGRADES;
+extern unsigned int OFFCHAIN_MSG_PADDING;
 /* MCHN END */
 /** The maximum size of a blk?????.dat file (since 0.8) */
 extern unsigned int MAX_BLOCKFILE_SIZE;                                     // MCHN global

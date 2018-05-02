@@ -19,8 +19,8 @@
 #define MC_CCF_ERROR_MASK                 0x00FF0000 
 #define MC_CCF_ALL                        0xFFFFFFFF
 
-#define MC_CCW_TIMEOUT_QUERY                      14
-#define MC_CCW_TIMEOUT_REQUEST                     3
+#define MC_CCW_TIMEOUT_QUERY                      30
+#define MC_CCW_TIMEOUT_REQUEST                     5
 #define MC_CCW_MAX_CHUNKS_PER_QUERY                4
 #define MC_CCW_DEFAULT_AUTOCOMMIT_DELAY          200
 #define MC_CCW_WORST_RESPONSE_SCORE             1000

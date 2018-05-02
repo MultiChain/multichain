@@ -418,7 +418,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
             collect_row=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(row);
         }
         
-        if( (collect_row == NULL)|| (last_count >= MC_CCW_MAX_CHUNKS_PER_QUERY) || (total_size+collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey)> MAX_SIZE-48) )
+        if( (collect_row == NULL)|| (last_count >= MC_CCW_MAX_CHUNKS_PER_QUERY) || (total_size+collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey)> MAX_SIZE-OFFCHAIN_MSG_PADDING) )
         {
             if(last_count)
             {
@@ -489,6 +489,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                         {
                             collect_row->m_State.m_Status |= MC_CCF_SELECTED;
                             last_count++;
+                            total_size+=collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey);
                         }
                     }
                 }
@@ -665,7 +666,7 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
                             return false;                    
                         }
                         total_size+=chunk_def.m_Size+size;
-                        if(total_size > MAX_SIZE-48)
+                        if(total_size > MAX_SIZE-OFFCHAIN_MSG_PADDING)
                         {
                             strError="Total size of requested chunks is too big";
                             return false;                                                

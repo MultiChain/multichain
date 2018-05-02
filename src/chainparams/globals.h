@@ -15,6 +15,7 @@ unsigned int MAX_BLOCK_SIGOPS = 20000;                                          
 unsigned int MAX_TX_SIGOPS = 4000;                                              // main.h
 int COINBASE_MATURITY = 100;                                                    // main.h
 unsigned int MAX_SIZE = 0x02000000;                                             // serialize,h
+unsigned int OFFCHAIN_MSG_PADDING = 2048;                                       // main.h
 int64_t COIN = 100000000;                                                       // amount.h
 int64_t CENT = 1000000;                                                         // amount.h
 int64_t MAX_MONEY = 21000000 * COIN;                                            // amount.h
