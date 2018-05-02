@@ -167,6 +167,10 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
                     goto exitlbl;                    
                 }
             }
+            else
+            {
+                LogPrint("chunks","Retrieved chunk %s\n",(*(uint256*)(chunk->m_Hash)).ToString().c_str());                
+            }
             collect_row->m_State.m_Status |= MC_CCF_DELETED;
         }        
         
@@ -590,7 +594,6 @@ bool mc_RelayProcess_Chunk_Query(unsigned char *ptrStart,unsigned char *ptrEnd,v
                 for(int c=0;c<count;c++)
                 {
                     chunk=*(mc_ChunkEntityKey*)ptr;
-LogPrintf("chnk qry: %d %s\n",c,(*(uint256*)(chunk.m_Hash)).ToString().c_str());
                     if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,chunk.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
                     {
                         if(chunk_def.m_Size != chunk.m_Size)
@@ -653,7 +656,7 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
                 for(int c=0;c<count;c++)
                 {
                     chunk=*(mc_ChunkEntityKey*)ptr;
-LogPrintf("chnk req: %d %s\n",c,(*(uint256*)(chunk.m_Hash)).ToString().c_str());
+                    LogPrint("chunks","Request for chunk: %s\n",(*(uint256*)(chunk.m_Hash)).ToString().c_str());
                     if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,chunk.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
                     {
                         if(chunk_def.m_Size != chunk.m_Size)
@@ -796,7 +799,7 @@ bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
         case MC_RMT_MC_ADDRESS_QUERY:
             if(msg_type_stored)
             {
-                strError=strprintf("Unexpected response message type (%d,%d)",msg_type_stored,msg_type_in);;
+                strError=strprintf("Unexpected response message type (%s,%s)",mc_MsgTypeStr(msg_type_stored).c_str(),mc_MsgTypeStr(msg_type_in).c_str());
                 goto exitlbl;
             } 
             if(payload_response_ptr == NULL)
@@ -825,7 +828,7 @@ bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
         case MC_RMT_NODE_DETAILS:
             if(msg_type_stored != MC_RMT_MC_ADDRESS_QUERY)
             {
-                strError=strprintf("Unexpected response message type (%d,%d)",msg_type_stored,msg_type_in);;
+                strError=strprintf("Unexpected response message type (%s,%s)",mc_MsgTypeStr(msg_type_stored).c_str(),mc_MsgTypeStr(msg_type_in).c_str());
                 goto exitlbl;
             } 
             if(payload_response_ptr)
@@ -837,7 +840,7 @@ bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
         case MC_RMT_CHUNK_QUERY:
             if(msg_type_stored)
             {
-                strError=strprintf("Unexpected response message type (%d,%d)",msg_type_stored,msg_type_in);;
+                strError=strprintf("Unexpected response message type (%s,%s)",mc_MsgTypeStr(msg_type_stored).c_str(),mc_MsgTypeStr(msg_type_in).c_str());
                 goto exitlbl;
             } 
             if(payload_response_ptr == NULL)
@@ -866,7 +869,7 @@ bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
         case MC_RMT_CHUNK_QUERY_HIT:
             if(msg_type_stored != MC_RMT_CHUNK_QUERY)
             {
-                strError=strprintf("Unexpected response message type (%d,%d)",msg_type_stored,msg_type_in);;
+                strError=strprintf("Unexpected response message type (%s,%s)",mc_MsgTypeStr(msg_type_stored).c_str(),mc_MsgTypeStr(msg_type_in).c_str());
                 goto exitlbl;
             } 
             if(payload_response_ptr)
@@ -877,7 +880,7 @@ bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
         case MC_RMT_CHUNK_REQUEST:
             if(msg_type_stored != MC_RMT_CHUNK_QUERY_HIT)
             {
-                strError=strprintf("Unexpected response message type (%d,%d)",msg_type_stored,msg_type_in);;
+                strError=strprintf("Unexpected response message type (%s,%s)",mc_MsgTypeStr(msg_type_stored).c_str(),mc_MsgTypeStr(msg_type_in).c_str());
                 goto exitlbl;
             } 
             if(payload_response_ptr == NULL)
@@ -906,7 +909,7 @@ bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
         case MC_RMT_CHUNK_RESPONSE:
             if(msg_type_stored != MC_RMT_CHUNK_REQUEST)
             {
-                strError=strprintf("Unexpected response message type (%d,%d)",msg_type_stored,msg_type_in);;
+                strError=strprintf("Unexpected response message type (%s,%s)",mc_MsgTypeStr(msg_type_stored).c_str(),mc_MsgTypeStr(msg_type_in).c_str());
                 goto exitlbl;
             } 
             if(payload_response_ptr)
@@ -1855,7 +1858,8 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
             }
             else
             {
-                LogPrintf("ProcessRelay() : Error processing %s (request %s) from peer %d: %s\n",mc_MsgTypeStr(msg_type_in).c_str(),pfrom->GetId(),strError.c_str());     
+                LogPrintf("ProcessRelay() : Error processing %s (request %s) from peer %d: %s\n",mc_MsgTypeStr(msg_type_in).c_str(),
+                        msg_id_received.ToString().c_str(),pfrom->GetId(),strError.c_str());     
                 return false;                
             }
         }        
