@@ -1543,7 +1543,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     vRecv >> msg_format;
     if(msg_format != 0)
     {
-        LogPrintf("ProcessRelay() : Unsupported message format %08X\n",msg_format);     
+        LogPrintf("ProcessOffchain() : Unsupported message format %08X\n",msg_format);     
         return false;        
     }
         
@@ -1552,7 +1552,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     vRecv >> vSendPaths;
     if(vSendPaths.size())
     {
-        LogPrintf("ProcessRelay() : Unsupported send path\n");     
+        LogPrintf("ProcessOffchain() : Unsupported send path\n");     
         return false;                
     }
     vRecv >> msg_type_in;
@@ -1579,7 +1579,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
         default:
             if(verify_flags & MC_VRA_MESSAGE_TYPE)    
             {
-                LogPrintf("ProcessRelay() : Unsupported relay message type %s\n",mc_MsgTypeStr(msg_type_in).c_str());     
+                LogPrintf("ProcessOffchain() : Unsupported relay message type %s\n",mc_MsgTypeStr(msg_type_in).c_str());     
                 return false;
             }
             break;
@@ -1589,7 +1589,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     {
         if(hop_count)
         {
-            LogPrintf("ProcessRelay() : Unsupported hop count %d for msg type %s\n",hop_count,mc_MsgTypeStr(msg_type_in).c_str());     
+            LogPrintf("ProcessOffchain() : Unsupported hop count %d for msg type %s\n",hop_count,mc_MsgTypeStr(msg_type_in).c_str());     
             return false;            
         }
     }
@@ -1598,7 +1598,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     {
         if(hop_count > 1)
         {
-            LogPrintf("ProcessRelay() : Unsupported hop count %d for msg type %s\n",hop_count,mc_MsgTypeStr(msg_type_in).c_str());     
+            LogPrintf("ProcessOffchain() : Unsupported hop count %d for msg type %s\n",hop_count,mc_MsgTypeStr(msg_type_in).c_str());     
             return false;            
         }
     }
@@ -1611,12 +1611,12 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     {
         if(msg_id_received.m_TimeStamp+m_MinTimeShift < m_LastTime)
         {
-            LogPrintf("ProcessRelay() : Timestamp too far in the past: %d\n",msg_id_received.m_TimeStamp);     
+            LogPrintf("ProcessOffchain() : Timestamp too far in the past: %d\n",msg_id_received.m_TimeStamp);     
             return false;                        
         }
         if(msg_id_received.m_TimeStamp > m_LastTime + m_MaxTimeShift)
         {
-            LogPrintf("ProcessRelay() : Timestamp too far in the future: %d\n",msg_id_received.m_TimeStamp);     
+            LogPrintf("ProcessOffchain() : Timestamp too far in the future: %d\n",msg_id_received.m_TimeStamp);     
             return false;                        
         }
     }    
@@ -1644,7 +1644,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
             case MC_ERR_ERROR_IN_SCRIPT:                                        // We already processed this message, it has errors
                 return false;                                        
             case MC_ERR_NOT_ALLOWED:
-                LogPrintf("ProcessRelay() : Processing this message is not allowed by current limits or requesting peer was disconnected\n");     
+                LogPrintf("ProcessOffchain() : Processing this message is not allowed by current limits or requesting peer was disconnected\n");     
                 return false;                                        
         }
     }
@@ -1665,7 +1665,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     {
         if( (msg_id_to_respond.m_TimeStamp != 0) || (msg_id_to_respond.m_Nonce != 0) )
         {
-            return state.DoS(100, error("ProcessRelay() : This message should not be response"),REJECT_INVALID, "bad-nonce");                
+            return state.DoS(100, error("ProcessOffchain() : This message should not be response"),REJECT_INVALID, "bad-nonce");                
         }
     }
         
@@ -1673,12 +1673,12 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     {
         if( msg_id_to_respond.m_TimeStamp == 0 )
         {
-            return state.DoS(100, error("ProcessRelay() : This message should be response"),REJECT_INVALID, "bad-nonce");                
+            return state.DoS(100, error("ProcessOffchain() : This message should be response"),REJECT_INVALID, "bad-nonce");                
         }
         
         if(GetRelayRecord(pfrom,msg_id_to_respond,&msg_type_stored,&pto_stored))
         {
-            LogPrintf("ProcessRelay() : Response without request from peer %d\n",pfrom->GetId());     
+            LogPrintf("ProcessOffchain() : Response without request from peer %d\n",pfrom->GetId());     
             return false;
         }
     }
@@ -1749,7 +1749,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
         {
             if(vSigScripts.size() < 1)
             {
-                return state.DoS(100, error("ProcessRelay() : Missing sigScript"),REJECT_INVALID, "bad-sigscript");                            
+                return state.DoS(100, error("ProcessOffchain() : Missing sigScript"),REJECT_INVALID, "bad-sigscript");                            
             }
             if(vSigScripts[0].size())
             {
@@ -1761,19 +1761,19 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
 
                 if (!scriptSig.GetOp(pc, opcode, vchSigOut))
                 {
-                    return state.DoS(100, error("ProcessRelay() : Cannot extract signature from sigScript"),REJECT_INVALID, "bad-sigscript-signature");                
+                    return state.DoS(100, error("ProcessOffchain() : Cannot extract signature from sigScript"),REJECT_INVALID, "bad-sigscript-signature");                
                 }
 
                 vchSigOut.resize(vchSigOut.size()-1);
                 if (!scriptSig.GetOp(pc, opcode, vchPubKey))
                 {
-                    return state.DoS(100, error("ProcessRelay() : Cannot extract pubkey from sigScript"),REJECT_INVALID, "bad-sigscript-pubkey");                
+                    return state.DoS(100, error("ProcessOffchain() : Cannot extract pubkey from sigScript"),REJECT_INVALID, "bad-sigscript-pubkey");                
                 }
 
                 CPubKey pubKeyOut(vchPubKey);
                 if (!pubKeyOut.IsValid())
                 {
-                    return state.DoS(100, error("ProcessRelay() : Invalid pubkey"),REJECT_INVALID, "bad-sigscript-pubkey");                
+                    return state.DoS(100, error("ProcessOffchain() : Invalid pubkey"),REJECT_INVALID, "bad-sigscript-pubkey");                
                 }        
 
                 pubkey=pubKeyOut;
@@ -1786,12 +1786,12 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
 
                 if(!pubkey.Verify(signed_hash,vchSigOut))
                 {
-                    return state.DoS(100, error("ProcessRelay() : Wrong signature"),REJECT_INVALID, "bad-signature");                            
+                    return state.DoS(100, error("ProcessOffchain() : Wrong signature"),REJECT_INVALID, "bad-signature");                            
                 }        
             }
             else
             {
-                return state.DoS(100, error("ProcessRelay() : Empty sigScript"),REJECT_INVALID, "bad-sigscript");                
+                return state.DoS(100, error("ProcessOffchain() : Empty sigScript"),REJECT_INVALID, "bad-sigscript");                
             }
         }
     }
@@ -1838,7 +1838,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
                         }                        
                         else
                         {
-                            LogPrintf("ProcessRelay() : Response without stored request from peer %d\n",pfrom->GetId());     
+                            LogPrintf("ProcessOffchain() : Response without stored request from peer %d\n",pfrom->GetId());     
                             return false;                            
                         }
                     }
@@ -1858,7 +1858,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
             }
             else
             {
-                LogPrintf("ProcessRelay() : Error processing %s (request %s) from peer %d: %s\n",mc_MsgTypeStr(msg_type_in).c_str(),
+                LogPrintf("ProcessOffchain() : Error processing %s (request %s) from peer %d: %s\n",mc_MsgTypeStr(msg_type_in).c_str(),
                         msg_id_received.ToString().c_str(),pfrom->GetId(),strError.c_str());     
                 return false;                
             }
