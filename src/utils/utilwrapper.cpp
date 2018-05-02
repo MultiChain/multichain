@@ -144,25 +144,28 @@ void mc_Params::Parse(int argc, const char* const argv[],int exe_type)
                     int err;
                     const char *seed_node;
 
-                    mapConfig=new mc_MapStringString;
-
-                    err=mc_ReadGeneralConfigFile(mapConfig,mc_gState->m_Params->NetworkName(),"seed",".dat");
-
-                    if(err == MC_ERR_NOERROR)
+                    if(!GetBoolArg("-addnodeonly",false))
                     {
-                        seed_node=mapConfig->Get("seed");
+                        mapConfig=new mc_MapStringString;
 
-                        if(seed_node)
+                        err=mc_ReadGeneralConfigFile(mapConfig,mc_gState->m_Params->NetworkName(),"seed",".dat");
+
+                        if(err == MC_ERR_NOERROR)
                         {
-                            if(strlen(seed_node) <= MC_DCT_SEED_NODE_MAX_SIZE)
+                            seed_node=mapConfig->Get("seed");
+
+                            if(seed_node)
                             {
-                                strcpy(m_Arguments[m_NumArguments],seed_node);
-                                length+=strlen(seed_node);
+                                if(strlen(seed_node) <= MC_DCT_SEED_NODE_MAX_SIZE)
+                                {
+                                    strcpy(m_Arguments[m_NumArguments],seed_node);
+                                    length+=strlen(seed_node);
+                                }
                             }
                         }
-                    }
 
-                    delete mapConfig;                            
+                        delete mapConfig;                            
+                    }
                     m_NumArguments++;                                                                
                 }                
             }            
@@ -201,10 +204,6 @@ const char *mc_Params::SeedNode()
 const char* mc_State::GetSeedNode()
 {
     const char *seed_node;
-    if(GetBoolArg("-addnodeonly",false))
-    {
-        return NULL;
-    }
     seed_node=mc_gState->m_Params->SeedNode();
     if(seed_node == NULL)
     {
