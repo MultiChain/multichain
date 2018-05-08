@@ -222,6 +222,8 @@ void mc_TxDB::Zero()
     m_LobFileNamePrefix[0]=0x00;
     m_LogFileName[0]=0x00;
     
+    m_UnsubscribeMemPoolSize=0;
+    
     m_Mode=MC_WMD_NONE;
     m_Semaphore=NULL;
     m_LockedBy=0;    
@@ -1609,15 +1611,21 @@ int mc_TxDB::Commit(mc_TxImport *import)
                         goto exitlbl;
                     }
                     if(ptr == NULL)
-                    {
-                        err=MC_ERR_CORRUPTED;
-                        goto exitlbl;
+                    {                            
+                        if((imp->m_ImportID != 0) || (i>=m_UnsubscribeMemPoolSize))                     // first rows may be deleted by Unsubscribe
+                        {
+                            err=MC_ERR_CORRUPTED;
+                            goto exitlbl;
+                        }
                     }
-                    memcpy((char*)&erow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
-                    erow.m_LastSubKeyPos=lperow->m_LastSubKeyPos;
-                    erow.SwapPosBytes();
-                    err=m_Database->m_DB->Write((char*)&erow+m_Database->m_KeyOffset,m_Database->m_KeySize,(char*)&erow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
-                    erow.SwapPosBytes();
+                    else
+                    {
+                        memcpy((char*)&erow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
+                        erow.m_LastSubKeyPos=lperow->m_LastSubKeyPos;
+                        erow.SwapPosBytes();
+                        err=m_Database->m_DB->Write((char*)&erow+m_Database->m_KeyOffset,m_Database->m_KeySize,(char*)&erow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+                        erow.SwapPosBytes();
+                    }
                 }
             }
             lperow->m_Pos=lperow->m_TempPos;                                    // m_Pos in mempool was 0 - to support search by TxID  in mempool
@@ -1680,6 +1688,7 @@ int mc_TxDB::Commit(mc_TxImport *import)
         }                            
     }
     
+    m_UnsubscribeMemPoolSize=0;
     FlushDataFile(m_DBStat.m_LastFileID);
 
     err=m_Database->m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
@@ -2699,6 +2708,8 @@ int mc_TxDB::Unsubscribe(mc_Buffer* lpEntities)
         deleted_items=0;                
     }    
 
+    m_UnsubscribeMemPoolSize=m_MemPools[0]->GetCount();
+    
 exitlbl:
     
     return err;

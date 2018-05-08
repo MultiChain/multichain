@@ -238,6 +238,7 @@ typedef struct mc_TxDB
     char m_LobFileNamePrefix[MC_DCT_DB_MAX_PATH];                               // Full data file name
     char m_LogFileName[MC_DCT_DB_MAX_PATH];                                     // Full log file name    
     
+    int m_UnsubscribeMemPoolSize;                                               // Size of the mempool when unsubscribed
     uint32_t m_Mode;
     void *m_Semaphore;                                                          // mc_TxDB object semaphore
     uint64_t m_LockedBy;                                                        // ID of the thread locking it
