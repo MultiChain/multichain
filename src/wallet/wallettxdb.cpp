@@ -510,10 +510,18 @@ int mc_TxDB::Destroy()
 }
 
 void mc_TxDB::Dump(const char *message)
+{
+    Dump(message,0);
+}
+
+void mc_TxDB::Dump(const char *message, int force)
 {    
-    if((m_Mode & MC_WMD_DEBUG) == 0)
+    if(force == 0)
     {
-        return;
+        if((m_Mode & MC_WMD_DEBUG) == 0)
+        {
+            return;
+        }
     }
     mc_TxEntityRow edbRow;
     

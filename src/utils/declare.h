@@ -35,6 +35,7 @@ typedef struct mc_MapStringIndex
     void Remove(const char* key,int size);
     int Get(const char* key);
     int Get(const unsigned char* key,int size);
+    void Set(const unsigned char* key,int size,int value);
     void Destroy();
     void Clear();
 } mc_MapStringIndex;
@@ -90,6 +91,7 @@ typedef struct mc_Buffer
     int Seek(void *lpKey);
     unsigned char *GetRow(int RowID);    
     int PutRow(int RowID,const void *lpKey,const void *lpValue);    
+    int UpdateRow(int RowID,const void *lpKey,const void *lpValue);    
     int GetCount();    
     int SetCount(int count);
     
@@ -259,6 +261,7 @@ void mc_StringLowerCase(char *buf,uint32_t len);
 int mc_StringCompareCaseInsensitive(const char *str1,const char *str2,int len);
 
 uint32_t mc_GetParamFromDetailsScript(const unsigned char *ptr,uint32_t total,uint32_t offset,uint32_t* param_value_start,size_t *bytes);
+uint32_t mc_GetParamFromDetailsScriptErr(const unsigned char *ptr,uint32_t total,uint32_t offset,uint32_t* param_value_start,size_t *bytes, int *err);
 uint32_t mc_FindSpecialParamInDetailsScript(const unsigned char *ptr,uint32_t total,uint32_t param,size_t *bytes);
 uint32_t mc_FindNamedParamInDetailsScript(const unsigned char *ptr,uint32_t total,const char *param,size_t *bytes);
 

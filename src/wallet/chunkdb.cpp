@@ -291,6 +291,269 @@ int mc_ChunkDB::AddEntity(mc_TxEntity* entity, uint32_t flags)
     return err;
 }
 
+int mc_ChunkDB::RemoveEntityInternal(mc_TxEntity *entity)                          
+{
+    int err;
+    mc_SubscriptionDBRow subscription;
+    mc_SubscriptionDBRow *old_subscription;
+    mc_ChunkDBRow chunk_def;
+    char msg[256];
+    char enthex[65];
+    char enthex_dir[65];
+    unsigned char* buf;
+    int FileHan;
+    char FileName[MC_DCT_DB_MAX_PATH];    
+    int chunk_found=0;
+    int count=0;
+    
+    err=MC_ERR_NOERROR;
+    sprintf_hex(enthex,entity->m_EntityID,MC_TDB_ENTITY_ID_SIZE);
+    
+    subscription.Zero();
+    subscription.m_RecordType=MC_CDB_TYPE_SUBSCRIPTION;
+    memcpy(&subscription.m_Entity,entity,sizeof(mc_TxEntity));
+    
+    subscription.m_Entity.m_EntityType &= MC_TET_TYPE_MASK;
+    sprintf_hex(enthex_dir,subscription.m_Entity.m_EntityID,MC_AST_SHORT_TXID_SIZE);
+    
+    old_subscription=FindSubscription(&subscription.m_Entity);
+    
+    if(old_subscription == NULL)
+    {
+        return MC_ERR_NOERROR;
+    }
+
+    CommitInternal(-4);
+    
+    memcpy(&subscription,old_subscription,sizeof(mc_SubscriptionDBRow));
+    subscription.m_Entity.m_EntityType |= MC_TET_DELETED;
+    
+    
+    err=m_DB->Write((char*)&subscription+m_KeyOffset,m_KeySize,(char*)&subscription+m_ValueOffset,m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+    if(err == MC_ERR_NOERROR)
+    {    
+        err=m_DB->Delete((char*)old_subscription+m_KeyOffset,m_KeySize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+    }
+    if(err == MC_ERR_NOERROR)
+    {
+        err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);        
+    }
+    
+    if(err)
+    {
+        goto exitlbl;
+    }
+    
+    m_Subscriptions->PutRow(old_subscription->m_SubscriptionID,&subscription,(char*)&subscription+m_ValueOffset);
+    
+    sprintf(msg,"Entity (%08X, %s) unlinked successfully",entity->m_EntityType,enthex);
+    LogString(msg);
+ 
+    m_TmpScript->Resize(MC_CDB_MAX_FILE_READ_BUFFER_SIZE,1);
+    buf=m_TmpScript->m_lpData;
+    
+    chunk_def.Zero();
+    chunk_def.m_SubscriptionID=old_subscription->m_SubscriptionID;
+    
+    for(int file_id=0;file_id<=old_subscription->m_LastFileID;file_id++)
+    {
+        err=MC_ERR_NOERROR;
+        
+        SetFileName(FileName,old_subscription,file_id);
+        FileHan=open(FileName,_O_BINARY | O_RDONLY, S_IRUSR | S_IWUSR);
+        if(FileHan<=0)
+        {
+            err=MC_ERR_INTERNAL_ERROR;
+        }
+    
+        if(err==MC_ERR_NOERROR)
+        {
+            int64_t file_size=0;
+            int64_t file_offset=0;
+            int64_t buf_offset,buf_tail,buf_size,offset;
+            uint32_t param_value_start;
+            size_t bytes;
+            buf_offset=0;
+            buf_tail=0;
+            file_size=lseek64(FileHan,0,SEEK_END);
+            lseek64(FileHan,0,SEEK_SET);
+            while(file_offset<file_size)
+            {
+                buf_size=MC_CDB_MAX_FILE_READ_BUFFER_SIZE-buf_tail;
+                if(buf_size>file_size-file_offset)
+                {
+                    buf_size=file_size-file_offset;
+                }
+                if(read(FileHan,buf+buf_tail,buf_size) != buf_size)
+                {
+                    err=MC_ERR_INTERNAL_ERROR;                    
+                }
+                if(err==MC_ERR_NOERROR)
+                {
+                    file_offset+=buf_size;
+                    buf_size+=buf_tail;
+                    buf_tail=0;
+                    buf_offset=0;
+                    
+                    while(buf_offset < buf_size)
+                    {
+                        offset=mc_GetParamFromDetailsScriptErr(buf,buf_size,buf_offset,&param_value_start,&bytes,&err);
+                        if(err)
+                        {
+                            buf_tail=buf_size-buf_offset;
+                            if(param_value_start<buf_size)
+                            {
+                                if(param_value_start-buf_offset+bytes>MC_CDB_MAX_FILE_READ_BUFFER_SIZE)
+                                {
+                                    buf_tail=0;
+                                    file_offset+=param_value_start+bytes-buf_size;
+                                    if(file_offset<file_size)
+                                    {
+                                        lseek64(FileHan,file_offset,SEEK_SET);
+                                    }
+                                }
+                            }
+                            if(buf_tail)                                
+                            {
+                                memmove(buf,buf+buf_offset,buf_tail);
+                            }
+                            buf_offset=buf_size;
+                            err=MC_ERR_NOERROR;
+                        }
+                        else
+                        {
+                            if(buf[buf_offset] != 0x00)
+                            {
+                                err= MC_ERR_CORRUPTED;
+                            }
+                            else
+                            {
+                                switch(buf[buf_offset+1])
+                                {
+                                    case MC_ENT_SPRM_CHUNK_HASH:
+                                        if(chunk_found)
+                                        {
+                                            chunk_def.SwapPosBytes();
+                                            err=m_DB->Delete((char*)&chunk_def+m_KeyOffset,m_KeySize,MC_OPT_DB_DATABASE_TRANSACTIONAL);                                            
+                                            chunk_def.SwapPosBytes();
+                                            count++;
+                                            chunk_def.Zero();
+                                            chunk_def.m_SubscriptionID=old_subscription->m_SubscriptionID;
+                                        }
+                                        if(err==MC_ERR_NOERROR)
+                                        {
+                                            if(bytes != MC_CDB_CHUNK_HASH_SIZE)
+                                            {
+                                                err=MC_ERR_CORRUPTED;
+                                            }
+                                            else
+                                            {
+                                                chunk_found=1;
+                                                memcpy(chunk_def.m_Hash,buf+param_value_start,bytes);
+                                            }
+                                        }
+                                        break;
+                                    case MC_ENT_SPRM_ITEM_COUNT:
+                                        if(bytes != sizeof(uint32_t))
+                                        {
+                                            err=MC_ERR_CORRUPTED;                                            
+                                        }
+                                        else
+                                        {
+                                            chunk_def.m_Pos=(uint32_t)mc_GetLE(buf+param_value_start,bytes);
+                                        }                                        
+                                        break;
+                                }
+                                buf_offset=offset;                            
+                            }
+                        }
+                        if(err==MC_ERR_NOERROR)
+                        {
+                            if(count >= 1000)
+                            {
+                                if(err == MC_ERR_NOERROR)
+                                {
+                                    err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);        
+                                    count=0;
+                                }                            
+                            }
+                        }
+                        if(err)
+                        {
+                            buf_offset=buf_size;
+                            file_offset=file_size;                                
+                        }
+                    }
+                }
+                else
+                {
+                    file_offset=file_size;
+                }
+            }
+        }
+        
+        
+        if(FileHan>0)
+        {
+            close(FileHan);
+        }
+    }
+    
+    if(err == MC_ERR_NOERROR)
+    {
+        if(chunk_found)
+        {
+            chunk_def.SwapPosBytes();
+            err=m_DB->Delete((char*)&chunk_def+m_KeyOffset,m_KeySize,MC_OPT_DB_DATABASE_TRANSACTIONAL);                                            
+            chunk_def.SwapPosBytes();
+            count++;
+        }
+    }
+    if(err == MC_ERR_NOERROR)
+    {
+        if(count)
+        {
+            err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);        
+            count=0;
+        }                            
+    }
+
+    if(err == MC_ERR_NOERROR)
+    {
+        char dir_name[64];
+        sprintf(dir_name,"chunks/data/stream-%s",enthex_dir);
+        
+        mc_RemoveDir(mc_gState->m_Params->NetworkName(),dir_name);
+    }
+exitlbl:
+            
+
+    if(err)
+    {
+        sprintf(msg,"Could not remove entity (%08X, %s), error: %d",entity->m_EntityType,enthex,err);        
+        LogString(msg);            
+    }
+    else
+    {
+        sprintf(msg,"Entity (%08X, %s) removed successfully",entity->m_EntityType,enthex);
+        LogString(msg);
+    }
+    
+    return err;
+}
+
+int mc_ChunkDB::RemoveEntity(mc_TxEntity *entity)                          
+{
+    int err;
+    
+    Lock();
+    err=RemoveEntityInternal(entity);    
+    UnLock();    
+    
+    return err;
+}
+
+
 int mc_ChunkDB::FindSubscription(const mc_TxEntity *entity,mc_SubscriptionDBRow *subscription)
 {
     mc_SubscriptionDBRow *found;
@@ -465,10 +728,18 @@ int mc_ChunkDB::Initialize(const char *name,uint32_t mode)
 }
 
 void mc_ChunkDB::Dump(const char *message)
+{
+    Dump(message,0);
+}
+
+void mc_ChunkDB::Dump(const char *message, int force)
 {    
-    if((m_DBStat.m_InitMode & MC_WMD_DEBUG) == 0)
+    if(force == 0)
     {
-        return;
+        if((m_DBStat.m_InitMode & MC_WMD_DEBUG) == 0)
+        {
+            return;
+        }
     }
     mc_ChunkDBRow dbrow;
     
@@ -540,6 +811,11 @@ int mc_ScriptMatchesTxIDAndVOut(unsigned char *ptr,size_t bytes,const unsigned c
     size_t value_size;
     uint32_t offset;
 
+    if(ptr == NULL)
+    {
+        return MC_ERR_NOT_FOUND;
+    }
+    
     offset=mc_FindSpecialParamInDetailsScript(ptr,bytes,MC_ENT_SPRM_SOURCE_TXID,&value_size);
     if(offset != bytes)
     {
@@ -613,13 +889,16 @@ int mc_ChunkDB::GetChunkDefInternal(
         {
             on_disk_items=chunk_def->m_TmpOnDiskItems;
             total_items=chunk_def->m_ItemCount;
-            while(chunk_def->m_Pos < total_items)
+            while(chunk_def->m_Pos+on_disk_items < total_items)
             {
 //                ptr=(unsigned char *)m_ChunkData->GetData(chunk_def->m_InternalFileOffset,&bytes);
-                ptr=GetChunkInternal(chunk_def,-1,-1,&bytes);
-                if(mc_ScriptMatchesTxIDAndVOut(ptr,bytes,txid,vout) == MC_ERR_NOERROR)
+                if( (chunk_def->m_TxIDStart == 0) || (chunk_def->m_TxIDStart == (uint32_t)mc_GetLE((void*)txid,4)))
                 {
-                    return MC_ERR_NOERROR;
+                    ptr=GetChunkInternal(chunk_def,-1,-1,&bytes);
+                    if(mc_ScriptMatchesTxIDAndVOut(ptr,bytes,txid,vout) == MC_ERR_NOERROR)
+                    {
+                        return MC_ERR_NOERROR;
+                    }
                 }
                 chunk_def->m_Pos+=1;
                 if(chunk_def->m_Pos < total_items)
@@ -631,35 +910,16 @@ int mc_ChunkDB::GetChunkDefInternal(
                     }
                     else
                     {
-                        chunk_def->m_Pos=total_items;
+                        chunk_def->m_Pos=total_items-on_disk_items;
                     }
                 }
             }
         }
         else
         {
-            if(entity == NULL)
+            if(mempool_row)
             {
-                if(mempool_row)
-                {
-                    while(chunk_def->m_NextSubscriptionID)
-                    {
-                        chunk_def->m_SubscriptionID=chunk_def->m_NextSubscriptionID;
-                        mprow=m_MemPool->Seek((unsigned char*)chunk_def);
-                        if(mprow >= 0)
-                        {
-                            if(mempool_row)
-                            {
-                                *mempool_row=mprow;
-                            }
-                            memcpy(chunk_def,(mc_ChunkDBRow *)m_MemPool->GetRow(mprow),sizeof(mc_ChunkDBRow));                            
-                        }
-                        else
-                        {
-                            return MC_ERR_INTERNAL_ERROR;
-                        }
-                    }
-                }                
+                *mempool_row=mprow;
             }
             return MC_ERR_NOERROR;
         }
@@ -667,29 +927,69 @@ int mc_ChunkDB::GetChunkDefInternal(
         {
             err=MC_ERR_NOT_FOUND;            
         }
+        else
+        {
+            mprow=-1;
+            chunk_def->m_Pos=0;
+        }
     }
-    else
+    
+    if(mprow < 0)
     {
         chunk_def->SwapPosBytes();
-        ptr=(unsigned char*)m_DB->Read((char*)chunk_def+m_KeyOffset,m_KeySize,&value_len,0,&err);
+        ptr=(unsigned char*)m_DB->Read((char*)chunk_def+m_KeyOffset,m_KeySize,&value_len,MC_OPT_DB_DATABASE_NEXT_ON_READ,&err);
         chunk_def->SwapPosBytes();
         if(err)
         {
             return err;
         }
 
+        if(ptr)
+        {
+            if(entity)
+            {
+                if(memcmp((char*)chunk_def+m_KeyOffset,ptr,m_KeySize))
+                {
+                    ptr=NULL;
+                }
+            }
+            else
+            {
+                if(memcmp(chunk_def->m_Hash,ptr,MC_CDB_CHUNK_HASH_SIZE))
+                {
+                    ptr=NULL;
+                }                
+            }
+        }
+        
         if(ptr)                                                                     
         {
-            memcpy((char*)chunk_def+m_ValueOffset,ptr,m_ValueSize);        
+//            mc_DumpSize("E",chunk_def,m_TotalSize,40);
+//            mc_DumpSize("F",ptr,m_TotalSize,40);
+            memcpy((char*)chunk_def+m_ValueOffset,ptr+m_ValueOffset,m_ValueSize);        
+            on_disk_items=chunk_def->m_ItemCount;
+//            mc_DumpSize("G",chunk_def,m_TotalSize,40);
+            if(entity == NULL)
+            {
+                if(chunk_def->m_NextSubscriptionID == 0)
+                {
+                    chunk_def->m_NextSubscriptionID=((mc_ChunkDBRow*)ptr)->m_SubscriptionID;
+                }
+            }
+//            mc_DumpSize("H",chunk_def,m_TotalSize,40);
             if(txid)
             {
-                ptr=GetChunkInternal(chunk_def,-1,-1,&bytes);
+//                ptr=GetChunkInternal(chunk_def,-1,-1,&bytes);
                 total_items=chunk_def->m_ItemCount;
-                while(ptr)
+                while(chunk_def->m_Pos < on_disk_items)
                 {
-                    if(mc_ScriptMatchesTxIDAndVOut(ptr,bytes,txid,vout) == MC_ERR_NOERROR)
+                    if( (chunk_def->m_TxIDStart == 0) || (chunk_def->m_TxIDStart == (uint32_t)mc_GetLE((void*)txid,4)))
                     {
-                        return MC_ERR_NOERROR;
+                        ptr=GetChunkInternal(chunk_def,-1,-1,&bytes);
+                        if(mc_ScriptMatchesTxIDAndVOut(ptr,bytes,txid,vout) == MC_ERR_NOERROR)
+                        {
+                            return MC_ERR_NOERROR;
+                        }
                     }
                     chunk_def->m_Pos+=1;
                     
@@ -706,22 +1006,19 @@ int mc_ChunkDB::GetChunkDefInternal(
                         if(ptr)
                         {
                             memcpy((char*)chunk_def+m_ValueOffset,ptr,m_ValueSize);        
-                            ptr=GetChunkInternal(chunk_def,-1,-1,&bytes);
+//                            ptr=GetChunkInternal(chunk_def,-1,-1,&bytes);
                         }
                         else
                         {
-                            chunk_def->m_Pos=total_items;
+                            chunk_def->m_Pos=on_disk_items;
                         }
-                    }
-                    else
-                    {
-                        ptr=NULL;
                     }
                 }
                 err=MC_ERR_NOT_FOUND;            
             }
             else
             {
+/*                
                 if(entity == NULL)
                 {
                     if(mempool_row)
@@ -748,6 +1045,7 @@ int mc_ChunkDB::GetChunkDefInternal(
                         }
                     }
                 }
+ */ 
                 return MC_ERR_NOERROR;                
             }
         }
@@ -789,7 +1087,7 @@ int mc_ChunkDB::AddChunkInternal(
 {
     int err;
     int add_null_row,add_entity_row;
-    int total_items,on_disk_items;
+    int total_items,on_disk_items,pos;
     int mempool_entity_row;
     int mempool_last_null_row;
     uint32_t timestamp;
@@ -893,6 +1191,8 @@ int mc_ChunkDB::AddChunkInternal(
     m_TmpScript->AddElement();
     
     timestamp=mc_TimeNowAsUInt();
+    pos=total_items-on_disk_items;
+    
     m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_TIMESTAMP,(unsigned char*)&timestamp,sizeof(timestamp));
     m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_CHUNK_HASH,hash,MC_CDB_CHUNK_HASH_SIZE);
     if(txid)
@@ -903,19 +1203,28 @@ int mc_ChunkDB::AddChunkInternal(
             m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_SOURCE_VOUT,(unsigned char*)&vout,sizeof(vout));            
         }
     }
+/*    
     else
     {
         m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_SOURCE_TXID,null_txid,MC_TDB_TXID_SIZE);
         m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_SOURCE_VOUT,(unsigned char*)&vout,sizeof(vout));                    
     }
-    m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_CHUNK_SIZE,(unsigned char*)&chunk_size,sizeof(chunk_size));
+ */ 
     if(details_size)
     {
         m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_CHUNK_DETAILS,details,details_size);        
     }
-    if(chunk_size)
+    if(total_items == 0)
     {
-        m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_CHUNK_DATA,chunk,chunk_size);                
+        m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_CHUNK_SIZE,(unsigned char*)&chunk_size,sizeof(chunk_size));
+        if(chunk_size)
+        {
+            m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_CHUNK_DATA,chunk,chunk_size);                
+        }
+    }
+    else
+    {
+        m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ITEM_COUNT,(unsigned char*)&total_items,sizeof(total_items));        
     }
 
     chunk_def.m_Size=chunk_size;
@@ -938,15 +1247,24 @@ int mc_ChunkDB::AddChunkInternal(
         chunk_def.m_Pos=0;
         chunk_def.m_ItemCount=1;
         chunk_def.m_TmpOnDiskItems=0;
+/*        
         chunk_def.m_PrevSubscriptionID=0;
+ */ 
         chunk_def.m_NextSubscriptionID=subscription->m_SubscriptionID;
         m_MemPool->Add(&chunk_def,(char*)&chunk_def+m_ValueOffset);        
     }
 
     chunk_def.m_SubscriptionID=subscription->m_SubscriptionID;
-    chunk_def.m_Pos=total_items-on_disk_items;
+    chunk_def.m_Pos=pos;
     chunk_def.m_ItemCount=total_items+1;
     chunk_def.m_TmpOnDiskItems=on_disk_items;
+    chunk_def.m_NextSubscriptionID=0;
+    if(txid)
+    {
+        chunk_def.m_TxIDStart=(uint32_t)mc_GetLE((void*)txid,4);
+    }
+    
+/*    
     if(add_null_row)
     {
         chunk_def.m_PrevSubscriptionID=0;
@@ -965,6 +1283,7 @@ int mc_ChunkDB::AddChunkInternal(
             chunk_def.m_NextSubscriptionID=entity_chunk_def.m_NextSubscriptionID;            
         }
     }
+*/
     
     m_MemPool->Add(&chunk_def,(char*)&chunk_def+m_ValueOffset);
     
@@ -973,6 +1292,7 @@ int mc_ChunkDB::AddChunkInternal(
         ((mc_ChunkDBRow *)m_MemPool->GetRow(mempool_entity_row))->m_ItemCount += 1;        
     }
     
+    
     if(mempool_last_null_row >= 0)
     {
         if(add_entity_row)
@@ -980,7 +1300,8 @@ int mc_ChunkDB::AddChunkInternal(
             ((mc_ChunkDBRow *)m_MemPool->GetRow(mempool_last_null_row))->m_NextSubscriptionID = subscription->m_SubscriptionID;                    
         }
     }
- 
+
+    
     sprintf_hex(enthex,entity->m_EntityID,MC_TDB_ENTITY_ID_SIZE);
     sprintf_hex(chunk_hex,hash,MC_CDB_CHUNK_HASH_SIZE);    
     sprintf(msg,"New Chunk %s, size %d, flags %08X, entity (%08X, %s)",chunk_hex,chunk_size,flags,entity->m_EntityType,enthex);
@@ -1036,8 +1357,25 @@ unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
     char FileName[MC_DCT_DB_MAX_PATH];    
     int FileHan;
     uint32_t read_from;
+    mc_ChunkDBRow chunk_def_zero;
     
     ptr=NULL;
+    if((offset >= 0) && (chunk_def->m_Pos > 0) )
+    {
+        subscription_id=chunk_def->m_SubscriptionID;
+        if(subscription_id == 0)
+        {
+            subscription_id=chunk_def->m_NextSubscriptionID;
+        }
+        subscription=(mc_SubscriptionDBRow *)m_Subscriptions->GetRow(subscription_id);
+        
+        if(GetChunkDefInternal(&chunk_def_zero,chunk_def->m_Hash,&(subscription->m_Entity),NULL,0,NULL) == MC_ERR_NOERROR)
+        {
+            return GetChunkInternal(&chunk_def_zero,offset,len,bytes);
+        }
+        return NULL;
+    }
+    
     FileHan=0;
     if(chunk_def->m_InternalFileID < 0)
     {
@@ -1191,7 +1529,7 @@ int mc_ChunkDB::CommitInternal(int block)
 {
     int r,s;
     int err;
-    int last_file_id, last_file_offset;
+//    int last_file_id, last_file_offset;
     uint32_t size;
     int value_len;
     unsigned char *ptr;
@@ -1209,24 +1547,21 @@ int mc_ChunkDB::CommitInternal(int block)
     }
     Dump("Before Commit");
         
-    last_file_id=-1;
-    last_file_offset=0;
+//    last_file_id=-1;
+//    last_file_offset=0;
     
     for(r=0;r<m_MemPool->GetCount();r++)
     {
         chunk_def=(mc_ChunkDBRow *)m_MemPool->GetRow(r);
         
-        s=chunk_def->m_SubscriptionID;
-        if(s == 0)
+        if(chunk_def->m_SubscriptionID)
         {
-            s=chunk_def->m_NextSubscriptionID;                        
-        }
-        
-        subscription=(mc_SubscriptionDBRow *)m_Subscriptions->GetRow(s);
-        subscription->m_TmpFlags |= MC_CDB_TMP_FLAG_SHOULD_COMMIT;
-        
-        if(last_file_id < 0)
-        {
+            s=chunk_def->m_SubscriptionID;
+
+            subscription=(mc_SubscriptionDBRow *)m_Subscriptions->GetRow(s);
+            subscription->m_TmpFlags |= MC_CDB_TMP_FLAG_SHOULD_COMMIT;
+
+
             size=chunk_def->m_Size+chunk_def->m_HeaderSize;
             if(subscription->m_LastFileSize+size > MC_CDB_MAX_FILE_SIZE)                          // New file is needed
             {
@@ -1234,7 +1569,7 @@ int mc_ChunkDB::CommitInternal(int block)
                 subscription->m_LastFileID+=1;
                 subscription->m_LastFileSize=0;
             }            
-            
+
             err=AddToFile(GetChunkInternal(chunk_def,-1,-1,NULL),size,
                           subscription,subscription->m_LastFileID,subscription->m_LastFileSize);
             if(err)
@@ -1243,36 +1578,22 @@ int mc_ChunkDB::CommitInternal(int block)
                 LogString(msg);
                 return err;
             }
-            
+
             chunk_def->m_InternalFileID=subscription->m_LastFileID;
             chunk_def->m_InternalFileOffset=subscription->m_LastFileSize;
             chunk_def->m_Pos+=chunk_def->m_TmpOnDiskItems;
-            
-            if(chunk_def->m_SubscriptionID == 0)
-            {
-                last_file_id=subscription->m_LastFileID;
-                last_file_offset=subscription->m_LastFileSize;
-            }
 
             subscription->m_LastFileSize+=size;    
             subscription->m_Count+=1;
             subscription->m_FullSize+=chunk_def->m_Size;
-            
+
             m_DBStat.m_Count+=1;
             m_DBStat.m_FullSize+=chunk_def->m_Size;
-        }
-        else
-        {
-            chunk_def->m_InternalFileID=last_file_id;
-            chunk_def->m_InternalFileOffset=last_file_offset;
-            chunk_def->m_Pos+=chunk_def->m_TmpOnDiskItems;
-            last_file_id=-1;
-        }
 
-        if(chunk_def->m_TmpOnDiskItems)
-        {
-            if(chunk_def->m_SubscriptionID)
+            if(chunk_def->m_TmpOnDiskItems)
             {
+                if(chunk_def->m_SubscriptionID)
+                {
                 entity_chunk_def.Zero();
                 memcpy(&entity_chunk_def,chunk_def,sizeof(mc_ChunkDBRow));
                 entity_chunk_def.m_Pos=0;
@@ -1296,17 +1617,18 @@ int mc_ChunkDB::CommitInternal(int block)
                         goto exitlbl;
                     }                                                            
                 }
+                }
             }
+
+            chunk_def->m_TmpOnDiskItems=0;
+            chunk_def->SwapPosBytes();
+            err=m_DB->Write((char*)chunk_def+m_KeyOffset,m_KeySize,(char*)chunk_def+m_ValueOffset,m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+            chunk_def->SwapPosBytes();
+            if(err)
+            {
+                goto exitlbl;
+            }                                            
         }
-        
-        chunk_def->m_TmpOnDiskItems=0;
-        chunk_def->SwapPosBytes();
-        err=m_DB->Write((char*)chunk_def+m_KeyOffset,m_KeySize,(char*)chunk_def+m_ValueOffset,m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
-        chunk_def->SwapPosBytes();
-        if(err)
-        {
-            goto exitlbl;
-        }                                            
     }
     
     for(s=0;s<m_Subscriptions->GetCount();s++)

@@ -171,6 +171,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "subscribe", 0 },
     { "subscribe", 1 },
     { "unsubscribe", 0 },
+    { "unsubscribe", 1 },
     { "listassettransactions", 1 },
     { "listassettransactions", 2 },
     { "listassettransactions", 3 },

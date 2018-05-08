@@ -136,7 +136,7 @@ typedef struct mc_WalletTxs
     int GetRow(
                mc_TxEntityRow *erow);
     
-    int Unsubscribe(mc_Buffer *lpEntities);                                     // List of the entities to unsubscribe from
+    int Unsubscribe(mc_Buffer *lpEntities,bool purge);                          // List of the entities to unsubscribe from
     
     mc_TxImport *StartImport(                                                   // Starts new import
                              mc_Buffer *lpEntities,                             // List of entities to import

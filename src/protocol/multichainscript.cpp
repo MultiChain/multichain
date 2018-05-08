@@ -301,11 +301,12 @@ int mc_Script::SetParamValue(const char *param_name,const size_t param_name_size
     return MC_ERR_NOERROR;        
 }
 
-uint32_t mc_GetParamFromDetailsScript(const unsigned char *ptr,uint32_t total,uint32_t offset,uint32_t* param_value_start,size_t *bytes,int *err)
+uint32_t mc_GetParamFromDetailsScriptErr(const unsigned char *ptr,uint32_t total,uint32_t offset,uint32_t* param_value_start,size_t *bytes,int *err)
 {
     int shift,name_size,value_size,size;
     
-    *param_value_start=0;
+    *param_value_start=total;
+    *bytes=0;
     *err=MC_ERR_NOERROR;
     
     if(offset>=total)
@@ -340,6 +341,9 @@ uint32_t mc_GetParamFromDetailsScript(const unsigned char *ptr,uint32_t total,ui
         *err=MC_ERR_ERROR_IN_SCRIPT;
         return total;
     }
+
+    *bytes=value_size;
+    *param_value_start=offset+name_size+shift;
     
     size=name_size+shift+value_size;
     if(offset+size>total)
@@ -348,8 +352,6 @@ uint32_t mc_GetParamFromDetailsScript(const unsigned char *ptr,uint32_t total,ui
         return total;
     }
     
-    *bytes=value_size;
-    *param_value_start=offset+name_size+shift;
     
     return offset+size;    
 }
@@ -357,7 +359,15 @@ uint32_t mc_GetParamFromDetailsScript(const unsigned char *ptr,uint32_t total,ui
 uint32_t mc_GetParamFromDetailsScript(const unsigned char *ptr,uint32_t total,uint32_t offset,uint32_t* param_value_start,size_t *bytes)
 {
     int err;
-    return mc_GetParamFromDetailsScript(ptr,total,offset,param_value_start,bytes,&err);
+    uint32_t new_offset;
+    new_offset=mc_GetParamFromDetailsScriptErr(ptr,total,offset,param_value_start,bytes,&err);
+    
+    if(err)
+    {
+        *param_value_start=0;
+        *bytes=0;
+    }
+    return new_offset;
 }
 
 uint32_t mc_FindSpecialParamInDetailsScript(const unsigned char *ptr,uint32_t total,uint32_t param,size_t *bytes)
@@ -426,7 +436,7 @@ int mc_VerifyDetailsScript(const unsigned char *script,uint32_t script_size)
     
     while(offset<script_size)
     {        
-        new_offset=(int32_t)mc_GetParamFromDetailsScript(script,script_size,offset,&param_value_start,&bytes,&err);
+        new_offset=(int32_t)mc_GetParamFromDetailsScriptErr(script,script_size,offset,&param_value_start,&bytes,&err);
         if(err)
         {
             return err;

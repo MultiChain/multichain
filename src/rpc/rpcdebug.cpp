@@ -8,7 +8,299 @@
 #include "net/net.h"
 void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity);
 
+string mcd_ParamStringValue(const Object& params,string name,string default_value)
+{
+    string value=default_value;
+    BOOST_FOREACH(const Pair& d, params) 
+    {
+        if(d.name_ == name)
+        {
+            if(d.value_.type() == str_type)
+            {
+                value=d.value_.get_str();
+            }
+        }
+    }
+    return value;
+}
 
+int mcd_ParamIntValue(const Object& params,string name,int default_value)
+{
+    int value=default_value;
+    BOOST_FOREACH(const Pair& d, params) 
+    {
+        if(d.name_ == name)
+        {
+            if(d.value_.type() == int_type)
+            {
+                value=d.value_.get_int();
+            }
+        }
+    }
+    return value;
+}
+
+int64_t mcd_OpenDatabase(const char *name,const char *dbname,int key_size,int value_size,mc_Database **lpDB)
+{
+    int err,value_len;   
+    int64_t size;
+    mc_Database *m_DB;
+    char m_DBName[MC_DCT_DB_MAX_PATH];     
+    char m_DirName[MC_DCT_DB_MAX_PATH];     
+    char *kbuf;
+    char *vbuf;
+    string rel_dbname=strprintf("debug/%s",dbname);
+    unsigned char *ptr;
+    
+    m_DB=new mc_Database;
+    
+    mc_GetFullFileName(name,"debug","",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,m_DirName);
+    mc_CreateDir(m_DirName);
+    mc_GetFullFileName(name,rel_dbname.c_str(),".db",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,m_DBName);
+    
+    m_DB->SetOption("KeySize",0,key_size);
+    m_DB->SetOption("ValueSize",0,value_size);
+    
+    
+    err=m_DB->Open(m_DBName,MC_OPT_DB_DATABASE_CREATE_IF_MISSING | MC_OPT_DB_DATABASE_TRANSACTIONAL | MC_OPT_DB_DATABASE_LEVELDB);
+    if(err)
+    {
+        return -1;
+    }
+
+    kbuf=new char[key_size];
+    vbuf=new char[value_size];
+    
+    memset(kbuf,0,key_size);
+    memset(vbuf,0,value_size);
+    
+    ptr=(unsigned char*)m_DB->Read(kbuf,key_size,&value_len,0,&err);
+    if(err)
+    {
+        return -2;
+    }
+
+    size=0;
+    if(ptr)                                                                     
+    {        
+        size=mc_GetLE(ptr,8);
+    }
+    else
+    {
+        err=m_DB->Write(kbuf,key_size,vbuf,value_size,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+        if(err)
+        {
+            return -3;
+        }        
+                
+        err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
+        if(err)
+        {
+            return -4;
+        }                
+    }
+    
+    delete [] kbuf;
+    delete [] vbuf;
+    
+    *lpDB=m_DB;
+
+    return size;
+}
+
+void mcd_CloseDatabase(mc_Database *m_DB)
+{
+    if(m_DB)
+    {
+        m_DB->Close();
+        delete m_DB;    
+    }    
+}
+
+int64_t mcd_AddRows(mc_Database *m_DB,int key_size,int value_size,int row_count,int64_t prev_rows)
+{
+    int err;
+    int per_commit_count=1000;
+    int commit_count=row_count/per_commit_count;
+    int64_t total_rows=prev_rows;
+    char *kbuf;
+    char *vbuf;
+    kbuf=new char[key_size];
+    vbuf=new char[value_size];
+
+    double tb,ta;
+    tb=mc_TimeNowAsDouble();
+    for(int c=0;c<commit_count;c++)
+    {
+        for(int r=0;r<per_commit_count;r++)
+        {    
+            GetRandBytes((unsigned char*)kbuf, key_size);
+            GetRandBytes((unsigned char*)vbuf, value_size);
+            err=m_DB->Write(kbuf,key_size,vbuf,value_size,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+            if(err)
+            {
+                return total_rows;
+            }        
+        }   
+        memset(kbuf,0,key_size);
+        memset(vbuf,0,value_size);
+        total_rows+=per_commit_count;
+        mc_PutLE(vbuf,&total_rows,8);
+        err=m_DB->Write(kbuf,key_size,vbuf,value_size,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+        if(err)
+        {
+            return total_rows;
+        }        
+        err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
+        if(err)
+        {
+            return total_rows;
+        }                        
+    }
+    ta=mc_TimeNowAsDouble();    
+    printf("%8.3f\n",ta-tb);
+    
+    delete [] kbuf;
+    delete [] vbuf;
+    
+    return total_rows; 
+}
+
+double mcd_ReadRows(mc_Database *m_DB,int key_size,int row_count,int read_type)
+{
+    int err,value_len;
+    int options;
+    char *kbuf;
+    char *vbuf;    
+    kbuf=new char[key_size];
+    int64_t sum=0;
+    
+    options=0;
+    if(read_type == 1 )
+    {
+        options=MC_OPT_DB_DATABASE_SEEK_ON_READ;
+    }
+    if(read_type == 2 )
+    {
+        options=MC_OPT_DB_DATABASE_NEXT_ON_READ;
+    }
+    double tb,ta;
+    tb=mc_TimeNowAsDouble();
+    for(int r=0;r<row_count;r++)
+    {    
+        GetRandBytes((unsigned char*)kbuf, key_size);
+        vbuf=(char*)m_DB->Read(kbuf,key_size,&value_len,options,&err);
+        if(err)
+        {
+            return 0;
+        }
+        if(vbuf)
+        {
+            if(read_type == 2)
+            {
+                sum+=mc_GetLE(vbuf,4);
+            }
+            else
+            {
+                return 0;
+            }
+        }
+        else
+        {
+            if(read_type == 2)
+            {
+                return 0;
+            }            
+        }
+    }   
+    ta=mc_TimeNowAsDouble();
+    
+    delete [] kbuf;
+    printf("%8.3f   %ld\n",ta-tb,sum);
+    return ta-tb; 
+}
+
+
+Value mcd_DebugRequest(string method,const Object& params)
+{
+    if(method == "dbopen")
+    {
+        mc_Database *m_DB;
+        string dbname=mcd_ParamStringValue(params,"dbname","");
+        int key_size=mcd_ParamIntValue(params,"keysize",-1);
+        int value_size=mcd_ParamIntValue(params,"valuesize",-1);
+        int sleep=mcd_ParamIntValue(params,"sleep",1000);
+        int64_t res;
+        if( (dbname.size() == 0) || (key_size < 0) || (value_size < 0) )
+        {            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameters");                                            
+        }
+        res=mcd_OpenDatabase(mc_gState->m_NetworkParams->Name(),dbname.c_str(),key_size,value_size,&m_DB);
+        __US_Sleep(sleep);
+        mcd_CloseDatabase(m_DB);
+        return res;
+    }
+    if(method == "dbwrite")
+    {
+        mc_Database *m_DB;
+        string dbname=mcd_ParamStringValue(params,"dbname","");
+        int key_size=mcd_ParamIntValue(params,"keysize",-1);
+        int value_size=mcd_ParamIntValue(params,"valuesize",-1);
+        int row_count=mcd_ParamIntValue(params,"rows",-1);
+        int sleep=mcd_ParamIntValue(params,"sleep",1000);
+        int64_t res;
+        if( (dbname.size() == 0) || (key_size < 0) || (value_size < 0) || (row_count < 0) )
+        {            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameters");                                            
+        }
+        res=mcd_OpenDatabase(mc_gState->m_NetworkParams->Name(),dbname.c_str(),key_size,value_size,&m_DB);
+        res=mcd_AddRows(m_DB,key_size,value_size,row_count,res);
+        __US_Sleep(sleep);
+        mcd_CloseDatabase(m_DB);
+        return res;
+    }
+    if(method == "dbread")
+    {
+        mc_Database *m_DB;
+        string dbname=mcd_ParamStringValue(params,"dbname","");
+        int key_size=mcd_ParamIntValue(params,"keysize",-1);
+        int value_size=mcd_ParamIntValue(params,"valuesize",-1);
+        int read_type=mcd_ParamIntValue(params,"type",-1);
+        int row_count=mcd_ParamIntValue(params,"rows",-1);
+        int sleep=mcd_ParamIntValue(params,"sleep",1000);
+        double dres;
+        if( (dbname.size() == 0) || (key_size < 0) || (read_type < 0) || (value_size < 0) || (row_count < 0)  )
+        {            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameters");                                            
+        }
+        mcd_OpenDatabase(mc_gState->m_NetworkParams->Name(),dbname.c_str(),key_size,value_size,&m_DB);
+        dres=mcd_ReadRows(m_DB,key_size,row_count,read_type);
+        __US_Sleep(sleep);
+        mcd_CloseDatabase(m_DB);
+        return dres;
+    }
+    if(method == "chunksdump")
+    {
+        int force=mcd_ParamIntValue(params,"force",0);
+        pwalletTxsMain->m_ChunkDB->Dump("Debug",force);
+        return Value::null;
+    }
+    if(method == "chunkscommit")
+    {
+        pwalletTxsMain->m_ChunkDB->Commit(-3);
+        return Value::null;
+    }
+    if(method == "walletdump")
+    {
+        int force=mcd_ParamIntValue(params,"force",0);        
+        pwalletTxsMain->m_Database->Dump("Debug",force);
+        return Value::null;
+    }
+    
+    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid request type");         
+    
+    return Value::null;
+}
 
 Value debug(const Array& params, bool fHelp)
 {
@@ -45,16 +337,18 @@ Value debug(const Array& params, bool fHelp)
             request_type=MC_RMT_SPECIAL_VIEW_CHUNKS;
         }        
     }
-    
-    if(request_type == MC_RMT_NONE)
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid request type");                    
-    }
-    
+           
     if(params[1].type() != obj_type)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid request details, should be object");                    
     }
+    
+    if(request_type == MC_RMT_NONE)
+    {
+        return mcd_DebugRequest(params[0].get_str(),params[1].get_obj());
+//        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid request type");                    
+    }
+    
     
     if(request_type & MC_RMT_SPECIAL_MASK)
     {
@@ -172,11 +466,34 @@ Value debug(const Array& params, bool fHelp)
                                     throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid chunk");                                
                                 }
                                 uint256 chunk_hash=0;                                
+                                uint256 txid=0;
+                                int vout=-1;
+                                mc_TxEntity entity;
+                                mc_EntityDetails stream_entity;
+                                entity.Zero();
                                 BOOST_FOREACH(const Pair& dd, cd.get_obj()) 
                                 {
                                     if(dd.name_ == "hash")
                                     {
                                         chunk_hash = ParseHashV(dd.value_.get_str(), "hash");
+                                    }
+                                    if(dd.name_ == "stream")
+                                    {
+                                        parseStreamIdentifier(dd.value_.get_str(),&stream_entity);           
+                                        memcpy(&entity,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+                                        entity.m_EntityType=MC_TET_STREAM;
+                                    }
+                                    if(dd.name_ == "txid")
+                                    {
+                                        txid = ParseHashV(dd.value_.get_str(), "hash");
+                                    }
+                                    if(dd.name_ == "vout")
+                                    {
+                                        if(dd.value_.type() != int_type)
+                                        {
+                                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid vout");                                                                        
+                                        }
+                                        vout=dd.value_.get_int();
                                     }
                                 }
                                 if(chunk_hash == 0)
@@ -191,7 +508,8 @@ Value debug(const Array& params, bool fHelp)
                                 Object chunk_obj;
                                 chunk_obj.push_back(Pair("hash",chunk_hash.ToString()));
                                 
-                                if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,(unsigned char *)&chunk_hash,NULL,NULL,-1) == MC_ERR_NOERROR)
+                                if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,(unsigned char *)&chunk_hash,
+                                        (entity.m_EntityType == MC_TET_NONE) ? NULL: &entity,(txid == 0) ? NULL : (unsigned char*)&txid,vout) == MC_ERR_NOERROR)
                                 {
                                     chunk_found=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&chunk_bytes);
                                     if(chunk_found)

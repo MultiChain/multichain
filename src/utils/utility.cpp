@@ -478,6 +478,21 @@ int mc_Buffer::Add(const void *lpKeyValue)
     return Add(lpKeyValue,(unsigned char*)lpKeyValue+m_KeySize);
 }
 
+int mc_Buffer::UpdateRow(int RowID,const void *lpKey,const void *lpValue)
+{
+    if(RowID>=m_Count)
+    {
+        return MC_ERR_INTERNAL_ERROR;
+    }
+    
+    if(m_lpIndex)
+    {
+        m_lpIndex->Remove((char*)GetRow(RowID),m_RowSize-m_KeySize);
+    }
+    
+    return PutRow(RowID,lpKey,lpValue);
+}
+
 int mc_Buffer::PutRow(int RowID,const void *lpKey,const void *lpValue)
 {
     unsigned char *ptr;
@@ -501,7 +516,14 @@ int mc_Buffer::PutRow(int RowID,const void *lpKey,const void *lpValue)
     
     if(m_lpIndex)
     {
-        m_lpIndex->Add((unsigned char*)lpKey,m_KeySize,RowID);
+        if(m_lpIndex->Get((unsigned char*)lpKey,m_KeySize) >= 0)
+        {
+            m_lpIndex->Set((unsigned char*)lpKey,m_KeySize,RowID);            
+        }
+        else
+        {
+            m_lpIndex->Add((unsigned char*)lpKey,m_KeySize,RowID);
+        }
     }
     
     return MC_ERR_NOERROR;

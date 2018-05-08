@@ -69,6 +69,7 @@
 #define MC_ENT_SPRM_CHUNK_SIZE                0x85
 #define MC_ENT_SPRM_CHUNK_DETAILS             0x86
 #define MC_ENT_SPRM_CHUNK_DATA                0x87
+#define MC_ENT_SPRM_ITEM_COUNT                0x88
 
 
 #define MC_ENT_FLAG_OFFSET_IS_SET     0x00000001

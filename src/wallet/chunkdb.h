@@ -18,6 +18,7 @@
 
 #define MC_CDB_MAX_FILE_SIZE             0x40000000                             // Maximal data file size, 1GB
 #define MC_CDB_MAX_CHUNK_DATA_POOL_SIZE  0x8000000                              // Maximal size of chunk pool before commit, 128MB
+#define MC_CDB_MAX_FILE_READ_BUFFER_SIZE 0x0100000                              // Maximal size of chunk pool before commit, 4MB
 #define MC_CDB_MAX_CHUNK_EXTRA_SIZE      1024 
 #define MC_CDB_MAX_MEMPOOL_SIZE          1024 
 
@@ -96,11 +97,11 @@ typedef struct mc_ChunkDBRow
     uint32_t m_Flags;                                                           // Flags passed from higher level
     uint32_t m_HeaderSize;                                                      // Header size
     uint32_t m_StorageFlags;                                                    // Internal flags
-    int32_t  m_ItemCount;                                                        // Number of times this chunk appears in subscription (if m_Pos=0)
+    int32_t  m_ItemCount;                                                       // Number of times this chunk appears in subscription (if m_Pos=0)
     int32_t  m_TmpOnDiskItems;
-    int32_t  m_InternalFileID;                                                   // Data file ID
+    int32_t  m_InternalFileID;                                                  // Data file ID
     uint32_t m_InternalFileOffset;                                              // Offset in the data file
-    int32_t  m_PrevSubscriptionID;                                              // Prev Subscription ID for this hash
+    uint32_t  m_TxIDStart;                                                       // First bytes of TxID
     int32_t  m_NextSubscriptionID;                                              // Next Subscription ID for this hash
     
     void Zero();
@@ -151,6 +152,8 @@ typedef struct mc_ChunkDB
     int AddSubscription(mc_SubscriptionDBRow *subscription);                          
     int AddEntity(mc_TxEntity *entity,uint32_t flags);                          // Adds entity
     int AddEntityInternal(mc_TxEntity *entity,uint32_t flags);                  
+    int RemoveEntity(mc_TxEntity *entity);                          
+    int RemoveEntityInternal(mc_TxEntity *entity);                          
     
     mc_SubscriptionDBRow *FindSubscription(const mc_TxEntity *entity);                // Finds subscription
     int FindSubscription(const mc_TxEntity *entity,mc_SubscriptionDBRow *subscription);   // Finds subscription
@@ -223,6 +226,7 @@ typedef struct mc_ChunkDB
     void Zero();    
     int Destroy();
     void Dump(const char *message);
+    void Dump(const char *message, int force);
     
     void LogString(const char *message);
     

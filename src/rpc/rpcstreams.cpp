@@ -783,7 +783,7 @@ Value unsubscribe(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
     }   
        
-
+    bool purge=false;
     vector<mc_EntityDetails> inputEntities;
     vector<string> inputStrings;
     if(params[0].type() == str_type)
@@ -793,6 +793,18 @@ Value unsubscribe(const Array& params, bool fHelp)
     else
     {    
         inputStrings=ParseStringList(params[0]);
+    }
+    
+    if(params.size() > 1)
+    {
+        if(params[1].type() == bool_type)
+        {
+            purge=params[1].get_bool();
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'purge' field, should be boolean");                                                                
+        }        
     }
     
     for(int is=0;is<(int)inputStrings.size();is++)
@@ -847,7 +859,7 @@ Value unsubscribe(const Array& params, bool fHelp)
 
     if(fNewFound)
     {
-        if(pwalletTxsMain->Unsubscribe(streams))
+        if(pwalletTxsMain->Unsubscribe(streams,purge))
         {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't unsubscribe from stream");                                    
         }

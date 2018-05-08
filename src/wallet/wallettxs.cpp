@@ -1303,9 +1303,9 @@ int mc_WalletTxs::GetListSize(mc_TxEntity *entity,int generation,int *confirmed)
     return res;                
 }
 
-int mc_WalletTxs::Unsubscribe(mc_Buffer* lpEntities)
+int mc_WalletTxs::Unsubscribe(mc_Buffer* lpEntities,bool purge)
 {
-    int err;
+    int err,j;
     if((m_Mode & MC_WMD_TXS) == 0)
     {
         return MC_ERR_NOT_SUPPORTED;
@@ -1316,6 +1316,22 @@ int mc_WalletTxs::Unsubscribe(mc_Buffer* lpEntities)
     }
     m_Database->Lock(1,0);    
     err=m_Database->Unsubscribe(lpEntities);
+    if(err==MC_ERR_NOERROR)
+    {
+        if(mc_gState->m_Features->Chunks())
+        {
+            if(purge)
+            {
+                if(m_ChunkDB)
+                {
+                    for(j=0;j<lpEntities->GetCount();j++)                                       
+                    {
+                        m_ChunkDB->RemoveEntity((mc_TxEntity*)lpEntities->GetRow(j));
+                    }
+                }
+            }
+        }
+    }
     if(fDebug)LogPrint("wallet","wtxs: Unsubscribed from %d entities\n",lpEntities->GetCount());
     m_Database->UnLock();
     return err;                        

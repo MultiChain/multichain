@@ -33,12 +33,13 @@
 #define MC_TET_SUBKEY_STREAM_KEY                0x00000046
 #define MC_TET_SUBKEY_STREAM_PUBLISHER          0x00000047
 #define MC_TET_SUBKEY                           0x00000040
-#define MC_TET_TYPE_MASK                        0x000000FF
+#define MC_TET_TYPE_MASK                        0x040000FF
 #define MC_TET_CHAINPOS                         0x00000100
 #define MC_TET_TIMERECEIVED                     0x00000200
 #define MC_TET_ORDERMASK                        0x0000FF00
 #define MC_TET_DB_STAT                          0x01000000
 #define MC_TET_IMPORT                           0x02000000
+#define MC_TET_DELETED                          0x04000000
 #define MC_TET_SPECIALMASK                      0xFF000000
 
 #define MC_EFL_NOT_IN_SYNC                      0x01000000
@@ -385,6 +386,7 @@ typedef struct mc_TxDB
     void Zero();    
     int Destroy();
     void Dump(const char *message);
+    void Dump(const char *message, int force);
     
     int Lock(int write_mode, int allow_secondary);
     void UnLock();
