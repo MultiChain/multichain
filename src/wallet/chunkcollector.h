@@ -23,7 +23,7 @@
 #define MC_CCW_TIMEOUT_REQUEST                     5
 #define MC_CCW_MAX_CHUNKS_PER_QUERY                4
 #define MC_CCW_DEFAULT_AUTOCOMMIT_DELAY          200
-#define MC_CCW_WORST_RESPONSE_SCORE             1000
+#define MC_CCW_WORST_RESPONSE_SCORE       1048576000
 #define MC_CCW_DEFAULT_MEMPOOL_SIZE             1000
 #define MC_CCW_MAX_MBS_PER_SECOND                  8
 

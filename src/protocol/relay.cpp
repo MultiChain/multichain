@@ -193,17 +193,30 @@ exitlbl:
     return result;
 }
 
-int MultichainResponseScore(mc_RelayResponse *response,mc_ChunkCollectorRow *collect_row)
+int MultichainResponseScore(mc_RelayResponse *response,mc_ChunkCollectorRow *collect_row,map<int64_t,int64_t>& destination_loads,uint32_t max_total_size)
 {
     unsigned char *ptr;
     unsigned char *ptrEnd;
     unsigned char *ptrStart;
     int shift,count,size;
+    int64_t total_size;
     mc_ChunkEntityKey *chunk;
     int c;
     if( (response->m_Status & MC_RST_SUCCESS) == 0 )
     {
         return MC_CCW_WORST_RESPONSE_SCORE;
+    }
+
+    total_size=0;
+    map<int64_t,int64_t>::iterator itdld = destination_loads.find(response->SourceID());
+    if (itdld != destination_loads.end())
+    {
+        total_size=itdld->second;
+    }                                    
+    
+    if(total_size + collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey) >= max_total_size)
+    {
+        return MC_CCW_WORST_RESPONSE_SCORE;                
     }
     
     ptrStart=&(response->m_Payload[0]);
@@ -238,7 +251,8 @@ int MultichainResponseScore(mc_RelayResponse *response,mc_ChunkCollectorRow *col
     {
         return MC_CCW_WORST_RESPONSE_SCORE;        
     }
-    return response->m_TryCount+response->m_HopCount;
+        
+    return (response->m_TryCount+response->m_HopCount)*1024*1024+total_size/1024;
 }
 
 int MultichainCollectChunks(mc_ChunkCollector* collector)
@@ -258,6 +272,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     map <mc_OffchainMessageID,bool> query_to_delete;
     map <CRelayResponsePair,CRelayRequestPairs> requests_to_send;    
     map <CRelayResponsePair,CRelayRequestPairs> responses_to_process;    
+    map <int64_t,int64_t> destination_loads;    
     mc_RelayRequest *request;
     mc_RelayRequest *query;
     mc_RelayResponse *response;
@@ -314,7 +329,56 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                 }            
                 pRelayManager->UnLock();
             }
-            else
+        }        
+    }
+
+    BOOST_FOREACH(PAIRTYPE(const CRelayResponsePair, CRelayRequestPairs)& item, responses_to_process)    
+    {
+        MultichainProcessChunkResponse(&(item.first),&(item.second.m_Pairs),collector);
+    }
+    
+    max_total_size=(MC_CCW_TIMEOUT_REQUEST-2)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
+    if(max_total_size > MAX_SIZE-OFFCHAIN_MSG_PADDING)
+    {
+        max_total_size=MAX_SIZE-OFFCHAIN_MSG_PADDING;        
+    }
+    
+    for(row=0;row<collector->m_MemPool->GetCount();row++)
+    {
+        collect_row=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(row);
+        if( (collect_row->m_State.m_Status & MC_CCF_DELETED ) == 0 )
+        {
+            request=NULL;
+            if(!collect_row->m_State.m_Request.IsZero())
+            {
+                request=pRelayManager->FindRequest(collect_row->m_State.m_Request);
+                if(request == NULL)
+                {
+                    collect_row->m_State.m_Request=0;
+                    collect_row->m_State.m_RequestTimeStamp=0;
+                }
+            }
+            if(request)
+            {
+                map<int64_t,int64_t>::iterator itdld = destination_loads.find(request->m_DestinationID);
+                if (itdld == destination_loads.end())
+                {
+                    destination_loads.insert(make_pair(request->m_DestinationID,collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey)));
+                }       
+                else
+                {
+                    itdld->second+=collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey);
+                }                                    
+            }
+        }
+    }
+    
+    for(row=0;row<collector->m_MemPool->GetCount();row++)
+    {
+        collect_row=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(row);
+        if( (collect_row->m_State.m_Status & MC_CCF_DELETED ) == 0 )
+        {
+            if(collect_row->m_State.m_Request.IsZero())
             {
                 query=NULL;
                 if(!collect_row->m_State.m_Query.IsZero())
@@ -333,7 +397,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                     best_score=MC_CCW_WORST_RESPONSE_SCORE;
                     for(int i=0;i<(int)query->m_Responses.size();i++)
                     {
-                        this_score=MultichainResponseScore(&(query->m_Responses[i]),collect_row);
+                        this_score=MultichainResponseScore(&(query->m_Responses[i]),collect_row,destination_loads,max_total_size);
                         if(this_score < best_score)
                         {
                             best_score=this_score;
@@ -362,11 +426,6 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                 pRelayManager->UnLock();
             }
         }        
-    }
-
-    BOOST_FOREACH(PAIRTYPE(const CRelayResponsePair, CRelayRequestPairs)& item, responses_to_process)    
-    {
-        MultichainProcessChunkResponse(&(item.first),&(item.second.m_Pairs),collector);
     }
     
     BOOST_FOREACH(PAIRTYPE(const CRelayResponsePair, CRelayRequestPairs)& item, requests_to_send)    
@@ -420,11 +479,6 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     last_count=0;
     total_size=0;
     
-    max_total_size=(MC_CCW_TIMEOUT_REQUEST-1)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
-    if(max_total_size > MAX_SIZE-OFFCHAIN_MSG_PADDING)
-    {
-        max_total_size=MAX_SIZE-OFFCHAIN_MSG_PADDING;        
-    }
     while(row<=collector->m_MemPool->GetCount())
     {
         collect_row=NULL;
@@ -1947,11 +2001,12 @@ void mc_RelayRequest::Zero()
     m_LastTryTimestamp=0;
     m_TryCount=0;
     m_Status=MC_RST_NONE;
+    m_DestinationID=0;
     m_Payload.clear();   
     m_Responses.clear();
 }
 
-int mc_RelayManager::AddRequest(CNode *pto,mc_OffchainMessageID msg_id,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status)
+int mc_RelayManager::AddRequest(CNode *pto,int64_t destination,mc_OffchainMessageID msg_id,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status)
 {    
     int err=MC_ERR_NOERROR;
  
@@ -1968,6 +2023,7 @@ int mc_RelayManager::AddRequest(CNode *pto,mc_OffchainMessageID msg_id,uint32_t 
         request.m_LastTryTimestamp=0;
         request.m_TryCount=0;
         request.m_Status=status;
+        request.m_DestinationID=destination;
         request.m_Payload=payload;   
         request.m_Responses.clear();
 
@@ -1981,6 +2037,13 @@ int mc_RelayManager::AddRequest(CNode *pto,mc_OffchainMessageID msg_id,uint32_t 
     
     UnLock();
     return err;            
+}
+
+int64_t mc_RelayResponse::SourceID()
+{
+    int64_t result=(int64_t)m_NodeFrom;
+    result = (result << 32) + (int64_t)m_Source;
+    return result;
 }
 
 int mc_RelayManager::AddResponse(mc_OffchainMessageID request,CNode *pfrom,int32_t source,int hop_count,mc_OffchainMessageID msg_id,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status)
@@ -2079,7 +2142,7 @@ mc_OffchainMessageID mc_RelayManager::SendRequest(CNode* pto,uint32_t msg_type,u
         }
     }
 
-    if(AddRequest(pto,msg_id,msg_type,flags,payload,MC_RST_NONE) != MC_ERR_NOERROR)
+    if(AddRequest(pto,0,msg_id,msg_type,flags,payload,MC_RST_NONE) != MC_ERR_NOERROR)
     {
         return mc_OffchainMessageID();
     }
@@ -2104,7 +2167,7 @@ mc_OffchainMessageID mc_RelayManager::SendNextRequest(mc_RelayResponse* response
             {
                 msg_id=PushRelay(pnode,0,vEmptyHops,vEmptySendPaths,msg_type,msg_id,response->m_MsgID,
                                      flags,payload,vSigScriptsEmpty,NULL,MC_PRA_NONE);                    
-                if(AddRequest(pnode,msg_id,msg_type,flags,payload,MC_RST_NONE) != MC_ERR_NOERROR)
+                if(AddRequest(pnode,response->SourceID(),msg_id,msg_type,flags,payload,MC_RST_NONE) != MC_ERR_NOERROR)
                 {                    
                     return mc_OffchainMessageID();
                 }
