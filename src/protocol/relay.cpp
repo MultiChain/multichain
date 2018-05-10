@@ -52,7 +52,6 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
     {
         return false;
     }
-    
     response=&(request->m_Responses[response_pair->response_id]);
     
     unsigned char *ptr;
@@ -82,6 +81,9 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
     {
         switch(*ptr)
         {
+            case MC_RDT_EXPIRATION:
+                ptr+=5;
+                break;
             case MC_RDT_CHUNK_IDS:
                 ptr++;
                 count=(int)mc_GetVarInt(ptr,ptrEnd-ptr,-1,&shift);
@@ -124,7 +126,7 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
     }
     ptrOut+=shift;
     
-    ptr=ptrStart+1+shift;
+    ptr=ptrStart+1+shift+5;
     for(int c=0;c<count;c++)
     {
         sizeOut=((mc_ChunkEntityKey*)ptr)->m_Size;
@@ -241,10 +243,10 @@ int MultichainResponseScore(mc_RelayResponse *response,mc_ChunkCollectorRow *col
 
 int MultichainCollectChunks(mc_ChunkCollector* collector)
 {
-    uint32_t time_now;    
+    uint32_t time_now,expiration,dest_expiration;    
     vector <mc_ChunkEntityKey> vChunkDefs;
     int row,last_row,last_count;
-    uint32_t total_size;
+    uint32_t total_size,max_total_size;
     mc_ChunkCollectorRow *collect_row;
     mc_ChunkCollectorRow *collect_subrow;
     time_now=mc_TimeNowAsUInt();
@@ -371,8 +373,22 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     {
         payload.clear();
         shift=mc_PutVarInt(buf,16,item.second.m_Pairs.size());
-        payload.resize(1+shift+sizeof(mc_ChunkEntityKey)*item.second.m_Pairs.size());
+        payload.resize(5+1+shift+sizeof(mc_ChunkEntityKey)*item.second.m_Pairs.size());
+        request=pRelayManager->FindRequest(item.first.request_id);
+        if(request == NULL)
+        {
+            return false;
+        }
+
+        response=&(request->m_Responses[item.first.response_id]);
+        
+        expiration=time_now+MC_CCW_TIMEOUT_REQUEST;
+        dest_expiration=expiration+response->m_TimeDiff;
         ptrOut=&(payload[0]);
+        *ptrOut=MC_RDT_EXPIRATION;
+        ptrOut++;
+        mc_PutLE(ptrOut,&dest_expiration,sizeof(dest_expiration));
+        ptrOut+=sizeof(dest_expiration);
         *ptrOut=MC_RDT_CHUNK_IDS;
         ptrOut++;
         memcpy(ptrOut,buf,shift);
@@ -388,20 +404,13 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
             count++;
         }
 //        mc_DumpSize("req",&(payload[0]),1+shift+sizeof(mc_ChunkEntityKey)*item.second.m_Pairs.size(),64);
-        request=pRelayManager->FindRequest(item.first.request_id);
-        if(request == NULL)
-        {
-            return false;
-        }
-
-        response=&(request->m_Responses[item.first.response_id]);
         request_id=pRelayManager->SendNextRequest(response,MC_RMT_CHUNK_REQUEST,0,payload);
         if(fDebug)LogPrint("chunks","New chunk request: %s, response: %s, chunks: %d\n",request_id.ToString().c_str(),response->m_MsgID.ToString().c_str(),item.second.m_Pairs.size());
         BOOST_FOREACH(PAIRTYPE(const int, int)& chunk_row, item.second.m_Pairs)    
         {                
             collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(chunk_row.first);
             collect_subrow->m_State.m_Request=request_id;
-            collect_subrow->m_State.m_RequestTimeStamp=time_now+MC_CCW_TIMEOUT_REQUEST;
+            collect_subrow->m_State.m_RequestTimeStamp=expiration;
 //            printf("T %d %d %s\n",chunk_row.first,collect_subrow->m_State.m_RequestPos,collect_subrow->m_State.m_Request.ToString().c_str());
         }
     }
@@ -410,6 +419,12 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     last_row=0;
     last_count=0;
     total_size=0;
+    
+    max_total_size=(MC_CCW_TIMEOUT_REQUEST-1)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
+    if(max_total_size > MAX_SIZE-OFFCHAIN_MSG_PADDING)
+    {
+        max_total_size=MAX_SIZE-OFFCHAIN_MSG_PADDING;        
+    }
     while(row<=collector->m_MemPool->GetCount())
     {
         collect_row=NULL;
@@ -418,7 +433,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
             collect_row=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(row);
         }
         
-        if( (collect_row == NULL)|| (last_count >= MC_CCW_MAX_CHUNKS_PER_QUERY) || (total_size+collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey)> MAX_SIZE-OFFCHAIN_MSG_PADDING) )
+        if( (collect_row == NULL)|| (last_count >= MC_CCW_MAX_CHUNKS_PER_QUERY) || (total_size+collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey)> max_total_size) )
         {
             if(last_count)
             {
@@ -635,6 +650,8 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
     unsigned char *ptrOut;
     
     uint32_t total_size=0;
+    uint32_t max_total_size=MAX_SIZE-OFFCHAIN_MSG_PADDING;
+    uint32_t expiration=0;
     
     mc_gState->m_TmpBuffers->m_RelayTmpBuffer->Clear();
     mc_gState->m_TmpBuffers->m_RelayTmpBuffer->AddElement();
@@ -645,6 +662,22 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
     {
         switch(*ptr)
         {
+            case MC_RDT_EXPIRATION:
+                ptr++;
+                expiration=(uint32_t)mc_GetLE(ptr,sizeof(expiration));
+                ptr+=sizeof(expiration);
+                if(expiration+1 < pRelayManager->m_LastTime)
+                {
+                    strError="Less than 1s for request expiration";
+                    return false;                                        
+                }
+                if(expiration-35 > pRelayManager->m_LastTime)                   // We are supposed to store query_hit record only for 30s, something is wrong
+                {
+                    strError="Expiration is too far in the future";
+                    return false;                                                            
+                }
+                max_total_size=MC_CCW_MAX_MBS_PER_SECOND*(expiration-pRelayManager->m_LastTime)*1024*1024;
+                break;
             case MC_RDT_CHUNK_IDS:
                 ptr++;
                 count=(int)mc_GetVarInt(ptr,ptrEnd-ptr,-1,&shift);
@@ -668,7 +701,12 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
                         total_size+=chunk_def.m_Size+size;
                         if(total_size > MAX_SIZE-OFFCHAIN_MSG_PADDING)
                         {
-                            strError="Total size of requested chunks is too big";
+                            strError="Total size of requested chunks is too big for message";
+                            return false;                                                
+                        }
+                        if(total_size > max_total_size)
+                        {
+                            strError="Total size of requested chunks is too big for response expiration";
                             return false;                                                
                         }
                         chunk_found=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&chunk_bytes);
@@ -700,6 +738,12 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
                 strError=strprintf("Unsupported request format (%d, %d)",MC_RMT_CHUNK_QUERY,*ptr);
                 return false;
         }
+    }
+
+    if(total_size > max_total_size)
+    {
+        strError="Total size of requested chunks is too big for response expiration";
+        return false;                                                
     }
     
     return true;
@@ -1891,6 +1935,7 @@ void mc_RelayResponse::Zero()
     m_Status=MC_RST_NONE;
     m_Payload.clear();
     m_Requests.clear();    
+    m_TimeDiff=0;
 }
 
 void mc_RelayRequest::Zero()
@@ -1949,8 +1994,9 @@ int mc_RelayManager::AddResponse(mc_OffchainMessageID request,CNode *pfrom,int32
     }
     
     mc_RelayResponse response;
-    response.m_MsgID=msg_id;
+    response.m_MsgID=msg_id;    
     response.m_MsgType=msg_type;
+    response.m_TimeDiff=msg_id.m_TimeStamp-m_LastTime;
     response.m_Flags=flags;
     response.m_NodeFrom=pfrom ? pfrom->GetId() : 0;
     response.m_HopCount=hop_count;

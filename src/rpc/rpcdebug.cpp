@@ -282,6 +282,7 @@ Value mcd_DebugRequest(string method,const Object& params)
     if(method == "chunksdump")
     {
         int force=mcd_ParamIntValue(params,"force",0);
+        string message=mcd_ParamStringValue(params,"message","Debug");        
         pwalletTxsMain->m_ChunkDB->Dump("Debug",force);
         return Value::null;
     }
@@ -293,9 +294,61 @@ Value mcd_DebugRequest(string method,const Object& params)
     if(method == "walletdump")
     {
         int force=mcd_ParamIntValue(params,"force",0);        
+        string message=mcd_ParamStringValue(params,"message","Debug");
         pwalletTxsMain->m_Database->Dump("Debug",force);
         return Value::null;
     }
+    if(method == "publishrandom")
+    {
+        int size=mcd_ParamIntValue(params,"size",-1);
+        string stream=mcd_ParamStringValue(params,"stream","");
+        string options=mcd_ParamStringValue(params,"options","");
+        string key=mcd_ParamStringValue(params,"key","");        
+        if( (stream.size() == 0) || (size < 0))
+        {            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameters");                                            
+        }
+        Array cbc_params;
+        string bcname=createbinarycache(cbc_params,false).get_str();
+        int part_size=100000;
+        int total_size=0;
+        int num_parts=(size-1)/part_size+1;
+        char *vbuf;
+        vbuf=new char[part_size];
+        for(int p=0;p<num_parts;p++)
+        {
+            Array abc_params;
+            abc_params.push_back(bcname);
+            int this_size=part_size;
+            if(p == num_parts-1)
+            {
+                this_size=size-p*part_size;
+            }
+            GetRandBytes((unsigned char*)vbuf, this_size);            
+            string strHex = HexStr(vbuf, vbuf+this_size);
+            abc_params.push_back(strHex);
+            total_size+=this_size;
+            if(appendbinarycache(abc_params,false).get_int() != total_size)
+            {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot add to binary cache");                                                            
+            }
+        }
+        delete [] vbuf;
+
+        Array p_params;
+        p_params.push_back(stream);
+        p_params.push_back(key);
+        Object c_obj;
+        c_obj.push_back(Pair("cache",bcname));
+        p_params.push_back(c_obj);
+        p_params.push_back(options);
+        string strTxID=publish(p_params,false).get_str();        
+        Array dbc_params;
+        dbc_params.push_back(bcname);
+        deletebinarycache(dbc_params,false);
+        
+        return strTxID;
+    }    
     
     throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid request type");         
     

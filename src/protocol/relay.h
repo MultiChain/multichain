@@ -56,6 +56,7 @@
 #define MC_RDT_UNKNOWN                                0
 #define MC_RDT_MC_ADDRESS                          0x01
 #define MC_RDT_NET_ADDRESS                         0x02
+#define MC_RDT_EXPIRATION                          0x03
 #define MC_RDT_CHUNK_IDS                           0x11
 #define MC_RDT_CHUNKS                              0x12
 
@@ -212,6 +213,7 @@ struct mc_RelayRequest;
 typedef struct mc_RelayResponse
 {
     mc_OffchainMessageID m_MsgID;
+    int m_TimeDiff;
     uint32_t m_MsgType;
     uint32_t m_Flags;
     NodeId m_NodeFrom;
