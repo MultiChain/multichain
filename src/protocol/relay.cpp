@@ -335,6 +335,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     BOOST_FOREACH(PAIRTYPE(const CRelayResponsePair, CRelayRequestPairs)& item, responses_to_process)    
     {
         MultichainProcessChunkResponse(&(item.first),&(item.second.m_Pairs),collector);
+        pRelayManager->DeleteRequest(item.first.request_id);
     }
     
     max_total_size=(MC_CCW_TIMEOUT_REQUEST-2)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
@@ -370,6 +371,17 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                     itdld->second+=collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey);
                 }                                    
             }
+        }
+        else
+        {
+            if(!collect_row->m_State.m_Query.IsZero())
+            {
+                map<mc_OffchainMessageID, bool>::iterator itqry = query_to_delete.find(collect_row->m_State.m_Query);
+                if (itqry == query_to_delete.end())
+                {
+                    query_to_delete.insert(make_pair(collect_row->m_State.m_Query,true));
+                }       
+            }            
         }
     }
     
@@ -421,6 +433,15 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
 //                    printf("coll old req: row: %d, id:  %s, rsps: %d, score (%d,%d)\n",row,collect_row->m_State.m_Query.ToString().c_str(),(int)query->m_Responses.size(),best_score,best_response);
                             itrsp->second.m_Pairs.insert(make_pair(row,0));
                         }                    
+                        map<int64_t,int64_t>::iterator itdld = destination_loads.find(query->m_Responses[best_response].SourceID());
+                        if (itdld == destination_loads.end())
+                        {
+                            destination_loads.insert(make_pair(query->m_Responses[best_response].SourceID(),collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey)));
+                        }       
+                        else
+                        {
+                            itdld->second+=collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey);
+                        }                                    
                     }
                 }
                 pRelayManager->UnLock();
@@ -442,7 +463,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         response=&(request->m_Responses[item.first.response_id]);
         
         expiration=time_now+MC_CCW_TIMEOUT_REQUEST;
-        dest_expiration=expiration+response->m_TimeDiff;
+        dest_expiration=expiration+response->m_MsgID.m_TimeStamp-request->m_MsgID.m_TimeStamp;// response->m_TimeDiff;
         ptrOut=&(payload[0]);
         *ptrOut=MC_RDT_EXPIRATION;
         ptrOut++;
@@ -2010,7 +2031,6 @@ int mc_RelayManager::AddRequest(CNode *pto,int64_t destination,mc_OffchainMessag
 {    
     int err=MC_ERR_NOERROR;
  
-    Lock();
     map<mc_OffchainMessageID, mc_RelayRequest>::iterator itreq_this = m_Requests.find(msg_id);
     if(itreq_this == m_Requests.end())
     {    
@@ -2035,7 +2055,6 @@ int mc_RelayManager::AddRequest(CNode *pto,int64_t destination,mc_OffchainMessag
         err=MC_ERR_FOUND;
     }    
     
-    UnLock();
     return err;            
 }
 
@@ -2098,6 +2117,8 @@ int mc_RelayManager::DeleteRequest(mc_OffchainMessageID request)
     if(itreq != m_Requests.end())
     {
         m_Requests.erase(itreq);       
+        if(fDebug)LogPrint("offchain","Offchain delete: %s, msg: %s, size: %d. Open requests: %d\n",itreq->second.m_MsgID.ToString().c_str(),
+            mc_MsgTypeStr(itreq->second.m_MsgType).c_str(),(int)itreq->second.m_Payload.size(),(int)m_Requests.size());
     }    
     else
     {
@@ -2131,6 +2152,7 @@ mc_OffchainMessageID mc_RelayManager::SendRequest(CNode* pto,uint32_t msg_type,u
 
     msg_id=GenerateMsgID();
     
+    Lock();
     {
         LOCK(cs_vNodes);
         BOOST_FOREACH(CNode* pnode, vNodes)
@@ -2144,6 +2166,7 @@ mc_OffchainMessageID mc_RelayManager::SendRequest(CNode* pto,uint32_t msg_type,u
 
     if(AddRequest(pto,0,msg_id,msg_type,flags,payload,MC_RST_NONE) != MC_ERR_NOERROR)
     {
+        UnLock();
         return mc_OffchainMessageID();
     }
     
@@ -2159,6 +2182,7 @@ mc_OffchainMessageID mc_RelayManager::SendNextRequest(mc_RelayResponse* response
     
     msg_id=GenerateMsgID();
 
+    Lock();
     {
         LOCK(cs_vNodes);
         BOOST_FOREACH(CNode* pnode, vNodes)
@@ -2169,12 +2193,14 @@ mc_OffchainMessageID mc_RelayManager::SendNextRequest(mc_RelayResponse* response
                                      flags,payload,vSigScriptsEmpty,NULL,MC_PRA_NONE);                    
                 if(AddRequest(pnode,response->SourceID(),msg_id,msg_type,flags,payload,MC_RST_NONE) != MC_ERR_NOERROR)
                 {                    
+                    UnLock();
                     return mc_OffchainMessageID();
                 }
             }
         }
     }
     
+    UnLock();
     return msg_id;
 }
 
