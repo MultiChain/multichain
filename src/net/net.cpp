@@ -329,6 +329,11 @@ bool SeenLocal(const CService& addr)
 /** check whether a given address is potentially local */
 bool IsLocal(const CService& addr)
 {
+    if(addr.IsLocal())
+    {
+        return 1;        
+    }
+            
     LOCK(cs_mapLocalHost);
     return mapLocalHost.count(addr) > 0;
 }
