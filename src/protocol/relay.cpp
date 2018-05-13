@@ -1632,6 +1632,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     vector<CScript> vSigScripts;
     vector<CScript> vSigScriptsEmpty;
     vector <int32_t> vHops;
+    vector <int32_t> vHopsToRelay;
     vector <int32_t> vSendPaths;
     vector <int32_t> vEmptyHops;
     uint256   message_hash;
@@ -1970,7 +1971,8 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
                     {
                         if(pnode != pfrom)
                         {
-                            PushRelay(pnode,msg_format,vHops,vSendPaths,*msg_type_relay_ptr,msg_id_received,msg_id_to_respond,flags_relay,
+                            vHopsToRelay=vHops;
+                            PushRelay(pnode,msg_format,vHopsToRelay,vSendPaths,*msg_type_relay_ptr,msg_id_received,msg_id_to_respond,flags_relay,
                                       vPayloadRelay,vSigScriptsEmpty,pfrom,MC_PRA_NONE);
                         }
                     }
