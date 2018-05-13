@@ -140,6 +140,7 @@ void AppendOffChainFormatData(uint32_t data_format,uint32_t out_options,mc_Scrip
 int mc_BinaryCacheFile(string id,int mode);
 void mc_RemoveBinaryCacheFile(string id);
 string OffChainError(uint32_t status,int *errorCode); 
+bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,string *strError);
 
 
 #endif	/* RPCMULTICHAINUTILS_H */

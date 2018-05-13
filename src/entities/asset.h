@@ -25,6 +25,11 @@
 #define MC_AST_ASSET_REF_TYPE_GENESIS      256 
 #define MC_AST_ASSET_REF_TYPE_SPECIAL      512
 
+#define MC_ENT_ENTITY_RESTRICTION_NONE           0x00000000
+#define MC_ENT_ENTITY_RESTRICTION_ONCHAIN        0x00000001
+#define MC_ENT_ENTITY_RESTRICTION_OFFCHAIN       0x00000002
+
+
 
 #define MC_ENT_REF_SIZE                 10
 #define MC_ENT_REF_PREFIX_SIZE           2
@@ -57,6 +62,7 @@
 #define MC_ENT_SPRM_ANYONE_CAN_WRITE          0x04
 #define MC_ENT_SPRM_JSON_DETAILS              0x05
 #define MC_ENT_SPRM_PERMISSIONS               0x06
+#define MC_ENT_SPRM_RESTRICTIONS              0x07
 #define MC_ENT_SPRM_ASSET_MULTIPLE            0x41
 #define MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION  0x42
 #define MC_ENT_SPRM_UPGRADE_START_BLOCK       0x43
@@ -148,6 +154,7 @@ typedef struct mc_EntityDetails
     char m_Name[MC_ENT_MAX_NAME_SIZE+6];                                        // Entity name
     uint32_t m_Flags;
     uint32_t m_Permissions;
+    uint32_t m_Restrictions;
     unsigned char m_Reserved[36];   
     mc_EntityLedgerRow m_LedgerRow;
     void Zero();
@@ -166,6 +173,7 @@ typedef struct mc_EntityDetails
 //    int HasFollowOns(); 
     int AllowedFollowOns(); 
     uint32_t Permissions(); 
+    uint32_t Restrictions(); 
     int AnyoneCanWrite(); 
     int UpgradeProtocolVersion(); 
     uint32_t UpgradeStartBlock(); 

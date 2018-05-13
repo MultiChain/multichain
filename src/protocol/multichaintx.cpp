@@ -792,6 +792,14 @@ bool MultiChainTransaction_CheckStreamItem(mc_EntityDetails *entity,
     unsigned char item_key[MC_ENT_MAX_ITEM_KEY_SIZE];
     int item_key_size;
     
+    if(mc_gState->m_Features->OffChainData())
+    {
+        if(mc_gState->m_TmpScript->m_Restrictions & entity->m_Restrictions)
+        {
+            reason="Metadata script rejected - stream restrictions violation";
+            return false;        
+        }
+    }
                                                                                 // Multiple keys, if not allowed, check for count is made in different place
     for (int e = 1; e < mc_gState->m_TmpScript->GetNumElements()-1; e++)
     {

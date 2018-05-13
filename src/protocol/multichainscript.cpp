@@ -53,7 +53,7 @@ int mc_Script::Zero()
     m_AllocElements=0;
     m_AllocSize=0;
     m_ScriptType=MC_DCT_SCRIPT_TYPE_REGULAR;
-    
+    m_Restrictions=MC_ENT_ENTITY_RESTRICTION_NONE;    
     return MC_ERR_NOERROR;
 }
 
@@ -2535,43 +2535,13 @@ int mc_Script::SetChunkDefHash(unsigned char *hash,int size)
 int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format)
 {
     return ExtractAndDeleteDataFormat(format,NULL,NULL,NULL);
-/*    
-    int elem,err;
-    
-    if(format)
-    {
-        *format=MC_SCR_DATA_FORMAT_UNKNOWN;
-    }
-    
-    if(mc_gState->m_Features->FormattedData() == 0)
-    {
-        return MC_ERR_NOERROR;
-    }
-    
-    if(m_NumElements < 2)
-    {        
-        return MC_ERR_NOERROR;
-    }
-        
-    elem=m_NumElements-2;
-        
-    SetElement(elem);
-    if( (err=GetDataFormat(format)) != MC_ERR_WRONG_SCRIPT  )
-    {
-        if( (mc_gState->m_Features->OffChainData() == 0) || (GetChunkDef(NULL,NULL,NULL,NULL) == MC_ERR_WRONG_SCRIPT) )
-        {
-            DeleteElement(elem);            
-        }
-        return err;
-    }        
-    
-    return MC_ERR_NOERROR;
- */ 
 }
 
 int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashes,int *chunk_count,int64_t *total_size)
 {
     int elem,err;
+
+    m_Restrictions=MC_ENT_ENTITY_RESTRICTION_NONE;
     
     if(format)
     {
@@ -2588,11 +2558,20 @@ int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashe
         return MC_ERR_NOERROR;
     }
     
+    if(m_NumElements >= 1)
+    {        
+        if(m_lpCoord[(m_NumElements-1)*2+1] > 0)
+        {
+            m_Restrictions |= MC_ENT_ENTITY_RESTRICTION_ONCHAIN;
+        }        
+    }
+    
     if(m_NumElements < 2)
     {        
         return MC_ERR_NOERROR;
     }
         
+    
     
     elem=m_NumElements-2;
         
@@ -2624,6 +2603,7 @@ int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashe
     SetElement(elem);
     while( (elem >= 0 ) && ((err=GetChunkDef(format,hashes,chunk_count,total_size)) == MC_ERR_NOERROR) )
     {
+        m_Restrictions |= MC_ENT_ENTITY_RESTRICTION_OFFCHAIN;
         DeleteElement(elem);
         elem--;
         if(elem < 0)

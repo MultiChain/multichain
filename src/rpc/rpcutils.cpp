@@ -625,8 +625,16 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
             {
                 entry.push_back(Pair("open",false));                                            
             }
+            if(mc_gState->m_Features->OffChainData())
+            {
+                Object pObject;
+                pObject.push_back(Pair("write",(entity.Permissions() & MC_PTP_WRITE) ? true : false));
+                pObject.push_back(Pair("onchain",(entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_ONCHAIN) ? true : false));
+                pObject.push_back(Pair("offchain",(entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN) ? true : false));
+                entry.push_back(Pair("restrict",pObject));                                            
+            }
         }
-        
+       
         
         size_t value_size;
         int64_t offset,new_offset;

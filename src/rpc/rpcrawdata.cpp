@@ -701,6 +701,53 @@ CScript RawDataScriptFollowOn(Value *param,mc_EntityDetails *entity,mc_Script *l
     return scriptOpReturn;
 }
 
+bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,string *strError)
+{
+    *restrict=0;
+    *permissions=0;
+ 
+    uint32_t match;
+    char* ptr;
+    char* start;
+    char* ptrEnd;
+    char c;
+    
+    if(param.type() != str_type)
+    {
+        *strError="Invalid restrict field, should be string";
+        return false;
+    }
+    
+    ptr=(char*)param.get_str().c_str();
+    ptrEnd=ptr+strlen(ptr);
+    start=ptr;
+    
+    while(ptr<=ptrEnd)
+    {
+        c=*ptr;
+        if( (c == ',') || (c ==0x00))
+        {
+            if(ptr > start)
+            {
+                match=0;
+                if(memcmp(start,"write",    ptr-start) == 0){match = 1; *permissions |= MC_PTP_WRITE ;}
+                if(memcmp(start,"onchain",  ptr-start) == 0){match = 1; *restrict |= MC_ENT_ENTITY_RESTRICTION_ONCHAIN;}
+                if(memcmp(start,"offchain", ptr-start) == 0){match = 1; *restrict |= MC_ENT_ENTITY_RESTRICTION_OFFCHAIN;}
+                
+                if(match == 0)
+                {
+                    *strError="Unsupported restriction";
+                    return false;
+                }
+                start=ptr+1;
+            }
+        }
+        ptr++;
+    }
+    
+    return true;    
+}
+
 CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError)
 {
     CScript scriptOpReturn=CScript();
@@ -710,6 +757,8 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
     const unsigned char *script;
     string entity_name;
     int is_open=0;
+    uint32_t restrict;
+    uint32_t permissions=MC_PTP_WRITE;
     
     bool missing_name=true;
     bool missing_open=true;
@@ -746,7 +795,7 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
         {
             if(!missing_open)
             {
-                *strError=string("open field can appear only once in the object");                                                                                                        
+                *strError=string("open/restrict field can appear only once in the object");                                                                                                        
             }
             if(d.value_.type() == bool_type)
             {
@@ -756,9 +805,48 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
             {
                 *strError=string("Invalid open");                                            
             }
-            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ANYONE_CAN_WRITE,(unsigned char*)&is_open,1); 
+            if(mc_gState->m_Features->OffChainData() == 0)
+            {
+                lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ANYONE_CAN_WRITE,(unsigned char*)&is_open,1); 
+            }
+            else
+            {
+                permissions=is_open ? MC_PTP_NONE : MC_PTP_WRITE;
+            }
             missing_open=false;
             field_parsed=true;
+        }
+        if(d.name_ == "restrict")
+        {
+            if(mc_gState->m_Features->OffChainData() == 0)
+            {
+                *strError=string("Per-stream restrictions not supported for this protocol version");               
+                *errorCode=RPC_NOT_SUPPORTED;
+            }
+            else
+            {                
+                if(!missing_open)
+                {
+                    *strError=string("open/restrict field can appear only once in the object");                                                                                                        
+                }
+                if(RawDataParseRestrictParameter(d.value_,&restrict,&permissions,strError))
+                {
+                    if(restrict & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN)
+                    {
+                        if(restrict & MC_ENT_ENTITY_RESTRICTION_ONCHAIN)
+                        {
+                            *strError=string("Stream cannot be restricted from both onchain and offchain items");               
+                            *errorCode=RPC_NOT_SUPPORTED;                            
+                        }                        
+                    }
+                    if(restrict)
+                    {
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_RESTRICTIONS,(unsigned char*)&restrict,1);                         
+                    }
+                }
+                missing_open=false;
+                field_parsed=true;
+            }
         }
         if(d.name_ == "details")
         {
@@ -776,6 +864,11 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
             *strError=strprintf("Invalid field: %s",d.name_.c_str());
         }
     }    
+    
+    if(mc_gState->m_Features->OffChainData())
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_PERMISSIONS,(unsigned char*)&permissions,1);                                
+    }
     
     if(strError->size() == 0)
     {

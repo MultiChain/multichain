@@ -271,9 +271,6 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
         stream_name=params[2].get_str();
     }
     
-    if(params[3].type() != bool_type)
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid open flag, should be boolean");
-    
     if(stream_name == "*")
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid stream name: *");                                                                                            
@@ -306,10 +303,69 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     
     lpDetails->Clear();
     lpDetails->AddElement();
-    if(params[3].get_bool())
+    
+    if(mc_gState->m_Features->OffChainData())
     {
-        unsigned char b=1;        
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ANYONE_CAN_WRITE,&b,1);        
+        string strError;
+        uint32_t permissions=0;
+        uint32_t restrict;
+        if(params[3].type() != bool_type)
+        {
+            if(params[3].type() == obj_type)
+            {
+                BOOST_FOREACH(const Pair& d, params[3].get_obj()) 
+                {
+                    if(d.name_ == "restrict")
+                    {
+                        if(RawDataParseRestrictParameter(d.value_,&restrict,&permissions,&strError))
+                        {
+                            if(restrict & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN)
+                            {
+                                if(restrict & MC_ENT_ENTITY_RESTRICTION_ONCHAIN)
+                                {
+                                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Stream cannot be restricted from both onchain and offchain items");               
+                                }                        
+                            }                            
+                        }
+                        else
+                        {
+                            throw JSONRPCError(RPC_INVALID_PARAMETER, strError);                                                                           
+                        }
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid field, should be restrict");               
+                    }
+                }
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid open flag, should be boolean or object");               
+            }
+        }
+        else
+        {            
+            permissions = params[3].get_bool() ? MC_PTP_NONE : MC_PTP_WRITE;
+        }
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_PERMISSIONS,(unsigned char*)&permissions,1);                                
+        if(restrict)
+        {
+            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_RESTRICTIONS,(unsigned char*)&restrict,1);                         
+        }
+        
+    }
+    else
+    {
+        if(params[3].type() != bool_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid open flag, should be boolean or object");
+        }
+
+        if(params[3].get_bool())
+        {
+            unsigned char b=1;        
+            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ANYONE_CAN_WRITE,&b,1);        
+        }
     }
     if(stream_name.size())
     {        
@@ -588,6 +644,24 @@ Value publishfrom(const Array& params, bool fHelp)
         }
     }
 
+    if( mc_gState->m_Features->OffChainData() )
+    {
+        if(in_options & MC_RFD_OPTION_OFFCHAIN)
+        {
+            if(stream_entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Publishing offchain items is not allowed to this stream");     
+            }
+        }
+        else
+        {
+            if(stream_entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_ONCHAIN)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Publishing onchain items is not allowed to this stream");     
+            }            
+        }
+    }
+    
     if(keys.size() > 1)
     {
         if( mc_gState->m_Features->MultipleStreamKeys() == 0 )

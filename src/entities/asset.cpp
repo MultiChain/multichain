@@ -538,6 +538,7 @@ void mc_EntityDetails::Set(mc_EntityLedgerRow* row)
     }
 
     m_Permissions=0;
+    m_Restrictions=0;
     switch(m_LedgerRow.m_EntityType)
     {
         case MC_ENT_TYPE_ASSET:
@@ -588,9 +589,23 @@ void mc_EntityDetails::Set(mc_EntityLedgerRow* row)
         value_offset=mc_FindSpecialParamInDetailsScript(m_LedgerRow.m_Script,m_LedgerRow.m_ScriptSize,MC_ENT_SPRM_PERMISSIONS,&value_size);
         if(value_offset <= m_LedgerRow.m_ScriptSize)
         {
+            if(m_Permissions & MC_PTP_WRITE)
+            {
+                m_Permissions -= MC_PTP_WRITE;
+            }
+            m_Permissions |= MC_PTP_SPECIFIED;
             if((value_size>0) && (value_size<=4))
             {
                 m_Permissions |= (uint32_t)mc_GetLE(m_LedgerRow.m_Script+value_offset,value_size);
+            }
+        }
+        
+        value_offset=mc_FindSpecialParamInDetailsScript(m_LedgerRow.m_Script,m_LedgerRow.m_ScriptSize,MC_ENT_SPRM_RESTRICTIONS,&value_size);
+        if(value_offset <= m_LedgerRow.m_ScriptSize)
+        {
+            if((value_size>0) && (value_size<=4))
+            {
+                m_Restrictions |= (uint32_t)mc_GetLE(m_LedgerRow.m_Script+value_offset,value_size);
             }
         }
         
@@ -1731,11 +1746,29 @@ uint32_t mc_EntityDetails::Permissions()
     return m_Permissions;
 }
 
+uint32_t mc_EntityDetails::Restrictions()
+{
+    return m_Restrictions;
+}
+
 
 int mc_EntityDetails::AnyoneCanWrite()
 {
     unsigned char *ptr;
     size_t bytes;
+
+    if(m_Permissions & MC_PTP_SPECIFIED)
+    {
+        if(mc_gState->m_Features->OffChainData())
+        {            
+            if(m_Permissions & MC_PTP_WRITE)
+            {
+                return 0;
+            }
+            return 1;            
+        }
+    }
+    
     ptr=(unsigned char *)GetSpecialParam(MC_ENT_SPRM_ANYONE_CAN_WRITE,&bytes);
     if(ptr)
     {

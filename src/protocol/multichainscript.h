@@ -29,6 +29,7 @@ typedef struct mc_Script
     int m_AllocElements;
     int m_AllocSize;
     int m_ScriptType;
+    uint32_t m_Restrictions;
     
     mc_Script()
     {
