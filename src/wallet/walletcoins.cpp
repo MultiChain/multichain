@@ -2407,7 +2407,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                                                 if(no_send_coins)
                                                 {
                                                     if(eErrorCode)*eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
-                                                    strFailReason = _("Insufficient funds, but there are coins belonging to addresses without send or receive permission.");
+                                                    strFailReason = _("Insufficient funds, but there are unspent outputs belonging to addresses without send or receive permission.");
                                                 }                                                                                    
                                             }
                                             else
@@ -2447,7 +2447,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                                     if(no_send_coins)
                                     {
                                         if(eErrorCode)*eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
-                                        strFailReason = _("Insufficient funds, but there are coins belonging to addresses without send or receive permission.");
+                                        strFailReason = _("Insufficient funds, but there are unspent outputs belonging to addresses without send or receive permission.");
                                     }                                    
                                 }
                                 
