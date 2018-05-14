@@ -308,7 +308,7 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     {
         string strError;
         uint32_t permissions=0;
-        uint32_t restrict;
+        uint32_t restrict=0;
         if(params[3].type() != bool_type)
         {
             if(params[3].type() == obj_type)
