@@ -474,19 +474,27 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         {
             string autosubscribe=params[1].get_str();
             uint32_t mode=MC_WMD_NONE;
+            bool found=false;
             if(autosubscribe=="streams")
             {
                 mode |= MC_WMD_AUTOSUBSCRIBE_STREAMS;
+                found=true;
             }
             if(autosubscribe=="assets")
             {
                 mode |= MC_WMD_AUTOSUBSCRIBE_ASSETS;
+                found=true;
             }
             if( (autosubscribe=="assets,streams") || (autosubscribe=="streams,assets"))
             {
                 mode |= MC_WMD_AUTOSUBSCRIBE_STREAMS;
                 mode |= MC_WMD_AUTOSUBSCRIBE_ASSETS;
+                found=true;
             }                
+            if(!found)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value");                                                                        
+            }
             
             if(pwalletTxsMain)
             {
