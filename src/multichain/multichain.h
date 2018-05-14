@@ -16,6 +16,7 @@
 
     
 extern unsigned int MIN_RELAY_TX_FEE;  
+extern unsigned int MIN_OFFCHAIN_FEE;  
 
 
 #endif	/* MULTICHAIN_H */

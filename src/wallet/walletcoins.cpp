@@ -14,6 +14,8 @@
 #include "custom/custom.h"
 
 extern mc_WalletTxs* pwalletTxsMain;
+void MultiChainTransaction_SetTmpOutputScript(const CScript& script1);
+int64_t MultiChainTransaction_OffchainFee(int64_t total_offchain_size);
 
 using namespace std;
 
@@ -1497,6 +1499,8 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
     CAmount nTotalChangeValue=0;
     CAmount default_change_output;
     CAmount change_amount;
+    CAmount mandatory_fee=0;
+    int64_t total_offchain_size=0;
         
     for(int i=0;i<change_amounts->GetCount();i++)                               // Finding relevant asset groups and calculating native currency total 
     {
@@ -1592,6 +1596,22 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
         {
             default_change_output=0;
         }
+    }
+    
+    if(MIN_OFFCHAIN_FEE)
+    {
+        total_offchain_size=0;
+        BOOST_FOREACH (const PAIRTYPE(CScript, CAmount)& s, vecSend)            // Original outputs
+        {
+            MultiChainTransaction_SetTmpOutputScript(s.first);
+            mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL,NULL,NULL,&total_offchain_size);            
+        }
+        mandatory_fee=MultiChainTransaction_OffchainFee(total_offchain_size);
+    }
+    
+    if(nFeeRet == 0)
+    {
+        nFeeRet=mandatory_fee;
     }
     
     missing_amount=nFeeRet+(change_count+extra_change_count)*default_change_output-nTotalInValue;
@@ -1860,7 +1880,7 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
                 break;
         }
 
-        CAmount nFeeNeeded = lpWallet->GetMinimumFee(nBytes, nTxConfirmTarget, mempool);
+        CAmount nFeeNeeded = lpWallet->GetMinimumFee(nBytes, nTxConfirmTarget, mempool)+mandatory_fee;
 
         // If we made it here and we aren't even able to meet the relay fee on the next pass, give up
         // because we must be at the maximum allowed fee.

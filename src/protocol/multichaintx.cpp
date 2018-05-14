@@ -54,6 +54,9 @@ typedef struct CMultiChainTxDetails
     int details_script_type;                                                    // Entity details script type - new/update
     uint32_t new_entity_type;                                                   // New entity type
     int new_entity_output;                                                      // Output where new entity is defined
+    int64_t total_offchain_size;                                                // Total size of offchain items
+    int64_t total_value_in;                                                     // Total amount in inputs
+    int64_t total_value_out;                                                    // Total amount in outputs
     
     CMultiChainTxDetails()
     {
@@ -97,7 +100,9 @@ void CMultiChainTxDetails::Zero()
     details_script_type=-1;
     new_entity_type=MC_ENT_TYPE_NONE;
     new_entity_output=-1;
-    
+    total_offchain_size=0;
+    total_value_in=0;
+    total_value_out=0;
 }
 
 bool CMultiChainTxDetails::IsRelevantInput(int vin, int vout)
@@ -338,6 +343,8 @@ bool MultiChainTransaction_CheckInputs(const CTransaction& tx,                  
         const CScript& script1 = coins->vout[prevout.n].scriptPubKey;        
         CScript::const_iterator pc1 = script1.begin();
 
+        details->total_value_in+=coins->vout[prevout.n].nValue;
+        
         txnouttype typeRet;
         int nRequiredRet;
         vector<CTxDestination> addressRets;
@@ -559,9 +566,9 @@ void MultiChainTransaction_FillAdminPermissionsBeforeTx(const CTransaction& tx,
     }
 }
 
-bool MultiChainTransaction_VerifyAndDeleteDataFormatElements(string& reason)
+bool MultiChainTransaction_VerifyAndDeleteDataFormatElements(string& reason,int64_t *total_size)
 {
-    if(mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL))
+    if(mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL,NULL,NULL,total_size))
     {
         reason="Error in data format script";
         return false;                    
@@ -580,12 +587,15 @@ bool MultiChainTransaction_CheckOpReturnScript(const CTransaction& tx,
     uint32_t timestamp,approval;
     vector<CTxDestination> addressRets;
     CTxDestination single_address;
+    int64_t total_offchain_size;
     
+    total_offchain_size=0;
 //    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);                   // Format scripts are eliminated for protocol checks    
-    if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason))
+    if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason,&total_offchain_size))
     {
         return false;
     }
+    details->total_offchain_size+=total_offchain_size;
     
     if(!details->fScriptHashAllFound)             
     {
@@ -849,7 +859,7 @@ bool MultiChainTransaction_CheckEntityItem(const CTransaction& tx,
     mc_EntityDetails entity;
     
 //    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);                   // Format scripts are eliminated for protocol checks    
-    if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason))
+    if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason,NULL))
     {
         return false;
     }
@@ -1277,6 +1287,8 @@ bool MultiChainTransaction_CheckOutputs(const CTransaction& tx,                 
     
     for (unsigned int vout = 0; vout < tx.vout.size(); vout++)                  // Basic checks, destinations and simple grants
     {
+        details->total_value_out+=tx.vout[vout].nValue;
+        
         MultiChainTransaction_SetTmpOutputScript(tx.vout[vout].scriptPubKey);
 
         if(mc_gState->m_TmpScript->IsOpReturnScript())                    
@@ -1311,8 +1323,7 @@ bool MultiChainTransaction_CheckOutputs(const CTransaction& tx,                 
             if(!MultiChainTransaction_ProcessPermissions(tx,offset,vout,permission_type,false,details,reason))
             {
                 return false;
-            }            
-            
+            }                        
         }
     }    
 
@@ -1363,6 +1374,31 @@ bool MultiChainTransaction_CheckOutputs(const CTransaction& tx,                 
 
     return true;
 }
+
+int64_t MultiChainTransaction_OffchainFee(int64_t total_offchain_size)            // Total size of offchain items
+{
+    return (MIN_OFFCHAIN_FEE*total_offchain_size + 999)/ 1000;
+}
+
+bool MultiChainTransaction_CheckMandatoryFee(CMultiChainTxDetails *details,     // Tx details object
+                                             int64_t *mandatory_fee,            // Mandatory Fee    
+                                             string& reason)                    // Error message
+{
+    *mandatory_fee = MultiChainTransaction_OffchainFee(details->total_offchain_size);
+
+    if(*mandatory_fee)
+    {
+        if(details->total_value_in-details->total_value_out < *mandatory_fee)
+        {
+            reason="Insufficient mandatory fee";
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+
 
 bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         // Tx to check
                                                 int offset,                     // Tx offset in block, -1 if in memppol
@@ -1968,10 +2004,12 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
                                     int offset,                                 // Tx offset in block, -1 if in memppol
                                     bool accept,                                // Accept to mempools if successful
                                     string& reason,                             // Error message
+                                    int64_t *mandatory_fee_out,                 // Mandatory fee
                                     uint32_t *replay)                           // Replay flag - if tx should be rechecked or only permissions
 {
     CMultiChainTxDetails details;
     bool fReject=false;
+    int64_t mandatory_fee=0;
             
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)                 
     {
@@ -1998,6 +2036,11 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
         goto exitlbl;                                                                    
     }
 
+    if(!MultiChainTransaction_CheckMandatoryFee(&details,&mandatory_fee,reason))
+    {
+        fReject=true;
+        goto exitlbl;                                                                            
+    }
                                                                                 // Asset genesis/followon
     if(!MultiChainTransaction_ProcessAssetIssuance(tx,offset,accept,&details,reason))           
     {
@@ -2035,6 +2078,11 @@ exitlbl:
     if(!accept || fReject)                                                      // Rolling back permission database if we were just checking or error occurred    
     {
         mc_gState->m_Permissions->RollBackToCheckPoint();
+    }
+
+    if(mandatory_fee_out)
+    {
+        *mandatory_fee_out=mandatory_fee;
     }
 
     if(replay)

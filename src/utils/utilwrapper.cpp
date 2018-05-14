@@ -777,6 +777,7 @@ int mc_MultichainParams::SetGlobals()
     m_ProtocolVersion=ProtocolVersion();
     
     MIN_RELAY_TX_FEE=(unsigned int)GetInt64Param("minimumrelayfee");    
+    MIN_OFFCHAIN_FEE=(unsigned int)GetInt64Param("minimumoffchainfee");    
     MAX_OP_RETURN_RELAY=(unsigned int)GetInt64Param("maxstdopreturnsize");    
     MAX_OP_RETURN_RELAY=GetArg("-datacarriersize", MAX_OP_RETURN_RELAY);
     MAX_BLOCK_SIZE=(unsigned int)GetInt64Param("maximumblocksize");    

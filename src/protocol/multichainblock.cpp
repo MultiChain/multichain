@@ -21,6 +21,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                  int offset,
                                  bool accept,
                                  string& reason,
+                                 int64_t *mandatory_fee_out,     
                                  uint32_t *replay);
 bool AcceptAdminMinerPermissions(const CTransaction& tx,
                                  int offset,
@@ -369,7 +370,7 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
                     CCoinsViewCache view(&dummy);
                     CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
                     view.SetBackend(viewMemPool);
-                    if(!AcceptMultiChainTransaction(tx,view,-1,accept,reason,NULL))
+                    if(!AcceptMultiChainTransaction(tx,view,-1,accept,reason,NULL,NULL))
                     {
                         removed_type="rejected";                    
                     }

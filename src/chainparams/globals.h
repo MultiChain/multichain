@@ -5,6 +5,7 @@
 #define	GLOBALS_H
 
 mc_State* mc_gState;
+unsigned int MIN_OFFCHAIN_FEE = 0;                                              // new
 unsigned int MIN_RELAY_TX_FEE = 1000;                                           // new
 unsigned int MAX_OP_RETURN_RELAY = 40;                                          // standard.h
 unsigned int MAX_BLOCK_SIZE = 1000000;                                          // block.h
