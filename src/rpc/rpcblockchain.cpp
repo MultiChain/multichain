@@ -34,6 +34,7 @@ Array PerOutputDataEntries(const CTxOut& txout,mc_Script *lpScript,uint256 txid,
 string EncodeHexTx(const CTransaction& tx);
 int OrphanPoolSize();
 bool paramtobool(Value param);
+bool StringToInt(string str,int *value);
 /* MCHN END */
 
 void ScriptPubKeyToJSON(const CScript& scriptPubKey, Object& out, bool fIncludeHex);
@@ -397,7 +398,13 @@ Value getblock(const Array& params, bool fHelp)
     std::string strHash = params[0].get_str();
     if(strHash.size() < 64)
     {
-        int nHeight = atoi(params[0].get_str().c_str());
+        int nHeight;
+        if(!StringToInt(params[0].get_str(),&nHeight))
+        {
+            throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height should be integer");
+        }
+        
+//        int nHeight = atoi(params[0].get_str().c_str());
         if (nHeight < 0 || nHeight > chainActive.Height())
             throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range");
 
