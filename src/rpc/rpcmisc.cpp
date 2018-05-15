@@ -81,7 +81,7 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("burnaddress", BurnAddress(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS))));                
     obj.push_back(Pair("incomingpaused", (mc_gState->m_NodePausedState & MC_NPS_INCOMING) ? true : false));                
     obj.push_back(Pair("miningpaused", (mc_gState->m_NodePausedState & MC_NPS_MINING) ? true : false));                
-
+    
 /* MCHN END */    
 #ifdef ENABLE_WALLET
     if (pwalletMain) {
@@ -685,6 +685,7 @@ void SetSynchronizedFlag(CTxDestination &dest,Object &ret)
             if(entStat.m_Flags & MC_EFL_NOT_IN_SYNC)
             {
                 ret.push_back(Pair("synchronized",false));                                                            
+                ret.push_back(Pair("startblock",entStat.m_LastImportedBlock+1));                                                                            
             }
             else
             {
