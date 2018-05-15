@@ -43,6 +43,7 @@
 #define MC_TET_SPECIALMASK                      0xFF000000
 
 #define MC_EFL_NOT_IN_SYNC                      0x01000000
+#define MC_EFL_NOT_IN_SYNC_AFTER_IMPORT         0x02000000
 #define MC_EFL_UNSUBSCRIBED                     0x10000000
 
 #define MC_SFL_NONE             0x00000000
@@ -64,6 +65,7 @@ typedef struct mc_TxEntity
     uint32_t m_EntityType;                                                      // Entity type, MC_TET_ constants
     void Zero();
     void Init(unsigned char *entity_id,uint32_t entity_type);
+    int IsSubscription();
 } mc_TxEntity;
 
 typedef struct mc_TxEntityRowExtension
@@ -373,7 +375,7 @@ typedef struct mc_TxDB
     int ImportGetBlock(                                                         // Returns last processed block in the import
                        mc_TxImport *import);
     
-    int CompleteImport(mc_TxImport *import);                                    // Completes import - merges with chain
+    int CompleteImport(mc_TxImport *import,uint32_t flags);                     // Completes import - merges with chain
     
     int DropImport(mc_TxImport *import);                                        // Drops uncompleted import
 

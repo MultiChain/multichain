@@ -151,7 +151,7 @@ typedef struct mc_WalletTxs
     int ImportGetBlock(                                                         // Returns last processed block in the import
                        mc_TxImport *import);
     
-    int CompleteImport(mc_TxImport *import);                                    // Completes import - merges with chain
+    int CompleteImport(mc_TxImport *import,uint32_t flags);                    // Completes import - merges with chain
     
     int DropImport(mc_TxImport *import);                                        // Drops uncompleted import
 

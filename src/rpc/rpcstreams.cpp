@@ -840,7 +840,7 @@ Value subscribe(const Array& params, bool fHelp)
     
     if (fRescan && fNewFound)
     {
-        pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true, true);
+        pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true, true, true);
     }
 
     return Value::null;

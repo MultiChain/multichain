@@ -461,7 +461,7 @@ public:
     void SyncTransaction(const CTransaction& tx, const CBlock* pblock);
     bool AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pblock, bool fUpdate);
     void EraseFromWallet(const uint256 &hash);
-    int ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate = false, bool fOnlyUnsynced = false);
+    int ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate = false, bool fOnlyUnsynced = false,bool fOnlySubscriptions = false);
     void ReacceptWalletTransactions();
     void ResendWalletTransactions(bool fForce = false);
     CAmount GetBalance() const;

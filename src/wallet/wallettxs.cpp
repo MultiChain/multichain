@@ -1396,7 +1396,7 @@ int mc_WalletTxs::ImportGetBlock(mc_TxImport *import)
     
 }
 
-int mc_WalletTxs::CompleteImport(mc_TxImport *import)
+int mc_WalletTxs::CompleteImport(mc_TxImport *import,uint32_t flags)
 {
     int err,import_pos,gen,count;
     
@@ -1414,7 +1414,7 @@ int mc_WalletTxs::CompleteImport(mc_TxImport *import)
     
     gen=import->m_ImportID;
     
-    err=m_Database->CompleteImport(import);
+    err=m_Database->CompleteImport(import,flags);
     
                                                                                 
     if(m_Database->m_DBStat.m_Block != m_Database->m_Imports->m_Block)

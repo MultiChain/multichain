@@ -130,6 +130,8 @@ void ParseRawAction(string action,bool& lock_it, bool& sign_it,bool& send_it);
 bool paramtobool(Value param);
 int paramtoint(Value param,bool check_for_min,int min_value,string error_message);
 int64_t paramtoint64(Value param,bool check_for_min,int64_t min_value,string error_message);
+int ParseBlockIdentifier(Value blockset_identifier);
+int ParseRescanParameter(Value rescan_identifier, bool *fRescan);
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
 vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,uint32_t in_options,uint32_t *out_options,int *errorCode,string *strError);
 void ParseRawDetails(const Value *value,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError);

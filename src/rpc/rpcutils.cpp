@@ -3586,6 +3586,92 @@ bool ParseIntRange(string str,int *from,int *to)
     return true;
 }
 
+
+
+int ParseBlockIdentifier(Value blockset_identifier)
+{
+    if(blockset_identifier.type() == obj_type)
+    {
+        int64_t starttime=-1; 
+        BOOST_FOREACH(const Pair& d, blockset_identifier.get_obj()) 
+        {              
+            if(d.name_ == "starttime")
+            {
+                if(starttime >= 0)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Multiple starttime");                                
+                }
+                
+                starttime=d.value_.get_int64();
+                if( (starttime<0) || (starttime > 0xffffffff))
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid starttime");                                
+                }                
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid block identifier");                            
+            }
+        }        
+        if(starttime<0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid block identifier");                                
+        }                
+        for(int block=0; block<chainActive.Height();block++)
+        {
+            if(chainActive[block]->nTime >= starttime)
+            {
+                return block;
+            }
+        }            
+        return chainActive.Height()+1;
+    }    
+    else
+    {
+        if(blockset_identifier.type() == int_type)
+        {
+            int block=blockset_identifier.get_int();
+            if(block < 0)
+            {
+                block=chainActive.Height()+block+1;
+            }
+            if(block<0)
+            {
+                block=0;
+            }
+            return block;
+        }
+    }    
+    
+    return -1;
+}
+
+int ParseRescanParameter(Value rescan_identifier, bool *fRescan)
+{
+    int start_block=ParseBlockIdentifier(rescan_identifier);
+    *fRescan=false;
+    if(start_block >= 0)
+    {
+        if(start_block <= chainActive.Height())
+        {
+            *fRescan=true;
+        }
+    }
+    else
+    {
+        if(rescan_identifier.type() == bool_type)
+        {
+            start_block=0;
+            *fRescan=rescan_identifier.get_bool();
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid rescan");                                            
+        }
+    }
+    return start_block;
+}
+
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
 {
     vector<int> block_set;
@@ -3633,11 +3719,11 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
         if(starttime < 0)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing starttime");            
         if(endtime < 0)
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing starttime");            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing endtime");            
         
         if(starttime <= endtime)
         {
-            for(int block=0; block<chainActive.Height();block++)
+            for(int block=0; block<=chainActive.Height();block++)
             {
                 if( (chainActive[block]->nTime >= starttime) && (chainActive[block]->nTime <= endtime) )
                 {
