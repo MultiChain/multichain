@@ -617,22 +617,25 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
 
         if(output_level & 0x0004)
         {
-            if(entity.AnyoneCanWrite())
-            {
-                entry.push_back(Pair("open",true));                                
+            if(mc_gState->m_Compatibility & MC_VCM_1_0)
+            {            
+                if(entity.AnyoneCanWrite())
+                {
+                    entry.push_back(Pair("open",true));                                
+                }
+                else
+                {
+                    entry.push_back(Pair("open",false));                                            
+                }
             }
-            else
-            {
-                entry.push_back(Pair("open",false));                                            
-            }
+            Object pObject;
+            pObject.push_back(Pair("write",entity.AnyoneCanWrite() ? false : true));
             if(mc_gState->m_Features->OffChainData())
             {
-                Object pObject;
-                pObject.push_back(Pair("write",(entity.Permissions() & MC_PTP_WRITE) ? true : false));
                 pObject.push_back(Pair("onchain",(entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_ONCHAIN) ? true : false));
                 pObject.push_back(Pair("offchain",(entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN) ? true : false));
-                entry.push_back(Pair("restrict",pObject));                                            
             }
+            entry.push_back(Pair("restrict",pObject));                                            
         }
        
         
