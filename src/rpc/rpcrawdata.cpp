@@ -525,8 +525,18 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             if(d.value_.type() != null_type && !d.value_.get_str().empty())
             {
                 entity_name=d.value_.get_str();
+                                
+                if(entity_name == "*")
+                {
+                    *strError=string("Invalid asset name"); 
+                }
+                
                 if(entity_name.size())
                 {
+                    if(entity_name.size() > MC_ENT_MAX_NAME_SIZE)
+                    {
+                        *strError=string("Invalid asset name - too long"); 
+                    }
                     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());
                 }
             }
