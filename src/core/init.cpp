@@ -2403,6 +2403,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     LogPrintf("mapAddressBook.size() = %u\n",  pwalletMain ? pwalletMain->mapAddressBook.size() : 0);
 #endif
 
+    if (pwalletMain)
+        bitdb.Flush(false);
+    
     if(!GetBoolArg("-offline",false))
     {
         StartNode(threadGroup);

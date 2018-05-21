@@ -1232,6 +1232,9 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     LogPrintf("mapAddressBook.size() = %u\n",  pwalletMain ? pwalletMain->mapAddressBook.size() : 0);
 #endif
 
+    if (pwalletMain)
+        bitdb.Flush(false);
+    
 #ifdef ENABLE_WALLET
     if (pwalletMain) {
         // Run a thread to flush wallet periodically
