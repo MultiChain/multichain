@@ -648,7 +648,7 @@ Value getblockchaininfo(const Array& params, bool fHelp)
         }
         chain_balance=(double)total_value/(double)COIN;
     }
-    obj.push_back(Pair("chainbalance",             chain_balance));
+    obj.push_back(Pair("chainrewards",             chain_balance));
     
     return obj;
 }
