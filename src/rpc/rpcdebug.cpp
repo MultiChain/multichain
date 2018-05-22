@@ -6,6 +6,7 @@
 #include "protocol/relay.h"
 #include "wallet/wallettxs.h"
 #include "net/net.h"
+
 void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity);
 
 string mcd_ParamStringValue(const Object& params,string name,string default_value)

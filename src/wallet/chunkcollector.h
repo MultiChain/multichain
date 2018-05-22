@@ -22,10 +22,10 @@
 #define MC_CCW_TIMEOUT_QUERY                      35
 #define MC_CCW_TIMEOUT_REQUEST                    10
 #define MC_CCW_TIMEOUT_REQUEST_SHIFT               2
-#define MC_CCW_MAX_CHUNKS_PER_QUERY               16
+#define MC_CCW_MAX_CHUNKS_PER_QUERY             1000
 #define MC_CCW_DEFAULT_AUTOCOMMIT_DELAY          200
 #define MC_CCW_WORST_RESPONSE_SCORE       1048576000
-#define MC_CCW_DEFAULT_MEMPOOL_SIZE            10000
+#define MC_CCW_DEFAULT_MEMPOOL_SIZE           100000
 #define MC_CCW_MAX_MBS_PER_SECOND                  8
 
 
@@ -86,6 +86,19 @@ typedef struct mc_ChunkCollectorRow
     void Zero();
 } mc_ChunkCollectorRow;
 
+typedef struct mc_ChunkCollectorStat
+{
+    int64_t m_Pending;
+    int64_t m_Delivered;
+    int64_t m_Sleeping;
+    int64_t m_Queried;
+    int64_t m_Requested;    
+    int64_t m_Unresponded;
+    int64_t m_Undelivered;
+    int64_t m_Baddelivered;
+    
+    void Zero();
+} mc_ChunkCollectorStat;
 
 typedef struct mc_ChunkCollector
 {    
@@ -107,6 +120,9 @@ typedef struct mc_ChunkCollector
     int m_MaxMemPoolSize;
     int m_TimeoutRequest;
     int m_TimeoutQuery;
+    
+    mc_ChunkCollectorStat m_StatLast[2];
+    mc_ChunkCollectorStat m_StatTotal[2];
     
     char m_Name[MC_PRM_NETWORK_NAME_MAX_SIZE+1];                                // Chain name
     char m_DBName[MC_DCT_DB_MAX_PATH];                                          // Full database name

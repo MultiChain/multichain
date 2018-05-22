@@ -4091,11 +4091,32 @@ void mc_InitRPCHelpMap17()
         ));
 
      
-     
+    mapHelpStrings.insert(std::make_pair("getchunkqueueinfo",
+            "getchunkqueueinfo\n"
+            "\nReturns data about each current chunk queue status.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getchunkqueueinfo", "")
+            + HelpExampleRpc("getchunkqueueinfo", "")
+        ));
+    
+}
+
+void mc_InitRPCHelpMap18()
+{
+    mapHelpStrings.insert(std::make_pair("getchunktotals",
+            "getchunktotals\n"
+            "\nReturns chunks delivery statistics.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getchunktotals", "")
+            + HelpExampleRpc("getchunktotals", "")
+        ));
+    
+    
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
        
+    
 }
 
 void mc_InitRPCLogParamCountMap()
@@ -4189,6 +4210,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap15();
     mc_InitRPCHelpMap16();
     mc_InitRPCHelpMap17();
+    mc_InitRPCHelpMap18();
     
     mc_InitRPCLogParamCountMap();
     mc_InitRPCAllowedWhenWaitingForUpgradeSet();    

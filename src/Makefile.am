@@ -193,6 +193,7 @@ libbitcoin_server_a_SOURCES = \
   rpc/rpcrawdata.cpp \
   rpc/rpcutils.cpp \
   rpc/rpccache.cpp \
+  rpc/rpcchunks.cpp \
   rpc/rpcdebug.cpp \
   rpc/rpchelp.cpp \
   rpc/rpcblockchain.cpp \

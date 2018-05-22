@@ -24,19 +24,12 @@ void mc_ChunkCollectorDBRow::Zero()
 {
     memset(this,0, sizeof(mc_ChunkCollectorDBRow));    
 }
-    uint32_t m_QueryNextAttempt;
-    int m_Vout;
-    unsigned char m_TxID[MC_TDB_TXID_SIZE];                               
-    mc_TxEntity m_Entity;
-    unsigned char m_Hash[MC_CDB_CHUNK_HASH_SIZE];                               // Chunk hash
-    
-    uint32_t m_Size;
-    uint32_t m_Flags;
-    uint32_t m_QueryAttempts;
-    uint32_t m_Status;
-    int64_t m_Reserved1;
-    int64_t m_Reserved2;        
 
+void mc_ChunkCollectorStat::Zero()
+{
+    memset(this,0, sizeof(mc_ChunkCollectorStat));    
+}    
+    
 void mc_ChunkCollector::Zero()
 {
     m_DB=NULL;
@@ -70,6 +63,10 @@ void mc_ChunkCollector::Zero()
     }
     m_TimeoutQuery=(int)GetArg("-chunkquerytimeout",MC_CCW_TIMEOUT_QUERY);
     
+    m_StatLast[0].Zero();
+    m_StatLast[1].Zero();
+    m_StatTotal[0].Zero();
+    m_StatTotal[1].Zero();
     
     m_Semaphore=NULL;
     m_LockedBy=0;     

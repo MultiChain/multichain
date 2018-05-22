@@ -130,16 +130,19 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
         ptrOut+=size;
         if(chunk->m_Size != chunkOut->m_Size)
         {
+            for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Baddelivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                
             strError="Chunk info size mismatch";
             goto exitlbl;                                        
         }
         if(memcmp(chunk->m_Hash,chunkOut->m_Hash,sizeof(uint256)))
         {
+            for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Baddelivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                
             strError="Chunk info hash mismatch";
             goto exitlbl;                                                    
         }
         if(memcmp(&(chunk->m_Entity),&(chunkOut->m_Entity),sizeof(mc_TxEntity)))
         {
+            for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Baddelivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                
             strError="Chunk info entity mismatch";
             goto exitlbl;                                                    
         }
@@ -152,6 +155,7 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
             mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(ptrOut,sizeOut,&hash);
             if(memcmp(&hash,chunk->m_Hash,sizeof(uint256)))
             {
+                for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Baddelivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                
                 strError="Chunk data hash mismatch";
                 goto exitlbl;                                        
             }
@@ -166,6 +170,7 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
             }
             else
             {
+                for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Delivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                
                 LogPrint("chunks","Retrieved chunk %s\n",(*(uint256*)(chunk->m_Hash)).ToString().c_str());                
             }
             collect_row->m_State.m_Status |= MC_CCF_DELETED;
@@ -262,6 +267,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     vector<unsigned char> payload;
     unsigned char buf[16];
     int shift,count;
+    uint32_t size;
     unsigned char *ptrOut;
     mc_OffchainMessageID query_id,request_id;
     map <mc_OffchainMessageID,bool> query_to_delete;
@@ -291,6 +297,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                 {
                     pRelayManager->DeleteRequest(collect_row->m_State.m_Request);
                     collect_row->m_State.m_Request=0;                    
+                    for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Undelivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                
                 }                
             }
             request=NULL;
@@ -301,6 +308,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                 {
                     collect_row->m_State.m_Request=0;
                     collect_row->m_State.m_RequestTimeStamp=0;
+                    for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Undelivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                                    
                 }
             }
             if(request)
@@ -352,6 +360,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                 {
                     collect_row->m_State.m_Request=0;
                     collect_row->m_State.m_RequestTimeStamp=0;
+                    for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Undelivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                
                 }
             }
             if(request)
@@ -396,6 +405,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                         collect_row->m_State.m_Query=0;
                         collect_row->m_State.m_QueryNextAttempt=time_now+MultichainNextChunkQueryAttempt(collect_row->m_State.m_QueryAttempts);                                                
                         collect_row->m_State.m_Status |= MC_CCF_UPDATED;
+                        for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Unresponded+=k ? collect_row->m_ChunkDef.m_Size : 1;                
                     }
                 }
                 if(query)
@@ -486,6 +496,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
             collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(chunk_row.first);
             collect_subrow->m_State.m_Request=request_id;
             collect_subrow->m_State.m_RequestTimeStamp=expiration;
+            for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Requested+=k ? collect_row->m_ChunkDef.m_Size : 1;                
 //            printf("T %d %d %s\n",chunk_row.first,collect_subrow->m_State.m_RequestPos,collect_subrow->m_State.m_Request.ToString().c_str());
         }
     }
@@ -543,6 +554,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                             collect_subrow->m_State.m_QuerySilenceTimestamp=collect_subrow->m_State.m_QueryTimeStamp;
                         }
                         collect_subrow->m_State.m_Status |= MC_CCF_UPDATED;
+                        for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Queried+=k ? collect_subrow->m_ChunkDef.m_Size : 1;                
                     }
                 }
                 last_row=row;
@@ -585,6 +597,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                     {
                         pRelayManager->DeleteRequest(collect_row->m_State.m_Request);
                         collect_row->m_State.m_Request=0;
+                        for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Undelivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                
                     }
                     if(!collect_row->m_State.m_Query.IsZero())
                     {
@@ -596,6 +609,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                         collect_row->m_State.m_Query=0;
                         collect_row->m_State.m_QueryNextAttempt=time_now+MultichainNextChunkQueryAttempt(collect_row->m_State.m_QueryAttempts);      
                         collect_row->m_State.m_Status |= MC_CCF_UPDATED;
+                        for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Unresponded+=k ? collect_row->m_ChunkDef.m_Size : 1;                
                     }
                     if(collect_row->m_State.m_QueryNextAttempt <= time_now)
                     {
@@ -638,6 +652,31 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
             pRelayManager->DeleteRequest(item.first);
         }
     }    
+    
+    for(int k=0;k<2;k++)collector->m_StatLast[k].Zero();
+    for(row=0;row<collector->m_MemPool->GetCount();row++)
+    {
+        collect_row=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(row);
+        if( (collect_row->m_State.m_Status & MC_CCF_DELETED ) == 0 )
+        {
+            size=collect_row->m_ChunkDef.m_Size;
+            if(!collect_row->m_State.m_Request.IsZero())
+            {
+                for(int k=0;k<2;k++)collector->m_StatLast[k].m_Requested+=k ? size : 1;                
+            }
+            else
+            {
+                if(!collect_row->m_State.m_Query.IsZero())
+                {
+                    for(int k=0;k<2;k++)collector->m_StatLast[k].m_Queried+=k ? size : 1;                                        
+                }
+                else                    
+                {
+                    for(int k=0;k<2;k++)collector->m_StatLast[k].m_Sleeping+=k ? size : 1;                    
+                }                
+            }
+        }        
+    }
     
     collector->UnLock();
     if(not_processed < collector->m_MaxMemPoolSize/2)

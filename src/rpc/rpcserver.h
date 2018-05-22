@@ -193,6 +193,8 @@ extern json_spirit::Value getaddressesbyaccount(const json_spirit::Array& params
 extern json_spirit::Value sendtoaddress(const json_spirit::Array& params, bool fHelp);
 /* MCHN START */    
 extern json_spirit::Value debug(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getchunkqueueinfo(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getchunktotals(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value createkeypairs(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getaddresses(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value createbinarycache(const json_spirit::Array& params, bool fHelp);
