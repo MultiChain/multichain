@@ -9,13 +9,8 @@
 
 uint32_t MultichainNextChunkQueryAttempt(uint32_t attempts)
 {
-    if(attempts <  4)return 0;
-    if(attempts <  8)return 60;
-    if(attempts < 12)return 3600;
-    if(attempts < 16)return 86400;
-    if(attempts < 20)return 86400*30;
-    if(attempts < 24)return 86400*365;
-    return 86400*365*10;
+    if(attempts <  2)return 0;
+    return (uint32_t)(int64_t)(pow(1.5,attempts-1)-1);
 }
 
 string mc_MsgTypeStr(uint32_t msg_type)
@@ -338,7 +333,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         pRelayManager->DeleteRequest(item.first.request_id);
     }
     
-    max_total_size=(MC_CCW_TIMEOUT_REQUEST-2)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
+    max_total_size=(collector->m_TimeoutRequest-MC_CCW_TIMEOUT_REQUEST_SHIFT)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
     if(max_total_size > MAX_SIZE-OFFCHAIN_MSG_PADDING)
     {
         max_total_size=MAX_SIZE-OFFCHAIN_MSG_PADDING;        
@@ -462,7 +457,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
 
         response=&(request->m_Responses[item.first.response_id]);
         
-        expiration=time_now+MC_CCW_TIMEOUT_REQUEST;
+        expiration=time_now+collector->m_TimeoutRequest;
         dest_expiration=expiration+response->m_MsgID.m_TimeStamp-request->m_MsgID.m_TimeStamp;// response->m_TimeDiff;
         ptrOut=&(payload[0]);
         *ptrOut=MC_RDT_EXPIRATION;
@@ -541,7 +536,12 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                         collect_subrow->m_State.m_Status -= MC_CCF_SELECTED;
                         collect_subrow->m_State.m_Query=query_id;
                         collect_subrow->m_State.m_QueryAttempts+=1;
-                        collect_subrow->m_State.m_QueryTimeStamp=time_now+MC_CCW_TIMEOUT_QUERY;
+                        collect_subrow->m_State.m_QueryTimeStamp=time_now+collector->m_TimeoutQuery;
+                        collect_subrow->m_State.m_QuerySilenceTimestamp=time_now+collector->m_TimeoutRequest;
+                        if(collect_subrow->m_State.m_QueryAttempts>1)
+                        {
+                            collect_subrow->m_State.m_QuerySilenceTimestamp=collect_subrow->m_State.m_QueryTimeStamp;
+                        }
                         collect_subrow->m_State.m_Status |= MC_CCF_UPDATED;
                     }
                 }
@@ -555,7 +555,31 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         {
             if( (collect_row->m_State.m_Status & MC_CCF_DELETED ) == 0 )
             {
+                int expired=0;
                 if(collect_row->m_State.m_QueryTimeStamp <= time_now)
+                {
+                    expired=1;
+                }
+                else
+                {
+                    if(collect_row->m_State.m_QuerySilenceTimestamp <= time_now)
+                    {
+                        query=NULL;
+                        if(!collect_row->m_State.m_Query.IsZero())
+                        {
+                            query=pRelayManager->FindRequest(collect_row->m_State.m_Query);
+                        }
+                        if(query)
+                        {
+                            if(query->m_Responses.size() == 0)
+                            {
+                                expired=1;
+                            }
+                        }                        
+                    }                    
+                }
+                
+                if(expired)
                 {
                     if(!collect_row->m_State.m_Request.IsZero())
                     {

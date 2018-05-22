@@ -63,6 +63,13 @@ void mc_ChunkCollector::Zero()
     
     m_MaxMemPoolSize=MC_CCW_DEFAULT_MEMPOOL_SIZE;
     m_AutoCommitDelay=MC_CCW_DEFAULT_AUTOCOMMIT_DELAY;
+    m_TimeoutRequest=(int)GetArg("-chunkrequesttimeout",MC_CCW_TIMEOUT_REQUEST);
+    if(m_TimeoutRequest <= MC_CCW_TIMEOUT_REQUEST_SHIFT)
+    {
+        m_TimeoutRequest=MC_CCW_TIMEOUT_REQUEST_SHIFT+1;
+    }
+    m_TimeoutQuery=(int)GetArg("-chunkquerytimeout",MC_CCW_TIMEOUT_QUERY);
+    
     
     m_Semaphore=NULL;
     m_LockedBy=0;     
@@ -391,56 +398,6 @@ int mc_ChunkCollector::Initialize(mc_ChunkDB *chunk_db,const char *name,uint32_t
             }                            
         }
     }
-/*        
-        ptr=(unsigned char*)m_DB->Read((char*)&collect_row+m_KeyOffset,m_KeySize,&value_len,MC_OPT_DB_DATABASE_SEEK_ON_READ,&err);
-        if(err)
-        {
-            return err;
-        }
-
-        if(ptr)                                                                     
-        {   
-            ptr=(unsigned char*)m_DB->MoveNext(&err);
-            collect_row.Zero();
-            if(ptr)
-            {
-                memcpy((char*)&collect_row,ptr,m_TotalDBSize);
-            }
-            while(ptr)
-            {
-                ptr=(unsigned char*)m_DB->MoveNext(&err);
-                if(err)
-                {
-                    return MC_ERR_CORRUPTED;            
-                }
-                collect_row.m_State.m_Status |= MC_CCF_INSERTED;                
-                if(m_ChunkDB->GetChunkDef(&chunk_def,collect_row.m_ChunkDef.m_Hash,&(collect_row.m_ChunkDef.m_Entity),collect_row.m_TxID,collect_row.m_Vout) == MC_ERR_NOERROR)
-                {
-                    collect_row.m_State.m_Status |= MC_CCF_DELETED;
-                }
-                m_MemPool->Add(&collect_row);
-                collect_row.Zero();
-                if(ptr)
-                {
-                    memcpy((char*)&collect_row,ptr,m_TotalDBSize);
-                }
-            }        
-        }
-        else
-        {
-            err=m_DB->Write((char*)&collect_row+m_KeyOffset,m_KeySize,(char*)&collect_row+m_ValueOffset,m_ValueDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
-            if(err)
-            {
-                return err;     
-            }              
-            err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
-            if(err)
-            {
-                return err;
-            }                
-        }
-    }
- */ 
     
     Dump("Initialize");
     

@@ -21,10 +21,11 @@
 
 #define MC_CCW_TIMEOUT_QUERY                      35
 #define MC_CCW_TIMEOUT_REQUEST                    10
+#define MC_CCW_TIMEOUT_REQUEST_SHIFT               2
 #define MC_CCW_MAX_CHUNKS_PER_QUERY               16
 #define MC_CCW_DEFAULT_AUTOCOMMIT_DELAY          200
 #define MC_CCW_WORST_RESPONSE_SCORE       1048576000
-#define MC_CCW_DEFAULT_MEMPOOL_SIZE             1000
+#define MC_CCW_DEFAULT_MEMPOOL_SIZE            10000
 #define MC_CCW_MAX_MBS_PER_SECOND                  8
 
 
@@ -47,7 +48,7 @@ typedef struct mc_ChunkEntityValue
     mc_OffchainMessageID m_Query;
     mc_OffchainMessageID m_Request;
     uint32_t m_QueryTimeStamp;
-    uint32_t m_Reserved2;
+    uint32_t m_QuerySilenceTimestamp;
     uint32_t m_RequestTimeStamp;
     uint32_t m_RequestPos;
     
@@ -104,6 +105,8 @@ typedef struct mc_ChunkCollector
     int64_t m_NextAutoCommitTimestamp;
     int64_t m_NextTryTimestamp;
     int m_MaxMemPoolSize;
+    int m_TimeoutRequest;
+    int m_TimeoutQuery;
     
     char m_Name[MC_PRM_NETWORK_NAME_MAX_SIZE+1];                                // Chain name
     char m_DBName[MC_DCT_DB_MAX_PATH];                                          // Full database name
