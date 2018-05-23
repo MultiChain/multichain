@@ -259,8 +259,8 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
 {
     uint32_t time_now,expiration,dest_expiration;    
     vector <mc_ChunkEntityKey> vChunkDefs;
-    int row,last_row,last_count;
-    uint32_t total_size,max_total_size;
+    int row,last_row,last_count,to_end_of_query;
+    uint32_t total_size,max_total_size,total_in_queries,max_total_in_queries;
     mc_ChunkCollectorRow *collect_row;
     mc_ChunkCollectorRow *collect_subrow;
     time_now=mc_TimeNowAsUInt();
@@ -346,6 +346,9 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     {
         max_total_size=MAX_SIZE-OFFCHAIN_MSG_PADDING;        
     }
+    
+    max_total_in_queries=2*(collector->m_TimeoutRequest)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
+    total_in_queries=0;
     
     for(row=0;row<collector->m_MemPool->GetCount();row++)
     {
@@ -451,6 +454,13 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                 }
                 pRelayManager->UnLock();
             }
+            if(!collect_row->m_State.m_Query.IsZero())
+            {
+                to_end_of_query=collect_row->m_State.m_QueryTimeStamp-time_now;
+                if(to_end_of_query<0)to_end_of_query=0;
+                if(to_end_of_query>collector->m_TimeoutRequest)to_end_of_query=collector->m_TimeoutRequest;
+                total_in_queries+=collect_row->m_ChunkDef.m_Size*to_end_of_query;
+            }
         }        
     }
     
@@ -554,6 +564,10 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                             collect_subrow->m_State.m_QuerySilenceTimestamp=collect_subrow->m_State.m_QueryTimeStamp;
                         }
                         collect_subrow->m_State.m_Status |= MC_CCF_UPDATED;
+                        to_end_of_query=collect_subrow->m_State.m_QueryTimeStamp-time_now;
+                        if(to_end_of_query<0)to_end_of_query=0;
+                        if(to_end_of_query>collector->m_TimeoutRequest)to_end_of_query=collector->m_TimeoutRequest;
+                        total_in_queries+=collect_subrow->m_ChunkDef.m_Size*to_end_of_query;
                         for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Queried+=k ? collect_subrow->m_ChunkDef.m_Size : 1;                
                     }
                 }
@@ -573,7 +587,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                     expired=1;
                 }
                 else
-                {
+                {                    
                     if(collect_row->m_State.m_QuerySilenceTimestamp <= time_now)
                     {
                         query=NULL;
@@ -611,7 +625,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                         collect_row->m_State.m_Status |= MC_CCF_UPDATED;
                         for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Unresponded+=k ? collect_row->m_ChunkDef.m_Size : 1;                
                     }
-                    if(collect_row->m_State.m_QueryNextAttempt <= time_now)
+                    if((collect_row->m_State.m_QueryNextAttempt <= time_now) && (total_in_queries < max_total_in_queries))
                     {
                         if( (collect_row->m_State.m_Status & MC_CCF_ERROR_MASK) == 0)
                         {
@@ -663,6 +677,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
             if(!collect_row->m_State.m_Request.IsZero())
             {
                 for(int k=0;k<2;k++)collector->m_StatLast[k].m_Requested+=k ? size : 1;                
+                for(int k=0;k<2;k++)collector->m_StatLast[k].m_Queried+=k ? size : 1;                                        
             }
             else
             {
@@ -1421,9 +1436,9 @@ void mc_RelayManager::SetDefaults()
     MsgTypeSettings(MC_RMT_NONE            , 0,10,1000,100*1024*1024);
     MsgTypeSettings(MC_RMT_MC_ADDRESS_QUERY,10,10, 100,  1*1024*1024);
     MsgTypeSettings(MC_RMT_NODE_DETAILS    , 0,10, 100,  1*1024*1024);
-    MsgTypeSettings(MC_RMT_CHUNK_QUERY     ,10,10, 100,  1*1024*1024);
-    MsgTypeSettings(MC_RMT_CHUNK_QUERY_HIT ,30,10, 100,  1*1024*1024);
-    MsgTypeSettings(MC_RMT_CHUNK_REQUEST   ,30,10, 100,  1*1024*1024);
+    MsgTypeSettings(MC_RMT_CHUNK_QUERY     ,pwalletTxsMain->m_ChunkCollector->m_TimeoutQuery+5,10, 100,  1*1024*1024);
+    MsgTypeSettings(MC_RMT_CHUNK_QUERY_HIT ,pwalletTxsMain->m_ChunkCollector->m_TimeoutQuery+5,10, 100,  1*1024*1024);
+    MsgTypeSettings(MC_RMT_CHUNK_REQUEST   ,pwalletTxsMain->m_ChunkCollector->m_TimeoutRequest+5,10, 100, (MC_CCW_MAX_MBS_PER_SECOND+2)*1024*1024);
     MsgTypeSettings(MC_RMT_CHUNK_RESPONSE  , 0,10, 100,100*1024*1024);
     MsgTypeSettings(MC_RMT_ERROR_IN_MESSAGE,30,10,1000,  1*1024*1024);
     MsgTypeSettings(MC_RMT_NEW_REQUEST     ,30,10,1000,  1*1024*1024);
@@ -1862,7 +1877,8 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
         
         if(GetRelayRecord(pfrom,msg_id_to_respond,&msg_type_stored,&pto_stored))
         {
-            LogPrintf("ProcessOffchain() : Response without request from peer %d\n",pfrom->GetId());     
+            LogPrintf("ProcessOffchain() : Orphan response: %s, request: %s, from: %d, to: %d, msg: %s, hops: %d, size: %d\n",
+            msg_id_received.ToString().c_str(),msg_id_to_respond.ToString().c_str(),pfrom->GetId(),pto_stored ? pto_stored->GetId() : 0,mc_MsgTypeStr(msg_type_in).c_str(),hop_count,(int)vPayloadIn.size());
             return false;
         }
     }
@@ -2022,7 +2038,8 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
                         }                        
                         else
                         {
-                            LogPrintf("ProcessOffchain() : Response without stored request from peer %d\n",pfrom->GetId());     
+                            if(fDebug)LogPrint("offchain","ProcessOffchain() : Deleted request: %s, request: %s, from: %d, to: %d, msg: %s, hops: %d, size: %d\n",
+                            msg_id_received.ToString().c_str(),msg_id_to_respond.ToString().c_str(),pfrom->GetId(),pto_stored ? pto_stored->GetId() : 0,mc_MsgTypeStr(msg_type_in).c_str(),hop_count,(int)vPayloadIn.size());
                             return false;                            
                         }
                     }

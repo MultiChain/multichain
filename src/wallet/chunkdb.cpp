@@ -1306,10 +1306,13 @@ int mc_ChunkDB::AddChunkInternal(
     sprintf_hex(chunk_hex,hash,MC_CDB_CHUNK_HASH_SIZE);    
     sprintf(msg,"New Chunk %s, size %d, flags %08X, entity (%08X, %s)",chunk_hex,chunk_size,flags,entity->m_EntityType,enthex);
     LogString(msg);
-    
-    if(entity->m_EntityType == MC_TET_AUTHOR)
+ 
+    if((m_DBStat.m_InitMode & MC_WMD_NO_CHUNK_FLUSH) == 0)
     {
-        CommitInternal(-2);
+        if(entity->m_EntityType == MC_TET_AUTHOR)
+        {
+            CommitInternal(-2);
+        }
     }
     
     return MC_ERR_NOERROR;

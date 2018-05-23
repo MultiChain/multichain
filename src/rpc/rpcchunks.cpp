@@ -18,7 +18,7 @@ Value getchunkqueueinfo(const Array& params, bool fHelp)
     for(int k=0;k<2;k++)
     {
         Object stat;
-        stat.push_back(Pair("pending",collector->m_StatLast[k].m_Sleeping+collector->m_StatLast[k].m_Queried+collector->m_StatLast[k].m_Requested));
+        stat.push_back(Pair("pending",collector->m_StatLast[k].m_Sleeping+collector->m_StatLast[k].m_Queried));
         stat.push_back(Pair("queried",collector->m_StatLast[k].m_Queried));
         stat.push_back(Pair("requested",collector->m_StatLast[k].m_Requested));
         result.push_back(Pair(k ? "bytes" : "chunks",stat));
