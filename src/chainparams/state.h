@@ -46,6 +46,7 @@
 #define MC_WMD_DEBUG                 0x01000000
 #define MC_WMD_AUTOSUBSCRIBE_STREAMS 0x02000000
 #define MC_WMD_AUTOSUBSCRIBE_ASSETS  0x04000000
+#define MC_WMD_NO_CHUNK_FLUSH        0x08000000
 #define MC_WMD_AUTO                  0x10000000
 
 #define MC_VCM_NONE                  0x00000000
