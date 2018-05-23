@@ -2171,7 +2171,6 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
 		            {
 		                strError=string("Invalid asset name"); 
 		            }
-		            
 	                if(entity_name.size() > MC_ENT_MAX_NAME_SIZE)
 	                {
 	                    strError=string("Invalid asset name - too long"); 
