@@ -177,6 +177,10 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                     value_offset=mc_FindSpecialParamInDetailsScript(details_script,details_script_size,MC_ENT_SPRM_NAME,&value_size);
                     if(value_offset<(uint32_t)details_script_size)
                     {
+                        if(value_size > MC_ENT_MAX_NAME_SIZE)
+                        {
+                            value_size=MC_ENT_MAX_NAME_SIZE; 
+                        }
                         memcpy(asset_name,details_script+value_offset,value_size);
                         asset_name[value_size]=0x00;
                     }
