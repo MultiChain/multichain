@@ -1307,12 +1307,18 @@ int mc_ChunkDB::AddChunkInternal(
     sprintf(msg,"New Chunk %s, size %d, flags %08X, entity (%08X, %s)",chunk_hex,chunk_size,flags,entity->m_EntityType,enthex);
     LogString(msg);
  
-    if((m_DBStat.m_InitMode & MC_WMD_NO_CHUNK_FLUSH) == 0)
+    if(entity->m_EntityType == MC_TET_AUTHOR)
     {
-        if(entity->m_EntityType == MC_TET_AUTHOR)
+        if((m_DBStat.m_InitMode & MC_WMD_NO_CHUNK_FLUSH) == 0)
         {
-            CommitInternal(-2);
+            FlushLastChunk();
+//            CommitInternal(-2);
         }
+/*        
+        else
+        {
+        }
+ */ 
     }
     
     return MC_ERR_NOERROR;
@@ -1478,7 +1484,8 @@ int mc_ChunkDB::AddToFile(const void* chunk,
                           uint32_t size,
                           mc_SubscriptionDBRow *subscription,
                           uint32_t fileid,
-                          uint32_t offset)
+                          uint32_t offset,
+                          int flush)
 {
     char FileName[MC_DCT_DB_MAX_PATH];         
     int FileHan,err;
@@ -1506,6 +1513,13 @@ int mc_ChunkDB::AddToFile(const void* chunk,
     
 exitlbl:
 
+    if(err == MC_ERR_NOERROR)
+    {
+        if(flush)
+        {
+            __US_FlushFile(FileHan);            
+        }
+    }
     close(FileHan);
     return err;
 }
@@ -1527,6 +1541,60 @@ int mc_ChunkDB::FlushDataFile(mc_SubscriptionDBRow *subscription,uint32_t fileid
     return MC_ERR_NOERROR;
 }
 
+int mc_ChunkDB::FlushLastChunk()
+{
+    mc_ChunkDBRow *chunk_def;
+    mc_SubscriptionDBRow *subscription;
+    int err;
+    uint32_t size;
+    char msg[256];
+    
+    err=MC_ERR_NOERROR;
+    
+    if(m_MemPool->GetCount() < 1)
+    {
+        return MC_ERR_INTERNAL_ERROR;
+    }
+    
+    chunk_def=(mc_ChunkDBRow *)m_MemPool->GetRow(m_MemPool->GetCount()-1);
+    if(chunk_def->m_SubscriptionID != 1)
+    {
+        return MC_ERR_INTERNAL_ERROR;        
+    }
+    
+    subscription=(mc_SubscriptionDBRow *)m_Subscriptions->GetRow(chunk_def->m_SubscriptionID);
+    
+    size=chunk_def->m_Size+chunk_def->m_HeaderSize;
+    if(subscription->m_LastFileSize+size > MC_CDB_MAX_FILE_SIZE)                          // New file is needed
+    {
+        FlushDataFile(subscription,subscription->m_LastFileID);
+        subscription->m_LastFileID+=1;
+        subscription->m_LastFileSize=0;
+    }            
+
+    err=AddToFile(GetChunkInternal(chunk_def,-1,-1,NULL),size,
+                  subscription,subscription->m_LastFileID,subscription->m_LastFileSize,1);
+    if(err)
+    {
+        sprintf(msg,"Couldn't store key in file, error:  %d",err);
+        LogString(msg);
+        return err;
+    }
+
+    chunk_def->m_InternalFileID=subscription->m_LastFileID;
+    chunk_def->m_InternalFileOffset=subscription->m_LastFileSize;
+    chunk_def->m_Pos+=chunk_def->m_TmpOnDiskItems;
+    chunk_def->m_StorageFlags |= MC_CFL_STORAGE_FLUSHED;
+
+    subscription->m_LastFileSize+=size;    
+    subscription->m_Count+=1;
+    subscription->m_FullSize+=chunk_def->m_Size;
+
+    m_DBStat.m_Count+=1;
+    m_DBStat.m_FullSize+=chunk_def->m_Size;
+
+    return err; 
+}
 
 int mc_ChunkDB::CommitInternal(int block)
 {
@@ -1564,34 +1632,36 @@ int mc_ChunkDB::CommitInternal(int block)
             subscription=(mc_SubscriptionDBRow *)m_Subscriptions->GetRow(s);
             subscription->m_TmpFlags |= MC_CDB_TMP_FLAG_SHOULD_COMMIT;
 
-
-            size=chunk_def->m_Size+chunk_def->m_HeaderSize;
-            if(subscription->m_LastFileSize+size > MC_CDB_MAX_FILE_SIZE)                          // New file is needed
+            if( (chunk_def->m_StorageFlags & MC_CFL_STORAGE_FLUSHED) == 0)
             {
-                FlushDataFile(subscription,subscription->m_LastFileID);
-                subscription->m_LastFileID+=1;
-                subscription->m_LastFileSize=0;
-            }            
+                size=chunk_def->m_Size+chunk_def->m_HeaderSize;
+                if(subscription->m_LastFileSize+size > MC_CDB_MAX_FILE_SIZE)                          // New file is needed
+                {
+                    FlushDataFile(subscription,subscription->m_LastFileID);
+                    subscription->m_LastFileID+=1;
+                    subscription->m_LastFileSize=0;
+                }            
 
-            err=AddToFile(GetChunkInternal(chunk_def,-1,-1,NULL),size,
-                          subscription,subscription->m_LastFileID,subscription->m_LastFileSize);
-            if(err)
-            {
-                sprintf(msg,"Couldn't store key in file, error:  %d",err);
-                LogString(msg);
-                return err;
+                err=AddToFile(GetChunkInternal(chunk_def,-1,-1,NULL),size,
+                              subscription,subscription->m_LastFileID,subscription->m_LastFileSize,0);
+                if(err)
+                {
+                    sprintf(msg,"Couldn't store key in file, error:  %d",err);
+                    LogString(msg);
+                    return err;
+                }
+
+                chunk_def->m_InternalFileID=subscription->m_LastFileID;
+                chunk_def->m_InternalFileOffset=subscription->m_LastFileSize;
+                chunk_def->m_Pos+=chunk_def->m_TmpOnDiskItems;
+
+                subscription->m_LastFileSize+=size;    
+                subscription->m_Count+=1;
+                subscription->m_FullSize+=chunk_def->m_Size;
+
+                m_DBStat.m_Count+=1;
+                m_DBStat.m_FullSize+=chunk_def->m_Size;
             }
-
-            chunk_def->m_InternalFileID=subscription->m_LastFileID;
-            chunk_def->m_InternalFileOffset=subscription->m_LastFileSize;
-            chunk_def->m_Pos+=chunk_def->m_TmpOnDiskItems;
-
-            subscription->m_LastFileSize+=size;    
-            subscription->m_Count+=1;
-            subscription->m_FullSize+=chunk_def->m_Size;
-
-            m_DBStat.m_Count+=1;
-            m_DBStat.m_FullSize+=chunk_def->m_Size;
 
             if(chunk_def->m_TmpOnDiskItems)
             {
