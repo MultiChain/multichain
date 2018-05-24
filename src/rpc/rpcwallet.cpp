@@ -582,6 +582,7 @@ Value storechunk(const Array& params, bool fHelp)
         }
     }
     
+    pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-chunkflushmode",MC_CDB_FLUSH_MODE_COMMIT));
     pwalletTxsMain->m_ChunkDB->Dump("storechunk");
     
     return hash.GetHex();

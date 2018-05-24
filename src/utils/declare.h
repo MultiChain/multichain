@@ -284,6 +284,7 @@ uint64_t __US_ThreadID();
 const char* __US_UserHomeDir();
 char * __US_FullPath(const char* path, char *full_path, int len);
 void __US_FlushFile(int FileHan);
+void __US_FlushFileWithMode(int FileHan,uint32_t use_data_sync);
 void sprintf_hex(char *hex,const unsigned char *bin,int size);
 
 

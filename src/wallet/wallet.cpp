@@ -3140,6 +3140,11 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
 
         // Broadcast
 
+        if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
+        {
+            pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-chunkflushmode",MC_CDB_FLUSH_MODE_COMMIT));
+        }
+        
         if (!wtxNew.AcceptToMemoryPoolReturnReason(false,true,reject_reason))   // MCHN
         {
             // This must not fail. The transaction has already been signed and recorded.

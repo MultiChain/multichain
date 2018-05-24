@@ -229,6 +229,18 @@ void __US_FlushFile(int FileHan)
     fsync(FileHan);
 }
 
+void __US_FlushFileWithMode(int FileHan,uint32_t use_data_sync)
+{
+    if(use_data_sync)
+    {
+        fdatasync(FileHan);
+    }
+    else
+    {
+        fsync(FileHan);
+    }
+}
+
 #else
 
 #include "windows.h"

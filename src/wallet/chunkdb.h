@@ -22,6 +22,11 @@
 #define MC_CDB_MAX_CHUNK_EXTRA_SIZE      1024 
 #define MC_CDB_MAX_MEMPOOL_SIZE          1024 
 
+#define MC_CDB_FLUSH_MODE_NONE        0x00000000
+#define MC_CDB_FLUSH_MODE_FILE        0x00000001
+#define MC_CDB_FLUSH_MODE_COMMIT      0x00000002
+#define MC_CDB_FLUSH_MODE_DATASYNC    0x00000100
+
 #define MC_CFL_STORAGE_FLUSHED        0x01000000 
 
 
@@ -221,12 +226,12 @@ typedef struct mc_ChunkDB
                           mc_SubscriptionDBRow *subscription,
                           uint32_t fileid,
                           uint32_t offset,
-                          int flush);
+                          uint32_t flush_mode);
     
     int Commit(int block);                                                               // Commit mempool to disk
     int CommitInternal(int block); 
 
-    int FlushLastChunk();
+    int FlushSourceChunks(uint32_t flush_mode);
     
     void Zero();    
     int Destroy();
