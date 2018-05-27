@@ -624,7 +624,7 @@ int cs_Database::Commit(int Options)
 
             if(Options & MC_OPT_DB_DATABASE_TRANSACTIONAL)
             {
-                leveldb_write((leveldb_t*)m_DB, (leveldb_writeoptions_t*)m_WriteOptions, (leveldb_writebatch_t*)m_WriteBatch, &err);        
+                leveldb_write((leveldb_t*)m_DB, (leveldb_writeoptions_t*)m_SyncOptions, (leveldb_writebatch_t*)m_WriteBatch, &err);        
                 leveldb_writebatch_clear((leveldb_writebatch_t*)m_WriteBatch);
             }
 
