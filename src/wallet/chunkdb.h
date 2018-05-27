@@ -218,7 +218,8 @@ typedef struct mc_ChunkDB
                      uint32_t fileid);
     
     int FlushDataFile(mc_SubscriptionDBRow *subscription,
-                                  uint32_t fileid);
+                                  uint32_t fileid,
+                                  uint32_t flush_mode);
     
     
     int AddToFile(const void *chunk,                  
@@ -229,8 +230,10 @@ typedef struct mc_ChunkDB
                           uint32_t flush_mode);
     
     int Commit(int block);                                                               // Commit mempool to disk
-    int CommitInternal(int block); 
 
+    int Commit(int block,uint32_t flush_mode);                                                               // Commit mempool to disk
+    int CommitInternal(int block,uint32_t flush_mode); 
+    
     int FlushSourceChunks(uint32_t flush_mode);
     
     void Zero();    

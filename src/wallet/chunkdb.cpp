@@ -5,6 +5,7 @@
 #include "wallet/chunkdb.h"
 
 #define MC_CDB_TMP_FLAG_SHOULD_COMMIT           0x00000001
+#define MC_CDB_FILE_PAGE_SIZE                   0x00100000
 
 unsigned char null_txid[MC_TDB_TXID_SIZE];
 
@@ -323,7 +324,7 @@ int mc_ChunkDB::RemoveEntityInternal(mc_TxEntity *entity)
         return MC_ERR_NOERROR;
     }
 
-    CommitInternal(-4);
+    CommitInternal(-4,0);
     
     memcpy(&subscription,old_subscription,sizeof(mc_SubscriptionDBRow));
     subscription.m_Entity.m_EntityType |= MC_TET_DELETED;
@@ -462,6 +463,10 @@ int mc_ChunkDB::RemoveEntityInternal(mc_TxEntity *entity)
                                         {
                                             chunk_def.m_Pos=(uint32_t)mc_GetLE(buf+param_value_start,bytes);
                                         }                                        
+                                        break;
+                                    case MC_ENT_SPRM_FILE_END:
+                                        offset=buf_size;
+                                        file_offset=file_size;                                
                                         break;
                                 }
                                 buf_offset=offset;                            
@@ -1118,7 +1123,7 @@ int mc_ChunkDB::AddChunkInternal(
     if( (m_ChunkData->m_Size + chunk_size + details_size + MC_CDB_MAX_CHUNK_EXTRA_SIZE > MC_CDB_MAX_CHUNK_DATA_POOL_SIZE) || 
         (m_MemPool->GetCount() + 2 > MC_CDB_MAX_MEMPOOL_SIZE ) )
     {
-        CommitInternal(-1);
+        CommitInternal(-1,0);
     }
 
     subscription=FindSubscription(entity);
@@ -1477,6 +1482,7 @@ unsigned char *mc_ChunkDB::GetChunk(mc_ChunkDBRow *chunk_def,
     return ptr;
 }
 
+
 int mc_ChunkDB::AddToFile(const void* chunk,                  
                           uint32_t size,
                           mc_SubscriptionDBRow *subscription,
@@ -1486,6 +1492,12 @@ int mc_ChunkDB::AddToFile(const void* chunk,
 {
     char FileName[MC_DCT_DB_MAX_PATH];         
     int FileHan,err;
+    uint32_t tail_size,file_size,expected_end,new_file_size;
+    unsigned char tail[3];
+    
+    tail[0]=0x00;
+    tail[1]=MC_ENT_SPRM_FILE_END;
+    tail[2]=0x00;
     
     SetFileName(FileName,subscription,fileid);
     err=MC_ERR_NOERROR;
@@ -1494,6 +1506,21 @@ int mc_ChunkDB::AddToFile(const void* chunk,
     if(FileHan<=0)
     {
         return MC_ERR_INTERNAL_ERROR;
+    }
+    
+    expected_end=offset+size+3;
+    tail_size=0;
+    if( (offset == 0) || ( (expected_end % MC_CDB_FILE_PAGE_SIZE) != (offset % MC_CDB_FILE_PAGE_SIZE) ) )
+    {
+        file_size=lseek64(FileHan,0,SEEK_END);
+        new_file_size=((expected_end-1) / MC_CDB_FILE_PAGE_SIZE + 1) * MC_CDB_FILE_PAGE_SIZE;
+        if(new_file_size > file_size)
+        {
+            if(new_file_size > expected_end)
+            {
+                tail_size=new_file_size-expected_end;
+            }
+        }
     }
     
     if(lseek64(FileHan,offset,SEEK_SET) != offset)
@@ -1506,6 +1533,32 @@ int mc_ChunkDB::AddToFile(const void* chunk,
     {
         err=MC_ERR_INTERNAL_ERROR;
         return MC_ERR_INTERNAL_ERROR;
+    }
+
+    if(write(FileHan,tail,3) != 3)
+    {
+        err=MC_ERR_INTERNAL_ERROR;
+        return MC_ERR_INTERNAL_ERROR;
+    }
+    
+    if(tail_size)
+    {
+        unsigned char empty_buf[65536];
+        uint32_t empty_buf_size=65536;
+        memset(empty_buf,0,empty_buf_size);
+        while(tail_size)
+        {
+            if(empty_buf_size>tail_size)
+            {
+                empty_buf_size=tail_size;
+            }
+            if(write(FileHan,empty_buf,empty_buf_size) != empty_buf_size)
+            {
+                err=MC_ERR_INTERNAL_ERROR;
+                return MC_ERR_INTERNAL_ERROR;
+            }
+            tail_size-=empty_buf_size;
+        }        
     }
     
 exitlbl:
@@ -1521,7 +1574,7 @@ exitlbl:
     return err;
 }
 
-int mc_ChunkDB::FlushDataFile(mc_SubscriptionDBRow *subscription,uint32_t fileid)
+int mc_ChunkDB::FlushDataFile(mc_SubscriptionDBRow *subscription,uint32_t fileid,uint32_t flush_mode)
 {
     char FileName[MC_DCT_DB_MAX_PATH];         
     int FileHan;
@@ -1533,7 +1586,7 @@ int mc_ChunkDB::FlushDataFile(mc_SubscriptionDBRow *subscription,uint32_t fileid
     {
         return MC_ERR_INTERNAL_ERROR;
     }
-    __US_FlushFile(FileHan);
+    __US_FlushFileWithMode(FileHan,flush_mode);
     close(FileHan);
     return MC_ERR_NOERROR;
 }
@@ -1548,7 +1601,7 @@ int mc_ChunkDB::FlushSourceChunks(uint32_t flush_mode)
     
     if(flush_mode & MC_CDB_FLUSH_MODE_COMMIT)
     {
-        return Commit(-2);
+        return Commit(-2,flush_mode);
     }
     
     if( (flush_mode & MC_CDB_FLUSH_MODE_FILE) == 0)
@@ -1596,7 +1649,7 @@ int mc_ChunkDB::FlushSourceChunks(uint32_t flush_mode)
             size=chunk_def->m_Size+chunk_def->m_HeaderSize;
             if(subscription->m_LastFileSize+size > MC_CDB_MAX_FILE_SIZE)                          // New file is needed
             {
-                FlushDataFile(subscription,subscription->m_LastFileID);
+                FlushDataFile(subscription,subscription->m_LastFileID,0);
                 subscription->m_LastFileID+=1;
                 subscription->m_LastFileSize=0;
             }            
@@ -1630,7 +1683,7 @@ exitlbl:
     return err; 
 }
 
-int mc_ChunkDB::CommitInternal(int block)
+int mc_ChunkDB::CommitInternal(int block,uint32_t flush_mode)
 {
     int r,s;
     int err;
@@ -1671,7 +1724,7 @@ int mc_ChunkDB::CommitInternal(int block)
                 size=chunk_def->m_Size+chunk_def->m_HeaderSize;
                 if(subscription->m_LastFileSize+size > MC_CDB_MAX_FILE_SIZE)                          // New file is needed
                 {
-                    FlushDataFile(subscription,subscription->m_LastFileID);
+                    FlushDataFile(subscription,subscription->m_LastFileID,flush_mode);
                     subscription->m_LastFileID+=1;
                     subscription->m_LastFileSize=0;
                 }            
@@ -1745,7 +1798,7 @@ int mc_ChunkDB::CommitInternal(int block)
         {
             subscription->m_TmpFlags=0;
 
-            FlushDataFile(subscription,subscription->m_LastFileID);
+            FlushDataFile(subscription,subscription->m_LastFileID,flush_mode);
 
             err=m_DB->Write((char*)subscription+m_KeyOffset,m_KeySize,(char*)subscription+m_ValueOffset,m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
             if(err)
@@ -1795,7 +1848,18 @@ int mc_ChunkDB::Commit(int block)
     int err;
     
     Lock();
-    err=CommitInternal(block);
+    err=CommitInternal(block,0);
+    UnLock();
+    
+    return err;
+}
+
+int mc_ChunkDB::Commit(int block,uint32_t flush_mode)
+{
+    int err;
+    
+    Lock();
+    err=CommitInternal(block,flush_mode);
     UnLock();
     
     return err;

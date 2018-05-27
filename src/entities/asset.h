@@ -77,6 +77,7 @@
 #define MC_ENT_SPRM_CHUNK_DATA                0x87
 #define MC_ENT_SPRM_ITEM_COUNT                0x88
 
+#define MC_ENT_SPRM_FILE_END                  0xFF
 
 #define MC_ENT_FLAG_OFFSET_IS_SET     0x00000001
 #define MC_ENT_FLAG_NAME_IS_SET       0x00000010
