@@ -1956,6 +1956,12 @@ Value sendrawtransaction(const Array& params, bool fHelp)
     bool fHaveMempool = mempool.exists(hashTx);
     bool fHaveChain = existingCoins && existingCoins->nHeight < 1000000000;
     bool fMissingInputs;
+    
+    if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
+    {
+        pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-chunkflushmode",MC_CDB_FLUSH_MODE_COMMIT));
+    }
+    
     if (!fHaveMempool && !fHaveChain) {
         // push to local node and sync with wallets
         CValidationState state;
