@@ -878,7 +878,6 @@ void AppendOffChainFormatData(uint32_t data_format,
                     }
                 }
     
-                pwalletTxsMain->m_ChunkDB->Dump("storechunk");
                 lpDetailsScript->SetChunkDefHash((unsigned char*)&hash,size);
                 if(vChunkHashes)
                 {

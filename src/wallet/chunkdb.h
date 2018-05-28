@@ -161,6 +161,7 @@ typedef struct mc_ChunkDB
     int AddEntityInternal(mc_TxEntity *entity,uint32_t flags);                  
     int RemoveEntity(mc_TxEntity *entity);                          
     int RemoveEntityInternal(mc_TxEntity *entity);                          
+    int SourceChunksRecovery();                          
     
     mc_SubscriptionDBRow *FindSubscription(const mc_TxEntity *entity);                // Finds subscription
     int FindSubscription(const mc_TxEntity *entity,mc_SubscriptionDBRow *subscription);   // Finds subscription

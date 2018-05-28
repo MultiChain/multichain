@@ -292,6 +292,219 @@ int mc_ChunkDB::AddEntity(mc_TxEntity* entity, uint32_t flags)
     return err;
 }
 
+int mc_ChunkDB::SourceChunksRecovery()                          
+{
+    int err;
+    mc_SubscriptionDBRow *subscription;
+    mc_ChunkDBRow chunk_def;
+    char FileName[MC_DCT_DB_MAX_PATH];    
+    int FileHan;
+    unsigned char* buf;
+    int chunk_found=0;
+    
+    subscription=(mc_SubscriptionDBRow *)m_Subscriptions->GetRow(1);
+    
+    SetFileName(FileName,subscription,subscription->m_LastFileID);
+    FileHan=open(FileName,_O_BINARY | O_RDONLY, S_IRUSR | S_IWUSR);
+    if(FileHan<=0)
+    {
+        return MC_ERR_NOERROR;
+    }
+    int64_t file_size=0;
+    int64_t file_offset=subscription->m_LastFileSize;
+    int64_t buf_offset,buf_tail,buf_size,offset,read_offset;    
+    uint32_t param_value_start;
+    size_t bytes;
+    int count=0;
+    buf_offset=0;
+    buf_tail=0;
+    file_size=lseek64(FileHan,0,SEEK_END);
+    lseek64(FileHan,file_offset,SEEK_SET);
+    m_TmpScript->Resize(MC_CDB_MAX_FILE_READ_BUFFER_SIZE,1);
+    buf=m_TmpScript->m_lpData;
+    chunk_def.Zero();
+    chunk_def.m_SubscriptionID=subscription->m_SubscriptionID;
+    
+    while(file_offset<file_size)
+    {
+        buf_size=MC_CDB_MAX_FILE_READ_BUFFER_SIZE-buf_tail;
+        if(buf_size>file_size-file_offset)
+        {
+            buf_size=file_size-file_offset;
+        }
+        read_offset=file_offset;
+        if(read(FileHan,buf+buf_tail,buf_size) != buf_size)
+        {
+            err=MC_ERR_INTERNAL_ERROR;                    
+        }
+        if(err==MC_ERR_NOERROR)
+        {
+            file_offset+=buf_size;
+            buf_size+=buf_tail;
+            buf_tail=0;
+            buf_offset=0;
+
+            while(buf_offset < buf_size)
+            {
+                offset=mc_GetParamFromDetailsScriptErr(buf,buf_size,buf_offset,&param_value_start,&bytes,&err);
+                if(err)
+                {
+                    buf_tail=buf_size-buf_offset;
+                    if(param_value_start<buf_size)
+                    {
+                        if(param_value_start-buf_offset+bytes>MC_CDB_MAX_FILE_READ_BUFFER_SIZE)
+                        {
+                            buf_tail=0;
+                            file_offset+=param_value_start+bytes-buf_size;
+                            if(file_offset<file_size)
+                            {
+                                lseek64(FileHan,file_offset,SEEK_SET);
+                            }
+                        }
+                    }
+                    if(buf_tail)                                
+                    {
+                        memmove(buf,buf+buf_offset,buf_tail);
+                    }
+                    buf_offset=buf_size;
+                    err=MC_ERR_NOERROR;
+                }
+                else
+                {
+                    if(buf[buf_offset] != 0x00)
+                    {
+                        err= MC_ERR_CORRUPTED;
+                    }
+                    else
+                    {
+                        switch(buf[buf_offset+1])
+                        {
+                            case MC_ENT_SPRM_TIMESTAMP:
+                                if(chunk_found)
+                                {
+                                    chunk_def.m_InternalFileID=subscription->m_LastFileID;
+                                    chunk_def.m_InternalFileOffset=subscription->m_LastFileSize;
+                                    subscription->m_LastFileSize=read_offset+buf_offset;                                
+                                    chunk_def.m_HeaderSize=subscription->m_LastFileSize-chunk_def.m_InternalFileOffset-chunk_def.m_Size;
+                                    chunk_def.SwapPosBytes();
+                                    err=m_DB->Write((char*)&chunk_def+m_KeyOffset,m_KeySize,(char*)&chunk_def+m_ValueOffset,m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+                                    chunk_def.SwapPosBytes();
+                                    count++;
+                                    subscription->m_Count+=1;
+                                    subscription->m_FullSize+=chunk_def.m_Size;
+                                    m_DBStat.m_Count+=1;
+                                    m_DBStat.m_FullSize+=chunk_def.m_Size;
+                                    chunk_def.Zero();
+                                    chunk_def.m_SubscriptionID=subscription->m_SubscriptionID;
+                                }
+                                if(err==MC_ERR_NOERROR)
+                                {
+                                    chunk_found=1;
+                                }
+                                break;
+                            case MC_ENT_SPRM_CHUNK_HASH:
+                                memcpy(chunk_def.m_Hash,buf+param_value_start,bytes);
+                                break;
+                            case MC_ENT_SPRM_ITEM_COUNT:
+                                if(bytes != sizeof(uint32_t))
+                                {
+                                    err=MC_ERR_CORRUPTED;                                            
+                                }
+                                else
+                                {
+                                    chunk_def.m_Pos=(uint32_t)mc_GetLE(buf+param_value_start,bytes);
+                                }                                        
+                                break;
+                            case MC_ENT_SPRM_CHUNK_SIZE:
+                                if(bytes != sizeof(uint32_t))
+                                {
+                                    err=MC_ERR_CORRUPTED;                                            
+                                }
+                                else
+                                {
+                                    chunk_def.m_Size=(uint32_t)mc_GetLE(buf+param_value_start,bytes);
+                                }                                        
+                                break;
+                            case MC_ENT_SPRM_FILE_END:
+                                chunk_def.m_InternalFileID=subscription->m_LastFileID;
+                                chunk_def.m_InternalFileOffset=subscription->m_LastFileSize;
+                                subscription->m_LastFileSize=read_offset+buf_offset;                                
+                                chunk_def.m_HeaderSize=subscription->m_LastFileSize-chunk_def.m_InternalFileOffset-chunk_def.m_Size;
+                                offset=buf_size;
+                                read_offset=file_size;                                
+                                break;
+                        }
+                        buf_offset=offset;                            
+                    }
+                }
+                if(err==MC_ERR_NOERROR)
+                {
+                    if(count >= 1000)
+                    {
+                        if(err == MC_ERR_NOERROR)
+                        {
+                            err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);        
+                            count=0;
+                        }                            
+                    }
+                }
+                if(err)
+                {
+                    buf_offset=buf_size;
+                    read_offset=file_size;                                
+                }
+            }
+        }
+        else
+        {
+            read_offset=file_size;
+        }
+    }
+        
+        
+    if(FileHan>0)
+    {
+        close(FileHan);
+    }
+
+    if(err == MC_ERR_NOERROR)
+    {
+        if(chunk_found)
+        {
+            if(chunk_def.m_HeaderSize == 0)
+            {
+                chunk_def.m_InternalFileID=subscription->m_LastFileID;
+                chunk_def.m_InternalFileOffset=subscription->m_LastFileSize;
+                subscription->m_LastFileSize=file_size;                                
+                chunk_def.m_HeaderSize=subscription->m_LastFileSize-chunk_def.m_InternalFileOffset-chunk_def.m_Size;
+            }
+            chunk_def.SwapPosBytes();
+            err=m_DB->Write((char*)&chunk_def+m_KeyOffset,m_KeySize,(char*)&chunk_def+m_ValueOffset,m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+            chunk_def.SwapPosBytes();
+            subscription->m_Count+=1;
+            subscription->m_FullSize+=chunk_def.m_Size;
+            m_DBStat.m_Count+=1;
+            m_DBStat.m_FullSize+=chunk_def.m_Size;
+            count++;
+            if(err == MC_ERR_NOERROR)
+            {
+                err=m_DB->Write((char*)subscription+m_KeyOffset,m_KeySize,(char*)subscription+m_ValueOffset,m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+            }
+            if(err == MC_ERR_NOERROR)
+            {
+                err=m_DB->Write((char*)&m_DBStat+m_KeyOffset,m_KeySize,(char*)&m_DBStat+m_ValueOffset,m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+            }
+            if(err == MC_ERR_NOERROR)
+            {
+                err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL | MC_OPT_DB_DATABASE_SYNC_ON_COMMIT);
+            }                    
+        }
+    }
+
+    Dump("SourceChunkRecovery");
+    return err;
+}
+
 int mc_ChunkDB::RemoveEntityInternal(mc_TxEntity *entity)                          
 {
     int err;
@@ -578,7 +791,7 @@ int mc_ChunkDB::FindSubscription(const mc_TxEntity *entity,mc_SubscriptionDBRow 
 
 int mc_ChunkDB::Initialize(const char *name,uint32_t mode)
 {
-    int err,value_len;   
+    int err,value_len,new_db;   
     char msg[256];
     
     mc_SubscriptionDBRow subscription;
@@ -624,8 +837,10 @@ int mc_ChunkDB::Initialize(const char *name,uint32_t mode)
         return err;
     }
 
+    new_db=1;
     if(ptr)                                                                     
     {        
+        new_db=0;
         memcpy((char*)&m_DBStat+m_ValueOffset,ptr,m_ValueSize);
         
         m_Subscriptions->SetCount(m_DBStat.m_LastSubscription+1);
@@ -728,6 +943,11 @@ int mc_ChunkDB::Initialize(const char *name,uint32_t mode)
     
     sprintf(msg, "Initialized. Chunks: %d",m_DBStat.m_Count);
     LogString(msg);    
+    
+    if(new_db == 0)
+    {
+        SourceChunksRecovery();        
+    }
     
     return err;   
 }
@@ -1596,9 +1816,10 @@ int mc_ChunkDB::FlushSourceChunks(uint32_t flush_mode)
     mc_ChunkDBRow *chunk_def;
     mc_SubscriptionDBRow *subscription;
     int err,row,first_row,last_row;
+    int full_commit_required;
     uint32_t size;
     char msg[256];
-    
+        
     if(flush_mode & MC_CDB_FLUSH_MODE_COMMIT)
     {
         return Commit(-2,flush_mode);
@@ -1609,6 +1830,7 @@ int mc_ChunkDB::FlushSourceChunks(uint32_t flush_mode)
         return MC_ERR_NOERROR;
     }
 
+    full_commit_required=0;
     
     Lock();
     
@@ -1652,6 +1874,7 @@ int mc_ChunkDB::FlushSourceChunks(uint32_t flush_mode)
                 FlushDataFile(subscription,subscription->m_LastFileID,0);
                 subscription->m_LastFileID+=1;
                 subscription->m_LastFileSize=0;
+                full_commit_required=1;
             }            
 
             err=AddToFile(GetChunkInternal(chunk_def,-1,-1,NULL),size,
@@ -1679,6 +1902,11 @@ int mc_ChunkDB::FlushSourceChunks(uint32_t flush_mode)
     
 exitlbl:    
     UnLock();
+
+    if(full_commit_required)
+    {
+        return Commit(-2,flush_mode);        
+    }
 
     return err; 
 }
@@ -1815,7 +2043,7 @@ int mc_ChunkDB::CommitInternal(int block,uint32_t flush_mode)
         goto exitlbl;
     }                                            
         
-    err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
+    err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL | MC_OPT_DB_DATABASE_SYNC_ON_COMMIT);
     if(err)
     {
         goto exitlbl;
