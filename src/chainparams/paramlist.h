@@ -226,7 +226,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
                    "maxstdopreturnscount","",
                    "Maximum size of standard transactions, in bytes."},
     { "maxstdopreturnscount"                  , "max-std-op-returns-count"                  , 
-                   MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE                  , -1,        10,          0,      1024, 0.0, 10006, 0, "-mc-maxstdopreturnscount",
+                   MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE                  , -1,        32,          0,      1024, 0.0, 10006, 0, "-mc-maxstdopreturnscount",
                    "maxstdopreturnsize","",
                    "Maximum number of OP_RETURN metadata outputs in standard transactions."},                   
     { "maxstdopreturnsize"                  , "max-std-op-return-size"                  , 
