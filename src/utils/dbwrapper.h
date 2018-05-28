@@ -26,6 +26,7 @@
 #define MC_OPT_DB_DATABASE_SEEK_ON_READ                     0x00000010
 #define MC_OPT_DB_DATABASE_DELAYED_OPEN                     0x00000020
 #define MC_OPT_DB_DATABASE_NEXT_ON_READ                     0x00000040
+#define MC_OPT_DB_DATABASE_SYNC_ON_COMMIT                   0x00000080
 #define MC_OPT_DB_DATABASE_OPTION_MASK                      0x000FFFFF
 #define MC_OPT_DB_DATABASE_LEVELDB                          0x00100000
 #define MC_OPT_DB_DATABASE_FSR_UTXOC_BLOCKS                 0x00200000
