@@ -668,12 +668,14 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     }    
     
     for(int k=0;k<2;k++)collector->m_StatLast[k].Zero();
+    collector->m_StatLast[0].m_Pending=collector->m_TotalChunkCount;
+    collector->m_StatLast[1].m_Pending=collector->m_TotalChunkSize;
     for(row=0;row<collector->m_MemPool->GetCount();row++)
     {
         collect_row=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(row);
+        size=collect_row->m_ChunkDef.m_Size;
         if( (collect_row->m_State.m_Status & MC_CCF_DELETED ) == 0 )
         {
-            size=collect_row->m_ChunkDef.m_Size;
             if(!collect_row->m_State.m_Request.IsZero())
             {
                 for(int k=0;k<2;k++)collector->m_StatLast[k].m_Requested+=k ? size : 1;                
@@ -693,7 +695,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         }        
         else
         {
-            for(int k=0;k<2;k++)collector->m_StatLast[k].m_Delivered+=k ? size : 1;                                
+            for(int k=0;k<2;k++)collector->m_StatLast[k].m_Pending-=k ? size : 1;                                
         }
     }
     
