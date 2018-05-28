@@ -62,6 +62,8 @@ void mc_ChunkCollector::Zero()
         m_TimeoutRequest=MC_CCW_TIMEOUT_REQUEST_SHIFT+1;
     }
     m_TimeoutQuery=(int)GetArg("-chunkquerytimeout",MC_CCW_TIMEOUT_QUERY);
+    m_TotalChunkCount=0;
+    m_TotalChunkSize=0;
     
     m_StatLast[0].Zero();
     m_StatLast[1].Zero();
@@ -229,7 +231,7 @@ int mc_ChunkCollector::ReadFromDB(mc_Buffer *mempool,int rows)
     err=MC_ERR_NOERROR;
     
     ptr=NULL;
-    row=0;
+    row=mempool->GetCount();
     while(row<rows)
     {
         ptr=(unsigned char*)m_DB->MoveNext(&err);
@@ -375,6 +377,8 @@ int mc_ChunkCollector::Initialize(mc_ChunkDB *chunk_db,const char *name,uint32_t
         }
         if(err != MC_ERR_NOT_FOUND)
         {
+            m_TotalChunkCount=m_DBRow.m_TotalChunkCount;
+            m_TotalChunkSize=m_DBRow.m_TotalChunkSize;
             err=ReadFromDB(m_MemPool,m_MaxMemPoolSize);
             if(err)
             {
@@ -439,6 +443,8 @@ int mc_ChunkCollector::InsertChunkInternal(
     if(mprow<0)
     {
         m_MemPool->Add(&collect_row);
+        m_TotalChunkCount++;
+        m_TotalChunkSize+=chunk_size;
     }
     
     return MC_ERR_NOERROR;
@@ -596,10 +602,12 @@ int mc_ChunkCollector::CommitInternal()
         
         if(row->m_State.m_Status & MC_CCF_DELETED)
         {
+            m_TotalChunkCount--;
+            m_TotalChunkSize-=row->m_ChunkDef.m_Size;
             if(row->m_State.m_Status & MC_CCF_INSERTED)
             {
                 commit_required=1;
-                DeleteDBRow(row);
+                DeleteDBRow(row);                
 //                m_DB->Delete((char*)row+m_KeyOffset,m_KeySize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
             }            
         }
@@ -636,6 +644,11 @@ int mc_ChunkCollector::CommitInternal()
 
     if(commit_required)
     {
+        m_DBRow.Zero();
+        m_DBRow.m_TotalChunkSize=m_TotalChunkSize;
+        m_DBRow.m_TotalChunkCount=m_TotalChunkCount;
+        m_DB->Write((char*)&m_DBRow+m_KeyDBOffset,m_KeyDBSize,(char*)&m_DBRow+m_ValueDBOffset,m_ValueDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+        
         err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
         if(err)
         {

@@ -67,8 +67,8 @@ typedef struct mc_ChunkCollectorDBRow
     uint32_t m_Flags;
     uint32_t m_QueryAttempts;
     uint32_t m_Status;
-    int64_t m_Reserved1;
-    int64_t m_Reserved2;        
+    int64_t m_TotalChunkSize;
+    int64_t m_TotalChunkCount;                                                       
     
     void Zero();
 } mc_ChunkCollectorDBRow;
@@ -120,6 +120,8 @@ typedef struct mc_ChunkCollector
     int m_MaxMemPoolSize;
     int m_TimeoutRequest;
     int m_TimeoutQuery;
+    int64_t m_TotalChunkSize;
+    int64_t m_TotalChunkCount;                                                       
     
     mc_ChunkCollectorStat m_StatLast[2];
     mc_ChunkCollectorStat m_StatTotal[2];

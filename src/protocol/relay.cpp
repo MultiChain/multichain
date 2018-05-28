@@ -691,6 +691,10 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                 }                
             }
         }        
+        else
+        {
+            for(int k=0;k<2;k++)collector->m_StatLast[k].m_Delivered+=k ? size : 1;                                
+        }
     }
     
     collector->UnLock();
