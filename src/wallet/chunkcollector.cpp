@@ -223,6 +223,8 @@ int mc_ChunkCollector::ReadFromDB(mc_Buffer *mempool,int rows)
     mc_ChunkDBRow chunk_def;
     unsigned char *ptr;
     int row;
+    int64_t total_size=0;
+    
     if(rows <= 0)    
     {
         return MC_ERR_NOERROR;
@@ -251,6 +253,7 @@ int mc_ChunkCollector::ReadFromDB(mc_Buffer *mempool,int rows)
             mprow=mempool->Seek(&collect_row);
             if(mprow < 0)
             {
+                total_size+=collect_row.m_ChunkDef.m_Size;
                 mempool->Add(&collect_row);
                 row++;
             }
@@ -258,6 +261,15 @@ int mc_ChunkCollector::ReadFromDB(mc_Buffer *mempool,int rows)
         else
         {
             row=rows;
+        }
+    }
+    
+    if(mempool->GetCount() < rows)
+    {
+        if(mempool->GetCount() <= m_TotalChunkCount)
+        {
+            m_TotalChunkCount=mempool->GetCount();
+            m_TotalChunkSize=total_size;
         }
     }
     
@@ -637,7 +649,10 @@ int mc_ChunkCollector::CommitInternal()
  */ 
             if(!row->m_State.m_Query.IsZero() || (row->m_State.m_QueryNextAttempt <= time_now))
             {
-                m_MemPoolNext->Add(row);                
+                if(m_MemPoolNext->GetCount() < m_MaxMemPoolSize)
+                {
+                    m_MemPoolNext->Add(row);                                    
+                }
             }
         }
     }    

@@ -17,6 +17,10 @@ string mc_MsgTypeStr(uint32_t msg_type)
 {
     char *ptr;
     ptr=(char*)&msg_type;
+    if(msg_type < 0x01000000)
+    {
+        return strprintf("%08x",msg_type);        
+    }
     return strprintf("%c%c%c%c",ptr[0],ptr[1],ptr[2],ptr[3]);
 }
 
@@ -267,7 +271,6 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     vector<unsigned char> payload;
     unsigned char buf[16];
     int shift,count;
-    uint32_t size;
     unsigned char *ptrOut;
     mc_OffchainMessageID query_id,request_id;
     map <mc_OffchainMessageID,bool> query_to_delete;
@@ -282,6 +285,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     CRelayRequestPairs request_pairs;
     int best_score,best_response,this_score,not_processed;
     
+    pRelayManager->CheckTime();
     pRelayManager->InvalidateResponsesFromDisconnected();
     
     collector->Lock();
@@ -667,6 +671,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         }
     }    
     
+/*    
     for(int k=0;k<2;k++)collector->m_StatLast[k].Zero();
     collector->m_StatLast[0].m_Pending=collector->m_TotalChunkCount;
     collector->m_StatLast[1].m_Pending=collector->m_TotalChunkSize;
@@ -698,7 +703,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
             for(int k=0;k<2;k++)collector->m_StatLast[k].m_Pending-=k ? size : 1;                                
         }
     }
-    
+ */   
     collector->UnLock();
     if(not_processed < collector->m_MaxMemPoolSize/2)
     {
@@ -713,6 +718,57 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     return not_processed;
 }
 
+void MultichainCollectChunksQueueStats(mc_ChunkCollector* collector)
+{
+    int row;
+    mc_ChunkCollectorRow *collect_row;
+    uint32_t size;
+    
+    collector->Lock();    
+    
+    for(int k=0;k<2;k++)collector->m_StatLast[k].Zero();
+    collector->m_StatLast[0].m_Pending=collector->m_TotalChunkCount;
+    collector->m_StatLast[1].m_Pending=collector->m_TotalChunkSize;
+    for(row=0;row<collector->m_MemPool->GetCount();row++)
+    {
+        collect_row=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(row);
+        size=collect_row->m_ChunkDef.m_Size;
+        for(int k=0;k<2;k++)collector->m_StatLast[k].m_Undelivered+=k ? size : 1;                
+        if( (collect_row->m_State.m_Status & MC_CCF_DELETED ) == 0 )
+        {
+            if(!collect_row->m_State.m_Request.IsZero())
+            {
+                for(int k=0;k<2;k++)collector->m_StatLast[k].m_Requested+=k ? size : 1;                
+                for(int k=0;k<2;k++)collector->m_StatLast[k].m_Queried+=k ? size : 1;                                        
+            }
+            else
+            {
+                if(!collect_row->m_State.m_Query.IsZero())
+                {
+                    for(int k=0;k<2;k++)collector->m_StatLast[k].m_Queried+=k ? size : 1;                                        
+                }
+                else                    
+                {
+                    for(int k=0;k<2;k++)collector->m_StatLast[k].m_Sleeping+=k ? size : 1;                    
+                }                
+            }
+        }        
+        else
+        {
+            for(int k=0;k<2;k++)collector->m_StatLast[k].m_Pending-=k ? size : 1;                                
+        }
+    }
+
+    collector->UnLock();    
+    if(collector->m_MemPool->GetCount() > (int)(collector->m_MaxMemPoolSize*1.2))
+    {
+        if(collector->m_NextAutoCommitTimestamp < GetTimeMillis())
+        {
+            collector->Commit();
+            collector->m_NextAutoCommitTimestamp=GetTimeMillis()+collector->m_AutoCommitDelay;
+        }
+    }
+}
 
 void mc_RelayPayload_ChunkIDs(vector<unsigned char>* payload,vector <mc_ChunkEntityKey>& vChunkDefs,int size)
 {
@@ -1462,11 +1518,17 @@ void mc_RelayManager::CheckTime()
     {
         return;
     }
-    
+
+    Lock();
     for(map<mc_RelayRecordKey,mc_RelayRecordValue>::iterator it = m_RelayRecords.begin(); it != m_RelayRecords.end();)
     {
         if(it->second.m_Timestamp < m_LastTime)
         {
+/*            
+            mc_OffchainMessageID msg_id=it->first.m_ID;
+            LogPrint("offchain","Offchain rrdl:  %s, from: %d, to: %d, msg: %s, now: %d, exp: %d\n",
+            msg_id.ToString().c_str(),it->second.m_NodeFrom,it->first.m_NodeTo,mc_MsgTypeStr(it->second.m_MsgType).c_str(),m_LastTime,it->second.m_Timestamp);
+*/
             m_RelayRecords.erase(it++);
         }
         else
@@ -1475,6 +1537,7 @@ void mc_RelayManager::CheckTime()
         }
     }        
     m_LastTime=time_now;
+    UnLock();
 }
 
 void mc_RelayManager::SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,mc_OffchainMessageID msg_id)
@@ -1515,8 +1578,12 @@ void mc_RelayManager::SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,m
         value.m_Timestamp=(it->second).m_Timestamp;
         value.m_Count=(it->second).m_Count;
         it->second=value;
-    }    
-//    printf("setrr: %d, ts: %u, nc: %u, mt: %d\n",pto_id,value.m_Timestamp,nonce,msg_type);
+    }
+/*   
+    LogPrint("offchain","Offchain rrst:  %s, from: %d, to: %d, msg: %s, now: %d, exp: %d\n",
+    msg_id.ToString().c_str(),pfrom ? pfrom->GetId() : 0,pto ? pto->GetId() : 0,mc_MsgTypeStr(msg_type).c_str(),m_LastTime,value.m_Timestamp);
+*/    
+
 }
 
 int mc_RelayManager::GetRelayRecord(CNode *pfrom,mc_OffchainMessageID msg_id,uint32_t* msg_type,CNode **pto)
@@ -1710,6 +1777,7 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
 {
     uint32_t  msg_type_in;
     uint32_t verify_flags;
+    int err;
     mc_OffchainMessageID msg_id_received;
     mc_OffchainMessageID msg_id_to_respond;
     vector<unsigned char> vPayloadIn;
@@ -1881,10 +1949,10 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
             return state.DoS(100, error("ProcessOffchain() : This message should be response"),REJECT_INVALID, "bad-nonce");                
         }
         
-        if(GetRelayRecord(pfrom,msg_id_to_respond,&msg_type_stored,&pto_stored))
+        if((err=GetRelayRecord(pfrom,msg_id_to_respond,&msg_type_stored,&pto_stored)))
         {
-            LogPrintf("ProcessOffchain() : Orphan response: %s, request: %s, from: %d, to: %d, msg: %s, hops: %d, size: %d\n",
-            msg_id_received.ToString().c_str(),msg_id_to_respond.ToString().c_str(),pfrom->GetId(),pto_stored ? pto_stored->GetId() : 0,mc_MsgTypeStr(msg_type_in).c_str(),hop_count,(int)vPayloadIn.size());
+            LogPrintf("ProcessOffchain() : Orphan response: %s, request: %s, from: %d, to: %d, msg: %s, hops: %d, size: %d, error: %d\n",
+            msg_id_received.ToString().c_str(),msg_id_to_respond.ToString().c_str(),pfrom->GetId(),pto_stored ? pto_stored->GetId() : 0,mc_MsgTypeStr(msg_type_in).c_str(),hop_count,(int)vPayloadIn.size(),err);
             return false;
         }
     }

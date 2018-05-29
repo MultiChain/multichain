@@ -7312,18 +7312,19 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         }
         pto->fLastIgnoreIncoming=ignore_incoming;
         
-        if(MultichainNode_CollectChunks())
+        if(pwalletTxsMain->m_ChunkCollector)
         {
-            if(pwalletTxsMain->m_ChunkCollector)
-            {
-                int64_t time_millis_now=GetTimeMillis();
+            int64_t time_millis_now=GetTimeMillis();
 
-                if(pwalletTxsMain->m_ChunkCollector->m_NextTryTimestamp < time_millis_now)
+            if(pwalletTxsMain->m_ChunkCollector->m_NextTryTimestamp < time_millis_now)
+            {
+                if(MultichainNode_CollectChunks())
                 {
                     MultichainCollectChunks(pwalletTxsMain->m_ChunkCollector);
+                }                
+                MultichainCollectChunksQueueStats(pwalletTxsMain->m_ChunkCollector);
 //                    if(fDebug)LogPrint("chunks", "Chunks to collect: %d\n", still_to_collect);
-                    pwalletTxsMain->m_ChunkCollector->m_NextTryTimestamp=time_millis_now+100;
-                }
+                pwalletTxsMain->m_ChunkCollector->m_NextTryTimestamp=time_millis_now+100;
             }
         }
 /* MCHN END */                
