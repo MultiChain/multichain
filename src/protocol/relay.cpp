@@ -264,7 +264,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     uint32_t time_now,expiration,dest_expiration;    
     vector <mc_ChunkEntityKey> vChunkDefs;
     int row,last_row,last_count,to_end_of_query;
-    uint32_t total_size,max_total_size,total_in_queries,max_total_in_queries;
+    uint32_t total_size,max_total_size,total_in_queries,max_total_in_queries,query_count;
     mc_ChunkCollectorRow *collect_row;
     mc_ChunkCollectorRow *collect_subrow;
     time_now=mc_TimeNowAsUInt();
@@ -353,6 +353,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     
     max_total_in_queries=2*(collector->m_TimeoutRequest)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
     total_in_queries=0;
+    query_count=0;
     
     for(row=0;row<collector->m_MemPool->GetCount();row++)
     {
@@ -629,7 +630,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                         collect_row->m_State.m_Status |= MC_CCF_UPDATED;
                         for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Unresponded+=k ? collect_row->m_ChunkDef.m_Size : 1;                
                     }
-                    if((collect_row->m_State.m_QueryNextAttempt <= time_now) && (total_in_queries < max_total_in_queries))
+                    if((collect_row->m_State.m_QueryNextAttempt <= time_now) && (total_in_queries < max_total_in_queries) && (query_count<collector->m_MaxMemPoolSize))
                     {
                         if( (collect_row->m_State.m_Status & MC_CCF_ERROR_MASK) == 0)
                         {
@@ -638,6 +639,10 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                             total_size+=collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey);
                         }
                     }
+                }
+                else
+                {
+                    query_count++;
                 }
             }
         }

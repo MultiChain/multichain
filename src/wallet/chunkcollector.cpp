@@ -647,12 +647,10 @@ int mc_ChunkCollector::CommitInternal()
                 row->m_State.m_Status |= MC_CCF_INSERTED;
             }            
  */ 
-            if(!row->m_State.m_Query.IsZero() || (row->m_State.m_QueryNextAttempt <= time_now))
+            if(!row->m_State.m_Query.IsZero() || 
+               ((row->m_State.m_QueryNextAttempt <= time_now) && (m_MemPoolNext->GetCount() < m_MaxMemPoolSize)) )
             {
-                if(m_MemPoolNext->GetCount() < m_MaxMemPoolSize)
-                {
                     m_MemPoolNext->Add(row);                                    
-                }
             }
         }
     }    
