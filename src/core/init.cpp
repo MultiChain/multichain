@@ -496,6 +496,8 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -shortoutput                             " + _("Only show the node address (if connecting was successful) or an address in the wallet (if connect permissions must be granted by another node)") + "\n";
     strUsage += "  -bantx=<txids>                           " + _("Comma delimited list of banned transactions.") + "\n";
     strUsage += "  -lockblock=<hash>                        " + _("Blocks on branches without this block will be rejected") + "\n";
+    strUsage += "  -chunkquerytimeout=<n>                   " + _("Timeout, after which undelivered chunk is moved to the end of the chunk queue, default 25s") + "\n";
+    strUsage += "  -chunkrequesttimeout=<n>                 " + _("Timeout, after which chunk request is dropped and another source is tried, default 10s") + "\n";
     strUsage += "  -flushsourcechunks=<n>                   " + _("Flush offchain items created by this node to disk immediately when created, default 1") + "\n";
 
     strUsage += "\n" + _("MultiChain API response parameters") + "\n";        

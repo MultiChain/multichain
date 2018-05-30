@@ -7324,7 +7324,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                 }                
                 MultichainCollectChunksQueueStats(pwalletTxsMain->m_ChunkCollector);
 //                    if(fDebug)LogPrint("chunks", "Chunks to collect: %d\n", still_to_collect);
-                pwalletTxsMain->m_ChunkCollector->m_NextTryTimestamp=time_millis_now+100;
+                pwalletTxsMain->m_ChunkCollector->m_NextTryTimestamp=time_millis_now+GetArg("-offchainrequestfreq",100);
             }
         }
 /* MCHN END */                
