@@ -268,9 +268,9 @@ int mc_ChunkCollector::ReadFromDB(mc_Buffer *mempool,int rows)
         {
             m_TotalChunkCount=mempool->GetCount();
             m_TotalChunkSize=0;
-            for(i=0;i<m_MemPool->GetCount();i++)
+            for(row=0;row<m_MemPool->GetCount();row++)
             {
-                m_TotalChunkSize+=((mc_ChunkCollectorRow *)m_MemPool->GetRow(i))->m_ChunkDef.m_Size;
+                m_TotalChunkSize+=((mc_ChunkCollectorRow *)m_MemPool->GetRow(row))->m_ChunkDef.m_Size;
             }
         }
     }
