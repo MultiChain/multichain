@@ -1451,6 +1451,11 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
         {
             if(value_size > MC_ENT_MAX_NAME_SIZE)
             {
+                if(mc_gState->m_Features->FixedIn1001120003())
+                {
+                    reason="Metadata script rejected - entity name too long";
+                    return false;                    
+                }
                 value_size=MC_ENT_MAX_NAME_SIZE;
             }
             

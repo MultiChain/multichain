@@ -672,6 +672,10 @@ int mc_AssetDB::InsertEntity(const void* txid, int offset, int entity_type, cons
                 {
                     if(value_size > MC_ENT_MAX_NAME_SIZE)
                     {
+                        if(mc_gState->m_Features->FixedIn1001120003())
+                        {
+                            return MC_ERR_ERROR_IN_SCRIPT;                                            
+                        }
                         value_size=MC_ENT_MAX_NAME_SIZE;
                     }
                     memcpy(stream_name,(unsigned char*)script+value_offset,value_size);
