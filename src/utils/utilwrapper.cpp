@@ -716,6 +716,14 @@ int mc_MultichainParams::SetGlobals()
     {
         MAX_SIZE *= 2;
     }
+
+    if(mc_gState->m_Features->FixedIn1001120003())
+    {
+        MAX_BLOCK_SIGOPS = MAX_BLOCK_SIZE/50;
+        MAX_TX_SIGOPS = MAX_BLOCK_SIGOPS/5;
+    }
+
+
     MAX_STANDARD_TX_SIZE=(unsigned int)GetInt64Param("maxstdtxsize");    
     MAX_SCRIPT_ELEMENT_SIZE=(unsigned int)GetInt64Param("maxstdelementsize");
     COINBASE_MATURITY=(int)GetInt64Param("rewardspendabledelay");    
