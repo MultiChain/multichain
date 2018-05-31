@@ -1265,7 +1265,7 @@ int mc_Permissions::CanIssue(const void* lpEntity,const void* lpAddress)
 //    if(lpEntity == NULL)
     if(mc_IsNullEntity(lpEntity))
     {
-        if(mc_gState->m_NetworkParams->GetInt64Param("anyonecanissue"))
+        if(MCP_ANYONE_CAN_ISSUE)
         {
             return MC_PTP_ISSUE;
         }

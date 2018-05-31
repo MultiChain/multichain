@@ -819,7 +819,15 @@ int mc_MultichainParams::SetGlobals()
     MCP_ANYONE_CAN_SEND=mc_gState->m_NetworkParams->GetInt64Param("anyonecansend");
     MCP_ANYONE_CAN_RECEIVE=mc_gState->m_NetworkParams->GetInt64Param("anyonecanreceive");
     MCP_ANYONE_CAN_CREATE=mc_gState->m_NetworkParams->GetInt64Param("anyonecancreate");
+    MCP_ANYONE_CAN_ISSUE=mc_gState->m_NetworkParams->GetInt64Param("anyonecanissue");    
     MCP_ANYONE_CAN_ACTIVATE=mc_gState->m_NetworkParams->GetInt64Param("anyonecanactivate");
+    if(mc_gState->m_Features->FixedIn1001120003())
+    {
+        if(MCP_ANYONE_CAN_ADMIN)MCP_ANYONE_CAN_SEND=1;
+        if(MCP_ANYONE_CAN_ACTIVATE)MCP_ANYONE_CAN_SEND=1;
+        if(MCP_ANYONE_CAN_CREATE)MCP_ANYONE_CAN_SEND=1;
+        if(MCP_ANYONE_CAN_ISSUE)MCP_ANYONE_CAN_SEND=1;
+    }
     MCP_MINIMUM_PER_OUTPUT=mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
     MCP_ALLOW_MULTISIG_OUTPUTS=mc_gState->m_NetworkParams->GetInt64Param("allowmultisigoutputs");
     MCP_ALLOW_P2SH_OUTPUTS=mc_gState->m_NetworkParams->GetInt64Param("allowp2shoutputs");
