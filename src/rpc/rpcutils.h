@@ -52,10 +52,11 @@ using namespace json_spirit;
 
 #define MC_VMM_MERGE_OBJECTS                   0x00000001
 #define MC_VMM_RECURSIVE                       0x00000002
-#define MC_VMM_IGNORE                          0x00000004
+#define MC_VMM_IGNORE_OTHER                    0x00000004
 #define MC_VMM_TAKE_FIRST                      0x00000008
 #define MC_VMM_TAKE_FIRST_FOR_FIELD            0x00000010
 #define MC_VMM_OMIT_NULL                       0x00000020
+#define MC_VMM_IGNORE_MISSING                  0x00000040
 
 #define MC_RFD_OPTION_NONE                     0x00000000
 #define MC_RFD_OPTION_INLINE                   0x00000001

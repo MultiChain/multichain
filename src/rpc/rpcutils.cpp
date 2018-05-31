@@ -4057,7 +4057,7 @@ Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int l
         
     if(!value1_is_obj)
     {
-        if(mode & MC_VMM_IGNORE)
+        if(mode & MC_VMM_IGNORE_OTHER)
         {
             return *value2; 
         }
@@ -4068,7 +4068,7 @@ Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int l
     {
         if(!value2_is_obj)
         {
-            if(mode & MC_VMM_IGNORE)
+            if(mode & MC_VMM_IGNORE_OTHER)
             {
                 return *value1;
             }            

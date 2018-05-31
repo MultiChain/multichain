@@ -1350,9 +1350,14 @@ Value getstreamsummary(const Array& params, bool fPublisher)
             mode |= MC_VMM_RECURSIVE;
             found=true;
         }
-        if(inputStrings[j]=="ignore")
+        if( (inputStrings[j]=="ignore") || (inputStrings[j]=="ignoreother") )
         {
-            mode |= MC_VMM_IGNORE;
+            mode |= MC_VMM_IGNORE_OTHER;
+            found=true;
+        }
+        if(inputStrings[j]=="ignoremissing")
+        {
+            mode |= MC_VMM_IGNORE_MISSING;
             found=true;
         }
         if(inputStrings[j]=="noupdate")
@@ -1406,6 +1411,7 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     Object empty_object;
     Object obj;
     int i,n,c,m,err,pcount;
+    bool available;
     err=MC_ERR_NOERROR;
     n=pwalletTxsMain->GetListSize(&entity,entStat.m_Generation,NULL);
     i=0;
@@ -1476,32 +1482,94 @@ Value getstreamsummary(const Array& params, bool fPublisher)
             }
         }
         
+        available=true;
+        BOOST_FOREACH(const Pair& a, entry) 
+        {
+            if(a.name_ == "offchain")
+            {
+                available=!a.value_.get_bool();
+            }
+        }
+                        
+        
         BOOST_FOREACH(const Pair& a, entry) 
         {
             if(a.name_ == "data")
             {
-                if(i == 0)
+                if(!available)
                 {
-//                    if(a.value_.type() == obj_type)
-/*                    
+                    if(a.value_.type() != obj_type)
                     {
-                        result=empty_object;
-                    }
+                        available=true;
+                    }                    
+                }
+                if(!available)
+                {                
+                    available=true;
+                    BOOST_FOREACH(const Pair& b, a.value_.get_obj()) 
+                    {
+                        if(b.name_ == "available")
+                        {
+                            available=b.value_.get_bool();
+                        }                            
+                    }                        
+                }
+                if(available)
+                {
+                    if(i == 0)
+                    {
+    //                    if(a.value_.type() == obj_type)
+    /*                    
+                        {
+                            result=empty_object;
+                        }
 
-                    if( (i==0) && ((mode & MC_VMM_TAKE_FIRST) != 0) )               
-                    {
-                        result=mc_MergeValues(&(a.value_),&result,mode,0,&err);
+                        if( (i==0) && ((mode & MC_VMM_TAKE_FIRST) != 0) )               
+                        {
+                            result=mc_MergeValues(&(a.value_),&result,mode,0,&err);
+                        }
+                        else
+                        {
+                            result=mc_MergeValues(&result,&(a.value_),mode,0,&err);
+                        }         
+     */ 
+                        result=a.value_;
                     }
                     else
                     {
                         result=mc_MergeValues(&result,&(a.value_),mode,0,&err);
-                    }         
- */ 
-                    result=a.value_;
+                    }
                 }
                 else
                 {
-                    result=mc_MergeValues(&result,&(a.value_),mode,0,&err);
+                    available=true;
+                    BOOST_FOREACH(const Pair& b, a.value_.get_obj()) 
+                    {
+                        if(b.name_ == "format")
+                        {
+                            available=false;
+                            if(b.value_.get_str() != "json")
+                            {
+                                if(mode & MC_VMM_IGNORE_OTHER)
+                                {
+                                    available=true;
+                                }
+                                else
+                                {
+                                    err=MC_ERR_INVALID_PARAMETER_VALUE;                                            
+                                    goto exitlbl;
+                                }
+                            }
+
+                        }
+                    }
+                    if( (mode & MC_VMM_IGNORE_MISSING) == 0)
+                    {
+                        if(!available)
+                        {
+                            throw JSONRPCError(RPC_NOT_ALLOWED, "Some items to be merged are missing (try using \'ignoremissing\')" );                                                                            
+                        }
+                    }                    
                 }
             }
         }    
@@ -1521,7 +1589,7 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     }            
     else
     {
-        if( (mode & MC_VMM_IGNORE) == 0)
+        if( (mode & MC_VMM_IGNORE_OTHER) == 0)
         {
             err=MC_ERR_INVALID_PARAMETER_VALUE;
         }
@@ -1533,7 +1601,7 @@ exitlbl:
 
     if(err)
     {
-        throw JSONRPCError(RPC_NOT_ALLOWED, "Some items to be merged are in the wrong format (try using \'ignore\')" );                                                    
+        throw JSONRPCError(RPC_NOT_ALLOWED, "Some items to be merged are in the wrong format (try using \'ignoreother\')" );                                                    
     }
 
     return result;
