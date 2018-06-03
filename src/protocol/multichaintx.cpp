@@ -655,7 +655,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
 
     if(new_issue)
     {
-        mc_gState->m_Permissions->SetCheckPoint();
+//        mc_gState->m_Permissions->SetCheckPoint();
         err=MC_ERR_NOERROR;
 
         txid=tx.GetHash();
@@ -686,7 +686,8 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
     }        
 
     memset(issuer_buf,0,sizeof(issuer_buf));
-    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,1);                    
+    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,1);
+/*                    
     if(new_issue)
     {
         if((err != MC_ERR_NOERROR) || !accept)
@@ -694,6 +695,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
             mc_gState->m_Permissions->RollBackToCheckPoint();            
         }
     }
+*/
     if(err)
     {
         reason="Cannot update permission database for issued asset";
