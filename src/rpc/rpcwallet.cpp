@@ -757,9 +757,13 @@ Value gettxoutdata(const Array& params, bool fHelp)
         if(elem == NULL)
         {
             elem=GetChunkDataInRange(&out_size,chunk_hashes,chunk_count,start,count);
+            if(elem == NULL)
+            {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't retrieve data for this output");                                                                                            
+            }
+            return OpReturnFormatEntry(elem,count,0,0,format,NULL);        
         }
     }
-    
     return OpReturnFormatEntry(elem+start,count,0,0,format,NULL);        
 }
 

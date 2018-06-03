@@ -913,7 +913,6 @@ const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes
     mc_ChunkDBRow chunk_def;
     int size,shift,chunk;
     unsigned char *ptr;
-    unsigned char *ptrEnd;
     size_t elem_size;
     int64_t total_size=0;
     unsigned char *elem;
@@ -925,10 +924,9 @@ const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes
     *out_size=0;
     
     ptr=hashes;
-    ptrEnd=ptr+MC_CDB_CHUNK_HASH_SIZE+16;
     for(chunk=0;chunk<chunk_count;chunk++)
     {
-        size=(int)mc_GetVarInt(ptr,ptrEnd-ptr,-1,&shift);
+        size=(int)mc_GetVarInt(ptr,MC_CDB_CHUNK_HASH_SIZE+16,-1,&shift);
 
         if(size<0)
         {
@@ -950,12 +948,13 @@ const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes
             {
                 if(total_size < start)
                 {
-                    read_from=start-read_size;
+                    read_from=start-total_size;
                 }             
                 if(total_size+read_size > start+count)
                 {
                     read_size=start+count-total_size;
                 }
+                read_size-=read_from;
                 elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&elem_size);
                 if(elem)
                 {
