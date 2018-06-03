@@ -723,9 +723,10 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     return not_processed;
 }
 
-void MultichainCollectChunksQueueStats(mc_ChunkCollector* collector)
+int MultichainCollectChunksQueueStats(mc_ChunkCollector* collector)
 {
     int row;
+    int delay;
     mc_ChunkCollectorRow *collect_row;
     uint32_t size;
     
@@ -773,6 +774,14 @@ void MultichainCollectChunksQueueStats(mc_ChunkCollector* collector)
             collector->m_NextAutoCommitTimestamp=GetTimeMillis()+collector->m_AutoCommitDelay;
         }
     }
+    
+    delay=collector->m_StatLast[0].m_Queried;
+    if(delay>MC_CCW_MAX_DELAY_BETWEEN_COLLECTS)
+    {
+        delay=MC_CCW_MAX_DELAY_BETWEEN_COLLECTS;
+    }
+    
+    return delay;
 }
 
 void mc_RelayPayload_ChunkIDs(vector<unsigned char>* payload,vector <mc_ChunkEntityKey>& vChunkDefs,int size)

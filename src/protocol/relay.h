@@ -81,7 +81,7 @@ bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
                              string& strError);
 
 int MultichainCollectChunks(mc_ChunkCollector* collector);
-void MultichainCollectChunksQueueStats(mc_ChunkCollector* collector);
+int MultichainCollectChunksQueueStats(mc_ChunkCollector* collector);
 
 
 
