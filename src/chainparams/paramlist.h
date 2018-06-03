@@ -238,7 +238,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
                    "maxstdelementsize","",
                    "Maximum number of OP_DROPs per output in standard transactions."},
     { "maxstdelementsize"                    , "max-std-element-size"                    ,
-                   MC_PRM_INT64   | MC_PRM_USER | MC_PRM_CLONE                  , -1,      8192,        128,     32768, 0.0, 10003, 0, "-mc-maxscriptelementsize",
+                   MC_PRM_INT64   | MC_PRM_USER | MC_PRM_CLONE                  , -1,     40000,        128,     80000, 0.0, 10003, 0, "-mc-maxscriptelementsize",
                    "maxstdopdropsize","",
                    "Maximum size of data elements in standard transactions, in bytes."},
  
