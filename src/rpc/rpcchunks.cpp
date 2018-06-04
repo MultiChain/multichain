@@ -41,6 +41,7 @@ Value getchunktotals(const Array& params, bool fHelp)
     {
         Object stat;
         stat.push_back(Pair("queries",collector->m_StatTotal[k].m_Queried));
+        stat.push_back(Pair("responded",collector->m_StatTotal[k].m_Queried-collector->m_StatTotal[k].m_Unresponded-collector->m_StatLast[k].m_Queried));
         stat.push_back(Pair("unresponded",collector->m_StatTotal[k].m_Unresponded));
         stat.push_back(Pair("requests",collector->m_StatTotal[k].m_Requested));
         stat.push_back(Pair("delivered",collector->m_StatTotal[k].m_Delivered));
