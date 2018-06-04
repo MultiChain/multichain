@@ -316,4 +316,10 @@ void __US_FlushFile(int FileHan)
     FlushFileBuffers(hFile);
 }
 
+void __US_FlushFileWithMode(int FileHan,uint32_t use_data_sync)
+{
+    HANDLE hFile = (HANDLE)_get_osfhandle(FileHan);
+    FlushFileBuffers(hFile);
+}
+
 #endif
