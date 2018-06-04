@@ -685,8 +685,10 @@ Value debug(const Array& params, bool fHelp)
         }
         
         request_id=pRelayManager->SendRequest(pto,request_type,0,payload);
+/*        
         printf("%s",request_str.c_str());        
         printf(". Request ID: %s\n",request_id.ToString().c_str());
+ */ 
     }    
 
     uint32_t time_now;

@@ -36,6 +36,7 @@
 #define MC_VRA_BROADCAST_ONCE                0x00800000
 #define MC_VRA_SINGLE_HOP_BROADCAST          0x01000000
 #define MC_VRA_TIMESTAMP                     0x02000000
+#define MC_VRA_NOT_ALLOWED                   0x80000000
 
 #define MC_VRA_DEFAULT                       0x03970000
 

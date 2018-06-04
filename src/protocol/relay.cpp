@@ -630,7 +630,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                         collect_row->m_State.m_Status |= MC_CCF_UPDATED;
                         for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Unresponded+=k ? collect_row->m_ChunkDef.m_Size : 1;                
                     }
-                    if((collect_row->m_State.m_QueryNextAttempt <= time_now) && (total_in_queries < max_total_in_queries) && (query_count<collector->m_MaxMemPoolSize))
+                    if((collect_row->m_State.m_QueryNextAttempt <= time_now) && (total_in_queries < max_total_in_queries) && ((int)query_count<collector->m_MaxMemPoolSize))
                     {
                         if( (collect_row->m_State.m_Status & MC_CCF_ERROR_MASK) == 0)
                         {
@@ -1846,10 +1846,10 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     switch(msg_type_in)
     {
         case MC_RMT_MC_ADDRESS_QUERY:
-            verify_flags |= MC_VRA_IS_NOT_RESPONSE;
+            verify_flags |= MC_VRA_IS_NOT_RESPONSE | MC_VRA_NOT_ALLOWED;
             break;
         case MC_RMT_NODE_DETAILS:
-            verify_flags |= MC_VRA_IS_RESPONSE | MC_VRA_SIGNATURE_ORIGIN;
+            verify_flags |= MC_VRA_IS_RESPONSE | MC_VRA_SIGNATURE_ORIGIN  | MC_VRA_NOT_ALLOWED;
             break;
         case MC_RMT_CHUNK_QUERY:
             verify_flags |= MC_VRA_IS_NOT_RESPONSE;
@@ -1866,10 +1866,16 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
         default:
             if(verify_flags & MC_VRA_MESSAGE_TYPE)    
             {
-                LogPrintf("ProcessOffchain() : Unsupported relay message type %s\n",mc_MsgTypeStr(msg_type_in).c_str());     
+                LogPrintf("ProcessOffchain() : Unsupported offchain message type %s\n",mc_MsgTypeStr(msg_type_in).c_str());     
                 return false;
             }
             break;
+    }
+    
+    if(verify_flags & MC_VRA_NOT_ALLOWED)
+    {
+        LogPrintf("ProcessOffchain() : Not allowed offchain message type %s\n",mc_MsgTypeStr(msg_type_in).c_str());             
+        return false;            
     }
     
     if(verify_flags & MC_VRA_SINGLE_HOP)
