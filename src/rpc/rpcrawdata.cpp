@@ -740,9 +740,9 @@ bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_
             if(ptr > start)
             {
                 match=0;
-                if(memcmp(start,"write",    ptr-start) == 0){match = 1; *permissions |= MC_PTP_WRITE ;}
-                if(memcmp(start,"onchain",  ptr-start) == 0){match = 1; *restrict |= MC_ENT_ENTITY_RESTRICTION_ONCHAIN;}
-                if(memcmp(start,"offchain", ptr-start) == 0){match = 1; *restrict |= MC_ENT_ENTITY_RESTRICTION_OFFCHAIN;}
+                if(( (ptr-start) ==  5) && (memcmp(start,"write",    ptr-start) == 0) ){match = 1; *permissions |= MC_PTP_WRITE ;}
+                if(( (ptr-start) == 11) && (memcmp(start,"onchainonly",  ptr-start) == 0) ){match = 1; *restrict |= MC_ENT_ENTITY_RESTRICTION_ONCHAIN;}
+                if(( (ptr-start) == 12) && (memcmp(start,"offchainonly", ptr-start) == 0) ){match = 1; *restrict |= MC_ENT_ENTITY_RESTRICTION_OFFCHAIN;}
                 
                 if(match == 0)
                 {

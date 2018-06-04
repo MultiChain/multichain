@@ -1396,7 +1396,7 @@ void mc_InitRPCHelpMap06()
             "  or \n"
             "3. restrictions                     (object, optional) Stream restrictions\n"
             "    {\n"
-            "      \"restrict\" : \"restrictions\"   (string, optional) Stream restrictions, comma delimited. Possible values: write,offchain,onchain\n"
+            "      \"restrict\" : \"restrictions\"   (string, optional) Stream restrictions, comma delimited. Possible values: write,offchainonly,onchainonly\n"
             "    }\n"
             "4  custom-fields                    (object, optional)  a json object with custom fields\n"
             "    {\n"
@@ -1443,7 +1443,7 @@ void mc_InitRPCHelpMap06()
             "  or \n"
             "4. restrictions                     (object, optional) Stream restrictions\n"
             "    {\n"
-            "      \"restrict\" : \"restrictions\"   (string, optional) Stream restrictions, comma delimited. Possible values: write,offchain,onchain\n"
+            "      \"restrict\" : \"restrictions\"   (string, optional) Stream restrictions, comma delimited. Possible values: write,offchainonly,onchainonly\n"
             "    }\n"
             "5  custom-fields                    (object, optional)  a json object with custom fields\n"
             "    {\n"
@@ -3480,7 +3480,7 @@ void mc_InitRPCHelpMap15()
          ));
     
     mapHelpStrings.insert(std::make_pair("unsubscribe",
-            "unsubscribe entity-identifier(s)\n"
+            "unsubscribe entity-identifier(s) ( purge )\n"
             "\nUnsubscribes from the stream.\n"
             "\nArguments:\n"
             "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
@@ -3767,7 +3767,7 @@ void mc_InitRPCHelpMap16()
             "      \"create\" : \"stream\"             (string, required) stream\n"
             "      \"name\" : \"stream-name\"          (string, optional) Stream name\n"
             "      \"open\" : true|false             (boolean, optional, default: false) If true, anyone can publish\n"
-            "      \"restrict\" : \"restrictions\"     (string, optional) Stream restrictions, comma delimited. Possible values: write,offchain,onchain\n"
+            "      \"restrict\" : \"restrictions\"     (string, optional) Stream restrictions, comma delimited. Possible values: write,offchainonly,onchainonly\n"
             "      \"details\" :                     (object, optional) A json object with custom fields\n"           
             "        {\n"
             "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
