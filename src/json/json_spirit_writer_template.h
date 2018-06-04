@@ -113,7 +113,6 @@ namespace json_spirit
             result[  9 ] = to_hex_char( part2 & 0x000F ); part2 >>= 4;
             result[  8 ] = to_hex_char( part2 & 0x000F );                        
         }
-        
         return result;
     }
 
@@ -135,16 +134,17 @@ namespace json_spirit
 
             const wint_t unsigned_c( ( c >= 0 ) ? c : 256 + c );
 
-            if( iswprint( unsigned_c ) )
+            unsigned int codepoint=0;
+            unsigned int charlen,shift,j,mask;
+            charlen=utf8_len_and_mask(unsigned_c,&mask);
+            
+//            if( iswprint( unsigned_c ) )
+            if(charlen == 1)
             {
                 result += c;
             }
             else
             {
-                unsigned int codepoint=0;
-                unsigned int charlen,shift,j,mask;
-
-                charlen=utf8_len_and_mask(unsigned_c,&mask);
                 if( end - i >= charlen)
                 {
                     shift=6*(charlen-1);
