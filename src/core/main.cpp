@@ -409,6 +409,34 @@ int SetUpgradedParamValue(const mc_OneMultichainParam *param,int64_t value)
         pwalletMain->InitializeUnspentList();        
     }   
     
+    if(strcmp(param->m_Name,"maximumchunksize") == 0)
+    {
+        int old_value=MAX_CHUNK_SIZE;
+        MAX_CHUNK_SIZE=(unsigned int)value;    
+
+        while(MAX_CHUNK_SIZE+OFFCHAIN_MSG_PADDING>MAX_SIZE)
+        {
+            MAX_SIZE *= 2;
+        }
+
+        if(MAX_CHUNK_SIZE > old_value)
+        {
+            if(pwalletTxsMain)
+            {
+                if(pwalletTxsMain->m_ChunkBuffer)
+                {
+                    mc_Delete(pwalletTxsMain->m_ChunkBuffer);
+                    pwalletTxsMain->m_ChunkBuffer=(unsigned char*)mc_New(MAX_CHUNK_SIZE);                        
+                }
+            }
+        }
+    }
+
+    if(strcmp(param->m_Name,"maximumchunkcount") == 0)
+    {
+        MAX_CHUNK_COUNT=value;
+    }           
+    
     return MC_ERR_NOERROR;
 }
 

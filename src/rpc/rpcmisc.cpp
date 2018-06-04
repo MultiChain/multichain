@@ -712,6 +712,14 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                 {
                     param_value=(int)MAX_SCRIPT_ELEMENT_SIZE;
                 }
+                if(strcmp("maximumchunksize",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(int)MAX_CHUNK_SIZE;
+                }
+                if(strcmp("maximumchunkcount",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(int)MAX_CHUNK_COUNT;
+                }
             }
 
             if(!hidden)

@@ -264,6 +264,22 @@ int mc_MultichainParams::CanBeUpgradedByVersion(const char *param,int version,in
         }
     }
     
+    if(strcmp(param,"maximumchunksize") == 0)
+    {
+        if(version >= 20003)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    if(strcmp(param,"maximumchunkcount") == 0)
+    {
+        if(version >= 20003)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
     
     
     return 0;
