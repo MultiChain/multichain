@@ -603,6 +603,17 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
         entry.push_back(Pair("key", keys[0]));        
     }
     entry.push_back(Pair("data", format_item_value));        
+    if( ( retrieve_status & MC_OST_CONTROL_NO_DATA ) == 0)
+    {
+        if(retrieve_status & MC_OST_ERROR_MASK)
+        {
+            string error_str;
+            int errorCode;
+            error_str=OffChainError(retrieve_status,&errorCode);
+            entry.push_back(Pair("error", error_str));        
+        }
+        entry.push_back(Pair("available", AvailableFromStatus(retrieve_status)));        
+    }
     entry.push_back(Pair("offchain", (retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN));        
     
     if(verbose)

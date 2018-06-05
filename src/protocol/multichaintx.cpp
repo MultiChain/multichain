@@ -568,7 +568,7 @@ void MultiChainTransaction_FillAdminPermissionsBeforeTx(const CTransaction& tx,
 
 bool MultiChainTransaction_VerifyAndDeleteDataFormatElements(string& reason,int64_t *total_size)
 {
-    if(mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL,NULL,NULL,total_size))
+    if(mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL,NULL,NULL,total_size,1))
     {
         reason="Error in data format script";
         return false;                    
@@ -590,7 +590,6 @@ bool MultiChainTransaction_CheckOpReturnScript(const CTransaction& tx,
     int64_t total_offchain_size;
     
     total_offchain_size=0;
-//    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);                   // Format scripts are eliminated for protocol checks    
     if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason,&total_offchain_size))
     {
         return false;
@@ -858,7 +857,6 @@ bool MultiChainTransaction_CheckEntityItem(const CTransaction& tx,
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     mc_EntityDetails entity;
     
-//    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);                   // Format scripts are eliminated for protocol checks    
     if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason,NULL))
     {
         return false;

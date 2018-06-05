@@ -142,6 +142,7 @@ Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total);
 void AppendOffChainFormatData(uint32_t data_format,uint32_t out_options,mc_Script *lpDetailsScript,vector<unsigned char>& vValue,vector<uint256>* vChunkHashes,int *errorCode,string *strError);
 int mc_BinaryCacheFile(string id,int mode);
 void mc_RemoveBinaryCacheFile(string id);
+bool AvailableFromStatus(uint32_t status);
 string OffChainError(uint32_t status,int *errorCode); 
 bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,string *strError);
 
