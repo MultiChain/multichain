@@ -2203,7 +2203,8 @@ void mc_InitRPCHelpMap10()
             " or\n"
             "1. address(es)                      (array, optional) A json array of addresses \n"                
             "2. \"label\"                          (string, optional, default=\"\") An optional label\n"
-            "3. rescan                           (boolean, optional, default=true) Rescan the wallet for transactions\n"
+            "3. rescan                           (boolean or integer, optional, default=true) Rescan the wallet for transactions. \n"
+            "                                                       If integer rescan from block, if negative - from the end.\n"
             "\nNote: This call can take minutes to complete if rescan is true.\n"
             "\nResult:\n"
             "\nExamples:\n"
@@ -2223,7 +2224,8 @@ void mc_InitRPCHelpMap10()
             " or\n"
             "1. privkey(s)                       (array, optional) A json array of private keys \n"                
             "2. \"label\"                          (string, optional, default=\"\") An optional label\n"
-            "3. rescan                           (boolean, optional, default=true) Rescan the wallet for transactions\n"
+            "3. rescan                           (boolean or integer, optional, default=true) Rescan the wallet for transactions. \n"
+            "                                                       If integer rescan from block, if negative - from the end.\n"
             "\nNote: This call can take minutes to complete if rescan is true.\n"
             "\nResult:\n"
             "\nExamples:\n"
@@ -2238,10 +2240,11 @@ void mc_InitRPCHelpMap10()
         ));
     
     mapHelpStrings.insert(std::make_pair("importwallet",
-            "importwallet \"filename\"\n"
+            "importwallet \"filename\" ( rescan )\n"
             "\nImports keys from a wallet dump file (see dumpwallet).\n"
             "\nArguments:\n"
             "1. \"filename\"                       (string, required) The wallet file\n"
+            "2. rescan                           (integer, optional, default=0) Rescan from block, if negative - from the end.\n"
             "\nExamples:\n"
             "\nDump the wallet\n"
             + HelpExampleCli("dumpwallet", "\"test\"") +
