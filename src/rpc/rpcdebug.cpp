@@ -361,6 +361,11 @@ Value debug(const Array& params, bool fHelp)
     if (fHelp || params.size() < 2 || params.size() > 4)  
         throw runtime_error("Help message not found\n");
     
+    if(!GetBoolArg("-rpcallowdebug",false))
+    {
+        throw JSONRPCError(RPC_NOT_ALLOWED, "API is not allowed");                 
+    }
+    
     uint32_t request_type=MC_RMT_NONE;
     int timeout=5;
     vector <unsigned char> payload;
