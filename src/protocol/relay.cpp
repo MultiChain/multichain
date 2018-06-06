@@ -346,9 +346,15 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     }
     
     max_total_size=(collector->m_TimeoutRequest-MC_CCW_TIMEOUT_REQUEST_SHIFT)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
+    max_total_size/=MC_CCW_QUERY_SPLIT;
     if(max_total_size > MAX_SIZE-OFFCHAIN_MSG_PADDING)
     {
         max_total_size=MAX_SIZE-OFFCHAIN_MSG_PADDING;        
+    }
+    
+    if(max_total_size < MAX_CHUNK_SIZE + sizeof(mc_ChunkEntityKey))
+    {
+        max_total_size = MAX_CHUNK_SIZE + sizeof(mc_ChunkEntityKey);
     }
     
     max_total_in_queries=2*(collector->m_TimeoutRequest)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
