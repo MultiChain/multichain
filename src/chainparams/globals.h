@@ -26,6 +26,7 @@ int MAX_OP_RETURN_SHOWN=16384;
 int MAX_FORMATTED_DATA_DEPTH=100;
 unsigned int MAX_OP_RETURN_OP_DROP_COUNT=100000000;
 uint32_t JSON_NO_DOUBLE_FORMATTING=0;                             
+int JSON_DOUBLE_DECIMAL_DIGITS=-1;                             
 int MAX_CHUNK_SIZE = 1048576; 
 int MAX_CHUNK_COUNT = 1024; 
 

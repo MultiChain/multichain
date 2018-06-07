@@ -67,6 +67,7 @@ mc_WalletTxs* pwalletTxsMain = NULL;
 #endif
 mc_RelayManager* pRelayManager = NULL;
 bool fFeeEstimatesInitialized = false;
+extern int JSON_DOUBLE_DECIMAL_DIGITS;                             
 
 #ifdef WIN32
 // Win32 LevelDB doesn't use filedescriptors, and the ones used for
@@ -505,6 +506,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -maxshowndata=<n>      " + strprintf(_("The maximum number of bytes to show in the data field of API responses. (default: %u)"), MAX_OP_RETURN_SHOWN) + "\n";
     strUsage += "                         " + _("Pieces of data larger than this will be returned as an object with txid, vout and size fields, for use with the gettxoutdata command.") + "\n";
     strUsage += "  -v1apicompatible=<n>   " + strprintf(_("JSON_RPC calls responses compatible with MultiChain 1.0 (default: %u)"), 0) + "\n";
+    strUsage += "  -apidecimaldigits=<n>  " + _("maximal number of decimal digits in API output (default: auto)") + "\n";
            
     strUsage += "\n" + _("Wallet optimization options:") + "\n";
     strUsage += "  -autocombineminconf    " + _("Only automatically combine outputs with at least this number of confirmations, default 1") + "\n";
@@ -1762,6 +1764,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
     if (fServer)
     {
+        JSON_DOUBLE_DECIMAL_DIGITS=GetArg("-apidecimaldigits",-1);        
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
         StartRPCThreads();
     }
