@@ -134,19 +134,19 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
         ptrOut+=size;
         if(chunk->m_Size != chunkOut->m_Size)
         {
-            for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Baddelivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                
+            for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Baddelivered+=k ? chunk->m_Size : 1;                
             strError="Chunk info size mismatch";
             goto exitlbl;                                        
         }
         if(memcmp(chunk->m_Hash,chunkOut->m_Hash,sizeof(uint256)))
         {
-            for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Baddelivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                
+            for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Baddelivered+=k ? chunk->m_Size : 1;                
             strError="Chunk info hash mismatch";
             goto exitlbl;                                                    
         }
         if(memcmp(&(chunk->m_Entity),&(chunkOut->m_Entity),sizeof(mc_TxEntity)))
         {
-            for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Baddelivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                
+            for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Baddelivered+=k ? chunk->m_Size : 1;                
             strError="Chunk info entity mismatch";
             goto exitlbl;                                                    
         }
@@ -362,7 +362,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     max_total_query_size=MAX_CHUNK_SIZE + sizeof(mc_ChunkEntityKey);
     
     max_total_in_queries=(collector->m_TimeoutRequest-MC_CCW_TIMEOUT_REQUEST_SHIFT)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
-    max_total_in_queries*=max_total_destination_size;
+    max_total_in_queries*=collector->m_TimeoutRequest;
     total_in_queries=0;
     query_count=0;
     
