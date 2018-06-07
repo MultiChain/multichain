@@ -264,7 +264,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     uint32_t time_now,expiration,dest_expiration;    
     vector <mc_ChunkEntityKey> vChunkDefs;
     int row,last_row,last_count,to_end_of_query;
-    uint32_t total_size,max_total_size,total_in_queries,max_total_in_queries,query_count;
+    uint32_t total_size,max_total_query_size,max_total_destination_size,total_in_queries,max_total_in_queries,query_count;
     mc_ChunkCollectorRow *collect_row;
     mc_ChunkCollectorRow *collect_subrow;
     time_now=mc_TimeNowAsUInt();
@@ -345,20 +345,21 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         pRelayManager->DeleteRequest(item.first.request_id);
     }
 
-/*    
-    max_total_size=(collector->m_TimeoutRequest-MC_CCW_TIMEOUT_REQUEST_SHIFT)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
-    max_total_size/=MC_CCW_QUERY_SPLIT;
-    if(max_total_size > MAX_SIZE-OFFCHAIN_MSG_PADDING)
+
+    max_total_destination_size=(collector->m_TimeoutRequest-MC_CCW_TIMEOUT_REQUEST_SHIFT)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
+//    max_total_size/=MC_CCW_QUERY_SPLIT;
+    if(max_total_destination_size > MAX_SIZE-OFFCHAIN_MSG_PADDING)
     {
-        max_total_size=MAX_SIZE-OFFCHAIN_MSG_PADDING;        
+        max_total_destination_size=MAX_SIZE-OFFCHAIN_MSG_PADDING;        
     }
     
+/*    
     if(max_total_size < MAX_CHUNK_SIZE + sizeof(mc_ChunkEntityKey))
     {
         max_total_size = MAX_CHUNK_SIZE + sizeof(mc_ChunkEntityKey);
     }
  */ 
-    max_total_size=MAX_CHUNK_SIZE + sizeof(mc_ChunkEntityKey);
+    max_total_query_size=MAX_CHUNK_SIZE + sizeof(mc_ChunkEntityKey);
     
     max_total_in_queries=2*(collector->m_TimeoutRequest)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
     total_in_queries=0;
@@ -431,7 +432,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                     best_score=MC_CCW_WORST_RESPONSE_SCORE;
                     for(int i=0;i<(int)query->m_Responses.size();i++)
                     {
-                        this_score=MultichainResponseScore(&(query->m_Responses[i]),collect_row,destination_loads,max_total_size);
+                        this_score=MultichainResponseScore(&(query->m_Responses[i]),collect_row,destination_loads,max_total_destination_size);
                         if(this_score < best_score)
                         {
                             best_score=this_score;
@@ -520,7 +521,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
             collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(chunk_row.first);
             collect_subrow->m_State.m_Request=request_id;
             collect_subrow->m_State.m_RequestTimeStamp=expiration;
-            for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Requested+=k ? collect_row->m_ChunkDef.m_Size : 1;                
+            for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Requested+=k ? collect_subrow->m_ChunkDef.m_Size : 1;                
 //            printf("T %d %d %s\n",chunk_row.first,collect_subrow->m_State.m_RequestPos,collect_subrow->m_State.m_Request.ToString().c_str());
         }
     }
@@ -538,7 +539,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
             collect_row=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(row);
         }
         
-        if( (collect_row == NULL)|| (last_count >= MC_CCW_MAX_CHUNKS_PER_QUERY) || (total_size+collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey)> max_total_size) )
+        if( (collect_row == NULL)|| (last_count >= MC_CCW_MAX_CHUNKS_PER_QUERY) || (total_size+collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey)> max_total_query_size) )
         {
             if(last_count)
             {
