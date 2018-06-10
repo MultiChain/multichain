@@ -155,6 +155,7 @@ typedef struct mc_EntityDetails
     char m_Name[MC_ENT_MAX_NAME_SIZE+6];                                        // Entity name
     uint32_t m_Flags;
     uint32_t m_Permissions;
+    uint32_t m_ScriptPermissions;
     uint32_t m_Restrictions;
     unsigned char m_Reserved[36];   
     mc_EntityLedgerRow m_LedgerRow;
