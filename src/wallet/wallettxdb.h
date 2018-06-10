@@ -41,6 +41,7 @@
 #define MC_TET_SPECIALMASK                      0xFF000000
 
 #define MC_EFL_NOT_IN_SYNC                      0x01000000
+#define MC_EFL_NOT_IN_SYNC_AFTER_IMPORT         0x02000000
 #define MC_EFL_UNSUBSCRIBED                     0x10000000
 
 #define MC_SFL_NONE             0x00000000
@@ -58,6 +59,7 @@ typedef struct mc_TxEntity
     uint32_t m_EntityType;                                                      // Entity type, MC_TET_ constants
     void Zero();
     void Init(unsigned char *entity_id,uint32_t entity_type);
+    int IsSubscription();
 } mc_TxEntity;
 
 /** Entity row pos->txid **/
@@ -223,6 +225,7 @@ typedef struct mc_TxDB
     char m_LobFileNamePrefix[MC_DCT_DB_MAX_PATH];                               // Full data file name
     char m_LogFileName[MC_DCT_DB_MAX_PATH];                                     // Full log file name    
     
+    int m_UnsubscribeMemPoolSize;                                               // Size of the mempool when unsubscribed
     uint32_t m_Mode;
     void *m_Semaphore;                                                          // mc_TxDB object semaphore
     uint64_t m_LockedBy;                                                        // ID of the thread locking it
@@ -355,7 +358,7 @@ typedef struct mc_TxDB
     int ImportGetBlock(                                                         // Returns last processed block in the import
                        mc_TxImport *import);
     
-    int CompleteImport(mc_TxImport *import);                                    // Completes import - merges with chain
+    int CompleteImport(mc_TxImport *import,uint32_t flags);                     // Completes import - merges with chain
     
     int DropImport(mc_TxImport *import);                                        // Drops uncompleted import
 

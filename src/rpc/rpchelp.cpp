@@ -824,7 +824,7 @@ void mc_InitRPCHelpMap04()
             "    {\n"                
             "      \"create\" : \"stream\"             (string,required) stream\n"
             "      \"name\" : \"stream-name\"          (string,optional) Stream name\n"
-            "      \"open\" : true|false             (string,optional, default: false) If true, anyone can publish\n"
+            "      \"open\" : true|false             (boolean,optional, default: false) If true, anyone can publish\n"
             "      \"details\" :                     (object, optional)  a json object with custom fields\n"           
             "        {\n"
             "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
@@ -885,7 +885,7 @@ void mc_InitRPCHelpMap05()
             "    {\n"                
             "      \"create\" : stream               (string,required) stream\n"
             "      \"name\" : stream-name            (string,optional) Stream name\n"
-            "      \"open\" : true|false             (string,optional, default: false) If true, anyone can publish\n"
+            "      \"open\" : true|false             (boolean,optional, default: false) If true, anyone can publish\n"
             "      \"details\" :                     (object,optional) a json object with custom fields\n"           
             "        {\n"
             "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
@@ -2265,7 +2265,8 @@ void mc_InitRPCHelpMap10()
             " or\n"
             "1. address(es)                      (array, optional) A json array of addresses \n"                
             "2. \"label\"                          (string, optional, default=\"\") An optional label\n"
-            "3. rescan                           (boolean, optional, default=true) Rescan the wallet for transactions\n"
+            "3. rescan                           (boolean or integer, optional, default=true) Rescan the wallet for transactions. \n"
+            "                                                       If integer rescan from block, if negative - from the end.\n"
             "\nNote: This call can take minutes to complete if rescan is true.\n"
             "\nResult:\n"
             "\nExamples:\n"
@@ -2285,7 +2286,8 @@ void mc_InitRPCHelpMap10()
             " or\n"
             "1. privkey(s)                       (array, optional) A json array of private keys \n"                
             "2. \"label\"                          (string, optional, default=\"\") An optional label\n"
-            "3. rescan                           (boolean, optional, default=true) Rescan the wallet for transactions\n"
+            "3. rescan                           (boolean or integer, optional, default=true) Rescan the wallet for transactions. \n"
+            "                                                       If integer rescan from block, if negative - from the end.\n"
             "\nNote: This call can take minutes to complete if rescan is true.\n"
             "\nResult:\n"
             "\nExamples:\n"
@@ -2300,10 +2302,11 @@ void mc_InitRPCHelpMap10()
         ));
     
     mapHelpStrings.insert(std::make_pair("importwallet",
-            "importwallet \"filename\"\n"
+            "importwallet \"filename\" ( rescan )\n"
             "\nImports keys from a wallet dump file (see dumpwallet).\n"
             "\nArguments:\n"
             "1. \"filename\"                       (string, required) The wallet file\n"
+            "2. rescan                           (integer, optional, default=0) Rescan from block, if negative - from the end.\n"
             "\nExamples:\n"
             "\nDump the wallet\n"
             + HelpExampleCli("dumpwallet", "\"test\"") +
@@ -3793,6 +3796,53 @@ void mc_InitRPCHelpMap16()
             + HelpExampleRpc("liststreamblockitems", "\"test-stream\", 1000, false, 20")
         ));
     
+    mapHelpStrings.insert(std::make_pair("walletpassphrase",
+            "walletpassphrase \"passphrase\" timeout\n"
+            "\nStores the wallet decryption key in memory for 'timeout' seconds.\n"
+            "This is needed prior to performing transactions related to private keys such as sending assets\n"
+            "\nArguments:\n"
+            "1. \"passphrase\"                     (string, required) The wallet passphrase\n"
+            "2. timeout                          (numeric, required) The time to keep the decryption key in seconds.\n"
+            "\nNote:\n"
+            "Issuing the walletpassphrase command while the wallet is already unlocked will set a new unlock\n"
+            "time that overrides the old one.\n"
+            "\nExamples:\n"
+            "\nunlock the wallet for 60 seconds\n"
+            + HelpExampleCli("walletpassphrase", "\"my pass phrase\" 60") +
+            "\nLock the wallet again (before 60 seconds)\n"
+            + HelpExampleCli("walletlock", "") +
+            "\nAs json rpc call\n"
+            + HelpExampleRpc("walletpassphrase", "\"my pass phrase\", 60")
+        ));
+    
+    
+    mapHelpStrings.insert(std::make_pair("walletpassphrasechange",
+            "walletpassphrasechange \"oldpassphrase\" \"newpassphrase\"\n"
+            "\nChanges the wallet passphrase from 'oldpassphrase' to 'newpassphrase'.\n"
+            "\nArguments:\n"
+            "1. \"oldpassphrase\"                  (string, required) The current passphrase\n"
+            "2. \"newpassphrase\"                  (string, required) The new passphrase\n"
+            "\nExamples:\n"
+            + HelpExampleCli("walletpassphrasechange", "\"old one\" \"new one\"")
+            + HelpExampleRpc("walletpassphrasechange", "\"old one\", \"new one\"")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("walletlock",
+            "walletlock\n"
+            "\nRemoves the wallet encryption key from memory, locking the wallet.\n"
+            "After calling this method, you will need to call walletpassphrase again\n"
+            "before being able to call any methods which require the wallet to be unlocked.\n"
+            "\nExamples:\n"
+            "\nSet the passphrase for 2 minutes to perform a transaction\n"
+            + HelpExampleCli("walletpassphrase", "\"my pass phrase\" 120") +
+            "\nPerform a send (requires passphrase set)\n"
+            + HelpExampleCli("sendtoaddress", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" 1.0") +
+            "\nClear the passphrase since we are done before 2 minutes is up\n"
+            + HelpExampleCli("walletlock", "") +
+            "\nAs json rpc call\n"
+            + HelpExampleRpc("walletlock", "")
+        ));
+
 
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""

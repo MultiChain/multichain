@@ -67,6 +67,8 @@ Array AssetArrayFromAmounts(mc_Buffer *asset_amounts,int issue_asset_id,uint256 
 void ParseRawAction(string action,bool& lock_it, bool& sign_it,bool& send_it);
 bool paramtobool(Value param);
 int paramtoint(Value param,bool check_for_min,int min_value,string error_message);
+int ParseBlockIdentifier(Value blockset_identifier);
+int ParseRescanParameter(Value rescan_identifier, bool *fRescan);
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
 
 

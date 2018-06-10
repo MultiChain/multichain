@@ -15,6 +15,7 @@
 #include "wallet/wallet.h"
 /* MCHN START */
 #include "wallet/wallettxs.h"
+#include "rpc/rpcutils.h"
 /* MCHN END */
 
 #include <fstream>
@@ -90,8 +91,11 @@ Value importprivkey(const Array& params, bool fHelp)
 
     // Whether to perform rescan after import
     bool fRescan = true;
+    int start_block=0;
     if (params.size() > 2)
-        fRescan = params[2].get_bool();
+    {        
+        start_block=ParseRescanParameter(params[2],&fRescan);
+    }
 
     
     bool fNewFound=false;
@@ -167,7 +171,7 @@ Value importprivkey(const Array& params, bool fHelp)
     }    
     
     if (fRescan) {
-        pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true, true);
+        pwalletMain->ScanForWalletTransactions(chainActive[start_block], true, true);
     }
     
     return Value::null;
@@ -186,8 +190,11 @@ Value importaddress(const Array& params, bool fHelp)
 
     // Whether to perform rescan after import
     bool fRescan = true;
+    int start_block=0;
     if (params.size() > 2)
-        fRescan = params[2].get_bool();
+    {        
+        start_block=ParseRescanParameter(params[2],&fRescan);
+    }
 
     bool fNewFound=false;
     vector<string> inputStrings=ParseStringList(params[0]);
@@ -211,10 +218,13 @@ Value importaddress(const Array& params, bool fHelp)
         inputAddresses.push_back(address);
         inputScripts.push_back(script);
         
-        if (::IsMine(*pwalletMain, script) == ISMINE_SPENDABLE)
+        if( (mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0 )
         {
-//            throw JSONRPCError(RPC_WALLET_ERROR, "The wallet already contains the private key for this address or script");
-            return Value::null;    
+            if (::IsMine(*pwalletMain, script) == ISMINE_SPENDABLE)
+            {
+    //            throw JSONRPCError(RPC_WALLET_ERROR, "The wallet already contains the private key for this address or script");
+                return Value::null;    
+            }
         }
         
         if (!pwalletMain->HaveWatchOnly(script))
@@ -223,9 +233,12 @@ Value importaddress(const Array& params, bool fHelp)
         }
     }
 
-    if(!fNewFound)
+    if( (mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0 )
     {
-        return Value::null;        
+        if(!fNewFound)
+        {
+            return Value::null;        
+        }
     }
     
     pwalletMain->MarkDirty();
@@ -282,7 +295,7 @@ Value importaddress(const Array& params, bool fHelp)
     {
         if (fRescan)
         {
-            pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true, true);
+            pwalletMain->ScanForWalletTransactions(chainActive[start_block], true, true);
             pwalletMain->ReacceptWalletTransactions();
         }
     }
@@ -292,11 +305,18 @@ Value importaddress(const Array& params, bool fHelp)
 
 Value importwallet(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() != 1)
+    if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error("Help message not found\n");
 
     EnsureWalletIsUnlocked();
 
+    bool fRescan = true;
+    int start_block=0;
+    if (params.size() > 1)
+    {        
+        start_block=ParseRescanParameter(params[1],&fRescan);
+    }
+    
     ifstream file;
     file.open(params[0].get_str().c_str(), std::ios::in | std::ios::ate);
     if (!file.is_open())
@@ -328,9 +348,11 @@ Value importwallet(const Array& params, bool fHelp)
         CPubKey pubkey = key.GetPubKey();
         assert(key.VerifyPubKey(pubkey));
         CKeyID keyid = pubkey.GetID();
+        bool fAlreadyHave=false;
         if (pwalletMain->HaveKey(keyid)) {
             LogPrintf("Skipping import of %s (key already present)\n", CBitcoinAddress(keyid).ToString());
-            continue;
+//                continue;
+            fAlreadyHave=true;
         }
         int64_t nTime = DecodeDumpTime(vstr[1]);
         std::string strLabel;
@@ -348,11 +370,14 @@ Value importwallet(const Array& params, bool fHelp)
             }
         }
         LogPrintf("Importing %s...\n", CBitcoinAddress(keyid).ToString());
-        if (!pwalletMain->AddKeyPubKey(key, pubkey)) {
-            fGood = false;
-            continue;
+        if(!fAlreadyHave)
+        {
+            if (!pwalletMain->AddKeyPubKey(key, pubkey)) {
+                fGood = false;
+                continue;
+            }
+            pwalletMain->mapKeyMetadata[keyid].nCreateTime = nTime;
         }
-        pwalletMain->mapKeyMetadata[keyid].nCreateTime = nTime;
         if (fLabel)
             pwalletMain->SetAddressBook(keyid, strLabel, "receive");
         
@@ -385,8 +410,15 @@ Value importwallet(const Array& params, bool fHelp)
 /* MCHN START */        
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        LogPrintf("Rescanning all %i blocks\n", chainActive.Height());
-        pwalletMain->ScanForWalletTransactions(chainActive.Genesis(),false,true);
+        if(start_block)
+        {
+            LogPrintf("Rescanning last %i blocks\n", chainActive.Height()-start_block+1);
+        }
+        else
+        {
+            LogPrintf("Rescanning all %i blocks\n", chainActive.Height());
+        }
+        pwalletMain->ScanForWalletTransactions(chainActive[start_block],false,true);
         pwalletMain->MarkDirty();        
     }
     else

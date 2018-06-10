@@ -289,8 +289,20 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
                                 *asset_name=0x00;
                                 multiple=1;
                                 value_offset=mc_FindSpecialParamInDetailsScript(details_script,details_script_size,MC_ENT_SPRM_NAME,&value_size);
+                                							
                                 if(value_offset<(uint32_t)details_script_size)
                                 {
+                                    if(value_size > MC_ENT_MAX_NAME_SIZE)
+                                    {
+                                        if(mc_gState->m_Features->FixedIn1001120003())
+                                        {
+                                            reason="Metadata script rejected - entity name too long";
+                                            return false;                    
+                                        }
+
+                                        value_size=MC_ENT_MAX_NAME_SIZE;
+                                    }
+
                                     memcpy(asset_name,details_script+value_offset,value_size);
                                     asset_name[value_size]=0x00;
                                 }
@@ -643,7 +655,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
 
     if(new_issue)
     {
-        mc_gState->m_Permissions->SetCheckPoint();
+//        mc_gState->m_Permissions->SetCheckPoint();
         err=MC_ERR_NOERROR;
 
         txid=tx.GetHash();
@@ -674,7 +686,8 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
     }        
 
     memset(issuer_buf,0,sizeof(issuer_buf));
-    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,1);                    
+    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,1);
+/*                    
     if(new_issue)
     {
         if((err != MC_ERR_NOERROR) || !accept)
@@ -682,6 +695,7 @@ bool AcceptAssetGenesisFromPredefinedIssuers(const CTransaction &tx,
             mc_gState->m_Permissions->RollBackToCheckPoint();            
         }
     }
+*/
     if(err)
     {
         reason="Cannot update permission database for issued asset";

@@ -562,8 +562,17 @@ void mc_EntityDetails::Set(mc_EntityLedgerRow* row)
         }
         if(value_offset < m_LedgerRow.m_ScriptSize)
         {            
-            memcpy(m_Name,m_LedgerRow.m_Script+value_offset,value_size);
-            mc_StringLowerCase(m_Name,value_size);
+            if(value_size > MC_ENT_MAX_NAME_SIZE)
+            {
+                value_size=MC_ENT_MAX_NAME_SIZE;
+                memcpy(m_Name,m_LedgerRow.m_Script+value_offset,value_size);
+                m_Name[value_size]=0;
+            }
+            else
+            {
+                memcpy(m_Name,m_LedgerRow.m_Script+value_offset,value_size);                
+            }
+           mc_StringLowerCase(m_Name,value_size);
             m_Flags |= MC_ENT_FLAG_NAME_IS_SET;
         }
     }
@@ -626,6 +635,14 @@ int mc_AssetDB::InsertEntity(const void* txid, int offset, int entity_type, cons
             {
                 if(*((unsigned char*)script+value_offset+value_size-1))
                 {
+		            if(value_size > MC_ENT_MAX_NAME_SIZE)
+		            {
+                        if(mc_gState->m_Features->FixedIn1001120003())
+                        {
+                            return MC_ERR_ERROR_IN_SCRIPT;                                            
+                        }
+		                value_size=MC_ENT_MAX_NAME_SIZE;
+		            }
                     memcpy(stream_name,(unsigned char*)script+value_offset,value_size);
                     stream_name[value_size]=0x00;
                     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(unsigned char*)stream_name,strlen(stream_name)+1);            
