@@ -1490,49 +1490,27 @@ Value getstreamsummary(const Array& params, bool fPublisher)
                 available=!a.value_.get_bool();
             }
         }
+        
+        if(!available)
+        {
+            BOOST_FOREACH(const Pair& a, entry) 
+            {
+                if(a.name_ == "available")
+                {
+                    available=a.value_.get_bool();
+                }
+            }
+        }
                         
         
         BOOST_FOREACH(const Pair& a, entry) 
         {
             if(a.name_ == "data")
             {
-                if(!available)
-                {
-                    if(a.value_.type() != obj_type)
-                    {
-                        available=true;
-                    }                    
-                }
-                if(!available)
-                {                
-                    available=true;
-                    BOOST_FOREACH(const Pair& b, a.value_.get_obj()) 
-                    {
-                        if(b.name_ == "available")
-                        {
-                            available=b.value_.get_bool();
-                        }                            
-                    }                        
-                }
                 if(available)
                 {
                     if(i == 0)
                     {
-    //                    if(a.value_.type() == obj_type)
-    /*                    
-                        {
-                            result=empty_object;
-                        }
-
-                        if( (i==0) && ((mode & MC_VMM_TAKE_FIRST) != 0) )               
-                        {
-                            result=mc_MergeValues(&(a.value_),&result,mode,0,&err);
-                        }
-                        else
-                        {
-                            result=mc_MergeValues(&result,&(a.value_),mode,0,&err);
-                        }         
-     */ 
                         result=a.value_;
                     }
                     else
