@@ -418,6 +418,7 @@ int mc_MultichainParams::Create(const char* name,int version)
     mc_OneMultichainParam *param;
     char *ptrData;
     int num_sets;
+    int64_t override_int64;
     uint32_t network_port=MC_DEFAULT_NETWORK_PORT;
     uint32_t rpc_port=MC_DEFAULT_RPC_PORT;
     
@@ -496,6 +497,14 @@ int mc_MultichainParams::Create(const char* name,int version)
                             case MC_PRM_INT64:
                                 size=8;
                                 mc_PutLE(ptrData,&(param->m_DefaultIntegerValue),8);
+                                if(strcmp(param->m_Name,"maxstdelementsize") == 0)
+                                {
+                                    if(version<20003)
+                                    {
+                                        override_int64=8192;
+                                        mc_PutLE(ptrData,&override_int64,8);
+                                    }
+                                }                                   
                                 break;
                             case MC_PRM_DOUBLE:
                                 size=8;
