@@ -239,13 +239,9 @@ namespace json_spirit
             }
         }
         
-        int output_double_precision( const double& value )
+        int output_double_precision( const double& value, int max_p )
         {
-            int p=14;
-            if(JSON_DOUBLE_DECIMAL_DIGITS >= 0)
-            {
-                p=JSON_DOUBLE_DECIMAL_DIGITS;
-            }
+            int p=max_p;
                         
             char fp[20];
             char sp[40];
@@ -267,14 +263,15 @@ namespace json_spirit
         
         void output_double( const double& value )
         {
+            int max_p=14;
+            if(JSON_DOUBLE_DECIMAL_DIGITS >= 0)
+            {
+                max_p=JSON_DOUBLE_DECIMAL_DIGITS;
+            }
+            
             if(JSON_NO_DOUBLE_FORMATTING)                     
             {
-                int p=14;
-                if(JSON_DOUBLE_DECIMAL_DIGITS >= 0)
-                {
-                    p=JSON_DOUBLE_DECIMAL_DIGITS;
-                }
-                os_ << std::showpoint << std::fixed << std::setprecision(p) << value;                
+                os_ << std::showpoint << std::fixed << std::setprecision(max_p) << value;                
                 return; 
             }
             double a=fabs(value);
@@ -305,8 +302,8 @@ namespace json_spirit
             }
             double v=value/pow(10.,k);
             
-            int p=output_double_precision(v);
-            if(p-k > 9)
+            int p=output_double_precision(v,max_p);
+            if(p-k > max_p)
             {
                 z=0;
             }
@@ -325,8 +322,8 @@ namespace json_spirit
             }
             else
             {
-                int pfull=output_double_precision(value);
-                if(pfull + k <= 14)
+                int pfull=output_double_precision(value,max_p);
+                if(pfull + k <= max_p)
                 {
                     p=pfull;
                 }
