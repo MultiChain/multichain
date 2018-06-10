@@ -4108,12 +4108,12 @@ void mc_InitRPCHelpMap17()
 
 void mc_InitRPCHelpMap18()
 {
-    mapHelpStrings.insert(std::make_pair("getchunktotals",
-            "getchunktotals\n"
+    mapHelpStrings.insert(std::make_pair("getchunkqueuetotals",
+            "getchunkqueuetotals\n"
             "\nReturns chunks delivery statistics.\n"
             "\nExamples:\n"
-            + HelpExampleCli("getchunktotals", "")
-            + HelpExampleRpc("getchunktotals", "")
+            + HelpExampleCli("getchunkqueuetotals", "")
+            + HelpExampleRpc("getchunkqueuetotals", "")
         ));
     
     

@@ -18,10 +18,10 @@ Value getchunkqueueinfo(const Array& params, bool fHelp)
     for(int k=0;k<2;k++)
     {
         Object stat;
-        stat.push_back(Pair("pending",collector->m_StatLast[k].m_Pending));
+        stat.push_back(Pair("waiting",collector->m_StatLast[k].m_Pending-collector->m_StatLast[k].m_Queried));
 //        stat.push_back(Pair("processing",collector->m_StatLast[k].m_Undelivered));
-        stat.push_back(Pair("queried",collector->m_StatLast[k].m_Queried));
-        stat.push_back(Pair("requested",collector->m_StatLast[k].m_Requested));
+        stat.push_back(Pair("querying",collector->m_StatLast[k].m_Queried-collector->m_StatLast[k].m_Requested));
+        stat.push_back(Pair("retrieving",collector->m_StatLast[k].m_Requested));
         result.push_back(Pair(k ? "bytes" : "chunks",stat));
     }
     
@@ -30,7 +30,7 @@ Value getchunkqueueinfo(const Array& params, bool fHelp)
     return result;
 }
 
-Value getchunktotals(const Array& params, bool fHelp)
+Value getchunkqueuetotals(const Array& params, bool fHelp)
 {
     Object result;
     mc_ChunkCollector *collector=pwalletTxsMain->m_ChunkCollector;
