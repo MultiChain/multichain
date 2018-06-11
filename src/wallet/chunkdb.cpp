@@ -431,7 +431,7 @@ int mc_ChunkDB::SourceChunksRecovery()
                                 subscription->m_LastFileSize=read_offset+buf_offset;                                
                                 chunk_def.m_HeaderSize=subscription->m_LastFileSize-chunk_def.m_InternalFileOffset-chunk_def.m_Size;
                                 offset=buf_size;
-                                read_offset=file_size;                                
+                                file_offset=file_size;                                
                                 break;
                         }
                         buf_offset=offset;                            
@@ -451,13 +451,13 @@ int mc_ChunkDB::SourceChunksRecovery()
                 if(err)
                 {
                     buf_offset=buf_size;
-                    read_offset=file_size;                                
+                    file_offset=file_size;                                
                 }
             }
         }
         else
         {
-            read_offset=file_size;
+            file_offset=file_size;
         }
     }
         

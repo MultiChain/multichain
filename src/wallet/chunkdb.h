@@ -18,7 +18,7 @@
 
 #define MC_CDB_MAX_FILE_SIZE             0x08000000                             // Maximal data file size, 1GB
 #define MC_CDB_MAX_CHUNK_DATA_POOL_SIZE  0x8000000                              // Maximal size of chunk pool before commit, 128MB
-#define MC_CDB_MAX_FILE_READ_BUFFER_SIZE 0x0100000                              // Maximal size of chunk pool before commit, 4MB
+#define MC_CDB_MAX_FILE_READ_BUFFER_SIZE 0x0100000                              // Maximal size of chunk pool before commit, 1MB
 #define MC_CDB_MAX_CHUNK_EXTRA_SIZE      1024 
 #define MC_CDB_MAX_MEMPOOL_SIZE          1024 
 
