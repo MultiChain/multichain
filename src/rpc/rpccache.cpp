@@ -106,6 +106,8 @@ Value deletebinarycache(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Binary cache item with this identifier not found");                                                                                                                        
     }
     
+    close(fHan);
+    
     mc_RemoveBinaryCacheFile(params[0].get_str());
     
     return Value::null;    
