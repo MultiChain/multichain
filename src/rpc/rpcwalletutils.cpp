@@ -602,6 +602,7 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
     {
         entry.push_back(Pair("key", keys[0]));        
     }
+    entry.push_back(Pair("offchain", (retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN));        
     if( ( retrieve_status & MC_OST_CONTROL_NO_DATA ) == 0)
     {
         entry.push_back(Pair("available", AvailableFromStatus(retrieve_status)));        
@@ -614,7 +615,6 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
         }
     }
     entry.push_back(Pair("data", format_item_value));        
-    entry.push_back(Pair("offchain", (retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN));        
     
     if(verbose)
     {

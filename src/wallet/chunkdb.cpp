@@ -326,7 +326,7 @@ int mc_ChunkDB::SourceChunksRecovery()
     chunk_def.Zero();
     chunk_def.m_SubscriptionID=subscription->m_SubscriptionID;
     
-    err=0;
+    err=MC_ERR_NOERROR;
     
     sprintf(msg,"Starting source recovery, last file: %d, file_size: %ld, file offset: %ld",subscription->m_LastFileID,file_size,file_offset);        
     LogString(msg);            
