@@ -4205,6 +4205,6 @@ void mc_RemoveBinaryCacheFile(string id)
     
     mc_GetFullFileName(mc_gState->m_Params->NetworkName(),str_file_name.c_str(),"",MC_FOM_RELATIVE_TO_DATADIR,file_name);
 
-    unlink(file_name);
+    __US_DeleteFile(file_name);
 }
 

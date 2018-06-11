@@ -504,7 +504,7 @@ FILE *mc_OpenFile(const char *network_name,const char *filename, const char *ext
 
 int mc_RemoveFile(const char *network_name,const char *filename, const char *extension,int options)        
 {    
-    return unlink(mc_GetFullFileName(network_name,filename,extension,options).c_str()); 
+    return __US_DeleteFile(mc_GetFullFileName(network_name,filename,extension,options).c_str()); 
 }
 
 
