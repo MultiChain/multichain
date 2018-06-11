@@ -301,6 +301,7 @@ int mc_ChunkDB::SourceChunksRecovery()
     int FileHan;
     unsigned char* buf;
     int chunk_found=0;
+    char msg[256];
     
     subscription=(mc_SubscriptionDBRow *)m_Subscriptions->GetRow(1);
     
@@ -324,6 +325,11 @@ int mc_ChunkDB::SourceChunksRecovery()
     buf=m_TmpScript->m_lpData;
     chunk_def.Zero();
     chunk_def.m_SubscriptionID=subscription->m_SubscriptionID;
+    
+    err=0;
+    
+    sprintf(msg,"Starting source recovery, last file: %d, file_size: %ld, file offset: %ld",subscription->m_LastFileID,file_size,file_offset);        
+    LogString(msg);            
     
     while(file_offset<file_size)
     {
@@ -430,6 +436,8 @@ int mc_ChunkDB::SourceChunksRecovery()
                                 chunk_def.m_InternalFileOffset=subscription->m_LastFileSize;
                                 subscription->m_LastFileSize=read_offset+buf_offset;                                
                                 chunk_def.m_HeaderSize=subscription->m_LastFileSize-chunk_def.m_InternalFileOffset-chunk_def.m_Size;
+                                sprintf(msg,"Found end marker at: %ld",read_offset+buf_offset);        
+                                LogString(msg);            
                                 offset=buf_size;
                                 file_offset=file_size;                                
                                 break;
@@ -450,6 +458,8 @@ int mc_ChunkDB::SourceChunksRecovery()
                 }
                 if(err)
                 {
+                    sprintf(msg,"Error %d on file offset %ld",err,read_offset+buf_offset);        
+                    LogString(msg);                                
                     buf_offset=buf_size;
                     file_offset=file_size;                                
                 }
@@ -457,6 +467,8 @@ int mc_ChunkDB::SourceChunksRecovery()
         }
         else
         {
+            sprintf(msg,"Read error %d on file offset %ld",err,read_offset+buf_offset);        
+            LogString(msg);                                
             file_offset=file_size;
         }
     }
@@ -501,6 +513,23 @@ int mc_ChunkDB::SourceChunksRecovery()
         }
     }
 
+    if(err)
+    {
+        sprintf(msg,"Source recovery completed with error %d",err);                        
+    }
+    else
+    {
+        if(chunk_found)
+        {
+            sprintf(msg,"Source recovery completed, chunks recovered");                    
+        }
+        else
+        {
+            sprintf(msg,"Source recovery completed, no recovery needed");                    
+        }
+    }
+    LogString(msg);                        
+    
     Dump("SourceChunkRecovery");
     return err;
 }
