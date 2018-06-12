@@ -583,7 +583,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                         to_end_of_query=collect_subrow->m_State.m_QueryTimeStamp-time_now;
                         if(to_end_of_query<0)to_end_of_query=0;
                         if(to_end_of_query>collector->m_TimeoutRequest)to_end_of_query=collector->m_TimeoutRequest;
-                        total_in_queries+=collect_subrow->m_ChunkDef.m_Size*to_end_of_query;
+                        total_in_queries+=(collect_subrow->m_ChunkDef.m_Size+ sizeof(mc_ChunkEntityKey))*to_end_of_query;
                         for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Queried+=k ? collect_subrow->m_ChunkDef.m_Size : 1;                
                     }
                 }
@@ -648,6 +648,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                             collect_row->m_State.m_Status |= MC_CCF_SELECTED;
                             last_count++;
                             total_size+=collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey);
+                            query_count++;
                         }
                     }
                 }
