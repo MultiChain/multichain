@@ -28,6 +28,7 @@ using namespace json_spirit;
 
 static const int CONTINUE_EXECUTION=-1;
 extern unsigned int JSON_NO_DOUBLE_FORMATTING;  
+extern int JSON_DOUBLE_DECIMAL_DIGITS;                             
 
 std::string HelpMessageCli()
 {
@@ -239,9 +240,10 @@ Object CallRPC(const string& strMethod, const Array& params)
     map<string, string> mapRequestHeaders;
     mapRequestHeaders["Authorization"] = string("Basic ") + strUserPass64;
     // Send request
-    JSON_NO_DOUBLE_FORMATTING=1;    
+//    JSON_NO_DOUBLE_FORMATTING=1;    
     string strRequest = JSONRPCRequest(strMethod, params, 1);
-    JSON_NO_DOUBLE_FORMATTING=0;    
+//    JSON_NO_DOUBLE_FORMATTING=0;    
+    JSON_DOUBLE_DECIMAL_DIGITS=GetArg("-apidecimaldigits",-1);        
     string strPost = HTTPPost(strRequest, mapRequestHeaders);
     stream << strPost << std::flush;
 

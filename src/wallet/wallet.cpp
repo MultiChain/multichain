@@ -355,8 +355,11 @@ bool CWallet::ChangeWalletPassphrase(const SecureString& strOldWalletPassphrase,
 
 void CWallet::SetBestChain(const CBlockLocator& loc)
 {
-    CWalletDB walletdb(strWalletFile);
-    walletdb.WriteBestBlock(loc);
+    if( (mc_gState->m_WalletMode & MC_WMD_TXS) == 0 )
+    {                
+        CWalletDB walletdb(strWalletFile);
+        walletdb.WriteBestBlock(loc);
+    }
 }
 
 bool CWallet::SetMinVersion(enum WalletFeature nVersion, CWalletDB* pwalletdbIn, bool fExplicit)
@@ -1277,7 +1280,7 @@ bool CWalletTx::WriteToDisk()
 
 /* MCHN START */
 
-mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, int block, int *err)
+mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, bool fOnlySubscriptions, int block, int *err)
 {
     vector <CBitcoinAddress> vAddressesToImport;
     vector <mc_TxEntity> vStreamsToImport;
@@ -1301,40 +1304,44 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, int block, int *e
     
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        BOOST_FOREACH(const PAIRTYPE(CBitcoinAddress, CAddressBookData)& item, lpWallet->mapAddressBook)
+        if(!fOnlySubscriptions)
         {
-            const CBitcoinAddress& address = item.first;
-            mc_TxEntityStat entStat;
-            CTxDestination addressRet=address.Get();        
-            const CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
-            const CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
+            BOOST_FOREACH(const PAIRTYPE(CBitcoinAddress, CAddressBookData)& item, lpWallet->mapAddressBook)
+            {
+                const CBitcoinAddress& address = item.first;
+                mc_TxEntityStat entStat;
+                CTxDestination addressRet=address.Get();        
+                const CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
+                const CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
 
-            entity.Zero();
-            if(lpKeyID)
-            {
-                memcpy(entity.m_EntityID,lpKeyID,MC_TDB_ENTITY_ID_SIZE);
-                entity.m_EntityType=MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS;
-            }
-            if(lpScriptID)
-            {
-                memcpy(entity.m_EntityID,lpScriptID,MC_TDB_ENTITY_ID_SIZE);
-                entity.m_EntityType=MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS;
-            }
-
-            if(entity.m_EntityType)
-            {
-                entStat.Zero();
-                memcpy(&entStat,&entity,sizeof(mc_TxEntity));
-                if(pwalletTxsMain->FindEntity(&entStat))
+                entity.Zero();
+                if(lpKeyID)
                 {
-                    if(!fOnlyUnsynced || ((entStat.m_Flags & MC_EFL_NOT_IN_SYNC) != 0) )
-                    {
-                        vAddressesToImport.push_back(address);
-                    }
+                    memcpy(entity.m_EntityID,lpKeyID,MC_TDB_ENTITY_ID_SIZE);
+                    entity.m_EntityType=MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS;
                 }
-                else
+                if(lpScriptID)
                 {
-                    vAddressesToImport.push_back(address);                    
+                    memcpy(entity.m_EntityID,lpScriptID,MC_TDB_ENTITY_ID_SIZE);
+                    entity.m_EntityType=MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS;
+                }
+
+                if(entity.m_EntityType)
+                {
+                    entStat.Zero();
+                    memcpy(&entStat,&entity,sizeof(mc_TxEntity));
+                    if(pwalletTxsMain->FindEntity(&entStat))
+                    {                        
+                        if(!fOnlyUnsynced || 
+                           (((entStat.m_Flags & MC_EFL_NOT_IN_SYNC) != 0) && (entStat.m_LastImportedBlock > block) ) )
+                        {
+                            vAddressesToImport.push_back(address);
+                        }
+                    }
+                    else
+                    {
+                        vAddressesToImport.push_back(address);                    
+                    }
                 }
             }
         }
@@ -1347,20 +1354,15 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, int block, int *e
         for(i=0;i<m_ChainEntities->GetCount();i++)
         {
             lpent=(mc_TxEntityStat*)m_ChainEntities->GetRow(i);
-            switch(lpent->m_Entity.m_EntityType & MC_TET_TYPE_MASK)
+            if(lpent->m_Entity.IsSubscription())
             {
-                case MC_TET_STREAM:
-                case MC_TET_STREAM_KEY:
-                case MC_TET_STREAM_PUBLISHER:
-                case MC_TET_ASSET:
-                    if(lpent->m_Entity.m_EntityType & MC_TET_CHAINPOS)
+                if(lpent->m_Entity.m_EntityType & MC_TET_CHAINPOS)
+                {
+                    if(lpent->m_Flags & MC_EFL_NOT_IN_SYNC)
                     {
-                        if(lpent->m_Flags & MC_EFL_NOT_IN_SYNC)
-                        {
-                            vStreamsToImport.push_back(lpent->m_Entity);
-                        }
+                        vStreamsToImport.push_back(lpent->m_Entity);
                     }
-                    break;
+                }
             }
         }
     }
@@ -1417,39 +1419,32 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, int block, int *e
         for(unsigned int i=0;i<vStreamsToImport.size();i++)
         {     
             bool take_it=false;
-            if( ( (vStreamsToImport[i].m_EntityType & MC_TET_TYPE_MASK) == MC_TET_ASSET ) &&
-                ( mc_gState->m_Features->ShortTxIDInTx() == 0) )    
+            if(mc_gState->m_Assets->FindEntityByShortTxID(&stream_entity,vStreamsToImport[i].m_EntityID))
             {
-                if(mc_gState->m_Assets->FindEntityByRef(&stream_entity,vStreamsToImport[i].m_EntityID))
-                {
-                    take_it=true;
-                }   
-            }
-            else
-            {
-                if(mc_gState->m_Assets->FindEntityByShortTxID(&stream_entity,vStreamsToImport[i].m_EntityID))
-                {
-                    take_it=true;
-                }                
-            }
-//            if(mc_gState->m_Assets->FindEntityByShortTxID(&stream_entity,vStreamsToImport[i].m_EntityID))
+                take_it=true;
+            }                
             if(take_it)
             {
-                entity.Zero();            
-                memcpy(entity.m_EntityID,vStreamsToImport[i].m_EntityID,MC_TDB_ENTITY_ID_SIZE);
-                entity.m_EntityType=vStreamsToImport[i].m_EntityType;
-                lpEntities->Add(&entity,NULL);
-                entity.m_EntityType=(vStreamsToImport[i].m_EntityType - MC_TET_CHAINPOS) | MC_TET_TIMERECEIVED;
-                lpEntities->Add(&entity,NULL);
                 ptr=(unsigned char *)stream_entity.GetRef();
+                b=chainActive.Height();
                 if(stream_entity.IsUnconfirmedGenesis() == 0)
                 {
                     b=(int)mc_GetLE(ptr,4)-1;
+                }
+                
+                if(b > block)
+                {
                     if(b < block_to_start_from)
                     {
                         block_to_start_from=b;
                     }
-                }                
+                    entity.Zero();            
+                    memcpy(entity.m_EntityID,vStreamsToImport[i].m_EntityID,MC_TDB_ENTITY_ID_SIZE);
+                    entity.m_EntityType=vStreamsToImport[i].m_EntityType;
+                    lpEntities->Add(&entity,NULL);
+                    entity.m_EntityType=(vStreamsToImport[i].m_EntityType - MC_TET_CHAINPOS) | MC_TET_TIMERECEIVED;
+                    lpEntities->Add(&entity,NULL);
+                }
             }            
         }
     }
@@ -1478,7 +1473,7 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, int block, int *e
  * from or to us. If fUpdate is true, found transactions that already
  * exist in the wallet will be updated.
  */
-int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bool fOnlyUnsynced)
+int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bool fOnlyUnsynced,bool fOnlySubscriptions)
 {
     int ret = 0;
     int64_t nNow = GetTime();
@@ -1490,7 +1485,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
 /* MCHN START */        
         mc_TxImport *imp;
         int err;
-        imp=StartImport(this,fOnlyUnsynced,pindex->nHeight-1,&err);
+        imp=StartImport(this,fOnlyUnsynced,fOnlySubscriptions,pindex->nHeight-1,&err);
 /* MCHN END */      
         
 /* MCHN START */        
@@ -1599,7 +1594,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
                     }
                 }
                 
-                err=pwalletTxsMain->CompleteImport(imp);
+                err=pwalletTxsMain->CompleteImport(imp,((pindexStart->nHeight > 0) & !fOnlySubscriptions) ? MC_EFL_NOT_IN_SYNC_AFTER_IMPORT : 0);
             }
             else
             {
@@ -3145,6 +3140,12 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
 
         // Broadcast
 
+        if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
+        {
+//            pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-chunkflushmode",MC_CDB_FLUSH_MODE_COMMIT));
+            pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-flushsourcechunks",true) ? (MC_CDB_FLUSH_MODE_FILE | MC_CDB_FLUSH_MODE_DATASYNC) : MC_CDB_FLUSH_MODE_NONE);
+        }
+        
         if (!wtxNew.AcceptToMemoryPoolReturnReason(false,true,reject_reason))   // MCHN
         {
             // This must not fail. The transaction has already been signed and recorded.
@@ -3326,7 +3327,7 @@ bool CWallet::NewKeyPool()
         if (IsLocked())
             return false;
 
-        int64_t nKeys = max(GetArg("-keypool", 100), (int64_t)0);
+        int64_t nKeys = max(GetArg("-keypool", mc_gState->m_NetworkParams->IsProtocolMultichain() ? 1 : 100), (int64_t)0);
         for (int i = 0; i < nKeys; i++)
         {
             int64_t nIndex = i+1;

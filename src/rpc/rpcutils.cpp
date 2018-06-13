@@ -275,22 +275,15 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
 int ParseAssetKeyToFullAssetRef(const char* asset_key,unsigned char *full_asset_ref,int *multiple,int *type,int entity_type)
 {
     int ret;
-    if(mc_gState->m_Features->ShortTxIDInTx())
+    unsigned char txid[MC_ENT_KEY_SIZE];
+    ret=ParseAssetKey(asset_key,txid,NULL,NULL,multiple,type,entity_type);
+    if(ret == MC_ASSET_KEY_UNCONFIRMED_GENESIS)
     {
-        unsigned char txid[MC_ENT_KEY_SIZE];
-        ret=ParseAssetKey(asset_key,txid,NULL,NULL,multiple,type,entity_type);
-        if(ret == MC_ASSET_KEY_UNCONFIRMED_GENESIS)
-        {
-            ret=0;
-        }
-        memcpy(full_asset_ref+MC_AST_SHORT_TXID_OFFSET,txid+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-        
-        mc_SetABRefType(full_asset_ref,MC_AST_ASSET_REF_TYPE_SHORT_TXID);        
+        ret=0;
     }
-    else
-    {
-        ret=ParseAssetKey(asset_key,NULL,full_asset_ref,NULL,multiple,type,entity_type);        
-    }
+    memcpy(full_asset_ref+MC_AST_SHORT_TXID_OFFSET,txid+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+
+    mc_SetABRefType(full_asset_ref,MC_AST_ASSET_REF_TYPE_SHORT_TXID);        
     return ret;
 }
 
@@ -527,11 +520,8 @@ Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong)
                 if(full_type & MC_PTP_CONNECT)entry.push_back(Pair("connect", (type & MC_PTP_CONNECT) ? true : false));
                 if(full_type & MC_PTP_SEND)entry.push_back(Pair("send", (type & MC_PTP_SEND) ? true : false));
                 if(full_type & MC_PTP_RECEIVE)entry.push_back(Pair("receive", (type & MC_PTP_RECEIVE) ? true : false));
-                if(mc_gState->m_Features->Streams())
-                {
-                    if(full_type & MC_PTP_WRITE)entry.push_back(Pair("write", (type & MC_PTP_WRITE) ? true : false));                
-                    if(full_type & MC_PTP_CREATE)entry.push_back(Pair("create", (type & MC_PTP_CREATE) ? true : false));                
-                }
+                if(full_type & MC_PTP_WRITE)entry.push_back(Pair("write", (type & MC_PTP_WRITE) ? true : false));                
+                if(full_type & MC_PTP_CREATE)entry.push_back(Pair("create", (type & MC_PTP_CREATE) ? true : false));                
                 if(full_type & MC_PTP_ISSUE)entry.push_back(Pair("issue", (type & MC_PTP_ISSUE) ? true : false));
                 if(full_type & MC_PTP_MINE)entry.push_back(Pair("mine", (type & MC_PTP_MINE) ? true : false));
                 if(full_type & MC_PTP_ADMIN)entry.push_back(Pair("admin", (type & MC_PTP_ADMIN) ? true : false));
@@ -627,16 +617,27 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
 
         if(output_level & 0x0004)
         {
-            if(entity.AnyoneCanWrite())
-            {
-                entry.push_back(Pair("open",true));                                
+            if(mc_gState->m_Compatibility & MC_VCM_1_0)
+            {            
+                if(entity.AnyoneCanWrite())
+                {
+                    entry.push_back(Pair("open",true));                                
+                }
+                else
+                {
+                    entry.push_back(Pair("open",false));                                            
+                }
             }
-            else
+            Object pObject;
+            pObject.push_back(Pair("write",entity.AnyoneCanWrite() ? false : true));
+            if(mc_gState->m_Features->OffChainData())
             {
-                entry.push_back(Pair("open",false));                                            
+                pObject.push_back(Pair("onchain",(entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_ONCHAIN) ? true : false));
+                pObject.push_back(Pair("offchain",(entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN) ? true : false));
             }
+            entry.push_back(Pair("restrict",pObject));                                            
         }
-        
+       
         
         size_t value_size;
         int64_t offset,new_offset;
@@ -907,13 +908,267 @@ int mc_IsUTF8(const unsigned char *elem,size_t elem_size)
     return 1;
 }
 
-Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out)
+const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t start,int64_t count)
+{
+    mc_ChunkDBRow chunk_def;
+    int size,shift,chunk;
+    unsigned char *ptr;
+    size_t elem_size;
+    int64_t total_size=0;
+    unsigned char *elem;
+    int64_t read_from,read_size;
+
+    mc_gState->m_TmpBuffers->m_RpcChunkScript1->Clear();
+    mc_gState->m_TmpBuffers->m_RpcChunkScript1->AddElement();
+    
+    *out_size=0;
+    
+    ptr=hashes;
+    for(chunk=0;chunk<chunk_count;chunk++)
+    {
+        size=(int)mc_GetVarInt(ptr,MC_CDB_CHUNK_HASH_SIZE+16,-1,&shift);
+
+        if(size<0)
+        {
+            return NULL;
+        }
+        
+        if(size > MAX_CHUNK_SIZE)
+        {
+            return NULL;
+        }
+        
+        
+        ptr+=shift;
+        if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,ptr,NULL,NULL,-1) == MC_ERR_NOERROR)
+        {
+            read_from=0;
+            read_size=chunk_def.m_Size;
+            if( (total_size+read_size > start) && (total_size < start+count) )
+            {
+                if(total_size < start)
+                {
+                    read_from=start-total_size;
+                }             
+                if(total_size+read_size > start+count)
+                {
+                    read_size=start+count-total_size;
+                }
+                read_size-=read_from;
+                elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&elem_size);
+                if(elem)
+                {
+                    mc_gState->m_TmpBuffers->m_RpcChunkScript1->SetData(elem+read_from,read_size);
+                    *out_size+=read_size;
+                }
+            }            
+            total_size+=chunk_def.m_Size;
+        }
+        else
+        {
+            return NULL;
+        }
+        ptr+=MC_CDB_CHUNK_HASH_SIZE;
+    }
+    
+    return mc_gState->m_TmpBuffers->m_RpcChunkScript1->GetData(0,&elem_size);
+}
+
+uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t total_size)
+{
+    uint32_t status;  
+    mc_ChunkDBRow chunk_def;
+    int size,shift,chunk;
+    unsigned char *ptr;
+    bool use_tmp_buf=false;    
+    bool skip_read=false;    
+    size_t elem_size;
+        
+    if(chunk_count > 1) 
+    {
+        if(total_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN))
+        {
+            use_tmp_buf=true;
+        }
+        else
+        {
+            skip_read=true;
+        }
+    }
+    
+    
+    *elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
+    *out_size=elem_size;
+    if(hashes == NULL)
+    {
+        return MC_OST_ON_CHAIN;
+    }
+    if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
+    {
+        return MC_OST_OFF_CHAIN | MC_OST_ERROR_NOT_SUPPORTED;
+    }
+    
+    if(use_tmp_buf)
+    {
+        mc_gState->m_TmpBuffers->m_RpcChunkScript1->Clear();
+        mc_gState->m_TmpBuffers->m_RpcChunkScript1->AddElement();
+    }
+    
+    status=MC_OST_OFF_CHAIN;
+    
+    ptr=hashes;
+
+    for(chunk=0;chunk<chunk_count;chunk++)
+    {
+        size=(int)mc_GetVarInt(ptr,MC_CDB_CHUNK_HASH_SIZE+16,-1,&shift);
+
+        if(size<0)
+        {
+            status |= MC_OST_ERROR_SCRIPT;
+            return status;
+        }
+        
+/*        
+        if(size > MAX_CHUNK_SIZE)
+        {
+            status |= MC_OST_ERROR_SCRIPT;
+            return status;
+        }
+*/        
+        ptr+=shift;
+        if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,ptr,NULL,NULL,-1) == MC_ERR_NOERROR)
+        {
+            if(size != (int)chunk_def.m_Size)
+            {
+                status |= MC_OST_ERROR_WRONG_SIZES;            
+                return status;                
+            }
+            if(!skip_read)
+            {
+                *elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&elem_size);
+                if(*elem)
+                {
+                    if(use_tmp_buf)
+                    {
+                        mc_gState->m_TmpBuffers->m_RpcChunkScript1->SetData(*elem,elem_size);
+                    }
+                }
+                else
+                {
+                    status = MC_OST_OFF_CHAIN | MC_OST_ERROR_CORRUPTED;            
+                    return status;
+                }
+            }
+        }
+        else
+        {
+            status=MC_OST_OFF_CHAIN;
+            *out_size=total_size;
+            return status;            
+        }
+        ptr+=MC_CDB_CHUNK_HASH_SIZE;
+    }
+    
+    status |= MC_OST_RETRIEVED;
+    
+    if(use_tmp_buf)
+    {
+        *elem = mc_gState->m_TmpBuffers->m_RpcChunkScript1->GetData(0,&elem_size);
+    }
+    else
+    {
+        if(chunk_count > 1) 
+        {
+            *elem=NULL;    
+        }        
+    }
+    
+    if(chunk_count > 1) 
+    {
+        *out_size=total_size;
+    }   
+    else
+    {
+        *out_size=elem_size;
+    }
+    
+    return status;
+}
+
+string OffChainError(uint32_t status,int *errorCode) 
+{
+    string error_str="";
+    switch(status & MC_OST_ERROR_MASK)
+    {
+        case MC_OST_ERROR_SCRIPT:
+            error_str="Error in script";
+            *errorCode=RPC_VERIFY_ERROR;
+            break;
+        case MC_OST_ERROR_WRONG_SIZES:
+            error_str="Chunk sizes don't match output script";
+            *errorCode=RPC_VERIFY_ERROR;
+            break;
+        case MC_OST_ERROR_CORRUPTED:
+            error_str="Internal error";
+            *errorCode=RPC_INTERNAL_ERROR;
+            break;
+        case MC_OST_ERROR_NOT_SUPPORTED:
+            error_str="Not supported";
+            *errorCode=RPC_NOT_SUPPORTED;
+            break;
+    }
+    return  error_str;
+}
+
+bool AvailableFromStatus(uint32_t status)
+{
+    bool available;
+    available=false;
+    
+    if( status == MC_OST_UNDEFINED )
+    {
+        available=true;               
+    }
+    
+    if( (status & MC_OST_STORAGE_MASK) == MC_OST_ON_CHAIN )
+    {
+        available=true;       
+    }
+    
+    if( (status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN )
+    {
+        if( (status & MC_OST_STATUS_MASK) == MC_OST_RETRIEVED )
+        {
+            available=true;        
+        }
+        
+        if( status & MC_OST_CONTROL_NO_DATA )
+        {
+            available=false;
+        }   
+    }
+    
+    return available;
+}
+
+Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out,uint32_t status)
 {
     string metadata="";
     Object metadata_object;
     Value metadata_value;
+    bool available;//,offchain;
+    string error_str;    
+    int errorCode;
     int err;
-    if( ((int)elem_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)) || (txid == 0) )
+    
+    available=AvailableFromStatus(status);
+    
+    if(status & MC_OST_ERROR_MASK)
+    {
+        error_str=OffChainError(status,&errorCode);
+    }
+     
+    if( (((int)elem_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)) || (txid == 0)) && available && ((status & MC_OST_ERROR_MASK) == 0) && (elem != NULL) )
     {
         if(format_text_out)
         {
@@ -963,8 +1218,23 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
     metadata_object.push_back(Pair("txid", txid.ToString()));
     metadata_object.push_back(Pair("vout", vout));
     metadata_object.push_back(Pair("format", OpReturnFormatToText(format)));
-    metadata_object.push_back(Pair("size", (int)elem_size));
+    metadata_object.push_back(Pair("size", elem_size));
+/*    
+    if( ( status & MC_OST_CONTROL_NO_DATA ) == 0)
+    {
+        if(status & MC_OST_ERROR_MASK)
+        {
+            metadata_object.push_back(Pair("error", error_str));        
+        }
+        metadata_object.push_back(Pair("available", available));        
+    }
+ */ 
     return metadata_object;    
+}
+
+Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out)
+{
+    return OpReturnFormatEntry(elem,elem_size,txid,vout,format,format_text_out,MC_OST_UNDEFINED);
 }
 
 Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format)
@@ -983,6 +1253,8 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
 
 Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uint32_t stream_output_level)
 {
+    // 0x0100 No offchain data
+    
     Object entry;
     Array publishers;
     set<uint160> publishers_set;
@@ -990,8 +1262,12 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     const unsigned char *ptr;
     unsigned char item_key[MC_ENT_MAX_ITEM_KEY_SIZE+1];    
     int item_key_size;
-    Value item_value;
+//    Value item_value;
     uint32_t format;
+    unsigned char *chunk_hashes;
+    int chunk_count;   
+    int64_t total_chunk_size,out_size;
+    uint32_t retrieve_status;
     Value format_item_value;
     string format_text_str;
     
@@ -1015,7 +1291,8 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
         return Value::null;
     }
     
-    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+//    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
     
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     mc_gState->m_TmpScript->SetElement(0);
@@ -1051,12 +1328,37 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
         keys.push_back(string(item_key,item_key+item_key_size));
     }
 
-    size_t elem_size;
     const unsigned char *elem;
 
-    elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
-    item_value=OpReturnEntry(elem,elem_size,tx.GetHash(),n);
-	format_item_value=OpReturnFormatEntry(elem,elem_size,tx.GetHash(),n,format,&format_text_str);
+//    elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
+    retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
+//    item_value=OpReturnEntry(elem,elem_size,tx.GetHash(),n);
+    if(stream_output_level & 0x0100)
+    {
+        retrieve_status |= MC_OST_CONTROL_NO_DATA;
+    }
+	format_item_value=OpReturnFormatEntry(elem,out_size,tx.GetHash(),n,format,&format_text_str,retrieve_status);
+    
+    Array chunks;
+    if(retrieve_status & MC_OST_CONTROL_NO_DATA)
+    {
+        if(format_item_value.type() == obj_type)
+        {
+            for(int chunk=0;chunk<chunk_count;chunk++)
+            {
+                int chunk_shift,chunk_size;
+                Object chunk_obj;
+                
+                chunk_size=mc_GetVarInt(chunk_hashes,MC_CDB_CHUNK_HASH_SIZE+16,-1,&chunk_shift);
+                chunk_hashes+=chunk_shift;
+                chunk_obj.push_back(Pair("hash", ((uint256*)chunk_hashes)->ToString()));
+                chunk_obj.push_back(Pair("size", chunk_size));
+                chunks.push_back(chunk_obj);
+                chunk_hashes+=MC_CDB_CHUNK_HASH_SIZE;
+            }        
+//            format_item_value.get_obj().push_back(Pair("chunks", chunks));
+        }
+    }
     
     already_seen.insert(hash);
     
@@ -1098,7 +1400,28 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     {
         entry.push_back(Pair("key", keys[0]));        
     }
-    entry.push_back(Pair("data", format_item_value));        
+    entry.push_back(Pair("offchain", (retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN));        
+    if( ( retrieve_status & MC_OST_CONTROL_NO_DATA ) == 0)
+    {
+        entry.push_back(Pair("available", AvailableFromStatus(retrieve_status)));        
+        if(retrieve_status & MC_OST_ERROR_MASK)
+        {
+            string error_str;
+            int errorCode;
+            error_str=OffChainError(retrieve_status,&errorCode);
+            entry.push_back(Pair("error", error_str));        
+        }
+    }
+    entry.push_back(Pair("data", format_item_value));   
+    
+    
+    if(retrieve_status & MC_OST_CONTROL_NO_DATA)
+    {
+        if((retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN)
+        {
+            entry.push_back(Pair("chunks", chunks));            
+        }
+    }
     return entry;
 }
 
@@ -1416,13 +1739,7 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
     
     memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
     
-    if(mc_gState->m_Features->VerifySizeOfOpDropElements())
-    {        
-        if(mc_gState->m_Features->VerifySizeOfOpDropElements())
-        {
-            assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
-        }
-    }
+    assets_per_opdrop=(MAX_SCRIPT_ELEMENT_SIZE-4)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
     
     BOOST_FOREACH(const Pair& a, param.get_obj()) 
     {
@@ -1588,7 +1905,7 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
 
                     mc_gState->m_TmpScript->Clear();
 
-                    vector<unsigned char> vData=ParseRawFormattedData(&(arr[i]),&data_format,mc_gState->m_TmpScript,true,&errorCode,&strError);
+                    vector<unsigned char> vData=ParseRawFormattedData(&(arr[i]),&data_format,mc_gState->m_TmpScript,MC_RFD_OPTION_INLINE,NULL,&errorCode,&strError);
                     if(strError.size())
                     {
                         if(eErrorCode)
@@ -2188,92 +2505,85 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
             if(d.name_ == "inputcache")
             {
                 new_type=-3;
-                if( ((allowed_objects & 0x0200) == 0) || (mc_gState->m_Features->CachedInputScript() == 0) )
+                if(d.value_.type() != array_type)
                 {
-                    strError=string("Keyword not allowed in this API");                                                
+                    strError=string("Array should be specified for inputcache");                                                
                 }
                 else
                 {
-                    if(d.value_.type() != array_type)
+                    int cs_offset,cs_vin,cs_size;
+                    string cs_script="";
+                    Array csa=d.value_.get_array();
+                    lpDetails->Clear();
+                    lpDetails->SetCachedScript(0,&cs_offset,-1,NULL,-1);
+                    for(int csi=0;csi<(int)csa.size();csi++)
                     {
-                        strError=string("Array should be specified for inputcache");                                                
-                    }
-                    else
-                    {
-                        int cs_offset,cs_vin,cs_size;
-                        string cs_script="";
-                        Array csa=d.value_.get_array();
-                        lpDetails->Clear();
-                        lpDetails->SetCachedScript(0,&cs_offset,-1,NULL,-1);
-                        for(int csi=0;csi<(int)csa.size();csi++)
+                        if(strError.size() == 0)
                         {
-                            if(strError.size() == 0)
+                            if(csa[csi].type() != obj_type)
                             {
-                                if(csa[csi].type() != obj_type)
+                                strError=string("Elements of inputcache should be objects");                                                
+                            }
+                            cs_vin=-1;
+                            cs_size=-1;
+                            BOOST_FOREACH(const Pair& csf, csa[csi].get_obj())                                 
+                            {              
+                                bool cs_parsed=false;
+                                if(csf.name_ == "vin")
                                 {
-                                    strError=string("Elements of inputcache should be objects");                                                
-                                }
-                                cs_vin=-1;
-                                cs_size=-1;
-                                BOOST_FOREACH(const Pair& csf, csa[csi].get_obj())                                 
-                                {              
-                                    bool cs_parsed=false;
-                                    if(csf.name_ == "vin")
+                                    cs_parsed=true;
+                                    if(csf.value_.type() != int_type)
                                     {
-                                        cs_parsed=true;
-                                        if(csf.value_.type() != int_type)
-                                        {
-                                            strError=string("vin should be integer");                                                                                            
-                                        }
-                                        else
-                                        {
-                                            cs_vin=csf.value_.get_int();
-                                        } 
+                                        strError=string("vin should be integer");                                                                                            
                                     }
-                                    if(csf.name_ == "scriptPubKey")
-                                    {
-                                        cs_parsed=true;
-                                        if(csf.value_.type() != str_type)
-                                        {
-                                            strError=string("scriptPubKey should be string");                                                                                            
-                                        }
-                                        else
-                                        {
-                                            cs_script=csf.value_.get_str();
-                                            cs_size=cs_script.size()/2;
-                                        } 
-                                    }
-                                    if(!cs_parsed)
-                                    {
-                                        strError=string("Invalid field: ") + csf.name_;                                                                                    
-                                    }
-                                }
-                                if(strError.size() == 0)
-                                {
-                                    if(cs_vin<0)
-                                    {
-                                        strError=string("Missing vin field");                                                                                                                            
-                                    }
-                                }
-                                if(strError.size() == 0)
-                                {
-                                    if(cs_size<0)
-                                    {
-                                        strError=string("Missing scriptPubKey field");                                                                                                                            
-                                    }
-                                }                                
-                                if(strError.size() == 0)
-                                {
-                                    bool fIsHex;
-                                    vector<unsigned char> dataData(ParseHex(cs_script.c_str(),fIsHex));    
-                                    if(!fIsHex)
-                                    {
-                                        strError=string("scriptPubKey should be hexadecimal string");                                                                                                                            
-                                    }                                    
                                     else
                                     {
-                                        lpDetails->SetCachedScript(cs_offset,&cs_offset,cs_vin,&dataData[0],cs_size);                                        
+                                        cs_vin=csf.value_.get_int();
+                                    } 
+                                }
+                                if(csf.name_ == "scriptPubKey")
+                                {
+                                    cs_parsed=true;
+                                    if(csf.value_.type() != str_type)
+                                    {
+                                        strError=string("scriptPubKey should be string");                                                                                            
                                     }
+                                    else
+                                    {
+                                        cs_script=csf.value_.get_str();
+                                        cs_size=cs_script.size()/2;
+                                    } 
+                                }
+                                if(!cs_parsed)
+                                {
+                                    strError=string("Invalid field: ") + csf.name_;                                                                                    
+                                }
+                            }
+                            if(strError.size() == 0)
+                            {
+                                if(cs_vin<0)
+                                {
+                                    strError=string("Missing vin field");                                                                                                                            
+                                }
+                            }
+                            if(strError.size() == 0)
+                            {
+                                if(cs_size<0)
+                                {
+                                    strError=string("Missing scriptPubKey field");                                                                                                                            
+                                }
+                            }                                
+                            if(strError.size() == 0)
+                            {
+                                bool fIsHex;
+                                vector<unsigned char> dataData(ParseHex(cs_script.c_str(),fIsHex));    
+                                if(!fIsHex)
+                                {
+                                    strError=string("scriptPubKey should be hexadecimal string");                                                                                                                            
+                                }                                    
+                                else
+                                {
+                                    lpDetails->SetCachedScript(cs_offset,&cs_offset,cs_vin,&dataData[0],cs_size);                                        
                                 }
                             }
                         }
@@ -2723,17 +3033,11 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
                     }            
                     if(multiple_is_set)
                     {
-                        if(mc_gState->m_Features->OpDropDetailsScripts())
-                        {
-                            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,4);
-                        }
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,4);
                     }
                     if(entity_name.size())
                     {
-                        if(mc_gState->m_Features->OpDropDetailsScripts())
-                        {
-                            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());//+1);
-                        }
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());//+1);
                     }
                     if(vKey.size())
                     {
@@ -2812,69 +3116,32 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
         {
             if(new_type == MC_ENT_TYPE_UPGRADE)
             {
-                if(mc_gState->m_Features->Upgrades())
+                if((allowed_objects & 0x0040) == 0)
                 {
-                    if((allowed_objects & 0x0040) == 0)
-                    {
-                        strError=string("Creating new upgrades not allowed in this API");                                                
-                    }
-                    else
-                    {
-                        if(lpDetails->m_Size)
-                        {
-                            strError=string("Invalid fields in details object");                                                            
-                        }
-                        if(entity_name.size())
-                        {
-                            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());//+1);
-                        }
-                        if(protocol_version > 0)
-                        {
-                            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,(unsigned char*)&protocol_version,4);                                
-                        }
-                        else
-                        {
-                            strError=string("Missing protocol-version");                                                                                    
-                        }
-                        if(startblock > 0)
-                        {
-                            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_START_BLOCK,(unsigned char*)&startblock,4);        
-                        }                    
-                        if(multiple_is_set)
-                        {
-                            strError=string("Invalid field: multiple");                                                            
-                        }
-                        if(open_is_set)
-                        {
-                            strError=string("Invalid field: open");                                                            
-                        }
-                        if(vKey.size())
-                        {
-                            strError=string("Invalid field: key");                                                            
-                        }
-                        if(vValue.size())
-                        {
-                            strError=string("Invalid field: value");                                                            
-                        }
-                    }
+                    strError=string("Creating new upgrades not allowed in this API");                                                
                 }
                 else
                 {
-                    strError=string("Upgrades are not supported by this protocol version"); 
-                }
-            }
-        }
-        
-        if(strError.size() == 0)
-        {
-            if(new_type == -5)
-            {
-                if(mc_gState->m_Features->Upgrades())
-                {
                     if(lpDetails->m_Size)
                     {
-                        strError=string("Invalid field: details");                                                            
+                        strError=string("Invalid fields in details object");                                                            
                     }
+                    if(entity_name.size())
+                    {
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());//+1);
+                    }
+                    if(protocol_version > 0)
+                    {
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION,(unsigned char*)&protocol_version,4);                                
+                    }
+                    else
+                    {
+                        strError=string("Missing protocol-version");                                                                                    
+                    }
+                    if(startblock > 0)
+                    {
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPGRADE_START_BLOCK,(unsigned char*)&startblock,4);        
+                    }                    
                     if(multiple_is_set)
                     {
                         strError=string("Invalid field: multiple");                                                            
@@ -2892,9 +3159,32 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
                         strError=string("Invalid field: value");                                                            
                     }
                 }
-                else
+            }
+        }
+        
+        if(strError.size() == 0)
+        {
+            if(new_type == -5)
+            {
+                if(lpDetails->m_Size)
                 {
-                    strError=string("Upgrades are not supported by this protocol version"); 
+                    strError=string("Invalid field: details");                                                            
+                }
+                if(multiple_is_set)
+                {
+                    strError=string("Invalid field: multiple");                                                            
+                }
+                if(open_is_set)
+                {
+                    strError=string("Invalid field: open");                                                            
+                }
+                if(vKey.size())
+                {
+                    strError=string("Invalid field: key");                                                            
+                }
+                if(vValue.size())
+                {
+                    strError=string("Invalid field: value");                                                            
                 }
             }
         }
@@ -2907,64 +3197,32 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
             
             if(new_type == MC_ENT_TYPE_ASSET)
             {
-                if(mc_gState->m_Features->OpDropDetailsScripts())
+                script=lpDetails->GetData(0,&bytes);
+                err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
+                if(err)
                 {
-                    script=lpDetails->GetData(0,&bytes);
-                    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
-                    if(err)
-                    {
-                        strError=string("Invalid custom fields, too long");                                                            
-                    }
-                    else
-                    {
-                        script = lpDetailsScript->GetData(0,&bytes);
-                        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
-                    }
+                    strError=string("Invalid custom fields, too long");                                                            
                 }
                 else
                 {
-                    script=lpDetails->GetData(0,&bytes);
-                    lpDetailsScript->SetAssetDetails(entity_name.c_str(),multiple,script,bytes);                
                     script = lpDetailsScript->GetData(0,&bytes);
-                    if(bytes > 0)
-                    {
-                        scriptOpReturn << OP_RETURN << vector<unsigned char>(script, script + bytes);
-                    }                    
+                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
                 }
             }
             
             if(new_type == MC_ENT_TYPE_STREAM)
             {
-                if(mc_gState->m_Features->OpDropDetailsScripts())
+                int err;
+                script=lpDetails->GetData(0,&bytes);
+                err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
+                if(err)
                 {
-                    int err;
-                    script=lpDetails->GetData(0,&bytes);
-                    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
-                    if(err)
-                    {
-                        strError=string("Invalid custom fields, too long");                                                            
-                    }
-                    else
-                    {
-                        script = lpDetailsScript->GetData(0,&bytes);
-                        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
-                    }
+                    strError=string("Invalid custom fields, too long");                                                            
                 }
                 else
                 {
-                    lpDetailsScript->Clear();
-                    lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM);
                     script = lpDetailsScript->GetData(0,&bytes);
-                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
-                    
-                    lpDetailsScript->Clear();
-                    script=lpDetails->GetData(0,&bytes);
-                    lpDetailsScript->SetGeneralDetails(script,bytes);                
-                    script = lpDetailsScript->GetData(0,&bytes);
-                    if(bytes > 0)
-                    {
-                        scriptOpReturn << OP_RETURN << vector<unsigned char>(script, script + bytes);
-                    }
+                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
                 }
             }
             
@@ -2986,37 +3244,23 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
             
             if(new_type == -2)
             {
-                if(mc_gState->m_Features->OpDropDetailsScripts())
-                {
-                    int err;
-                    lpDetailsScript->Clear();
-                    lpDetailsScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
-                    script = lpDetailsScript->GetData(0,&bytes);
-                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
+                int err;
+                lpDetailsScript->Clear();
+                lpDetailsScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
+                script = lpDetailsScript->GetData(0,&bytes);
+                scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
 
-                    lpDetailsScript->Clear();
-                    script=lpDetails->GetData(0,&bytes);
-                    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
-                    if(err)
-                    {
-                        strError=string("Invalid custom fields, too long");                                                            
-                    }
-                    else
-                    {
-                        script = lpDetailsScript->GetData(0,&bytes);
-                        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
-                    }
+                lpDetailsScript->Clear();
+                script=lpDetails->GetData(0,&bytes);
+                err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
+                if(err)
+                {
+                    strError=string("Invalid custom fields, too long");                                                            
                 }
                 else
                 {
-                    lpDetailsScript->Clear();
-                    script=lpDetails->GetData(0,&bytes);
-                    lpDetailsScript->SetGeneralDetails(script,bytes);                
                     script = lpDetailsScript->GetData(0,&bytes);
-                    if(bytes > 0)
-                    {
-                        scriptOpReturn << OP_RETURN << vector<unsigned char>(script, script + bytes);
-                    }                    
+                    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
                 }
             }
                 
@@ -3361,6 +3605,92 @@ bool ParseIntRange(string str,int *from,int *to)
     return true;
 }
 
+
+
+int ParseBlockIdentifier(Value blockset_identifier)
+{
+    if(blockset_identifier.type() == obj_type)
+    {
+        int64_t starttime=-1; 
+        BOOST_FOREACH(const Pair& d, blockset_identifier.get_obj()) 
+        {              
+            if(d.name_ == "starttime")
+            {
+                if(starttime >= 0)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Multiple starttime");                                
+                }
+                
+                starttime=d.value_.get_int64();
+                if( (starttime<0) || (starttime > 0xffffffff))
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid starttime");                                
+                }                
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid block identifier");                            
+            }
+        }        
+        if(starttime<0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid block identifier");                                
+        }                
+        for(int block=0; block<chainActive.Height();block++)
+        {
+            if(chainActive[block]->nTime >= starttime)
+            {
+                return block;
+            }
+        }            
+        return chainActive.Height()+1;
+    }    
+    else
+    {
+        if(blockset_identifier.type() == int_type)
+        {
+            int block=blockset_identifier.get_int();
+            if(block < 0)
+            {
+                block=chainActive.Height()+block+1;
+            }
+            if(block<0)
+            {
+                block=0;
+            }
+            return block;
+        }
+    }    
+    
+    return -1;
+}
+
+int ParseRescanParameter(Value rescan_identifier, bool *fRescan)
+{
+    int start_block=ParseBlockIdentifier(rescan_identifier);
+    *fRescan=false;
+    if(start_block >= 0)
+    {
+        if(start_block <= chainActive.Height())
+        {
+            *fRescan=true;
+        }
+    }
+    else
+    {
+        if(rescan_identifier.type() == bool_type)
+        {
+            start_block=0;
+            *fRescan=rescan_identifier.get_bool();
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid rescan");                                            
+        }
+    }
+    return start_block;
+}
+
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
 {
     vector<int> block_set;
@@ -3408,11 +3738,11 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
         if(starttime < 0)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing starttime");            
         if(endtime < 0)
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing starttime");            
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing endtime");            
         
         if(starttime <= endtime)
         {
-            for(int block=0; block<chainActive.Height();block++)
+            for(int block=0; block<=chainActive.Height();block++)
             {
                 if( (chainActive[block]->nTime >= starttime) && (chainActive[block]->nTime <= endtime) )
                 {
@@ -3636,6 +3966,28 @@ int paramtoint(Value param,bool check_for_min,int min_value,string error_message
     return result;
 }
 
+int64_t paramtoint64(Value param,bool check_for_min,int64_t min_value,string error_message)
+{
+    int64_t result;
+    
+    if(param.type() != int_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, error_message);        
+    }
+    
+    result=param.get_int64();
+    if(check_for_min)
+    {
+        if(result < min_value)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, error_message);                    
+        }
+    }
+    
+    return result;
+}
+
+
 bool mc_IsJsonObjectForMerge(const Value *value,int level)
 {
     if(value->type() != obj_type)
@@ -3721,7 +4073,7 @@ Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int l
         
     if(!value1_is_obj)
     {
-        if(mode & MC_VMM_IGNORE)
+        if(mode & MC_VMM_IGNORE_OTHER)
         {
             return *value2; 
         }
@@ -3732,7 +4084,7 @@ Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int l
     {
         if(!value2_is_obj)
         {
-            if(mode & MC_VMM_IGNORE)
+            if(mode & MC_VMM_IGNORE_OTHER)
             {
                 return *value1;
             }            
@@ -3813,3 +4165,46 @@ Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int l
     
     return result;
 }
+
+int mc_BinaryCacheFile(string id,int mode)
+{
+    char dir_name[MC_DCT_DB_MAX_PATH];                   
+    char file_name[MC_DCT_DB_MAX_PATH];                   
+    int flags;
+    
+    
+    string str_file_name=strprintf("cache/%s",id);
+    
+    mc_GetFullFileName(mc_gState->m_Params->NetworkName(),"cache","",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,dir_name);
+    mc_CreateDir(dir_name);
+    mc_GetFullFileName(mc_gState->m_Params->NetworkName(),str_file_name.c_str(),"",MC_FOM_RELATIVE_TO_DATADIR,file_name);
+    
+    flags=O_RDONLY;
+    if(mode & 1)
+    {
+       flags=O_CREAT; 
+    }
+    if(mode & 2)
+    {
+       flags=O_RDWR; 
+    }
+    return open(file_name,_O_BINARY | flags, S_IRUSR | S_IWUSR);
+}
+
+void mc_RemoveBinaryCacheFile(string id)
+{
+    char file_name[MC_DCT_DB_MAX_PATH];                   
+    
+    if(id == "*")
+    {
+        mc_RemoveDir(mc_gState->m_Params->NetworkName(),"cache");
+        return; 
+    }
+    
+    string str_file_name=strprintf("cache/%s",id);
+    
+    mc_GetFullFileName(mc_gState->m_Params->NetworkName(),str_file_name.c_str(),"",MC_FOM_RELATIVE_TO_DATADIR,file_name);
+
+    __US_DeleteFile(file_name);
+}
+

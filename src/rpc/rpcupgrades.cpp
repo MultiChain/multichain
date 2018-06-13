@@ -14,11 +14,6 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
     if (fHelp || params.size() < 5)
         throw runtime_error("Help message not found\n");
 
-    if(mc_gState->m_Features->Upgrades() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported for this protocol version");        
-    }
-
     if (strcmp(params[1].get_str().c_str(),"upgrade"))
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type, should be stream");
 
@@ -44,12 +39,9 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
         upgrade_name=params[2].get_str();
     }
         
-    if(mc_gState->m_Features->Streams())
+    if(upgrade_name == "*")
     {
-        if(upgrade_name == "*")
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid upgrade name: *");                                                                                            
-        }
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid upgrade name: *");                                                                                            
     }
 
     unsigned char buf_a[MC_AST_ASSET_REF_SIZE];    
@@ -447,7 +439,7 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
         mc_PermissionDetails *plsRow;
         mc_PermissionDetails *plsDet;
         mc_EntityDetails upgrade_entity;
-        int flags,consensus,remaining;
+        int consensus;
         Value null_value;
         string param_name;
         
@@ -524,7 +516,6 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
             if(upgrades->GetCount())
             {
                 plsRow=(mc_PermissionDetails *)(upgrades->GetRow(upgrades->GetCount()-1));
-                flags=plsRow->m_Flags;
                 consensus=plsRow->m_RequiredAdmins;
                 if(plsRow->m_Type != MC_PTP_UPGRADE)
                 {
@@ -549,7 +540,6 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
                     for(int j=0;j<details->GetCount();j++)
                     {
                         plsDet=(mc_PermissionDetails *)(details->GetRow(j));
-                        remaining=plsDet->m_RequiredAdmins;
                         if(plsDet->m_BlockFrom < plsDet->m_BlockTo)
                         {
                             uint160 addr;
@@ -584,211 +574,4 @@ Value listupgrades(const json_spirit::Array& params, bool fHelp)
     return results;
 }
 
-Value listupgrades_old(const json_spirit::Array& params, bool fHelp)
-{
-    if (fHelp || params.size() > 1)
-        throw runtime_error("Help message not found\n");
-
-    Array results;
-    mc_Buffer *upgrades;
-    int latest_version;
-    
-    upgrades=NULL;
-    
-   
-    vector<string> inputStrings;
-    if (params.size() > 0 && params[0].type() != null_type && ((params[0].type() != str_type) || (params[0].get_str() !="*" ) ) )
-    {        
-        if(params[0].type() == str_type)
-        {
-            inputStrings.push_back(params[0].get_str());
-            if(params[0].get_str() == "")
-            {
-                return results;                
-            }
-        }
-        else
-        {
-            inputStrings=ParseStringList(params[0]);        
-            if(inputStrings.size() == 0)
-            {
-                return results;
-            }
-        }
-    }
-    
-    
-    if(inputStrings.size())
-    {
-        {
-            LOCK(cs_main);
-            for(int is=0;is<(int)inputStrings.size();is++)
-            {
-                string param=inputStrings[is];
-
-                mc_EntityDetails upgrade_entity;
-                ParseEntityIdentifier(param,&upgrade_entity, MC_ENT_TYPE_UPGRADE);           
-                
-                upgrades=mc_gState->m_Permissions->GetUpgradeList(upgrade_entity.GetTxID() + MC_AST_SHORT_TXID_OFFSET,upgrades);
-            }
-        }
-    }
-    else
-    {        
-        {
-            LOCK(cs_main);
-            upgrades=mc_gState->m_Permissions->GetUpgradeList(NULL,upgrades);
-        }
-    }
-    
-    if(upgrades == NULL)
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot open entity database");
-
-    set <uint160> stored_upgrades;
-    map <uint64_t,int> map_sorted;
-    uint160 hash;
-    
-    for(int i=0;i<upgrades->GetCount();i++)
-    {
-        mc_PermissionDetails *plsRow;
-        plsRow=(mc_PermissionDetails *)(upgrades->GetRow(i));
-        if(plsRow->m_Type == MC_PTP_UPGRADE)
-        {            
-            memcpy(&hash,plsRow->m_Address,sizeof(uint160));
-            stored_upgrades.insert(hash);
-            map_sorted.insert(std::make_pair(plsRow->m_LastRow,i));
-        }        
-    }   
-    for(int i=0;i<upgrades->GetCount();i++)
-    {
-        mc_PermissionDetails *plsRow;
-        plsRow=(mc_PermissionDetails *)(upgrades->GetRow(i));
-        if(plsRow->m_Type != MC_PTP_UPGRADE)
-        {
-            memcpy(&hash,plsRow->m_Address,sizeof(uint160));
-            if(stored_upgrades.count(hash) == 0)
-            {
-//                plsRow->m_Type = MC_PTP_UPGRADE;
-                plsRow->m_BlockTo = 0;
-                map_sorted.insert(std::make_pair(plsRow->m_LastRow,i));
-            }
-        }
-    }    
-    
-    latest_version=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
-    BOOST_FOREACH(PAIRTYPE(const uint64_t, int)& item, map_sorted)
-    {
-        int i=item.second;
-        Object entry;
-        mc_PermissionDetails *plsRow;
-        mc_PermissionDetails *plsDet;
-        mc_EntityDetails upgrade_entity;
-        bool take_it,approved;
-        int flags,consensus,remaining;
-        plsRow=(mc_PermissionDetails *)(upgrades->GetRow(i));
-        
-        upgrade_entity.Zero();
-        mc_gState->m_Assets->FindEntityByShortTxID(&upgrade_entity,plsRow->m_Address);
-
-        entry=UpgradeEntry(upgrade_entity.GetTxID());
-        approved=true;
-        if(plsRow->m_BlockFrom >= plsRow->m_BlockTo)
-        {
-            approved=false;  
-            entry.push_back(Pair("approved", false));            
-            Value null_value;
-            entry.push_back(Pair("appliedblock",null_value));            
-        }
-        else
-        {
-            entry.push_back(Pair("approved", true));
-            int current_height=chainActive.Height();     
-            int applied_height=upgrade_entity.UpgradeStartBlock();
-            if((int)plsRow->m_BlockReceived > applied_height)
-            {
-                applied_height=plsRow->m_BlockReceived;
-            }
-            if(current_height >=applied_height)
-            {
-                if(upgrade_entity.UpgradeProtocolVersion())
-                {
-                    if((latest_version < mc_gState->MinProtocolForbiddenDowngradeVersion()) || (upgrade_entity.UpgradeProtocolVersion() >= latest_version))
-                    {
-                        latest_version=upgrade_entity.UpgradeProtocolVersion();
-                        entry.push_back(Pair("appliedblock",(int64_t)applied_height));                            
-                    }
-                    else
-                    {
-                        Value null_value;
-                        entry.push_back(Pair("appliedblock",null_value));                                                
-                    }
-                }
-                else
-                {
-                    entry.push_back(Pair("appliedblock",(int64_t)applied_height));                                                
-                }
-            }
-            else
-            {
-                Value null_value;
-                entry.push_back(Pair("appliedblock",null_value));                            
-            }
-        }
-        
-        take_it=true;
-        flags=plsRow->m_Flags;
-        consensus=plsRow->m_RequiredAdmins;
-
-        if(take_it)
-        {
-            Array admins;
-            Array pending;
-            mc_Buffer *details;
-
-            if(plsRow->m_Type == MC_PTP_UPGRADE)
-            {
-                details=mc_gState->m_Permissions->GetPermissionDetails(plsRow);                            
-            }
-            else
-            {
-                details=NULL;
-            }
-
-            if(details)
-            {             
-                for(int j=0;j<details->GetCount();j++)
-                {
-                    plsDet=(mc_PermissionDetails *)(details->GetRow(j));
-                    remaining=plsDet->m_RequiredAdmins;
-                    if(plsDet->m_BlockFrom < plsDet->m_BlockTo)
-                    {
-                        uint160 addr;
-                        memcpy(&addr,plsDet->m_LastAdmin,sizeof(uint160));
-                        CKeyID lpKeyID=CKeyID(addr);
-                        admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
-                    }
-                }                    
-                consensus=plsRow->m_RequiredAdmins;
-            }
-            if(admins.size() == 0)
-            {
-                if(plsRow->m_BlockFrom < plsRow->m_BlockTo)
-                {
-                    uint160 addr;
-                    memcpy(&addr,plsRow->m_LastAdmin,sizeof(uint160));
-                    CKeyID lpKeyID=CKeyID(addr);
-                    admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                                    
-                }                
-            }
-            
-            entry.push_back(Pair("admins", admins));
-            entry.push_back(Pair("required", (int64_t)(consensus-admins.size())));
-            results.push_back(entry);
-        }
-    }
-    
-    mc_gState->m_Permissions->FreePermissionList(upgrades);
-     
-    return results;
-}
 

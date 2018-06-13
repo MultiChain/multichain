@@ -286,6 +286,14 @@ public:
     }
 };
 
+/** 96-bit unsigned big integer. */
+class uint96 : public base_uint<96> {
+public:
+    uint96() {}
+    uint96(const base_uint<96>& b) : base_uint<96>(b) {}
+    uint96(uint64_t b) : base_uint<96>(b) {}
+};
+
 /** 160-bit unsigned big integer. */
 class uint160 : public base_uint<160> {
 public:

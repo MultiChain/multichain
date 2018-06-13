@@ -70,6 +70,8 @@ static const CRPCCommand vRPCCommands[] =
     { "network",            "getnettotals",           &getnettotals,           true,      true,       false },
     { "network",            "getpeerinfo",            &getpeerinfo,            true,      false,      false },
     { "network",            "ping",                   &ping,                   true,      false,      false },
+    { "network",            "getchunkqueueinfo",      &getchunkqueueinfo,      true,      true,       true  },
+    { "network",            "getchunkqueuetotals",    &getchunkqueuetotals,         true,      true,       true  },
 
     /* Block chain and UTXO */
     { "blockchain",         "getblockchaininfo",      &getblockchaininfo,      true,      false,      false },
@@ -121,6 +123,7 @@ static const CRPCCommand vRPCCommands[] =
     { "rawtransactions",    "appendrawchange",        &appendrawchange,        false,     false,      true },
     { "hidden",             "appendrawmetadata",      &appendrawmetadata,      false,     false,      true },
     { "rawtransactions",    "appendrawdata",          &appendrawmetadata,      false,     false,      true },
+    { "hidden",             "debug",                  &debug,               false,     true,       true },
 /* MCHN END */    
 
     /* Utility functions */
@@ -130,6 +133,10 @@ static const CRPCCommand vRPCCommands[] =
     { "util",               "verifymessage",          &verifymessage,          true,      false,      false },
     { "util",               "estimatefee",            &estimatefee,            true,      true,       false },
     { "util",               "estimatepriority",       &estimatepriority,       true,      true,       false },
+    
+    { "util",               "createbinarycache",      &createbinarycache,      true,      false,       false },
+    { "util",               "appendbinarycache",      &appendbinarycache,      true,      false,       false },
+    { "util",               "deletebinarycache",      &deletebinarycache,       true,      false,       false },
 
     /* Not shown in help */
     { "hidden",             "invalidateblock",        &invalidateblock,        true,      true,       false },
@@ -241,6 +248,7 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "liststreamblockitems",   &liststreamblockitems,    false,      false,      false },
     { "wallet",             "getstreamkeysummary",    &getstreamkeysummary,        false,     false,      true },
     { "wallet",             "getstreampublishersummary",   &getstreampublishersummary,        false,     false,      true },
+    { "hidden",             "storechunk",             &storechunk,                false,     false,      true },
     
 /* MCHN END */    
     { "wallet",             "setaccount",             &setaccount,             true,      false,      true },

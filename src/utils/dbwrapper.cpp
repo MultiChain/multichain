@@ -410,10 +410,12 @@ char *cs_Database::Read(char *key,int key_len,int *value_len,int Options,int *er
 {
     char *err = NULL;
     const char *lpIterRead;
+    const char *lpIterReadKey;
     char *lpRead;
     char *lpNewBuffer;
     int NewSize;
     size_t vallen;
+    size_t kallen;
 
     int klen=key_len;
     
@@ -435,6 +437,7 @@ char *cs_Database::Read(char *key,int key_len,int *value_len,int Options,int *er
 
     lpRead=NULL;
     lpIterRead=NULL;
+    lpIterReadKey=NULL;
     
     switch(m_Options & MC_OPT_DB_DATABASE_TYPE_MASK)
     {
@@ -443,7 +446,7 @@ char *cs_Database::Read(char *key,int key_len,int *value_len,int Options,int *er
 //            *error=MC_ERR_NOT_SUPPORTED;
 //            return NULL;
 
-            if(Options & MC_OPT_DB_DATABASE_SEEK_ON_READ)
+            if(Options & (MC_OPT_DB_DATABASE_SEEK_ON_READ | MC_OPT_DB_DATABASE_NEXT_ON_READ) )
             {
 //                *error=MC_ERR_OPERATION_NOT_SUPPORTED;
 //                return NULL;                
@@ -459,10 +462,10 @@ char *cs_Database::Read(char *key,int key_len,int *value_len,int Options,int *er
                 leveldb_iter_seek((leveldb_iterator_t*)m_Iterator, key, klen);
                 if(leveldb_iter_valid((leveldb_iterator_t*)m_Iterator))
                 {
-                    lpIterRead=leveldb_iter_key((leveldb_iterator_t*)m_Iterator, &vallen);
-                    if(lpIterRead)
+                    lpIterReadKey=leveldb_iter_key((leveldb_iterator_t*)m_Iterator, &kallen);
+                    if(lpIterReadKey)
                     {
-                        if( ((int)vallen == klen) && (memcmp(lpIterRead,key,klen) == 0) )
+                        if( ((int)kallen == klen) && ( ((Options & MC_OPT_DB_DATABASE_NEXT_ON_READ) != 0) || (memcmp(lpIterReadKey,key,klen) == 0) ) )
                         {
                             lpIterRead=leveldb_iter_value((leveldb_iterator_t*)m_Iterator, &vallen);                            
                         }
@@ -499,9 +502,9 @@ char *cs_Database::Read(char *key,int key_len,int *value_len,int Options,int *er
             break;
     }
     
-    if(*value_len+1>m_ReadBufferSize)
+    if(*value_len+klen+1>m_ReadBufferSize)
     {
-        NewSize=((*value_len)/MC_DCT_DB_READ_BUFFER_SIZE + 1) * MC_DCT_DB_READ_BUFFER_SIZE;
+        NewSize=((*value_len+klen)/MC_DCT_DB_READ_BUFFER_SIZE + 1) * MC_DCT_DB_READ_BUFFER_SIZE;
         lpNewBuffer=(char*)mc_New(NewSize);
         if(lpNewBuffer  == NULL)
         {
@@ -518,12 +521,22 @@ char *cs_Database::Read(char *key,int key_len,int *value_len,int Options,int *er
     if(lpRead)
     {
         memcpy(m_ReadBuffer,lpRead,*value_len);
+        m_ReadBuffer[*value_len]=0;
     }
     if(lpIterRead)
     {
-        memcpy(m_ReadBuffer,lpIterRead,*value_len);
+        if(Options & MC_OPT_DB_DATABASE_NEXT_ON_READ)
+        {
+            memcpy(m_ReadBuffer,lpIterReadKey,klen);
+            memcpy(m_ReadBuffer+klen,lpIterRead,*value_len);
+            m_ReadBuffer[klen+*value_len]=0;
+        }
+        else
+        {
+            memcpy(m_ReadBuffer,lpIterRead,*value_len);
+            m_ReadBuffer[*value_len]=0;
+        }
     }
-    m_ReadBuffer[*value_len]=0;
     
     switch(m_Options & MC_OPT_DB_DATABASE_TYPE_MASK)
     {
@@ -611,7 +624,14 @@ int cs_Database::Commit(int Options)
 
             if(Options & MC_OPT_DB_DATABASE_TRANSACTIONAL)
             {
-                leveldb_write((leveldb_t*)m_DB, (leveldb_writeoptions_t*)m_WriteOptions, (leveldb_writebatch_t*)m_WriteBatch, &err);        
+                if(Options & MC_OPT_DB_DATABASE_SYNC_ON_COMMIT)
+                {
+                    leveldb_write((leveldb_t*)m_DB, (leveldb_writeoptions_t*)m_SyncOptions, (leveldb_writebatch_t*)m_WriteBatch, &err);        
+                }
+                else
+                {
+                    leveldb_write((leveldb_t*)m_DB, (leveldb_writeoptions_t*)m_WriteOptions, (leveldb_writebatch_t*)m_WriteBatch, &err);                            
+                }
                 leveldb_writebatch_clear((leveldb_writebatch_t*)m_WriteBatch);
             }
 

@@ -1393,6 +1393,11 @@ void mc_InitRPCHelpMap06()
             "1. \"entity-type\"                    (string, required) stream\n"
             "2. \"stream-name\"                    (string, required) Stream name, if not \"\" should be unique.\n"
             "3. open                             (boolean, required ) Allow anyone to publish in this stream\n"
+            "  or \n"
+            "3. restrictions                     (object, optional) Stream restrictions\n"
+            "    {\n"
+            "      \"restrict\" : \"restrictions\"   (string, optional) Stream restrictions, comma delimited. Possible values: write,offchain,onchain\n"
+            "    }\n"
             "4  custom-fields                    (object, optional)  a json object with custom fields\n"
             "    {\n"
             "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
@@ -1435,6 +1440,11 @@ void mc_InitRPCHelpMap06()
             "2. entity-type                      (string, required) stream\n"
             "3. \"stream-name\"                    (string, required) Stream name, if not \"\" should be unique.\n"
             "4. open                             (boolean, required) Allow anyone to publish in this stream\n"
+            "  or \n"
+            "4. restrictions                     (object, optional) Stream restrictions\n"
+            "    {\n"
+            "      \"restrict\" : \"restrictions\"   (string, optional) Stream restrictions, comma delimited. Possible values: write,offchain,onchain\n"
+            "    }\n"
             "5  custom-fields                    (object, optional)  a json object with custom fields\n"
             "    {\n"
             "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
@@ -2193,7 +2203,8 @@ void mc_InitRPCHelpMap10()
             " or\n"
             "1. address(es)                      (array, optional) A json array of addresses \n"                
             "2. \"label\"                          (string, optional, default=\"\") An optional label\n"
-            "3. rescan                           (boolean, optional, default=true) Rescan the wallet for transactions\n"
+            "3. rescan                           (boolean or integer, optional, default=true) Rescan the wallet for transactions. \n"
+            "                                                       If integer rescan from block, if negative - from the end.\n"
             "\nNote: This call can take minutes to complete if rescan is true.\n"
             "\nResult:\n"
             "\nExamples:\n"
@@ -2213,7 +2224,8 @@ void mc_InitRPCHelpMap10()
             " or\n"
             "1. privkey(s)                       (array, optional) A json array of private keys \n"                
             "2. \"label\"                          (string, optional, default=\"\") An optional label\n"
-            "3. rescan                           (boolean, optional, default=true) Rescan the wallet for transactions\n"
+            "3. rescan                           (boolean or integer, optional, default=true) Rescan the wallet for transactions. \n"
+            "                                                       If integer rescan from block, if negative - from the end.\n"
             "\nNote: This call can take minutes to complete if rescan is true.\n"
             "\nResult:\n"
             "\nExamples:\n"
@@ -2228,10 +2240,11 @@ void mc_InitRPCHelpMap10()
         ));
     
     mapHelpStrings.insert(std::make_pair("importwallet",
-            "importwallet \"filename\"\n"
+            "importwallet \"filename\" ( rescan )\n"
             "\nImports keys from a wallet dump file (see dumpwallet).\n"
             "\nArguments:\n"
             "1. \"filename\"                       (string, required) The wallet file\n"
+            "2. rescan                           (integer, optional, default=0) Rescan from block, if negative - from the end.\n"
             "\nExamples:\n"
             "\nDump the wallet\n"
             + HelpExampleCli("dumpwallet", "\"test\"") +
@@ -2949,7 +2962,7 @@ void mc_InitRPCHelpMap13()
         ));
     
     mapHelpStrings.insert(std::make_pair("publish",
-            "publish \"stream-identifier\" \"key\"|keys \"data-hex\"|data-obj \n"
+            "publish \"stream-identifier\" \"key\"|keys \"data-hex\"|data-obj \"options\" \n"
             "\nPublishes stream item\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -2968,6 +2981,18 @@ void mc_InitRPCHelpMap13()
             "    {\n"
             "      \"text\" : \"data-text\"          (string, required) Data string\n" 
             "    }\n"                                
+            " or\n"
+            "3. data-cached                      (object, required) Binary raw data created with appendbinarycache\n"
+            "    {\n"
+            "      \"cache\" : \"identifier\"        (string, required) Binary cache identifier\n" 
+            "    }\n"                                    
+/*    
+            "3. data-chunks                      (object, required) Offchain chunk hashes\n"
+            "    {\n"
+            "      \"chunks\" : chunk-hashes       (array, required) Array of chunk hashes created by storechunk\n" 
+            "    }\n"                                
+ */ 
+            "4. \"options\"                        (string, optional) Should be \"offchain\" or omitted\n"
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -2976,7 +3001,7 @@ void mc_InitRPCHelpMap13()
         ));
     
     mapHelpStrings.insert(std::make_pair("publishfrom",
-            "publishfrom \"from-address\" \"stream-identifier\" \"key\"|keys \"data-hex\"|data-obj \n"
+            "publishfrom \"from-address\" \"stream-identifier\" \"key\"|keys \"data-hex\"|data-obj \"options\" \n"
             "\nPublishes stream item from specific address\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -2996,6 +3021,18 @@ void mc_InitRPCHelpMap13()
             "    {\n"
             "      \"text\" : \"data-text\"          (string, required) Data string\n" 
             "    }\n"                                
+            " or\n"
+            "4. data-cached                      (object, required) Binary raw data created with appendbinarycache\n"
+            "    {\n"
+            "      \"cache\" : \"identifier\"        (string, required) Binary cache identifier\n" 
+            "    }\n"                                
+/*    
+            "4. data-chunks                      (object, required) Offchain chunk hashes\n"
+            "    {\n"
+            "      \"chunks\" : chunk-hashes       (array, required) Array of chunk hashes created by storechunk\n" 
+            "    }\n"                                
+ */ 
+            "5. \"options\"                        (string, optional) Should be \"offchain\" or omitted\n"
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -3446,7 +3483,7 @@ void mc_InitRPCHelpMap15()
          ));
     
     mapHelpStrings.insert(std::make_pair("unsubscribe",
-            "unsubscribe entity-identifier(s)\n"
+            "unsubscribe entity-identifier(s) ( purge )\n"
             "\nUnsubscribes from the stream.\n"
             "\nArguments:\n"
             "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
@@ -3454,6 +3491,7 @@ void mc_InitRPCHelpMap15()
             "1. \"asset-identifier\"               (string, required) Asset identifier - one of the following: asset txid, asset reference, asset name.\n"
             " or\n"
             "1. entity-identifier(s)             (array, optional) A json array of stream or asset identifiers \n"                
+            "2. purge                            (boolean, optional, default=false) Purge all offchain data for the stream\n"
             "\nResult:\n"
             "\nExamples:\n"
             + HelpExampleCli("unsubscribe", "\"test-stream\"")
@@ -3698,6 +3736,11 @@ void mc_InitRPCHelpMap16()
             "      \"text\" : \"data-text\"            (string, required) Data string\n" 
             "    }\n"                                
             " or\n"
+            "data-cached                           (object, required) Binary raw data created with appendbinarycache\n"
+            "    {\n"
+            "      \"cache\" : \"identifier\"          (string, required) Binary cache identifier\n" 
+            "    }\n"                                
+            " or\n"
             "issue-details                         (object, required) A json object with issue metadata\n"
             "    {\n"
             "      \"create\" : \"asset\"              (string, required) asset\n" 
@@ -3726,7 +3769,8 @@ void mc_InitRPCHelpMap16()
             "    {\n"                
             "      \"create\" : \"stream\"             (string, required) stream\n"
             "      \"name\" : \"stream-name\"          (string, optional) Stream name\n"
-            "      \"open\" : true|false             (string, optional, default: false) If true, anyone can publish\n"
+            "      \"open\" : true|false             (boolean, optional, default: false) If true, anyone can publish\n"
+            "      \"restrict\" : \"restrictions\"     (string, optional) Stream restrictions, comma delimited. Possible values: write,offchain,onchain\n"
             "      \"details\" :                     (object, optional) A json object with custom fields\n"           
             "        {\n"
             "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
@@ -3737,6 +3781,7 @@ void mc_InitRPCHelpMap16()
             "publish-new-stream-item               (object, required) A json object with stream item\n"
             "    {\n"                
             "      \"for\" : \"stream-identifier\"     (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "      \"options\" : \"options\"           (string, optional) Should be \"offchain\" or omitted\n"
             "      \"key\" : \"key\"                   (string, optional, default: \"\") Item key\n"
             "        or\n"
             "      \"keys\" : keys                   (array, optional) Item keys, array of strings\n"
@@ -3747,10 +3792,21 @@ void mc_InitRPCHelpMap16()
             "          \"json\" : data-json          (object, required) Valid JSON string\n" 
             "        }\n"                                
             "        or\n"
-            "      \"data\" :                        (object, required) JSON data object\n"
+            "      \"data\" :                        (object, required) Text data object\n"
             "        {\n"
             "          \"text\" : \"data-text\"        (string, required) Data string\n" 
             "        }\n"                                
+            "        or\n"
+            "      \"data\"                          (object, required) Binary raw data created with appendbinarycache\n"
+            "        {\n"
+            "          \"cache\" : \"identifier\"      (string, required) Binary cache identifier\n" 
+            "        }\n"                              
+/*    
+            "      \"data\" :                        (object, required) Offchain chunk hashes\n"
+            "        {\n"
+            "          \"chunks\" : chunk-hashes     (array, required) Array of chunk hashes created by storechunk\n" 
+            "        }\n"                                
+ */ 
             "    }\n"                                
             " or\n"
             "create-new-upgrade                    (object, required) A json object with new upgrade details\n"
@@ -3793,9 +3849,15 @@ void mc_InitRPCHelpMap16()
             "      \"text\" : \"data-text\"            (string, required) Data string\n" 
             "    }\n"                                
             " or\n"
+            "data-cached                           (object, required) Binary raw data created with appendbinarycache\n"
+            "    {\n"
+            "      \"cache\" : \"identifier\"          (string, required) Binary cache identifier\n" 
+            "    }\n"                                    
+            " or\n"
             "publish-new-stream-item               (object, required) A json object with stream item\n"
             "    {\n"                
             "      \"for\" : \"stream-identifier\"     (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "      \"options\" : \"options\"           (string, optional) Should be \"offchain\" or omitted\n"
             "      \"key\" : \"key\"                   (string, optional, default: \"\") Item key\n"
             "        or\n"
             "      \"keys\" : keys                   (array, optional) Item keys, array of strings\n"
@@ -3810,6 +3872,17 @@ void mc_InitRPCHelpMap16()
             "        {\n"
             "          \"text\" : \"data-text\"        (string, required) Data string\n" 
             "        }\n"                                
+            "        or\n"
+            "     \"data\" :                         (object, required) Binary raw data created with appendbinarycache\n"
+            "        {\n"
+            "          \"cache\" : \"identifier\"      (string, required) Binary cache identifier\n" 
+            "        }\n"                                    
+/*    
+            "      \"data\" :                        (object, required) Text chunk hashes\n"
+            "        {\n"
+            "          \"chunks\" : chunk-hashes     (array, required) Array of chunk hashes created by storechunk\n" 
+            "        }\n"                                
+ */ 
             "    }\n"                                
         ));
 
@@ -3867,6 +3940,11 @@ void mc_InitRPCHelpMap16()
             "            {\n"
             "              \"text\" : \"data-text\"     (string, required) Data string\n" 
             "            }\n"                                
+            "             or\n"
+            "          data-cached                  (object, required) Binary raw data created with appendbinarycache\n"
+            "            {\n"
+            "              \"cache\" : \"identifier\"   (string, required) Binary cache identifier\n" 
+            "            }\n"                                    
             "        }\n"                    
             "   }\n"                    
      
@@ -3889,7 +3967,8 @@ void mc_InitRPCHelpMap17()
             "                                                       recursive - merge json sub-objects recursively\n"
             "                                                       noupdate -  preserve first value for each key instead of taking the last\n"
             "                                                       omitnull - omit keys with null values\n"
-            "                                                       ignore - ignore items that cannot be included in summary (otherwise returns an error)\n"
+            "                                                       ignoreother - ignore items that cannot be included in summary (otherwise returns an error)\n"
+            "                                                       ignoremissing - ignore missing offchain items (otherwise returns an error)\n"
             "                                                       firstpublishersany - only summarize items by a publisher of first item with this key\n"
             "                                                       firstpublishersall - only summarize items by all publishers of first item with this key\n"
             "\nResult:\n"
@@ -3912,7 +3991,8 @@ void mc_InitRPCHelpMap17()
             "                                                       recursive - merge json sub-objects recursively\n"
             "                                                       noupdate -  preserve first value for each key instead of taking the last\n"
             "                                                       omitnull - omit keys with null values\n"
-            "                                                       ignore - ignore items that cannot be included in summary (otherwise returns an error)\n"
+            "                                                       ignoreother - ignore items that cannot be included in summary (otherwise returns an error)\n"
+            "                                                       ignoremissing - ignore missing offchain items (otherwise returns an error)\n"
             "\nResult:\n"
             "summary-object                      (object) Summary object for specific publisher.\n"
             "\nExamples:\n"
@@ -3921,11 +4001,127 @@ void mc_InitRPCHelpMap17()
             + HelpExampleRpc("liststreampublisheritems", "\"test-stream\", \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"jsonobjectmerge,ignore,recursive\"")
         ));
     
-  
+     mapHelpStrings.insert(std::make_pair("storechunk",
+            "storechunk \"data-hex\" \n"
+            "\nStores chunk of data in local wallet. Returns hash of the data, which can be used later when publishing offchain stream items.\n"
+            "\nArguments:\n"
+            "1. \"data-hex\"                       (string, required) The hex string of the data chunk\n"
+            "\nResult:\n"
+            "\"hex\"                               (string) The chunk hash in hex\n"
+            "\nExamples:\n"
+            + HelpExampleCli("storechunk", "\"f4c3dd510dd55761015c9d96bff7793b0d501dd6f01a959fd7\"") 
+            + HelpExampleRpc("storechunk", "\"f4c3dd510dd55761015c9d96bff7793b0d501dd6f01a959fd7\"")
+        ));
+    
+     mapHelpStrings.insert(std::make_pair("createbinarycache",
+            "createbinarycache \n"
+            "\nReturns random string, which can be used as binary cache item identifier\n"
+            "\nArguments:\n"
+            "\nResult:\n"
+            "\"identifier\"                               (string) Binary cache item identifier\n"
+            "\nExamples:\n"
+            + HelpExampleCli("createbinarycache","") 
+            + HelpExampleRpc("createbinarycache","")
+        ));
+    
+     mapHelpStrings.insert(std::make_pair("appendbinarycache",
+            "appendbinarycache \"identifier\" \"data-hex\" \n"
+            "\nAppends data to binary cache.\n"
+            "\nArguments:\n"
+            "1. \"identifier\"                     (string, required) Binary cache item identifier\n"
+            "2. \"data-hex\"                       (string, required) The hex string to be added to binary cache item\n"
+            "\nResult:\n"
+            "size                                (numeric) Size of the binary cache item\n"
+            "\nExamples:\n"
+            + HelpExampleCli("appendbinarycache", "\"TjnVWwHYEg4\" \"f4c3dd510dd55761015c9d96bff7793b0d501dd6f01a959fd7\"") 
+            + HelpExampleRpc("appendbinarycache", "\"TjnVWwHYEg4\",\"f4c3dd510dd55761015c9d96bff7793b0d501dd6f01a959fd7\"")
+        ));
+    
+     mapHelpStrings.insert(std::make_pair("deletebinarycache",
+            "deletebinarycache \"identifier\"  \n"
+            "\nClear binary cache item\n"
+            "\nArguments:\n"
+            "1. \"identifier\"                     (string, required) Binary cache item identifier, \"*\" - to clear all items\n"
+            "\nResult:\n"
+            "\nExamples:\n"
+            + HelpExampleCli("deletebinarycache", "\"TjnVWwHYEg4\"") 
+            + HelpExampleRpc("deletebinarycache", "\"TjnVWwHYEg4\"")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("walletpassphrase",
+            "walletpassphrase \"passphrase\" timeout\n"
+            "\nStores the wallet decryption key in memory for 'timeout' seconds.\n"
+            "This is needed prior to performing transactions related to private keys such as sending assets\n"
+            "\nArguments:\n"
+            "1. \"passphrase\"                     (string, required) The wallet passphrase\n"
+            "2. timeout                          (numeric, required) The time to keep the decryption key in seconds.\n"
+            "\nNote:\n"
+            "Issuing the walletpassphrase command while the wallet is already unlocked will set a new unlock\n"
+            "time that overrides the old one.\n"
+            "\nExamples:\n"
+            "\nunlock the wallet for 60 seconds\n"
+            + HelpExampleCli("walletpassphrase", "\"my pass phrase\" 60") +
+            "\nLock the wallet again (before 60 seconds)\n"
+            + HelpExampleCli("walletlock", "") +
+            "\nAs json rpc call\n"
+            + HelpExampleRpc("walletpassphrase", "\"my pass phrase\", 60")
+        ));
+    
+    
+    mapHelpStrings.insert(std::make_pair("walletpassphrasechange",
+            "walletpassphrasechange \"oldpassphrase\" \"newpassphrase\"\n"
+            "\nChanges the wallet passphrase from 'oldpassphrase' to 'newpassphrase'.\n"
+            "\nArguments:\n"
+            "1. \"oldpassphrase\"                  (string, required) The current passphrase\n"
+            "2. \"newpassphrase\"                  (string, required) The new passphrase\n"
+            "\nExamples:\n"
+            + HelpExampleCli("walletpassphrasechange", "\"old one\" \"new one\"")
+            + HelpExampleRpc("walletpassphrasechange", "\"old one\", \"new one\"")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("walletlock",
+            "walletlock\n"
+            "\nRemoves the wallet encryption key from memory, locking the wallet.\n"
+            "After calling this method, you will need to call walletpassphrase again\n"
+            "before being able to call any methods which require the wallet to be unlocked.\n"
+            "\nExamples:\n"
+            "\nSet the passphrase for 2 minutes to perform a transaction\n"
+            + HelpExampleCli("walletpassphrase", "\"my pass phrase\" 120") +
+            "\nPerform a send (requires passphrase set)\n"
+            + HelpExampleCli("sendtoaddress", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" 1.0") +
+            "\nClear the passphrase since we are done before 2 minutes is up\n"
+            + HelpExampleCli("walletlock", "") +
+            "\nAs json rpc call\n"
+            + HelpExampleRpc("walletlock", "")
+        ));
+
+     
+    mapHelpStrings.insert(std::make_pair("getchunkqueueinfo",
+            "getchunkqueueinfo\n"
+            "\nReturns data about each current chunk queue status.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getchunkqueueinfo", "")
+            + HelpExampleRpc("getchunkqueueinfo", "")
+        ));
+    
+}
+
+void mc_InitRPCHelpMap18()
+{
+    mapHelpStrings.insert(std::make_pair("getchunkqueuetotals",
+            "getchunkqueuetotals\n"
+            "\nReturns chunks delivery statistics.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getchunkqueuetotals", "")
+            + HelpExampleRpc("getchunkqueuetotals", "")
+        ));
+    
+    
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
        
+    
 }
 
 void mc_InitRPCLogParamCountMap()
@@ -4019,6 +4215,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap15();
     mc_InitRPCHelpMap16();
     mc_InitRPCHelpMap17();
+    mc_InitRPCHelpMap18();
     
     mc_InitRPCLogParamCountMap();
     mc_InitRPCAllowedWhenWaitingForUpgradeSet();    

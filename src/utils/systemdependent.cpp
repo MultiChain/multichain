@@ -229,6 +229,23 @@ void __US_FlushFile(int FileHan)
     fsync(FileHan);
 }
 
+void __US_FlushFileWithMode(int FileHan,uint32_t use_data_sync)
+{
+    if(use_data_sync)
+    {
+        fdatasync(FileHan);
+    }
+    else
+    {
+        fsync(FileHan);
+    }
+}
+
+int __US_DeleteFile(const char *file_name)
+{
+    return unlink(file_name);
+}
+
 #else
 
 #include "windows.h"
@@ -303,5 +320,17 @@ void __US_FlushFile(int FileHan)
     HANDLE hFile = (HANDLE)_get_osfhandle(FileHan);
     FlushFileBuffers(hFile);
 }
+
+void __US_FlushFileWithMode(int FileHan,uint32_t use_data_sync)
+{
+    HANDLE hFile = (HANDLE)_get_osfhandle(FileHan);
+    FlushFileBuffers(hFile);
+}
+
+int __US_DeleteFile(const char *file_name)
+{
+    return (int)DeleteFile(file_name);
+}
+
 
 #endif

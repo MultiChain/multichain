@@ -35,6 +35,7 @@ typedef struct mc_MapStringIndex
     void Remove(const char* key,int size);
     int Get(const char* key);
     int Get(const unsigned char* key,int size);
+    void Set(const unsigned char* key,int size,int value);
     void Destroy();
     void Clear();
 } mc_MapStringIndex;
@@ -90,6 +91,7 @@ typedef struct mc_Buffer
     int Seek(void *lpKey);
     unsigned char *GetRow(int RowID);    
     int PutRow(int RowID,const void *lpKey,const void *lpValue);    
+    int UpdateRow(int RowID,const void *lpKey,const void *lpValue);    
     int GetCount();    
     int SetCount(int count);
     
@@ -137,6 +139,8 @@ typedef struct mc_SHA256
     void Reset();
     void Write(const void *lpData,int size);
     void GetHash(unsigned char *hash);
+    
+    void DoubleHash(const void *lpData,int size,void *hash);
     
     mc_SHA256()
     {
@@ -204,6 +208,7 @@ void *mc_New(int Size);
 void mc_Delete(void *ptr);
 void mc_PutLE(void *dest,void *src,int dest_size);
 int64_t mc_GetLE(void *src,int size);
+uint32_t mc_SwapBytes32(uint32_t src);
 int mc_BackupFile(const char *network_name,const char *filename, const char *extension,int options);
 int mc_RecoverFile(const char *network_name,const char *filename, const char *extension,int options);
 FILE *mc_OpenFile(const char *network_name,const char *filename, const char *extension,const char *mode, int options);        
@@ -235,6 +240,7 @@ void mc_GetCompoundHash160(void *result,const void  *hash1,const void  *hash2);
 int mc_SetIPv4ServerAddress(const char* host);
 int mc_FindIPv4ServerAddress(uint32_t *all_ips,int max_ips);
 int mc_GenerateConfFiles(const char *network_name);
+void mc_CreateDir(const char *dir_name);
 void mc_RemoveDataDir(const char *network_name);
 void mc_RemoveDir(const char *network_name,const char *dir_name);
 int mc_GetDataDirArg(char *buf);
@@ -255,6 +261,7 @@ void mc_StringLowerCase(char *buf,uint32_t len);
 int mc_StringCompareCaseInsensitive(const char *str1,const char *str2,int len);
 
 uint32_t mc_GetParamFromDetailsScript(const unsigned char *ptr,uint32_t total,uint32_t offset,uint32_t* param_value_start,size_t *bytes);
+uint32_t mc_GetParamFromDetailsScriptErr(const unsigned char *ptr,uint32_t total,uint32_t offset,uint32_t* param_value_start,size_t *bytes, int *err);
 uint32_t mc_FindSpecialParamInDetailsScript(const unsigned char *ptr,uint32_t total,uint32_t param,size_t *bytes);
 uint32_t mc_FindNamedParamInDetailsScript(const unsigned char *ptr,uint32_t total,const char *param,size_t *bytes);
 
@@ -277,6 +284,9 @@ uint64_t __US_ThreadID();
 const char* __US_UserHomeDir();
 char * __US_FullPath(const char* path, char *full_path, int len);
 void __US_FlushFile(int FileHan);
+void __US_FlushFileWithMode(int FileHan,uint32_t use_data_sync);
+int __US_DeleteFile(const char *file_name);
+void sprintf_hex(char *hex,const unsigned char *bin,int size);
 
 
 

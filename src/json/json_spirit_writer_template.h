@@ -13,6 +13,7 @@
 #include <iomanip>
 
 extern uint32_t JSON_NO_DOUBLE_FORMATTING;                             
+extern int JSON_DOUBLE_DECIMAL_DIGITS;                             
 
 
 namespace json_spirit
@@ -113,7 +114,6 @@ namespace json_spirit
             result[  9 ] = to_hex_char( part2 & 0x000F ); part2 >>= 4;
             result[  8 ] = to_hex_char( part2 & 0x000F );                        
         }
-        
         return result;
     }
 
@@ -135,16 +135,17 @@ namespace json_spirit
 
             const wint_t unsigned_c( ( c >= 0 ) ? c : 256 + c );
 
-            if( iswprint( unsigned_c ) )
+            unsigned int codepoint=0;
+            unsigned int charlen,shift,j,mask;
+            charlen=utf8_len_and_mask(unsigned_c,&mask);
+            
+//            if( iswprint( unsigned_c ) )
+            if(charlen == 1)
             {
                 result += c;
             }
             else
             {
-                unsigned int codepoint=0;
-                unsigned int charlen,shift,j,mask;
-
-                charlen=utf8_len_and_mask(unsigned_c,&mask);
                 if( end - i >= charlen)
                 {
                     shift=6*(charlen-1);
@@ -237,8 +238,111 @@ namespace json_spirit
                os_ << value.get_int64();
             }
         }
-
+        
+        int output_double_precision( const double& value, int max_p )
+        {
+            int p=max_p;
+                        
+            char fp[20];
+            char sp[40];
+            sprintf(fp,"%%0.%df",p);
+            sprintf(sp,fp,value);
+            char *tp=sp+strlen(sp)-1;
+            while( (tp>sp) && (p>=0) && *tp=='0')
+            {
+                p--;
+                tp--;
+            }
+//            printf("%0.16f %s %s %c %d %d\n",value,fp,sp,*tp,(tp-sp),p);
+            if( (tp == sp) || (*tp == '.') )
+            {
+                p=0;
+            }
+            return p;
+        }
+        
         void output_double( const double& value )
+        {
+            int max_p=14;
+            if(JSON_DOUBLE_DECIMAL_DIGITS >= 0)
+            {
+                max_p=JSON_DOUBLE_DECIMAL_DIGITS;
+            }
+            
+            if(JSON_NO_DOUBLE_FORMATTING)                     
+            {
+                os_ << std::showpoint << std::fixed << std::setprecision(max_p) << value;                
+                return; 
+            }
+            double a=fabs(value);
+            double e=0.0;
+            int z=0;
+            double f=0.;
+            int j=0;
+            if(a > 0)
+            {
+                e=log10(a);
+            }            
+            if(e < -4)
+            {
+                f=a*1.e+9;
+                j=(int)f;
+                if(j)
+                {
+                    if( (f-j) < 0.0001)
+                    {
+                        z=1;
+                    }
+                }
+            }
+            int k=(int)e;
+            if(e<k)
+            {
+                k--;
+            }
+            double v=value/pow(10.,k);
+            
+            int p=output_double_precision(v,max_p);
+            if(p-k > max_p)
+            {
+                z=0;
+            }
+            
+            if( ((e < -4.) || (e > 12.)) && (z == 0))
+            {
+                if(p > 0)
+                {
+                    os_ << std::showpoint << std::fixed << std::setprecision(p) << v;
+                }
+                else
+                {
+                    os_ << (int)v;
+                }
+                os_ << "e" << ((e>=0) ? "+" : "") << k;
+            }
+            else
+            {
+                int pfull=output_double_precision(value,max_p);
+                if(pfull + k <= max_p)
+                {
+                    p=pfull;
+                }
+                else
+                {
+                    p-=k;
+                }
+                if(p > 0)
+                {
+                    os_ << std::showpoint << std::fixed << std::setprecision(p) << value;
+                }
+                else
+                {
+                    os_ << (int64_t)value;                    
+                }
+            }
+        }
+
+        void output_double_old( const double& value )
         {
             if(JSON_NO_DOUBLE_FORMATTING)                     
             {
@@ -277,18 +381,60 @@ namespace json_spirit
             double t=fabs(v)*pow(10.,p);
             int64_t n=(int64_t)(t+0.5);
             int64_t m=(int64_t)(t/10+0.5);
-            while( (p>0) && (n == m*10))
+            
+            if(JSON_DOUBLE_DECIMAL_DIGITS < 0)
             {
-                p--;
-                t/=10.;
-                n=m;
-                m=(int64_t)(t/10.+0.5);
+                while( (p>0) && (n == m*10))
+                {
+                    p--;
+                    t/=10.;
+                    n=m;
+                    m=(int64_t)(t/10.+0.5);
+                }
+                if(p-k > 9)
+                {
+                    z=0;
+                }
+            }
+            else
+            {
+                p=JSON_DOUBLE_DECIMAL_DIGITS;
+                if(p>16)
+                {
+                    p=16;
+                }
+                if(p-k > 9)
+                {
+                    z=0;
+                }
+                if(p)
+                {
+                    double tv=value;
+                    int ap=k;
+                    if( ((e < -4.) || (e > 12.)) && (z == 0))
+                    {
+                        tv=v;
+                        ap=0;
+                    }                    
+                    char fp[20];
+                    char sp[40];
+                    sprintf(fp,"%%0.%df",p);
+                    sprintf(sp,fp,tv);
+                    char *tp=sp+strlen(sp)-1;
+                    while( (tp>sp) && (p>=0) && *tp=='0')
+                    {
+                        p--;
+                        tp--;
+                    }
+                    printf("%d %s %s %c %d %d\n",k,fp,sp,*tp,(tp-sp),p);
+                    if( (tp == sp) || (*tp == '.') )
+                    {
+                        p=0;
+                    }
+                    p+=ap;
+                }
             }
             
-            if(p-k > 9)
-            {
-                z=0;
-            }
             
             if( ((e < -4.) || (e > 12.)) && (z == 0))
             {

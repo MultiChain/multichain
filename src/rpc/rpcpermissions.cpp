@@ -10,11 +10,7 @@
 
 string AllowedPermissions()
 {
-    string ret="connect,send,receive,issue,mine,admin,activate";
-    if(mc_gState->m_Features->Streams())
-    {
-        ret += ",create";
-    }
+    string ret="connect,send,receive,issue,mine,admin,activate,create";
     
     return ret;
 }

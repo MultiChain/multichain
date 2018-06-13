@@ -514,7 +514,80 @@ Value listaddresses(const Array& params, bool fHelp)
 
 
 
+Value storechunk(const Array& params, bool fHelp)
+{
+    int err;
+    
+    if (fHelp || params.size() != 1) 
+        throw runtime_error("Help message not found\n");
+    
+    if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+    }   
+    
+    vector<unsigned char> vValue;
+    if(params[0].type() != str_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "data should be hexadecimal string");                                                                                                                
+    }
+    
+    bool fIsHex;
+    vValue=ParseHex(params[0].get_str().c_str(),fIsHex);    
+    if(!fIsHex)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "data should be hexadecimal string");                                                                                                                
+    }        
+    
+    if(vValue.size() == 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "data should be non-empty hexadecimal string");                                                                                                                        
+    }
 
+    if((int)vValue.size() > MAX_CHUNK_SIZE)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "data is too long");                                                                                                                        
+    }
+    
+    uint256 hash;
+    mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(&vValue[0],(int)vValue.size(),&hash);
+/*    
+    mc_SHA256 *hasher;
+    
+    hasher=new mc_SHA256;    
+    hasher->Reset();
+    hasher->Write(&vValue[0],(int)vValue.size());
+    hasher->GetHash((unsigned char*)&hash);
+    hasher->Reset();
+    hasher->Write((unsigned char*)&hash,32);
+    hasher->GetHash((unsigned char*)&hash);
+    
+    delete hasher;
+*/    
+    mc_TxEntity entity;
+    entity.Zero();
+    entity.m_EntityType=MC_TET_AUTHOR;
+    
+    err=pwalletTxsMain->m_ChunkDB->AddChunk((unsigned char*)&hash,&entity,NULL,-1,(unsigned char*)&vValue[0],NULL,(int)vValue.size(),0,0);
+    
+    if(err)
+    {
+        switch(err)
+        {
+            case MC_ERR_FOUND:
+                break;
+            default:
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Internal error: couldn't store chunk");                                                                                                                                
+                break;
+        }
+    }
+    
+//    pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-chunkflushmode",MC_CDB_FLUSH_MODE_COMMIT));
+    pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-flushsourcechunks",true) ? (MC_CDB_FLUSH_MODE_FILE | MC_CDB_FLUSH_MODE_DATASYNC) : MC_CDB_FLUSH_MODE_NONE);
+    pwalletTxsMain->m_ChunkDB->Dump("storechunk");
+    
+    return hash.GetHex();
+}
 
 
 
@@ -571,9 +644,14 @@ Value gettxoutdata(const Array& params, bool fHelp)
     mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
 
     uint32_t format;
-    string metadata="";
+    unsigned char *chunk_hashes;
+    int chunk_count;   
+    int64_t total_chunk_size,out_size;
+    uint32_t retrieve_status;
     size_t elem_size;
     const unsigned char *elem;
+    string error_str;
+    int errorCode;
     
     if(mc_gState->m_TmpScript->IsOpReturnScript() == 0)                      
     {
@@ -598,6 +676,7 @@ Value gettxoutdata(const Array& params, bool fHelp)
                 }
                 elem=ptr;
                 elem_size=size;
+                out_size=elem_size;
             }        
         }
         if(elem == NULL)
@@ -607,40 +686,54 @@ Value gettxoutdata(const Array& params, bool fHelp)
     }
     else
     {
-        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
-        elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
+//        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
+        retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
+        if(retrieve_status & MC_OST_ERROR_MASK)
+        {
+            error_str=OffChainError(retrieve_status,&errorCode);
+            throw JSONRPCError(errorCode, error_str);                    
+        }
+        
+        elem_size=(size_t)out_size;
+        if( ( (retrieve_status & MC_OST_STATUS_MASK) != MC_OST_RETRIEVED ) && 
+            ( (retrieve_status & MC_OST_STORAGE_MASK) != MC_OST_ON_CHAIN ) )
+        {
+                throw JSONRPCError(RPC_OUTPUT_NOT_FOUND, "Data for this output is not available");        
+        }            
+//        elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
     }
 
-    int count,start;
-    count=elem_size;
+    int64_t count,start;
+    count=out_size;
     start=0;
     
     if (params.size() > 2)    
     {
-        count=paramtoint(params[2],true,0,"Invalid count");
+        count=paramtoint64(params[2],true,0,"Invalid count");
     }
     if (params.size() > 3)    
     {
-        start=paramtoint(params[3],false,0,"Invalid start");
+        start=paramtoint64(params[3],false,0,"Invalid start");
     }
 
 
     if(start < 0)
     {
-        start=elem_size+start;
+        start=out_size+start;
         if(start<0)
         {
             start=0;
         }        
     }
 
-    if(start > (int)elem_size)
+    if(start > out_size)
     {
-        start=elem_size;
+        start=out_size;
     }
-    if(start+count > (int)elem_size)
+    if(start+count > out_size)
     {
-        count=elem_size-start;
+        count=out_size-start;
     }
 
     if( (format == MC_SCR_DATA_FORMAT_UBJSON) || (format == MC_SCR_DATA_FORMAT_UTF8) )
@@ -649,20 +742,28 @@ Value gettxoutdata(const Array& params, bool fHelp)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start, must be 0 for text and JSON data");                                                                            
         }
-        if(count != (int)elem_size)
+        if(count != out_size)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, must include all text or JSON data");                                                                            
         }
     }
-/*
-    if(mc_gState->m_Compatibility & MC_VCM_1_0)
+    if(count > 0x4000000)
     {
-        if( format == MC_SCR_DATA_FORMAT_UNKNOWN )
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, must be below 64MB");                                                                            
+    }
+
+    if(chunk_count > 1)
+    {
+        if(elem == NULL)
         {
-            return HexStr(elem+start,elem+start+count);
+            elem=GetChunkDataInRange(&out_size,chunk_hashes,chunk_count,start,count);
+            if(elem == NULL)
+            {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't retrieve data for this output");                                                                                            
+            }
+            return OpReturnFormatEntry(elem,count,0,0,format,NULL);        
         }
     }
-*/    
     return OpReturnFormatEntry(elem+start,count,0,0,format,NULL);        
 }
 
@@ -1858,24 +1959,7 @@ static void LockWallet(CWallet* pWallet)
 Value walletpassphrase(const Array& params, bool fHelp)
 {
     if (pwalletMain->IsCrypted() && (fHelp || params.size() != 2))              // MCHN
-        throw runtime_error(
-            "walletpassphrase \"passphrase\" timeout\n"
-            "\nStores the wallet decryption key in memory for 'timeout' seconds.\n"
-            "This is needed prior to performing transactions related to private keys such as sending assets\n"
-            "\nArguments:\n"
-            "1. \"passphrase\"     (string, required) The wallet passphrase\n"
-            "2. timeout            (numeric, required) The time to keep the decryption key in seconds.\n"
-            "\nNote:\n"
-            "Issuing the walletpassphrase command while the wallet is already unlocked will set a new unlock\n"
-            "time that overrides the old one.\n"
-            "\nExamples:\n"
-            "\nunlock the wallet for 60 seconds\n"
-            + HelpExampleCli("walletpassphrase", "\"my pass phrase\" 60") +
-            "\nLock the wallet again (before 60 seconds)\n"
-            + HelpExampleCli("walletlock", "") +
-            "\nAs json rpc call\n"
-            + HelpExampleRpc("walletpassphrase", "\"my pass phrase\", 60")
-        );
+        throw runtime_error("Help message not found\n");
 
     if (fHelp)
         return true;
@@ -1913,16 +1997,7 @@ Value walletpassphrase(const Array& params, bool fHelp)
 Value walletpassphrasechange(const Array& params, bool fHelp)
 {
     if (pwalletMain->IsCrypted() && (fHelp || params.size() != 2))
-        throw runtime_error(
-            "walletpassphrasechange \"oldpassphrase\" \"newpassphrase\"\n"
-            "\nChanges the wallet passphrase from 'oldpassphrase' to 'newpassphrase'.\n"
-            "\nArguments:\n"
-            "1. \"oldpassphrase\"      (string) The current passphrase\n"
-            "2. \"newpassphrase\"      (string) The new passphrase\n"
-            "\nExamples:\n"
-            + HelpExampleCli("walletpassphrasechange", "\"old one\" \"new one\"")
-            + HelpExampleRpc("walletpassphrasechange", "\"old one\", \"new one\"")
-        );
+        throw runtime_error("Help message not found\n");
 
     if (fHelp)
         return true;
@@ -1954,21 +2029,7 @@ Value walletpassphrasechange(const Array& params, bool fHelp)
 Value walletlock(const Array& params, bool fHelp)
 {
     if (pwalletMain->IsCrypted() && (fHelp || params.size() != 0))
-        throw runtime_error(
-            "walletlock\n"
-            "\nRemoves the wallet encryption key from memory, locking the wallet.\n"
-            "After calling this method, you will need to call walletpassphrase again\n"
-            "before being able to call any methods which require the wallet to be unlocked.\n"
-            "\nExamples:\n"
-            "\nSet the passphrase for 2 minutes to perform a transaction\n"
-            + HelpExampleCli("walletpassphrase", "\"my pass phrase\" 120") +
-            "\nPerform a send (requires passphrase set)\n"
-            + HelpExampleCli("sendtoaddress", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" 1.0") +
-            "\nClear the passphrase since we are done before 2 minutes is up\n"
-            + HelpExampleCli("walletlock", "") +
-            "\nAs json rpc call\n"
-            + HelpExampleRpc("walletlock", "")
-        );
+        throw runtime_error("Help message not found\n");
 
     if (fHelp)
         return true;

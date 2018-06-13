@@ -177,6 +177,10 @@ Object ListWalletTransactions(const CWalletTx& wtx, bool fLong, const isminefilt
     Array aMetaData;
     Array aItems;
     uint32_t format;
+    unsigned char *chunk_hashes;
+    int chunk_count;   
+    int64_t total_chunk_size,out_size;
+    uint32_t retrieve_status;
     Array aFormatMetaData;
     vector<Array> aFormatMetaDataPerOutput;
 
@@ -248,18 +252,19 @@ Object ListWalletTransactions(const CWalletTx& wtx, bool fLong, const isminefilt
             lpScript->Clear();
             lpScript->SetScript((unsigned char*)(&pc2[0]),(size_t)(script2.end()-pc2),MC_SCR_TYPE_SCRIPTPUBKEY);
             
-        	lpScript->ExtractAndDeleteDataFormat(&format);
+//        	lpScript->ExtractAndDeleteDataFormat(&format);
+            lpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
             
-            size_t elem_size;
             const unsigned char *elem;
 
             if(lpScript->GetNumElements()<=1)
             {
                 if(lpScript->GetNumElements()==1)
                 {
-                    elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
+//                    elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
 //                    aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
-                    Value metadata=OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),i,format,NULL);
+                    retrieve_status = GetFormattedData(lpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
+                    Value metadata=OpReturnFormatEntry(elem,out_size,wtx.GetHash(),i,format,NULL,retrieve_status);
                     aFormatMetaData.push_back(metadata);
                     aFormatMetaDataPerOutput[i].push_back(metadata);
                 }                        
@@ -268,11 +273,12 @@ Object ListWalletTransactions(const CWalletTx& wtx, bool fLong, const isminefilt
             {
                 if(mc_gState->m_Compatibility & MC_VCM_1_0)
                 {
-                    elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
-                    if(elem_size)
+//                    elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
+                    retrieve_status = GetFormattedData(lpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
+                    if(out_size)
                     {
     //                    aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
-                        aFormatMetaData.push_back(OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),i,format,NULL));
+                        aFormatMetaData.push_back(OpReturnFormatEntry(elem,out_size,wtx.GetHash(),i,format,NULL,retrieve_status));
                     }
                 }
                 

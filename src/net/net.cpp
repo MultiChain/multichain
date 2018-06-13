@@ -329,6 +329,11 @@ bool SeenLocal(const CService& addr)
 /** check whether a given address is potentially local */
 bool IsLocal(const CService& addr)
 {
+    if(addr.IsLocal())
+    {
+        return 1;        
+    }
+            
     LOCK(cs_mapLocalHost);
     return mapLocalHost.count(addr) > 0;
 }
@@ -643,6 +648,7 @@ int CNetMessage::readHeader(const char *pch, unsigned int nBytes)
     nHdrPos += nCopy;
     
 //    mc_Dump("HEAD",pch,nCopy);
+//    mc_Dump("HEAD",pch,nBytes);
 
     // if header incomplete, exit
     if (nHdrPos < 24)
@@ -1475,9 +1481,12 @@ void ThreadOpenConnections()
         }
 
 /* MCHN START */        
-        if (addrConnect.IsValid())
+        if(!GetBoolArg("-addnodeonly",false))
         {
-            OpenNetworkConnection(addrConnect, &grant);
+            if (addrConnect.IsValid())
+            {
+                OpenNetworkConnection(addrConnect, &grant);
+            }
         }
 /* MCHN END */        
     }
@@ -1551,7 +1560,14 @@ void ThreadOpenAddedConnections()
             OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), &grant);
             MilliSleep(500);
         }
-        MilliSleep(120000); // Retry every 2 minutes
+        if(GetBoolArg("-addnodeonly",false))
+        {
+            MilliSleep(1000); // Retry every 1 second
+        }
+        else
+        {
+            MilliSleep(120000); // Retry every 2 minutes
+        }
     }
 }
 
@@ -2157,7 +2173,7 @@ bool CAddrDB::Read(CAddrMan& addr)
 }
 
 unsigned int ReceiveFloodSize() { return 1000*GetArg("-maxreceivebuffer", 5*1000); }
-unsigned int SendBufferSize() { return 1000*GetArg("-maxsendbuffer", 1*1000); }
+unsigned int SendBufferSize() { return 1000*GetArg("-maxsendbuffer", 1*100000); }
 
 CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fInboundIn) : ssSend(SER_NETWORK, INIT_PROTO_VERSION), setAddrKnown(5000)
 {

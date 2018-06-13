@@ -207,7 +207,10 @@ void mc_WalletTxs::Zero()
 {
     int i;
     m_Database=NULL;
+    m_ChunkDB=NULL;
+    m_ChunkCollector=NULL;
     m_lpWallet=NULL;
+    m_ChunkBuffer=NULL;
     for(i=0;i<MC_TDB_MAX_IMPORTS;i++)
     {
         m_UTXOs[i].clear();
@@ -240,12 +243,27 @@ int mc_WalletTxs::Initialize(
 {
     int err,i;
     
+    m_ChunkDB=new mc_ChunkDB;
+
+    err=m_ChunkDB->Initialize(name,mode);
+
+    if(err)
+    {
+        return err;
+    }
+    
+    m_ChunkCollector=new mc_ChunkCollector;
+    
+    err=m_ChunkCollector->Initialize(m_ChunkDB,name,mode);
+    if(err)
+    {
+        return err;
+    }   
     
     m_Database=new mc_TxDB;
-    
     m_Mode=mode;
     err=m_Database->Initialize(name,mode);
-    
+            
     if(err == MC_ERR_NOERROR)
     {
         m_Mode=m_Database->m_DBStat.m_InitMode;
@@ -273,6 +291,8 @@ int mc_WalletTxs::Initialize(
         }
         LoadUnconfirmedSends(m_Database->m_DBStat.m_Block,m_Database->m_DBStat.m_Block);
     }    
+    
+    m_ChunkBuffer=(unsigned char*)mc_New(MAX_CHUNK_SIZE);
     return err;
 }
 
@@ -286,11 +306,28 @@ int mc_WalletTxs::SetMode(uint32_t mode, uint32_t mask)
 
 int mc_WalletTxs::Destroy()
 {
+    
     if(m_Database)
     {
         delete m_Database;
     }
 
+    if(m_ChunkCollector)
+    {
+        m_ChunkCollector->Commit();
+        delete m_ChunkCollector;
+    }    
+    
+    if(m_ChunkDB)
+    {
+        m_ChunkDB->Commit(-1);
+        delete m_ChunkDB;
+    }
+
+    if(m_ChunkBuffer)
+    {
+        mc_Delete(m_ChunkBuffer);
+    }
     Zero();
     return MC_ERR_NOERROR;    
     
@@ -324,8 +361,22 @@ int mc_WalletTxs::AddEntity(mc_TxEntity *entity,uint32_t flags)
         return MC_ERR_INTERNAL_ERROR;
     }
     m_Database->Lock(1,0);
-    err=m_Database->AddEntity(entity,flags);
+    err=m_Database->AddEntity(entity,flags);    
     m_Database->UnLock();
+    
+    if(err == MC_ERR_NOERROR)
+    {
+        if(mc_gState->m_Features->Chunks())
+        {
+            switch(entity->m_EntityType & MC_TET_TYPE_MASK)
+            {
+                case MC_TET_STREAM:
+                    err=m_ChunkDB->AddEntity(entity,flags);
+                    break;
+            }
+        }
+    }
+    
     return err;
 }
 
@@ -450,6 +501,20 @@ int mc_WalletTxs::Commit(mc_TxImport *import)
     if(import)
     {        
         imp=import;
+    }    
+    if(mc_gState->m_Features->Chunks())
+    {
+        if(imp->m_ImportID == 0)
+        {
+            if(err == MC_ERR_NOERROR)
+            {
+                err=m_ChunkDB->Commit(imp->m_Block+1);
+            }
+            if(m_ChunkCollector)
+            {
+                err=m_ChunkCollector->Commit();
+            }                
+        }
     }    
     m_Database->Lock(1,0);
     
@@ -1238,9 +1303,9 @@ int mc_WalletTxs::GetListSize(mc_TxEntity *entity,int generation,int *confirmed)
     return res;                
 }
 
-int mc_WalletTxs::Unsubscribe(mc_Buffer* lpEntities)
+int mc_WalletTxs::Unsubscribe(mc_Buffer* lpEntities,bool purge)
 {
-    int err;
+    int err,j;
     if((m_Mode & MC_WMD_TXS) == 0)
     {
         return MC_ERR_NOT_SUPPORTED;
@@ -1251,6 +1316,22 @@ int mc_WalletTxs::Unsubscribe(mc_Buffer* lpEntities)
     }
     m_Database->Lock(1,0);    
     err=m_Database->Unsubscribe(lpEntities);
+    if(err==MC_ERR_NOERROR)
+    {
+        if(mc_gState->m_Features->Chunks())
+        {
+            if(purge)
+            {
+                if(m_ChunkDB)
+                {
+                    for(j=0;j<lpEntities->GetCount();j++)                                       
+                    {
+                        m_ChunkDB->RemoveEntity((mc_TxEntity*)lpEntities->GetRow(j));
+                    }
+                }
+            }
+        }
+    }
     if(fDebug)LogPrint("wallet","wtxs: Unsubscribed from %d entities\n",lpEntities->GetCount());
     m_Database->UnLock();
     return err;                        
@@ -1315,7 +1396,7 @@ int mc_WalletTxs::ImportGetBlock(mc_TxImport *import)
     
 }
 
-int mc_WalletTxs::CompleteImport(mc_TxImport *import)
+int mc_WalletTxs::CompleteImport(mc_TxImport *import,uint32_t flags)
 {
     int err,import_pos,gen,count;
     
@@ -1333,7 +1414,7 @@ int mc_WalletTxs::CompleteImport(mc_TxImport *import)
     
     gen=import->m_ImportID;
     
-    err=m_Database->CompleteImport(import);
+    err=m_Database->CompleteImport(import,flags);
     
                                                                                 
     if(m_Database->m_DBStat.m_Block != m_Database->m_Imports->m_Block)
@@ -2242,7 +2323,13 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
         }
         else
         {
-            mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);
+            unsigned char *chunk_hashes;
+            unsigned char *chunk_found;
+            int chunk_count,chunk_err;
+            int chunk_size,chunk_shift;
+            size_t chunk_bytes;
+            
+            mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL,&chunk_hashes,&chunk_count,NULL);
             if(mc_gState->m_TmpScript->GetNumElements() >= 3) // 2 OP_DROPs + OP_RETURN - item key
             {
                 mc_gState->m_TmpScript->DeleteDuplicatesInRange(1,mc_gState->m_TmpScript->GetNumElements()-1);
@@ -2257,6 +2344,47 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                     entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
                     if(imp->FindEntity(&entity) >= 0)    
                     {
+                        if(chunk_hashes)
+                        {
+                            mc_ChunkDBRow chunk_def;
+                            mc_TxEntity chunk_entity;
+                            chunk_entity.Zero();
+                            memcpy(chunk_entity.m_EntityID,short_txid,MC_AST_SHORT_TXID_SIZE);
+                            chunk_entity.m_EntityType=MC_TET_STREAM;            
+                            for(int chunk=0;chunk<chunk_count;chunk++)
+                            {
+                                chunk_size=(int)mc_GetVarInt(chunk_hashes,MC_CDB_CHUNK_HASH_SIZE+16,-1,&chunk_shift);
+                                chunk_hashes+=chunk_shift;
+                                if(m_ChunkDB->GetChunkDef(&chunk_def,chunk_hashes,&chunk_entity,(unsigned char*)&hash,i) != MC_ERR_NOERROR)
+                                {
+                                    if(m_ChunkDB->GetChunkDef(&chunk_def,chunk_hashes,NULL,NULL,-1) == MC_ERR_NOERROR)
+                                    {
+                                        chunk_found=m_ChunkDB->GetChunk(&chunk_def,0,-1,&chunk_bytes);
+                                        if(chunk_found)
+                                        {
+                                            memcpy(m_ChunkBuffer,chunk_found,chunk_size);
+                                            chunk_err=m_ChunkDB->AddChunk(chunk_hashes,&chunk_entity,(unsigned char*)&hash,i,m_ChunkBuffer,NULL,chunk_size,0,0);
+                                            if(chunk_err)
+                                            {
+                                                err=chunk_err;
+                                                goto exitlbl;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            err=MC_ERR_CORRUPTED;
+                                            goto exitlbl;      
+                                        }
+                                    }
+                                    else
+                                    {
+                                        m_ChunkCollector->InsertChunk(chunk_hashes,&chunk_entity,(unsigned char*)&hash,i,chunk_size);
+                                        // Feeding async chunk retriever here
+                                    }
+                                }
+                                chunk_hashes+=MC_CDB_CHUNK_HASH_SIZE;
+                            }
+                        }
 //                        if(imp->m_TmpEntities->Seek(&entity) < 0)
                         {
                             extension.Zero();
@@ -2440,25 +2568,8 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     if(fNewAsset)
     {
         entity.Zero();
-        if(mc_gState->m_Features->ShortTxIDInTx())
-        {
-            entity.m_EntityType=MC_TET_ASSET | MC_TET_CHAINPOS;
-            memcpy(entity.m_EntityID,(unsigned char*)&hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-        }
-        else
-        {
-            if(block >= 0)
-            {
-                entity.m_EntityType=MC_TET_ASSET | MC_TET_CHAINPOS;
-                int tx_offset=sizeof(CBlockHeader)+block_pos->nTxOffset;
-                mc_PutLE(entity.m_EntityID,&block,4);
-                mc_PutLE(entity.m_EntityID+4,&tx_offset,4);
-                for(i=0;i<MC_ENT_REF_PREFIX_SIZE;i++)
-                {
-                    entity.m_EntityID[8+i]=*((unsigned char*)&hash+MC_ENT_KEY_SIZE-1-i);
-                }
-            }
-        }
+        entity.m_EntityType=MC_TET_ASSET | MC_TET_CHAINPOS;
+        memcpy(entity.m_EntityID,(unsigned char*)&hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
         if(entity.m_EntityType)
         {
             if(imp->FindEntity(&entity) >= 0)    
@@ -2493,14 +2604,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     {
         ptrOut=mc_gState->m_TmpAssetsOut->GetRow(i);
         entity.Zero();
-        if(mc_gState->m_Features->ShortTxIDInTx())
-        {
-            memcpy(entity.m_EntityID,ptrOut+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-        }
-        else
-        {
-            memcpy(entity.m_EntityID,ptrOut,MC_AST_ASSET_REF_SIZE);            
-        }
+        memcpy(entity.m_EntityID,ptrOut+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
         entity.m_EntityType=MC_TET_ASSET | MC_TET_CHAINPOS;
         fRelevantEntity=false;
         if(imp->FindEntity(&entity) >= 0)    

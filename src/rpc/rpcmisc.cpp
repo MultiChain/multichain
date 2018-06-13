@@ -82,6 +82,7 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("burnaddress", BurnAddress(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS))));                
     obj.push_back(Pair("incomingpaused", (mc_gState->m_NodePausedState & MC_NPS_INCOMING) ? true : false));                
     obj.push_back(Pair("miningpaused", (mc_gState->m_NodePausedState & MC_NPS_MINING) ? true : false));                
+    obj.push_back(Pair("offchainpaused", (mc_gState->m_NodePausedState & MC_NPS_OFFCHAIN) ? true : false));                
 
 /* MCHN END */    
 #ifdef ENABLE_WALLET
@@ -474,19 +475,27 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         {
             string autosubscribe=params[1].get_str();
             uint32_t mode=MC_WMD_NONE;
+            bool found=false;
             if(autosubscribe=="streams")
             {
                 mode |= MC_WMD_AUTOSUBSCRIBE_STREAMS;
+                found=true;
             }
             if(autosubscribe=="assets")
             {
                 mode |= MC_WMD_AUTOSUBSCRIBE_ASSETS;
+                found=true;
             }
             if( (autosubscribe=="assets,streams") || (autosubscribe=="streams,assets"))
             {
                 mode |= MC_WMD_AUTOSUBSCRIBE_STREAMS;
                 mode |= MC_WMD_AUTOSUBSCRIBE_ASSETS;
+                found=true;
             }                
+            if(!found)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value");                                                                        
+            }
             
             if(pwalletTxsMain)
             {
@@ -703,6 +712,14 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                 {
                     param_value=(int)MAX_SCRIPT_ELEMENT_SIZE;
                 }
+                if(strcmp("maximumchunksize",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(int)MAX_CHUNK_SIZE;
+                }
+                if(strcmp("maximumchunkcount",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(int)MAX_CHUNK_COUNT;
+                }
             }
 
             if(!hidden)
@@ -738,6 +755,7 @@ void SetSynchronizedFlag(CTxDestination &dest,Object &ret)
             if(entStat.m_Flags & MC_EFL_NOT_IN_SYNC)
             {
                 ret.push_back(Pair("synchronized",false));                                                            
+                ret.push_back(Pair("startblock",entStat.m_LastImportedBlock+1));                                                                            
             }
             else
             {
@@ -1058,7 +1076,6 @@ Value createmultisig(const Array& params, bool fHelp)
 /* MCHN START */    
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-//        if(MCP_ALLOW_ARBITRARY_OUTPUTS == 0)
         if((MCP_ALLOW_ARBITRARY_OUTPUTS == 0) || (mc_gState->m_Features->FixedDestinationExtraction() == 0) )
         {
             if(MCP_ALLOW_P2SH_OUTPUTS == 0)

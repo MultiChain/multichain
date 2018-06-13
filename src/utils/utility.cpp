@@ -89,6 +89,20 @@ int64_t mc_GetLE(void *src,int size)
     return result;                                                              // Assuming all systems are little endian
 }
 
+uint32_t mc_SwapBytes32(uint32_t src)
+{
+    uint32_t res=0;
+    unsigned char *pr;
+    unsigned char *ps;
+    pr=(unsigned char*)&res;
+    ps=(unsigned char*)&src;
+    for(int i=0;i<4;i++)
+    {
+        pr[3-i]=ps[i];        
+    }
+    return res;
+}
+
 void mc_print(const char *message)
 {
     printf("%s\n",message);
@@ -464,6 +478,21 @@ int mc_Buffer::Add(const void *lpKeyValue)
     return Add(lpKeyValue,(unsigned char*)lpKeyValue+m_KeySize);
 }
 
+int mc_Buffer::UpdateRow(int RowID,const void *lpKey,const void *lpValue)
+{
+    if(RowID>=m_Count)
+    {
+        return MC_ERR_INTERNAL_ERROR;
+    }
+    
+    if(m_lpIndex)
+    {
+        m_lpIndex->Remove((char*)GetRow(RowID),m_RowSize-m_KeySize);
+    }
+    
+    return PutRow(RowID,lpKey,lpValue);
+}
+
 int mc_Buffer::PutRow(int RowID,const void *lpKey,const void *lpValue)
 {
     unsigned char *ptr;
@@ -487,7 +516,14 @@ int mc_Buffer::PutRow(int RowID,const void *lpKey,const void *lpValue)
     
     if(m_lpIndex)
     {
-        m_lpIndex->Add((unsigned char*)lpKey,m_KeySize,RowID);
+        if(m_lpIndex->Get((unsigned char*)lpKey,m_KeySize) >= 0)
+        {
+            m_lpIndex->Set((unsigned char*)lpKey,m_KeySize,RowID);            
+        }
+        else
+        {
+            m_lpIndex->Add((unsigned char*)lpKey,m_KeySize,RowID);
+        }
     }
     
     return MC_ERR_NOERROR;
@@ -1874,5 +1910,16 @@ void mc_AdjustStartAndCount(int *count,int *start,int size)
             *count=size-*start;
         }
     }    
+}
+
+void sprintf_hex(char *hex,const unsigned char *bin,int size)
+{
+    int i;
+    for(i=0;i<size;i++)
+    {
+        sprintf(hex+(i*2),"%02x",bin[size-1-i]);
+    }
+    
+    hex[size*2]=0;      
 }
 

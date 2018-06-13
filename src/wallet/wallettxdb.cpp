@@ -6,17 +6,6 @@
 
 #define MC_TDB_MAX_TXS_FILE_SIZE             0x8000000                          // Maximal data file size, 128MB
 
-void sprintf_hex(char *hex,const unsigned char *bin,int size)
-{
-    int i;
-    for(i=0;i<size;i++)
-    {
-        sprintf(hex+(i*2),"%02x",bin[size-1-i]);
-    }
-    
-    hex[64]=0;      
-}
-
 void mc_TxEntityRowExtension::Zero()
 {
     memset(this,0,sizeof(mc_TxEntityRowExtension));    
@@ -31,6 +20,19 @@ void mc_TxEntity::Init(unsigned char *entity_id,uint32_t entity_type)
 {
     memcpy(m_EntityID,entity_id,MC_TDB_ENTITY_ID_SIZE);
     m_EntityType=entity_type;
+}
+
+int mc_TxEntity::IsSubscription()
+{
+    switch(m_EntityType & MC_TET_TYPE_MASK)
+    {
+        case MC_TET_STREAM:
+        case MC_TET_STREAM_KEY:
+        case MC_TET_STREAM_PUBLISHER:
+        case MC_TET_ASSET:
+            return 1;
+    }    
+    return 0;
 }
 
 void mc_TxEntityRow::Zero()
@@ -232,6 +234,8 @@ void mc_TxDB::Zero()
     m_Name[0]=0x00; 
     m_LobFileNamePrefix[0]=0x00;
     m_LogFileName[0]=0x00;
+    
+    m_UnsubscribeMemPoolSize=0;
     
     m_Mode=MC_WMD_NONE;
     m_Semaphore=NULL;
@@ -457,6 +461,13 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
     m_RawUpdatePool=new mc_Buffer;    
     err=m_RawUpdatePool->Initialize(MC_TDB_TXID_SIZE,m_Database->m_TotalSize,MC_BUF_MODE_MAP);        
     
+    m_Semaphore=__US_SemCreate();
+    if(m_Semaphore == NULL)
+    {
+        LogString("Initialize: Cannot initialize semaphore");
+        return MC_ERR_INTERNAL_ERROR;
+    }
+    
     Dump("Initialize");
     sprintf(msg, "Initialized. Chain height: %d, Txs: %d",m_DBStat.m_Block,m_DBStat.m_Count);
     LogString(msg);
@@ -512,10 +523,18 @@ int mc_TxDB::Destroy()
 }
 
 void mc_TxDB::Dump(const char *message)
+{
+    Dump(message,0);
+}
+
+void mc_TxDB::Dump(const char *message, int force)
 {    
-    if((m_Mode & MC_WMD_DEBUG) == 0)
+    if(force == 0)
     {
-        return;
+        if((m_Mode & MC_WMD_DEBUG) == 0)
+        {
+            return;
+        }
     }
     mc_TxEntityRow edbRow;
     
@@ -678,7 +697,14 @@ int mc_TxDB::AddEntity(mc_TxImport *import,mc_TxEntity *entity,uint32_t flags)
         {
             stat.m_PosInImport=((mc_TxEntityStat*)import->m_Entities->GetRow(import->m_Entities->GetCount()-1))->m_PosInImport+1;
         }
-        stat.m_LastImportedBlock=m_DBStat.m_Block;                              // Block the entity was added on, relevant if out-of-sync
+        if(flags & MC_EFL_NOT_IN_SYNC)
+        {
+            stat.m_LastImportedBlock=m_DBStat.m_Block;                          // Block the entity was added on, relevant if out-of-sync
+        }
+        else
+        {
+            stat.m_LastImportedBlock=-1;
+        }
         stat.m_TimeAdded=mc_TimeNowAsUInt();
         stat.m_Flags=flags;                                                     // Mainly for out-of-sync flag
         
@@ -1613,15 +1639,21 @@ int mc_TxDB::Commit(mc_TxImport *import)
                         goto exitlbl;
                     }
                     if(ptr == NULL)
-                    {
-                        err=MC_ERR_CORRUPTED;
-                        goto exitlbl;
+                    {                            
+                        if((imp->m_ImportID != 0) || (i>=m_UnsubscribeMemPoolSize))                     // first rows may be deleted by Unsubscribe
+                        {
+                            err=MC_ERR_CORRUPTED;
+                            goto exitlbl;
+                        }
                     }
-                    memcpy((char*)&erow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
-                    erow.m_LastSubKeyPos=lperow->m_LastSubKeyPos;
-                    erow.SwapPosBytes();
-                    err=m_Database->m_DB->Write((char*)&erow+m_Database->m_KeyOffset,m_Database->m_KeySize,(char*)&erow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
-                    erow.SwapPosBytes();
+                    else
+                    {
+                        memcpy((char*)&erow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
+                        erow.m_LastSubKeyPos=lperow->m_LastSubKeyPos;
+                        erow.SwapPosBytes();
+                        err=m_Database->m_DB->Write((char*)&erow+m_Database->m_KeyOffset,m_Database->m_KeySize,(char*)&erow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+                        erow.SwapPosBytes();
+                    }
                 }
             }
             lperow->m_Pos=lperow->m_TempPos;                                    // m_Pos in mempool was 0 - to support search by TxID  in mempool
@@ -1684,6 +1716,7 @@ int mc_TxDB::Commit(mc_TxImport *import)
         }                            
     }
     
+    m_UnsubscribeMemPoolSize=0;
     FlushDataFile(m_DBStat.m_LastFileID);
 
     err=m_Database->m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
@@ -2396,6 +2429,7 @@ mc_TxImport *mc_TxDB::StartImport(mc_Buffer *lpEntities,int block,int *err)
         count=0;
         lpEntStat=(m_Imports+slot)->GetEntity(j);
         lpEntStat->m_Flags |= MC_EFL_NOT_IN_SYNC;
+        lpEntStat->m_LastImportedBlock=block;
         row=m_Imports->FindEntity(lpEntStat);
         if(row >= 0)                                                            // Old entity
         {
@@ -2703,12 +2737,14 @@ int mc_TxDB::Unsubscribe(mc_Buffer* lpEntities)
         deleted_items=0;                
     }    
 
+    m_UnsubscribeMemPoolSize=m_MemPools[0]->GetCount();
+    
 exitlbl:
     
     return err;
 }
 
-int mc_TxDB::CompleteImport(mc_TxImport *import)
+int mc_TxDB::CompleteImport(mc_TxImport *import,uint32_t flags)
 {
     char msg[256];
     char enthex[65];
@@ -2785,12 +2821,17 @@ int mc_TxDB::CompleteImport(mc_TxImport *import)
             m_Imports->AddEntity(lpent);
             lpdel=m_Imports->GetEntity(row);
         }
-        
-        lpdel->m_LastImportedBlock=import->m_Block;
+                
+//        lpdel->m_LastImportedBlock=import->m_Block;
+        lpdel->m_LastImportedBlock=lpent->m_LastImportedBlock;
         edbImport.m_Flags=lpdel->m_Flags;
+        
         if(lpdel->m_Flags & MC_EFL_NOT_IN_SYNC)
         {
-            lpdel->m_Flags-=MC_EFL_NOT_IN_SYNC;
+            if( (lpdel->m_Entity.IsSubscription() != 0) || ( (flags & MC_EFL_NOT_IN_SYNC_AFTER_IMPORT) == 0) )
+            {
+                lpdel->m_Flags-=MC_EFL_NOT_IN_SYNC;                
+            }
         }
         
         
@@ -2801,7 +2842,7 @@ int mc_TxDB::CompleteImport(mc_TxImport *import)
         edbImport.m_Block=import->m_Block;
         edbImport.m_Pos=lpdel->m_PosInImport;
         edbImport.m_LastPos=lpdel->m_LastPos;
-        edbImport.m_LastImportedBlock=import->m_Block;
+        edbImport.m_LastImportedBlock=lpent->m_LastImportedBlock;//import->m_Block;
         edbImport.m_TimeAdded=lpdel->m_TimeAdded;
         edbImport.m_Flags=lpdel->m_Flags;
         sprintf_hex(enthex,edbImport.m_Entity.m_EntityID,MC_TDB_ENTITY_ID_SIZE);

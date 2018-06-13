@@ -13,8 +13,8 @@ int mc_State::VersionInfo(int version)
         return custom_version;
     }
     
-    int this_build=20000102;
-    int this_protocol=20002;   
+    int this_build=20000103;
+    int this_protocol=20003;   
     
     if(version < 0)
     {
@@ -41,7 +41,7 @@ int mc_State::VersionInfo(int version)
     }
     if(version < 10002)return 10002;                                            // first version
     if(version < 10004)return -10000201;                                        // last build supporting this version (negative)
-    if(version < 10010)return -this_build;                                      // supported by this version    
+    if(version < 10012)return -this_build;                                      // supported by this version    
     if(version < 20001)return 20001;                                            // next version
     if(version < this_protocol+1)return -this_build;                            // supported by this version    
         

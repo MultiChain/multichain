@@ -341,7 +341,7 @@ Value stop(const Array& params, bool fHelp)
 
 string AllowedPausedServices()
 {
-    string ret="incoming,mining";
+    string ret="incoming,mining,offchain";
     
     return ret;
 }
@@ -365,12 +365,14 @@ uint32_t GetPausedServices(const char *str)
         c=*ptr;
         if( (c == ',') || (c ==0x00))
         {
-            if(ptr > start)
+            if(ptr > start+4)
             {
                 type=0;
                 if(memcmp(start,"incoming",    ptr-start) == 0)type = MC_NPS_INCOMING;
                 if(memcmp(start,"mining",      ptr-start) == 0)type = MC_NPS_MINING;
                 if(memcmp(start,"reaccepting", ptr-start) == 0)type = MC_NPS_REACCEPT;
+                if(memcmp(start,"offchain",    ptr-start) == 0)type = MC_NPS_OFFCHAIN;
+                if(memcmp(start,"chunks",      ptr-start) == 0)type = MC_NPS_CHUNKS;
                 
                 if(type == 0)
                 {

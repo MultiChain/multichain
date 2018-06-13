@@ -19,7 +19,7 @@
 #include "json/json_spirit_value.h"
 #include "multichain/multichain.h"
 #include "utils/utilparse.h"
-
+#include "wallet/chunkdb.h"
 
 using namespace std;
 using namespace json_spirit;
@@ -52,10 +52,30 @@ using namespace json_spirit;
 
 #define MC_VMM_MERGE_OBJECTS                   0x00000001
 #define MC_VMM_RECURSIVE                       0x00000002
-#define MC_VMM_IGNORE                          0x00000004
+#define MC_VMM_IGNORE_OTHER                    0x00000004
 #define MC_VMM_TAKE_FIRST                      0x00000008
 #define MC_VMM_TAKE_FIRST_FOR_FIELD            0x00000010
 #define MC_VMM_OMIT_NULL                       0x00000020
+#define MC_VMM_IGNORE_MISSING                  0x00000040
+
+#define MC_RFD_OPTION_NONE                     0x00000000
+#define MC_RFD_OPTION_INLINE                   0x00000001
+#define MC_RFD_OPTION_OFFCHAIN                 0x00000002
+#define MC_RFD_OPTION_CACHE                    0x00000004
+
+#define MC_OST_UNDEFINED                       0x00000000
+#define MC_OST_UNKNOWN                         0x00000001
+#define MC_OST_ON_CHAIN                        0x00000002
+#define MC_OST_OFF_CHAIN                       0x00000003
+#define MC_OST_STORAGE_MASK                    0x000000FF                  
+#define MC_OST_RETRIEVED                       0x00000100
+#define MC_OST_STATUS_MASK                     0x0000FF00                  
+#define MC_OST_ERROR_SCRIPT                    0x00010000
+#define MC_OST_ERROR_WRONG_SIZES               0x00020000
+#define MC_OST_ERROR_CORRUPTED                 0x00030000
+#define MC_OST_ERROR_NOT_SUPPORTED             0x00040000
+#define MC_OST_ERROR_MASK                      0x00FF0000
+#define MC_OST_CONTROL_NO_DATA                 0x01000000
 
 
 // codes for allowed_objects fields    
@@ -89,7 +109,10 @@ Array PerOutputDataEntries(const CTxOut& txout,mc_Script *lpScript,uint256 txid,
 Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong);
 Object StreamEntry(const unsigned char *txid,uint32_t output_level);
 Object UpgradeEntry(const unsigned char *txid);
+const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t start,int64_t count);
+uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t total_size);
 Value OpReturnEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout);
+Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out,uint32_t status);
 Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out);
 Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format);
 Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uint32_t stream_output_level);
@@ -107,12 +130,21 @@ Array AssetArrayFromAmounts(mc_Buffer *asset_amounts,int issue_asset_id,uint256 
 void ParseRawAction(string action,bool& lock_it, bool& sign_it,bool& send_it);
 bool paramtobool(Value param);
 int paramtoint(Value param,bool check_for_min,int min_value,string error_message);
+int64_t paramtoint64(Value param,bool check_for_min,int64_t min_value,string error_message);
+int ParseBlockIdentifier(Value blockset_identifier);
+int ParseRescanParameter(Value rescan_identifier, bool *fRescan);
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
-vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,bool allow_formatted,int *errorCode,string *strError);
+vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,uint32_t in_options,uint32_t *out_options,int *errorCode,string *strError);
 void ParseRawDetails(const Value *value,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError);
 bool mc_IsJsonObjectForMerge(const Value *value,int level);
 Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int level,int *error);
 Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total);
+void AppendOffChainFormatData(uint32_t data_format,uint32_t out_options,mc_Script *lpDetailsScript,vector<unsigned char>& vValue,vector<uint256>* vChunkHashes,int *errorCode,string *strError);
+int mc_BinaryCacheFile(string id,int mode);
+void mc_RemoveBinaryCacheFile(string id);
+bool AvailableFromStatus(uint32_t status);
+string OffChainError(uint32_t status,int *errorCode); 
+bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,string *strError);
 
 
 #endif	/* RPCMULTICHAINUTILS_H */

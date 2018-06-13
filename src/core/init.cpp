@@ -36,6 +36,8 @@
 #include "structs/base58.h"
 #include "multichain/multichain.h"
 #include "wallet/wallettxs.h"
+#include "protocol/relay.h"
+
 std::string BurnAddress(const std::vector<unsigned char>& vchVersion);
 std::string SetBannedTxs(std::string txlist);
 std::string SetLockedBlock(std::string hash);
@@ -63,7 +65,9 @@ using namespace std;
 CWallet* pwalletMain = NULL;
 mc_WalletTxs* pwalletTxsMain = NULL;
 #endif
+mc_RelayManager* pRelayManager = NULL;
 bool fFeeEstimatesInitialized = false;
+extern int JSON_DOUBLE_DECIMAL_DIGITS;                             
 
 #ifdef WIN32
 // Win32 LevelDB doesn't use filedescriptors, and the ones used for
@@ -216,6 +220,11 @@ void Shutdown()
         delete pwalletTxsMain;
         pwalletTxsMain=NULL;
     }
+    if(pRelayManager)
+    {
+        delete pRelayManager;
+        pRelayManager=NULL;        
+    }
 /* MCHN END */  
 #endif
     globalVerifyHandle.reset();
@@ -348,7 +357,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -listen                " + _("Accept connections from outside (default: 1 if no -proxy or -connect)") + "\n";
     strUsage += "  -maxconnections=<n>    " + strprintf(_("Maintain at most <n> connections to peers (default: %u)"), 125) + "\n";
     strUsage += "  -maxreceivebuffer=<n>  " + strprintf(_("Maximum per-connection receive buffer, <n>*1000 bytes (default: %u)"), 5000) + "\n";
-    strUsage += "  -maxsendbuffer=<n>     " + strprintf(_("Maximum per-connection send buffer, <n>*1000 bytes (default: %u)"), 1000) + "\n";
+    strUsage += "  -maxsendbuffer=<n>     " + strprintf(_("Maximum per-connection send buffer, <n>*1000 bytes (default: %u)"), 100000) + "\n";
     strUsage += "  -onion=<ip:port>       " + strprintf(_("Use separate SOCKS5 proxy to reach peers via Tor hidden services (default: %s)"), "-proxy") + "\n";
     strUsage += "  -onlynet=<net>         " + _("Only connect to nodes in network <net> (ipv4, ipv6 or onion)") + "\n";
     strUsage += "  -permitbaremultisig    " + strprintf(_("Relay non-P2SH multisig (default: %u)"), 1) + "\n";
@@ -372,7 +381,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
 #ifdef ENABLE_WALLET
     strUsage += "\n" + _("Wallet options:") + "\n";
     strUsage += "  -disablewallet         " + _("Do not load the wallet and disable wallet RPC calls") + "\n";
-    strUsage += "  -keypool=<n>           " + strprintf(_("Set key pool size to <n> (default: %u)"), 100) + "\n";
+    strUsage += "  -keypool=<n>           " + strprintf(_("Set key pool size to <n> (default: %u)"), 1) + "\n";
     if (GetBoolArg("-help-debug", false))
         strUsage += "  -mintxfee=<amt>        " + strprintf(_("Fees (in BTC/Kb) smaller than this are considered zero fee for transaction creation (default: %s)"), FormatMoney(CWallet::minTxFee.GetFeePerK())) + "\n";
     strUsage += "  -paytxfee=<amt>        " + strprintf(_("Fee (in BTC/kB) to add to transactions you send (default: %s)"), FormatMoney(payTxFee.GetFeePerK())) + "\n";
@@ -488,12 +497,16 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -shortoutput                             " + _("Only show the node address (if connecting was successful) or an address in the wallet (if connect permissions must be granted by another node)") + "\n";
     strUsage += "  -bantx=<txids>                           " + _("Comma delimited list of banned transactions.") + "\n";
     strUsage += "  -lockblock=<hash>                        " + _("Blocks on branches without this block will be rejected") + "\n";
+    strUsage += "  -chunkquerytimeout=<n>                   " + _("Timeout, after which undelivered chunk is moved to the end of the chunk queue, default 25s") + "\n";
+    strUsage += "  -chunkrequesttimeout=<n>                 " + _("Timeout, after which chunk request is dropped and another source is tried, default 10s") + "\n";
+    strUsage += "  -flushsourcechunks=<n>                   " + _("Flush offchain items created by this node to disk immediately when created, default 1") + "\n";
 
     strUsage += "\n" + _("MultiChain API response parameters") + "\n";        
     strUsage += "  -hideknownopdrops=<n>  " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON_RPC calls (default: %u)"), 0) + "\n";
     strUsage += "  -maxshowndata=<n>      " + strprintf(_("The maximum number of bytes to show in the data field of API responses. (default: %u)"), MAX_OP_RETURN_SHOWN) + "\n";
     strUsage += "                         " + _("Pieces of data larger than this will be returned as an object with txid, vout and size fields, for use with the gettxoutdata command.") + "\n";
     strUsage += "  -v1apicompatible=<n>   " + strprintf(_("JSON_RPC calls responses compatible with MultiChain 1.0 (default: %u)"), 0) + "\n";
+//    strUsage += "  -apidecimaldigits=<n>  " + _("maximal number of decimal digits in API output (default: auto)") + "\n";
            
     strUsage += "\n" + _("Wallet optimization options:") + "\n";
     strUsage += "  -autocombineminconf    " + _("Only automatically combine outputs with at least this number of confirmations, default 1") + "\n";
@@ -1375,34 +1388,32 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         vector <mc_TxEntity> vSubscribedEntities;
         if(GetBoolArg("-reindex", false) || GetBoolArg("-rescan", false))
         {
-            if(mc_gState->m_Features->Streams())
+            pwalletTxsMain=new mc_WalletTxs;
+            if(pwalletTxsMain->Initialize(mc_gState->m_NetworkParams->Name(),MC_WMD_TXS | MC_WMD_ADDRESS_TXS) == MC_ERR_NOERROR)
             {
-                pwalletTxsMain=new mc_WalletTxs;
-                if(pwalletTxsMain->Initialize(mc_gState->m_NetworkParams->Name(),MC_WMD_TXS | MC_WMD_ADDRESS_TXS) == MC_ERR_NOERROR)
+                mc_Buffer *entity_list;
+                entity_list=pwalletTxsMain->GetEntityList();
+                for(int e=0;e<entity_list->GetCount();e++)
                 {
-                    mc_Buffer *entity_list;
-                    entity_list=pwalletTxsMain->GetEntityList();
-                    for(int e=0;e<entity_list->GetCount();e++)
+                    mc_TxEntityStat *stat;
+                    stat=(mc_TxEntityStat *)entity_list->GetRow(e);
+                    switch(stat->m_Entity.m_EntityType & MC_TET_TYPE_MASK)
                     {
-                        mc_TxEntityStat *stat;
-                        stat=(mc_TxEntityStat *)entity_list->GetRow(e);
-                        switch(stat->m_Entity.m_EntityType & MC_TET_TYPE_MASK)
-                        {
-                            case MC_TET_PUBKEY_ADDRESS:
-                            case MC_TET_SCRIPT_ADDRESS:
-                            case MC_TET_STREAM:
-                            case MC_TET_STREAM_KEY:
-                            case MC_TET_STREAM_PUBLISHER:
-                            case MC_TET_ASSET:
-                                vSubscribedEntities.push_back(stat->m_Entity);
-                                break;
-                        }
+                        case MC_TET_PUBKEY_ADDRESS:
+                        case MC_TET_SCRIPT_ADDRESS:
+                        case MC_TET_STREAM:
+                        case MC_TET_STREAM_KEY:
+                        case MC_TET_STREAM_PUBLISHER:
+                        case MC_TET_ASSET:
+                            vSubscribedEntities.push_back(stat->m_Entity);
+                            break;
                     }
-                    __US_Sleep(1000);
                 }
-                pwalletTxsMain->Destroy();
-                delete pwalletTxsMain;            
+                __US_Sleep(1000);
             }
+            pwalletTxsMain->Destroy();
+            delete pwalletTxsMain;            
+
             mc_RemoveDir(mc_gState->m_Params->NetworkName(),"wallet");            
             zap_wallet_txs=true;
         }
@@ -1452,6 +1463,10 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 if(LogAcceptCategory("walletdump"))
                 {
                     mc_gState->m_WalletMode |= MC_WMD_DEBUG;
+                }
+                if(GetBoolArg("-nochunkflush",false))
+                {
+                    mc_gState->m_WalletMode |= MC_WMD_NO_CHUNK_FLUSH;
                 }
                 string autosubscribe=GetArg("-autosubscribe","none");
                 
@@ -1749,6 +1764,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
     if (fServer)
     {
+        JSON_DOUBLE_DECIMAL_DIGITS=GetArg("-apidecimaldigits",-1);        
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
         StartRPCThreads();
     }
@@ -1856,6 +1872,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             return InitError(_("Failed to listen on any port. Use -listen=0 if you want this."));
     }
 /* MCHN START */    
+    pRelayManager=new mc_RelayManager;
+    
     int max_ips=64;
     uint32_t all_ips[64];
     int found_ips=1;
@@ -1863,6 +1881,12 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     {
         found_ips=mc_FindIPv4ServerAddress(all_ips,max_ips);
     }
+    else
+    {
+        all_ips[0]=mc_gState->m_IPv4Address;
+    }
+    pRelayManager->SetMyIPs(all_ips,found_ips);
+    
     if(!GetBoolArg("-shortoutput", false))
     {
         if(fListen && !GetBoolArg("-offline",false))
@@ -2143,8 +2167,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
     if(mapMultiArgs.count("-rpcallowip") == 0)
     {
-        sprintf(bufOutput,"Listening for API requests on port %d (local only - see rpcallowip setting)\n\n",(int)GetArg("-rpcport", BaseParams().RPCPort()));                            
-        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+        if(!GetBoolArg("-shortoutput", false))
+        {    
+            sprintf(bufOutput,"Listening for API requests on port %d (local only - see rpcallowip setting)\n\n",(int)GetArg("-rpcport", BaseParams().RPCPort()));                            
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+        }
     }
     
 //    int version=mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
@@ -2365,6 +2392,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     if (!strErrors.str().empty())
         return InitError(strErrors.str());
 
+    pRelayManager->Initialize();
+    
 //    RandAddSeedPerfmon();
 
     //// debug print
@@ -2384,6 +2413,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     LogPrintf("mapAddressBook.size() = %u\n",  pwalletMain ? pwalletMain->mapAddressBook.size() : 0);
 #endif
 
+    if (pwalletMain)
+        bitdb.Flush(false);
+    
     if(!GetBoolArg("-offline",false))
     {
         StartNode(threadGroup);

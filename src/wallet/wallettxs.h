@@ -11,6 +11,8 @@
 #include "wallet/wallet.h"
 #include "multichain/multichain.h"
 #include "wallet/wallettxdb.h"
+#include "wallet/chunkdb.h"
+#include "wallet/chunkcollector.h"
 
 #define MC_TDB_MAX_OP_RETURN_SIZE             256
 
@@ -46,13 +48,16 @@ typedef struct mc_WalletCachedAddTx
 typedef struct mc_WalletTxs
 {
     mc_TxDB *m_Database;
+    mc_ChunkDB *m_ChunkDB;
+    mc_ChunkCollector *m_ChunkCollector;
     CWallet *m_lpWallet;
     uint32_t m_Mode;
     std::map<COutPoint, mc_Coin> m_UTXOs[MC_TDB_MAX_IMPORTS];    
     std::map<uint256,CWalletTx> m_UnconfirmedSends;
     std::vector<uint256> m_UnconfirmedSendsHashes;
     std::map<uint256, CWalletTx> vAvailableCoins;    
-    
+ 
+    unsigned char* m_ChunkBuffer;
     mc_WalletTxs()
     {
         Zero();
@@ -131,7 +136,7 @@ typedef struct mc_WalletTxs
     int GetRow(
                mc_TxEntityRow *erow);
     
-    int Unsubscribe(mc_Buffer *lpEntities);                                     // List of the entities to unsubscribe from
+    int Unsubscribe(mc_Buffer *lpEntities,bool purge);                          // List of the entities to unsubscribe from
     
     mc_TxImport *StartImport(                                                   // Starts new import
                              mc_Buffer *lpEntities,                             // List of entities to import
@@ -146,7 +151,7 @@ typedef struct mc_WalletTxs
     int ImportGetBlock(                                                         // Returns last processed block in the import
                        mc_TxImport *import);
     
-    int CompleteImport(mc_TxImport *import);                                    // Completes import - merges with chain
+    int CompleteImport(mc_TxImport *import,uint32_t flags);                    // Completes import - merges with chain
     
     int DropImport(mc_TxImport *import);                                        // Drops uncompleted import
 

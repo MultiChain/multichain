@@ -440,8 +440,12 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
     const unsigned char *ptr;
     unsigned char item_key[MC_ENT_MAX_ITEM_KEY_SIZE+1];
     int item_key_size;
-    Value item_value;
+//    Value item_value;
     uint32_t format;
+    unsigned char *chunk_hashes;
+    int chunk_count;   
+    int64_t total_chunk_size,out_size;
+    uint32_t retrieve_status=0;
     Value format_item_value;
     string format_text_str;
     int start_from=first_output;
@@ -470,7 +474,9 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
                 {
                     if(mc_gState->m_TmpScript->GetNumElements()) // 2 OP_DROPs + OP_RETURN - item key
                     {
-                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
+//                        chunk_hashes=NULL;
+//                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
 
                         unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
                         mc_gState->m_TmpScript->SetElement(0);
@@ -508,12 +514,12 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
                                     }
                                 }
 
-                                size_t elem_size;
                                 const unsigned char *elem;
 
-                                elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
-                                item_value=OpReturnEntry(elem,elem_size,wtx.GetHash(),j);
-                                format_item_value=OpReturnFormatEntry(elem,elem_size,wtx.GetHash(),j,format,&format_text_str);
+//                                elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
+                                retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
+//                                item_value=OpReturnEntry(elem,elem_size,wtx.GetHash(),j);
+                                format_item_value=OpReturnFormatEntry(elem,out_size,wtx.GetHash(),j,format,&format_text_str,retrieve_status);
                             }
                         }
                     }                        
@@ -596,7 +602,20 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
     {
         entry.push_back(Pair("key", keys[0]));        
     }
+    entry.push_back(Pair("offchain", (retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN));        
+    if( ( retrieve_status & MC_OST_CONTROL_NO_DATA ) == 0)
+    {
+        entry.push_back(Pair("available", AvailableFromStatus(retrieve_status)));        
+        if(retrieve_status & MC_OST_ERROR_MASK)
+        {
+            string error_str;
+            int errorCode;
+            error_str=OffChainError(retrieve_status,&errorCode);
+            entry.push_back(Pair("error", error_str));        
+        }
+    }
     entry.push_back(Pair("data", format_item_value));        
+    
     if(verbose)
     {
         WalletTxToJSON(wtx, entry, true, stream_output);
@@ -731,4 +750,159 @@ Object TxOutEntry(const CTxOut& TxOutIn,int vout,const CTxIn& TxIn,uint256 hash,
 
     return txout_entry;
 }
+
+void AppendOffChainFormatData(uint32_t data_format,
+                              uint32_t out_options,
+                              mc_Script *lpDetailsScript,
+                              vector<unsigned char>& vValue,
+                              vector<uint256>* vChunkHashes,
+                              int *errorCode,
+                              string *strError)
+{
+    if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
+    {
+        *strError="Offchain data is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\"";
+        *errorCode=RPC_NOT_SUPPORTED;
+        return;
+    }   
+    mc_ChunkDBRow chunk_def;
+    lpDetailsScript->Clear();
+    
+    int chunk_count;
+    int tail_size,size,max_chunk_size;
+    int64_t total_size;
+    int fHan;
+    int err;
+    unsigned char *ptr;
+    uint256 hash;
+    mc_TxEntity entity;
+    entity.Zero();
+    entity.m_EntityType=MC_TET_AUTHOR;    
+    
+    if(out_options & MC_RFD_OPTION_OFFCHAIN)
+    {
+        chunk_count=(int)vValue.size()/MC_CDB_CHUNK_HASH_SIZE;
+        if(chunk_count > MAX_CHUNK_COUNT)
+        {
+            *strError="Too many chunks in the script";
+            return; 
+        }
+        
+        lpDetailsScript->SetChunkDefHeader(data_format,chunk_count);
+        for(int i=0;i<chunk_count;i++)
+        {
+            err=pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,(unsigned char*)&vValue[i*MC_CDB_CHUNK_HASH_SIZE],&entity,NULL,-1);
+            if(err)
+            {
+                *strError="Chunk not found in this wallet";
+                return; 
+            }
+            lpDetailsScript->SetChunkDefHash((unsigned char*)&vValue[i*MC_CDB_CHUNK_HASH_SIZE],chunk_def.m_Size);
+            if(vChunkHashes)
+            {
+                vChunkHashes->push_back(*(uint256*)&vValue[i*MC_CDB_CHUNK_HASH_SIZE]);
+            }
+        }
+    }
+    else
+    {
+        chunk_count=0;
+        tail_size=0;
+        ptr=NULL;
+        fHan=-1;
+        if(vValue.size())
+        {
+            if(out_options & MC_RFD_OPTION_CACHE)
+            {            
+                fHan=mc_BinaryCacheFile((char*)&vValue[0],0);
+                if(fHan <= 0)
+                {
+                    *strError="Binary cache item with this identifier not found";
+                    return;                     
+                }
+                total_size=lseek64(fHan,0,SEEK_END);
+                if(lseek64(fHan,0,SEEK_SET) != 0)
+                {
+                    *strError="Cannot read binary cache item";
+                    close(fHan);
+                    return;                                         
+                }
+                if(total_size)
+                {
+                    chunk_count=(int)((total_size-1)/MAX_CHUNK_SIZE)+1;                    
+                }
+                tail_size=(int)(total_size-(int64_t)(chunk_count-1)*MAX_CHUNK_SIZE);            
+            }
+            else
+            {
+                chunk_count=((int)vValue.size()-1)/MAX_CHUNK_SIZE+1;            
+                tail_size=(int)vValue.size()-(chunk_count-1)*MAX_CHUNK_SIZE;            
+            }
+            max_chunk_size=tail_size;
+            if(chunk_count > 1)
+            {
+                max_chunk_size=MAX_CHUNK_SIZE;
+            }
+            mc_gState->m_TmpBuffers->m_RpcChunkScript1->Clear();
+            mc_gState->m_TmpBuffers->m_RpcChunkScript1->Resize(max_chunk_size,1);
+            ptr=mc_gState->m_TmpBuffers->m_RpcChunkScript1->m_lpData;
+            
+            lpDetailsScript->SetChunkDefHeader(data_format,chunk_count);
+            for(int i=0;i<chunk_count;i++)
+            {
+                size=MAX_CHUNK_SIZE;
+                if(i == chunk_count-1)
+                {
+                    size=tail_size;
+                }
+                if(fHan > 0)
+                {
+                    if(read(fHan,ptr,size) != size)
+                    {
+                        *errorCode=RPC_INTERNAL_ERROR;
+                        *strError="Cannot read binary cache item";
+                        close(fHan);
+                        return;                     
+                    }
+                }
+                else
+                {
+                    ptr=(unsigned char*)&vValue[i*MAX_CHUNK_SIZE];
+                }
+                
+                mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(ptr,size,&hash);
+                
+                err=pwalletTxsMain->m_ChunkDB->AddChunk((unsigned char*)&hash,&entity,NULL,-1,ptr,NULL,size,0,0);   
+                if(err)
+                {
+                    switch(err)
+                    {
+                        case MC_ERR_FOUND:
+                            break;
+                        default:
+                            *strError="Internal error: couldn't store chunk";
+                            if(fHan > 0)
+                            {
+                                close(fHan);
+                            }
+                            return; 
+                    }
+                }
+    
+                lpDetailsScript->SetChunkDefHash((unsigned char*)&hash,size);
+                if(vChunkHashes)
+                {
+                    vChunkHashes->push_back(*(uint256*)&hash);
+                }
+            }
+        }
+        if(fHan > 0)
+        {
+            close(fHan);
+            fHan=0;
+        }
+    }
+    
+//            err=pwalletTxsMain->m_ChunkDB->AddChunk((unsigned char*)&hash,&entity,NULL,-1,(unsigned char*)&vValue[0],NULL,(int)vValue.size(),0,0);
+}                             
 

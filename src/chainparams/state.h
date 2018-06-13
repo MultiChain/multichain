@@ -34,6 +34,8 @@
 #define MC_NPS_INCOMING  0x00000002
 #define MC_NPS_MINING    0x00000004
 #define MC_NPS_REACCEPT  0x00000008
+#define MC_NPS_OFFCHAIN  0x00000010
+#define MC_NPS_CHUNKS    0x00000020
 #define MC_NPS_ALL       0xFFFFFFFF
 
 #define MC_WMD_NONE                  0x00000000
@@ -44,6 +46,7 @@
 #define MC_WMD_DEBUG                 0x01000000
 #define MC_WMD_AUTOSUBSCRIBE_STREAMS 0x02000000
 #define MC_WMD_AUTOSUBSCRIBE_ASSETS  0x04000000
+#define MC_WMD_NO_CHUNK_FLUSH        0x08000000
 #define MC_WMD_AUTO                  0x10000000
 
 #define MC_VCM_NONE                  0x00000000
@@ -128,22 +131,8 @@ typedef struct mc_UpgradedParameter
 typedef struct mc_Features
 {    
     int MinProtocolVersion();
-    int ActivatePermission();
     int LastVersionNotSendingProtocolVersionInHandShake();
-    int VerifySizeOfOpDropElements();
-    int PerEntityPermissions();
-    int FollowOnIssues();
-    int SpecialParamsInDetailsScript();
-    int FixedGrantsInTheSameTx();
-    int UnconfirmedMinersCannotMine();
-    int Streams();
-    int OpDropDetailsScripts();
-    int ShortTxIDInTx();
-    int CachedInputScript();
     int AnyoneCanReceiveEmpty();
-    int FixedIn10007();
-    int Upgrades();
-    int FixedIn10008();
     int FormattedData();
     int FixedDestinationExtraction();
     int FixedIn1000920001();
@@ -151,6 +140,10 @@ typedef struct mc_Features
     int FixedIsUnspendable();
     int PerAssetPermissions();
     int ParameterUpgrades();
+    int OffChainData();
+    int Chunks();
+    int FixedIn1001020003();
+    int FixedIn1001120003();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo
@@ -183,6 +176,9 @@ typedef struct mc_TmpBuffers
     mc_Buffer               *m_RpcABNoMapBuffer1;
     mc_Buffer               *m_RpcABNoMapBuffer2;
     mc_Buffer               *m_RpcEntityRows;
+    mc_SHA256               *m_RpcHasher1;
+    mc_Script               *m_RpcChunkScript1;
+    mc_Script               *m_RelayTmpBuffer;
     
     void  Init()
     {
@@ -200,7 +196,10 @@ typedef struct mc_TmpBuffers
         m_RpcABNoMapBuffer2=new mc_Buffer;
         mc_InitABufferDefault(m_RpcABNoMapBuffer2);
         m_RpcEntityRows=new mc_Buffer;
-        m_RpcEntityRows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);        
+        m_RpcEntityRows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);     
+        m_RpcHasher1=new mc_SHA256();
+        m_RpcChunkScript1=new mc_Script();
+        m_RelayTmpBuffer=new mc_Script();
     }    
 
     void  Destroy()
@@ -215,6 +214,9 @@ typedef struct mc_TmpBuffers
         delete m_RpcABNoMapBuffer1;
         delete m_RpcABNoMapBuffer2;
         delete m_RpcEntityRows;
+        delete m_RpcHasher1;
+        delete m_RpcChunkScript1;
+        delete m_RelayTmpBuffer;
     }
     
 } mc_TmpBuffers;
