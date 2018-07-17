@@ -573,7 +573,7 @@ Value debug(const Array& params, bool fHelp)
                                     chunk_found=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&chunk_bytes);
                                     if(chunk_found)
                                     {
-                                        chunk_obj.push_back(Pair("size",chunk_bytes));
+                                        chunk_obj.push_back(Pair("size",(int)chunk_bytes));
                                         chunk_obj.push_back(Pair("data",HexStr(chunk_found,chunk_found+chunk_bytes)));
                                     }
                                     else
