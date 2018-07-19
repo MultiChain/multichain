@@ -408,25 +408,27 @@ Value importwallet(const Array& params, bool fHelp)
         pwalletMain->nTimeFirstKey = nTimeBegin;
 
 /* MCHN START */        
-    if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
+    if(fRescan)
     {
-        if(start_block)
+        if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
         {
-            LogPrintf("Rescanning last %i blocks\n", chainActive.Height()-start_block+1);
+            if(start_block)
+            {
+                LogPrintf("Rescanning last %i blocks\n", chainActive.Height()-start_block+1);
+            }
+            else
+            {
+                LogPrintf("Rescanning all %i blocks\n", chainActive.Height());
+            }
+            pwalletMain->ScanForWalletTransactions(chainActive[start_block],false,true);
         }
         else
         {
-            LogPrintf("Rescanning all %i blocks\n", chainActive.Height());
+            LogPrintf("Rescanning last %i blocks\n", chainActive.Height() - pindex->nHeight + 1);
+            pwalletMain->ScanForWalletTransactions(pindex,false,true);
         }
-        pwalletMain->ScanForWalletTransactions(chainActive[start_block],false,true);
-        pwalletMain->MarkDirty();        
     }
-    else
-    {
-        LogPrintf("Rescanning last %i blocks\n", chainActive.Height() - pindex->nHeight + 1);
-        pwalletMain->ScanForWalletTransactions(pindex,false,true);
-        pwalletMain->MarkDirty();
-    }
+    pwalletMain->MarkDirty();        
 
     if (!fGood)
         throw JSONRPCError(RPC_WALLET_ERROR, "Error adding some keys to wallet");

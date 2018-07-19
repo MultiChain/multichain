@@ -2244,7 +2244,8 @@ void mc_InitRPCHelpMap10()
             "\nImports keys from a wallet dump file (see dumpwallet).\n"
             "\nArguments:\n"
             "1. \"filename\"                       (string, required) The wallet file\n"
-            "2. rescan                           (integer, optional, default=0) Rescan from block, if negative - from the end.\n"
+            "2. rescan                           (boolean or integer, optional, default=true) Rescan the wallet for transactions. \n"
+            "                                                       If integer rescan from block, if negative - from the end.\n"
             "\nExamples:\n"
             "\nDump the wallet\n"
             + HelpExampleCli("dumpwallet", "\"test\"") +
