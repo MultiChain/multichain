@@ -1334,6 +1334,11 @@ int mc_WalletTxs::Unsubscribe(mc_Buffer* lpEntities,bool purge)
     }
     if(fDebug)LogPrint("wallet","wtxs: Unsubscribed from %d entities\n",lpEntities->GetCount());
     m_Database->UnLock();
+    
+    if(m_ChunkCollector)
+    {
+        m_ChunkCollector->Unsubscribe(lpEntities);
+    }
     return err;                        
 }
 

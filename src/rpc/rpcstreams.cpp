@@ -889,8 +889,13 @@ Value unsubscribe(const Array& params, bool fHelp)
         inputEntities.push_back(entity_to_subscribe);
     }
         
+    int32_t buf_mode=MC_BUF_MODE_DEFAULT;
+    if(inputStrings.size() > 1)
+    {
+        buf_mode=MC_BUF_MODE_MAP;
+    }
     mc_Buffer *streams=mc_gState->m_TmpBuffers->m_RpcBuffer1;
-    streams->Initialize(sizeof(mc_TxEntity),sizeof(mc_TxEntity),MC_BUF_MODE_DEFAULT);
+    streams->Initialize(sizeof(mc_TxEntity),sizeof(mc_TxEntity),buf_mode);
     
     
     bool fNewFound=false;
