@@ -80,6 +80,8 @@ bool AppInit(int argc, char* argv[])
     mc_gState->m_Params->Parse(argc, argv, MC_ETP_DAEMON);
     mc_CheckDataDirInConfFile();
     
+    mc_RandomSeed(mc_TimeNowAsUInt());
+    
     if(mc_gState->m_Params->NetworkName())
     {
         if(strlen(mc_gState->m_Params->NetworkName()) > MC_PRM_NETWORK_NAME_MAX_SIZE)
