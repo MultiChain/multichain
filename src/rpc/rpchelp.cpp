@@ -1085,7 +1085,7 @@ void mc_InitRPCHelpMap05()
 
             "\nArguments:\n"
             "1. \"txid\"                           (string, required) The transaction id\n"
-            "2. verbose                          (numeric, optional, default=0) If 0, return a string, other return a json object\n"
+            "2. verbose                          (numeric or boolean, optional, default=0(false)) If 0, return a string, other return a json object\n"
 
             "\nResult (if verbose is not set or set to 0):\n"
             "\"data\"                              (string) The serialized, hex-encoded data for 'txid'\n"
@@ -2306,7 +2306,8 @@ void mc_InitRPCHelpMap10()
             "\nImports keys from a wallet dump file (see dumpwallet).\n"
             "\nArguments:\n"
             "1. \"filename\"                       (string, required) The wallet file\n"
-            "2. rescan                           (integer, optional, default=0) Rescan from block, if negative - from the end.\n"
+            "2. rescan                           (boolean or integer, optional, default=true) Rescan the wallet for transactions. \n"
+            "                                                       If integer rescan from block, if negative - from the end.\n"
             "\nExamples:\n"
             "\nDump the wallet\n"
             + HelpExampleCli("dumpwallet", "\"test\"") +

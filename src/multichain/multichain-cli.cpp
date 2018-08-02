@@ -239,7 +239,11 @@ Object CallRPC(const string& strMethod, const Array& params)
     map<string, string> mapRequestHeaders;
     mapRequestHeaders["Authorization"] = string("Basic ") + strUserPass64;
     // Send request
-    string strRequest = JSONRPCRequest(strMethod, params, 1);
+    int32_t id_nonce;
+    id_nonce=mc_RandomInRange(10000000,99999999);
+    Value req_id=strprintf("%08d-%u",id_nonce,mc_TimeNowAsUInt());
+    
+    string strRequest = JSONRPCRequest(strMethod, params, req_id);
     string strPost = HTTPPost(strRequest, mapRequestHeaders);
     stream << strPost << std::flush;
 

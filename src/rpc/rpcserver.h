@@ -114,7 +114,7 @@ public:
      * @throws an exception (json_spirit::Value) when an error happens.
      */
     void initialize();
-    json_spirit::Value execute(const std::string &method, const json_spirit::Array &params) const;
+    json_spirit::Value execute(const std::string &method, const json_spirit::Array &params, const json_spirit::Value& req_id) const;
 };
 
 extern CRPCTable tableRPC;

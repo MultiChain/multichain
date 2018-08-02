@@ -59,7 +59,7 @@ bool AssetRefDecode(unsigned char *bin, const char* string, const size_t stringL
         return false;
     
     mc_PutLE(bin+0,&blockNum,4);
-    mc_PutLE(bin+4,&txOffset,8);
+    mc_PutLE(bin+4,&txOffset,4);
     bin[8]=(unsigned char)(txIDPrefixInteger%256);
     bin[9]=(unsigned char)(txIDPrefixInteger/256);
     
@@ -988,7 +988,9 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
 
         Array issues;
         int64_t total=0;
-        if(( (output_level & 0x0020) !=0 )|| mc_gState->m_Assets->HasFollowOns(txid))
+        if(( (output_level & 0x0020) !=0 ) ||                                   // issuers
+                                                                                // For listassets with followons
+             ( (mc_gState->m_Assets->HasFollowOns(txid) != 0) && (quantity < 0) && ( (output_level & 0x00C0) == 0) ))
         {
             int64_t qty;
             mc_Buffer *followons;
