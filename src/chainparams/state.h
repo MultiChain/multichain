@@ -176,6 +176,8 @@ typedef struct mc_TmpBuffers
     mc_Buffer               *m_RpcABNoMapBuffer1;
     mc_Buffer               *m_RpcABNoMapBuffer2;
     mc_Buffer               *m_RpcEntityRows;
+    mc_Buffer               *m_RpcEntityRowsToMerge;
+    mc_Buffer               *m_RpcEntityRowsFull;
     mc_SHA256               *m_RpcHasher1;
     mc_Script               *m_RpcChunkScript1;
     mc_Script               *m_RelayTmpBuffer;
@@ -197,6 +199,10 @@ typedef struct mc_TmpBuffers
         mc_InitABufferDefault(m_RpcABNoMapBuffer2);
         m_RpcEntityRows=new mc_Buffer;
         m_RpcEntityRows->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);     
+        m_RpcEntityRowsToMerge=new mc_Buffer;
+        m_RpcEntityRowsToMerge->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);     
+        m_RpcEntityRowsFull=new mc_Buffer;
+        m_RpcEntityRowsFull->Initialize(MC_TDB_ENTITY_KEY_SIZE,MC_TDB_ROW_SIZE,MC_BUF_MODE_DEFAULT);     
         m_RpcHasher1=new mc_SHA256();
         m_RpcChunkScript1=new mc_Script();
         m_RelayTmpBuffer=new mc_Script();
@@ -214,6 +220,8 @@ typedef struct mc_TmpBuffers
         delete m_RpcABNoMapBuffer1;
         delete m_RpcABNoMapBuffer2;
         delete m_RpcEntityRows;
+        delete m_RpcEntityRowsToMerge;
+        delete m_RpcEntityRowsFull;
         delete m_RpcHasher1;
         delete m_RpcChunkScript1;
         delete m_RelayTmpBuffer;

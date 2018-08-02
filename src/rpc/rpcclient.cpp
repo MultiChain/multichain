@@ -196,6 +196,8 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "liststreampublishers", 3 },
     { "liststreampublishers", 4 },
     { "liststreampublishers", 5 },
+    { "liststreamqueryitems", 1 },
+    { "liststreamqueryitems", 2 },
     { "liststreamkeyitems", 2 },
     { "liststreamkeyitems", 3 },
     { "liststreamkeyitems", 4 },

@@ -23,12 +23,33 @@
 #include "wallet/chunkdb.h"
 #include "rpc/rpcutils.h"
 
+#define MC_QCT_KEY                  1
+#define MC_QCT_PUBLISHER            2
+
+
+typedef struct mc_QueryCondition
+{
+    uint32_t m_Type;
+    string m_Value;      
+    bool m_TmpMatch;
+    
+    mc_QueryCondition(int type, string value)
+    {
+        m_Type=type;
+        m_Value=value;
+        m_TmpMatch=false;
+    }
+} mc_QueryCondition;
+
+
+
+
 void SendMoneyToSeveralAddresses(const std::vector<CTxDestination> addresses, CAmount nValue, CWalletTx& wtxNew,mc_Script *dropscript,CScript scriptOpReturn,const std::vector<CTxDestination>& fromaddresses);
 vector<CTxDestination> ParseAddresses(string param, bool create_full_list, bool allow_scripthash);
 void FindAddressesWithPublishPermission(std::vector<CTxDestination>& fromaddresses,mc_EntityDetails *stream_entity);
 set<string> ParseAddresses(Value param, isminefilter filter);
 bool CBitcoinAddressFromTxEntity(CBitcoinAddress &address,mc_TxEntity *lpEntity);
-Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char *stream_id, bool verbose, const char** given_key,const char ** given_publisher,int *output);
+Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char *stream_id, bool verbose, vector<mc_QueryCondition> *given_conditions,int *output);
 Object TxOutEntry(const CTxOut& TxOutIn,int vout,const CTxIn& TxIn,uint256 hash,mc_Buffer *amounts,mc_Script *lpScript);
 void WalletTxToJSON(const CWalletTx& wtx, Object& entry,bool skipWalletConflicts = false, int vout = -1);
 void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry);

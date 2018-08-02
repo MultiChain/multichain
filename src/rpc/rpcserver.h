@@ -260,6 +260,7 @@ extern json_spirit::Value getstreamitem(const json_spirit::Array& params, bool f
 extern json_spirit::Value liststreamtxitems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreamitems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreamkeyitems(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value liststreamqueryitems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreampublisheritems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreamkeys(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreampublishers(const json_spirit::Array& params, bool fHelp);
