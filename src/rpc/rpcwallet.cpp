@@ -1002,9 +1002,15 @@ Value getbalance(const Array& params, bool fHelp)
             {
                 CTxOut txout;
                 out.GetHashAndTxOut(txout);
-                if(out.IsTrustedNoDepth() || (out.nDepth >= nMinDepth))
+
+                isminetype fIsMine=pwalletMain->IsMine(txout);
+                
+                if(fIsMine & filter)
                 {
-                    nBalance+=txout.nValue;
+                    if(out.IsTrustedNoDepth() || (out.nDepth >= nMinDepth))
+                    {
+                        nBalance+=txout.nValue;
+                    }
                 }
             }            
         }
