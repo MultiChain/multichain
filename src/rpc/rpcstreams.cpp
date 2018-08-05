@@ -12,7 +12,8 @@
 
 #define MC_QPR_MAX_UNCHECKED_TX_LIST_SIZE    1048576
 #define MC_QPR_MAX_MERGED_TX_LIST_SIZE          1024
-#define MC_QPR_MAX_DIRTY_TX_LIST_SIZE            256
+#define MC_QPR_MAX_DIRTY_TX_LIST_SIZE           5000
+#define MC_QPR_MAX_CLEAN_TX_LIST_SIZE           5000
 #define MC_QPR_MAX_SECONDARY_TX_LIST_SIZE    1048576
 #define MC_QPR_TX_CHECK_COST                     100
 #define MC_QPR_MAX_TX_PER_BLOCK                    4
@@ -2125,23 +2126,23 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
             switch(conditions[i].m_Type)
             {
                 case MC_QCT_KEY:
-                    entStat.m_Entity.m_EntityType=MC_TET_STREAM_KEY;
+                    entStat.m_Entity.m_EntityType |= MC_TET_STREAM_KEY;
                     getSubKeyEntityFromKey(conditions[i].m_Value,entStat,&vConditionEntities[i]);                
                     break;
                 case MC_QCT_PUBLISHER:
-                    entStat.m_Entity.m_EntityType=MC_TET_STREAM_PUBLISHER;
-                    getSubKeyEntityFromKey(conditions[i].m_Value,entStat,&vConditionEntities[i]);                
+                    entStat.m_Entity.m_EntityType |= MC_TET_STREAM_PUBLISHER;
+                    getSubKeyEntityFromPublisher(conditions[i].m_Value,entStat,&vConditionEntities[i]);                
                     break;
             }
         }
         else
         {
-            entStat.m_Entity.m_EntityType=MC_TET_STREAM;
+            entStat.m_Entity.m_EntityType |= MC_TET_STREAM;
             memcpy(&vConditionEntities[i],&entStat.m_Entity,sizeof(mc_TxEntity));
         }
         if(vConditionEntities[i].m_EntityType)
         {
-            vConditionListSizes[i]=pwalletTxsMain->GetListSize(&vConditionEntities[i],entStat.m_Generation,NULL);            
+            vConditionListSizes[i]=pwalletTxsMain->GetListSize(&vConditionEntities[i],entStat.m_Generation,NULL);     
             if(vConditionListSizes[i]>max_size)
             {
                 max_size=vConditionListSizes[i];
@@ -2156,7 +2157,6 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
     {
         int min_size=max_size+1;
         int min_condition=conditions_count;
-        conditions_count=false;
         for(i=0;i<=conditions_count;i++)
         {
             if(vConditionMerged[i] == 0)
@@ -2172,11 +2172,11 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
         if(min_condition<conditions_count)
         {
             merge_lists=true;
-            if(conditions_count == 0)
+            if(conditions_used == 0)
             {
                 if(min_size > MC_QPR_MAX_UNCHECKED_TX_LIST_SIZE)
                 {
-                    throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                                    
+                    throw JSONRPCError(RPC_NOT_SUPPORTED, "This query may take too much time");                                                    
                 }          
                 pwalletTxsMain->GetList(&vConditionEntities[min_condition],entStat.m_Generation,1,min_size,entity_rows);         
                 conditions_used++;
@@ -2186,6 +2186,7 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
                 {
                     mc_TxEntityRow *lpEntTx;
                     lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(row);
+                    lpEntTx->m_TempPos=0;
                     if( (lpEntTx->m_Flags & MC_TFL_IS_EXTENSION) == 0 )
                     {
                         clean_count++;
@@ -2204,9 +2205,13 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
                 merge_lists=false;
             }
         }
+        else
+        {
+            merge_lists=false;            
+        }
     }
 
-    last_state=-2;
+    last_state=2;
     clean_count=0;
     dirty_count=0;
     out_row=0;
@@ -2216,21 +2221,25 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
         lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(row);
         if(lpEntTx->m_Flags & MC_TFL_IS_EXTENSION)
         {
-            lpEntTx->m_Generation=last_state;
+            lpEntTx->m_TempPos=last_state;
+            if(lpEntTx->m_TempPos == 2)
+            {
+                dirty_count++;                
+            }
         }
         else
         {
-            switch(lpEntTx->m_Generation)
+            switch(lpEntTx->m_TempPos)
             {
-                case -1:
+                case 1:
                     break;
-                case -2:
+                case 2:
                     dirty_count++;
                     break;
                 default:
                     if(conditions_used < conditions_count)
                     {
-                        lpEntTx->m_Generation=-2;
+                        lpEntTx->m_TempPos=2;
                         dirty_count++;
                     }
                     else
@@ -2239,15 +2248,15 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
                     }
                     break;                    
             }
-            last_state=lpEntTx->m_Generation;
+            last_state=lpEntTx->m_TempPos;
         }
-        if(lpEntTx->m_Generation != -1)
+        if(lpEntTx->m_TempPos != 1)
         {
             if(out_row < row)
             {
                 memcpy(entity_rows->GetRow(out_row),lpEntTx,entity_rows->m_Size);
-                out_row++;
             }
+            out_row++;
         }
     }
     
@@ -2256,15 +2265,213 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
     return dirty_count;
 }
 
+void FillContitionsList(vector<mc_QueryCondition>& conditions, Value param)
+{
+    bool key_found=false;
+    bool publisher_found=false;
+    bool field_parsed;
+    
+    if(param.type() != obj_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid query, should be object ");                                                            
+    }
+    
+    BOOST_FOREACH(const Pair& d, param.get_obj()) 
+    {
+        field_parsed=false;
+        if(d.name_ == "key")
+        {
+            if(key_found)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Only one of the key fields can appear in the object");                                                            
+            }
+            if(d.value_.type()==str_type)
+            {
+                conditions.push_back(mc_QueryCondition(MC_QCT_KEY,d.value_.get_str()));
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid key, should be string");                                                            
+            }
+            field_parsed=true;
+            key_found=true;
+        }
+        
+        if(d.name_ == "keys")
+        {
+            if( mc_gState->m_Features->MultipleStreamKeys() == 0 )
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "Multiple keys are not supported by this protocol version");                                                            
+            }
+            if(key_found)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Only one of the key fields can appear in the object");                                                            
+            }
+            if(d.value_.type() == array_type)
+            {
+                for(int i=0;i<(int)d.value_.get_array().size();i++)
+                {
+                    if(d.value_.get_array()[i].type()==str_type)
+                    {
+                        conditions.push_back(mc_QueryCondition(MC_QCT_KEY,d.value_.get_array()[i].get_str()));
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid key, should be string");                                                            
+                    }
+                }                
+            }            
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid keys, should be array");                                                            
+            }
+            field_parsed=true;
+            key_found=true;
+        }
+
+        if(d.name_ == "publisher")
+        {
+            if(publisher_found)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Only one of the publisher fields can appear in the object");                                                            
+            }
+            if(d.value_.type()==str_type)
+            {
+                conditions.push_back(mc_QueryCondition(MC_QCT_PUBLISHER,d.value_.get_str()));
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid publisher, should be string");                                                            
+            }
+            field_parsed=true;
+            publisher_found=true;
+        }
+
+        if(d.name_ == "publishers")
+        {
+            if(publisher_found)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Only one of the publisher fields can appear in the object");                                                            
+            }
+            if(d.value_.type() == array_type)
+            {
+                for(int i=0;i<(int)d.value_.get_array().size();i++)
+                {
+                    if(d.value_.get_array()[i].type()==str_type)
+                    {
+                        conditions.push_back(mc_QueryCondition(MC_QCT_PUBLISHER,d.value_.get_array()[i].get_str()));
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid publisher, should be string");                                                            
+                    }
+                }                
+            }            
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid publishers, should be array");                                                            
+            }
+            field_parsed=true;
+            publisher_found=true;
+        }
+        
+        if(!field_parsed)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid field: %s",d.name_.c_str()));                                                            
+        }
+
+    }        
+}
+
 Value liststreamqueryitems(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 2 || params.size() > 6)
+    if (fHelp || params.size() < 2 || params.size() > 3)
         throw runtime_error("Help message not found\n");
 
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
     }   
+
+    vector <mc_QueryCondition> conditions;
+    vector <mc_QueryCondition>* lpConditions;
     
-    return Value::null;
+    mc_EntityDetails stream_entity;
+    parseStreamIdentifier(params[0],&stream_entity);           
+
+    bool verbose=false;
+    int dirty_count;
+    
+    if (params.size() > 2)    
+    {
+        verbose=paramtobool(params[2]);
+    }
+    
+    FillContitionsList(conditions,params[1]);    
+
+    if(conditions.size() == 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid query, cannot be empty");                                                            
+    }
+    
+    mc_Buffer *entity_rows=mc_gState->m_TmpBuffers->m_RpcEntityRows;
+    entity_rows->Clear();
+    
+    dirty_count=GetAndQueryDirtyList(conditions,&stream_entity,false,entity_rows);
+    
+    if(dirty_count > MC_QPR_MAX_DIRTY_TX_LIST_SIZE)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "This query may take too much time");                                                    
+    }          
+    
+    if(entity_rows->GetCount() > MC_QPR_MAX_CLEAN_TX_LIST_SIZE)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Resulting list is too large");                                                            
+    }
+    
+    Array retArray;
+    int last_output;
+    uint256 last_hash=0;
+    for(int i=0;i<entity_rows->GetCount();i++)
+    {
+        mc_TxEntityRow *lpEntTx;
+        lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
+        lpConditions=NULL;
+        if(lpEntTx->m_TempPos != 1)
+        {
+            if(lpEntTx->m_TempPos == 2)
+            {
+                lpConditions=&conditions;
+            }
+            uint256 hash;
+            int first_output=mc_GetHashAndFirstOutput(lpEntTx,&hash);
+            if(last_hash == hash)
+            {
+                if(first_output <= last_output)
+                {
+                    first_output=-1;
+                }
+            }
+            else
+            {
+                last_output=-1;
+            }
+            last_hash=hash;
+            if(first_output >= 0)
+            {
+                const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
+                Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,lpConditions,&last_output);
+                if(entry.size())
+                {
+                    retArray.push_back(entry);                                
+                }                    
+                else
+                {
+                    last_output=-1;
+                }
+            }
+        }
+    }
+    
+    return retArray;
 }
