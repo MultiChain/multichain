@@ -981,9 +981,6 @@ Value liststreamtxitems(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
     }
     
-    
-    uint256 hash = ParseHashV(params[1], "parameter 2");
-    
     bool verbose=false;
     
     if (params.size() > 2)    
@@ -991,21 +988,35 @@ Value liststreamtxitems(const Array& params, bool fHelp)
         verbose=paramtobool(params[2]);
     }
     
-    const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
-    
     Array output_array;
-    int first_output=0;
-    int stream_output;
-    while(first_output < (int)wtx.vout.size())
+    
+    vector<string> inputStrings;
+    
+    inputStrings=ParseStringList(params[1]);
+    
+    for(int j=0;j<(int)inputStrings.size();j++)
     {
-        Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,NULL,&stream_output);   
+        uint256 hash = ParseHashV(inputStrings[j], "txid");
         
-        if(stream_output < (int)wtx.vout.size())
+        const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
+
+        int first_output=0;
+        int stream_output;
+        while(first_output < (int)wtx.vout.size())
         {
-            output_array.push_back(entry);
+            Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,NULL,&stream_output);   
+
+            if(stream_output < (int)wtx.vout.size())
+            {
+                output_array.push_back(entry);
+            }
+            first_output=stream_output+1;
         }
-        first_output=stream_output+1;
-    }
+    }   
+    
+//    uint256 hash = ParseHashV(params[1], "parameter 2");
+    
+    
     
     return output_array;    
 }

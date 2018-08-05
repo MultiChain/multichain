@@ -3709,11 +3709,13 @@ void mc_InitRPCHelpMap16()
         ));
     
     mapHelpStrings.insert(std::make_pair("liststreamtxitems",
-            "liststreamtxitems \"stream-identifier\" \"txid\" ( verbose )\n"
+            "liststreamtxitems \"stream-identifier\" txids ( verbose )\n"
             "\nReturns stream items.\n"
             "\nArguments:\n"
             "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
-            "2. \"txid\"                           (string, required) The transaction id\n"
+            "2. \"txids\"                          (string, required) Transaction IDs, comma delimited\n"
+            " or\n"
+            "2. txids                            (array, required) Array of transaction IDs\n"
             "3. verbose                          (boolean, optional, default=false) If true, returns information about item transaction \n"
             "\nResult:\n"
             "\"stream-items\"                      (array) Array of stream items.\n"
