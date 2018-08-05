@@ -4118,7 +4118,31 @@ void mc_InitRPCHelpMap18()
         ));
     
     
-    mapHelpStrings.insert(std::make_pair("AAAAAAA",
+     mapHelpStrings.insert(std::make_pair("liststreamqueryitems",
+            "liststreamqueryitems \"stream-identifier\" query ( verbose )\n"
+            "\nReturns stream items for specific query.\n"
+            "\nArguments:\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "2. query                            (object, required) Query\n"
+            "    {\n"                
+            "      \"key\" : \"key\"                   (string, optional, default: \"\") Item key\n"
+            "        or\n"
+            "      \"keys\" : keys                   (array, optional) Item keys, array of strings\n"
+            "        or\n"
+            "      \"publisher\" : \"publisher\"       (string, optional, default: \"\") Publisher\n"
+            "        or\n"
+            "      \"publishers\" : publishers       (array, optional) Publishers, array of strings\n"
+            "    }\n"                                
+            "3. verbose                          (boolean, optional, default=false) If true, returns information about item transaction \n"
+            "\nResult:\n"
+            "\"stream-items\"                      (array) List of stream items for specific query.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("liststreamqueryitems", "\"test-stream\" \"{\\\"keys\\\":[\\\"key01\\\",\"key02\"]}\"") 
+            + HelpExampleCli("liststreamqueryitems", "\"test-stream\" \"{\\\"keys\\\":[\\\"key01\\\",\"key02\"],\\\"publisher\\\":\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\\\"}\" true ") 
+            + HelpExampleRpc("liststreamqueryitems", "\"test-stream\", \"{\\\"keys\\\":[\\\"key01\\\",\"key02\"],\\\"publisher\\\":\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\\\"}\", false")
+        ));
+    
+   mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
        
