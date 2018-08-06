@@ -666,30 +666,41 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
                             string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
                             fields.push_back(Pair(param_name, param_value));                                                                        
                         }
-                        else
-                        {
-                            if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
-                            {
-                                if(value_size == 24)
-                                {
-                                    unsigned char tptr[4];
-                                    memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
-                                    if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
-                                    {
-                                        openers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
-                                    }
-                                    else
-                                    {
-                                        openers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
-                                    }
-                                }
-                            }                        
-                        }
                     }
                     offset=new_offset;
                 }      
                 vfields=fields;
             }
+            
+            offset=0;
+            while(offset>=0)
+            {
+                new_offset=entity.NextParam(offset,&value_offset,&value_size);
+                if(value_offset > 0)
+                {
+                    if(ptr[offset] == 0)
+                    {
+                        if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
+                        {
+                            if(value_size == 24)
+                            {
+                                unsigned char tptr[4];
+                                memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
+                                if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
+                                {
+                                    openers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
+                                }
+                                else
+                                {
+                                    openers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
+                                }
+                            }
+                        }                        
+                    }
+                }
+                offset=new_offset;
+            }      
+                        
             
             entry.push_back(Pair("details",vfields));                    
         }
