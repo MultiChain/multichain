@@ -505,6 +505,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -hideknownopdrops=<n>  " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON_RPC calls (default: %u)"), 0) + "\n";
     strUsage += "  -maxshowndata=<n>      " + strprintf(_("The maximum number of bytes to show in the data field of API responses. (default: %u)"), MAX_OP_RETURN_SHOWN) + "\n";
     strUsage += "                         " + _("Pieces of data larger than this will be returned as an object with txid, vout and size fields, for use with the gettxoutdata command.") + "\n";
+    strUsage += "  -maxqueryscanitems=<n> " + strprintf(_("The maximum number of txs to be decoded in JSON_RPC calls. (default: %u)"), MAX_STREAM_QUERY_ITEMS) + "\n";
     strUsage += "  -v1apicompatible=<n>   " + strprintf(_("JSON_RPC calls responses compatible with MultiChain 1.0 (default: %u)"), 0) + "\n";
 //    strUsage += "  -apidecimaldigits=<n>  " + _("maximal number of decimal digits in API output (default: auto)") + "\n";
            

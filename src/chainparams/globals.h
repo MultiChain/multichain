@@ -23,6 +23,7 @@ int64_t MAX_MONEY = 21000000 * COIN;                                            
 unsigned int MAX_SCRIPT_ELEMENT_SIZE=520;                                       // script.h
 int MIN_BLOCKS_BETWEEN_UPGRADES = 100;                                          
 int MAX_OP_RETURN_SHOWN=16384;
+int MAX_STREAM_QUERY_ITEMS=5000;
 int MAX_FORMATTED_DATA_DEPTH=100;
 unsigned int MAX_OP_RETURN_OP_DROP_COUNT=100000000;
 uint32_t JSON_NO_DOUBLE_FORMATTING=0;                             

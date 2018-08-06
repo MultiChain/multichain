@@ -2411,7 +2411,7 @@ Value liststreamqueryitems(const Array& params, bool fHelp)
     parseStreamIdentifier(params[0],&stream_entity);           
 
     bool verbose=false;
-    int dirty_count;
+    int dirty_count,max_count;
     
     if (params.size() > 2)    
     {
@@ -2429,13 +2429,15 @@ Value liststreamqueryitems(const Array& params, bool fHelp)
     entity_rows->Clear();
     
     dirty_count=GetAndQueryDirtyList(conditions,&stream_entity,false,entity_rows);
-    
-    if(dirty_count > MC_QPR_MAX_DIRTY_TX_LIST_SIZE)
+    max_count=GetArg("-maxqueryscanitems",MAX_STREAM_QUERY_ITEMS);
+    if(dirty_count > max_count)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "This query may take too much time");                                                    
+        throw JSONRPCError(RPC_NOT_SUPPORTED, 
+                strprintf("This query requires decoding %d items, which is above the maxqueryscanitems limit of %d.",
+                dirty_count,max_count));     
     }          
     
-    if(entity_rows->GetCount() > MC_QPR_MAX_CLEAN_TX_LIST_SIZE)
+    if(entity_rows->GetCount() > max_count)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "Resulting list is too large");                                                            
     }
