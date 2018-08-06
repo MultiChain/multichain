@@ -225,6 +225,7 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     obj.push_back(Pair("lockblock",GetArg("-lockblock","")));                        
     obj.push_back(Pair("hideknownopdrops",GetBoolArg("-hideknownopdrops",false)));                    
     obj.push_back(Pair("maxshowndata",GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)));                    
+    obj.push_back(Pair("maxqueryscanitems",GetArg("-maxqueryscanitems",MAX_STREAM_QUERY_ITEMS)));                    
     obj.push_back(Pair("v1apicompatible",GetBoolArg("-v1apicompatible",false)));                    
     obj.push_back(Pair("miningrequirespeers",Params().MiningRequiresPeers()));                    
     obj.push_back(Pair("mineemptyrounds",Params().MineEmptyRounds()));                    
@@ -360,6 +361,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
     }
     if( (param_name == "lockadminminerounds") ||
         (param_name == "maxshowndata") ||
+        (param_name == "maxqueryscanitems") ||
         (param_name == "dropmessagestest") )
     {
         if( (params[1].type() == int_type) || (params[1].type() == str_type) )
