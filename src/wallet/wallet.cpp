@@ -3136,7 +3136,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
         }
 
         // Track how many getdata requests our transaction gets
-        mapRequestCount[wtxNew.GetHash()] = 0;
+        // mapRequestCount[wtxNew.GetHash()] = 0;
 
         // Broadcast
 
