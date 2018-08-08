@@ -578,7 +578,7 @@ int mc_ChunkCollector::InsertChunkInternal(
         m_TotalChunkCount++;
         m_TotalChunkSize+=chunk_size;
         
-        if(m_MemPoolNext->GetCount() >= 2*m_MaxMemPoolSize)
+        if(m_MemPool->GetCount() >= 2*m_MaxMemPoolSize)
         {
             CommitInternal(0);
         }
