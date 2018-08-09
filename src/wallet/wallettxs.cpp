@@ -1334,6 +1334,11 @@ int mc_WalletTxs::Unsubscribe(mc_Buffer* lpEntities,bool purge)
     }
     if(fDebug)LogPrint("wallet","wtxs: Unsubscribed from %d entities\n",lpEntities->GetCount());
     m_Database->UnLock();
+    
+    if(m_ChunkCollector)
+    {
+        m_ChunkCollector->Unsubscribe(lpEntities);
+    }
     return err;                        
 }
 
@@ -2800,7 +2805,13 @@ exitlbl:
             entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS;
             m_Database->AddEntity(imp,&entity,0);
             entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_TIMERECEIVED;
-            m_Database->AddEntity(imp,&entity,0);            
+            m_Database->AddEntity(imp,&entity,0); 
+
+            if(mc_gState->m_Features->Chunks())
+            {
+                entity.m_EntityType=MC_TET_STREAM;
+                m_ChunkDB->AddEntity(&entity,0);
+            }            
         }       
     }
     

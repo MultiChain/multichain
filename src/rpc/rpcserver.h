@@ -114,7 +114,7 @@ public:
      * @throws an exception (json_spirit::Value) when an error happens.
      */
     void initialize();
-    json_spirit::Value execute(const std::string &method, const json_spirit::Array &params) const;
+    json_spirit::Value execute(const std::string &method, const json_spirit::Array &params, const json_spirit::Value& req_id) const;
 };
 
 extern CRPCTable tableRPC;
@@ -260,6 +260,7 @@ extern json_spirit::Value getstreamitem(const json_spirit::Array& params, bool f
 extern json_spirit::Value liststreamtxitems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreamitems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreamkeyitems(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value liststreamqueryitems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreampublisheritems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreamkeys(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreampublishers(const json_spirit::Array& params, bool fHelp);

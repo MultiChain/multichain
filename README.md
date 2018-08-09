@@ -91,6 +91,12 @@ Install dependencies
     Install brew (follow instructions on brew.sh)
     brew install autoconf automake berkeley-db4 libtool boost openssl pkg-config rename
 
+on MacOS High Sierra
+
+    brew uninstall boost
+    brew install boost@1.57
+    brew link boost@1.57 --force
+
 Prepare for static linking
 --------------------------
 Apple does not support statically linked binaries as [documented here](https://developer.apple.com/library/content/qa/qa1118/_index.html), however, it is convenient for end-users to launch a binary without having to first install brew, a third-party system designed for developers.
@@ -112,6 +118,8 @@ The default brew cookbook for berkeley-db and boost builds static libraries, but
     brew edit openssl
         In 'def configure_args' change 'shared' to 'no-shared'
     brew install openssl --force
+
+
 
 Compile MultiChain for Mac (64-bit)
 --------------------------

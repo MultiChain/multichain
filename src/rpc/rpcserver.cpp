@@ -73,11 +73,19 @@ string JSONRPCRequestForLog(const string& strMethod, const Array& params, const 
     {
         request.push_back(Pair("params", params));
     }
-/*    
     request.push_back(Pair("id", id));
+/*    
     request.push_back(Pair("chain_name", string(mc_gState->m_Params->NetworkName())));
  */ 
-    return write_string(Value(request), false) + "\n";
+    return write_string(Value(request), false);// + "\n";
+}
+
+string JSONRPCMethodIDForLog(const string& strMethod, const Value& id)
+{
+    Object request;
+    request.push_back(Pair("method", strMethod));
+    request.push_back(Pair("id", id));
+    return write_string(Value(request), false);// + "\n";
 }
 
 
@@ -979,14 +987,14 @@ static Object JSONRPCExecOne(const Value& req)
     try {
         jreq.parse(req);
 
-        Value result = tableRPC.execute(jreq.strMethod, jreq.params);
+        Value result = tableRPC.execute(jreq.strMethod, jreq.params,jreq.id);
         rpc_result = JSONRPCReplyObj(result, Value::null, jreq.id);
     }
     catch (Object& objError)
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
-        if(fDebug)LogPrint("mcapi","mcapi: API request failure A\n");        
+        if(fDebug)LogPrint("mcapi","mcapi: API request failure A: %s\n",JSONRPCMethodIDForLog(jreq.strMethod,jreq.id).c_str());        
 /* MCHN END */    
         rpc_result = JSONRPCReplyObj(Value::null, objError, jreq.id);
     }
@@ -994,7 +1002,7 @@ static Object JSONRPCExecOne(const Value& req)
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
-        if(fDebug)LogPrint("mcapi","mcapi: API request failure B\n");        
+        if(fDebug)LogPrint("mcapi","mcapi: API request failure B: %s\n",JSONRPCMethodIDForLog(jreq.strMethod,jreq.id).c_str());        
 /* MCHN END */    
         rpc_result = JSONRPCReplyObj(Value::null,
                                      JSONRPCError(RPC_PARSE_ERROR, e.what()), jreq.id);
@@ -1061,7 +1069,7 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
         if (valRequest.type() == obj_type) {
             jreq.parse(valRequest);
 
-            Value result = tableRPC.execute(jreq.strMethod, jreq.params);
+            Value result = tableRPC.execute(jreq.strMethod, jreq.params,jreq.id);
 
             // Send reply
             strReply = JSONRPCReply(result, Value::null, jreq.id);
@@ -1078,7 +1086,7 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
-        if(fDebug)LogPrint("mcapi","mcapi: API request failure: %s, code: %d\n",jreq.strMethod.c_str(),find_value(objError, "code").get_int());
+        if(fDebug)LogPrint("mcapi","mcapi: API request failure: %s, code: %d\n",JSONRPCMethodIDForLog(jreq.strMethod,jreq.id).c_str(),find_value(objError, "code").get_int());
         
 //        if(fDebug)LogPrint("mcapi","mcapi: API request failure C\n");        
 /* MCHN END */    
@@ -1089,7 +1097,7 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
-        if(fDebug)LogPrint("mcapi","mcapi: API request failure D\n");        
+        if(fDebug)LogPrint("mcapi","mcapi: API request failure D: %s\n",JSONRPCMethodIDForLog(jreq.strMethod,jreq.id).c_str());        
 /* MCHN END */    
         ErrorReply(conn->stream(), JSONRPCError(RPC_PARSE_ERROR, e.what()), jreq.id);
         return false;
@@ -1134,7 +1142,7 @@ void ServiceConnection(AcceptedConnection *conn)
     }
 }
 
-json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_spirit::Array &params) const
+json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_spirit::Array &params, const Value& req_id) const
 {
     // Find method
     const CRPCCommand *pcmd = tableRPC[strMethod];
@@ -1190,7 +1198,7 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         // Execute
         if(fDebug)
         {
-            string strRequest = JSONRPCRequestForLog(strMethod, params, 1);
+            string strRequest = JSONRPCRequestForLog(strMethod, params, req_id);
             LogPrint("mcapi","mcapi: API request: %s\n",strRequest.c_str());
         }
         
@@ -1233,7 +1241,7 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
                             strResult=JSONRPCReply(result, Value::null, 1);       
                             if(strcmp(strResultNone.c_str(),strResult.c_str()))
                             {
-                                string strRequestBad = JSONRPCRequestForLog(strMethod, params, 1);
+                                string strRequestBad = JSONRPCRequestForLog(strMethod, params, req_id);
                                 if(fDebug)LogPrint("walletcompare","walletcompare: ERROR: Result mismatch on API request: %s\n",strRequestBad.c_str());
                                 if(fDebug)LogPrint("walletcompare","walletcompare: %s\n",strResultNone.c_str());
                                 if(fDebug)LogPrint("walletcompare","walletcompare: %s\n",strResult.c_str());
@@ -1256,13 +1264,13 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
 #endif // !ENABLE_WALLET
         }
 /* MCHN START */        
-        if(fDebug)LogPrint("mcapi","mcapi: API request successful: %s\n",strMethod.c_str());
+        if(fDebug)LogPrint("mcapi","mcapi: API request successful: %s\n",JSONRPCMethodIDForLog(strMethod,req_id).c_str());
 /* MCHN END */        
         return result;
     }
     catch (std::exception& e)
     {
-        if(fDebug)LogPrint("mcapi","mcapi: API request failure: %s\n",strMethod.c_str());
+        if(fDebug)LogPrint("mcapi","mcapi: API request failure: %s\n",JSONRPCMethodIDForLog(strMethod,req_id).c_str());//strMethod.c_str());
         if(strcmp(e.what(),"Help message not found\n") == 0)
         {
             throw JSONRPCError(RPC_MISC_ERROR, mc_RPCHelpString(strMethod).c_str());

@@ -188,7 +188,9 @@ typedef struct mc_ChunkCollector
     int FillMarkPoolByFlag(uint32_t flag, uint32_t not_flag);    
         
     int Commit();                                                      
-    int CommitInternal(); 
+    int CommitInternal(int fill_mempool); 
+    
+    int Unsubscribe(mc_Buffer* lpEntities);
     
     void Zero();    
     int Destroy();

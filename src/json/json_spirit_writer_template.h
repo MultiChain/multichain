@@ -21,6 +21,7 @@ namespace json_spirit
     
     inline unsigned int utf8_len_and_mask(unsigned char c,unsigned int *mask)
     {
+        if(c<0x20){*mask=0x00;return 0;}
         if(c<0x80){*mask=0x7F;return 1;}
         if(c<0xC0){*mask=0x00;return 0;}
         if(c<0xE0){*mask=0x1F;return 2;}
@@ -146,18 +147,24 @@ namespace json_spirit
             }
             else
             {
-                if( end - i >= charlen)
+                if(charlen)
                 {
-                    shift=6*(charlen-1);
-                    codepoint |= ( unsigned_c & mask) << shift;
-                    for(j=1;j<charlen;j++)
+                    if( end - i >= charlen)
                     {
-                        shift-=6;
-                        codepoint |= ( *( ++i ) & 0x3F) << shift;            
+                        shift=6*(charlen-1);
+                        codepoint |= ( unsigned_c & mask) << shift;
+                        for(j=1;j<charlen;j++)
+                        {
+                            shift-=6;
+                            codepoint |= ( *( ++i ) & 0x3F) << shift;            
+                        }
+                        result += codepoint_to_string< String_type >( codepoint );
                     }
-                    result += codepoint_to_string< String_type >( codepoint );
                 }
-//                result += non_printable_to_string< String_type >( unsigned_c );
+                else
+                {
+                    result += non_printable_to_string< String_type >( unsigned_c );
+                }
             }
         }
 

@@ -75,7 +75,7 @@ bool AssetRefDecode(unsigned char *bin, const char* string, const size_t stringL
         return false;
     
     mc_PutLE(bin+0,&blockNum,4);
-    mc_PutLE(bin+4,&txOffset,8);
+    mc_PutLE(bin+4,&txOffset,4);
     bin[8]=(unsigned char)(txIDPrefixInteger%256);
     bin[9]=(unsigned char)(txIDPrefixInteger/256);
     
@@ -666,30 +666,41 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
                             string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
                             fields.push_back(Pair(param_name, param_value));                                                                        
                         }
-                        else
-                        {
-                            if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
-                            {
-                                if(value_size == 24)
-                                {
-                                    unsigned char tptr[4];
-                                    memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
-                                    if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
-                                    {
-                                        openers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
-                                    }
-                                    else
-                                    {
-                                        openers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
-                                    }
-                                }
-                            }                        
-                        }
                     }
                     offset=new_offset;
                 }      
                 vfields=fields;
             }
+            
+            offset=0;
+            while(offset>=0)
+            {
+                new_offset=entity.NextParam(offset,&value_offset,&value_size);
+                if(value_offset > 0)
+                {
+                    if(ptr[offset] == 0)
+                    {
+                        if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
+                        {
+                            if(value_size == 24)
+                            {
+                                unsigned char tptr[4];
+                                memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
+                                if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
+                                {
+                                    openers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
+                                }
+                                else
+                                {
+                                    openers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
+                                }
+                            }
+                        }                        
+                    }
+                }
+                offset=new_offset;
+            }      
+                        
             
             entry.push_back(Pair("details",vfields));                    
         }
@@ -1562,7 +1573,9 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
 
         Array issues;
         int64_t total=0;
-        if(( (output_level & 0x0020) !=0 )|| mc_gState->m_Assets->HasFollowOns(txid))
+        if(( (output_level & 0x0020) !=0 ) ||                                   // issuers
+                                                                                // For listassets with followons
+             ( (mc_gState->m_Assets->HasFollowOns(txid) != 0) && (quantity < 0) && ( (output_level & 0x00C0) == 0) ))
         {
             int64_t qty;
             mc_Buffer *followons;

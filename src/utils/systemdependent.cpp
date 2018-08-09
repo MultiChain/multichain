@@ -233,7 +233,11 @@ void __US_FlushFileWithMode(int FileHan,uint32_t use_data_sync)
 {
     if(use_data_sync)
     {
+#ifdef MAC_OSX
+        fcntl(FileHan, F_FULLFSYNC, 0);
+#else
         fdatasync(FileHan);
+#endif        
     }
     else
     {

@@ -1546,7 +1546,7 @@ void mc_RelayManager::CheckTime()
     }
 
     Lock();
-    for(map<mc_RelayRecordKey,mc_RelayRecordValue>::iterator it = m_RelayRecords.begin(); it != m_RelayRecords.end();)
+    for(map<const mc_RelayRecordKey,mc_RelayRecordValue>::iterator it = m_RelayRecords.begin(); it != m_RelayRecords.end();)
     {
         if(it->second.m_Timestamp < m_LastTime)
         {
@@ -1623,7 +1623,7 @@ int mc_RelayManager::GetRelayRecord(CNode *pfrom,mc_OffchainMessageID msg_id,uin
     }
 //    printf("getrr: %d, ts: %u, nc: %u\n",pfrom_id,timestamp,nonce);
     const mc_RelayRecordKey key=mc_RelayRecordKey(msg_id,pfrom_id);
-    map<mc_RelayRecordKey, mc_RelayRecordValue>::iterator it = m_RelayRecords.find(key);
+    map<const mc_RelayRecordKey, mc_RelayRecordValue>::iterator it = m_RelayRecords.find(key);
     if (it == m_RelayRecords.end())
     {
         return MC_ERR_NOT_FOUND;

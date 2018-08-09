@@ -241,7 +241,12 @@ Object CallRPC(const string& strMethod, const Array& params)
     mapRequestHeaders["Authorization"] = string("Basic ") + strUserPass64;
     // Send request
 //    JSON_NO_DOUBLE_FORMATTING=1;    
-    string strRequest = JSONRPCRequest(strMethod, params, 1);
+    
+    int32_t id_nonce;
+    id_nonce=mc_RandomInRange(10000000,99999999);
+    Value req_id=strprintf("%08d-%u",id_nonce,mc_TimeNowAsUInt());
+    
+    string strRequest = JSONRPCRequest(strMethod, params, req_id);
 //    JSON_NO_DOUBLE_FORMATTING=0;    
     JSON_DOUBLE_DECIMAL_DIGITS=GetArg("-apidecimaldigits",-1);        
     string strPost = HTTPPost(strRequest, mapRequestHeaders);
