@@ -72,6 +72,7 @@ static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 50000;
 static const unsigned int DEFAULT_MAX_SUCCESSORS_FROM_ONE_NODE = 10;
 /* MCHN END */
 extern int MAX_OP_RETURN_SHOWN;
+extern int MAX_STREAM_QUERY_ITEMS;
 extern int MAX_FORMATTED_DATA_DEPTH;
 extern int MIN_BLOCKS_BETWEEN_UPGRADES;
 extern unsigned int OFFCHAIN_MSG_PADDING;

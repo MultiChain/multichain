@@ -434,7 +434,125 @@ int mc_ChunkCollector::InsertChunk(                                             
     
     return err;    
 }
+
+int mc_ChunkCollector::Unsubscribe(mc_Buffer* lpEntities)
+{
+    Lock();
     
+    int i,err;    
+    unsigned char *ptr;
+    mc_ChunkCollectorRow *row;
+    mc_ChunkCollectorRow collect_row;
+    int try_again,commit_required;
+    mc_TxEntity entity;
+    
+    commit_required=0;
+    for(i=0;i<m_MemPool->GetCount();i++)
+    {
+        row=(mc_ChunkCollectorRow *)m_MemPool->GetRow(i);        
+        memcpy(&entity,&row->m_ChunkDef.m_Entity,sizeof(mc_TxEntity));
+        entity.m_EntityType |= MC_TET_CHAINPOS;
+        if(lpEntities->Seek(&entity) >= 0)    
+        {
+            row->m_State.m_Status |= MC_CCF_DELETED;
+            commit_required=1;
+        }        
+    }
+    
+    if(commit_required)
+    {
+        CommitInternal(0);            
+    }
+    
+    if(m_MemPool == m_MemPool1)
+    {
+        m_MemPoolNext=m_MemPool2;
+    }
+    else
+    {
+        m_MemPoolNext=m_MemPool1;        
+    }
+    
+    
+    try_again=1;
+    m_DBRow.Zero();    
+    if(m_DB)
+    {        
+        while(try_again)
+        {
+            m_MemPoolNext->Clear();
+            try_again=0;
+            err=SeekDB(&m_DBRow);
+
+            ptr=(unsigned char*)m_DB->MoveNext(&err);
+            while(ptr)
+            {
+                if(err)
+                {
+                    return MC_ERR_CORRUPTED;            
+                }
+                memcpy((char*)&m_DBRow,ptr,m_TotalDBSize);   
+                ptr=(unsigned char*)m_DB->MoveNext(&err);
+                GetDBRow(&collect_row);
+                memcpy(&entity,&collect_row.m_ChunkDef.m_Entity,sizeof(mc_TxEntity));
+                entity.m_EntityType |= MC_TET_CHAINPOS;
+                if(lpEntities->Seek(&entity) >= 0)    
+                {
+                    m_MemPoolNext->Add(&collect_row);
+                }
+                else
+                {
+                    memcpy(&m_LastDBRow,&m_DBRow,m_TotalDBSize);                       
+                }
+                if( (m_MemPoolNext->GetCount() >= 2*m_MaxMemPoolSize) || (ptr == NULL) )
+                {
+                    if(ptr)
+                    {
+                        try_again=1;
+                        ptr=NULL;
+                        memcpy(&m_DBRow,&m_LastDBRow,m_TotalDBSize);                        
+                    }
+                    if(m_MemPoolNext->GetCount())
+                    {
+                        commit_required=1;
+                        for(i=0;i<m_MemPoolNext->GetCount();i++)
+                        {
+                            row=(mc_ChunkCollectorRow *)m_MemPoolNext->GetRow(i);        
+                            m_TotalChunkCount--;
+                            m_TotalChunkSize-=row->m_ChunkDef.m_Size;
+                            if(row->m_State.m_Status & MC_CCF_INSERTED)
+                            {
+                                DeleteDBRow(row);                
+                            }            
+                        }
+                        m_DBRow.Zero();
+                        m_DBRow.m_TotalChunkSize=m_TotalChunkSize;
+                        m_DBRow.m_TotalChunkCount=m_TotalChunkCount;
+                        m_DB->Write((char*)&m_DBRow+m_KeyDBOffset,m_KeyDBSize,(char*)&m_DBRow+m_ValueDBOffset,m_ValueDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+
+                        err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
+                        if(err)
+                        {
+                            return err;
+                        }                                        
+                    }
+                }                
+            }
+        }        
+    }
+    
+    m_MemPoolNext->Clear();    
+    
+    if(commit_required)
+    {
+        CommitInternal(1);    
+    }
+    
+    UnLock();    
+    
+    return MC_ERR_NOERROR;
+}
+
 int mc_ChunkCollector::InsertChunkInternal(                  
                  const unsigned char *hash,   
                  const mc_TxEntity *entity,   
@@ -459,6 +577,11 @@ int mc_ChunkCollector::InsertChunkInternal(
         m_MemPool->Add(&collect_row);
         m_TotalChunkCount++;
         m_TotalChunkSize+=chunk_size;
+        
+        if(m_MemPool->GetCount() >= 2*m_MaxMemPoolSize)
+        {
+            CommitInternal(0);
+        }
     }
     
     return MC_ERR_NOERROR;
@@ -573,13 +696,13 @@ int mc_ChunkCollector::Commit()
     int err;
     
     Lock();
-    err=CommitInternal();
+    err=CommitInternal(1);
     UnLock();
     
     return err;        
 }
 
-int mc_ChunkCollector::CommitInternal()
+int mc_ChunkCollector::CommitInternal(int fill_mempool)
 {
     int i;    
     mc_ChunkCollectorRow *row;
@@ -650,7 +773,7 @@ int mc_ChunkCollector::CommitInternal()
             }            
  */ 
             if(!row->m_State.m_Query.IsZero() || 
-               ((row->m_State.m_QueryNextAttempt <= time_now) && (m_MemPoolNext->GetCount() < m_MaxMemPoolSize)) )
+               ((fill_mempool != 0) && (row->m_State.m_QueryNextAttempt <= time_now) && (m_MemPoolNext->GetCount() < m_MaxMemPoolSize)) )
             {
                     m_MemPoolNext->Add(row);                                    
             }
@@ -671,16 +794,19 @@ int mc_ChunkCollector::CommitInternal()
         }                
     }
    
-    if(m_MemPoolNext->GetCount() < m_MaxMemPoolSize)
+    if(fill_mempool)
     {
-        m_LastDBRow.Zero();
-        err=SeekDB(&m_LastDBRow);
-        if(err == MC_ERR_NOERROR)
+        if(m_MemPoolNext->GetCount() < m_MaxMemPoolSize)
         {
-            ReadFromDB(m_MemPoolNext,m_MaxMemPoolSize);
+            m_LastDBRow.Zero();
+            err=SeekDB(&m_LastDBRow);
+            if(err == MC_ERR_NOERROR)
+            {
+                ReadFromDB(m_MemPoolNext,m_MaxMemPoolSize);
+            }
         }
     }
-    
+
     m_MemPool->Clear();
     m_MemPool=m_MemPoolNext;
     

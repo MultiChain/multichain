@@ -430,7 +430,7 @@ bool CBitcoinAddressFromTxEntity(CBitcoinAddress &address,mc_TxEntity *lpEntity)
     return false;
 }
 
-Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char *stream_id, bool verbose, const char** given_key,const char ** given_publisher,int *output)
+Object StreamItemEntry1(const CWalletTx& wtx,int first_output,const unsigned char *stream_id, bool verbose, const char** given_key,const char ** given_publisher,int *output)
 {
     Object entry;
     Array publishers;
@@ -584,6 +584,237 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
             }
         }
                 
+        if(stream_output < 0)
+        {
+            start_from++;
+        }
+    }
+
+    if(stream_output < 0)
+    {
+        return entry;
+    }
+
+    
+    entry.push_back(Pair("publishers", publishers));
+    entry.push_back(Pair("keys", keys));
+    if(mc_gState->m_Compatibility & MC_VCM_1_0)
+    {
+        entry.push_back(Pair("key", keys[0]));        
+    }
+    entry.push_back(Pair("offchain", (retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN));        
+    if( ( retrieve_status & MC_OST_CONTROL_NO_DATA ) == 0)
+    {
+        entry.push_back(Pair("available", AvailableFromStatus(retrieve_status)));        
+        if(retrieve_status & MC_OST_ERROR_MASK)
+        {
+            string error_str;
+            int errorCode;
+            error_str=OffChainError(retrieve_status,&errorCode);
+            entry.push_back(Pair("error", error_str));        
+        }
+    }
+    entry.push_back(Pair("data", format_item_value));        
+    
+    if(verbose)
+    {
+        WalletTxToJSON(wtx, entry, true, stream_output);
+    }
+    else
+    {
+        MinimalWalletTxToJSON(wtx, entry);
+    }
+    
+    return entry;
+}
+
+Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char *stream_id, bool verbose, vector<mc_QueryCondition> *given_conditions,int *output)
+{
+    Object entry;
+    Array publishers;
+    set<uint160> publishers_set;
+    Array keys;    
+    int stream_output;
+    const unsigned char *ptr;
+    unsigned char item_key[MC_ENT_MAX_ITEM_KEY_SIZE+1];
+    int item_key_size;
+//    Value item_value;
+    uint32_t format;
+    unsigned char *chunk_hashes;
+    int chunk_count;   
+    int64_t total_chunk_size,out_size;
+    uint32_t retrieve_status=0;
+    Value format_item_value;
+    string format_text_str;
+    int start_from=first_output;
+    
+    stream_output=-1;
+    if(output)
+    {
+        *output=(int)wtx.vout.size();
+    }
+    while( (stream_output < 0) && (start_from<(int)wtx.vout.size()) )
+    {
+        stream_output=-1;
+        for (int j = start_from; j < (int)wtx.vout.size(); ++j)
+        {
+            if(stream_output < 0)
+            {
+                if(given_conditions)
+                {
+                    for(int c=0;c<(int)(*given_conditions).size();c++)
+                    {
+                        (*given_conditions)[c].m_TmpMatch=false;
+                    }
+                }
+                keys.clear();
+                const CScript& script1 = wtx.vout[j].scriptPubKey;        
+                CScript::const_iterator pc1 = script1.begin();
+
+                mc_gState->m_TmpScript->Clear();
+                mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+
+                if(mc_gState->m_TmpScript->IsOpReturnScript())                      
+                {
+                    if(mc_gState->m_TmpScript->GetNumElements()) // 2 OP_DROPs + OP_RETURN - item key
+                    {
+                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
+//                        chunk_hashes=NULL;
+//                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+
+                        unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
+                        mc_gState->m_TmpScript->SetElement(0);
+
+                        if(mc_gState->m_TmpScript->GetEntity(short_txid) == 0)           
+                        {
+                            if(memcmp(short_txid,stream_id,MC_AST_SHORT_TXID_SIZE) == 0)
+                            {
+                                stream_output=j;
+                                for(int e=1;e<mc_gState->m_TmpScript->GetNumElements()-1;e++)
+                                {
+                                    mc_gState->m_TmpScript->SetElement(e);
+                                                                                                // Should be spkk
+                                    if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
+                                    {
+                                        return entry;
+                                    }                                            
+                                    item_key[item_key_size]=0;
+                                    
+                                    if(given_conditions)
+                                    {
+                                        for(int c=0;c<(int)(*given_conditions).size();c++)
+                                        {
+                                            if((*given_conditions)[c].m_Type == MC_QCT_KEY)
+                                            {
+                                                if(strcmp((char*)item_key,(*given_conditions)[c].m_Value.c_str()) == 0)
+                                                {
+                                                    (*given_conditions)[c].m_TmpMatch=true;
+                                                }                                                
+                                            }
+                                        }
+                                    }
+                                    
+                                    keys.push_back(string(item_key,item_key+item_key_size));
+                                }
+                                
+                                if(given_conditions)
+                                {
+                                    for(int c=0;c<(int)(*given_conditions).size();c++)
+                                    {
+                                        if((*given_conditions)[c].m_Type == MC_QCT_KEY)
+                                        {
+                                            if(!(*given_conditions)[c].m_TmpMatch)
+                                            {
+                                                stream_output=-1;                                                
+                                            }
+                                        }
+                                    }
+                                }
+
+                                const unsigned char *elem;
+
+//                                elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
+                                retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
+//                                item_value=OpReturnEntry(elem,elem_size,wtx.GetHash(),j);
+                                format_item_value=OpReturnFormatEntry(elem,out_size,wtx.GetHash(),j,format,&format_text_str,retrieve_status);
+                            }
+                        }
+                    }                        
+                }                
+            }
+        }
+
+        if(stream_output < 0)
+        {
+            return entry;
+        }
+        if(output)
+        {
+            *output=stream_output;
+        }
+
+        publishers.clear();
+        publishers_set.clear();
+        for (int i = 0; i < (int)wtx.vin.size(); ++i)
+        {
+            int op_addr_offset,op_addr_size,is_redeem_script,sighash_type;
+
+            const CScript& script2 = wtx.vin[i].scriptSig;        
+            CScript::const_iterator pc2 = script2.begin();
+
+            ptr=mc_ExtractAddressFromInputScript((unsigned char*)(&pc2[0]),(int)(script2.end()-pc2),&op_addr_offset,&op_addr_size,&is_redeem_script,&sighash_type,0);
+            if(ptr)
+            {
+                if( (sighash_type == SIGHASH_ALL) || ( (sighash_type == SIGHASH_SINGLE) && (i == stream_output) ) )
+                {
+                    uint160 publisher_hash=Hash160(ptr+op_addr_offset,ptr+op_addr_offset+op_addr_size);
+                    if(publishers_set.count(publisher_hash) == 0)
+                    {
+                        publishers_set.insert(publisher_hash);
+                        string publisher_str;
+                        if(is_redeem_script)
+                        {
+                            publisher_str=CBitcoinAddress((CScriptID)publisher_hash).ToString();
+                        }
+                        else
+                        {
+                            publisher_str=CBitcoinAddress((CKeyID)publisher_hash).ToString();                    
+                        }
+                        
+                        if(given_conditions)
+                        {
+                            for(int c=0;c<(int)(*given_conditions).size();c++)
+                            {
+                                if((*given_conditions)[c].m_Type == MC_QCT_PUBLISHER)
+                                {
+                                    if(strcmp(publisher_str.c_str(),(*given_conditions)[c].m_Value.c_str()) == 0)
+                                    {
+                                        (*given_conditions)[c].m_TmpMatch=true;
+                                    }                                                
+                                }
+                            }
+                        }
+                        
+                        publishers.push_back(publisher_str);
+                    }
+                }
+            }        
+        }
+
+        if(given_conditions)
+        {
+            for(int c=0;c<(int)(*given_conditions).size();c++)
+            {
+                if((*given_conditions)[c].m_Type == MC_QCT_PUBLISHER)
+                {
+                    if(!(*given_conditions)[c].m_TmpMatch)
+                    {
+                        stream_output=-1;                                                
+                    }
+                }
+            }
+        }
+                        
         if(stream_output < 0)
         {
             start_from++;

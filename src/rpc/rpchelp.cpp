@@ -1068,7 +1068,7 @@ void mc_InitRPCHelpMap05()
 
             "\nArguments:\n"
             "1. \"txid\"                           (string, required) The transaction id\n"
-            "2. verbose                          (numeric, optional, default=0) If 0, return a string, other return a json object\n"
+            "2. verbose                          (numeric or boolean, optional, default=0(false)) If 0, return a string, other return a json object\n"
 
             "\nResult (if verbose is not set or set to 0):\n"
             "\"data\"                              (string) The serialized, hex-encoded data for 'txid'\n"
@@ -2244,7 +2244,8 @@ void mc_InitRPCHelpMap10()
             "\nImports keys from a wallet dump file (see dumpwallet).\n"
             "\nArguments:\n"
             "1. \"filename\"                       (string, required) The wallet file\n"
-            "2. rescan                           (integer, optional, default=0) Rescan from block, if negative - from the end.\n"
+            "2. rescan                           (boolean or integer, optional, default=true) Rescan the wallet for transactions. \n"
+            "                                                       If integer rescan from block, if negative - from the end.\n"
             "\nExamples:\n"
             "\nDump the wallet\n"
             + HelpExampleCli("dumpwallet", "\"test\"") +
@@ -3549,6 +3550,7 @@ void mc_InitRPCHelpMap15()
             "                                                       miningturnover,\n"
             "                                                       lockadminminerounds,\n"
             "                                                       maxshowndata, \n"
+            "                                                       maxqueryscanitems, \n"
             "                                                       bantx,\n"
             "                                                       lockblock,\n"
             "                                                       autosubscribe,\n"
@@ -3708,11 +3710,13 @@ void mc_InitRPCHelpMap16()
         ));
     
     mapHelpStrings.insert(std::make_pair("liststreamtxitems",
-            "liststreamtxitems \"stream-identifier\" \"txid\" ( verbose )\n"
+            "liststreamtxitems \"stream-identifier\" txids ( verbose )\n"
             "\nReturns stream items.\n"
             "\nArguments:\n"
             "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
-            "2. \"txid\"                           (string, required) The transaction id\n"
+            "2. \"txids\"                          (string, required) Transaction IDs, comma delimited\n"
+            " or\n"
+            "2. txids                            (array, required) Array of transaction IDs\n"
             "3. verbose                          (boolean, optional, default=false) If true, returns information about item transaction \n"
             "\nResult:\n"
             "\"stream-items\"                      (array) Array of stream items.\n"
@@ -4117,7 +4121,31 @@ void mc_InitRPCHelpMap18()
         ));
     
     
-    mapHelpStrings.insert(std::make_pair("AAAAAAA",
+     mapHelpStrings.insert(std::make_pair("liststreamqueryitems",
+            "liststreamqueryitems \"stream-identifier\" query ( verbose )\n"
+            "\nReturns stream items for specific query.\n"
+            "\nArguments:\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "2. query                            (object, required) Query\n"
+            "    {\n"                
+            "      \"key\" : \"key\"                   (string, optional, default: \"\") Item key\n"
+            "        or\n"
+            "      \"keys\" : keys                   (array, optional) Item keys, array of strings\n"
+            "        and/or\n"
+            "      \"publisher\" : \"publisher\"       (string, optional, default: \"\") Publisher\n"
+            "        or\n"
+            "      \"publishers\" : publishers       (array, optional) Publishers, array of strings\n"
+            "    }\n"                                
+            "3. verbose                          (boolean, optional, default=false) If true, returns information about item transaction \n"
+            "\nResult:\n"
+            "\"stream-items\"                      (array) List of stream items for specific query.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("liststreamqueryitems", "\"test-stream\" \"{\\\"keys\\\":[\\\"key01\\\",\"key02\"]}\"") 
+            + HelpExampleCli("liststreamqueryitems", "\"test-stream\" \"{\\\"keys\\\":[\\\"key01\\\",\"key02\"],\\\"publisher\\\":\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\\\"}\" true ") 
+            + HelpExampleRpc("liststreamqueryitems", "\"test-stream\", \"{\\\"keys\\\":[\\\"key01\\\",\"key02\"],\\\"publisher\\\":\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\\\"}\", false")
+        ));
+    
+   mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
        
