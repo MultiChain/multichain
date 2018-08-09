@@ -243,41 +243,27 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                         *allowed -= MC_PTP_SEND;                        
                     }
                     
-                    if((mc_gState->m_Features->ShortTxIDInTx() == 0) && (entity.IsUnconfirmedGenesis() != 0) )
+                    memcpy(buf,entity.GetFullRef(),MC_AST_ASSET_FULLREF_SIZE);
+                    row=amounts->Seek(buf);
+                    last=0;
+                    if(row >= 0)
                     {
-                        if(required)                                            // Unconfirmed genesis in protocol < 10007, cannot be spent
-                        {
-                            memset(buf,0,MC_AST_ASSET_FULLREF_SIZE);
-                            mc_SetABRefType(buf,MC_AST_ASSET_REF_TYPE_GENESIS);
-                            mc_SetABQuantity(buf,total);
-                            amounts->Add(buf);        
-                            *required |= MC_PTP_ISSUE;
-                        }
+                        last=mc_GetABQuantity(amounts->GetRow(row));
+                        total+=last;
+                        mc_SetABQuantity(amounts->GetRow(row),total);
                     }
-                    else            
+                    else
                     {
-                        memcpy(buf,entity.GetFullRef(),MC_AST_ASSET_FULLREF_SIZE);
-                        row=amounts->Seek(buf);
-                        last=0;
-                        if(row >= 0)
+                        mc_SetABQuantity(buf,total);
+                        amounts->Add(buf);                        
+                    }
+
+                    if(required)
+                    {
+                        if(expected_required == 0)                          
                         {
-                            last=mc_GetABQuantity(amounts->GetRow(row));
-                            total+=last;
-                            mc_SetABQuantity(amounts->GetRow(row),total);
-                        }
-                        else
-                        {
-                            mc_SetABQuantity(buf,total);
-                            amounts->Add(buf);                        
-                        }
-                        
-                        if(required)
-                        {
-                            if(expected_required == 0)                          
-                            {
-                                *required |= MC_PTP_ISSUE;
-                            }                            
-                        }
+                            *required |= MC_PTP_ISSUE;
+                        }                            
                     }
                 }                
                 else                                                            // Asset not found, no error but the caller should check required field
@@ -451,14 +437,6 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                                         }                                    
                                     }
                                 }
-                                else
-                                {
-                                    if(mc_gState->m_Features->OpDropDetailsScripts() == 0)// May be Follow-on details from v10007
-                                    {
-                                        strFailReason="Invalid publish script, not stream";
-                                        return false;                                                                    
-                                    }
-                                }                            
                             }                        
                             else
                             {
@@ -512,13 +490,10 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                         *required |= admin_type;
                         if( type & (MC_PTP_ADMIN | MC_PTP_MINE) )
                         {
-                            if(mc_gState->m_Features->CachedInputScript())
+                            if(mc_gState->m_NetworkParams->GetInt64Param("supportminerprecheck"))                                
                             {
-                                if(mc_gState->m_NetworkParams->GetInt64Param("supportminerprecheck"))                                
-                                {
-                                    *required |= MC_PTP_CACHED_SCRIPT_REQUIRED;
-                                }        
-                            }
+                                *required |= MC_PTP_CACHED_SCRIPT_REQUIRED;
+                            }        
                         }
                         
                         if(hash == 0)

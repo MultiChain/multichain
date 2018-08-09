@@ -25,6 +25,7 @@
 
 using namespace json_spirit;
 using namespace std;
+void PushMultiChainRelay(CNode* pto, uint32_t msg_type,vector<CAddress>& path,vector<CAddress>& path_to_follow,vector<unsigned char>& payload);
 
 Value getconnectioncount(const Array& params, bool fHelp)
 {
@@ -174,6 +175,19 @@ Value addnode(const Array& params, bool fHelp)
         if (it == vAddedNodes.end())
             throw JSONRPCError(RPC_CLIENT_NODE_NOT_ADDED, "Error: Node has not been added.");
         vAddedNodes.erase(it);
+        if(GetBoolArg("-addnodeonly",false))
+        {
+            LOCK(cs_vNodes);
+            CAddress addrNode=CAddress(CService(strNode.c_str(),Params().GetDefaultPort(),0));
+            BOOST_FOREACH(CNode* pnode, vNodes)
+            {
+                if (pnode->addr == addrNode)
+                {
+                    pnode->fDisconnect=true;
+                }
+            }
+        }
+        
     }
 
     return Value::null;
@@ -254,6 +268,13 @@ Value getaddednodeinfo(const Array& params, bool fHelp)
                     fFound = true;
                     fConnected = true;
                     node.push_back(Pair("connected", pnode->fInbound ? "inbound" : "outbound"));
+                    
+                    vector<CAddress>path;
+                    vector<CAddress>path_to_follow;
+                    vector<unsigned char> payload;
+                    
+//                    PushMultiChainRelay(pnode, MC_RMT_GLOBAL_PING,path,path_to_follow,payload);
+
                     break;
                 }
             if (!fFound)

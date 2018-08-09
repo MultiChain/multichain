@@ -6,6 +6,8 @@
 #define MC_DCT_SCRIPT_ALLOC_BUFFER_CHUNK 4096
 #define MC_DCT_SCRIPT_ALLOC_INDEX_CHUNK    16
 
+#define MC_DCT_SCRIPT_CHUNK_HASH_SIZE      32
+
 #define MC_DCT_SCRIPT_OP_PUSHDATA1       0x4c
 #define MC_DCT_SCRIPT_OP_PUSHDATA2       0x4d
 #define MC_DCT_SCRIPT_OP_PUSHDATA4       0x4e
@@ -33,11 +35,12 @@
 #define MC_DCT_SCRIPT_MULTICHAIN_DATA_FORMAT_PREFIX 'f'
 #define MC_DCT_SCRIPT_MULTICHAIN_RAW_DATA_PREFIX 'd'
 
+#define MC_DCT_SCRIPT_EXTENDED_TYPE_CHUNK_DEF              0xF0
+
 #define MC_DCT_SCRIPT_TYPE_REGULAR                         0x00
 #define MC_DCT_SCRIPT_TYPE_OP_RETURN                       0x01
 #define MC_DCT_SCRIPT_TYPE_OP_DROP                         0x02
 #define MC_DCT_SCRIPT_TYPE_DIRTY_OP_RETURN                 0x04
-
 
 
 int mc_Script::Zero()
@@ -50,7 +53,7 @@ int mc_Script::Zero()
     m_AllocElements=0;
     m_AllocSize=0;
     m_ScriptType=MC_DCT_SCRIPT_TYPE_REGULAR;
-    
+    m_Restrictions=MC_ENT_ENTITY_RESTRICTION_NONE;    
     return MC_ERR_NOERROR;
 }
 
@@ -298,11 +301,12 @@ int mc_Script::SetParamValue(const char *param_name,const size_t param_name_size
     return MC_ERR_NOERROR;        
 }
 
-uint32_t mc_GetParamFromDetailsScript(const unsigned char *ptr,uint32_t total,uint32_t offset,uint32_t* param_value_start,size_t *bytes,int *err)
+uint32_t mc_GetParamFromDetailsScriptErr(const unsigned char *ptr,uint32_t total,uint32_t offset,uint32_t* param_value_start,size_t *bytes,int *err)
 {
     int shift,name_size,value_size,size;
     
-    *param_value_start=0;
+    *param_value_start=total;
+    *bytes=0;
     *err=MC_ERR_NOERROR;
     
     if(offset>=total)
@@ -337,6 +341,9 @@ uint32_t mc_GetParamFromDetailsScript(const unsigned char *ptr,uint32_t total,ui
         *err=MC_ERR_ERROR_IN_SCRIPT;
         return total;
     }
+
+    *bytes=value_size;
+    *param_value_start=offset+name_size+shift;
     
     size=name_size+shift+value_size;
     if(offset+size>total)
@@ -345,8 +352,6 @@ uint32_t mc_GetParamFromDetailsScript(const unsigned char *ptr,uint32_t total,ui
         return total;
     }
     
-    *bytes=value_size;
-    *param_value_start=offset+name_size+shift;
     
     return offset+size;    
 }
@@ -354,7 +359,15 @@ uint32_t mc_GetParamFromDetailsScript(const unsigned char *ptr,uint32_t total,ui
 uint32_t mc_GetParamFromDetailsScript(const unsigned char *ptr,uint32_t total,uint32_t offset,uint32_t* param_value_start,size_t *bytes)
 {
     int err;
-    return mc_GetParamFromDetailsScript(ptr,total,offset,param_value_start,bytes,&err);
+    uint32_t new_offset;
+    new_offset=mc_GetParamFromDetailsScriptErr(ptr,total,offset,param_value_start,bytes,&err);
+    
+    if(err)
+    {
+        *param_value_start=0;
+        *bytes=0;
+    }
+    return new_offset;
 }
 
 uint32_t mc_FindSpecialParamInDetailsScript(const unsigned char *ptr,uint32_t total,uint32_t param,size_t *bytes)
@@ -423,7 +436,7 @@ int mc_VerifyDetailsScript(const unsigned char *script,uint32_t script_size)
     
     while(offset<script_size)
     {        
-        new_offset=(int32_t)mc_GetParamFromDetailsScript(script,script_size,offset,&param_value_start,&bytes,&err);
+        new_offset=(int32_t)mc_GetParamFromDetailsScriptErr(script,script_size,offset,&param_value_start,&bytes,&err);
         if(err)
         {
             return err;
@@ -934,29 +947,22 @@ int mc_Script::SetScript(const unsigned char* src,const size_t bytes,int type)
         {
             if(lastSize == 0)
             {
-                if(mc_gState->m_Features->FixedIn10007())
+                if(opcode > MC_DCT_SCRIPT_OP_16)                            // Not push data
                 {
-                    if(opcode > MC_DCT_SCRIPT_OP_16)                            // Not push data
-                    {
-                        lastSize=-1;                                                    
-                    }
-                    else
-                    {
-                        if(opcode > MC_DCT_SCRIPT_OP_PUSHDATA4)
-                        {
-                            if(mc_gState->m_Features->FormattedData())
-                            {
-                                if( (m_ScriptType & MC_DCT_SCRIPT_TYPE_OP_RETURN ) == 0) 
-                                {
-                                    m_ScriptType |= MC_DCT_SCRIPT_TYPE_DIRTY_OP_RETURN;                                
-                                }
-                            }
-                        }
-                    }
+                    lastSize=-1;                                                    
                 }
                 else
                 {
-                    lastSize=-1;                                                                    
+                    if(opcode > MC_DCT_SCRIPT_OP_PUSHDATA4)
+                    {
+                        if(mc_gState->m_Features->FormattedData())
+                        {
+                            if( (m_ScriptType & MC_DCT_SCRIPT_TYPE_OP_RETURN ) == 0) 
+                            {
+                                m_ScriptType |= MC_DCT_SCRIPT_TYPE_DIRTY_OP_RETURN;                                
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1777,20 +1783,10 @@ int mc_Script::GetNewEntityType(uint32_t *type)
         return MC_ERR_INVALID_PARAMETER_VALUE;
     }
     
-    if(mc_gState->m_Features->OpDropDetailsScripts())
+    if(m_lpCoord[m_CurrentElement*2+1] < MC_DCT_SCRIPT_IDENTIFIER_LEN+1+1)
     {
-        if(m_lpCoord[m_CurrentElement*2+1] < MC_DCT_SCRIPT_IDENTIFIER_LEN+1+1)
-        {
-            return MC_ERR_WRONG_SCRIPT;
-        }        
-    }
-    else
-    {
-        if(m_lpCoord[m_CurrentElement*2+1] != MC_DCT_SCRIPT_IDENTIFIER_LEN+1+1)
-        {
-            return MC_ERR_WRONG_SCRIPT;
-        }
-    }
+        return MC_ERR_WRONG_SCRIPT;
+    }        
         
     ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
     
@@ -1881,13 +1877,8 @@ int mc_Script::GetFullRef(unsigned char *ref,uint32_t *script_type)
     }
     
     new_ref=1;
-    shift=0;
-    ref_type=MC_AST_ASSET_REF_TYPE_REF;
-    if(mc_gState->m_Features->ShortTxIDInTx())
-    {
-        shift=MC_AST_SHORT_TXID_OFFSET;
-        ref_type=MC_AST_ASSET_REF_TYPE_SHORT_TXID;
-    }
+    shift=MC_AST_SHORT_TXID_OFFSET;
+    ref_type=MC_AST_ASSET_REF_TYPE_SHORT_TXID;
     memset(ref,0,MC_AST_ASSET_FULLREF_SIZE);
     
     for(i=0;i<items;i++)
@@ -1968,13 +1959,8 @@ int mc_Script::GetAssetQuantities(mc_Buffer *amounts,uint32_t script_type)
             
     ptr+=MC_DCT_SCRIPT_IDENTIFIER_LEN+1;
 
-    shift=0;
-    ref_type=MC_AST_ASSET_REF_TYPE_REF;
-    if(mc_gState->m_Features->ShortTxIDInTx())
-    {
-        shift=MC_AST_SHORT_TXID_OFFSET;
-        ref_type=MC_AST_ASSET_REF_TYPE_SHORT_TXID;
-    }
+    shift=MC_AST_SHORT_TXID_OFFSET;
+    ref_type=MC_AST_ASSET_REF_TYPE_SHORT_TXID;
     
     items=(m_lpCoord[m_CurrentElement*2+1] - (MC_DCT_SCRIPT_IDENTIFIER_LEN+1)) / (mc_gState->m_NetworkParams->m_AssetRefSize + MC_AST_ASSET_QUANTITY_SIZE);
 
@@ -2064,11 +2050,7 @@ int mc_Script::SetAssetQuantities(mc_Buffer *amounts,uint32_t script_type)
         return err;
     }
 
-    shift=0;
-    if(mc_gState->m_Features->ShortTxIDInTx())
-    {
-        shift=MC_AST_SHORT_TXID_OFFSET;
-    }
+    shift=MC_AST_SHORT_TXID_OFFSET;
     
     
     for(i=0;i<amounts->GetCount();i++)
@@ -2294,7 +2276,6 @@ int mc_Script::SetRawData(const unsigned char *data,const int size)
 int mc_Script::GetDataFormat(uint32_t *format)
 {
     unsigned char *ptr;
-    unsigned char *ptrEnd;
     unsigned char f;
     
     if(format)
@@ -2313,7 +2294,6 @@ int mc_Script::GetDataFormat(uint32_t *format)
     }
     
     ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
-    ptrEnd=ptr+m_lpCoord[m_CurrentElement*2+1];
     
     if(memcmp(ptr,MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
     {
@@ -2374,16 +2354,252 @@ int mc_Script::SetDataFormat(const uint32_t format)
     return MC_ERR_NOERROR;    
 }
 
+int mc_Script::GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_count,int64_t *total_size,int check_sizes)
+{
+    unsigned char *ptr;
+    unsigned char *ptrEnd;
+    unsigned char f,s;
+    int c,count,shift,size;
+/*    
+    if(format)
+    {
+        *format=MC_SCR_DATA_FORMAT_UNKNOWN;
+    }
+*/        
+    if(m_CurrentElement<0)
+    {
+        return MC_ERR_INVALID_PARAMETER_VALUE;
+    }
+    
+    if(m_lpCoord[m_CurrentElement*2+1] < MC_DCT_SCRIPT_IDENTIFIER_LEN+1+1)
+    {
+        return MC_ERR_WRONG_SCRIPT;
+    }
+    
+    ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
+    ptrEnd=ptr+m_lpCoord[m_CurrentElement*2+1];
+    
+    if(memcmp(ptr,MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
+    {
+        return MC_ERR_WRONG_SCRIPT;
+    }
+    
+    
+    if(ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN] != MC_DCT_SCRIPT_MULTICHAIN_DATA_FORMAT_PREFIX)
+    {
+        return MC_ERR_WRONG_SCRIPT;            
+    }
+    
+    ptr+=MC_DCT_SCRIPT_IDENTIFIER_LEN+1;
+
+    f=(unsigned char)(*ptr);
+
+    if(f != MC_DCT_SCRIPT_EXTENDED_TYPE_CHUNK_DEF)
+    {
+        return MC_ERR_WRONG_SCRIPT;            
+    }
+    
+    ptr++;
+    
+    if(ptr+3 > ptrEnd)
+    {
+        return MC_ERR_ERROR_IN_SCRIPT;                                                            
+    }
+    
+    if(format)
+    {
+        *format=(uint32_t)(*ptr);
+    }   
+    
+    ptr++;
+
+    s=(uint32_t)(*ptr);
+ 
+    if(s != 0)
+    {
+        return MC_ERR_ERROR_IN_SCRIPT;                                          // Salt length should be 0
+    }
+    
+    ptr++;
+    
+    count=(int)mc_GetVarInt(ptr,ptrEnd-ptr,-1,&shift);
+    
+    if(count<0)
+    {
+        return MC_ERR_ERROR_IN_SCRIPT;
+    }
+
+    ptr+=shift;
+
+    if(check_sizes)
+    {
+        if(count > MAX_CHUNK_COUNT)
+        {
+            return MC_ERR_ERROR_IN_SCRIPT;        
+        }
+    }
+    
+    if(chunk_count)
+    {
+        *chunk_count=count;
+    }
+    
+    if(hashes)
+    {
+        *hashes=ptr;
+    }
+    
+    if(total_size)
+    {
+        *total_size=0;
+    }
+    
+    for(c=0;c<count;c++)
+    {
+        size=(int)mc_GetVarInt(ptr,ptrEnd-ptr,-1,&shift);
+
+        if(size<0)
+        {
+            return MC_ERR_ERROR_IN_SCRIPT;
+        }
+        
+        if(check_sizes)
+        {
+            if(size > MAX_CHUNK_SIZE)
+            {
+                return MC_ERR_ERROR_IN_SCRIPT;        
+            }
+        }
+        
+        ptr+=shift;
+        
+        if(ptr+MC_DCT_SCRIPT_CHUNK_HASH_SIZE>ptrEnd)
+        {
+            return MC_ERR_ERROR_IN_SCRIPT;                    
+        }
+        
+        ptr+=MC_DCT_SCRIPT_CHUNK_HASH_SIZE;
+        
+        if(total_size)
+        {
+            *total_size+=size;
+        }
+    }    
+    
+    return MC_ERR_NOERROR;    
+}
+
+int mc_Script::GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_count,int64_t *total_size)
+{
+    return GetChunkDef(format,hashes,chunk_count,total_size,0);
+}
+
+int mc_Script::SetChunkDefHeader(const uint32_t format,int chunk_count)
+{
+    int err,shift;
+    unsigned char buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+14];
+    
+    err=AddElement();
+    if(err)
+    {
+        return err;
+    }
+    
+    memcpy(buf,MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_DATA_FORMAT_PREFIX;        
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+1]=MC_DCT_SCRIPT_EXTENDED_TYPE_CHUNK_DEF;
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+2]=(unsigned char)format;
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+3]=0;                                      // Salt length    
+    shift=mc_PutVarInt(buf+MC_DCT_SCRIPT_IDENTIFIER_LEN+4,11,chunk_count);
+    
+    err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+4+shift);
+    if(err)
+    {
+        return err;
+    }
+
+    return MC_ERR_NOERROR;        
+}
+
+int mc_Script::SetChunkDefHash(unsigned char *hash,int size)
+{
+    int err,shift;
+    unsigned char buf[16];
+
+    shift=mc_PutVarInt(buf,16,size);
+    err=SetData(buf,shift);
+    if(err)
+    {
+        return err;
+    }
+
+    err=SetData(hash,MC_DCT_SCRIPT_CHUNK_HASH_SIZE);
+    if(err)
+    {
+        return err;
+    }
+    
+    return MC_ERR_NOERROR;            
+}
+
+
 int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format)
 {
+    return ExtractAndDeleteDataFormat(format,NULL,NULL,NULL);
+}
+
+int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashes,int *chunk_count,int64_t *total_size,int check_sizes)
+{
     int elem,err;
+
+    m_Restrictions=MC_ENT_ENTITY_RESTRICTION_NONE;
     
     if(format)
     {
         *format=MC_SCR_DATA_FORMAT_UNKNOWN;
     }
-    
+
+    if(hashes)
+    {
+        *hashes=NULL;
+    }
+
     if(mc_gState->m_Features->FormattedData() == 0)
+    {
+        return MC_ERR_NOERROR;
+    }
+    
+    if(m_NumElements >= 1)
+    {        
+        if(m_lpCoord[(m_NumElements-1)*2+1] > 0)
+        {
+            m_Restrictions |= MC_ENT_ENTITY_RESTRICTION_ONCHAIN;
+        }        
+    }
+    
+    if(m_NumElements < 2)
+    {        
+        return MC_ERR_NOERROR;
+    }
+        
+    
+    
+    elem=m_NumElements-2;
+        
+    SetElement(elem);
+    if( (err=GetDataFormat(format)) != MC_ERR_WRONG_SCRIPT  )
+    {
+        if( (mc_gState->m_Features->OffChainData() == 0) || (GetChunkDef(NULL,NULL,NULL,NULL) == MC_ERR_WRONG_SCRIPT) )
+        {
+            DeleteElement(elem);            
+        }
+        if(err)
+        {
+            return err;
+        }
+    }        
+    
+    if(mc_gState->m_Features->OffChainData() == 0)
     {
         return MC_ERR_NOERROR;
     }
@@ -2394,15 +2610,42 @@ int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format)
     }
         
     elem=m_NumElements-2;
-        
-    SetElement(elem);
-    if( (err=GetDataFormat(format)) != MC_ERR_WRONG_SCRIPT  )
-    {
-        DeleteElement(elem);
-        return err;
-    }        
     
-    return MC_ERR_NOERROR;
+    SetElement(elem);
+    while( (elem >= 0 ) && ((err=GetChunkDef(format,hashes,chunk_count,total_size,check_sizes)) == MC_ERR_NOERROR) )
+    {
+        m_Restrictions |= MC_ENT_ENTITY_RESTRICTION_OFFCHAIN;
+        DeleteElement(elem);
+        elem--;
+        if(elem < 0)
+        {
+            err=MC_ERR_WRONG_SCRIPT;
+        }
+        else
+        {
+            SetElement(elem);            
+        }
+    }
+        
+    if(err != MC_ERR_WRONG_SCRIPT)
+    {
+        if(hashes)
+        {
+            *hashes=NULL;
+        }
+        if(chunk_count)
+        {
+            *chunk_count=0;
+        }
+        return err;            
+    }
+    
+    return MC_ERR_NOERROR;        
+}
+
+int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashes,int *chunk_count,int64_t *total_size)
+{
+    return ExtractAndDeleteDataFormat(format,hashes,chunk_count,total_size,0);
 }
 
 int mc_Script::DeleteDuplicatesInRange(int from,int to)

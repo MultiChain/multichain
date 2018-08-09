@@ -264,6 +264,22 @@ int mc_MultichainParams::CanBeUpgradedByVersion(const char *param,int version,in
         }
     }
     
+    if(strcmp(param,"maximumchunksize") == 0)
+    {
+        if(version >= 20003)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    if(strcmp(param,"maximumchunkcount") == 0)
+    {
+        if(version >= 20003)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
     
     
     return 0;
@@ -402,6 +418,7 @@ int mc_MultichainParams::Create(const char* name,int version)
     mc_OneMultichainParam *param;
     char *ptrData;
     int num_sets;
+    int64_t override_int64;
     uint32_t network_port=MC_DEFAULT_NETWORK_PORT;
     uint32_t rpc_port=MC_DEFAULT_RPC_PORT;
     
@@ -480,6 +497,14 @@ int mc_MultichainParams::Create(const char* name,int version)
                             case MC_PRM_INT64:
                                 size=8;
                                 mc_PutLE(ptrData,&(param->m_DefaultIntegerValue),8);
+                                if(strcmp(param->m_Name,"maxstdelementsize") == 0)
+                                {
+                                    if(version<20003)
+                                    {
+                                        override_int64=8192;
+                                        mc_PutLE(ptrData,&override_int64,8);
+                                    }
+                                }                                   
                                 break;
                             case MC_PRM_DOUBLE:
                                 size=8;
@@ -1742,214 +1767,9 @@ int mc_Features::MinProtocolVersion()
     return 10004;
 }
 
-int mc_Features::ActivatePermission()                                           // This test is eliminated from the code as 10002 is not supported
-{
-    int ret=0;
-    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
-    
-    if(protocol)
-    {
-        if(protocol >= 10003)
-        {
-            ret=1;
-        }
-    }
-    
-    return ret;
-}
-
 int mc_Features::LastVersionNotSendingProtocolVersionInHandShake()
 {
     return 10002;
-}
-
-int mc_Features::VerifySizeOfOpDropElements()                                   // This test is still in the code to keep protocol!-multichain untouched
-{
-    
-    int ret=0;        
-    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
-    
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
-    {
-        return 1;
-    }
-    
-    if(protocol)
-    {
-        if(protocol >= 10003)
-        {
-            ret=1;
-        }
-    }
-    
-    return ret;
-}
-
-int mc_Features::PerEntityPermissions()                                         // This test is eliminated from the code as 10002 is not supported
-{
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
-    {
-        return 0;
-    }
-    int ret=0;
-    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
-    
-    if(protocol)
-    {
-        if(protocol >= 10004)
-        {
-            ret=1;
-        }
-    }
-    
-    return ret;
-}
-
-int mc_Features::FollowOnIssues()                                               // This test is eliminated from the code as 10002 is not supported
-{
-    int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
-    {
-        return 0;
-    }
-    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
-    if(protocol)
-    {
-        if(protocol >= 10004)
-        {
-            ret=1;
-        }
-    }
-    
-    return ret;
-}
-
-int mc_Features::SpecialParamsInDetailsScript()                                 // This test is eliminated from the code as 10002 is not supported
-{
-    int ret=0;
-    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
-    
-    if(protocol)
-    {
-        if(protocol >= 10004)
-        {
-            ret=1;
-        }
-    }
-    
-    return ret;    
-}
-
-int mc_Features::FixedGrantsInTheSameTx()                                       // This test is eliminated from the code as 10002 is not supported
-{
-    int ret=0;
-    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
-    
-    if(protocol)
-    {
-        if(protocol >= 10004)
-        {
-            ret=1;
-        }
-    }
-    
-    return ret;    
-}
-
-int mc_Features::UnconfirmedMinersCannotMine()
-{
-    int ret=0;
-    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
-    
-    if(protocol)
-    {
-        if(protocol >= 10004)
-        {
-            ret=1;
-        }
-    }
-    
-    return ret;    
-}
-
-int mc_Features::Streams()
-{
-    int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
-    {
-        return 0;
-    }
-    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
-    
-    if(protocol)
-    {
-        if(protocol >= 10006)
-        {
-            ret=1;
-        }
-    }
-    
-    return ret;    
-}
-
-int mc_Features::OpDropDetailsScripts()
-{
-    int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
-    {
-        return 0;
-    }
-    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
-    
-    if(protocol)
-    {
-        if(protocol >= 10007)
-        {
-            ret=1;
-        }
-    }
-    
-    return ret;    
-}
-
-int mc_Features::ShortTxIDInTx()
-{
-    int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
-    {
-        return 0;
-    }
-    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
-    
-    if(protocol)
-    {
-        if(protocol >= 10007)
-        {
-            ret=1;
-        }
-    }
-    
-    return ret;    
-}
-
-int mc_Features::CachedInputScript()
-{
-    int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
-    {
-        return 0;
-    }
-    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
-    
-    if(protocol)
-    {
-        if(protocol >= 10007)
-        {
-            ret=1;
-        }
-    }
-    
-    return ret;    
 }
 
 int mc_Features::AnyoneCanReceiveEmpty()
@@ -1969,66 +1789,6 @@ int mc_Features::AnyoneCanReceiveEmpty()
             {
                 ret=1;
             }
-        }
-    }
-    
-    return ret;    
-}
-
-int mc_Features::FixedIn10007()
-{
-    int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
-    {
-        return 0;
-    }
-    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
-    
-    if(protocol)
-    {
-        if(protocol >= 10007)
-        {
-            ret=1;
-        }
-    }
-    
-    return ret;    
-}
-
-int mc_Features::Upgrades()
-{
-    int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
-    {
-        return 0;
-    }
-    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
-    
-    if(protocol)
-    {
-        if(protocol >= 10008)
-        {
-            ret=1;
-        }
-    }
-    
-    return ret;    
-}
-
-int mc_Features::FixedIn10008()
-{
-    int ret=0;
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
-    {
-        return 0;
-    }
-    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
-    
-    if(protocol)
-    {
-        if(protocol >= 10008)
-        {
-            ret=1;
         }
     }
     
@@ -2170,6 +1930,107 @@ int mc_Features::ParameterUpgrades()
         if(protocol >= 20002)
         {
             ret=1;
+        }
+    }
+    
+    return ret;    
+}
+
+int mc_Features::OffChainData()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 20003)
+        {
+            ret=1;
+        }
+    }
+    
+    return ret;    
+}
+
+int mc_Features::Chunks()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 20003)
+        {
+            ret=1;
+        }
+    }
+    
+    return ret;    
+}
+
+
+int mc_Features::FixedIn1001020003()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 1;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol < 20000)
+        {
+            if(protocol >= 10010)
+            {
+                ret=1;
+            }
+        }
+        else
+        {
+            if(protocol >= 20003)
+            {
+                ret=1;
+            }            
+        }
+    }
+    
+    return ret;    
+}
+
+int mc_Features::FixedIn1001120003()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 1;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol < 20000)
+        {
+            if(protocol >= 10011)
+            {
+                ret=1;
+            }
+        }
+        else
+        {
+            if(protocol >= 20003)
+            {
+                ret=1;
+            }            
         }
     }
     

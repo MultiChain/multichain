@@ -114,7 +114,7 @@ public:
      * @throws an exception (json_spirit::Value) when an error happens.
      */
     void initialize();
-    json_spirit::Value execute(const std::string &method, const json_spirit::Array &params) const;
+    json_spirit::Value execute(const std::string &method, const json_spirit::Array &params, const json_spirit::Value& req_id) const;
 };
 
 extern CRPCTable tableRPC;
@@ -192,8 +192,14 @@ extern json_spirit::Value getaccount(const json_spirit::Array& params, bool fHel
 extern json_spirit::Value getaddressesbyaccount(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value sendtoaddress(const json_spirit::Array& params, bool fHelp);
 /* MCHN START */    
+extern json_spirit::Value debug(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getchunkqueueinfo(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getchunkqueuetotals(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value createkeypairs(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getaddresses(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value createbinarycache(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value appendbinarycache(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value deletebinarycache(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value combineunspent(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value grantcmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value revokecmd(const json_spirit::Array& params, bool fHelp);
@@ -254,6 +260,7 @@ extern json_spirit::Value getstreamitem(const json_spirit::Array& params, bool f
 extern json_spirit::Value liststreamtxitems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreamitems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreamkeyitems(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value liststreamqueryitems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreampublisheritems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreamkeys(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreampublishers(const json_spirit::Array& params, bool fHelp);
@@ -262,6 +269,7 @@ extern json_spirit::Value listblocks(const json_spirit::Array& params, bool fHel
 extern json_spirit::Value liststreamblockitems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getstreamkeysummary(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getstreampublishersummary(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value storechunk(const json_spirit::Array& params, bool fHelp);
 
 extern json_spirit::Value purehelpitem(const json_spirit::Array& params, bool fHelp);
 /* MCHN END */    

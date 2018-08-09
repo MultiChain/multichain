@@ -29,18 +29,21 @@
 #define MC_TET_STREAM_KEY                       0x00000006
 #define MC_TET_STREAM_PUBLISHER                 0x00000007
 #define MC_TET_ASSET                            0x00000008
+#define MC_TET_AUTHOR                           0x00000009
 #define MC_TET_SUBKEY_STREAM_KEY                0x00000046
 #define MC_TET_SUBKEY_STREAM_PUBLISHER          0x00000047
 #define MC_TET_SUBKEY                           0x00000040
-#define MC_TET_TYPE_MASK                        0x000000FF
+#define MC_TET_TYPE_MASK                        0x040000FF
 #define MC_TET_CHAINPOS                         0x00000100
 #define MC_TET_TIMERECEIVED                     0x00000200
 #define MC_TET_ORDERMASK                        0x0000FF00
 #define MC_TET_DB_STAT                          0x01000000
 #define MC_TET_IMPORT                           0x02000000
+#define MC_TET_DELETED                          0x04000000
 #define MC_TET_SPECIALMASK                      0xFF000000
 
 #define MC_EFL_NOT_IN_SYNC                      0x01000000
+#define MC_EFL_NOT_IN_SYNC_AFTER_IMPORT         0x02000000
 #define MC_EFL_UNSUBSCRIBED                     0x10000000
 
 #define MC_SFL_NONE             0x00000000
@@ -62,6 +65,7 @@ typedef struct mc_TxEntity
     uint32_t m_EntityType;                                                      // Entity type, MC_TET_ constants
     void Zero();
     void Init(unsigned char *entity_id,uint32_t entity_type);
+    int IsSubscription();
 } mc_TxEntity;
 
 typedef struct mc_TxEntityRowExtension
@@ -237,6 +241,7 @@ typedef struct mc_TxDB
     char m_LobFileNamePrefix[MC_DCT_DB_MAX_PATH];                               // Full data file name
     char m_LogFileName[MC_DCT_DB_MAX_PATH];                                     // Full log file name    
     
+    int m_UnsubscribeMemPoolSize;                                               // Size of the mempool when unsubscribed
     uint32_t m_Mode;
     void *m_Semaphore;                                                          // mc_TxDB object semaphore
     uint64_t m_LockedBy;                                                        // ID of the thread locking it
@@ -370,7 +375,7 @@ typedef struct mc_TxDB
     int ImportGetBlock(                                                         // Returns last processed block in the import
                        mc_TxImport *import);
     
-    int CompleteImport(mc_TxImport *import);                                    // Completes import - merges with chain
+    int CompleteImport(mc_TxImport *import,uint32_t flags);                     // Completes import - merges with chain
     
     int DropImport(mc_TxImport *import);                                        // Drops uncompleted import
 
@@ -383,6 +388,7 @@ typedef struct mc_TxDB
     void Zero();    
     int Destroy();
     void Dump(const char *message);
+    void Dump(const char *message, int force);
     
     int Lock(int write_mode, int allow_secondary);
     void UnLock();

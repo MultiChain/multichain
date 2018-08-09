@@ -863,13 +863,6 @@ Value sendassetfrom(const Array& params, bool fHelp)
         mc_EntityDetails entity;
         ParseEntityIdentifier(params[2],&entity, MC_ENT_TYPE_ASSET);           
         memcpy(buf,entity.GetFullRef(),MC_AST_ASSET_FULLREF_SIZE);
-        if(mc_gState->m_Features->ShortTxIDInTx() == 0)
-        {
-            if(entity.IsUnconfirmedGenesis())
-            {
-                throw JSONRPCError(RPC_UNCONFIRMED_ENTITY, "Unconfirmed asset: "+params[2].get_str());            
-            }
-        }
         multiple=entity.GetAssetMultiple();
     }
     else
@@ -994,13 +987,6 @@ Value sendassettoaddress(const Array& params, bool fHelp)
         mc_EntityDetails entity;
         ParseEntityIdentifier(params[1],&entity, MC_ENT_TYPE_ASSET);           
         memcpy(buf,entity.GetFullRef(),MC_AST_ASSET_FULLREF_SIZE);
-        if(mc_gState->m_Features->ShortTxIDInTx() == 0)
-        {
-            if(entity.IsUnconfirmedGenesis())
-            {
-                throw JSONRPCError(RPC_UNCONFIRMED_ENTITY, "Unconfirmed asset: "+params[1].get_str());            
-            }
-        }
         multiple=entity.GetAssetMultiple();
     }
     else

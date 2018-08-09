@@ -257,10 +257,6 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
     int nOpCount = 0;
     bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
 
-/* MCHN START */            
-    bool fLongElement=false;
-/* MCHN END */            
-    
     try
     {
         while (pc < pend)
@@ -272,40 +268,7 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
             //
             if (!script.GetOp(pc, opcode, vchPushValue))
                 return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
-/* MCHN START */            
-            if(fLongElement)
-            {
-                if(mc_gState->m_Features->FixedIn10007() == 0)
-                {
-                    if(opcode != OP_DROP)
-                    {
-                        return set_error(serror, SCRIPT_ERR_PUSH_SIZE);                    
-                    }                
-                }
-            }
-            if(mc_gState->m_Features->Streams())                                // It is now part of the IsStandard check
-            {
-                fLongElement=false;                                
-            }
-            else
-            {
-                if (vchPushValue.size() > MAX_SCRIPT_ELEMENT_SIZE)
-                {
-                    if(mc_gState->m_Features->VerifySizeOfOpDropElements() == 0)
-                    {
-                        fLongElement=true;                    
-                    }
-                    else
-                    {
-                        return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
-                    }
-                }
-                else
-                {
-                    fLongElement=false;                
-                }
-            }
-/* MCHN END */            
+            
             // Note how OP_RESERVED does not count towards the opcode limit.
             if (opcode > OP_16 && ++nOpCount > 201)
                 return set_error(serror, SCRIPT_ERR_OP_COUNT);
@@ -1186,14 +1149,11 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, unsigne
 //        return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
 /* MCHN START */
         
-    if(mc_gState->m_Features->Streams())
+    if(!scriptSig.HasSmallIntegerInTheBeginning())
     {
-        if(!scriptSig.HasSmallIntegerInTheBeginning())
+        if(stack.size() != 1)
         {
-            if(stack.size() != 1)
-            {
-                return set_error(serror, SCRIPT_ERR_EVAL_FALSE);                    
-            }
+            return set_error(serror, SCRIPT_ERR_EVAL_FALSE);                    
         }
     }
 /* MCHN END */
@@ -1208,31 +1168,28 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, unsigne
         unsigned int p2shflags=flags;
         CTxDestination addressRet;
 
-        if(mc_gState->m_Features->Streams())
+        if(!scriptSig.HasSmallIntegerInTheBeginning())
         {
-            if(!scriptSig.HasSmallIntegerInTheBeginning())
-            {
-                return set_error(serror, SCRIPT_ERR_EVAL_FALSE);                    
-            }
-            if(!ExtractDestination(scriptPubKey, addressRet))
-            {
-                return set_error(serror, SCRIPT_ERR_VERIFY);
-            }
+            return set_error(serror, SCRIPT_ERR_EVAL_FALSE);                    
+        }
+        if(!ExtractDestination(scriptPubKey, addressRet))
+        {
+            return set_error(serror, SCRIPT_ERR_VERIFY);
+        }
 
-            if( (p2shflags & SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK) == 0)
+        if( (p2shflags & SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK) == 0)
+        {
+            CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
+            if(lpScriptID)
             {
-                CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
-                if(lpScriptID)
+                if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpScriptID)))
                 {
-                    if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpScriptID)))
-                    {
-                        p2shflags |= SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
-                    }                
-                }
-                else
-                {
-                    return set_error(serror, SCRIPT_ERR_VERIFY);                
-                }
+                    p2shflags |= SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
+                }                
+            }
+            else
+            {
+                return set_error(serror, SCRIPT_ERR_VERIFY);                
             }
         }
  

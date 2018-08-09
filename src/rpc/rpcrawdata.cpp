@@ -29,12 +29,6 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
             this_param_type=MC_DATA_API_PARAM_TYPE_NONE;   
             if(d.name_ == "inputcache")
             {
-                if( mc_gState->m_Features->CachedInputScript() == 0 )
-                {
-                    *errorCode=RPC_NOT_SUPPORTED;
-                    *strError=string("Cached input scripts are not supported by this protocol version");       
-                    goto exitlbl;
-                }
                 this_param_type=MC_DATA_API_PARAM_TYPE_CIS;
             }            
             if(d.name_ == "create")
@@ -43,12 +37,6 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                 {
                     if(d.value_.get_str() == "stream")
                     {
-                        if( mc_gState->m_Features->Streams() == 0 )
-                        {
-                            *errorCode=RPC_NOT_SUPPORTED;
-                            *strError=string("Streams are not supported by this protocol version");       
-                            goto exitlbl;
-                        }
                         this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_STREAM;
                     }
                     if(d.value_.get_str() == "asset")
@@ -57,12 +45,6 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     }
                     if(d.value_.get_str() == "upgrade")
                     {
-                        if( mc_gState->m_Features->Upgrades() == 0 )
-                        {
-                            *errorCode=RPC_NOT_SUPPORTED;
-                            *strError=string("Upgrades are not supported by this protocol version");       
-                            goto exitlbl;
-                        }
                         this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_UPGRADE;
                     }
                 }
@@ -93,22 +75,10 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                 }                
                 if(entity->GetEntityType() == MC_ENT_TYPE_STREAM)
                 {
-                    if( mc_gState->m_Features->Streams() == 0 )
-                    {
-                        *errorCode=RPC_NOT_SUPPORTED;
-                        *strError=string("Upgrades are not supported by this protocol version");       
-                        goto exitlbl;
-                    }
                     this_param_type=MC_DATA_API_PARAM_TYPE_PUBLISH;                
                 }
                 if(entity->GetEntityType() == MC_ENT_TYPE_UPGRADE)
                 {
-                    if( mc_gState->m_Features->Upgrades() == 0 )
-                    {
-                        *errorCode=RPC_NOT_SUPPORTED;
-                        *strError=string("Upgrades are not supported by this protocol version");       
-                        goto exitlbl;
-                    }
                     this_param_type=MC_DATA_API_PARAM_TYPE_APPROVAL;                
                 }
                 if(this_param_type == MC_DATA_API_PARAM_TYPE_NONE)
@@ -117,26 +87,7 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     goto exitlbl;                        
                 }
             }
-/*            
-            if(d.name_ == "data")
-            {
-                if(!missing_data)
-                {
-                    *strError=string("data field can appear only once in the object");                                                                                        
-                    goto exitlbl;                    
-                }
-                missing_data=false;
-                if(d.value_.type() != str_type)
-                {
-                    if(d.value_.type() != obj_type)
-                    {
-                        *strError=string("data should be string or object");                                                                                        
-                        goto exitlbl;                                            
-                    }
-                }
-            }
- */ 
-            if( (d.name_ == "text") || (d.name_ == "json") )
+            if( (d.name_ == "text") || (d.name_ == "json")  || (d.name_ == "cache") )
             {
                 if( mc_gState->m_Features->FormattedData() == 0 )
                 {
@@ -151,54 +102,11 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                 }
                 missing_data=false;
             }
-/*            
-            if(d.name_ == "format")
-            {
-                if( mc_gState->m_Features->FormattedData() == 0 )
-                {
-                    *errorCode=RPC_NOT_SUPPORTED;
-                    *strError=string("Formatted data is not supported by this protocol version");       
-                    goto exitlbl;
-                }
-                if(*data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
-                {
-                    *strError=string("format field can appear only once in the object");                                                                                        
-                    goto exitlbl;                    
-                }
-                if(d.value_.type() != null_type && !d.value_.get_str().empty())
-                {
-                    if(d.value_.get_str() == "hex")
-                    {
-                        *data_format=MC_SCR_DATA_FORMAT_RAW;                        
-                    }
-                    if(d.value_.get_str() == "text")
-                    {
-                        *data_format=MC_SCR_DATA_FORMAT_UTF8;                        
-                    }
-                    if(d.value_.get_str() == "json")
-                    {
-                        *data_format=MC_SCR_DATA_FORMAT_UBJSON;                        
-                    }
-                }
-                if(*data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
-                {
-                    *strError=string("Invalid format");                                                    
-                }
-            }
- */ 
             if(this_param_type != MC_DATA_API_PARAM_TYPE_NONE)
             {
                 if(param_type != MC_DATA_API_PARAM_TYPE_NONE)
                 {                
-                    *strError=string("Only one of the following keywords can appear in the object: create, update");                                                                                        
-                    if(mc_gState->m_Features->Streams())
-                    {
-                        *strError += string(", for");
-                    }
-                    if(mc_gState->m_Features->Streams())
-                    {
-                        *strError += string(", json, text");
-                    }
+                    *strError=string("Only one of the following keywords can appear in the object: create, update, for, json, text");                                                                                        
                     goto exitlbl;
                 }
             }
@@ -283,8 +191,12 @@ CScript RawDataScriptRawHex(Value *param,int *errorCode,string *strError)
     return scriptOpReturn;
 }
 
-vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,bool allow_formatted,int *errorCode,string *strError)
+vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,uint32_t in_options,uint32_t* out_options,int *errorCode,string *strError)
 {
+    if(out_options)
+    {
+        *out_options=MC_RFD_OPTION_NONE;
+    }
     vector<unsigned char> vValue;
     if(value->type() == str_type)
     {
@@ -302,7 +214,9 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
     }
     else
     {
-        if(allow_formatted || (mc_gState->m_Features->FormattedData() != 0) )
+        if( (in_options & MC_RFD_OPTION_INLINE) || 
+            (mc_gState->m_Features->FormattedData() != 0) || 
+            (mc_gState->m_Features->OffChainData() != 0) )
         {
             if(value->type() == obj_type) 
             {
@@ -314,18 +228,6 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
                 {
                     BOOST_FOREACH(const Pair& d, value->get_obj()) 
                     {
-    /*                    
-                        if(d.name_ == "raw")
-                        {
-                            bool fIsHex;
-                            vValue=ParseHex(d.value_.get_str().c_str(),fIsHex);    
-                            if(!fIsHex)
-                            {
-                                *strError=string("value in data object should be hexadecimal string");                            
-                            }
-                            *data_format=MC_SCR_DATA_FORMAT_RAW;                    
-                        }
-    */ 
                         if(d.name_ == "text")
                         {
                             if(d.value_.type() == str_type)
@@ -353,10 +255,139 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
                             vValue=vector<unsigned char> (script,script+bytes);                                            
                             *data_format=MC_SCR_DATA_FORMAT_UBJSON;                    
                         }
-                        if(*data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
+                        if(d.name_ == "cache")
                         {
-                            throw JSONRPCError(RPC_NOT_SUPPORTED, "Unsupported item data type: " + d.name_);                                    
-                        }                    
+                            if(d.value_.type() == str_type)
+                            {
+                                vValue=vector<unsigned char> (d.value_.get_str().begin(),d.value_.get_str().end());  
+                                vValue.push_back(0);
+                                if(in_options & MC_RFD_OPTION_OFFCHAIN)
+                                {
+                                    if(out_options)
+                                    {
+                                        *out_options |= MC_RFD_OPTION_CACHE;
+                                    }    
+                                }
+                                else
+                                {
+                                    int fHan=mc_BinaryCacheFile((char*)&vValue[0],0);
+                                    if(fHan <= 0)
+                                    {
+                                        *strError="Binary cache item with this identifier not found";
+                                    }
+                                    int64_t total_size=0;
+                                    if(strError->size() == 0)
+                                    {
+                                        total_size=lseek64(fHan,0,SEEK_END);
+                                        if(lseek64(fHan,0,SEEK_SET) != 0)
+                                        {
+                                            *strError="Cannot read binary cache item";
+                                            *errorCode=RPC_INTERNAL_ERROR;
+                                            close(fHan);
+                                        }
+                                    }
+                                    if(strError->size() == 0)
+                                    {
+                                        if(total_size > MAX_OP_RETURN_RELAY)
+                                        {
+                                            *strError="Binary cache item too big";
+                                            *errorCode=RPC_NOT_SUPPORTED;
+                                            close(fHan);                                        
+                                        }
+                                    }
+                                    if(strError->size() == 0)
+                                    {
+                                        if(total_size)
+                                        {
+                                            mc_gState->m_TmpBuffers->m_RpcChunkScript1->Clear();
+                                            mc_gState->m_TmpBuffers->m_RpcChunkScript1->Resize(total_size,1);
+                                            unsigned char* ptr=mc_gState->m_TmpBuffers->m_RpcChunkScript1->m_lpData;
+                                            if(read(fHan,ptr,total_size) != total_size)
+                                            {
+                                                *errorCode=RPC_INTERNAL_ERROR;
+                                                *strError="Cannot read binary cache item";
+                                            }
+                                            close(fHan);
+                                            vValue=vector<unsigned char> (ptr,ptr+total_size);                                              
+                                        }
+                                        else
+                                        {
+                                            vValue.clear();
+                                        }
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                *strError=string("cache identifier in data object should be string");                            
+                            }
+                            *data_format=MC_SCR_DATA_FORMAT_UNKNOWN;                                                
+                        }
+                        else
+                        {    
+                            if(d.name_ == "chunks")
+                            {
+                                if(mc_gState->m_Features->OffChainData())
+                                {
+                                    if(d.value_.type() == array_type)
+                                    {
+                                        Array arr=d.value_.get_array();
+                                        for(int i=0;i<(int)arr.size();i++)
+                                        {
+                                            if(strError->size() == 0)
+                                            {
+                                                if(arr[i].type() == str_type)
+                                                {
+                                                    vector<unsigned char> vHash;
+                                                    bool fIsHex;
+                                                    vHash=ParseHex(arr[i].get_str().c_str(),fIsHex);    
+                                                    if(!fIsHex)
+                                                    {
+                                                        *strError=string("Chunk hash should be hexadecimal string");                            
+                                                    }
+                                                    else
+                                                    {
+                                                        if(vHash.size() != MC_CDB_CHUNK_HASH_SIZE)
+                                                        {
+                                                            *strError=strprintf("Chunk hash should be %d bytes long",MC_CDB_CHUNK_HASH_SIZE);                                                                                    
+                                                        }
+                                                        else
+                                                        {                                                        
+                                                            uint256 hash;
+                                                            hash.SetHex(arr[i].get_str());
+
+                                                            vValue.insert(vValue.end(),(unsigned char*)&hash,(unsigned char*)&hash+MC_CDB_CHUNK_HASH_SIZE);
+                                                        }
+                                                    }                                                
+                                                }                                            
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        *strError=string("value in data object should be array");                            
+                                    }
+
+                                    if(out_options)
+                                    {
+                                        *out_options |= MC_RFD_OPTION_OFFCHAIN;
+                                    }    
+                                    *data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
+                                }
+                                else
+                                {
+                                    *errorCode=RPC_NOT_SUPPORTED;
+                                    *strError="Unsupported item data type: " + d.name_;
+                                }
+                            }
+                            else
+                            {
+                                if(*data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
+                                {
+                                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Unsupported item data type: " + d.name_);                                    
+                                }                    
+                            }
+                        }
                     }                
                 }
             }   
@@ -375,50 +406,6 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
         }
     }
     
-/*    
-    switch(data_format)
-    {
-        case MC_SCR_DATA_FORMAT_RAW:
-        case MC_SCR_DATA_FORMAT_UNKNOWN:
-            if(value->type() != null_type && (value->type()==str_type))
-            {
-                bool fIsHex;
-                vValue=ParseHex(value->get_str().c_str(),fIsHex);    
-                if(!fIsHex)
-                {
-                    *strError=string("value should be hexadecimal string");                            
-                }
-            }
-            else
-            {
-                *strError=string("Invalid value in data field for this format");                            
-            }
-            break;
-        case MC_SCR_DATA_FORMAT_UTF8:
-            if(value->type() != null_type && (value->type()==str_type))
-            {
-                vValue=vector<unsigned char> (value->get_str().begin(),value->get_str().end());    
-            }
-            else
-            {
-                *strError=string("Invalid value in data field for this format");                            
-            }
-            break;
-        case MC_SCR_DATA_FORMAT_UBJSON:
-            size_t bytes;
-            int err;
-            const unsigned char *script;
-            lpDetailsScript->Clear();
-            lpDetailsScript->AddElement();
-            if((err = ubjson_write(*value,lpDetailsScript,MAX_FORMATTED_DATA_DEPTH)) != MC_ERR_NOERROR)
-            {
-                *strError=string("Couldn't transfer JSON object to internal UBJSON format");    
-            }
-            script = lpDetailsScript->GetData(0,&bytes);
-            vValue=vector<unsigned char> (script,script+bytes);                                            
-            break;
-    }
-*/
     return vValue;
 }
 
@@ -472,25 +459,13 @@ CScript RawDataScriptFormatted(Value *param,uint32_t *data_format,mc_Script *lpD
     BOOST_FOREACH(const Pair& d, param->get_obj()) 
     {
         field_parsed=false;
-/*        
-        if(d.name_ == "data")        
-        {
-            if(!missing_data)
-            {
-                *strError=string("data field can appear only once in the object");                                                                                                        
-            }
-            vValue=ParseRawFormattedData(&(d.value_),data_format,lpDetailsScript,errorCode,strError);
-            field_parsed=true;
-            missing_data=false;
-        }
- */ 
-        if( (d.name_ == "text") || (d.name_ == "json") )      
+        if( (d.name_ == "text") || (d.name_ == "json")  || (d.name_ == "cache") )      
         {
             if(!missing_data)
             {
                 *strError=string("data object should have single key - json or text");                                                                                                        
             }
-            vValue=ParseRawFormattedData(param,data_format,lpDetailsScript,false,errorCode,strError);
+            vValue=ParseRawFormattedData(param,data_format,lpDetailsScript,MC_RFD_OPTION_NONE,NULL,errorCode,strError);
             field_parsed=true;
             missing_data=false;
         }
@@ -550,12 +525,19 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             if(d.value_.type() != null_type && !d.value_.get_str().empty())
             {
                 entity_name=d.value_.get_str();
+                                
+                if(entity_name == "*")
+                {
+                    *strError=string("Invalid asset name"); 
+                }
+                
                 if(entity_name.size())
                 {
-                    if(mc_gState->m_Features->OpDropDetailsScripts())
+                    if(entity_name.size() > MC_ENT_MAX_NAME_SIZE)
                     {
-                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());
+                        *strError=string("Invalid asset name - too long"); 
                     }
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());
                 }
             }
             else
@@ -580,10 +562,7 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
                 }
                 else
                 {
-                    if(mc_gState->m_Features->OpDropDetailsScripts())                    
-                    {
-                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,4);
-                    }
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,4);
                 }
             }
             else
@@ -663,37 +642,17 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
     if(strError->size() == 0)
     {
         lpDetailsScript->Clear();
-        if(mc_gState->m_Features->OpDropDetailsScripts())
+        script=lpDetails->GetData(0,&bytes);
+        err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
+        if(err)
         {
-            script=lpDetails->GetData(0,&bytes);
-            err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,0,script,bytes);
-            if(err)
-            {
-                *strError=string("Invalid custom fields, too long");                                                            
-            }
-            else
-            {
-                script = lpDetailsScript->GetData(0,&bytes);
-                scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
-            }
+            *strError=string("Invalid custom fields, too long");                                                            
         }
         else
         {
-            script=lpDetails->GetData(0,&bytes);
-            err=lpDetailsScript->SetAssetDetails(entity_name.c_str(),multiple,script,bytes);                
             script = lpDetailsScript->GetData(0,&bytes);
-            if(err)
-            {
-                *strError=string("Invalid custom fields, too long");                                                            
-            }
-            else
-            {
-                if(bytes > 0)
-                {
-                    scriptOpReturn << OP_RETURN << vector<unsigned char>(script, script + bytes);
-                }                    
-            }
-        }        
+            scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+        }
     }
     
     return scriptOpReturn;
@@ -731,47 +690,72 @@ CScript RawDataScriptFollowOn(Value *param,mc_EntityDetails *entity,mc_Script *l
         }
     }    
     
-    if(mc_gState->m_Features->OpDropDetailsScripts())
-    {
-        int err;
-        lpDetailsScript->Clear();
-        lpDetailsScript->SetEntity(entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET);
-        script = lpDetailsScript->GetData(0,&bytes);
-        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
+    lpDetailsScript->Clear();
+    lpDetailsScript->SetEntity(entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET);
+    script = lpDetailsScript->GetData(0,&bytes);
+    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
 
-        lpDetailsScript->Clear();
-        script=lpDetails->GetData(0,&bytes);
-        err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
-        if(err)
-        {
-            *strError=string("Invalid custom fields, too long");                                                            
-        }
-        else
-        {
-            script = lpDetailsScript->GetData(0,&bytes);
-            scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
-        }
+    lpDetailsScript->Clear();
+    script=lpDetails->GetData(0,&bytes);
+    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_ASSET,1,script,bytes);
+    if(err)
+    {
+        *strError=string("Invalid custom fields, too long");                                                            
     }
     else
     {
-        lpDetailsScript->Clear();
-        script=lpDetails->GetData(0,&bytes);
-        err=lpDetailsScript->SetGeneralDetails(script,bytes);                
-        if(err)
-        {
-            *strError=string("Invalid custom fields, too long");                                                            
-        }
-        else
-        {
-            script = lpDetailsScript->GetData(0,&bytes);
-            if(bytes > 0)
-            {
-                scriptOpReturn << OP_RETURN << vector<unsigned char>(script, script + bytes);
-            }                    
-        }
+        script = lpDetailsScript->GetData(0,&bytes);
+        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
     }
     
     return scriptOpReturn;
+}
+
+bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,string *strError)
+{
+    *restrict=0;
+    *permissions=0;
+ 
+    uint32_t match;
+    char* ptr;
+    char* start;
+    char* ptrEnd;
+    char c;
+    
+    if(param.type() != str_type)
+    {
+        *strError="Invalid restrict field, should be string";
+        return false;
+    }
+    
+    ptr=(char*)param.get_str().c_str();
+    ptrEnd=ptr+strlen(ptr);
+    start=ptr;
+    
+    while(ptr<=ptrEnd)
+    {
+        c=*ptr;
+        if( (c == ',') || (c ==0x00))
+        {
+            if(ptr > start)
+            {
+                match=0;
+                if(( (ptr-start) ==  5) && (memcmp(start,"write",    ptr-start) == 0) ){match = 1; *permissions |= MC_PTP_WRITE ;}
+                if(( (ptr-start) ==  7) && (memcmp(start,"onchain",  ptr-start) == 0) ){match = 1; *restrict |= MC_ENT_ENTITY_RESTRICTION_ONCHAIN;}
+                if(( (ptr-start) ==  8) && (memcmp(start,"offchain", ptr-start) == 0) ){match = 1; *restrict |= MC_ENT_ENTITY_RESTRICTION_OFFCHAIN;}
+                
+                if(match == 0)
+                {
+                    *strError="Unsupported restriction";
+                    return false;
+                }
+                start=ptr+1;
+            }
+        }
+        ptr++;
+    }
+    
+    return true;    
 }
 
 CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError)
@@ -783,6 +767,8 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
     const unsigned char *script;
     string entity_name;
     int is_open=0;
+    uint32_t restrict;
+    uint32_t permissions=MC_PTP_WRITE;
     
     bool missing_name=true;
     bool missing_open=true;
@@ -805,6 +791,10 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
                 entity_name=d.value_.get_str();
                 if(entity_name.size())
                 {
+                    if(entity_name.size() > MC_ENT_MAX_NAME_SIZE)
+                    {
+                        *strError=string("Invalid stream name - too long"); 
+                    }
                     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());
                 }
             }
@@ -819,7 +809,7 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
         {
             if(!missing_open)
             {
-                *strError=string("open field can appear only once in the object");                                                                                                        
+                *strError=string("open/restrict field can appear only once in the object");                                                                                                        
             }
             if(d.value_.type() == bool_type)
             {
@@ -829,9 +819,48 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
             {
                 *strError=string("Invalid open");                                            
             }
-            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ANYONE_CAN_WRITE,(unsigned char*)&is_open,1); 
+            if(mc_gState->m_Features->OffChainData() == 0)
+            {
+                lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ANYONE_CAN_WRITE,(unsigned char*)&is_open,1); 
+            }
+            else
+            {
+                permissions=is_open ? MC_PTP_NONE : MC_PTP_WRITE;
+            }
             missing_open=false;
             field_parsed=true;
+        }
+        if(d.name_ == "restrict")
+        {
+            if(mc_gState->m_Features->OffChainData() == 0)
+            {
+                *strError=string("Per-stream restrictions not supported for this protocol version");               
+                *errorCode=RPC_NOT_SUPPORTED;
+            }
+            else
+            {                
+                if(!missing_open)
+                {
+                    *strError=string("open/restrict field can appear only once in the object");                                                                                                        
+                }
+                if(RawDataParseRestrictParameter(d.value_,&restrict,&permissions,strError))
+                {
+                    if(restrict & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN)
+                    {
+                        if(restrict & MC_ENT_ENTITY_RESTRICTION_ONCHAIN)
+                        {
+                            *strError=string("Stream cannot be restricted from both onchain and offchain items");               
+                            *errorCode=RPC_NOT_SUPPORTED;                            
+                        }                        
+                    }
+                    if(restrict)
+                    {
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_RESTRICTIONS,(unsigned char*)&restrict,1);                         
+                    }
+                }
+                missing_open=false;
+                field_parsed=true;
+            }
         }
         if(d.name_ == "details")
         {
@@ -850,45 +879,25 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
         }
     }    
     
+    if(mc_gState->m_Features->OffChainData())
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_PERMISSIONS,(unsigned char*)&permissions,1);                                
+    }
+    
     if(strError->size() == 0)
     {
         lpDetailsScript->Clear();
-        if(mc_gState->m_Features->OpDropDetailsScripts())
+        script=lpDetails->GetData(0,&bytes);
+        err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
+        if(err)
         {
-            script=lpDetails->GetData(0,&bytes);
-            err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
-            if(err)
-            {
-                *strError=string("Invalid custom fields, too long");                                                            
-            }
-            else
-            {
-                script = lpDetailsScript->GetData(0,&bytes);
-                scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
-            }
+            *strError=string("Invalid custom fields, too long");                                                            
         }
         else
         {
-            lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM);
             script = lpDetailsScript->GetData(0,&bytes);
-            scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
-
-            lpDetailsScript->Clear();
-            script=lpDetails->GetData(0,&bytes);
-            err=lpDetailsScript->SetGeneralDetails(script,bytes);                
-            if(err)
-            {
-                *strError=string("Invalid custom fields, too long");                                                            
-            }
-            else
-            {
-                script = lpDetailsScript->GetData(0,&bytes);
-                if(bytes > 0)
-                {
-                    scriptOpReturn << OP_RETURN << vector<unsigned char>(script, script + bytes);
-                }
-            }
-        }        
+            scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+        }
     }
     
     return scriptOpReturn;
@@ -1022,6 +1031,10 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
                 entity_name=d.value_.get_str();
                 if(entity_name.size())
                 {
+                    if(entity_name.size() > MC_ENT_MAX_NAME_SIZE)
+                    {
+                        *strError=string("Invalid upgrade name - too long"); 
+                    }
                     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());
                 }
             }
@@ -1157,7 +1170,8 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
     return scriptOpReturn;
 }
 
-CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *data_format,mc_Script *lpDetailsScript,int *errorCode,string *strError)
+
+CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *data_format,mc_Script *lpDetailsScript,vector<uint256>* vChunkHashes,int *errorCode,string *strError)
 {
     CScript scriptOpReturn=CScript();
     vector<unsigned char> vValue;
@@ -1168,7 +1182,42 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
     bool field_parsed;
     bool missing_data=true;
     bool missing_key=true;
+    uint32_t in_options,out_options;
+    in_options=MC_RFD_OPTION_NONE;
+    out_options=MC_RFD_OPTION_NONE;
     vKeys.clear();
+    BOOST_FOREACH(const Pair& d, param->get_obj()) 
+    {
+        if(d.name_ == "options")
+        {
+            if( mc_gState->m_Features->OffChainData() == 0 )
+            {
+                *errorCode=RPC_NOT_SUPPORTED;
+                *strError=string("Format options are not supported by this protocol version");       
+                goto exitlbl;
+            }
+            if(d.value_.type() != null_type && (d.value_.type()==str_type))
+            {
+                if(d.value_.get_str() == "offchain")
+                {
+                    in_options |= MC_RFD_OPTION_OFFCHAIN;
+                }
+                else
+                {
+                    if(d.value_.get_str().size())
+                    {
+                        *strError=string("Stream item options must be offchain or empty");                                                
+                    }
+                }
+            }
+            else
+            {
+                *strError=string("Stream item options must be offchain or empty");                            
+            }
+            field_parsed=true;
+        }                
+    }
+    
     BOOST_FOREACH(const Pair& d, param->get_obj()) 
     {
         field_parsed=false;
@@ -1222,10 +1271,14 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
             {
                 *strError=string("data field can appear only once in the object");                                                                                                        
             }
-            vValue=ParseRawFormattedData(&(d.value_),data_format,lpDetailsScript,false,errorCode,strError);
+            vValue=ParseRawFormattedData(&(d.value_),data_format,lpDetailsScript,in_options,&out_options,errorCode,strError);
             field_parsed=true;
             missing_data=false;
         }
+        if(d.name_ == "options")
+        {
+            field_parsed=true;
+        }        
         if(d.name_ == "for")field_parsed=true;
 //        if(d.name_ == "format")field_parsed=true;
         if(!field_parsed)
@@ -1279,21 +1332,40 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
             }
         }
 
-        if(*data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
+        if(in_options & MC_RFD_OPTION_OFFCHAIN)
         {
-            lpDetailsScript->Clear();
-            lpDetailsScript->SetDataFormat(*data_format);
+            AppendOffChainFormatData(*data_format,out_options,lpDetailsScript,vValue,vChunkHashes,errorCode,strError);
+            if(strError->size())
+            {
+                goto exitlbl;                                
+            }
             script = lpDetailsScript->GetData(0,&bytes);
             scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;                    
-        }
-
-        if(vValue.size())
-        {
-            scriptOpReturn << OP_RETURN << vValue;                            
+            scriptOpReturn << OP_RETURN;                                        
         }
         else
         {
-            scriptOpReturn << OP_RETURN;                                        
+            if(out_options & MC_RFD_OPTION_OFFCHAIN)
+            {
+                *strError=string("chunks data type is not allowed with missing options field");                                            
+                goto exitlbl;                
+            }
+            if(*data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
+            {
+                lpDetailsScript->Clear();
+                lpDetailsScript->SetDataFormat(*data_format);
+                script = lpDetailsScript->GetData(0,&bytes);
+                scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;                    
+            }
+
+            if(vValue.size())
+            {
+                scriptOpReturn << OP_RETURN << vValue;                            
+            }
+            else
+            {
+                scriptOpReturn << OP_RETURN;                                        
+            }
         }
     }
     
@@ -1479,6 +1551,7 @@ CScript RawDataScriptInputCache(Value *param,mc_Script *lpDetails,int *errorCode
 
 CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *given_entity,mc_EntityDetails *found_entity)
 {
+    vector<uint256> vChunkHashes;
     string strError="";
     int errorCode=RPC_INVALID_PARAMETER;
     uint32_t data_format;
@@ -1534,7 +1607,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             scriptOpReturn=RawDataScriptCreateStream(&param,lpDetails,lpDetailsScript,&errorCode,&strError);
             break;
         case MC_DATA_API_PARAM_TYPE_PUBLISH:
-            scriptOpReturn=RawDataScriptPublish(&param,&entity,&data_format,lpDetailsScript,&errorCode,&strError);
+            scriptOpReturn=RawDataScriptPublish(&param,&entity,&data_format,lpDetailsScript,&vChunkHashes,&errorCode,&strError);
             break;
         case MC_DATA_API_PARAM_TYPE_CREATE_UPGRADE:
             scriptOpReturn=RawDataScriptCreateUpgrade(&param,lpDetails,lpDetailsScript,&errorCode,&strError);

@@ -21,6 +21,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                  int offset,
                                  bool accept,
                                  string& reason,
+                                 int64_t *mandatory_fee_out,     
                                  uint32_t *replay);
 bool AcceptAdminMinerPermissions(const CTransaction& tx,
                                  int offset,
@@ -360,64 +361,31 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
             }
             else
             {
-                
-                if(mc_gState->m_Features->Streams())
+                int permissions_from,permissions_to;
+                permissions_from=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
+                if(entry.FullReplayRequired())
                 {
-                    int permissions_from,permissions_to;
-                    permissions_from=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
-                    if(entry.FullReplayRequired())
+                    LOCK(pool.cs);
+                    CCoinsView dummy;
+                    CCoinsViewCache view(&dummy);
+                    CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
+                    view.SetBackend(viewMemPool);
+                    if(!AcceptMultiChainTransaction(tx,view,-1,accept,reason,NULL,NULL))
                     {
-                        LOCK(pool.cs);
-                        CCoinsView dummy;
-                        CCoinsViewCache view(&dummy);
-                        CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
-                        view.SetBackend(viewMemPool);
-                        if(!AcceptMultiChainTransaction(tx,view,-1,accept,reason,NULL))
-                        {
-                            removed_type="rejected";                    
-                        }
-                    }
-                    else
-                    {
-                       if(mc_gState->m_Permissions->MempoolPermissionsCheck(entry.ReplayPermissionFrom(),entry.ReplayPermissionTo()) == 0) 
-                       {
-                            removed_type="rejected";                                               
-                       }                        
-                    }
-                    if(removed_type.size() == 0)
-                    {
-                        permissions_to=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
-                        pool.mapTx[hash].SetReplayNodeParams(entry.FullReplayRequired(),permissions_from,permissions_to);                    
+                        removed_type="rejected";                    
                     }
                 }
                 else
-                {                
-                    if(removed_type.size() == 0)
-                    {
-                        if(!AcceptPermissionsAndCheckForDust(tx,accept,reason))
-                        {
-                            removed_type="permissions";
-                        }
-                    }
-                    if(removed_type.size() == 0)
-                    {
-                        if(!AcceptAssetGenesis(tx,-1,true,reason))
-                        {
-                            removed_type="issue";
-                        }        
-                    }
-                    if(removed_type.size() == 0)
-                    {
-                        LOCK(pool.cs);
-                        CCoinsView dummy;
-                        CCoinsViewCache view(&dummy);
-                        CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
-                        view.SetBackend(viewMemPool);
-                        if(!AcceptAssetTransfers(tx, view, reason))
-                        {
-                            removed_type="transfer";
-                        }
-                    }            
+                {
+                   if(mc_gState->m_Permissions->MempoolPermissionsCheck(entry.ReplayPermissionFrom(),entry.ReplayPermissionTo()) == 0) 
+                   {
+                        removed_type="rejected";                                               
+                   }                        
+                }
+                if(removed_type.size() == 0)
+                {
+                    permissions_to=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
+                    pool.mapTx[hash].SetReplayNodeParams(entry.FullReplayRequired(),permissions_from,permissions_to);                    
                 }
             }
 
@@ -611,7 +579,6 @@ bool ReadTxFromDisk(CBlockIndex* pindex,int32_t offset,CTransaction& tx)
 bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
 {
     if( (mc_gState->m_NetworkParams->IsProtocolMultichain() == 0) ||
-        (mc_gState->m_Features->CachedInputScript() == 0) ||
         (mc_gState->m_NetworkParams->GetInt64Param("supportminerprecheck") == 0) ||
         (MCP_ANYONE_CAN_MINE) )                               
     {

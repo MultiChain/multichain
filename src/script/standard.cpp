@@ -64,14 +64,10 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
 /* MCHN START*/    
         if(mc_gState->m_NetworkParams->IsProtocolMultichain())
         {
-            if(mc_gState->m_Features->Streams())
-            {
-                mTemplates.insert(make_pair(TX_NULL_DATA, CScript() << OP_DROPDATA << OP_DROP << OP_RETURN));            
-                mTemplates.insert(make_pair(TX_NULL_DATA, CScript() << OP_DROPDATA << OP_DROP << OP_RETURN << OP_SMALLDATA));            
-                mTemplates.insert(make_pair(TX_NULL_DATA, CScript() << OP_DROPDATA << OP_DROP << OP_DROPDATA << OP_DROP << OP_RETURN));            
-                mTemplates.insert(make_pair(TX_NULL_DATA, CScript() << OP_DROPDATA << OP_DROP << OP_DROPDATA << OP_DROP << OP_RETURN << OP_SMALLDATA));            
-            }
-        
+            mTemplates.insert(make_pair(TX_NULL_DATA, CScript() << OP_DROPDATA << OP_DROP << OP_RETURN));            
+            mTemplates.insert(make_pair(TX_NULL_DATA, CScript() << OP_DROPDATA << OP_DROP << OP_RETURN << OP_SMALLDATA));            
+            mTemplates.insert(make_pair(TX_NULL_DATA, CScript() << OP_DROPDATA << OP_DROP << OP_DROPDATA << OP_DROP << OP_RETURN));            
+            mTemplates.insert(make_pair(TX_NULL_DATA, CScript() << OP_DROPDATA << OP_DROP << OP_DROPDATA << OP_DROP << OP_RETURN << OP_SMALLDATA));            
         }
         
         mTemplates.insert(make_pair(TX_SCRIPTHASH, CScript() << OP_HASH160 << OP_PUBKEYHASH << OP_EQUAL));
@@ -190,11 +186,8 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
             else if (opcode2 == OP_DROPDATA)
             {
                 // small pushdata, <= nMaxDatacarrierBytes
-                if(mc_gState->m_Features->VerifySizeOfOpDropElements())
-                {
-                    if (vch1.size() > MAX_SCRIPT_ELEMENT_SIZE)
-                        break;
-                }
+                if (vch1.size() > MAX_SCRIPT_ELEMENT_SIZE)
+                    break;
             }
 /* MCHN END */        
             else if (opcode1 != opcode2 || vch1 != vch2)
@@ -388,23 +381,13 @@ bool IsStandardNullData(const CScript& scriptPubKey,bool standard_check)
     int max_op_drop_count=2;
     bool check_sizes=false;
 
-    if(mc_gState->m_Features->VerifySizeOfOpDropElements())
+    if( !fixed || standard_check )
     {
-        if( !fixed || standard_check )
-        {
-            check_sizes=true;
-        }
+        check_sizes=true;
     }
     
-/*    
-    unsigned int sizes[3];
-    sizes[0]=0;
-    sizes[1]=0;
-    sizes[2]=0;
-*/    
     if(mc_gState->m_Features->FormattedData())
-    {
-    
+    {    
         max_op_drop_count=MAX_OP_RETURN_OP_DROP_COUNT;
     }
     
@@ -577,13 +560,17 @@ bool CScript::IsUnspendable() const
 }
 
 
-bool ExtractDestinations10008(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet)
+bool ExtractDestinations10008(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet, bool no_clear, bool *not_cleared)
 {
     addressRet.clear();
     typeRet = TX_NONSTANDARD;
     opcodetype opcode;
     vector<unsigned char> vch;
 
+    if(not_cleared)
+    {
+        *not_cleared=false;
+    }
     nRequiredRet=1;
     
     CScript::const_iterator pc = scriptPubKey.begin();
@@ -665,7 +652,17 @@ bool ExtractDestinations10008(const CScript& scriptPubKey, txnouttype& typeRet, 
         return true;
     }
     
-    addressRet.clear();
+    if(!no_clear)
+    {
+        addressRet.clear();
+    }
+    else
+    {
+        if(not_cleared)
+        {
+            *not_cleared=true;
+        }        
+    }
     typeRet = TX_NONSTANDARD;
     return true;
 }
@@ -691,7 +688,7 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
 {
     if(mc_gState->m_Features->FixedDestinationExtraction() == 0)
     {
-        return ExtractDestinations10008(scriptPubKey,typeRet,addressRet,nRequiredRet);
+        return ExtractDestinations10008(scriptPubKey,typeRet,addressRet,nRequiredRet,false,NULL);
     }
     
     addressRet.clear();
@@ -966,53 +963,26 @@ bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType)
 
     max_op_drops=MCP_STD_OP_DROP_COUNT;
     
-    if(mc_gState->m_Features->VerifySizeOfOpDropElements())
+    for(int d=0;d<max_op_drops;d++)
     {
-        for(int d=0;d<max_op_drops;d++)
+        if (pc < scriptPubKey.end())                                            
         {
-            if (pc < scriptPubKey.end())                                            
+            if ( !scriptPubKey.GetOp(pc, opcode, vch) || (vch.size() > MAX_SCRIPT_ELEMENT_SIZE) )
             {
-                if ( !scriptPubKey.GetOp(pc, opcode, vch) || (vch.size() > MAX_SCRIPT_ELEMENT_SIZE) )
-                {
-                    whichType = TX_NONSTANDARD;
-                    return false;
-                }
-                if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_DROP) )
-                {
-                    whichType = TX_NONSTANDARD;
-                    return false;
-                }
+                whichType = TX_NONSTANDARD;
+                return false;
             }
-            else
+            if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_DROP) )
             {
-                return true;
+                whichType = TX_NONSTANDARD;
+                return false;
             }
         }
-    }
-    else
-    {
-        for(int d=0;d<max_op_drops;d++)
+        else
         {
-            if (pc < scriptPubKey.end())                                            
-            {
-                if ( !scriptPubKey.GetOp(pc, opcode) )
-                {
-                    whichType = TX_NONSTANDARD;
-                    return false;
-                }
-                if ( !scriptPubKey.GetOp(pc, opcode) || (opcode != OP_DROP) )
-                {
-                    whichType = TX_NONSTANDARD;
-                    return false;
-                }
-            }        
-            else
-            {
-                return true;
-            }
-        }        
+            return true;
+        }
     }
-    
     
     if (pc < scriptPubKey.end())                                                
     {

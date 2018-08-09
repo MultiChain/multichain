@@ -609,16 +609,12 @@ public:
         txNew.vin.resize(1);
 
         root_stream_name_size=0;
-        root_stream_name=NULL;
-        if(mc_gState->m_Features->Streams())
+        root_stream_name=(unsigned char *)mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
+        if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
         {
-            root_stream_name=(unsigned char *)mc_gState->m_NetworkParams->GetParam("rootstreamname",&root_stream_name_size);        
-            if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
-            {
-                root_stream_name_size=0;
-            }    
-        }
-        if(root_stream_name_size > ( (mc_gState->m_Features->FixedIn10008() != 0) ? 1 : 0 ) )
+            root_stream_name_size=0;
+        }    
+        if(root_stream_name_size > 1)
         {
             txNew.vout.resize(2);                        
         }
@@ -651,14 +647,7 @@ public:
             
             lpScript=new mc_Script;
             
-            if(mc_gState->m_Features->Streams())
-            {
-                lpScript->SetPermission(MC_PTP_GLOBAL_ALL,0,0xffffffff,(uint32_t)mc_gState->m_NetworkParams->GetInt64Param("genesistimestamp"));
-            }
-            else
-            {
-                lpScript->SetPermission(MC_PTP_ALL,0,0xffffffff,(uint32_t)mc_gState->m_NetworkParams->GetInt64Param("genesistimestamp"));                
-            }
+            lpScript->SetPermission(MC_PTP_GLOBAL_ALL,0,0xffffffff,(uint32_t)mc_gState->m_NetworkParams->GetInt64Param("genesistimestamp"));
             
             elem = lpScript->GetData(0,&elem_size);
             txNew.vout[0].scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
@@ -666,7 +655,7 @@ public:
             delete lpScript;            
         }
         
-        if(root_stream_name_size > ( (mc_gState->m_Features->FixedIn10008() != 0) ? 1 : 0 ))
+        if(root_stream_name_size > 1)
         {        
             txNew.vout[1].nValue=0;
             lpDetails=new mc_Script;
@@ -678,13 +667,10 @@ public:
             }
 
 
-            if(mc_gState->m_Features->FixedIn10007())
+            if( (root_stream_name_size > 1) && (root_stream_name[root_stream_name_size - 1] == 0x00) )
             {
-                if( (root_stream_name_size > 1) && (root_stream_name[root_stream_name_size - 1] == 0x00) )
-                {
-                    root_stream_name_size--;
-                }           
-            }
+                root_stream_name_size--;
+            }           
 
             
             lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,root_stream_name,root_stream_name_size);
@@ -695,44 +681,11 @@ public:
     
             lpDetailsScript=new mc_Script;
             
-            if(mc_gState->m_Features->OpDropDetailsScripts())
-            {
-                lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
+            lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM,0,script,bytes);
 
-                elem = lpDetailsScript->GetData(0,&elem_size);
-                txNew.vout[1].scriptPubKey=CScript();
-                txNew.vout[1].scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;                        
-            }
-            else
-            {                            
-                lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_STREAM);
-
-                lpDetailsScript->SetGeneralDetails(script,bytes);
-                txNew.vout[1].scriptPubKey=CScript();
-
-                for(int e=0;e<lpDetailsScript->GetNumElements();e++)
-                {
-                    elem = lpDetailsScript->GetData(e,&elem_size);
-                    if(e == (lpDetailsScript->GetNumElements() - 1) )
-                    {
-                        if(elem_size > 0)
-                        {
-                            txNew.vout[1].scriptPubKey << OP_RETURN << vector<unsigned char>(elem, elem + elem_size);
-                        }
-                        else
-                        {
-                            txNew.vout[1].scriptPubKey << OP_RETURN;
-                        }
-                    }
-                    else
-                    {
-                        if(elem_size > 0)
-                        {
-                            txNew.vout[1].scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
-                        }                
-                    }
-                }
-            }
+            elem = lpDetailsScript->GetData(0,&elem_size);
+            txNew.vout[1].scriptPubKey=CScript();
+            txNew.vout[1].scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;                        
             
             delete lpDetails;
             delete lpDetailsScript;
