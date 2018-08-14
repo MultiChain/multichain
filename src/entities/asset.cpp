@@ -1959,7 +1959,20 @@ void mc_AssetDB::Dump()
 
 uint32_t mc_AssetDB::MaxEntityType()
 {
+    if(mc_gState->m_Features->Filters() == 0)
+    {
+        return MC_ENT_TYPE_UPGRADE;
+    }
     return MC_ENT_TYPE_MAX; 
+}
+
+int mc_AssetDB::MaxScriptSize()
+{
+    if(mc_gState->m_Features->Filters() == 0)
+    {
+        return MC_ENT_MAX_SCRIPT_SIZE_BEFORE_FILTERS;
+    }
+    return MC_ENT_MAX_SCRIPT_SIZE; 
 }
 
 int mc_AssetDB::MaxStoredIssuers()

@@ -21,6 +21,7 @@
 
 
 Value createupgradefromcmd(const Array& params, bool fHelp);
+Value createtxfilterfromcmd(const Array& params, bool fHelp);
 
 void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
 {
@@ -517,6 +518,10 @@ Value createfromcmd(const Array& params, bool fHelp)
     if (strcmp(params[1].get_str().c_str(),"upgrade") == 0)
     {
         return createupgradefromcmd(params,fHelp);    
+    }
+    if (strcmp(params[1].get_str().c_str(),"txfilter") == 0)
+    {
+        return createtxfilterfromcmd(params,fHelp);    
     }
     
     throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type, should be stream");

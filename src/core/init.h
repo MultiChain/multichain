@@ -12,6 +12,7 @@
 class CWallet;
 struct mc_WalletTxs;
 struct mc_RelayManager;
+struct mc_FilterEngine;
 
 namespace boost
 {
@@ -21,6 +22,7 @@ class thread_group;
 extern CWallet* pwalletMain;
 extern mc_WalletTxs* pwalletTxsMain;
 extern mc_RelayManager* pRelayManager;
+extern mc_FilterEngine* pFilterEngine;
 
 
 void StartShutdown();

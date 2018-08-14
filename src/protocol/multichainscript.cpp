@@ -1287,7 +1287,7 @@ int mc_Script::GetAssetDetails(char* name,int* multiple,unsigned char* script,in
         return MC_ERR_WRONG_SCRIPT;
     }
     
-    if(m_lpCoord[m_CurrentElement*2+1] > MC_DCT_SCRIPT_IDENTIFIER_LEN+1+MC_ENT_MAX_SCRIPT_SIZE + 4 + MC_ENT_MAX_NAME_SIZE + 1)
+    if(m_lpCoord[m_CurrentElement*2+1] > MC_DCT_SCRIPT_IDENTIFIER_LEN+1+mc_gState->m_Assets->MaxScriptSize() + 4 + MC_ENT_MAX_NAME_SIZE + 1)
     {
         return MC_ERR_WRONG_SCRIPT;
     }
@@ -1342,7 +1342,7 @@ int mc_Script::SetAssetDetails(const char*name,int multiple,const unsigned char*
     int err;
     unsigned char buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+1+4];
     
-    if((script_size<0) || (script_size>MC_ENT_MAX_SCRIPT_SIZE))
+    if((script_size<0) || (script_size>mc_gState->m_Assets->MaxScriptSize()))
     {
         return MC_ERR_INVALID_PARAMETER_VALUE;        
     }
@@ -1402,7 +1402,7 @@ int mc_Script::GetGeneralDetails(unsigned char* script,int *script_size)
         return MC_ERR_WRONG_SCRIPT;
     }
     
-    if(m_lpCoord[m_CurrentElement*2+1] > MC_DCT_SCRIPT_IDENTIFIER_LEN+1+MC_ENT_MAX_SCRIPT_SIZE)
+    if(m_lpCoord[m_CurrentElement*2+1] > MC_DCT_SCRIPT_IDENTIFIER_LEN+1+mc_gState->m_Assets->MaxScriptSize())
     {
         return MC_ERR_WRONG_SCRIPT;
     }
@@ -1437,7 +1437,7 @@ int mc_Script::SetGeneralDetails(const unsigned char* script,int script_size)
     int err;
     unsigned char buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+1+4];
     
-    if((script_size<0) || (script_size>MC_ENT_MAX_SCRIPT_SIZE))
+    if((script_size<0) || (script_size>mc_gState->m_Assets->MaxScriptSize()))
     {
         return MC_ERR_INVALID_PARAMETER_VALUE;        
     }
@@ -1540,7 +1540,7 @@ int mc_Script::GetNewEntityType(uint32_t *type,int *update,unsigned char* script
         return MC_ERR_WRONG_SCRIPT;
     }
     
-    if(m_lpCoord[m_CurrentElement*2+1] > MC_DCT_SCRIPT_IDENTIFIER_LEN+1+1+MC_ENT_MAX_SCRIPT_SIZE)
+    if(m_lpCoord[m_CurrentElement*2+1] > MC_DCT_SCRIPT_IDENTIFIER_LEN+1+1+mc_gState->m_Assets->MaxScriptSize())
     {
         return MC_ERR_WRONG_SCRIPT;
     }
@@ -1590,7 +1590,7 @@ int mc_Script::SetNewEntityType(const uint32_t type,const int update,const unsig
     int err;
     unsigned char buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+1+1];
     
-    if((script_size<0) || (script_size>MC_ENT_MAX_SCRIPT_SIZE))
+    if((script_size<0) || (script_size>mc_gState->m_Assets->MaxScriptSize()))
     {
         return MC_ERR_INVALID_PARAMETER_VALUE;        
     }

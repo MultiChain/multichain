@@ -35,6 +35,7 @@
 
 extern mc_WalletTxs* pwalletTxsMain;
 extern mc_RelayManager* pRelayManager;
+extern mc_FilterEngine* pFilterEngine;
 
 /* MCHN END */
 

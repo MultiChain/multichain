@@ -180,6 +180,7 @@ libbitcoin_server_a_SOURCES = \
   protocol/multichaintx.cpp \
   protocol/multichainblock.cpp \
   custom/custom_server.cpp \
+  protocol/filter.cpp \
   protocol/relay.cpp \
   protocol/handshake.cpp \
   chain/merkleblock.cpp \
@@ -225,6 +226,7 @@ libbitcoin_wallet_a_SOURCES = \
   rpc/rpcassets.cpp \
   rpc/rpcstreams.cpp \
   rpc/rpcupgrades.cpp \
+  rpc/rpcfilters.cpp \
   wallet/wallet.cpp \
   wallet/walletcoins.cpp \
   wallet/wallettxs.cpp \

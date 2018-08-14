@@ -66,6 +66,7 @@ CWallet* pwalletMain = NULL;
 mc_WalletTxs* pwalletTxsMain = NULL;
 #endif
 mc_RelayManager* pRelayManager = NULL;
+mc_FilterEngine* pFilterEngine = NULL;
 bool fFeeEstimatesInitialized = false;
 extern int JSON_DOUBLE_DECIMAL_DIGITS;                             
 
@@ -225,6 +226,12 @@ void Shutdown()
         delete pRelayManager;
         pRelayManager=NULL;        
     }
+    if(pFilterEngine)
+    {
+        delete pFilterEngine;
+        pFilterEngine=NULL;        
+    }
+    
 /* MCHN END */  
 #endif
     globalVerifyHandle.reset();
@@ -1873,6 +1880,12 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             return InitError(_("Failed to listen on any port. Use -listen=0 if you want this."));
     }
 /* MCHN START */    
+    pFilterEngine=new mc_FilterEngine;
+    if(pFilterEngine->Initialize())
+    {
+        return InitError(_("Couldn't initialize filter engine."));        
+    }
+    
     pRelayManager=new mc_RelayManager;
     
     int max_ips=64;
