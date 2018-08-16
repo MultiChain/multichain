@@ -6,7 +6,7 @@
 
 
 #include "rpc/rpcwallet.h"
-#include "protocol/filter.h"
+#include "protocol/multichainfilter.h"
 
 Value createtxfilterfromcmd(const Array& params, bool fHelp)
 {
@@ -150,7 +150,10 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
     const unsigned char *script;
     CScript scriptOpReturn=CScript();
     
-
+    uint32_t filter_type=MC_FLT_TYPE_TX;
+    
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_TYPE,(unsigned char*)&filter_type,4);
+    
     lpDetailsScript->Clear();
     lpDetailsScript->AddElement();            
     if(params[3].type() == obj_type)
@@ -244,7 +247,7 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
         
         mc_Filter filter;
         string strError="";
-        int err=pFilterEngine->CreateFilter(js.c_str(),"filtertransaction",&filter,strError);
+        int err=pFilterEngine->CreateFilter(js.c_str(),MC_FLT_MAIN_NAME_TX,&filter,strError);
         if(err)
         {
             throw JSONRPCError(RPC_INTERNAL_ERROR,"Couldn't create filter");                                                                   
@@ -261,7 +264,7 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
     }
 
     
-    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_JS,(unsigned char*)js.c_str(),js.size());                                                        
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)js.c_str(),js.size());                                                        
     
     
     script=lpDetails->GetData(0,&bytes);
@@ -301,5 +304,258 @@ exitlbl:
 
 Value listfilters(const Array& params, bool fHelp)
 {
-    return Value::null;
+    Array results;
+    uint32_t output_level;
+
+    vector<string> inputStrings;
+    if (params.size() > 0 && params[0].type() != null_type && ((params[0].type() != str_type) || (params[0].get_str() !="*" ) ) )
+    {        
+        if(params[0].type() == str_type)
+        {
+            inputStrings.push_back(params[0].get_str());
+            if(params[0].get_str() == "")
+            {
+                return results;                
+            }
+        }
+        else
+        {
+            inputStrings=ParseStringList(params[0]);        
+            if(inputStrings.size() == 0)
+            {
+                return results;
+            }
+        }
+    }
+    
+    set <uint256> filter_list;
+    
+    if(inputStrings.size())
+    {
+        {
+            LOCK(cs_main);
+            for(int is=0;is<(int)inputStrings.size();is++)
+            {
+                string param=inputStrings[is];
+
+                mc_EntityDetails filter_entity;
+                ParseEntityIdentifier(param,&filter_entity,MC_ENT_TYPE_FILTER);
+                filter_list.insert(*(uint256*)filter_entity.GetTxID());
+            }
+        }
+    }
+    
+    
+    bool verbose=false;
+    if (params.size() > 1)    
+    {
+        if(paramtobool(params[1]))
+        {
+            verbose=true;            
+        }
+    }
+    
+    output_level=0x07;
+    
+    if (verbose)    
+    {
+        output_level=0x27;            
+    }
+    
+    int unconfirmed_count=0;
+    for(int i=0;i<(int)pMultiChainFilterEngine->m_Filters.size();i++)
+    {
+        Object entry;
+
+        if((filter_list.size() == 0) || 
+           (filter_list.find(*(uint256*)pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID()) != filter_list.end()) )
+        {
+            entry=FilterEntry(pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID(),output_level);
+            if(entry.size()>0)
+            {
+                bool take_it=false;
+                BOOST_FOREACH(const Pair& p, entry) 
+                {
+                    if(p.name_ == "filterref")
+                    {
+                        if(p.value_.type() == str_type)
+                        {
+                            take_it=true;
+                        }
+                        else
+                        {
+                            unconfirmed_count++;
+                        }
+                    }
+                }            
+                if(take_it)
+                {
+                    bool valid=pMultiChainFilterEngine->m_Filters[i].m_CreateError.size() == 0;
+                    entry.push_back(Pair("valid",valid));
+                    if(!valid)
+                    {
+                        entry.push_back(Pair("error",pMultiChainFilterEngine->m_Filters[i].m_CreateError));                            
+                    }
+                    entry.push_back(Pair("approved",mc_gState->m_Permissions->FilterApproved(NULL,&(pMultiChainFilterEngine->m_Filters[i].m_FilterAddress)) !=0 ));
+                    entry.push_back(Pair("address",pMultiChainFilterEngine->m_Filters[i].m_FilterAddress.ToString()));
+                    results.push_back(entry);                                            
+                }
+            }            
+        }
+    }
+
+    sort(results.begin(), results.end(), AssetCompareByRef);
+        
+    for(int i=0;i<(int)pMultiChainFilterEngine->m_Filters.size();i++)
+    {
+        if((filter_list.size() == 0) || 
+           (filter_list.find(*(uint256*)pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID()) != filter_list.end()) )
+        {
+            Object entry;
+
+            entry=FilterEntry(pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID(),output_level);
+            if(entry.size()>0)
+            {
+                bool take_it=false;
+                BOOST_FOREACH(const Pair& p, entry) 
+                {
+                    if(p.name_ == "filterref")
+                    {
+                        if(p.value_.type() != str_type)
+                        {
+                            take_it=true;
+                        }
+                    }
+                }            
+                if(take_it)
+                {
+                    bool valid=pMultiChainFilterEngine->m_Filters[i].m_CreateError.size() == 0;
+                    entry.push_back(Pair("valid",valid));
+                    if(!valid)
+                    {
+                        entry.push_back(Pair("error",pMultiChainFilterEngine->m_Filters[i].m_CreateError));                            
+                    }
+                    entry.push_back(Pair("approved",mc_gState->m_Permissions->FilterApproved(NULL,&(pMultiChainFilterEngine->m_Filters[i].m_FilterAddress)) !=0 ));
+                    entry.push_back(Pair("address",pMultiChainFilterEngine->m_Filters[i].m_FilterAddress.ToString()));
+                    results.push_back(entry);                                            
+                }
+            }            
+        }
+    }
+
+    for(int i=0;i<(int)results.size();i++)
+    {
+        uint160 filter_address=0;
+        BOOST_FOREACH(const Pair& p, results[i].get_obj()) 
+        {
+            if(p.name_ == "address")
+            {
+                filter_address.SetHex(p.value_.get_str());
+            }
+        }
+        results[i].get_obj().pop_back();
+        
+        if(verbose)
+        {
+            mc_PermissionDetails *plsRow;
+            mc_PermissionDetails *plsDet;
+            mc_PermissionDetails *plsPend;
+            int flags,consensus,remaining;
+            Array admins;
+            Array pending;
+
+            mc_Buffer *permissions=NULL;
+            permissions=mc_gState->m_Permissions->GetPermissionList(NULL,(unsigned char*)&filter_address,MC_PTP_FILTER,permissions);
+
+            if(permissions->GetCount())
+            {
+                plsRow=(mc_PermissionDetails *)(permissions->GetRow(0));
+
+                flags=plsRow->m_Flags;
+                consensus=plsRow->m_RequiredAdmins;
+                mc_Buffer *details;
+
+                if((flags & MC_PFL_HAVE_PENDING) || (consensus>1))
+                {
+                    details=mc_gState->m_Permissions->GetPermissionDetails(plsRow);                            
+                }
+                else
+                {
+                    details=NULL;
+                }
+
+                if(details)
+                {
+                    for(int j=0;j<details->GetCount();j++)
+                    {
+                        plsDet=(mc_PermissionDetails *)(details->GetRow(j));
+                        remaining=plsDet->m_RequiredAdmins;
+                        if(remaining > 0)
+                        {
+                            uint160 addr;
+                            memcpy(&addr,plsDet->m_LastAdmin,sizeof(uint160));
+                            CKeyID lpKeyID=CKeyID(addr);
+                            admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                        }
+                    }                    
+                    for(int j=0;j<details->GetCount();j++)
+                    {
+                        plsDet=(mc_PermissionDetails *)(details->GetRow(j));
+                        remaining=plsDet->m_RequiredAdmins;
+                        if(remaining == 0)
+                        {
+                            Object pend_obj;
+                            Array pend_admins;
+                            uint32_t block_from=plsDet->m_BlockFrom;
+                            uint32_t block_to=plsDet->m_BlockTo;
+                            for(int k=j;k<details->GetCount();k++)
+                            {
+                                plsPend=(mc_PermissionDetails *)(details->GetRow(k));
+                                remaining=plsPend->m_RequiredAdmins;
+
+                                if(remaining == 0)
+                                {
+                                    if(block_from == plsPend->m_BlockFrom)
+                                    {
+                                        if(block_to == plsPend->m_BlockTo)
+                                        {
+                                            uint160 addr;
+                                            memcpy(&addr,plsPend->m_LastAdmin,sizeof(uint160));
+                                            CKeyID lpKeyID=CKeyID(addr);
+    //                                        CKeyID lpKeyID=CKeyID(*(uint160*)((void*)(plsPend->m_LastAdmin)));
+                                            pend_admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                                            plsPend->m_RequiredAdmins=0x01010101;
+                                        }                                    
+                                    }
+                                }
+                            }          
+                            pend_obj.push_back(Pair("approve", block_from < block_to));                        
+                            pend_obj.push_back(Pair("admins", pend_admins));
+                            pend_obj.push_back(Pair("required", (int64_t)(consensus-pend_admins.size())));
+                            pending.push_back(pend_obj);                            
+                        }
+                    }                    
+                    mc_gState->m_Permissions->FreePermissionList(details);                    
+                }
+                else
+                {
+                    uint160 addr;
+                    memcpy(&addr,plsRow->m_LastAdmin,sizeof(uint160));
+                    CKeyID lpKeyID=CKeyID(addr);
+                    admins.push_back(CBitcoinAddress(lpKeyID).ToString());                    
+                }
+
+                results[i].get_obj().push_back(Pair("admins", admins));
+                results[i].get_obj().push_back(Pair("pending", pending));                                            
+            }
+            else
+            {
+                results[i].get_obj().push_back(Pair("admins", admins));
+                results[i].get_obj().push_back(Pair("pending", pending));                                                            
+            }
+            mc_gState->m_Permissions->FreePermissionList(permissions);                    
+        }    
+    }
+    
+    return results;
 }

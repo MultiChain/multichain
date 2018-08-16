@@ -10,6 +10,9 @@
 #include "multichain/multichain.h"
 #include "structs/base58.h"
 #include "custom/custom.h"
+#include "protocol/multichainfilter.h"
+
+extern mc_MultiChainFilterEngine* pMultiChainFilterEngine;
 
 using namespace std;
 
@@ -894,10 +897,17 @@ bool MultiChainTransaction_CheckEntityItem(const CTransaction& tx,
         }
         else                                                                    // (Pseudo)stream item
         {
-            if(!MultiChainTransaction_CheckStreamItem(&entity,vout,details,reason))
+            if(entity.GetEntityType() <= MC_ENT_TYPE_STREAM_MAX)
             {
-                return false;            
-            }            
+                if(!MultiChainTransaction_CheckStreamItem(&entity,vout,details,reason))
+                {
+                    return false;            
+                }            
+            }
+            else
+            {
+                reason="Metadata script rejected - too many elements for this entity type";                
+            }
         }
     }
     
@@ -1891,7 +1901,8 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
         {
             if(mc_gState->m_Permissions->CanCreate(NULL,(unsigned char*)&(details->vInputDestinations[i])))
             {                            
-                if( (details->new_entity_type != MC_ENT_TYPE_UPGRADE) || (mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)&(details->vInputDestinations[i])) != 0) )
+                if( (details->new_entity_type <= MC_ENT_TYPE_STREAM_MAX) ||     // Admin persmission is required for upgrades and filters
+                    (mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)&(details->vInputDestinations[i])) != 0) )
                 {
                     openers.push_back(details->vInputDestinations[i]);
                     flags=MC_PFL_NONE;
@@ -1917,7 +1928,7 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
     mc_gState->m_TmpScript->AddElement();
     txid=tx.GetHash();                                                          // Setting first record in the per-entity permissions list
 
-    if(details->new_entity_type != MC_ENT_TYPE_UPGRADE)
+    if(details->new_entity_type <= MC_ENT_TYPE_STREAM_MAX)
     {
         memset(opener_buf,0,sizeof(opener_buf));
         err=mc_gState->m_Permissions->SetPermission(&txid,opener_buf,MC_PTP_CONNECT,
@@ -1936,7 +1947,7 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
                 {
                     mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,opener_buf,sizeof(opener_buf));            
                 }
-                if(details->new_entity_type != MC_ENT_TYPE_UPGRADE)
+                if(details->new_entity_type <= MC_ENT_TYPE_STREAM_MAX)
                 {
                                                                                 // Granting default per-entity permissions to openers
                     err=mc_gState->m_Permissions->SetPermission(&txid,opener_buf,MC_PTP_ADMIN | MC_PTP_ACTIVATE | MC_PTP_WRITE,
@@ -1984,6 +1995,10 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
             {
                 entity_type_str="upgrade";
             }
+            if(details->new_entity_type == MC_ENT_TYPE_FILTER)
+            {
+                entity_type_str="filter";
+            }
             if(offset>=0)
             {
                 LogPrintf("New %s. TxID: %s, StreamRef: %d-%d-%d, Name: %s\n",
@@ -1995,6 +2010,10 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
             {
                 LogPrintf("New %s. TxID: %s, unconfirmed, Name: %s\n",
                         entity_type_str.c_str(),tx.GetHash().GetHex().c_str(),entity.GetName());                                                            
+            }
+            if(details->new_entity_type == MC_ENT_TYPE_FILTER)
+            {
+                pMultiChainFilterEngine->Add((unsigned char*)&txid+MC_AST_SHORT_TXID_OFFSET);
             }
         }
         else

@@ -20,6 +20,7 @@
 #define MC_PTP_UPGRADE          0x00010000
 #define MC_PTP_BLOCK_MINER      0x01000000
 #define MC_PTP_BLOCK_INDEX      0x02000000
+#define MC_PTP_FILTER           0x04000000
 #define MC_PTP_SPECIFIED        0x80000000
 #define MC_PTP_ALL              0x00FFFFFF
 #define MC_PTP_GLOBAL_ALL       0x00003137
@@ -316,6 +317,7 @@ typedef struct mc_Permissions
     int CanMine(const void* lpEntity,const void* lpAddress);
     int CanAdmin(const void* lpEntity,const void* lpAddress);    
     int CanActivate(const void* lpEntity,const void* lpAddress);    
+    int FilterApproved(const void* lpEntity,const void* lpAddress);
     
     int CanMineBlock(const void* lpAddress,uint32_t block);
     

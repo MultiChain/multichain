@@ -1219,6 +1219,32 @@ int mc_Permissions::CanWrite(const void* lpEntity,const void* lpAddress)
     return result;
 }
 
+/** Returns non-zero value if filter is approved */
+
+int mc_Permissions::FilterApproved(const void* lpEntity,const void* lpAddress)
+{
+    int result;
+    mc_MempoolPermissionRow row;
+
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    
+    Lock(0);
+    
+    result = GetPermission(lpEntity,lpAddress,MC_PTP_FILTER);    
+    
+    if(result)
+    {
+        result = MC_PTP_FILTER; 
+    }
+    
+    UnLock();
+    
+    return result;
+}
+
 /** Returns non-zero value if (entity,address) can write */
 
 int mc_Permissions::CanCreate(const void* lpEntity,const void* lpAddress)
@@ -2178,6 +2204,7 @@ int mc_Permissions::AdminConsensus(const void* lpEntity,uint32_t type)
             case MC_PTP_ACTIVATE:
             case MC_PTP_ISSUE:
             case MC_PTP_CREATE:
+            case MC_PTP_FILTER:
                 if(IsSetupPeriod())            
                 {
                     return 1;
@@ -2203,6 +2230,10 @@ int mc_Permissions::AdminConsensus(const void* lpEntity,uint32_t type)
                 if(type == MC_PTP_CREATE)
                 {
                     consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensuscreate");
+                }
+                if(type == MC_PTP_CREATE)
+                {
+                    consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensusfilter");
                 }
 
                 if(consensus==0)
@@ -2945,7 +2976,7 @@ void mc_Permissions::FreePermissionList(mc_Buffer *permissions)
 
 int mc_Permissions::IsActivateEnough(uint32_t type)
 {
-    if(type & ( MC_PTP_ADMIN | MC_PTP_ISSUE | MC_PTP_MINE | MC_PTP_ACTIVATE | MC_PTP_CREATE))
+    if(type & ( MC_PTP_ADMIN | MC_PTP_ISSUE | MC_PTP_MINE | MC_PTP_ACTIVATE | MC_PTP_CREATE | MC_PTP_FILTER))
     {
         return 0;
     }    
@@ -3040,6 +3071,7 @@ int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAdd
     types[num_types]=MC_PTP_ACTIVATE;num_types++;        
     types[num_types]=MC_PTP_ADMIN;num_types++;        
     types[num_types]=MC_PTP_UPGRADE;num_types++;                        
+    types[num_types]=MC_PTP_FILTER;num_types++;                        
     
     err=MC_ERR_NOERROR;
 

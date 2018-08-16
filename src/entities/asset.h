@@ -70,7 +70,8 @@
 #define MC_ENT_SPRM_UPGRADE_START_BLOCK       0x43
 #define MC_ENT_SPRM_UPGRADE_CHAIN_PARAMS      0x44
 #define MC_ENT_SPRM_FILTER_ENTITY             0x45
-#define MC_ENT_SPRM_FILTER_JS                 0x46
+#define MC_ENT_SPRM_FILTER_CODE               0x46
+#define MC_ENT_SPRM_FILTER_TYPE               0x47
 
 #define MC_ENT_SPRM_TIMESTAMP                 0x81
 #define MC_ENT_SPRM_CHUNK_HASH                0x82

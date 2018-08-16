@@ -67,6 +67,7 @@ mc_WalletTxs* pwalletTxsMain = NULL;
 #endif
 mc_RelayManager* pRelayManager = NULL;
 mc_FilterEngine* pFilterEngine = NULL;
+mc_MultiChainFilterEngine* pMultiChainFilterEngine = NULL;
 bool fFeeEstimatesInitialized = false;
 extern int JSON_DOUBLE_DECIMAL_DIGITS;                             
 
@@ -226,6 +227,13 @@ void Shutdown()
         delete pRelayManager;
         pRelayManager=NULL;        
     }
+    
+    if(pMultiChainFilterEngine)
+    {
+        delete pMultiChainFilterEngine;
+        pMultiChainFilterEngine=NULL;        
+    }
+    
     if(pFilterEngine)
     {
         delete pFilterEngine;
@@ -1885,6 +1893,13 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     {
         return InitError(_("Couldn't initialize filter engine."));        
     }
+    
+    pMultiChainFilterEngine=new mc_MultiChainFilterEngine;
+    if(pMultiChainFilterEngine->Initialize())
+    {
+        return InitError(_("Couldn't initialize filter engine."));        
+    }
+    
     
     pRelayManager=new mc_RelayManager;
     

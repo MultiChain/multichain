@@ -549,7 +549,202 @@ exitlbl:
     return results;
 }
 
+Object FilterEntry(const unsigned char *txid,uint32_t output_level)
+{
+// output_level constants
+// 0x0001 type
+// 0x0002 txid
+// 0x0004 details
+// 0x0020 creators    
+    
+    Object entry;
+    mc_EntityDetails entity;
+    unsigned char *ptr;
+    size_t value_size;
 
+    if(txid == NULL)
+    {
+        entry.push_back(Pair("filterref", ""));
+        return entry;
+    }
+    
+    uint256 hash=*(uint256*)txid;
+    if(mc_gState->m_Assets->FindEntityByTxID(&entity,txid))
+    {        
+        if(output_level & 0x0001)
+        {
+            uint32_t filter_type=MC_FLT_TYPE_TX;
+            ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_FILTER_TYPE,&value_size);
+
+            if(ptr)
+            {
+                if( (value_size <=0) || (value_size > 4) )
+                {
+                    filter_type=MC_FLT_TYPE_BAD;                        
+                }
+                else
+                {
+                    filter_type=mc_GetLE(ptr,value_size);
+                }
+            }                                    
+            switch(filter_type)
+            {
+                case MC_FLT_TYPE_TX:
+                    entry.push_back(Pair("type", "txfilter"));            
+                    break;
+                default:
+                    entry.push_back(Pair("type", "unsupported"));            
+                    break;
+            }
+            
+        }
+        
+        ptr=(unsigned char *)entity.GetName();
+                
+        if(ptr && strlen((char*)ptr))
+        {
+            entry.push_back(Pair("name", string((char*)ptr)));            
+        }
+        if(output_level & 0x002)
+        {
+            entry.push_back(Pair("createtxid", hash.GetHex()));
+        }
+        ptr=(unsigned char *)entity.GetRef();
+        string streamref="";
+        if(entity.IsUnconfirmedGenesis())
+        {
+            Value null_value;
+            entry.push_back(Pair("filterref",null_value));
+        }
+        else
+        {
+            if((int)mc_GetLE(ptr,4))
+            {
+                streamref += itostr((int)mc_GetLE(ptr,4));
+                streamref += "-";
+                streamref += itostr((int)mc_GetLE(ptr+4,4));
+                streamref += "-";
+                streamref += itostr((int)mc_GetLE(ptr+8,2));
+            }
+            else
+            {
+                streamref="0-0-0";                
+            }
+            entry.push_back(Pair("filterref", streamref));
+        }
+
+        if(output_level & 0x0004)
+        {
+            entry.push_back(Pair("language", "javascript"));
+            
+            Array entities;
+            ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size);
+
+            if(ptr)
+            {   
+                entry.push_back(Pair("codesize", value_size));                
+            }
+            else
+            {
+                entry.push_back(Pair("codesize", 0));                
+            }
+            
+            ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_FILTER_ENTITY,&value_size);
+
+            if(ptr)
+            {
+                if(value_size % MC_AST_SHORT_TXID_SIZE)
+                {
+                    entry.push_back(Pair("entities","error"));                    
+                }
+                else
+                {
+                    for(int i=0;i<(int)value_size/MC_AST_SHORT_TXID_SIZE;i++)
+                    {
+                        mc_EntityDetails relevant_entity;
+                        Object asset_entry;
+                        if(mc_gState->m_Assets->FindEntityByShortTxID(&relevant_entity,ptr+i*MC_AST_SHORT_TXID_SIZE))
+                        {
+                            switch(relevant_entity.GetEntityType())
+                            {
+                                case MC_ENT_TYPE_ASSET:
+                                    asset_entry=AssetEntry(relevant_entity.GetTxID(),-1,0x00);
+                                    asset_entry.push_back(Pair("type", "asset"));
+                                    entities.push_back(asset_entry);
+                                    break;
+                                default:
+                                    entities.push_back(StreamEntry(relevant_entity.GetTxID(),0x03));
+                                    break;
+                            }
+                        }                        
+                    }
+                    entry.push_back(Pair("entities",entities));                    
+                }
+            }                           
+            else
+            {
+                entry.push_back(Pair("entities",entities));                                    
+            }            
+        }
+       
+        
+        
+        if(output_level & 0x0020)
+        {
+            Array openers;
+            int64_t offset,new_offset;
+            uint32_t value_offset;
+            ptr=(unsigned char*)entity.GetScript();
+
+            offset=0;
+            while(offset>=0)
+            {
+                new_offset=entity.NextParam(offset,&value_offset,&value_size);
+                if(value_offset > 0)
+                {
+                    if(ptr[offset] == 0)
+                    {
+                        if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
+                        {
+                            if(value_size == 24)
+                            {
+                                unsigned char tptr[4];
+                                memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
+                                if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
+                                {
+                                    openers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
+                                }
+                                else
+                                {
+                                    openers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
+                                }
+                            }
+                        }                        
+                    }
+                }
+                offset=new_offset;
+            }      
+                        
+            entry.push_back(Pair("creators",openers));                    
+        }
+    }
+    else
+    {
+        Value null_value;
+        if(output_level & 0x001)
+        {
+            entry.push_back(Pair("type", "stream"));                        
+        }
+        entry.push_back(Pair("name",null_value));
+        if(output_level & 0x002)
+        {
+            entry.push_back(Pair("createtxid",null_value));
+        }
+        entry.push_back(Pair("filterref", null_value));
+    }
+    
+    return entry;    
+}
 
 Object StreamEntry(const unsigned char *txid,uint32_t output_level)
 {
@@ -3532,6 +3727,10 @@ bool AssetCompareByRef(Value a,Value b)
         {
             assetref_a=p.value_;
         }
+        if(p.name_ == "filterref")
+        {
+            assetref_a=p.value_;
+        }
     }
 
     BOOST_FOREACH(const Pair& p, b.get_obj()) 
@@ -3541,6 +3740,10 @@ bool AssetCompareByRef(Value a,Value b)
             assetref_b=p.value_;
         }
         if(p.name_ == "streamref")
+        {
+            assetref_b=p.value_;
+        }
+        if(p.name_ == "filterref")
         {
             assetref_b=p.value_;
         }

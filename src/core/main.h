@@ -23,6 +23,7 @@
 #include "script/sigcache.h"
 #include "script/standard.h"
 #include "protocol/filter.h"
+#include "protocol/multichainfilter.h"
 #include "utils/sync.h"
 #include "utils/tinyformat.h"
 #include "chain/txmempool.h"
