@@ -46,6 +46,7 @@ typedef struct CMultiChainTxDetails
     
     set <string> vAllowedAdmins;                                                // Admin permissions before this tx - for grants
     set <string> vAllowedActivators;                                            // Activate permissions before this tx - for grants
+    set <uint160> vRelevantEntities;                                            // Set of entities involved in this transaction
     
     vector <uint32_t> vOutputScriptFlags;                                       // Output script flags, filled when script is processed for the first time
     vector <int> vOutputPermissionRequired;                                     // Number of required receive permissions 
@@ -74,6 +75,8 @@ typedef struct CMultiChainTxDetails
     
     void Zero();
     bool IsRelevantInput(int vin,int vout);
+    void SetRelevantEntity(void *entity);
+    bool IsRelevantEntity(uint160 hash);
     
 } CMultiChainTxDetails;
 
@@ -117,6 +120,25 @@ bool CMultiChainTxDetails::IsRelevantInput(int vin, int vout)
         return true;
     }
     return false;
+}
+
+bool CMultiChainTxDetails::IsRelevantEntity(uint160 hash)
+{
+    if(vRelevantEntities.find(hash) != vRelevantEntities.end())
+    {
+        return true;
+    }
+    return false;
+}
+
+void CMultiChainTxDetails::SetRelevantEntity(void *entity)
+{
+    uint160 hash;
+    memcpy(&hash,entity,MC_AST_SHORT_TXID_SIZE);
+    if(!IsRelevantEntity(hash))
+    {
+        vRelevantEntities.insert(hash);
+    }
 }
 
 uint160 mc_GenesisAdmin(const CTransaction& tx)
@@ -212,7 +234,7 @@ bool mc_ExtractInputAssetQuantities(mc_Buffer *assets, const CScript& script1, u
     return true;
 }
 
-bool mc_CompareAssetQuantities(string& reason)
+bool mc_CompareAssetQuantities(CMultiChainTxDetails *details,string& reason)
 {
     unsigned char *ptrIn;
     unsigned char *ptrOut;
@@ -254,6 +276,8 @@ bool mc_CompareAssetQuantities(string& reason)
             reason="Asset transfer script rejected - asset not found";
             return false;                                                    
         }                           
+        
+        details->SetRelevantEntity((unsigned char*)entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
         
         if(quantity>0)
         {
@@ -881,6 +905,8 @@ bool MultiChainTransaction_CheckEntityItem(const CTransaction& tx,
         return false;
     }               
     
+    details->SetRelevantEntity(short_txid);
+    
     if(entity.GetEntityType() == MC_ENT_TYPE_ASSET)                             // Asset update
     {
         if(!MultiChainTransaction_CheckAssetUpdateDetails(&entity,vout,details,reason))
@@ -1031,7 +1057,9 @@ bool MultiChainTransaction_ProcessPermissions(const CTransaction& tx,
             {
                 reason="Script rejected - entity not found";
                 return false;
-            }                        
+            }        
+            
+            details->SetRelevantEntity(short_txid);            
         }
         else                                                                    // Not entity element
         {   
@@ -1381,7 +1409,7 @@ bool MultiChainTransaction_CheckOutputs(const CTransaction& tx,                 
         }        
     }    
     
-    if(!mc_CompareAssetQuantities(reason))                                      // Comparing input/output asset quantities
+    if(!mc_CompareAssetQuantities(details,reason))                              // Comparing input/output asset quantities
     {
         return false;                
     }
@@ -1498,7 +1526,6 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                 reason="Metadata script rejected - wrong element, should be entityref";
                 return false;
             }
-            
         }
         
         if(details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_NOT_OP_RETURN)
@@ -1643,6 +1670,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                 reason="Details script rejected - entity not found";
                 return false;                                    
             }                                           
+            details->SetRelevantEntity(short_txid);
         }
         else
         {
@@ -2097,10 +2125,9 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
     {
         if(pMultiChainFilterEngine)
         {
-            string filter_error;
             mc_MultiChainFilter* lpFilter;
 
-            if(pMultiChainFilterEngine->Run(tx.GetHash(),reason,&lpFilter) != MC_ERR_NOERROR)
+            if(pMultiChainFilterEngine->Run(tx.GetHash(),details.vRelevantEntities,reason,&lpFilter) != MC_ERR_NOERROR)
             {
                 reason="Error while running filters";
                 fReject=true;

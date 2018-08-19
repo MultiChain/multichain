@@ -40,8 +40,10 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
         return MC_ERR_NOT_FOUND;
     }
     
-    m_FilterCaption=strprintf("TxID: %s, FilterRef: %s, Name: %s",
-            m_Details.GetTxID(),m_Details.GetRef(),m_Details.m_Name);
+    uint256 txid;
+    txid=*(uint256*)m_Details.GetTxID();
+    m_FilterCaption=strprintf("TxID: %s, Name: %s",
+            txid.ToString().c_str(),m_Details.m_Name);
     
     ptr=(unsigned char *)m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_TYPE,&value_size);
     
@@ -96,10 +98,26 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
     return MC_ERR_NOERROR;    
 }
 
+bool mc_MultiChainFilter::HasRelevantEntity(set <uint160>& sRelevantEntities)
+{
+    if(m_RelevantEntities.size() == 0)
+    {
+        return true;
+    }
+    for(int i=0;i<(int)m_RelevantEntities.size();i++)
+    {
+        if(sRelevantEntities.find(m_RelevantEntities[i]) != sRelevantEntities.end())
+        {
+            return true;
+        }
+    }
+    return false;
+}
 
 int mc_MultiChainFilterEngine::Zero()
 {
     m_Filters.clear();
+    m_TxID=0;
     
     return MC_ERR_NOERROR;
 }
@@ -138,6 +156,8 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid)
         return err;
     }
     
+    LogPrint("filter","Filter added: %s\n",m_Filters.back().m_FilterCaption.c_str());
+    
     return MC_ERR_NOERROR;
 }
 
@@ -145,6 +165,12 @@ int mc_MultiChainFilterEngine::Reset(int block)
 {
     int filter_block;
     int err;
+    
+    if(m_Filters.size() == 0)
+    {
+        return MC_ERR_NOERROR;        
+    }
+    
     filter_block=m_Filters.back().m_Details.m_LedgerRow.m_Block;
     if(filter_block<0)
     {
@@ -152,6 +178,7 @@ int mc_MultiChainFilterEngine::Reset(int block)
     }
     while( (m_Filters.size()>0) && (filter_block > block) )
     {
+        LogPrint("filter","Filter rolled back: %s\n",m_Filters.back().m_FilterCaption.c_str());
         m_Filters.back().Destroy();
         m_Filters.pop_back();
         if(m_Filters.size()>0)
@@ -174,38 +201,51 @@ int mc_MultiChainFilterEngine::Reset(int block)
         }        
     }    
     
+    LogPrint("filter","Filter engine reset\n");
     return MC_ERR_NOERROR;
 }
 
-int mc_MultiChainFilterEngine::Run(uint256 txid,std::string &strResult,mc_MultiChainFilter **lppFilter)
+int mc_MultiChainFilterEngine::Run(uint256 txid,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter)
 {
     int err;
     strResult="";
+    m_TxID=txid;
     
     for(int i=0;i<(int)m_Filters.size();i++)
     {
-        if(m_Filters[i].m_CreateError.size())
+        if(m_Filters[i].m_CreateError.size() == 0)
         {
             if(mc_gState->m_Permissions->FilterApproved(NULL,&(m_Filters[i].m_FilterAddress)))
             {
-                err=pFilterEngine->RunFilter(m_Filters[i].m_Filter,strResult);
-                if(err)
+                if(m_Filters[i].HasRelevantEntity(sRelevantEntities))
                 {
-                    LogPrintf("Error while running filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
-                    return err;
-                }
-                if(strResult.c_str())
-                {
-                    if(lppFilter)
+                    err=pFilterEngine->RunFilter(m_Filters[i].m_Filter,strResult);
+                    if(err)
                     {
-                        *lppFilter=&(m_Filters[i]);
+                        LogPrintf("Error while running filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
+                        return err;
                     }
-                    return MC_ERR_NOERROR;
+                    if(strResult.size())
+                    {
+                        if(lppFilter)
+                        {
+                            *lppFilter=&(m_Filters[i]);
+                        }
+                        LogPrint("filter","Tx rejected: %s, filter: %s\n",strResult.c_str(),m_Filters[i].m_FilterCaption.c_str());
+                        
+                        return MC_ERR_NOERROR;
+                    }
+                    LogPrint("filter","Tx %s accepted, filter: %s\n",txid.ToString().c_str(),m_Filters[i].m_FilterCaption.c_str());
+                }
+                else
+                {
+                    LogPrint("filter","Irrelevant, filter: %s\n",m_Filters[i].m_FilterCaption.c_str());                    
                 }
             }
         }
     }    
     
+    m_TxID=0;
     return MC_ERR_NOERROR;
 }
 

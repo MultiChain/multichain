@@ -567,3 +567,42 @@ Value listfilters(const Array& params, bool fHelp)
     
     return results;
 }
+
+Value getfiltercode(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error("Help message not found\n");
+    
+    if(mc_gState->m_Features->Filters() == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
+    }   
+    
+    mc_EntityDetails filter_entity;
+    ParseEntityIdentifier(params[0],&filter_entity,MC_ENT_TYPE_FILTER);
+    
+    char *ptr;
+    size_t value_size;
+    char filter_code[MC_ENT_MAX_SCRIPT_SIZE+1];
+    
+    ptr=(char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size);
+
+    if(ptr == NULL)
+    {
+        return Value::null;
+    }
+
+    if(value_size)
+    {
+        memcpy(filter_code,ptr,value_size);
+        
+    }
+    filter_code[value_size]=0x00;
+
+    return string(filter_code);
+}
+
+Value getfiltertxid(const Array& params, bool fHelp)
+{
+    return pMultiChainFilterEngine->m_TxID.ToString();
+}

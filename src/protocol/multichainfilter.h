@@ -43,12 +43,15 @@ typedef struct mc_MultiChainFilter
     
     int Zero();
     int Destroy();   
-        
+
+    bool HasRelevantEntity(std::set <uint160>& sRelevantEntities);
+    
 } mc_MultiChainFilter;
 
 typedef struct mc_MultiChainFilterEngine
 {
     std::vector <mc_MultiChainFilter> m_Filters;
+    uint256 m_TxID;
 
     mc_MultiChainFilterEngine()
     {
@@ -63,7 +66,7 @@ typedef struct mc_MultiChainFilterEngine
     int Initialize();
     int Add(const unsigned char* short_txid);
     int Reset(int block);
-    int Run(uint256 txid, std::string &strResult,mc_MultiChainFilter **lppFilter);            
+    int Run(uint256 txid,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter);            
     
     int Zero();
     int Destroy();   

@@ -4175,10 +4175,6 @@ void mc_InitRPCHelpMap18()
             + HelpExampleRpc("liststreamqueryitems", "\"test-stream\", \"{\\\"keys\\\":[\\\"key01\\\",\"key02\"],\\\"publisher\\\":\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\\\"}\", false")
         ));
     
-   mapHelpStrings.insert(std::make_pair("AAAAAAA",
-            ""
-        ));
-       
      mapHelpStrings.insert(std::make_pair("listfilters",
             "listfilters ( filter-identifier(s) verbose )\n"
             "\nReturns list of defined filters\n"
@@ -4193,6 +4189,23 @@ void mc_InitRPCHelpMap18()
             + HelpExampleCli("listfilters", "")
             + HelpExampleRpc("listfilters", "")
         ));
+     
+     mapHelpStrings.insert(std::make_pair("getfiltercode",
+            "getfiltercode \"filter-identifier\"\n"
+            "\nReturns code for specified filter\n"
+            "\nArguments:\n"
+            "1. \"filter-identifier\"              (string, optional) Filter identifier - one of the following: create txid, filter reference, filter name.\n"
+            "\nResult:\n"
+            "Filter code in plain text\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("getfiltercode", "filter1")
+            + HelpExampleRpc("getfiltercode", "filter1")
+        ));
+     
+   mapHelpStrings.insert(std::make_pair("AAAAAAA",
+            ""
+        ));
+       
     
    
 }
