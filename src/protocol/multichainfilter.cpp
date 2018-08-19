@@ -177,7 +177,7 @@ int mc_MultiChainFilterEngine::Reset(int block)
     return MC_ERR_NOERROR;
 }
 
-int mc_MultiChainFilterEngine::Run(std::string &strResult,mc_MultiChainFilter **lppFilter)
+int mc_MultiChainFilterEngine::Run(uint256 txid,std::string &strResult,mc_MultiChainFilter **lppFilter)
 {
     int err;
     strResult="";

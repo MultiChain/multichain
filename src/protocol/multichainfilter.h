@@ -63,7 +63,7 @@ typedef struct mc_MultiChainFilterEngine
     int Initialize();
     int Add(const unsigned char* short_txid);
     int Reset(int block);
-    int Run(std::string &strResult,mc_MultiChainFilter **lppFilter);            
+    int Run(uint256 txid, std::string &strResult,mc_MultiChainFilter **lppFilter);            
     
     int Zero();
     int Destroy();   

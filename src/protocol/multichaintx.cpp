@@ -36,6 +36,7 @@ typedef struct CMultiChainTxDetails
     bool fSeedNodeInvolved;                                                     // Connect permission of seed node changed
     bool fFullReplayCheckRequired;                                              // Tx should be rechecked when mempool is replayed
     bool fAdminMinerGrant;                                                      // Admin/miner grant in this transaction
+    bool fNoFiltering;                                                          // Filters are not applied in this transaction
     
     vector <txnouttype> vInputScriptTypes;                                      // Input script types
     vector <uint160> vInputDestinations;                                        // Addresses used in input scripts
@@ -98,6 +99,7 @@ void CMultiChainTxDetails::Zero()
     fSeedNodeInvolved=false;
     fFullReplayCheckRequired=false;
     fAdminMinerGrant=false;
+    fNoFiltering=false;
 
     details_script_size=0;
     details_script_type=-1;
@@ -1046,6 +1048,10 @@ bool MultiChainTransaction_ProcessPermissions(const CTransaction& tx,
                     if( type & ( MC_PTP_CREATE | MC_PTP_ISSUE | MC_PTP_ACTIVATE | MC_PTP_FILTER ) )
                     {
                         details->vOutputScriptFlags[vout] |= MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_CREATE;
+                        if(type & MC_PTP_FILTER)
+                        {
+                            details->fNoFiltering=true;
+                        }
                     }
                     if( type & ( MC_PTP_MINE | MC_PTP_ADMIN ) )
                     {
@@ -1928,13 +1934,18 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
     mc_gState->m_TmpScript->AddElement();
     txid=tx.GetHash();                                                          // Setting first record in the per-entity permissions list
 
+    if(details->new_entity_type > MC_ENT_TYPE_STREAM_MAX)
+    {
+        details->fNoFiltering=true;
+    }
+    
     if(details->new_entity_type <= MC_ENT_TYPE_STREAM_MAX)
     {
         memset(opener_buf,0,sizeof(opener_buf));
         err=mc_gState->m_Permissions->SetPermission(&txid,opener_buf,MC_PTP_CONNECT,
                 (unsigned char*)openers[0].begin(),0,(uint32_t)(-1),timestamp, MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
     }
-
+    
     for (unsigned int i = 0; i < openers.size(); i++)
     {
         if(err == MC_ERR_NOERROR)
@@ -2082,6 +2093,30 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
         goto exitlbl;                                                                    
     }
 
+    if(!details.fNoFiltering)
+    {
+        if(pMultiChainFilterEngine)
+        {
+            string filter_error;
+            mc_MultiChainFilter* lpFilter;
+
+            if(pMultiChainFilterEngine->Run(tx.GetHash(),reason,&lpFilter) != MC_ERR_NOERROR)
+            {
+                reason="Error while running filters";
+                fReject=true;
+                goto exitlbl;                                                                    
+            }
+            else
+            {
+                if(reason.size())
+                {
+                    if(fDebug)LogPrint("mchn","mchn: Rejecting filter: %s\n",lpFilter->m_FilterCaption.c_str());
+                    fReject=true;
+                    goto exitlbl;                                                                                    
+                }
+            }
+        }
+    }
                                                                                 // Custom filters
     fReject=!custom_accept_transacton(tx,inputs,offset,accept,reason,replay);
     
