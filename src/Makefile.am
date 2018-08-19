@@ -1,10 +1,12 @@
 walDIST_SUBDIRS = secp256k1
 AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS)
+CXXFLAGS += -Wno-implicit-fallthrough -std=c++0x
 
 
 if EMBEDDED_LEVELDB
 LEVELDB_CPPFLAGS += -I$(srcdir)/leveldb/include
 LEVELDB_CPPFLAGS += -I$(srcdir)/leveldb/helpers/memenv
+LEVELDB_CPPFLAGS += -Wno-deprecated
 LIBLEVELDB += $(builddir)/leveldb/libleveldb.a
 LIBMEMENV  += $(builddir)/leveldb/libmemenv.a
 
@@ -167,7 +169,7 @@ obj/build.h: FORCE
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
 # server: shared between bitcoind and bitcoin-qt
-libbitcoin_server_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS)
+libbitcoin_server_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(V8_INCLUDE)
 libbitcoin_server_a_SOURCES = \
   storage/addrman.cpp \
   structs/alert.cpp \
@@ -182,6 +184,9 @@ libbitcoin_server_a_SOURCES = \
   custom/custom_server.cpp \
   protocol/multichainfilter.cpp \
   protocol/filter.cpp \
+  v8/v8engine.cpp \
+  v8/v8filter.cpp \
+  v8/callbacks.cpp \
   protocol/relay.cpp \
   protocol/handshake.cpp \
   chain/merkleblock.cpp \
@@ -408,6 +413,22 @@ endif
 
 # MCHN START
 
+V8_RELEASE = $(HOME)/local/v8
+V8_INCLUDE = -I$(V8_RELEASE)/include
+V8_LIB_DIR = $(V8_RELEASE)/lib
+V8_LIBS = \
+    -L$(V8_RELEASE)/lib \
+    -Wl,--start-group \
+        -lv8_libbase \
+        -lv8_libplatform \
+        -lv8_base \
+        -lv8_external_snapshot \
+        -lv8_libsampler \
+        -licuuc \
+        -licui18n \
+        -lv8pp \
+    -lrt -ldl
+
 # multichaind binary #								
 multichaind_LDADD = \
   $(LIBBITCOIN_SERVER) \
@@ -433,7 +454,7 @@ endif
 
 multichaind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
 multichaind_CPPFLAGS = $(BITCOIN_INCLUDES)
-multichaind_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+multichaind_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) $(V8_LIBS) -pthread
 
 # multichaind-cold binary #								
 multichaind_cold_LDADD = \
@@ -460,7 +481,7 @@ endif
 
 multichaind_cold_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
 multichaind_cold_CPPFLAGS = $(BITCOIN_INCLUDES)
-multichaind_cold_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+multichaind_cold_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) $(V8_LIBS) -pthread
 
 # multichain-cli binary #
 multichain_cli_LDADD = \

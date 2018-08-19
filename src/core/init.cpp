@@ -1888,10 +1888,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             return InitError(_("Failed to listen on any port. Use -listen=0 if you want this."));
     }
 /* MCHN START */    
-    pFilterEngine=new mc_FilterEngine;
-    if(pFilterEngine->Initialize())
+    std::string strResult;
+    pFilterEngine=new mc_FilterEngine();
+    if (pFilterEngine->Initialize(strResult) != MC_ERR_NOERROR)
     {
-        return InitError(_("Couldn't initialize filter engine."));        
+        return InitError(strprintf(_("Couldn't initialize filter engine: '%s'"), strResult));
     }
     
     pMultiChainFilterEngine=new mc_MultiChainFilterEngine;
