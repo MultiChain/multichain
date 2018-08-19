@@ -304,9 +304,17 @@ exitlbl:
 
 Value listfilters(const Array& params, bool fHelp)
 {
+    if (fHelp || params.size() > 2)
+        throw runtime_error("Help message not found\n");
+    
     Array results;
     uint32_t output_level;
 
+    if(mc_gState->m_Features->Filters() == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
+    }   
+    
     vector<string> inputStrings;
     if (params.size() > 0 && params[0].type() != null_type && ((params[0].type() != str_type) || (params[0].get_str() !="*" ) ) )
     {        

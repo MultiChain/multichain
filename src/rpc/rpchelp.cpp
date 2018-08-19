@@ -3618,12 +3618,14 @@ void mc_InitRPCHelpMap16()
         ));
     
     mapHelpStrings.insert(std::make_pair("approvefrom",
-            "approvefrom \"from-address\" \"upgrade-identifier\" ( approve )\n"
+            "approvefrom \"from-address\" \"upgrade-identifier\"|\"filter-identifier\" ( approve )\n"
             "\nApprove upgrade using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"from-address\"                   (string, required) Address used for approval.\n"
             "2. \"upgrade-identifier\"             (string, required) Upgrade identifier - one of the following: upgrade txid, upgrade name.\n"
+            " or\n"
+            "2. \"filter-identifier\"              (string, required) Filter identifier - one of the following: filter txid, filter name.\n"
             "3. approve                          (boolean, required)  Approve or disapprove\n"
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
@@ -4177,7 +4179,22 @@ void mc_InitRPCHelpMap18()
             ""
         ));
        
+     mapHelpStrings.insert(std::make_pair("listfilters",
+            "listfilters ( filter-identifier(s) verbose )\n"
+            "\nReturns list of defined filters\n"
+            "\nArguments:\n"
+            "1. \"filter-identifier\"              (string, optional) Filter identifier - one of the following: create txid, filter reference, filter name.\n"
+            " or\n"
+            "1. filter-identifier(s)             (array, optional) A json array of filter identifiers \n"                
+            "2. verbose                          (boolean, optional, default=false) If true, returns list of creators and approval details \n"
+            "\nResult:\n"
+            "An array containing list of defined filters\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("listfilters", "")
+            + HelpExampleRpc("listfilters", "")
+        ));
     
+   
 }
 
 void mc_InitRPCLogParamCountMap()

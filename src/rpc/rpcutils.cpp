@@ -3636,6 +3636,10 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
             entity_nameU="Upgrade";
             entity_nameL="upgrade";
             break;
+        case MC_ENT_TYPE_FILTER:
+            entity_nameU="Filter";
+            entity_nameL="filter";
+            break;
         default:
             entity_nameU="Entity";
             entity_nameL="entity";

@@ -1043,7 +1043,7 @@ bool MultiChainTransaction_ProcessPermissions(const CTransaction& tx,
                 
                 if(fFirstPass)  
                 {
-                    if( type & ( MC_PTP_CREATE | MC_PTP_ISSUE | MC_PTP_ACTIVATE ) )
+                    if( type & ( MC_PTP_CREATE | MC_PTP_ISSUE | MC_PTP_ACTIVATE | MC_PTP_FILTER ) )
                     {
                         details->vOutputScriptFlags[vout] |= MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_CREATE;
                     }
@@ -1327,7 +1327,7 @@ bool MultiChainTransaction_CheckOutputs(const CTransaction& tx,                 
         {
             MultiChainTransaction_SetTmpOutputScript(tx.vout[vout].scriptPubKey);
             
-            permission_type=MC_PTP_CREATE | MC_PTP_ISSUE | MC_PTP_ACTIVATE;
+            permission_type=MC_PTP_CREATE | MC_PTP_ISSUE | MC_PTP_ACTIVATE | MC_PTP_FILTER;
             if(!MultiChainTransaction_ProcessPermissions(tx,offset,vout,permission_type,false,details,reason))
             {
                 return false;
