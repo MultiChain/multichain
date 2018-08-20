@@ -534,7 +534,10 @@ Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong)
                     txnouttype typeRet;
                     entry.push_back(Pair("addresses", AddressEntries(txout,typeRet)));
                 }
-                results.push_back(entry);
+                if( (type & MC_PTP_FILTER) == 0)
+                {
+                    results.push_back(entry);
+                }
             }            
             else
             {
