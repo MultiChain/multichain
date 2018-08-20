@@ -204,7 +204,17 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
     }
     else
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid restrictions, should be object");                            
+        if(params[3].type() == bool_type)
+        {
+            if(params[3].get_bool())
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid restrictions, should be object or boolean false");                                                        
+            }
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid restrictions, should be object or boolean false");                                        
+        }
     }
     
     if(params[4].type() == obj_type)
