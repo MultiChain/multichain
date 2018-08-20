@@ -87,14 +87,13 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
     
     if(ptr)
     {
-        m_CreateError="Empty filter code";
+        memcpy(m_FilterCode,ptr,value_size);
+        m_FilterCode[value_size]=0x00;    
     }                                    
     else
     {    
-        memcpy(m_FilterCode,ptr,value_size);
-        m_FilterCode[value_size]=0x00;    
+        m_CreateError="Empty filter code";
     }
-    
     return MC_ERR_NOERROR;    
 }
 
@@ -147,7 +146,7 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid)
     }
     
     m_Filters.push_back(filter);
-        
+    
     err=pFilterEngine->CreateFilter(m_Filters.back().m_FilterCode,m_Filters.back().m_MainName.c_str(),&(m_Filters.back().m_Filter),m_Filters.back().m_CreateError);
     if(err)
     {
