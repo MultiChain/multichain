@@ -255,9 +255,10 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER,"js cannot be empty");                                                       
         }        
         
-        mc_Filter filter;
-        string strError="";
-        int err=pFilterEngine->CreateFilter(js.c_str(),MC_FLT_MAIN_NAME_TX,&filter,strError);
+        mc_Filter *worker=new mc_Filter;
+        string strError="";        
+        int err=pFilterEngine->CreateFilter(js.c_str(),MC_FLT_MAIN_NAME_TX,worker,strError);
+        delete worker;
         if(err)
         {
             throw JSONRPCError(RPC_INTERNAL_ERROR,"Couldn't create filter");                                                                   

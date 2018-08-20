@@ -21,7 +21,6 @@ typedef struct mc_MultiChainFilter
     std::vector <uint160> m_RelevantEntities;
     
     mc_EntityDetails m_Details;
-    mc_Filter m_Filter;
     std::string m_CreateError;
     std::string m_MainName;
     std::string m_FilterCaption;
@@ -51,6 +50,7 @@ typedef struct mc_MultiChainFilter
 typedef struct mc_MultiChainFilterEngine
 {
     std::vector <mc_MultiChainFilter> m_Filters;
+    mc_Buffer *m_Workers;
     uint256 m_TxID;
 
     mc_MultiChainFilterEngine()

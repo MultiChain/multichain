@@ -2084,10 +2084,13 @@ bool MultiChainTransaction_VerifyNotFilteredRestrictions(const CTransaction& tx,
 {
     int change_count=0;
     
-    if(tx.IsCoinBase())
+    if(details->fNoFiltering)
     {
-        reason="Not filtered tx rejected - coinbase";
-        return false;                
+        if(tx.IsCoinBase())
+        {
+            reason="Not filtered tx rejected - coinbase";
+            return false;                
+        }
     }
     
     if(details->total_value_out)
@@ -2242,7 +2245,7 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
         goto exitlbl;                                                                    
     }
 
-    if(!details.fNoFiltering)
+    if(!details.fNoFiltering && !tx.IsCoinBase())
     {
         if(mc_gState->m_Features->Filters())
         {

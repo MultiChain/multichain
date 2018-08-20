@@ -87,7 +87,7 @@ public:
      * @param strResult Reason for script failure or transaction rejection.
      * @return          MC_ERR_NOERROR if the transaction was accepted, MC_ERR_INTERNAL_ERROR if not.
      */
-    int RunFilter(const mc_Filter& filter, std::string& strResult);
+    int RunFilter(const mc_Filter* filter, std::string& strResult);
 
 private:
     void *m_Impl;

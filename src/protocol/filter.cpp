@@ -26,7 +26,6 @@ int mc_Filter::Destroy()
         auto v8filter = static_cast<mc_v8::V8Filter*>(m_Impl);
         delete v8filter;
     }
-
     this->Zero();
     return MC_ERR_NOERROR;
 }
@@ -79,10 +78,10 @@ int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, mc_
     return v8engine->CreateFilter(script, main_name, v8filter, strResult);
 }
 
-int mc_FilterEngine::RunFilter(const mc_Filter& filter, std::string& strResult)
+int mc_FilterEngine::RunFilter(const mc_Filter* filter, std::string& strResult)
 {
     LogPrintf("mc_FilterEngine: RunFilter\n");
     strResult.clear();
-    auto v8filter = static_cast<mc_v8::V8Filter*>(filter.m_Impl);
+    auto v8filter = static_cast<mc_v8::V8Filter*>(filter->m_Impl);
     return v8filter->Run(strResult);
 }
