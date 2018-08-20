@@ -27,6 +27,8 @@ bool ExtractDestinations10008(const CScript& scriptPubKey, txnouttype& typeRet, 
 #define MC_MTX_OUTPUT_DETAIL_FLAG_NOT_OP_RETURN          0x00000010                              
 #define MC_MTX_OUTPUT_DETAIL_FLAG_FOLLOWON_DETAILS       0x00000020                              
 #define MC_MTX_OUTPUT_DETAIL_FLAG_NO_DESTINATION         0x00000040                              
+#define MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_FILTER      0x00000080                              
+#define MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_NOT_FILTER  0x00000100                              
 
 typedef struct CMultiChainTxDetails
 {    
@@ -37,6 +39,7 @@ typedef struct CMultiChainTxDetails
     bool fFullReplayCheckRequired;                                              // Tx should be rechecked when mempool is replayed
     bool fAdminMinerGrant;                                                      // Admin/miner grant in this transaction
     bool fNoFiltering;                                                          // Filters are not applied in this transaction
+    bool fAssetIssuance;                                                        // New/followon issuance in this tx 
     
     vector <txnouttype> vInputScriptTypes;                                      // Input script types
     vector <uint160> vInputDestinations;                                        // Addresses used in input scripts
@@ -103,7 +106,8 @@ void CMultiChainTxDetails::Zero()
     fFullReplayCheckRequired=false;
     fAdminMinerGrant=false;
     fNoFiltering=false;
-
+    fAssetIssuance=false;
+    
     details_script_size=0;
     details_script_type=-1;
     new_entity_type=MC_ENT_TYPE_NONE;
@@ -1076,10 +1080,15 @@ bool MultiChainTransaction_ProcessPermissions(const CTransaction& tx,
                     if( type & ( MC_PTP_CREATE | MC_PTP_ISSUE | MC_PTP_ACTIVATE | MC_PTP_FILTER ) )
                     {
                         details->vOutputScriptFlags[vout] |= MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_CREATE;
-                        if(type & MC_PTP_FILTER)
-                        {
-                            details->fNoFiltering=true;
-                        }
+                    }
+                    if( type & MC_PTP_FILTER )
+                    {
+                        details->vOutputScriptFlags[vout] |= MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_FILTER;
+                        details->fNoFiltering=true;
+                    }
+                    if( type != MC_PTP_FILTER)
+                    {
+                        details->vOutputScriptFlags[vout] |= MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_NOT_FILTER;
                     }
                     if( type & ( MC_PTP_MINE | MC_PTP_ADMIN ) )
                     {
@@ -1357,7 +1366,7 @@ bool MultiChainTransaction_CheckOutputs(const CTransaction& tx,                 
     
     for (unsigned int vout = 0; vout < tx.vout.size(); vout++)                  // create, issue, activate grants (requiring pre-tx permissions)
     {
-        if(details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_CREATE)
+        if(details->vOutputScriptFlags[vout] & (MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_CREATE | MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_FILTER) )
         {
             MultiChainTransaction_SetTmpOutputScript(tx.vout[vout].scriptPubKey);
             
@@ -1710,6 +1719,8 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     {
         return true;
     }
+    
+    details->fAssetIssuance=true;
     
     if(details->new_entity_output >= 0)
     {
@@ -2065,6 +2076,116 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
     return true;
 }
 
+bool MultiChainTransaction_VerifyNotFilteredRestrictions(const CTransaction& tx,        // Tx to check
+                                                         int offset,                    // Tx offset in block, -1 if in memppol
+                                                         bool accept,                   // Accept to mempools if successful
+                                                         CMultiChainTxDetails *details, // Tx details object
+                                                         string& reason)                // Error message
+{
+    int change_count=0;
+    
+    if(tx.IsCoinBase())
+    {
+        reason="Not filtered tx rejected - coinbase";
+        return false;                
+    }
+    
+    if(details->total_value_out)
+    {
+        reason="Not filtered tx rejected - non zero native currency value";
+        return false;        
+    }
+
+    if(details->total_value_in)
+    {
+        reason="Not filtered tx rejected - non zero native currency value";
+        return false;        
+    }
+    
+    if(tx.vin.size() > 1)
+    {
+        reason="Not filtered tx rejected - more than 1 tx input";
+        return false;                
+    }
+    
+    if(details->vInputDestinations.size() != 1)
+    {
+        reason="Not filtered tx rejected - multisig input";
+        return false;                        
+    }
+    
+    if(tx.vout.size() > 2)
+    {
+        reason="Not filtered tx rejected - more than 2 tx outputs";
+        return false;                
+    }
+        
+    if(details->vRelevantEntities.size())
+    {
+        reason="Not filtered tx rejected - asset transfers or stream publishing";
+        return false;                        
+    }
+    
+    if(details->fAssetIssuance)
+    {
+        reason="Not filtered tx rejected - assets issuance";
+        return false;                                
+    }
+    
+    for (unsigned int vout = 0; vout < tx.vout.size(); vout++)
+    {
+        if(details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_NOT_OP_RETURN)
+        {
+            if(  (details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_FILTER) == 0 )
+            {
+                change_count++;
+                CKeyID *lpKeyID=boost::get<CKeyID> (&(details->vOutputSingleDestination[vout]));
+                CScriptID *lpScriptID=boost::get<CScriptID> (&(details->vOutputSingleDestination[vout]));
+                if(((lpKeyID == NULL) && (lpScriptID == NULL)) || (details->vOutputDestinations[vout].size() != 1))
+                {
+                    reason="Not filtered tx rejected  - wrong change destination type";
+                    return false;
+                }
+                if(lpKeyID)
+                {
+                    if(*(uint160*)lpKeyID != details->vInputDestinations[0])
+                    {
+                        reason="Not filtered tx rejected  - change destination mismatch";
+                        return false;                        
+                    }
+                }
+                if(lpScriptID)
+                {
+                    if(*(uint160*)lpScriptID != details->vInputDestinations[0])
+                    {
+                        reason="Not filtered tx rejected  - change destination mismatch";
+                        return false;                        
+                    }
+                }
+            }            
+        }
+        if(details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_NOT_FILTER)
+        {
+            reason="Not filtered tx rejected - grants are not allowed";
+            return false;                    
+        }
+    }
+    
+    if( change_count > 1 )
+    {
+        reason="Not filtered tx rejected - too many change outputs";
+        return false;                            
+    }
+    
+    if( (int)tx.vout.size() - change_count > 1)
+    {
+        reason="Not filtered tx rejected - missing change output";
+        return false;                                    
+    }
+    
+    return true;
+}
+
 bool AcceptMultiChainTransaction   (const CTransaction& tx,                     // Tx to check
                                     const CCoinsViewCache &inputs,              // Tx inputs from UTXO database
                                     int offset,                                 // Tx offset in block, -1 if in memppol
@@ -2123,26 +2244,40 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
 
     if(!details.fNoFiltering)
     {
-        if(pMultiChainFilterEngine)
+        if(mc_gState->m_Features->Filters())
         {
-            mc_MultiChainFilter* lpFilter;
+            if(pMultiChainFilterEngine)
+            {
+                mc_MultiChainFilter* lpFilter;
 
-            if(pMultiChainFilterEngine->Run(tx.GetHash(),details.vRelevantEntities,reason,&lpFilter) != MC_ERR_NOERROR)
-            {
-                reason="Error while running filters";
-                fReject=true;
-                goto exitlbl;                                                                    
-            }
-            else
-            {
-                if(reason.size())
+                if(pMultiChainFilterEngine->Run(tx.GetHash(),details.vRelevantEntities,reason,&lpFilter) != MC_ERR_NOERROR)
                 {
-                    if(fDebug)LogPrint("mchn","mchn: Rejecting filter: %s\n",lpFilter->m_FilterCaption.c_str());
+                    reason="Error while running filters";
                     fReject=true;
-                    goto exitlbl;                                                                                    
+                    goto exitlbl;                                                                    
+                }
+                else
+                {
+                    if(reason.size())
+                    {
+                        if(fDebug)LogPrint("mchn","mchn: Rejecting filter: %s\n",lpFilter->m_FilterCaption.c_str());
+                        fReject=true;
+                        goto exitlbl;                                                                                    
+                    }
                 }
             }
         }
+    }
+    else
+    {
+        if(mc_gState->m_Features->Filters())
+        {
+            if(!MultiChainTransaction_VerifyNotFilteredRestrictions(tx,offset,accept,&details,reason))           
+            {
+                fReject=true;
+                goto exitlbl;                                                                    
+            }
+        }        
     }
                                                                                 // Custom filters
     fReject=!custom_accept_transacton(tx,inputs,offset,accept,reason,replay);
