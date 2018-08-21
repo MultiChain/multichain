@@ -89,13 +89,11 @@ console.log("Finished loading fixture.js");
 
 void V8Filter::Zero()
 {
-//    LogPrintf("V8Filter: Zero\n");
     m_isolate = nullptr;
 }
 
 int V8Filter::Destroy()
 {
-//    LogPrintf("V8Filter: Destroy\n");
     m_filterFunction.Reset();
     m_context.Reset();
     this->Zero();
@@ -106,7 +104,7 @@ int V8Filter::Destroy()
 
 int V8Filter::Initialize(std::string script, std::string functionName, std::string& strResult)
 {
-    LogPrintf("V8Filter: Initialize\n");
+    LogPrint("v8filter", "v8filter: V8Filter::Initialize\n");
     strResult.clear();
     this->MaybeCreateIsolate();
     v8::Locker locker(m_isolate);
@@ -123,10 +121,12 @@ int V8Filter::Initialize(std::string script, std::string functionName, std::stri
     m_context.Reset(m_isolate, context);
 
     int status = this->CompileAndLoadScript(jsFixture, "", "fixture", strResult);
-    if (status == MC_ERR_NOERROR && !script.empty())
+    if (status != MC_ERR_NOERROR || !strResult.empty())
     {
-        status = this->CompileAndLoadScript(script, functionName, "<script>", strResult);
+        m_context.Reset();
+        return status;
     }
+    status = this->CompileAndLoadScript(script, functionName, "<script>", strResult);
     if (status != MC_ERR_NOERROR)
     {
         m_context.Reset();
@@ -144,9 +144,14 @@ void V8Filter::MaybeCreateIsolate()
 
 int V8Filter::Run(std::string& strResult)
 {
-    LogPrintf("V8Filter::Run\n");
+    LogPrint("v8filter", "v8filter: V8Filter::Run\n");
 
     strResult.clear();
+    if (m_context.IsEmpty() || m_filterFunction.IsEmpty())
+    {
+        strResult = "Trying to run an invalid filter";
+        return MC_ERR_NOERROR;
+    }
     v8::Locker locker(m_isolate);
     v8::Isolate::Scope isolateScope(m_isolate);
     v8::HandleScope handleScope(m_isolate);
@@ -159,16 +164,12 @@ int V8Filter::Run(std::string& strResult)
     {
         assert(tryCatch.HasCaught());
         this->ReportException(&tryCatch, strResult);
-        return MC_ERR_INTERNAL_ERROR;
+        return MC_ERR_NOERROR;
     }
 
     if (result->IsString())
     {
         strResult = V82String(m_isolate, result);
-        if (!strResult.empty())
-        {
-            return MC_ERR_INTERNAL_ERROR;
-        }
     }
 
     return MC_ERR_NOERROR;
@@ -177,7 +178,7 @@ int V8Filter::Run(std::string& strResult)
 int V8Filter::CompileAndLoadScript(std::string script, std::string functionName, std::string source,
         std::string& strResult)
 {
-    LogPrintf("V8Filter: CompileAndLoadScript %s\n", source.c_str());
+    LogPrint("v8filter", "v8filter: V8Filter::CompileAndLoadScript %s\n", source);
 
     strResult.clear();
     v8::HandleScope handleScope(m_isolate);
@@ -192,7 +193,7 @@ int V8Filter::CompileAndLoadScript(std::string script, std::string functionName,
     {
         assert(tryCatch.HasCaught());
         this->ReportException(&tryCatch, strResult);
-        return MC_ERR_INTERNAL_ERROR;
+        return MC_ERR_NOERROR;
     }
 
     v8::Local<v8::Value> result;
@@ -200,7 +201,7 @@ int V8Filter::CompileAndLoadScript(std::string script, std::string functionName,
     {
         assert(tryCatch.HasCaught());
         this->ReportException(&tryCatch, strResult);
-        return MC_ERR_INTERNAL_ERROR;
+        return MC_ERR_NOERROR;
     }
 
     if (!functionName.empty())
@@ -209,8 +210,8 @@ int V8Filter::CompileAndLoadScript(std::string script, std::string functionName,
         v8::Local<v8::Value> processVal;
         if (!context->Global()->Get(context, processName).ToLocal(&processVal) || !processVal->IsFunction())
         {
-            LogPrintf("V8Filter: Cannot find function '%s' in script\n", functionName.c_str());
-            return MC_ERR_INTERNAL_ERROR;
+            strResult = tfm::format("Cannot find function '%s' in script", functionName);
+            return MC_ERR_NOERROR;
         }
         m_filterFunction.Reset(m_isolate, v8::Local<v8::Function>::Cast(processVal));
     }
@@ -219,13 +220,14 @@ int V8Filter::CompileAndLoadScript(std::string script, std::string functionName,
 
 void V8Filter::ReportException(v8::TryCatch* tryCatch, std::string& strResult)
 {
-    LogPrintf("V8Filter: ReportException\n");
+    LogPrint("v8filter", "v8filter: V8Filter: ReportException\n");
+
     v8::HandleScope handlecope(m_isolate);
     strResult = V82String(m_isolate, tryCatch->Exception());
     v8::Local<v8::Message> message = tryCatch->Message();
     if (message.IsEmpty())
     {
-        LogPrintf("V8Filter: %s\n", strResult.c_str());
+        LogPrint("v8filter", "v8filter: %s", strResult);
     }
     else
     {
@@ -236,16 +238,16 @@ void V8Filter::ReportException(v8::TryCatch* tryCatch, std::string& strResult)
         int start = message->GetStartColumn(context).FromJust();
         int end = message->GetEndColumn(context).FromJust();
         assert(linenum >= 0 && start >= 0 && end >= 0);
-        LogPrintf("V8Filter: %s:%d %s\n", filename.c_str(), linenum, strResult.c_str());
+        LogPrint("v8filter", "v8filter: %s:%d %s\n", filename, linenum, strResult);
         std::string sourceline = V82String(m_isolate, message->GetSourceLine(context).ToLocalChecked());
-        LogPrintf("V8Filter: %s\n", sourceline.c_str());
-        LogPrintf("V8Filter: %s%s\n", std::string(start, ' ').c_str(), std::string(end - start, '^').c_str());
+        LogPrint("v8filter", "v8filter: %s\n", sourceline);
+        LogPrint("v8filter", "v8filter: %s%s\n", std::string(start, ' '), std::string(end - start, '^'));
 //        v8::Local<v8::Value> stackTraceString;
 //        if (try_catch->StackTrace(context).ToLocal(&stackTraceString) && stackTraceString->IsString()
 //                && v8::Local<v8::String>::Cast(stackTraceString)->Length() > 0)
 //        {
 //            std::string stackTrace = V82String(m_isolate, stackTraceString);
-//            LogPrintf("V8Filter: %s\n", stackTrace.c_str());
+//            LogPrint("v8filter", "v8filter: %s\n", stackTrace);
 //        }
     }
 }
