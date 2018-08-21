@@ -2092,6 +2092,10 @@ bool MultiChainTransaction_VerifyNotFilteredRestrictions(const CTransaction& tx,
             return false;                
         }
     }
+    else
+    {
+        return true;
+    }
     
     if(details->total_value_out)
     {
