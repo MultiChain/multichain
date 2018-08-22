@@ -4194,12 +4194,57 @@ void mc_InitRPCHelpMap18()
             "getfiltercode \"filter-identifier\"\n"
             "\nReturns code for specified filter\n"
             "\nArguments:\n"
-            "1. \"filter-identifier\"              (string, optional) Filter identifier - one of the following: create txid, filter reference, filter name.\n"
+            "1. \"filter-identifier\"              (string, required) Filter identifier - one of the following: create txid, filter reference, filter name.\n"
             "\nResult:\n"
             "Filter code in plain text\n"            
-            "\nExamples:\n"
+           "\nExamples:\n"
             + HelpExampleCli("getfiltercode", "filter1")
             + HelpExampleRpc("getfiltercode", "filter1")
+        ));
+     
+     mapHelpStrings.insert(std::make_pair("runtxfilter",
+            "runtxfilter \"filter-identifier\" ( \"tx-hex\" )\n"
+            "\nReturns filter compilation error and/or filtering result for specified transaction\n"
+            "\nArguments:\n"
+            "1. \"filter-identifier\"              (string, required) Filter identifier - one of the following: create txid, filter reference, filter name.\n"
+            "2. \"tx-hex\"                         (string, optional) The transaction hex string to filter, if omitted, only filter is checked\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"error\": \"compilation error\",     (string) Filter compilation error or null if filter is valid\n"
+            "  \"passed\": true|false,             (boolean) Passed\n"
+            "  \"reason\": \"rejection reason\",     (boolean) Rejection reason, null if passed\n"
+            "  \"time\": x.xxxxxx,                 (numeric) Number of seconds it took to run this transaction through the filter\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("runtxfilter", "filter1")
+            + HelpExampleRpc("runtxfilter", "filter1")
+        ));
+     
+     mapHelpStrings.insert(std::make_pair("testtxfilter",
+            "testtxfilter restrictions details ( \"tx-hex\" )\n"
+            "\nReturns filter compilation error and/or filtering result for specified transaction\n"
+            "\nArguments:\n"
+            "1. restrictions                     (object, required)  a json object with filter restrictions\n"
+            "    {\n"
+            "      \"for\": \"stream-identifier\"    (string, optional) List of stream identifiers - one of the following: stream txid, stream reference, stream name.\n"
+            "        or\n"
+            "      \"for\": stream-identifier(s)   (array, optional) A json array of stream identifiers .\n"    
+            "    }\n"
+            "2. details                          (object, required) A json object with custom fields\n"
+            "    {\n"
+            "      \"js\": \"stream-identifier\"     (string, required) Javascript code in clear text.\n"
+            "    }\n"
+            "3. \"tx-hex\"                         (string, optional) The transaction hex string to filter, if omitted, only filter is checked\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"error\": \"compilation error\",     (string) Filter compilation error or null if filter is valid\n"
+            "  \"passed\": true|false,             (boolean) Passed\n"
+            "  \"reason\": \"rejection reason\",     (boolean) Rejection reason, null if passed\n"
+            "  \"time\": x.xxxxxx,                 (numeric) Number of seconds it took to run this transaction through the filter\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("testtxfilter", "false \"{\"js\":\"js-code\"}\"")
+            + HelpExampleRpc("testtxfilter", "filter1, \"{\"js\":\"js-code\"}\"")
         ));
      
    mapHelpStrings.insert(std::make_pair("AAAAAAA",

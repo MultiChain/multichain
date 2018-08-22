@@ -78,6 +78,8 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "listupgrades", 3 },                                                            
     { "listfilters", 0 },
     { "listfilters", 1 },                                                            
+    { "testtxfilter", 0 },                                                            
+    { "testtxfilter", 1 },                                                            
     { "publishfrom", 2 },                                                            
     { "publishfrom", 3 },                                                            
     { "publish", 1 },

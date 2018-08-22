@@ -137,7 +137,7 @@ bool CMultiChainTxDetails::IsRelevantEntity(uint160 hash)
 
 void CMultiChainTxDetails::SetRelevantEntity(void *entity)
 {
-    uint160 hash;
+    uint160 hash=0;
     memcpy(&hash,entity,MC_AST_SHORT_TXID_SIZE);
     if(!IsRelevantEntity(hash))
     {
@@ -2257,7 +2257,7 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
             {
                 mc_MultiChainFilter* lpFilter;
 
-                if(pMultiChainFilterEngine->Run(tx.GetHash(),details.vRelevantEntities,reason,&lpFilter) != MC_ERR_NOERROR)
+                if(pMultiChainFilterEngine->Run(tx,details.vRelevantEntities,reason,&lpFilter) != MC_ERR_NOERROR)
                 {
                     reason="Error while running filters";
                     fReject=true;

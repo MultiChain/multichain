@@ -5,6 +5,23 @@
 
 using namespace std;
 
+std::vector <uint160>  mc_FillRelevantFilterEntitities(const unsigned char *ptr, size_t value_size)
+{
+    std::vector <uint160> entities;
+    
+    if(ptr)
+    {
+        for(int i=0;i<(int)value_size/MC_AST_SHORT_TXID_SIZE;i++)
+        {
+            uint160 hash=0;
+            memcpy(&hash,ptr+i*MC_AST_SHORT_TXID_SIZE,MC_AST_SHORT_TXID_SIZE);
+            entities.push_back(hash);
+        }
+    }    
+    
+    return entities;
+}
+
 int mc_MultiChainFilter::Zero()
 {
     m_RelevantEntities.clear();
@@ -71,14 +88,9 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
         {
             return MC_ERR_ERROR_IN_SCRIPT;                        
         }
-        
-        for(int i=0;i<(int)value_size/MC_AST_SHORT_TXID_SIZE;i++)
-        {
-            uint160 hash=0;
-            memcpy(&hash,ptr+i*MC_AST_SHORT_TXID_SIZE,MC_AST_SHORT_TXID_SIZE);
-            m_RelevantEntities.push_back(hash);
-        }
-    }                                    
+        m_RelevantEntities=mc_FillRelevantFilterEntitities(ptr, value_size);
+    }    
+    
     
     ptr=(unsigned char *)m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size);
     
@@ -221,11 +233,12 @@ int mc_MultiChainFilterEngine::Reset(int block)
     return MC_ERR_NOERROR;
 }
 
-int mc_MultiChainFilterEngine::Run(uint256 txid,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter)
+int mc_MultiChainFilterEngine::Run(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter)
 {
-    int err;
+    int err=MC_ERR_NOERROR;
     strResult="";
-    m_TxID=txid;
+    m_Tx=tx;
+    m_TxID=m_Tx.GetHash();
     
     for(int i=0;i<(int)m_Filters.size();i++)
     {
@@ -240,7 +253,7 @@ int mc_MultiChainFilterEngine::Run(uint256 txid,std::set <uint160>& sRelevantEnt
                     if(err)
                     {
                         LogPrintf("Error while running filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
-                        return err;
+                        goto exitlbl;
                     }
                     if(strResult.size())
                     {
@@ -250,9 +263,9 @@ int mc_MultiChainFilterEngine::Run(uint256 txid,std::set <uint160>& sRelevantEnt
                         }
                         if(fDebug)LogPrint("filter","filter: Tx rejected: %s, filter: %s\n",strResult.c_str(),m_Filters[i].m_FilterCaption.c_str());
                         
-                        return MC_ERR_NOERROR;
+                        goto exitlbl;
                     }
-                    if(fDebug)LogPrint("filter","filter: Tx %s accepted, filter: %s\n",txid.ToString().c_str(),m_Filters[i].m_FilterCaption.c_str());
+                    if(fDebug)LogPrint("filter","filter: Tx %s accepted, filter: %s\n",m_TxID.ToString().c_str(),m_Filters[i].m_FilterCaption.c_str());
                 }
                 else
                 {
@@ -261,9 +274,23 @@ int mc_MultiChainFilterEngine::Run(uint256 txid,std::set <uint160>& sRelevantEnt
             }
         }
     }    
+
+exitlbl:
+            
+    m_TxID=0;
+    return err;
+}
+
+int mc_MultiChainFilterEngine::RunFilter(const CTransaction& tx,mc_Filter *filter,std::string &strResult)
+{
+    int err=MC_ERR_NOERROR;
+    m_Tx=tx;
+    m_TxID=m_Tx.GetHash();
+    
+    err=pFilterEngine->RunFilter(filter,strResult);
     
     m_TxID=0;
-    return MC_ERR_NOERROR;
+    return err;
 }
 
 int mc_MultiChainFilterEngine::Initialize()

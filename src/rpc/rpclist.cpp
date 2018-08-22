@@ -96,6 +96,8 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "listupgrades",           &listupgrades,           true,      false,      false },
     { "blockchain",         "listfilters",            &listfilters,            true,      false,      false },
     { "blockchain",         "getfiltercode",          &getfiltercode,          true,      false,      false },
+    { "blockchain",         "testtxfilter",           &testtxfilter,           true,      false,      false },
+    { "blockchain",         "runtxfilter",            &runtxfilter,            true,      false,      false },
     { "blockchain",         "listblocks",             &listblocks,             true,      false,      false },
 /* MCHN END */    
     
