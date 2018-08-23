@@ -8,6 +8,125 @@
 #include "rpc/rpcwallet.h"
 #include "protocol/multichainfilter.h"
 
+void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
+
+void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript)
+{
+    bool field_parsed,already_found;
+    
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();            
+    if(param.type() == obj_type)
+    {
+        Object objParams = param.get_obj();
+        already_found=false;
+        BOOST_FOREACH(const Pair& s, objParams) 
+        {
+            field_parsed=false;
+            if(s.name_ == "for")
+            {
+                if(already_found)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"for field can appear only once in the object");                               
+                }
+                lpDetailsScript->Clear();
+                lpDetailsScript->AddElement();                   
+                vector<string> inputStrings;
+                if(s.value_.type() == str_type)
+                {
+                    inputStrings.push_back(s.value_.get_str());
+                }
+                else
+                {
+                    inputStrings=ParseStringList(s.value_);        
+                }
+                for(int is=0;is<(int)inputStrings.size();is++)
+                {
+                    mc_EntityDetails entity;
+                    ParseEntityIdentifier(inputStrings[is],&entity, MC_ENT_TYPE_ANY);           
+                    if(entity.GetEntityType() > MC_ENT_TYPE_STREAM_MAX)
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Filter can be created only for streams and assets");           
+                    }
+                    lpDetailsScript->SetData(entity.GetShortRef(),MC_AST_SHORT_TXID_SIZE);
+                }
+                field_parsed=true;
+                already_found=true;
+            }
+            if(!field_parsed)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid field: %s",s.name_.c_str()));                           
+            }
+        }
+    }
+    else
+    {
+        if(param.type() == bool_type)
+        {
+            if(param.get_bool())
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid restrictions, should be object or boolean false");                                                        
+            }
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid restrictions, should be object or boolean false");                                        
+        }
+    }    
+}
+
+string ParseFilterDetails(Value param)
+{
+    string js;
+    bool field_parsed,already_found;
+    
+    if(param.type() == obj_type)
+    {
+        Object objParams = param.get_obj();
+        already_found=false;
+        BOOST_FOREACH(const Pair& s, objParams) 
+        {
+            field_parsed=false;
+            if(s.name_ == "js")
+            {
+                if(s.value_.type() == str_type)
+                {
+                    if(already_found)
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER,"js field can appear only once in the object");                               
+                    }
+                    js=s.value_.get_str();
+                    already_found=true;
+                    field_parsed=true;
+                }
+                else
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid js field, should be string");                    
+                }
+            }            
+            if(!field_parsed)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid field: %s",s.name_.c_str()));                           
+            }
+        }
+        if(!already_found)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER,"js field is required");                                           
+        }
+        if(js.size() == 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER,"js cannot be empty");                                                       
+        }        
+        
+    }
+    else
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid details, expecting object");                    
+    }
+
+    return js;
+}
+
 Value createtxfilterfromcmd(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 5)
@@ -36,33 +155,34 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
     lpDetails->Clear();
     
     int ret,type;
-    string upgrade_name="";
+    string filter_name="";
     string strError="";
+    int err;
     int errorCode=RPC_INVALID_PARAMETER;
     
     if (params[2].type() != str_type)
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid upgrade name, should be string");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filter name, should be string");
             
     if(!params[2].get_str().empty())
     {        
-        upgrade_name=params[2].get_str();
+        filter_name=params[2].get_str();
     }
         
-    if(upgrade_name == "*")
+    if(filter_name == "*")
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid upgrade name: *");                                                                                            
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filter name: *");                                                                                            
     }
 
     unsigned char buf_a[MC_AST_ASSET_REF_SIZE];    
-    if(AssetRefDecode(buf_a,upgrade_name.c_str(),upgrade_name.size()))
+    if(AssetRefDecode(buf_a,filter_name.c_str(),filter_name.size()))
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid upgrade name, looks like a upgrade reference");                                                                                                    
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filter name, looks like a filter reference");                                                                                                    
     }
             
     
-    if(upgrade_name.size())
+    if(filter_name.size())
     {
-        ret=ParseAssetKey(upgrade_name.c_str(),NULL,NULL,NULL,NULL,&type,MC_ENT_TYPE_ANY);
+        ret=ParseAssetKey(filter_name.c_str(),NULL,NULL,NULL,NULL,&type,MC_ENT_TYPE_ANY);
         if(ret != MC_ASSET_KEY_INVALID_NAME)
         {
             if(type == MC_ENT_KEYTYPE_NAME)
@@ -71,7 +191,7 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
             }
             else
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid upgrade name");                                    
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filter name");                                    
             }
         }        
     }
@@ -139,12 +259,11 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
     
     lpDetails->Clear();
     lpDetails->AddElement();
-    if(upgrade_name.size())
+    if(filter_name.size())
     {        
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(unsigned char*)(upgrade_name.c_str()),upgrade_name.size());//+1);
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(unsigned char*)(filter_name.c_str()),filter_name.size());//+1);
     }
     
-    bool field_parsed,already_found;
     size_t bytes;
     string js;
     const unsigned char *script;
@@ -153,135 +272,37 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
     uint32_t filter_type=MC_FLT_TYPE_TX;
     
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_TYPE,(unsigned char*)&filter_type,4);
-    
-    lpDetailsScript->Clear();
-    lpDetailsScript->AddElement();            
-    if(params[3].type() == obj_type)
-    {
-        Object objParams = params[4].get_obj();
-        already_found=false;
-        BOOST_FOREACH(const Pair& s, objParams) 
-        {
-            field_parsed=false;
-            if(s.name_ == "for")
-            {
-                if(already_found)
-                {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER,"for field can appear only once in the object");                               
-                }
-                lpDetailsScript->Clear();
-                lpDetailsScript->AddElement();                   
-                vector<string> inputStrings;
-                inputStrings=ParseStringList(params[0]);        
-                for(int is=0;is<(int)inputStrings.size();is++)
-                {
-                    mc_EntityDetails entity;
-                    ParseEntityIdentifier(inputStrings[is],&entity, MC_ENT_TYPE_ANY);           
-                    if(entity.GetEntityType() > MC_ENT_TYPE_STREAM_MAX)
-                    {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Filter can be created only for streams and assets");           
-                    }
-                    lpDetailsScript->SetData(entity.GetShortRef(),MC_AST_SHORT_TXID_SIZE);
-                }
-                field_parsed=true;
-                already_found=true;
-            }
-            if(s.name_ == "js")
-            {
-                field_parsed=true;                
-            }            
-            if(!field_parsed)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid field: %s",s.name_.c_str()));                           
-            }
-        }
-        script = lpDetailsScript->GetData(0,&bytes);
 
-        if(bytes)
-        {
-            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_ENTITY,script,bytes);
-        }
-    }
-    else
-    {
-        if(params[3].type() == bool_type)
-        {
-            if(params[3].get_bool())
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid restrictions, should be object or boolean false");                                                        
-            }
-        }
-        else
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid restrictions, should be object or boolean false");                                        
-        }
-    }
+    ParseFilterRestrictions(params[3],lpDetailsScript);
     
-    if(params[4].type() == obj_type)
+    script = lpDetailsScript->GetData(0,&bytes);
+
+    if(bytes)
     {
-        Object objParams = params[4].get_obj();
-        already_found=false;
-        BOOST_FOREACH(const Pair& s, objParams) 
-        {
-            field_parsed=false;
-            if(s.name_ == "js")
-            {
-                if(s.value_.type() == str_type)
-                {
-                    if(already_found)
-                    {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER,"js field can appear only once in the object");                               
-                    }
-                    js=s.value_.get_str();
-                    already_found=true;
-                    field_parsed=true;
-                }
-                else
-                {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid js field, should be string");                    
-                }
-            }            
-            if(!field_parsed)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid field: %s",s.name_.c_str()));                           
-            }
-        }
-        if(!already_found)
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER,"js field is required");                                           
-        }
-        if(js.size() == 0)
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER,"js cannot be empty");                                                       
-        }        
-        
-        mc_Filter *worker=new mc_Filter;
-        string strError="";        
-        int err=pFilterEngine->CreateFilter(js.c_str(),MC_FLT_MAIN_NAME_TX,worker,strError);
-        delete worker;
-        if(err)
-        {
-            throw JSONRPCError(RPC_INTERNAL_ERROR,"Couldn't create filter");                                                                   
-        }
-        if(strError.size())
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER,strprintf("Couldn't create filter: %s",strError.c_str()));                                                                               
-        }
-    }
-    else
-    {
-        strError="Invalid details, expecting object";
-        goto exitlbl;
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_ENTITY,script,bytes);
     }
 
-    
+    js=ParseFilterDetails(params[4]);
+
+/*    
+    mc_Filter *worker=new mc_Filter;
+    err=pFilterEngine->CreateFilter(js.c_str(),MC_FLT_MAIN_NAME_TX,worker,strError);
+    delete worker;
+    if(err)
+    {
+        throw JSONRPCError(RPC_INTERNAL_ERROR,"Couldn't create filter");                                                                   
+    }
+    if(strError.size())
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER,strprintf("Couldn't create filter: %s",strError.c_str()));                                                                               
+    }
+*/    
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)js.c_str(),js.size());                                                        
     
     
     script=lpDetails->GetData(0,&bytes);
     
 
-    int err;
     size_t elem_size;
     const unsigned char *elem;
     
@@ -616,4 +637,226 @@ Value getfiltercode(const Array& params, bool fHelp)
 Value getfiltertxid(const Array& params, bool fHelp)
 {
     return pMultiChainFilterEngine->m_TxID.ToString();
+}
+
+Value setfilterparam(const json_spirit::Array& params, bool fHelp)
+{
+    return Value::null;
+}
+
+Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, string txhex)
+{
+    Object result;
+    int err;
+    string strError;
+    string strReason="";
+    int errorCode=RPC_INVALID_PARAMETER;
+    string strFatal="";
+    bool relevant_filter=true;
+    int64_t nStart;
+    
+    CTransaction tx;
+
+    if(txhex.size())
+    {
+        if (!DecodeHexTx(tx,txhex))
+            throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+    }
+    
+    mc_Filter *worker=new mc_Filter;
+    err=pFilterEngine->CreateFilter(filter_code,MC_FLT_MAIN_NAME_TX,worker,strError);
+    if(err)
+    {
+        errorCode=RPC_INTERNAL_ERROR;
+        strFatal="Couldn't create filter";
+        goto exitlbl;
+    }
+    if(strError.size())   
+    {
+        result.push_back(Pair("compiled", false));
+        strReason=strError;
+        relevant_filter=false;
+    }
+    else
+    {
+        result.push_back(Pair("compiled", true));
+    }
+
+    nStart = GetTimeMicros();
+    if(txhex.size())
+    {
+        if(relevant_filter)
+        {
+            if(entities.size())
+            {
+                uint160 hash=0;
+                mc_gState->m_Assets->m_TmpRelevantEntities->Clear();
+                mc_gState->m_Assets->m_TmpRelevantEntities->Add(&hash);
+
+                Object result;
+                set <uint160> TxEntities;                                        
+                TxToJSON(tx, 0, result);
+
+
+                for(int i=1;i<mc_gState->m_Assets->m_TmpRelevantEntities->GetCount();i++)
+                {
+                    uint160 hash=0;
+                    memcpy(&hash,mc_gState->m_Assets->m_TmpRelevantEntities->GetRow(i),MC_AST_SHORT_TXID_SIZE);
+                    if(TxEntities.find(hash) == TxEntities.end())
+                    {
+                        TxEntities.insert(hash);
+                    }
+                }
+                mc_gState->m_Assets->m_TmpRelevantEntities->Clear();
+
+                relevant_filter=false;
+                for(int i=0;i<(int)entities.size();i++)
+                {
+                    if(TxEntities.find(entities[i]) != TxEntities.end())
+                    {
+                        relevant_filter=true;
+                    }
+                }
+            }
+        }        
+        
+        strError="";
+        if(relevant_filter)
+        {
+            err=pMultiChainFilterEngine->RunFilter(tx,worker,strError);
+            if(err)
+            {
+                errorCode=RPC_INTERNAL_ERROR;
+                strFatal="Couldn't run filter";
+            }
+        }
+        
+        if(strError.size())   
+        {
+            result.push_back(Pair("passed", false));
+            strReason=strError;
+        }
+        else
+        {
+            result.push_back(Pair("passed", true));
+        }                
+    }
+
+    if(strReason.size())
+    {
+        result.push_back(Pair("reason", strReason));        
+    }
+    else
+    {
+        result.push_back(Pair("reason", Value::null));                
+    }
+    
+    if(txhex.size())
+    {
+        result.push_back(Pair("time", ((double)GetTimeMicros()-nStart)/1000000.));                
+    }
+    
+exitlbl:    
+
+    delete worker;
+    
+    if(strFatal.size())
+    {
+        throw JSONRPCError(errorCode,strFatal);                                                                                       
+    }
+
+    return result;    
+}
+
+Value runtxfilter(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)
+        throw runtime_error("Help message not found\n");
+    
+    mc_EntityDetails filter_entity;
+    ParseEntityIdentifier(params[0],&filter_entity,MC_ENT_TYPE_FILTER);
+    
+    char filter_code[MC_ENT_MAX_SCRIPT_SIZE+1];
+    std::vector <uint160> entities;   
+    unsigned char *ptr;
+    size_t value_size;
+    string txhex="";
+    
+    ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_ENTITY,&value_size);
+    
+    if(ptr)
+    {
+        if(value_size % MC_AST_SHORT_TXID_SIZE)
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Specified filter has invalid restriction value");        
+        }
+    }    
+    
+    entities=mc_FillRelevantFilterEntitities(ptr, value_size);
+    
+    ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size);
+    
+    if(ptr)
+    {
+        memcpy(filter_code,ptr,value_size);
+        filter_code[value_size]=0x00;    
+    }                                    
+    
+    if (params.size() > 1)    
+    {
+        if(params[1].type() != str_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx-hex, should be string");            
+        }
+        txhex=params[1].get_str();
+        if(txhex.size() == 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty tx-hex");                        
+        }
+    }
+    
+    return testtxfilter(entities, (char *)filter_code, txhex);
+}
+
+Value testtxfilter(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 2 || params.size() > 3)
+        throw runtime_error("Help message not found\n");
+    
+    size_t bytes;
+    string js;
+    const unsigned char *script;
+    std::vector <uint160> entities;   
+    string txhex="";
+    
+    uint32_t filter_type=MC_FLT_TYPE_TX;
+    
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
+    lpDetailsScript->Clear();
+    
+    ParseFilterRestrictions(params[0],lpDetailsScript);
+    
+    script = lpDetailsScript->GetData(0,&bytes);
+
+    if(bytes)
+    {
+        entities=mc_FillRelevantFilterEntitities(script, bytes);
+    }
+
+    js=ParseFilterDetails(params[1]);
+    
+    if (params.size() > 2)    
+    {
+        if(params[2].type() != str_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx-hex, should be string");            
+        }
+        txhex=params[2].get_str();
+        if(txhex.size() == 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty tx-hex");                        
+        }
+    }
+    
+    return testtxfilter(entities, js.c_str(), txhex);
 }

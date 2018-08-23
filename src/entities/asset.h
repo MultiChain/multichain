@@ -232,6 +232,7 @@ typedef struct mc_AssetDB
     mc_EntityLedger *m_Ledger;
     
     mc_Buffer   *m_MemPool;
+    mc_Buffer   *m_TmpRelevantEntities;
     
     char m_Name[MC_PRM_NETWORK_NAME_MAX_SIZE+1]; 
     int m_Block;

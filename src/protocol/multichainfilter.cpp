@@ -5,6 +5,23 @@
 
 using namespace std;
 
+std::vector <uint160>  mc_FillRelevantFilterEntitities(const unsigned char *ptr, size_t value_size)
+{
+    std::vector <uint160> entities;
+    
+    if(ptr)
+    {
+        for(int i=0;i<(int)value_size/MC_AST_SHORT_TXID_SIZE;i++)
+        {
+            uint160 hash=0;
+            memcpy(&hash,ptr+i*MC_AST_SHORT_TXID_SIZE,MC_AST_SHORT_TXID_SIZE);
+            entities.push_back(hash);
+        }
+    }    
+    
+    return entities;
+}
+
 int mc_MultiChainFilter::Zero()
 {
     m_RelevantEntities.clear();
@@ -71,14 +88,9 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
         {
             return MC_ERR_ERROR_IN_SCRIPT;                        
         }
-        
-        for(int i=0;i<(int)value_size/MC_AST_SHORT_TXID_SIZE;i++)
-        {
-            uint160 hash=0;
-            memcpy(&hash,ptr+i*MC_AST_SHORT_TXID_SIZE,MC_AST_SHORT_TXID_SIZE);
-            m_RelevantEntities.push_back(hash);
-        }
-    }                                    
+        m_RelevantEntities=mc_FillRelevantFilterEntitities(ptr, value_size);
+    }    
+    
     
     ptr=(unsigned char *)m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size);
     
@@ -167,7 +179,7 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid)
         return err;
     }
     
-    if(fDebug)LogPrint("filter","Filter added: %s\n",m_Filters.back().m_FilterCaption.c_str());
+    if(fDebug)LogPrint("filter","filter: Filter added: %s\n",m_Filters.back().m_FilterCaption.c_str());
     
     return MC_ERR_NOERROR;
 }
@@ -189,8 +201,9 @@ int mc_MultiChainFilterEngine::Reset(int block)
     }
     while( (m_Filters.size()>0) && (filter_block > block) )
     {
-        if(fDebug)LogPrint("filter","Filter rolled back: %s\n",m_Filters.back().m_FilterCaption.c_str());
+        if(fDebug)LogPrint("filter","filter: Filter rolled back: %s\n",m_Filters.back().m_FilterCaption.c_str());
         mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(m_Workers->GetCount()-1);
+        worker->Destroy();
         m_Workers->SetCount(m_Workers->GetCount()-1);
         m_Filters.back().Destroy();
         m_Filters.pop_back();
@@ -216,15 +229,16 @@ int mc_MultiChainFilterEngine::Reset(int block)
         }        
     }    
     
-    if(fDebug)LogPrint("filter","Filter engine reset\n");
+    if(fDebug)LogPrint("filter","filter: Filter engine reset\n");
     return MC_ERR_NOERROR;
 }
 
-int mc_MultiChainFilterEngine::Run(uint256 txid,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter)
+int mc_MultiChainFilterEngine::Run(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter)
 {
-    int err;
+    int err=MC_ERR_NOERROR;
     strResult="";
-    m_TxID=txid;
+    m_Tx=tx;
+    m_TxID=m_Tx.GetHash();
     
     for(int i=0;i<(int)m_Filters.size();i++)
     {
@@ -239,7 +253,7 @@ int mc_MultiChainFilterEngine::Run(uint256 txid,std::set <uint160>& sRelevantEnt
                     if(err)
                     {
                         LogPrintf("Error while running filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
-                        return err;
+                        goto exitlbl;
                     }
                     if(strResult.size())
                     {
@@ -247,22 +261,36 @@ int mc_MultiChainFilterEngine::Run(uint256 txid,std::set <uint160>& sRelevantEnt
                         {
                             *lppFilter=&(m_Filters[i]);
                         }
-                        if(fDebug)LogPrint("filter","Tx rejected: %s, filter: %s\n",strResult.c_str(),m_Filters[i].m_FilterCaption.c_str());
+                        if(fDebug)LogPrint("filter","filter: Tx rejected: %s, filter: %s\n",strResult.c_str(),m_Filters[i].m_FilterCaption.c_str());
                         
-                        return MC_ERR_NOERROR;
+                        goto exitlbl;
                     }
-                    if(fDebug)LogPrint("filter","Tx %s accepted, filter: %s\n",txid.ToString().c_str(),m_Filters[i].m_FilterCaption.c_str());
+                    if(fDebug)LogPrint("filter","filter: Tx %s accepted, filter: %s\n",m_TxID.ToString().c_str(),m_Filters[i].m_FilterCaption.c_str());
                 }
                 else
                 {
-                    if(fDebug)LogPrint("filter","Irrelevant, filter: %s\n",m_Filters[i].m_FilterCaption.c_str());                    
+                    if(fDebug)LogPrint("filter","filter: Irrelevant, filter: %s\n",m_Filters[i].m_FilterCaption.c_str());                    
                 }
             }
         }
     }    
+
+exitlbl:
+            
+    m_TxID=0;
+    return err;
+}
+
+int mc_MultiChainFilterEngine::RunFilter(const CTransaction& tx,mc_Filter *filter,std::string &strResult)
+{
+    int err=MC_ERR_NOERROR;
+    m_Tx=tx;
+    m_TxID=m_Tx.GetHash();
+    
+    err=pFilterEngine->RunFilter(filter,strResult);
     
     m_TxID=0;
-    return MC_ERR_NOERROR;
+    return err;
 }
 
 int mc_MultiChainFilterEngine::Initialize()
@@ -270,9 +298,13 @@ int mc_MultiChainFilterEngine::Initialize()
     mc_Buffer *filters;
     unsigned char *txid;
     int err=MC_ERR_NOERROR;
+    mc_EntityDetails entity;
+    map <uint64_t, uint256> filter_refs;
+    uint64_t max_ref=0;
  
     m_Workers=new mc_Buffer;
     m_Workers->Initialize(sizeof(mc_Filter*),sizeof(mc_Filter*),MC_BUF_MODE_DEFAULT);
+    
     
     filters=NULL;
     filters=mc_gState->m_Assets->GetEntityList(filters,NULL,MC_ENT_TYPE_FILTER);
@@ -280,13 +312,46 @@ int mc_MultiChainFilterEngine::Initialize()
     for(int i=0;i<filters->GetCount();i++)
     {
         txid=filters->GetRow(i);
-        err=Add(txid+MC_AST_SHORT_TXID_OFFSET);
+        if(mc_gState->m_Assets->FindEntityByTxID(&entity,txid))
+        {        
+            if(entity.IsUnconfirmedGenesis() == 0)
+            {            
+                unsigned char *ptr;
+                ptr=(unsigned char *)entity.GetRef();
+                uint64_t ref=(mc_GetLE(ptr,4) << 32) + mc_GetLE(ptr+4,4);
+                if(ref > max_ref)
+                {
+                    max_ref=ref;
+                }
+                filter_refs.insert(pair<uint64_t, uint256>(ref,*(uint256*)txid));
+            }
+        }
+    }
+
+    for(int i=0;i<filters->GetCount();i++)
+    {
+        txid=filters->GetRow(i);
+        if(mc_gState->m_Assets->FindEntityByTxID(&entity,txid))
+        {        
+            if(entity.IsUnconfirmedGenesis())
+            {            
+                max_ref++;
+                filter_refs.insert(pair<uint64_t, uint256>(max_ref,*(uint256*)txid));
+            }
+        }
+    }
+    
+    map<uint64_t, uint256>::iterator it;
+    
+    for(it=filter_refs.begin();it != filter_refs.end();it++)
+    {
+        err=Add((unsigned char*)&(it->second)+MC_AST_SHORT_TXID_OFFSET);
         if(err)
         {
             goto exitlbl;
         }
     }
-    
+
     LogPrintf("Filter initialization completed\n");
     
 exitlbl:

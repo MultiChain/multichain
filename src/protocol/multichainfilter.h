@@ -16,6 +16,8 @@
 
 #define MC_FLT_MAIN_NAME_TX                "filtertransaction"
 
+std::vector <uint160>  mc_FillRelevantFilterEntitities(const unsigned char *ptr, size_t value_size);
+
 typedef struct mc_MultiChainFilter
 {
     std::vector <uint160> m_RelevantEntities;
@@ -52,6 +54,7 @@ typedef struct mc_MultiChainFilterEngine
     std::vector <mc_MultiChainFilter> m_Filters;
     mc_Buffer *m_Workers;
     uint256 m_TxID;
+    CTransaction m_Tx;
 
     mc_MultiChainFilterEngine()
     {
@@ -66,7 +69,9 @@ typedef struct mc_MultiChainFilterEngine
     int Initialize();
     int Add(const unsigned char* short_txid);
     int Reset(int block);
-    int Run(uint256 txid,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter);            
+    int Run(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter);            
+    int RunFilter(const CTransaction& tx,mc_Filter *filter,std::string &strResult);            
+
     
     int Zero();
     int Destroy();   
