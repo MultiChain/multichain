@@ -3,6 +3,7 @@
 
 #include "v8filter.h"
 #include "v8utils.h"
+#include "v8isolatemanager.h"
 #include "callbacks.h"
 #include "utils/define.h"
 #include "utils/util.h"
@@ -11,36 +12,6 @@
 namespace mc_v8
 {
 
-V8IsolateManager* V8IsolateManager::m_instance = nullptr;
-
-V8IsolateManager* V8IsolateManager::Instance()
-{
-    if (m_instance == nullptr)
-    {
-        m_instance = new V8IsolateManager();
-    }
-    return m_instance;
-}
-
-v8::Isolate* V8IsolateManager::GetIsolate()
-{
-    if (m_isolate == nullptr)
-    {
-        m_createParams.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
-        m_isolate = v8::Isolate::New(m_createParams);
-    }
-    return m_isolate;
-}
-
-V8IsolateManager::~V8IsolateManager()
-{
-    if (m_isolate != nullptr)
-    {
-        m_isolate->Dispose();
-        m_isolate = nullptr;
-        delete m_createParams.array_buffer_allocator;
-    }
-}
 
 static std::string jsFixture =
         R"(

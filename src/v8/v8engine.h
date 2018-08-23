@@ -5,7 +5,6 @@
 #define MULTICHAIN_V8ENGINE_H_
 
 #include <v8.h>
-#include <libplatform/libplatform.h>
 
 namespace mc_v8
 {
@@ -49,10 +48,6 @@ public:
      * @return          MC_ERR_NOERROR if successful, MC_ERR_INTERNAL_ERROR if not.
      */
     int CreateFilter(std::string script, std::string main_name, V8Filter* filter, std::string& strResult);
-
-private:
-
-    std::unique_ptr<v8::Platform> m_platform;
 };
 
 } // namespace mc_v8

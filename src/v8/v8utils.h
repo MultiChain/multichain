@@ -4,7 +4,12 @@
 #ifndef V8UTILS_H_
 #define V8UTILS_H_
 
+#include <fstream>
 #include <v8.h>
+#include <boost/filesystem.hpp>
+#include <unistd.h>
+
+namespace fs = boost::filesystem;
 
 namespace mc_v8
 {
@@ -34,6 +39,17 @@ inline v8::Local<v8::String> String2V8(v8::Isolate* isolate, std::string str)
     return v8::String::NewFromUtf8(isolate, str.c_str(), v8::NewStringType::kNormal).ToLocalChecked();
 }
 
+inline fs::path GetTemporaryPidDirectory()
+{
+    return fs::path("/tmp") / "multichain" / std::to_string(getpid());
+}
+
+inline void WriteBinaryFile(fs::path filename, char* data, size_t size)
+{
+    std::ofstream ofs(filename.string(), std::fstream::out | std::fstream::binary);
+    ofs.write(data, size);
+    ofs.close();
+}
 } // namespace mc_v8
 
 #endif /* V8UTILS_H_ */
