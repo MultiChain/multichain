@@ -649,9 +649,11 @@ Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, st
     Object result;
     int err;
     string strError;
+    string strReason="";
     int errorCode=RPC_INVALID_PARAMETER;
     string strFatal="";
     bool relevant_filter=true;
+    int64_t nStart;
     
     CTransaction tx;
 
@@ -671,14 +673,16 @@ Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, st
     }
     if(strError.size())   
     {
-        result.push_back(Pair("error", strError));
+        result.push_back(Pair("compiled", false));
+        strReason=strError;
         relevant_filter=false;
     }
     else
     {
-        result.push_back(Pair("error", Value::null));        
+        result.push_back(Pair("compiled", true));
     }
 
+    nStart = GetTimeMicros();
     if(txhex.size())
     {
         if(relevant_filter)
@@ -717,7 +721,6 @@ Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, st
         }        
         
         strError="";
-        int64_t nStart = GetTimeMicros();
         if(relevant_filter)
         {
             err=pMultiChainFilterEngine->RunFilter(tx,worker,strError);
@@ -731,15 +734,26 @@ Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, st
         if(strError.size())   
         {
             result.push_back(Pair("passed", false));
-            result.push_back(Pair("reason", strError));
+            strReason=strError;
         }
         else
         {
             result.push_back(Pair("passed", true));
-            result.push_back(Pair("reason", Value::null));        
-        }
-                
-        result.push_back(Pair("time", ((double)GetTimeMicros()-nStart)/1000000.));        
+        }                
+    }
+
+    if(strReason.size())
+    {
+        result.push_back(Pair("reason", strReason));        
+    }
+    else
+    {
+        result.push_back(Pair("reason", Value::null));                
+    }
+    
+    if(txhex.size())
+    {
+        result.push_back(Pair("time", ((double)GetTimeMicros()-nStart)/1000000.));                
     }
     
 exitlbl:    
