@@ -38,7 +38,6 @@ typedef struct CMultiChainTxDetails
     bool fSeedNodeInvolved;                                                     // Connect permission of seed node changed
     bool fFullReplayCheckRequired;                                              // Tx should be rechecked when mempool is replayed
     bool fAdminMinerGrant;                                                      // Admin/miner grant in this transaction
-    bool fNoFiltering;                                                          // Filters are not applied in this transaction
     bool fAssetIssuance;                                                        // New/followon issuance in this tx 
     
     vector <txnouttype> vInputScriptTypes;                                      // Input script types
@@ -65,6 +64,7 @@ typedef struct CMultiChainTxDetails
     int64_t total_offchain_size;                                                // Total size of offchain items
     int64_t total_value_in;                                                     // Total amount in inputs
     int64_t total_value_out;                                                    // Total amount in outputs
+    int emergency_disapproval_output;                                           // Output carrying emergency filter disapproval - bypassed by filters
     
     CMultiChainTxDetails()
     {
@@ -105,7 +105,6 @@ void CMultiChainTxDetails::Zero()
     fSeedNodeInvolved=false;
     fFullReplayCheckRequired=false;
     fAdminMinerGrant=false;
-    fNoFiltering=false;
     fAssetIssuance=false;
     
     details_script_size=0;
@@ -115,6 +114,7 @@ void CMultiChainTxDetails::Zero()
     total_offchain_size=0;
     total_value_in=0;
     total_value_out=0;
+    emergency_disapproval_output=-1;
 }
 
 bool CMultiChainTxDetails::IsRelevantInput(int vin, int vout)
@@ -1063,6 +1063,7 @@ bool MultiChainTransaction_ProcessPermissions(const CTransaction& tx,
                 return false;
             }        
             
+            details->emergency_disapproval_output=-2;                           // Only global filter disapprovals can bypass filters
             details->SetRelevantEntity(short_txid);            
         }
         else                                                                    // Not entity element
@@ -1084,7 +1085,14 @@ bool MultiChainTransaction_ProcessPermissions(const CTransaction& tx,
                     if( type & MC_PTP_FILTER )
                     {
                         details->vOutputScriptFlags[vout] |= MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_FILTER;
-                        details->fNoFiltering=true;
+                        if( (type == MC_PTP_FILTER) && (details->emergency_disapproval_output == -1) )
+                        {
+                            details->emergency_disapproval_output=vout;
+                        }
+                        else
+                        {
+                            details->emergency_disapproval_output=-2;           // non-standard emergency disapproval
+                        }
                     }
                     if( type != MC_PTP_FILTER)
                     {
@@ -1164,6 +1172,15 @@ bool MultiChainTransaction_ProcessPermissions(const CTransaction& tx,
                     bool fAdminFound=false;
                     bool fAdminFoundWithoutCachedScript=false;
                     bool fActivateIsEnough=mc_gState->m_Permissions->IsActivateEnough(type);
+
+                    
+                    if(details->emergency_disapproval_output == vout)
+                    {
+                        if(mc_gState->m_Permissions->FilterApproved(NULL,ptr) == 0) // Already disapproved
+                        {
+                            details->emergency_disapproval_output=-2;
+                        }
+                    }
                     
                     for (unsigned int i = 0; i < tx.vin.size(); i++)
                     {
@@ -1972,11 +1989,6 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
     mc_gState->m_TmpScript->Clear();
     mc_gState->m_TmpScript->AddElement();
     txid=tx.GetHash();                                                          // Setting first record in the per-entity permissions list
-
-    if(details->new_entity_type > MC_ENT_TYPE_STREAM_MAX)
-    {
-        details->fNoFiltering=true;
-    }
     
     if(details->new_entity_type <= MC_ENT_TYPE_STREAM_MAX)
     {
@@ -2084,110 +2096,90 @@ bool MultiChainTransaction_VerifyNotFilteredRestrictions(const CTransaction& tx,
 {
     int change_count=0;
     
-    if(details->fNoFiltering)
+    if(details->emergency_disapproval_output < 0)
     {
-        if(tx.IsCoinBase())
-        {
-            reason="Not filtered tx rejected - coinbase";
-            return false;                
-        }
+        return true;        
     }
-    else
+    
+    if(tx.IsCoinBase())
     {
+        details->emergency_disapproval_output=-2;
         return true;
     }
-    
-    if(details->total_value_out)
-    {
-        reason="Not filtered tx rejected - non zero native currency value";
-        return false;        
-    }
-
-    if(details->total_value_in)
-    {
-        reason="Not filtered tx rejected - non zero native currency value";
-        return false;        
-    }
-    
+        
     if(tx.vin.size() > 1)
     {
-        reason="Not filtered tx rejected - more than 1 tx input";
-        return false;                
+        details->emergency_disapproval_output=-2;
+        return true;
     }
     
     if(details->vInputDestinations.size() != 1)
     {
-        reason="Not filtered tx rejected - multisig input";
-        return false;                        
+        details->emergency_disapproval_output=-2;
+        return true;
     }
     
     if(tx.vout.size() > 2)
     {
-        reason="Not filtered tx rejected - more than 2 tx outputs";
-        return false;                
+        details->emergency_disapproval_output=-2;
+        return true;
     }
-        
-    if(details->vRelevantEntities.size())
-    {
-        reason="Not filtered tx rejected - asset transfers or stream publishing";
-        return false;                        
-    }
-    
-    if(details->fAssetIssuance)
-    {
-        reason="Not filtered tx rejected - assets issuance";
-        return false;                                
-    }
-    
+            
     for (unsigned int vout = 0; vout < tx.vout.size(); vout++)
     {
         if(details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_NOT_OP_RETURN)
         {
-            if(  (details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_FILTER) == 0 )
-            {
-                change_count++;
-                CKeyID *lpKeyID=boost::get<CKeyID> (&(details->vOutputSingleDestination[vout]));
-                CScriptID *lpScriptID=boost::get<CScriptID> (&(details->vOutputSingleDestination[vout]));
-                if(((lpKeyID == NULL) && (lpScriptID == NULL)) || (details->vOutputDestinations[vout].size() != 1))
-                {
-                    reason="Not filtered tx rejected  - wrong change destination type";
-                    return false;
-                }
-                if(lpKeyID)
-                {
-                    if(*(uint160*)lpKeyID != details->vInputDestinations[0])
-                    {
-                        reason="Not filtered tx rejected  - change destination mismatch";
-                        return false;                        
-                    }
-                }
-                if(lpScriptID)
-                {
-                    if(*(uint160*)lpScriptID != details->vInputDestinations[0])
-                    {
-                        reason="Not filtered tx rejected  - change destination mismatch";
-                        return false;                        
-                    }
-                }
-            }            
+            details->emergency_disapproval_output=-2;
+            return true;            
         }
-        if(details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_NOT_FILTER)
+        
+        MultiChainTransaction_SetTmpOutputScript(tx.vout[vout].scriptPubKey);
+        
+        if(vout == details->emergency_disapproval_output)
         {
-            reason="Not filtered tx rejected - grants are not allowed";
-            return false;                    
+            if(mc_gState->m_TmpScript->GetNumElements() > 1)
+            {
+                details->emergency_disapproval_output=-2;
+                return true;                            
+            }        
         }
-    }
-    
-    if( change_count > 1 )
-    {
-        reason="Not filtered tx rejected - too many change outputs";
-        return false;                            
-    }
-    
-    if( (int)tx.vout.size() - change_count > 1)
-    {
-        reason="Not filtered tx rejected - missing change output";
-        return false;                                    
+        else
+        {
+            mc_gState->m_TmpAssetsTmp->Clear();
+            for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
+            {
+                mc_gState->m_TmpScript->SetElement(e);
+                if(mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsTmp,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER) != MC_ERR_NOERROR)
+                {
+                    details->emergency_disapproval_output=-2;
+                    return true;                                                
+                }
+            }
+            
+            CKeyID *lpKeyID=boost::get<CKeyID> (&(details->vOutputSingleDestination[vout]));
+            CScriptID *lpScriptID=boost::get<CScriptID> (&(details->vOutputSingleDestination[vout]));
+            if(((lpKeyID == NULL) && (lpScriptID == NULL)) || (details->vOutputDestinations[vout].size() != 1))
+            {
+                details->emergency_disapproval_output=-2;
+                return true;                                                
+            }
+            if(lpKeyID)
+            {
+                if(*(uint160*)lpKeyID != details->vInputDestinations[0])
+                {
+                    details->emergency_disapproval_output=-2;
+                    return true;                                                
+                }
+            }
+            if(lpScriptID)
+            {
+                if(*(uint160*)lpScriptID != details->vInputDestinations[0])
+                {
+                    details->emergency_disapproval_output=-2;
+                    return true;                                                
+                }
+            }
+        }
     }
     
     return true;
@@ -2249,7 +2241,13 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
         goto exitlbl;                                                                    
     }
 
-    if(!details.fNoFiltering && !tx.IsCoinBase())
+    if(!MultiChainTransaction_VerifyNotFilteredRestrictions(tx,offset,accept,&details,reason))           
+    {
+        fReject=true;
+        goto exitlbl;                                                                                
+    }        
+    
+    if(details.emergency_disapproval_output < 0)
     {
         if(mc_gState->m_Features->Filters())
         {
@@ -2274,17 +2272,6 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
                 }
             }
         }
-    }
-    else
-    {
-        if(mc_gState->m_Features->Filters())
-        {
-            if(!MultiChainTransaction_VerifyNotFilteredRestrictions(tx,offset,accept,&details,reason))           
-            {
-                fReject=true;
-                goto exitlbl;                                                                    
-            }
-        }        
     }
                                                                                 // Custom filters
     fReject=!custom_accept_transacton(tx,inputs,offset,accept,reason,replay);
