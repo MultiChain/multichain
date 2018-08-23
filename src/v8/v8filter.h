@@ -4,39 +4,10 @@
 #ifndef MULTICHAIN_V8FILTER_H_
 #define MULTICHAIN_V8FILTER_H_
 
-//#include "v8engine.h"
 #include <v8.h>
 
 namespace mc_v8
 {
-
-/**
- * Manage v8::Isolate objects.
- *
- * Currently support a single Isolate. In the future might support one for each calling thread.
- * Implemented as a Singleton.
- */
-class V8IsolateManager
-{
-public:
-    /**
-     * Get the (single) instance of this class.
-     */
-    static V8IsolateManager* Instance();
-
-    /**
-     * Get a usable Isolate for use in the calling thread.
-     */
-    v8::Isolate* GetIsolate();
-
-private:
-    V8IsolateManager() {}
-    ~V8IsolateManager();
-
-    static V8IsolateManager* m_instance;
-    v8::Isolate::CreateParams m_createParams;
-    v8::Isolate* m_isolate = nullptr;
-};
 
 /**
  * Implementation of a transaction filter based on the V8 JS engine.
