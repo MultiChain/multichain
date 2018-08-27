@@ -80,6 +80,16 @@ string ParseFilterDetails(Value param)
     string js;
     bool field_parsed,already_found;
     
+    if(param.type() != str_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filter code, expecting string");                            
+    }
+    
+    if(param.type() == str_type)
+    {
+        return param.get_str();
+    }
+    
     if(param.type() == obj_type)
     {
         Object objParams = param.get_obj();
@@ -334,7 +344,7 @@ exitlbl:
     return wtx.GetHash().GetHex();    
 }
 
-Value listfilters(const Array& params, bool fHelp)
+Value listtxfilters(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 2)
         throw runtime_error("Help message not found\n");
@@ -410,7 +420,7 @@ Value listfilters(const Array& params, bool fHelp)
         if((filter_list.size() == 0) || 
            (filter_list.find(*(uint256*)pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID()) != filter_list.end()) )
         {
-            entry=FilterEntry(pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID(),output_level);
+            entry=TxFilterEntry(pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID(),output_level);
             if(entry.size()>0)
             {
                 bool take_it=false;
@@ -453,7 +463,7 @@ Value listfilters(const Array& params, bool fHelp)
         {
             Object entry;
 
-            entry=FilterEntry(pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID(),output_level);
+            entry=TxFilterEntry(pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID(),output_level);
             if(entry.size()>0)
             {
                 bool take_it=false;

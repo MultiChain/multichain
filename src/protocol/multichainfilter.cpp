@@ -56,8 +56,8 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
     
     uint256 txid;
     txid=*(uint256*)m_Details.GetTxID();
-    m_FilterCaption=strprintf("TxID: %s, Name: %s",
-            txid.ToString().c_str(),m_Details.m_Name);
+    m_FilterCaption=strprintf("%s (txid %s)",
+            m_Details.m_Name,txid.ToString().c_str());
     
     ptr=(unsigned char *)m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_TYPE,&value_size);
     
@@ -77,7 +77,7 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
             break;
         default:
             m_CreateError="Unsupported filter type";
-            break;
+            return MC_ERR_NOT_SUPPORTED;
     }
     
     ptr=(unsigned char *)m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_ENTITY,&value_size);
@@ -261,7 +261,8 @@ int mc_MultiChainFilterEngine::Run(const CTransaction& tx,std::set <uint160>& sR
                         {
                             *lppFilter=&(m_Filters[i]);
                         }
-                        if(fDebug)LogPrint("filter","filter: Tx rejected: %s, filter: %s\n",strResult.c_str(),m_Filters[i].m_FilterCaption.c_str());
+                        strResult=strprintf("The transaction did not pass filter %s: %s",m_Filters[i].m_FilterCaption.c_str(),strResult.c_str());
+                        if(fDebug)LogPrint("filter","filter: %s\n",strResult.c_str());
                         
                         goto exitlbl;
                     }

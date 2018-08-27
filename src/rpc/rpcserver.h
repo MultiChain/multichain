@@ -248,7 +248,7 @@ extern json_spirit::Value resendwallettransactions(const json_spirit::Array& par
 extern json_spirit::Value listaddresses(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreams(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listupgrades(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value listfilters(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listtxfilters(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getfiltercode(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getfiltertxid(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value setfilterparam(const json_spirit::Array& params, bool fHelp);

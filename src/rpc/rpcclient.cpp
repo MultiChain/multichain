@@ -76,10 +76,9 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "listupgrades", 1 },                                                            
     { "listupgrades", 2 },                                                            
     { "listupgrades", 3 },                                                            
-    { "listfilters", 0 },
-    { "listfilters", 1 },                                                            
+    { "listtxfilters", 0 },
+    { "listtxfilters", 1 },                                                            
     { "testtxfilter", 0 },                                                            
-    { "testtxfilter", 1 },                                                            
     { "publishfrom", 2 },                                                            
     { "publishfrom", 3 },                                                            
     { "publish", 1 },
@@ -350,7 +349,7 @@ static const CRPCConvertParamMayBeString vRPCConvertParamsMayBeString[] =
     { "listassets", 0 },
     { "liststreams", 0 },
     { "listupgrades", 0 },
-    { "listfilters", 0 },                                                            
+    { "listtxfilters", 0 },                                                            
     { "listpermissions", 1 },
     { "publishfrom", 2 },                                                            
     { "publishfrom", 3 },                                                            
@@ -359,6 +358,8 @@ static const CRPCConvertParamMayBeString vRPCConvertParamsMayBeString[] =
     { "setgenerate", 0 },
     { "liststreamblockitems", 1 },
     { "listblocks", 0 },
+    { "createfrom", 4 },                                                            
+    { "create", 3 },                                                            
 };
 
 class CRPCConvertTableMayBeString

@@ -552,7 +552,7 @@ exitlbl:
     return results;
 }
 
-Object FilterEntry(const unsigned char *txid,uint32_t output_level)
+Object TxFilterEntry(const unsigned char *txid,uint32_t output_level)
 {
 // output_level constants
 // 0x0001 type
@@ -590,16 +590,10 @@ Object FilterEntry(const unsigned char *txid,uint32_t output_level)
                     filter_type=mc_GetLE(ptr,value_size);
                 }
             }                                    
-            switch(filter_type)
+            if(filter_type != MC_FLT_TYPE_TX)
             {
-                case MC_FLT_TYPE_TX:
-                    entry.push_back(Pair("type", "txfilter"));            
-                    break;
-                default:
-                    entry.push_back(Pair("type", "unsupported"));            
-                    break;
-            }
-            
+                return entry;
+            }            
         }
         
         ptr=(unsigned char *)entity.GetName();
@@ -645,11 +639,11 @@ Object FilterEntry(const unsigned char *txid,uint32_t output_level)
 
             if(ptr)
             {   
-                entry.push_back(Pair("codesize", value_size));                
+                entry.push_back(Pair("codelen", value_size));                
             }
             else
             {
-                entry.push_back(Pair("codesize", 0));                
+                entry.push_back(Pair("codelen", 0));                
             }
             
             ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_FILTER_ENTITY,&value_size);
@@ -658,7 +652,7 @@ Object FilterEntry(const unsigned char *txid,uint32_t output_level)
             {
                 if(value_size % MC_AST_SHORT_TXID_SIZE)
                 {
-                    entry.push_back(Pair("entities","error"));                    
+                    entry.push_back(Pair("for","error"));                    
                 }
                 else
                 {
@@ -681,12 +675,12 @@ Object FilterEntry(const unsigned char *txid,uint32_t output_level)
                             }
                         }                        
                     }
-                    entry.push_back(Pair("entities",entities));                    
+                    entry.push_back(Pair("for",entities));                    
                 }
             }                           
             else
             {
-                entry.push_back(Pair("entities",entities));                                    
+                entry.push_back(Pair("for",entities));                                    
             }            
         }
        

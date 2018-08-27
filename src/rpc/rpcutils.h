@@ -117,7 +117,7 @@ Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 tx
 Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out);
 Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format);
 Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uint32_t stream_output_level);
-Object FilterEntry(const unsigned char *txid,uint32_t output_level);
+Object TxFilterEntry(const unsigned char *txid,uint32_t output_level);
 Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_level);
 string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript,int *eErrorCode);
 bool FindPreparedTxOut(CTxOut& txout,COutPoint outpoint,string& reason);
