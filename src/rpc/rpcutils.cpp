@@ -42,6 +42,10 @@ int c_UTF8_charlen[256]={
 
 CScript RemoveOpDropsIfNeeded(const CScript& scriptInput)
 {
+    if(pMultiChainFilterEngine->m_TxID != 0)
+    {
+        return scriptInput;        
+    }
     if (!GetBoolArg("-hideknownopdrops", false))
     {
         return scriptInput;
@@ -80,6 +84,21 @@ bool AssetRefDecode(unsigned char *bin, const char* string, const size_t stringL
     bin[9]=(unsigned char)(txIDPrefixInteger/256);
     
     return true;
+}
+
+int mc_MaxOpReturnShown()
+{
+    int res=GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN);    
+    if(pMultiChainFilterEngine->m_TxID != 0)
+    {
+        res=MAX_OP_RETURN_SHOWN;    
+        if(pMultiChainFilterEngine->m_Params.m_MaxShownData >= 0)
+        {
+            res=pMultiChainFilterEngine->m_Params.m_MaxShownData;
+        }
+    }
+    
+    return res;
 }
 
 uint256 mc_GenesisCoinbaseTxID()
@@ -1067,7 +1086,7 @@ Value OpReturnEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int
 {
     string metadata="";
     Object metadata_object;
-    if((int)elem_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN))
+    if((int)elem_size <= mc_MaxOpReturnShown())
     {
         metadata=HexStr(elem,elem+elem_size);
         return metadata;
@@ -1189,7 +1208,7 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
         
     if(chunk_count > 1) 
     {
-        if(total_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN))
+        if(total_size <= mc_MaxOpReturnShown())
         {
             use_tmp_buf=true;
         }
@@ -1371,7 +1390,7 @@ Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 tx
         error_str=OffChainError(status,&errorCode);
     }
      
-    if( (((int)elem_size <= GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN)) || (txid == 0)) && available && ((status & MC_OST_ERROR_MASK) == 0) && (elem != NULL) )
+    if( (((int)elem_size <= mc_MaxOpReturnShown()) || (txid == 0)) && available && ((status & MC_OST_ERROR_MASK) == 0) && (elem != NULL) )
     {
         if(format_text_out)
         {

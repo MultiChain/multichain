@@ -643,6 +643,39 @@ Value getfiltertxid(const Array& params, bool fHelp)
 
 Value setfilterparam(const json_spirit::Array& params, bool fHelp)
 {
+    if (fHelp || params.size() != 2)                                            
+        throw runtime_error("Help message not found\n");
+    
+    string param_name=params[0].get_str();
+    bool fFound=false;
+    
+    if( (param_name == "maxshowndata") )
+    {
+        if( (params[1].type() == int_type) || (params[1].type() == str_type) )
+        {
+            int nValue;
+            if(params[1].type() == int_type)
+            {
+                nValue=params[1].get_int();
+            }
+            else
+            {
+                nValue=atoi(params[1].get_str().c_str());
+            }
+            pMultiChainFilterEngine->m_Params.m_MaxShownData=nValue;
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value type");                                            
+        }
+        fFound=true;
+    }
+
+    if(!fFound)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Unsupported runtime parameter: " + param_name);                                                    
+    }
+    
     return Value::null;
 }
 

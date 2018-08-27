@@ -49,12 +49,33 @@ typedef struct mc_MultiChainFilter
     
 } mc_MultiChainFilter;
 
+typedef struct mc_MultiChainFilterParams
+{
+    int m_MaxShownData;
+    int m_Compatibility;
+    mc_MultiChainFilterParams()
+    {
+        Zero();
+    }
+    
+    ~mc_MultiChainFilterParams()
+    {
+        Destroy();
+    }
+    
+    int Zero();
+    int Destroy();  
+    int Init();
+    int Close();
+}mc_MultiChainFilterParams;
+
 typedef struct mc_MultiChainFilterEngine
 {
     std::vector <mc_MultiChainFilter> m_Filters;
     mc_Buffer *m_Workers;
     uint256 m_TxID;
     CTransaction m_Tx;
+    mc_MultiChainFilterParams m_Params;
 
     mc_MultiChainFilterEngine()
     {

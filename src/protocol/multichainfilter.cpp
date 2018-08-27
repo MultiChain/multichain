@@ -5,6 +5,29 @@
 
 using namespace std;
 
+int mc_MultiChainFilterParams::Zero()
+{
+    m_MaxShownData=-1;
+    m_Compatibility=MC_VCM_NONE;
+}
+
+int mc_MultiChainFilterParams::Init()
+{
+    Zero();
+    m_Compatibility=mc_gState->m_Compatibility;
+    mc_gState->m_Compatibility=MC_VCM_NONE;    
+}
+
+int mc_MultiChainFilterParams::Close()
+{
+    mc_gState->m_Compatibility=m_Compatibility;    
+}
+
+int mc_MultiChainFilterParams::Destroy()
+{
+    Zero();
+}
+
 std::vector <uint160>  mc_FillRelevantFilterEntitities(const unsigned char *ptr, size_t value_size)
 {
     std::vector <uint160> entities;
@@ -239,6 +262,7 @@ int mc_MultiChainFilterEngine::Run(const CTransaction& tx,std::set <uint160>& sR
     strResult="";
     m_Tx=tx;
     m_TxID=m_Tx.GetHash();
+    m_Params.Init();
     
     for(int i=0;i<(int)m_Filters.size();i++)
     {
@@ -278,6 +302,7 @@ int mc_MultiChainFilterEngine::Run(const CTransaction& tx,std::set <uint160>& sR
 
 exitlbl:
             
+    m_Params.Close();
     m_TxID=0;
     return err;
 }
@@ -287,9 +312,11 @@ int mc_MultiChainFilterEngine::RunFilter(const CTransaction& tx,mc_Filter *filte
     int err=MC_ERR_NOERROR;
     m_Tx=tx;
     m_TxID=m_Tx.GetHash();
+    m_Params.Init();
     
     err=pFilterEngine->RunFilter(filter,strResult);
     
+    m_Params.Close();
     m_TxID=0;
     return err;
 }

@@ -84,6 +84,7 @@ int V8Filter::Initialize(std::string script, std::string functionName, std::stri
     auto global = v8::ObjectTemplate::New(m_isolate);
     REGISTER_RPC(getfiltertxid);
     REGISTER_RPC(getfiltertransaction);
+    REGISTER_RPC(setfilterparam);
     REGISTER_RPC(gettxout);
     REGISTER_RPC(listassets);
     REGISTER_RPC(liststreams);
