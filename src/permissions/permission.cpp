@@ -2231,9 +2231,9 @@ int mc_Permissions::AdminConsensus(const void* lpEntity,uint32_t type)
                 {
                     consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensuscreate");
                 }
-                if(type == MC_PTP_CREATE)
+                if(type == MC_PTP_FILTER)
                 {
-                    consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensusfilter");
+                    consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensustxfilter");
                 }
 
                 if(consensus==0)
