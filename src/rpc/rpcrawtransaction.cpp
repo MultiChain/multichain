@@ -501,7 +501,6 @@ Value getfiltertransaction(const Array& params, bool fHelp)
         throw runtime_error("Help message not found\n");
 
     CTransaction tx;
-
     uint256 hashBlock = 0;
     if(pMultiChainFilterEngine->m_TxID != 0)
     {
@@ -519,10 +518,6 @@ Value getfiltertransaction(const Array& params, bool fHelp)
         }        
         uint256 hash = ParseHashV(params[0], "parameter 1");
 
-        bool fVerbose = false;
-        if (params.size() > 1)
-            fVerbose=paramtobool(params[1],false);
-    //        fVerbose = (params[1].get_int() != 0);
 
         if (!GetTransaction(hash, tx, hashBlock, true))
             throw JSONRPCError(RPC_TX_NOT_FOUND, "No information available about transaction");

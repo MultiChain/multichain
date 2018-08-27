@@ -73,7 +73,7 @@ void CallRpcFunction(rpcfn_type rpcFunction, const v8::FunctionCallbackInfo<v8::
     }
 
 FILTER_FUNCTION(getfiltertxid)
-FILTER_FUNCTION(getrawtransaction)
+FILTER_FUNCTION(getfiltertransaction)
 FILTER_FUNCTION(gettxout)
 FILTER_FUNCTION(listassets)
 FILTER_FUNCTION(liststreams)
