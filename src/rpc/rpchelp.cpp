@@ -4260,7 +4260,24 @@ void mc_InitRPCHelpMap18()
             + HelpExampleRpc("testtxfilter", "filter1, \"{\"js\":\"js-code\"}\"")
         ));
      
-   mapHelpStrings.insert(std::make_pair("AAAAAAA",
+     mapHelpStrings.insert(std::make_pair("getfiltertransaction",
+            "getfiltertransaction \"txid\"\n"
+            "\nNOTE: When called from the filter code, txid parameter should be omitted\n"
+            "\nReturns an object with information about filtered transaction as it is received by the filter code.\n"
+
+            "\nArguments:\n"
+            "1. \"txid\"                           (string, required) The transaction id, omitted when called from the filter code\n"
+
+            "\nResult\n"
+            "Object with information about filtered transaction\n"            
+
+            "\nExamples:\n"
+            + HelpExampleCli("getfiltertransaction", "\"mytxid\"")
+            + HelpExampleCli("getfiltertransaction", "\"mytxid\" 1")
+            + HelpExampleRpc("getfiltertransaction", "\"mytxid\", 1")
+        ));
+    
+  mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
        

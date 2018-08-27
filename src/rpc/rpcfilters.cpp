@@ -441,11 +441,7 @@ Value listtxfilters(const Array& params, bool fHelp)
                 if(take_it)
                 {
                     bool valid=pMultiChainFilterEngine->m_Filters[i].m_CreateError.size() == 0;
-                    entry.push_back(Pair("valid",valid));
-                    if(!valid)
-                    {
-                        entry.push_back(Pair("error",pMultiChainFilterEngine->m_Filters[i].m_CreateError));                            
-                    }
+                    entry.push_back(Pair("compiled",valid));
                     entry.push_back(Pair("approved",mc_gState->m_Permissions->FilterApproved(NULL,&(pMultiChainFilterEngine->m_Filters[i].m_FilterAddress)) !=0 ));
                     entry.push_back(Pair("address",pMultiChainFilterEngine->m_Filters[i].m_FilterAddress.ToString()));
                     results.push_back(entry);                                            
@@ -480,11 +476,7 @@ Value listtxfilters(const Array& params, bool fHelp)
                 if(take_it)
                 {
                     bool valid=pMultiChainFilterEngine->m_Filters[i].m_CreateError.size() == 0;
-                    entry.push_back(Pair("valid",valid));
-                    if(!valid)
-                    {
-                        entry.push_back(Pair("error",pMultiChainFilterEngine->m_Filters[i].m_CreateError));                            
-                    }
+                    entry.push_back(Pair("compiled",valid));
                     entry.push_back(Pair("approved",mc_gState->m_Permissions->FilterApproved(NULL,&(pMultiChainFilterEngine->m_Filters[i].m_FilterAddress)) !=0 ));
                     entry.push_back(Pair("address",pMultiChainFilterEngine->m_Filters[i].m_FilterAddress.ToString()));
                     results.push_back(entry);                                            
