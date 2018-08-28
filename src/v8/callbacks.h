@@ -13,6 +13,7 @@ void filter_getfiltertxid(const v8::FunctionCallbackInfo<v8::Value>& args);
 void filter_getfiltertransaction(const v8::FunctionCallbackInfo<v8::Value>& args);
 void filter_setfilterparam(const v8::FunctionCallbackInfo<v8::Value>& args);
 void filter_gettxout(const v8::FunctionCallbackInfo<v8::Value>& args);
+void filter_getblock(const v8::FunctionCallbackInfo<v8::Value>& args);
 void filter_listassets(const v8::FunctionCallbackInfo<v8::Value>& args);
 void filter_liststreams(const v8::FunctionCallbackInfo<v8::Value>& args);
 void filter_listpermissions(const v8::FunctionCallbackInfo<v8::Value>& args);

@@ -214,7 +214,7 @@ void mc_InitRPCHelpMap01()
             "\nArguments:\n"
             "1. \"txid\"                           (string, required) The transaction id\n"
             "2. n                                (numeric, required) vout value\n"
-            "3. includemempool                   (boolean, optional) Whether to included the mem pool\n"
+            "3. includemempool                   (boolean, optional, default true) Whether to included the mem pool\n"
             "\nResult:\n"
             "{\n"
             "  \"bestblock\" : \"hash\",             (string) the block hash\n"

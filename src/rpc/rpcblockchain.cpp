@@ -396,7 +396,7 @@ Value getblock(const Array& params, bool fHelp)
         throw runtime_error("Help message not found\n");
 
     std::string strHash = params[0].get_str();
-    if(strHash.size() < 64)
+    if( (strHash.size() < 64) || (pMultiChainFilterEngine->m_TxID != 0) )
     {
         int nHeight;
         if(!StringToInt(params[0].get_str(),&nHeight))
