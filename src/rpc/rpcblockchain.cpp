@@ -411,7 +411,7 @@ Value getblock(const Array& params, bool fHelp)
         throw runtime_error("Help message not found\n");
 
     std::string strHash = params[0].get_str();
-    if( (strHash.size() < 64) || (pMultiChainFilterEngine->m_TxID != 0) )
+    if( strHash.size() < 64 )
     {
         int nHeight;
         if(!StringToInt(params[0].get_str(),&nHeight))
@@ -453,10 +453,18 @@ Value getblock(const Array& params, bool fHelp)
     
     if (mapBlockIndex.count(hash) == 0)
         throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block not found");
-
+    
     CBlock block;
     CBlockIndex* pblockindex = mapBlockIndex[hash];
 
+    if(pMultiChainFilterEngine->m_TxID != 0)
+    {
+        if (!chainActive.Contains(pblockindex))
+        {
+            throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block not found in active chain");
+        }    
+    }
+    
     if(!ReadBlockFromDisk(block, pblockindex))
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
 
