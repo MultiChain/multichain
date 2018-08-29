@@ -387,6 +387,21 @@ Value listblocks(const Array& params, bool fHelp)
     return result;
 }
 
+Value getlastblockinfo(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 0)
+        throw runtime_error("Help message not found\n");
+    
+    CBlockIndex* pblockindex = chainActive.Tip();
+   
+    Object result;
+    result.push_back(Pair("hash", pblockindex->GetBlockHash().GetHex()));
+    result.push_back(Pair("height", pblockindex->nHeight));
+    result.push_back(Pair("time", pblockindex->GetBlockTime()));
+    
+    return result;    
+}
+
 /* MCHN END */
 
 

@@ -4277,6 +4277,20 @@ void mc_InitRPCHelpMap18()
             + HelpExampleRpc("getfiltertransaction", "\"mytxid\", 1")
         ));
     
+    mapHelpStrings.insert(std::make_pair("getlastblockinfo",
+            "getlastblockinfo \n"
+            "\nReturns information about last block in the chain.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"hash\" : \"hash\",                  (string) The block hash\n"
+            "  \"height\" : n,                     (numeric) The block height or index\n"
+            "  \"time\" : ttt,                     (numeric) The block time in seconds since epoch (Jan 1 1970 GMT)\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getlastblockinfo", "")
+            + HelpExampleRpc("getlastblockinfo", "")
+        ));
+    
   mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));

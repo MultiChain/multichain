@@ -87,6 +87,7 @@ int V8Filter::Initialize(std::string script, std::string functionName, std::stri
     REGISTER_RPC(setfilterparam);
     REGISTER_RPC(gettxout);
     REGISTER_RPC(getblock);
+    REGISTER_RPC(getlastblockinfo);
     REGISTER_RPC(listassets);
     REGISTER_RPC(liststreams);
     REGISTER_RPC(listpermissions);

@@ -676,7 +676,7 @@ Value setfilterparam(const json_spirit::Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Unsupported runtime parameter: " + param_name);                                                    
     }
     
-    return Value::null;
+    return "Set";
 }
 
 Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, string txhex)
