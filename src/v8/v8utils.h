@@ -39,11 +39,21 @@ inline v8::Local<v8::String> String2V8(v8::Isolate* isolate, std::string str)
     return v8::String::NewFromUtf8(isolate, str.c_str(), v8::NewStringType::kNormal).ToLocalChecked();
 }
 
+/**
+ * Get a directory for multichain temporary files.
+ */
 inline fs::path GetTemporaryPidDirectory()
 {
     return fs::path("/tmp") / "multichain" / std::to_string(getpid());
 }
 
+/**
+ * Write a blob to a binary file.
+ *
+ * @param filename The name of the file to write.
+ * @param data     The data array to write.
+ * @param size     The number of bytes to write.
+ */
 inline void WriteBinaryFile(fs::path filename, char* data, size_t size)
 {
     std::ofstream ofs(filename.string(), std::fstream::out | std::fstream::binary);

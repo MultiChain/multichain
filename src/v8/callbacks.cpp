@@ -28,8 +28,8 @@ typedef void (*fnSanitize)(json_spirit::Value& value);
  * @param args        The V8 arguments/return value.
  * @param sanitize    An optional function to transform the RPC function result before returning it to JS.
  */
-void CallRpcFunction(rpcfn_type rpcFunction, const v8::FunctionCallbackInfo<v8::Value>& args,
-        fnSanitize sanitize = nullptr)
+void CallRpcFunction(rpcfn_type rpcFunction, const v8::FunctionCallbackInfo<v8::Value>& args, fnSanitize sanitize =
+        nullptr)
 {
     v8::Isolate* isolate = args.GetIsolate();
     v8::Locker locker(isolate);
@@ -48,7 +48,21 @@ void CallRpcFunction(rpcfn_type rpcFunction, const v8::FunctionCallbackInfo<v8::
     json_spirit::Value params;
     json_spirit::read_string(argsString, params);
 
-    json_spirit::Value result = rpcFunction(params.get_array(), false);
+    json_spirit::Value result;
+    try
+    {
+        result = rpcFunction(params.get_array(), false);
+    } catch (...)
+    {
+        args.GetReturnValue().SetUndefined();
+        return;
+    }
+
+    if (result.is_null())
+    {
+        args.GetReturnValue().SetUndefined();
+        return;
+    }
 
     if (sanitize != nullptr)
     {
