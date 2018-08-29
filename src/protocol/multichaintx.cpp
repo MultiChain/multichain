@@ -2260,8 +2260,9 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
             if(pMultiChainFilterEngine)
             {
                 mc_MultiChainFilter* lpFilter;
+                int applied=0;
 
-                if(pMultiChainFilterEngine->Run(tx,details.vRelevantEntities,reason,&lpFilter) != MC_ERR_NOERROR)
+                if(pMultiChainFilterEngine->Run(tx,details.vRelevantEntities,reason,&lpFilter,&applied) != MC_ERR_NOERROR)
                 {
                     reason="Error while running filters";
                     fReject=true;
@@ -2274,6 +2275,10 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
                         if(fDebug)LogPrint("mchn","mchn: Rejecting filter: %s\n",lpFilter->m_FilterCaption.c_str());
                         fReject=true;
                         goto exitlbl;                                                                                    
+                    }
+                    if(applied)
+                    {
+                        details.fFullReplayCheckRequired=true;                        
                     }
                 }
             }

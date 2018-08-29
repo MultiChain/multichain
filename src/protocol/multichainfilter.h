@@ -90,7 +90,7 @@ typedef struct mc_MultiChainFilterEngine
     int Initialize();
     int Add(const unsigned char* short_txid);
     int Reset(int block);
-    int Run(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter);            
+    int Run(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied);            
     int RunFilter(const CTransaction& tx,mc_Filter *filter,std::string &strResult);            
 
     

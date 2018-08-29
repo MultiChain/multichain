@@ -256,13 +256,18 @@ int mc_MultiChainFilterEngine::Reset(int block)
     return MC_ERR_NOERROR;
 }
 
-int mc_MultiChainFilterEngine::Run(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter)
+int mc_MultiChainFilterEngine::Run(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied)
 {
     int err=MC_ERR_NOERROR;
     strResult="";
     m_Tx=tx;
     m_TxID=m_Tx.GetHash();
     m_Params.Init();
+    
+    if(applied)
+    {
+        *applied=0;
+    }
     
     for(int i=0;i<(int)m_Filters.size();i++)
     {
@@ -291,6 +296,10 @@ int mc_MultiChainFilterEngine::Run(const CTransaction& tx,std::set <uint160>& sR
                         goto exitlbl;
                     }
                     if(fDebug)LogPrint("filter","filter: Tx %s accepted, filter: %s\n",m_TxID.ToString().c_str(),m_Filters[i].m_FilterCaption.c_str());
+                    if(applied)
+                    {
+                        *applied+=1;
+                    }
                 }
                 else
                 {
