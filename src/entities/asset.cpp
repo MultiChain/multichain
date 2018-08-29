@@ -1723,6 +1723,11 @@ const unsigned char* mc_EntityDetails::GetRef()
 
 int mc_EntityDetails::IsUnconfirmedGenesis()
 {
+    if( (m_LedgerRow.m_Block > mc_gState->m_Assets->m_Block) && (m_LedgerRow.m_Offset >= 0) )                     // Can happen only when called from filter
+    {
+        return 1;
+    }
+
     return ((int)mc_GetLE(m_Ref+4,4)<0) ? 1 : 0; 
 }
 

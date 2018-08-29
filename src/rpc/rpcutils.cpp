@@ -272,10 +272,17 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
         if(entity.IsUnconfirmedGenesis())
         {
             ret=MC_ASSET_KEY_UNCONFIRMED_GENESIS;                            
+            if(asset_ref)
+            {
+                memset(asset_ref,0,MC_AST_ASSET_REF_SIZE);            
+            }            
         }
-        if(asset_ref)
+        else
         {
-            memcpy(asset_ref,ptr,MC_AST_ASSET_REF_SIZE);            
+            if(asset_ref)
+            {
+                memcpy(asset_ref,ptr,MC_AST_ASSET_REF_SIZE);            
+            }
         }
         if(name)
         {
