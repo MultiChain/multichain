@@ -90,7 +90,10 @@ Value grantoperation(const Array& params)
         to=(uint32_t)params[6].get_int64();
     }
     
-    if(((type & MC_PTP_RECEIVE) == 0) || (from >= to))
+    bool require_receive=true;
+    
+/*    
+    if( ((type & MC_PTP_RECEIVE) == 0) || (from >= to))
     {        
         if(nAmount > 0)
         {
@@ -103,6 +106,7 @@ Value grantoperation(const Array& params)
             }
         }
     }
+*/    
     timestamp=mc_TimeNowAsUInt();
 
     mc_EntityDetails entity;
@@ -129,10 +133,30 @@ Value grantoperation(const Array& params)
         if(type == 0)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
         
+        if(type & MC_PTP_RECEIVE)
+        {
+            if(from < to)
+            {
+                require_receive=false;
+            }
+        }
+        
         LogPrintf("mchn: Granting %s permission(s) to address %s (%ld-%ld)\n",permission_type,params[1].get_str(),from,to);
     }
     
-    
+    if(require_receive)
+    {
+        if(nAmount > 0)
+        {
+            BOOST_FOREACH(CTxDestination& txdest, addresses) 
+            {
+                if(!AddressCanReceive(txdest))
+                {
+                    throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Destination address doesn't have receive permission");        
+                }
+            }
+        }        
+    }
     
     lpScript->SetPermission(type,from,to,timestamp);
     
@@ -579,6 +603,23 @@ Value listpermissions(const Array& params, bool fHelp)
             case MC_PTP_ADMIN  :entry.push_back(Pair("type", "admin"));break;
             case MC_PTP_ACTIVATE  :entry.push_back(Pair("type", "activate"));break;                
             default:take_it=false;
+        }
+        if(!take_it)
+        {
+            take_it=true;
+            if(mc_gState->m_Features->CustomPermissions())
+            {
+                switch(plsRow->m_Type)
+                {
+                    case MC_PTP_CUSTOM1  :entry.push_back(Pair("type", MC_PTN_CUSTOM1));break;
+                    case MC_PTP_CUSTOM2  :entry.push_back(Pair("type", MC_PTN_CUSTOM2));break;
+                    case MC_PTP_CUSTOM3  :entry.push_back(Pair("type", MC_PTN_CUSTOM3));break;
+                    case MC_PTP_CUSTOM4  :entry.push_back(Pair("type", MC_PTN_CUSTOM4));break;
+                    case MC_PTP_CUSTOM5  :entry.push_back(Pair("type", MC_PTN_CUSTOM5));break;
+                    case MC_PTP_CUSTOM6  :entry.push_back(Pair("type", MC_PTN_CUSTOM6));break;
+                    default:take_it=false;
+                }
+            }
         }
         entry.push_back(Pair("startblock", (int64_t)plsRow->m_BlockFrom));
         entry.push_back(Pair("endblock", (int64_t)plsRow->m_BlockTo));                        

@@ -2057,3 +2057,23 @@ int mc_Features::Filters()
     return ret;    
 }
 
+int mc_Features::CustomPermissions()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 20004)
+        {
+            ret=1;
+        }
+    }
+    
+    return ret;    
+}
+

@@ -1081,6 +1081,10 @@ bool MultiChainTransaction_ProcessPermissions(const CTransaction& tx,
                     if( type & ( MC_PTP_CREATE | MC_PTP_ISSUE | MC_PTP_ACTIVATE | MC_PTP_FILTER ) )
                     {
                         details->vOutputScriptFlags[vout] |= MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_CREATE;
+                    }                    
+                    if(type & mc_gState->m_Permissions->GetCustomHighPermissionTypes())
+                    {
+                        details->vOutputScriptFlags[vout] |= MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_CREATE;                        
                     }
                     if( type & MC_PTP_FILTER )
                     {
@@ -1374,6 +1378,7 @@ bool MultiChainTransaction_CheckOutputs(const CTransaction& tx,                 
             }            
             
             permission_type=MC_PTP_CONNECT | MC_PTP_SEND | MC_PTP_RECEIVE | MC_PTP_WRITE;
+            permission_type |= mc_gState->m_Permissions->GetCustomLowPermissionTypes();
             if(!MultiChainTransaction_ProcessPermissions(tx,offset,vout,permission_type,true,details,reason))
             {
                 return false;
@@ -1388,6 +1393,7 @@ bool MultiChainTransaction_CheckOutputs(const CTransaction& tx,                 
             MultiChainTransaction_SetTmpOutputScript(tx.vout[vout].scriptPubKey);
             
             permission_type=MC_PTP_CREATE | MC_PTP_ISSUE | MC_PTP_ACTIVATE | MC_PTP_FILTER;
+            permission_type |= mc_gState->m_Permissions->GetCustomHighPermissionTypes();
             if(!MultiChainTransaction_ProcessPermissions(tx,offset,vout,permission_type,false,details,reason))
             {
                 return false;

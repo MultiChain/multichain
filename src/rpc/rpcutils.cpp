@@ -544,7 +544,18 @@ Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong)
                 if(full_type & MC_PTP_ISSUE)entry.push_back(Pair("issue", (type & MC_PTP_ISSUE) ? true : false));
                 if(full_type & MC_PTP_MINE)entry.push_back(Pair("mine", (type & MC_PTP_MINE) ? true : false));
                 if(full_type & MC_PTP_ADMIN)entry.push_back(Pair("admin", (type & MC_PTP_ADMIN) ? true : false));
-                if(full_type & MC_PTP_ACTIVATE)entry.push_back(Pair("activate", (type & MC_PTP_ACTIVATE) ? true : false));                
+                if(full_type & MC_PTP_ACTIVATE)entry.push_back(Pair("activate", (type & MC_PTP_ACTIVATE) ? true : false));    
+                if(mc_gState->m_Features->CustomPermissions())
+                {
+                    Array custom_permissions;
+                    if(type & MC_PTP_CUSTOM1)custom_permissions.push_back(MC_PTN_CUSTOM1);
+                    if(type & MC_PTP_CUSTOM2)custom_permissions.push_back(MC_PTN_CUSTOM2);
+                    if(type & MC_PTP_CUSTOM3)custom_permissions.push_back(MC_PTN_CUSTOM3);
+                    if(type & MC_PTP_CUSTOM4)custom_permissions.push_back(MC_PTN_CUSTOM4);
+                    if(type & MC_PTP_CUSTOM5)custom_permissions.push_back(MC_PTN_CUSTOM5);
+                    if(type & MC_PTP_CUSTOM6)custom_permissions.push_back(MC_PTN_CUSTOM6);
+                    entry.push_back(Pair("custom", custom_permissions));    
+                }
                 entry.push_back(Pair("startblock",(int64_t)from));
                 entry.push_back(Pair("endblock",(int64_t)to));
                 entry.push_back(Pair("timestamp",(int64_t)timestamp));        
