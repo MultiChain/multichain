@@ -95,6 +95,7 @@ FILTER_FUNCTION(getlastblockinfo)
 FILTER_FUNCTION(listassets)
 FILTER_FUNCTION(liststreams)
 FILTER_FUNCTION(listpermissions)
+FILTER_FUNCTION(verifymessage)
 
 } // namespace mc_v8
 

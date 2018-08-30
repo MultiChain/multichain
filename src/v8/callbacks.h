@@ -18,6 +18,7 @@ void filter_getlastblockinfo(const v8::FunctionCallbackInfo<v8::Value>& args);
 void filter_listassets(const v8::FunctionCallbackInfo<v8::Value>& args);
 void filter_liststreams(const v8::FunctionCallbackInfo<v8::Value>& args);
 void filter_listpermissions(const v8::FunctionCallbackInfo<v8::Value>& args);
+void filter_verifymessage(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 } // namespace mc_v8
 

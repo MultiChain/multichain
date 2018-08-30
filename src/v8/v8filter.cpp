@@ -91,6 +91,7 @@ int V8Filter::Initialize(std::string script, std::string functionName, std::stri
     REGISTER_RPC(listassets);
     REGISTER_RPC(liststreams);
     REGISTER_RPC(listpermissions);
+    REGISTER_RPC(verifymessage);
     auto context = v8::Context::New(m_isolate, nullptr, global);
     m_context.Reset(m_isolate, context);
 
