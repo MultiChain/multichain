@@ -13,7 +13,7 @@ LIBMEMENV  += $(builddir)/leveldb/libmemenv.a
 # NOTE: This dependency is not strictly necessary, but without it make may try to build both in parallel, which breaks the LevelDB build system in a race
 $(LIBLEVELDB): $(LIBMEMENV)
 
-$(LIBLEVELDB) $(LIBMEMENV):	
+$(LIBLEVELDB) $(LIBMEMENV):
 	@echo "Building LevelDB ..." && $(MAKE) -C $(@D) $(@F) CXX="$(CXX)" \
 	  CC="$(CC)" PLATFORM=$(TARGET_OS) AR="$(AR)" $(LEVELDB_TARGET_FLAGS) \
           OPT="$(CXXFLAGS) $(CPPFLAGS)"
@@ -404,7 +404,7 @@ endif
   $(BOOST_LIBS) \
   $(CRYPTO_LIBS)
 
-#bitcoin_tx_SOURCES = bitcoin-tx.cpp 
+#bitcoin_tx_SOURCES = bitcoin-tx.cpp
 #bitcoin_tx_CPPFLAGS = $(BITCOIN_INCLUDES)
 #
 #bitcoin_tx_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
@@ -415,7 +415,7 @@ endif
 #bitcoin_cli_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
 # MCHN START
-  
+
 V8_RELEASE = $(HOME)/local/v8
 V8_DATA_DIR = $(V8_RELEASE)/data
 V8_INCLUDE = -I$(V8_RELEASE)/include
@@ -430,16 +430,14 @@ V8_LIBS = \
         -lv8_libsampler \
         -licuuc \
         -licui18n \
-        -lv8pp \
     -lrt -ldl
-  
+
 v8_libbitcoin_v8data_a_SOURCES = \
   $(V8_DATA_DIR)/icudtl.dat \
   $(V8_DATA_DIR)/natives_blob.bin \
-  $(V8_DATA_DIR)/snapshot_blob.bin \
-  $(V8_DATA_DIR)/snapshot_blob_trusted.bin
+  $(V8_DATA_DIR)/snapshot_blob.bin
 
-# multichaind binary #								
+# multichaind binary #
 multichaind_LDADD = \
   $(LIBBITCOIN_SERVER) \
   $(LIBBITCOIN_COMMON) \
@@ -467,7 +465,7 @@ multichaind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINI
 multichaind_CPPFLAGS = $(BITCOIN_INCLUDES)
 multichaind_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) $(V8_LIBS) -pthread
 
-# multichaind-cold binary #								
+# multichaind-cold binary #
 multichaind_cold_LDADD = \
   $(LIBBITCOIN_SERVER) \
   $(LIBBITCOIN_COMMON) \
@@ -609,10 +607,10 @@ clean-local:
 %.pb.cc %.pb.h: %.proto
 	@test -f $(PROTOC)
 	$(AM_V_GEN) $(PROTOC) --cpp_out=$(@D) --proto_path=$(abspath $(<D) $<)
-	
+
 .bin.o:
 	cd $(dir $<) && objcopy -B i386 -I binary -O elf64-x86-64 $(notdir $<) $(notdir $@)
-	
+
 .dat.o:
 	cd $(dir $<) && objcopy -B i386 -I binary -O elf64-x86-64 $(notdir $<) $(notdir $@)
 
