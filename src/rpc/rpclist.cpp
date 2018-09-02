@@ -100,6 +100,9 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "testtxfilter",           &testtxfilter,           true,      false,      false },
     { "blockchain",         "runtxfilter",            &runtxfilter,            true,      false,      false },
     { "blockchain",         "listblocks",             &listblocks,             true,      false,      false },
+    { "blockchain",         "getassetinfo",           &getassetinfo,           true,      false,      false },
+    { "blockchain",         "getstreaminfo",          &getstreaminfo,          true,      false,      false },
+    { "blockchain",         "verifypermission",       &verifypermission,       true,      false,      false },
 /* MCHN END */    
     
     /* Mining */

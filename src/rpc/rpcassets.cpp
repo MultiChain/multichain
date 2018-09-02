@@ -1478,6 +1478,32 @@ Value gettotalbalances(const Array& params, bool fHelp)
     return  getassetbalances(new_params,fHelp);
 }
 
+Value getassetinfo(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)
+       throw runtime_error("Help message not found\n");
+    
+    if(params[0].type() != str_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset identifier, expected string");                                                        
+    }
+    
+    uint32_t output_level;
+    mc_EntityDetails entity;
+    ParseEntityIdentifier(params[0].get_str(),&entity, MC_ENT_TYPE_ASSET);           
+
+    output_level=0x0F;
+    
+    if (params.size() > 1)    
+    {
+        if(paramtobool(params[1]))
+        {
+            output_level|=0x20;
+        }
+    }
+    
+    return AssetEntry(entity.GetTxID(),-1,output_level);    
+}
 
 Value listassets(const Array& params, bool fHelp)
 {

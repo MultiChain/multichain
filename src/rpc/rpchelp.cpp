@@ -303,7 +303,7 @@ void mc_InitRPCHelpMap02()
             "liststreams ( stream-identifier(s) verbose count start )\n"
             "\nReturns list of defined streams\n"
             "\nArguments:\n"
-            "1. \"stream-identifier(s)\"           (string, optional, default=*, all streams) Stream identifier - one of the following: issue txid, stream reference, stream name.\n"
+            "1. \"stream-identifier(s)\"           (string, optional, default=*, all streams) Stream identifier - one of the following: create txid, stream reference, stream name.\n"
             " or\n"
             "1. stream-identifier(s)             (array, optional) A json array of stream identifiers \n"                
             "2. verbose                          (boolean, optional, default=false) If true, returns stream list of creators \n"
@@ -4291,12 +4291,42 @@ void mc_InitRPCHelpMap18()
             + HelpExampleRpc("getlastblockinfo", "")
         ));
     
+     mapHelpStrings.insert(std::make_pair("getassetinfo",
+            "getassetinfo \"asset-identifier\" ( verbose )\n"
+            "\nReturns information about asset\n"
+            "\nArguments:\n"
+            "1. \"asset-identifier\"               (string, required) Asset identifier - one of the following: issue txid, asset reference, asset name.\n"
+            "2. verbose                          (boolean, optional, default=false) If true, returns list of all issue transactions, including follow-ons \n"
+            "\nResult:\n"
+            "Object with asset details\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("getassetinfo", "myasset")
+            + HelpExampleRpc("getassetinfo", "myasset")
+        ));
+      
+     mapHelpStrings.insert(std::make_pair("getstreaminfo",
+            "getstreaminfo \"stream-identifier\" ( verbose )\n"
+            "\nReturns information about stream\n"
+            "\nArguments:\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: create txid, stream reference, stream name.\n"
+            "2. verbose                          (boolean, optional, default=false) If true, returns list of all issue transactions, including follow-ons \n"
+            "\nResult:\n"
+            "Object with stream details\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("getstreaminfo", "mystream")
+            + HelpExampleRpc("getstreaminfo", "mystream")
+        ));
+      
+    
+   
+}
+
+void mc_InitRPCHelpMap19()
+{
   mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
-       
     
-   
 }
 
 void mc_InitRPCLogParamCountMap()
@@ -4391,6 +4421,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap16();
     mc_InitRPCHelpMap17();
     mc_InitRPCHelpMap18();
+    mc_InitRPCHelpMap19();
     
     mc_InitRPCLogParamCountMap();
     mc_InitRPCAllowedWhenWaitingForUpgradeSet();    

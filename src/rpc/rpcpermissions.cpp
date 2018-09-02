@@ -454,6 +454,11 @@ Value revokecmd(const Array& params, bool fHelp)
     
 }
 
+Value verifypermission(const Array& params, bool fHelp)
+{
+    return Value::null;
+}
+
 Value listpermissions(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 3)
