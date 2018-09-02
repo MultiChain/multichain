@@ -4361,7 +4361,6 @@ void mc_InitRPCHelpMap19()
      mapHelpStrings.insert(std::make_pair("filters",
             "\nThe following APIs are allowed to be called from filter code:\n"
             "                         getfiltertransaction \n"
-            "                         getblock \n"
             "                         getlastblockinfo \n"
             "                         getassetinfo \n"
             "                         getstreaminfo \n"

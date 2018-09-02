@@ -410,21 +410,37 @@ Value getblock(const Array& params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 2)                        // MCHN
         throw runtime_error("Help message not found\n");
 
-    std::string strHash = params[0].get_str();
-    if( strHash.size() < 64 )
+    int nHeight=-1;
+    bool is_hash=true;
+    std::string strHash;
+    
+    if(params[0].type() == int_type)
     {
-        int nHeight;
-        if(!StringToInt(params[0].get_str(),&nHeight))
+        nHeight=params[0].get_int();
+        is_hash=false;
+    }
+    else
+    {
+        strHash = params[0].get_str();
+        if( strHash.size() < 64 )
         {
-            throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height should be integer");
-        }
-        
-//        int nHeight = atoi(params[0].get_str().c_str());
+            if(!StringToInt(params[0].get_str(),&nHeight))
+            {
+                throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height should be integer");
+            }
+            is_hash=false;
+        }        
+    }
+    
+    if(!is_hash)
+    {
         if (nHeight < 0 || nHeight > chainActive.Height())
             throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range");
 
-        strHash=chainActive[nHeight]->GetBlockHash().GetHex();            
+        strHash=chainActive[nHeight]->GetBlockHash().GetHex();                    
     }
+        
+//        int nHeight = atoi(params[0].get_str().c_str());
     uint256 hash(strHash);
 /*
     bool fVerbose = true;
