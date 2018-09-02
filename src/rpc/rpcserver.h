@@ -254,6 +254,10 @@ extern json_spirit::Value getfiltertxid(const json_spirit::Array& params, bool f
 extern json_spirit::Value setfilterparam(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value testtxfilter(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value runtxfilter(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getassetinfo(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getstreaminfo(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value verifypermission(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getfiltertxinput(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value createcmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value createfromcmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value publish(const json_spirit::Array& params, bool fHelp);

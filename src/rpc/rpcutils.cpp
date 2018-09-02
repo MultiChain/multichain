@@ -938,7 +938,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
         {
             entry.push_back(Pair("creators",openers));                    
         }
-        if(output_level & 0x0018)
+        if( ( (output_level & 0x0018)  != 0) && (pMultiChainFilterEngine->m_TxID == 0) )
         {
             entStat.Zero();
             memcpy(&entStat,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
@@ -946,7 +946,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
             if(pwalletTxsMain->FindEntity(&entStat))
             {
                 if(output_level & 0x0008)
-                {
+                {                
                     entry.push_back(Pair("subscribed",true));                                            
                     if(entStat.m_Flags & MC_EFL_NOT_IN_SYNC)
                     {
@@ -1913,7 +1913,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         }
         
         
-        if( ((output_level & 0x0008) != 0) && ((mc_gState->m_WalletMode & MC_WMD_TXS) != 0) )
+        if( ((output_level & 0x0008) != 0) && ((mc_gState->m_WalletMode & MC_WMD_TXS) != 0) && (pMultiChainFilterEngine->m_TxID == 0) )
         {
             entStat.Zero();
             memcpy(&entStat,genesis_entity.GetShortRef(),mc_gState->m_NetworkParams->m_AssetRefSize);

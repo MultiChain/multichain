@@ -96,6 +96,35 @@ void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
     }    
 }
 
+Value getstreaminfo(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)
+       throw runtime_error("Help message not found\n");
+    
+    if(params[0].type() != str_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid stream identifier, expected string");                                                        
+    }
+    
+    uint32_t output_level;
+    mc_EntityDetails entity;
+    ParseEntityIdentifier(params[0].get_str(),&entity, MC_ENT_TYPE_STREAM);           
+
+    output_level=0x1E;
+    
+    if (params.size() > 1)    
+    {
+        if(paramtobool(params[1]))
+        {
+            output_level=0x3E;            
+        }
+    }
+    
+    
+    return StreamEntry(entity.GetTxID(),output_level);
+}
+
+
 Value liststreams(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 4)
