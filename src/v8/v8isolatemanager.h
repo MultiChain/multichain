@@ -4,11 +4,41 @@
 #ifndef V8ISOLATEMANAGER_H_
 #define V8ISOLATEMANAGER_H_
 
+#include <json/json_spirit.h>
 #include <v8.h>
 #include <libplatform/libplatform.h>
 
 namespace mc_v8
 {
+
+/**
+ * Auxiliary data associated with an Isolate.
+ */
+struct IsolateData
+{
+    /**
+     * Indicates if RPC callback data is being accumulated.
+     */
+    bool withCallbackLog;
+
+    /**
+     * Detailed data about RPC callback calls.
+     */
+    json_spirit::Array callbacks;
+
+    IsolateData() : withCallbackLog(false) {}
+
+    /**
+     * Clear callback call data and set tracking indicator.
+     *
+     * @param withCallbackLog The value of the tracking indicator.
+     */
+    void Reset(bool withCallbackLog = false)
+    {
+        this->withCallbackLog = withCallbackLog;
+        this->callbacks.clear();
+    }
+};
 
 /**
  * Manage v8::Isolate objects.
@@ -19,6 +49,7 @@ namespace mc_v8
 class V8IsolateManager
 {
 public:
+
     /**
      * Get the (single) instance of this class.
      */
@@ -29,6 +60,8 @@ public:
      */
     v8::Isolate* GetIsolate();
 
+    IsolateData& GetIsolateData(v8::Isolate* isolate);
+
 private:
     V8IsolateManager();
     ~V8IsolateManager();
@@ -37,6 +70,7 @@ private:
     std::unique_ptr<v8::Platform> m_platform;
     v8::Isolate::CreateParams m_createParams;
     v8::Isolate* m_isolate = nullptr;
+    std::map<v8::Isolate*, IsolateData> m_callbacks;
 };
 
 } /* namespace mc_v8 */

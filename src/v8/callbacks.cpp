@@ -4,8 +4,10 @@
 #include "callbacks.h"
 #include "v8engine.h"
 #include "v8utils.h"
+#include "v8isolatemanager.h"
 #include "utils/util.h"
 #include "rpc/rpcserver.h"
+#include "rpc/rpcprotocol.h"
 #include <cassert>
 
 namespace mc_v8
@@ -24,12 +26,13 @@ typedef void (*fnSanitize)(json_spirit::Value& value);
  * Marshal the arguments and the return value between V8 and json_spirit using intermediate JSON strings.
  * Optionally filter the result before returning it to JS.
  *
+ * @param name        The name of the RPC function.
  * @param rpcFunction The RPC function to call.
  * @param args        The V8 arguments/return value.
  * @param sanitize    An optional function to transform the RPC function result before returning it to JS.
  */
-void CallRpcFunction(rpcfn_type rpcFunction, const v8::FunctionCallbackInfo<v8::Value>& args, fnSanitize sanitize =
-        nullptr)
+void CallRpcFunction(std::string name, rpcfn_type rpcFunction, const v8::FunctionCallbackInfo<v8::Value>& args,
+        fnSanitize sanitize = nullptr)
 {
     v8::Isolate* isolate = args.GetIsolate();
     v8::Locker locker(isolate);
@@ -37,6 +40,9 @@ void CallRpcFunction(rpcfn_type rpcFunction, const v8::FunctionCallbackInfo<v8::
     v8::HandleScope handleScope(isolate);
     v8::Local<v8::Context> context(isolate->GetCurrentContext());
     v8::Context::Scope contextScope(context);
+
+    IsolateData& isolateData = V8IsolateManager::Instance()->GetIsolateData(isolate);
+    json_spirit::Object callbackData;
 
     auto args_array = v8::Array::New(isolate, args.Length());
     for (int i = 0; i < args.Length(); ++i)
@@ -47,43 +53,86 @@ void CallRpcFunction(rpcfn_type rpcFunction, const v8::FunctionCallbackInfo<v8::
     std::string argsString = V82String(isolate, argsJson);
     json_spirit::Value params;
     json_spirit::read_string(argsString, params);
+    if (isolateData.withCallbackLog)
+    {
+        callbackData.push_back(json_spirit::Pair("method", name));
+        callbackData.push_back(json_spirit::Pair("params", params));
+    }
 
+    bool ok = true;
     json_spirit::Value result;
     try
     {
         result = rpcFunction(params.get_array(), false);
-    } catch (...)
+        if (isolateData.withCallbackLog)
+        {
+            bool success = true;
+            if (result.type() == json_spirit::obj_type)
+            {
+                auto obj = result.get_obj();
+                auto it = std::find_if(obj.begin(), obj.end(), [](const json_spirit::Pair& pair) -> bool
+                {
+                    return pair.name_ == "code";
+                });
+                success = (it == obj.end());
+            }
+            callbackData.push_back(json_spirit::Pair("success", success));
+            callbackData.push_back(json_spirit::Pair("result", result));
+        }
+    } catch (json_spirit::Object& e)
     {
         args.GetReturnValue().SetUndefined();
-        return;
-    }
-
-    if (result.is_null())
+        if (isolateData.withCallbackLog)
+        {
+            callbackData.push_back(json_spirit::Pair("success", false));
+            callbackData.push_back(json_spirit::Pair("result", e));
+        }
+        ok = false;
+    } catch (std::exception& e)
     {
         args.GetReturnValue().SetUndefined();
-        return;
+        if (isolateData.withCallbackLog)
+        {
+            callbackData.push_back(json_spirit::Pair("success", false));
+            callbackData.push_back(json_spirit::Pair("result", e.what()));
+        }
+        ok = false;
     }
 
-    if (sanitize != nullptr)
+    if (ok)
     {
-        sanitize(result);
+        if (result.is_null())
+        {
+            args.GetReturnValue().SetUndefined();
+            ok = false;
+        }
+
+        if (sanitize != nullptr)
+        {
+            sanitize(result);
+        }
+
+        std::string resultString = json_spirit::write_string(result, false);
+        v8::Local<v8::String> resultJson = String2V8(isolate, resultString);
+        args.GetReturnValue().Set(v8::JSON::Parse(context, resultJson).ToLocalChecked());
     }
 
-    std::string resultString = json_spirit::write_string(result, false);
-    v8::Local<v8::String> resultJson = String2V8(isolate, resultString);
-    args.GetReturnValue().Set(v8::JSON::Parse(context, resultJson).ToLocalChecked());
+    if (isolateData.withCallbackLog)
+    {
+        isolateData.callbacks.push_back(callbackData);
+    }
 }
 
 #define FILTER_FUNCTION(name)                                           \
     void filter_##name(const v8::FunctionCallbackInfo<v8::Value>& args) \
     {                                                                   \
-        CallRpcFunction(name, args);                                    \
+        CallRpcFunction(#name, name, args);                             \
     }
 
 #define FILTER_FUNCTION_SANITIZE(name, sanitize)                        \
     void filter_##name(const v8::FunctionCallbackInfo<v8::Value>& args) \
     {                                                                   \
-        CallRpcFunction(name, args, sanitize);                          \
+        CallRpcFunction(#name, name, args, sanitize);                   \
     }
 
 FILTER_FUNCTION(getfiltertxid)

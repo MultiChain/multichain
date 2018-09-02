@@ -36,12 +36,20 @@ v8::Isolate* V8IsolateManager::GetIsolate()
     return m_isolate;
 }
 
+IsolateData& V8IsolateManager::GetIsolateData(v8::Isolate* isolate)
+{
+    auto it = m_callbacks.find(isolate);
+    if (it == m_callbacks.end())
+    {
+        auto p = m_callbacks.insert(std::make_pair(isolate, IsolateData()));
+        it = p.first;
+    }
+    return it->second;
+}
+
 V8IsolateManager::V8IsolateManager()
 {
     LogPrint("v8filter", "v8filter: V8IsolateManager::V8IsolateManager\n");
-//    fs::path v8DataDir = fs::path(std::getenv("HOME")) / "local" / "v8" / "data" / "foo";
-//    v8::V8::InitializeICUDefaultLocation(v8DataDir.string().c_str());
-//    v8::V8::InitializeExternalStartupData(v8DataDir.string().c_str());
 
     fs::path tempDir = GetTemporaryPidDirectory();
     fs::path v8TempDir = tempDir / "v8";

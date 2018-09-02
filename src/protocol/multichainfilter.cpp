@@ -330,6 +330,20 @@ int mc_MultiChainFilterEngine::RunFilter(const CTransaction& tx,mc_Filter *filte
     return err;
 }
 
+int mc_MultiChainFilterEngine::RunFilterWithCallbackLog(const CTransaction& tx,mc_Filter *filter,std::string &strResult, json_spirit::Array& callbacks)
+{
+    int err=MC_ERR_NOERROR;
+    m_Tx=tx;
+    m_TxID=m_Tx.GetHash();
+    m_Params.Init();
+
+    err=pFilterEngine->RunFilterWithCallbackLog(filter,strResult, callbacks);
+
+    m_Params.Close();
+    m_TxID=0;
+    return err;
+}
+
 int mc_MultiChainFilterEngine::Initialize()
 {
     mc_Buffer *filters;

@@ -33,4 +33,26 @@ int V8Engine::CreateFilter(std::string script, std::string main_name, V8Filter* 
     return filter->Initialize(script, main_name, strResult);
 }
 
+int V8Engine::RunFilter(V8Filter* filter, std::string& strResult)
+{
+    strResult.clear();
+    if (filter == nullptr)
+    {
+        strResult = "Trying to run an invalid filter";
+        return MC_ERR_NOERROR;
+    }
+    return filter->Run(strResult);
+}
+
+int V8Engine::RunFilterWithCallbackLog(V8Filter* filter, std::string& strResult, json_spirit::Array& callbacks)
+{
+    strResult.clear();
+    if (filter == nullptr)
+    {
+        strResult = "Trying to run an invalid filter";
+        return MC_ERR_NOERROR;
+    }
+    return filter->RunWithCallbackLog(strResult, callbacks);
+}
+
 } // namespace mc_v8

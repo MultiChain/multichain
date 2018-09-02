@@ -83,12 +83,16 @@ int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, mc_
 int mc_FilterEngine::RunFilter(const mc_Filter* filter, std::string& strResult)
 {
     LogPrint("v8filter", "v8filter: mc_FilterEngine::RunFilter\n");
-    strResult.clear();
+
+    auto v8engine = static_cast<mc_v8::V8Engine*>(m_Impl);
     auto v8filter = static_cast<mc_v8::V8Filter*>(filter->m_Impl);
-    if (v8filter == nullptr)
-    {
-        strResult = "Trying to run an invalid filter";
-        return MC_ERR_NOERROR;
-    }
-    return v8filter->Run(strResult);
+    return v8engine->RunFilter(v8filter, strResult);
+}
+
+int mc_FilterEngine::RunFilterWithCallbackLog(const mc_Filter* filter, std::string& strResult, json_spirit::Array& callbacks)
+{
+    LogPrint("v8filter", "v8filter: mc_FilterEngine::RunFilterWithCallbackLog\n");
+    auto v8engine = static_cast<mc_v8::V8Engine*>(m_Impl);
+    auto v8filter = static_cast<mc_v8::V8Filter*>(filter->m_Impl);
+    return v8engine->RunFilterWithCallbackLog(v8filter, strResult, callbacks);
 }
