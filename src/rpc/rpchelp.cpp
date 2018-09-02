@@ -4280,8 +4280,10 @@ void mc_InitRPCHelpMap18()
         ));
     
     mapHelpStrings.insert(std::make_pair("getlastblockinfo",
-            "getlastblockinfo \n"
+            "getlastblockinfo ( skip )\n"
             "\nReturns information about last block in the chain.\n"
+            "\nArguments:\n"
+            "1. skip                            (numeric, optional) The number of blocks to skip. Default 0.\n"
             "\nResult:\n"
             "{\n"
             "  \"hash\" : \"hash\",                  (string) The block hash\n"

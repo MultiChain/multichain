@@ -389,15 +389,42 @@ Value listblocks(const Array& params, bool fHelp)
 
 Value getlastblockinfo(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() > 0)
+    if (fHelp || params.size() > 1)
         throw runtime_error("Help message not found\n");
     
     CBlockIndex* pblockindex = chainActive.Tip();
+    
+    if(params.size() == 1)
+    {
+        if(params[0].type() != int_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Skip should be integer");
+        }
+        
+        int skip=params[0].get_int();
+        if (skip < 0 || skip > chainActive.Height())
+            throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Skip out of range");
+        
+        pblockindex=chainActive[chainActive.Height() - skip];
+    }
    
     Object result;
     result.push_back(Pair("hash", pblockindex->GetBlockHash().GetHex()));
     result.push_back(Pair("height", pblockindex->nHeight));
     result.push_back(Pair("time", pblockindex->GetBlockTime()));
+    result.push_back(Pair("txcount", (int)pblockindex->nTx));
+    
+    CKeyID keyID;
+    Value miner;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    {
+        if(mc_gState->m_Permissions->GetBlockMiner(pblockindex->nHeight,(unsigned char*)&keyID) == MC_ERR_NOERROR)
+        {
+            miner=CBitcoinAddress(keyID).ToString();
+        }
+    }
+    result.push_back(Pair("miner", miner));
+    
     
     return result;    
 }
