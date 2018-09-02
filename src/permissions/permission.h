@@ -333,6 +333,7 @@ typedef struct mc_Permissions
     int CanMine(const void* lpEntity,const void* lpAddress);
     int CanAdmin(const void* lpEntity,const void* lpAddress);    
     int CanActivate(const void* lpEntity,const void* lpAddress);    
+    int CanCustom(const void* lpEntity,const void* lpAddress,uint32_t permission);    
     int FilterApproved(const void* lpEntity,const void* lpAddress);
     
     int CanMineBlock(const void* lpAddress,uint32_t block);

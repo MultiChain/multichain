@@ -456,7 +456,101 @@ Value revokecmd(const Array& params, bool fHelp)
 
 Value verifypermission(const Array& params, bool fHelp)
 {
-    return Value::null;
+    if (fHelp || params.size() != 2)
+        throw runtime_error("Help message not found\n");
+    
+    if(params[0].type() != str_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission, expected string");                                                        
+    }
+    
+    if(params[1].type() != str_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid address, expected string");                                                        
+    }
+    
+    uint32_t type;
+    string entity_identifier, permission_type;
+    entity_identifier="";
+    permission_type="all";
+    if (params.size() > 0 && params[0].type() != null_type)// && !params[0].get_str().empty())
+    {
+        permission_type=params[0].get_str();
+//        int period_pos=permission_type.find_last_of(".",permission_type.size());
+        int period_pos=permission_type.find_last_of(".");
+        
+        if(period_pos >= 0)
+        {
+            entity_identifier=permission_type.substr(0,period_pos);
+            permission_type=permission_type.substr(period_pos+1,permission_type.size());
+        }
+    }
+        
+    mc_EntityDetails entity;
+    const unsigned char *lpEntity;
+    lpEntity=NULL;
+    entity.Zero();
+    if (entity_identifier.size())
+    {        
+        ParseEntityIdentifier(entity_identifier,&entity, MC_ENT_TYPE_ANY);           
+        lpEntity=entity.GetTxID();
+    }
+    
+    type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),&entity);
+    if(type == 0)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
+
+    CBitcoinAddress address(params[1].get_str());
+    if (!address.IsValid())
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+params[1].get_str());            
+
+    CTxDestination dest=address.Get();
+    CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
+    CScriptID *lpScriptID=boost::get<CScriptID> (&dest);
+    
+    void* lpAddress=NULL;
+
+    if(((lpKeyID == NULL) && (lpScriptID == NULL)))
+    {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+params[1].get_str());            
+        return false;                
+    }
+            
+    if(lpKeyID != NULL)
+    {
+        lpAddress=lpKeyID;
+    }
+    else
+    {
+        lpAddress=lpScriptID;
+    }
+    
+    
+    int result=0;
+    switch(type)
+    {
+        case MC_PTP_CONNECT : result = mc_gState->m_Permissions->CanConnect   (lpEntity,lpAddress); break;
+        case MC_PTP_SEND:     result = mc_gState->m_Permissions->CanSend      (lpEntity,lpAddress); break;
+        case MC_PTP_RECEIVE:  result = mc_gState->m_Permissions->CanReceive   (lpEntity,lpAddress); break;
+        case MC_PTP_WRITE:    result = mc_gState->m_Permissions->CanWrite     (lpEntity,lpAddress); break;
+        case MC_PTP_CREATE:   result = mc_gState->m_Permissions->CanCreate    (lpEntity,lpAddress); break;
+        case MC_PTP_ISSUE:    result = mc_gState->m_Permissions->CanIssue     (lpEntity,lpAddress); break;
+        case MC_PTP_ACTIVATE: result = mc_gState->m_Permissions->CanActivate  (lpEntity,lpAddress); break;
+        case MC_PTP_MINE:     result = mc_gState->m_Permissions->CanMine      (lpEntity,lpAddress); break;
+        case MC_PTP_ADMIN:    result = mc_gState->m_Permissions->CanAdmin     (lpEntity,lpAddress); break;
+        case MC_PTP_CUSTOM1:
+        case MC_PTP_CUSTOM2:
+        case MC_PTP_CUSTOM3:
+        case MC_PTP_CUSTOM4:
+        case MC_PTP_CUSTOM5:
+        case MC_PTP_CUSTOM6:
+            result = mc_gState->m_Permissions->CanCustom(lpEntity,lpAddress,type);
+            break;
+        default:
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
+    }    
+    
+    return (result != 0);
 }
 
 Value listpermissions(const Array& params, bool fHelp)

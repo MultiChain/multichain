@@ -1336,6 +1336,20 @@ int mc_Permissions::CanIssue(const void* lpEntity,const void* lpAddress)
     return result;    
 }
 
+int mc_Permissions::CanCustom(const void* lpEntity,const void* lpAddress,uint32_t permission)
+{
+    int result;
+    
+    Lock(0);
+            
+    result=GetPermission(lpEntity,lpAddress,permission);
+    
+    UnLock();
+    
+    return result;        
+}
+
+
 /** Returns 1 if we are still in setup period (NULL entity only) */
 
 int mc_Permissions::IsSetupPeriod()
