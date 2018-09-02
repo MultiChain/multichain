@@ -504,7 +504,7 @@ Value gettxoutsetinfo(const Array& params, bool fHelp)
 Value getfiltertxinput(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)                       
-        throw runtime_error("Help message not found\n");
+        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
     
     int64_t vin = params[0].get_int64();                                          
     int64_t n;

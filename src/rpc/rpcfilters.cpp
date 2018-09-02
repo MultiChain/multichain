@@ -638,13 +638,16 @@ Value getfiltercode(const Array& params, bool fHelp)
 
 Value getfiltertxid(const Array& params, bool fHelp)
 {
+    if (fHelp || params.size() != 0)
+        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
+    
     return pMultiChainFilterEngine->m_TxID.ToString();
 }
 
 Value setfilterparam(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 2)                                            
-        throw runtime_error("Help message not found\n");
+        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
     
     string param_name=params[0].get_str();
     bool fFound=false;

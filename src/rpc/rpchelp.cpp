@@ -4221,6 +4221,7 @@ void mc_InitRPCHelpMap18()
             "{\n"
             "  \"compiled\": true|false,           (boolean) Filter passed compilation\n"
             "  \"passed\": true|false,             (boolean) Passed\n"
+            "  \"callbacks\": callbacks,           (array of objects) Information about callbacks used in the filter\n"
             "  \"reason\": \"rejection reason\",     (boolean) Rejection reason, null if passed\n"
             "  \"time\": x.xxxxxx,                 (numeric) Number of seconds it took to run this transaction through the filter\n"
             "}\n"
@@ -4252,6 +4253,7 @@ void mc_InitRPCHelpMap18()
             "{\n"
             "  \"compiled\": true|false,           (boolean) Filter passed compilation\n"
             "  \"passed\": true|false,             (boolean) Passed\n"
+            "  \"callbacks\": callbacks,           (array of objects) Information about callbacks used in the filter\n"
             "  \"reason\": \"rejection reason\",     (boolean) Rejection reason, null if passed\n"
             "  \"time\": x.xxxxxx,                 (numeric) Number of seconds it took to run this transaction through the filter\n"
             "}\n"
@@ -4336,7 +4338,42 @@ void mc_InitRPCHelpMap19()
             + HelpExampleRpc("verifypermission", "\"send\", \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\"")
         ));
     
-  mapHelpStrings.insert(std::make_pair("AAAAAAA",
+     mapHelpStrings.insert(std::make_pair("getfiltertxinput",
+            "getfiltertxinput(n) \n"
+            "\nReturns details about an unspent transaction output spent in the filtered transaction.\n"
+            "\nArguments:\n"
+            "1. vin                                (numeric, required) Tx input index\n"
+        ));
+     
+     mapHelpStrings.insert(std::make_pair("getfiltertxid",
+            "getfiltertxid  \n"
+            "\nReturns The transaction id of the filtered transaction.\n"
+        ));
+     
+     mapHelpStrings.insert(std::make_pair("setfilterparam",
+             "setfilterparam(\"parameter-name\",parameter-value) \n"
+            "\nSets value for runtime parameter, used for all subsequent filter callbacks\n"
+            "\nArguments:\n"
+            "1. \"parameter-name\"                 (string, required) Parameter name, one of the following:\n"
+            "                                                       maxshowndata, \n"
+            "2. parameter-value                  (required) parameter value\n"
+        ));
+     mapHelpStrings.insert(std::make_pair("filters",
+            "\nThe following APIs are allowed to be called from filter code:\n"
+            "                         getfiltertransaction \n"
+            "                         getblock \n"
+            "                         getlastblockinfo \n"
+            "                         getassetinfo \n"
+            "                         getstreaminfo \n"
+            "                         verifypermission \n"
+            "                         verifymessage \n"
+            "\nThe following additional methods can be called from filter code (see help <method> for details):\n"
+            "                         getfiltertxid \n"
+            "                         getfiltertxinput \n"
+            "                         setfilterparam \n"             
+        ));
+    
+ mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
     

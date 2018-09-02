@@ -154,6 +154,11 @@ static const CRPCCommand vRPCCommands[] =
     { "hidden",             "data-all",               &purehelpitem,           true,      true,       true },
     { "hidden",             "data-with",               &purehelpitem,           true,      true,       true },
     { "hidden",             "addresses-all",          &purehelpitem,           true,      true,       true },
+    
+    { "hidden",             "getfiltertxid",          &purehelpitem,          true,      true,       true },
+    { "hidden",             "getfiltertxinput",       &purehelpitem,         true,      true,       true },
+    { "hidden",             "setfilterparam",         &purehelpitem,         true,      true,       true },
+    { "hidden",             "filters",                &purehelpitem,         true,      true,       true },
 
 #ifdef ENABLE_WALLET
     /* Wallet */
