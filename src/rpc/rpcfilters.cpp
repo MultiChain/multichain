@@ -755,6 +755,8 @@ Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, st
             }
         }        
         
+        Array callbacks;
+        
         strError="";
         if(relevant_filter)
         {
@@ -775,6 +777,7 @@ Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, st
         {
             result.push_back(Pair("passed", true));
         }                
+        result.push_back(Pair("callbacks", callbacks));
     }
 
     if(strReason.size())
