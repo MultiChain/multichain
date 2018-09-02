@@ -11,8 +11,6 @@ extern char _binary_natives_blob_bin_start;
 extern char _binary_natives_blob_bin_end;
 extern char _binary_snapshot_blob_bin_start;
 extern char _binary_snapshot_blob_bin_end;
-extern char _binary_snapshot_blob_trusted_bin_start;
-extern char _binary_snapshot_blob_trusted_bin_end;
 
 namespace mc_v8
 {
@@ -52,15 +50,12 @@ V8IsolateManager::V8IsolateManager()
     fs::path icudtl_blob = v8TempDir / "icudtl.dat";
     fs::path natives_blob = v8TempDir / "natives_blob.bin";
     fs::path snapshot_blob = v8TempDir / "snapshot_blob.bin";
-    fs::path snapshot_blob_trusted = v8TempDir / "snapshot_blob_trusted.bin";
 
     WriteBinaryFile(icudtl_blob, &_binary_icudtl_dat_start, &_binary_icudtl_dat_end - &_binary_icudtl_dat_start);
     WriteBinaryFile(natives_blob, &_binary_natives_blob_bin_start,
             &_binary_natives_blob_bin_end - &_binary_natives_blob_bin_start);
     WriteBinaryFile(snapshot_blob, &_binary_snapshot_blob_bin_start,
             &_binary_snapshot_blob_bin_end - &_binary_snapshot_blob_bin_start);
-    WriteBinaryFile(snapshot_blob_trusted, &_binary_snapshot_blob_trusted_bin_start,
-            &_binary_snapshot_blob_trusted_bin_end - &_binary_snapshot_blob_trusted_bin_start);
 
     v8::V8::InitializeICUDefaultLocation(icudtl_blob.string().c_str());
     v8::V8::InitializeExternalStartupData(natives_blob.string().c_str());
