@@ -133,6 +133,8 @@ int V8Filter::Run(std::string& strResult)
     v8::TryCatch tryCatch(m_isolate);
     auto context = v8::Local<v8::Context>::New(m_isolate, m_context);
     v8::Context::Scope contextScope(context);
+    V8IsolateManager::Instance()->GetIsolateData(m_isolate).Reset();
+
     v8::Local<v8::Value> result;
     auto filterFunction = v8::Local<v8::Function>::New(m_isolate, m_filterFunction);
     if (!filterFunction->Call(context, context->Global(), 0, nullptr).ToLocal(&result))
@@ -147,6 +149,42 @@ int V8Filter::Run(std::string& strResult)
         strResult = V82String(m_isolate, result);
     }
 
+    return MC_ERR_NOERROR;
+}
+
+int V8Filter::RunWithCallbackLog(std::string& strResult, json_spirit::Array& callbacks)
+{
+    LogPrint("v8filter", "v8filter: V8Filter::RunWithCallbackLog\n");
+
+    strResult.clear();
+    callbacks.clear();
+    if (m_context.IsEmpty() || m_filterFunction.IsEmpty())
+    {
+        strResult = "Trying to run an invalid filter";
+        return MC_ERR_NOERROR;
+    }
+    v8::Locker locker(m_isolate);
+    v8::Isolate::Scope isolateScope(m_isolate);
+    v8::HandleScope handleScope(m_isolate);
+    v8::TryCatch tryCatch(m_isolate);
+    auto context = v8::Local<v8::Context>::New(m_isolate, m_context);
+    v8::Context::Scope contextScope(context);
+
+    IsolateData& isolateData = V8IsolateManager::Instance()->GetIsolateData(m_isolate);
+    isolateData.Reset(true);
+
+    v8::Local<v8::Value> result;
+    auto filterFunction = v8::Local<v8::Function>::New(m_isolate, m_filterFunction);
+    if (!filterFunction->Call(context, context->Global(), 0, nullptr).ToLocal(&result))
+    {
+        assert(tryCatch.HasCaught());
+        this->ReportException(&tryCatch, strResult);
+    }
+    else if (result->IsString())
+    {
+        strResult = V82String(m_isolate, result);
+    }
+    callbacks = isolateData.callbacks;
     return MC_ERR_NOERROR;
 }
 
