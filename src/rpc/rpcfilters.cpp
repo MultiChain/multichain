@@ -760,7 +760,7 @@ Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, st
         strError="";
         if(relevant_filter)
         {
-            err=pMultiChainFilterEngine->RunFilter(tx,worker,strError);
+            err=pMultiChainFilterEngine->RunFilterWithCallbackLog(tx,worker,strError,callbacks);
             if(err)
             {
                 errorCode=RPC_INTERNAL_ERROR;

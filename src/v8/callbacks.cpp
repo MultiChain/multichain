@@ -138,12 +138,12 @@ void CallRpcFunction(std::string name, rpcfn_type rpcFunction, const v8::Functio
 FILTER_FUNCTION(getfiltertxid)
 FILTER_FUNCTION(getfiltertransaction)
 FILTER_FUNCTION(setfilterparam)
-FILTER_FUNCTION(gettxout)
+FILTER_FUNCTION(getfiltertxinput)
 FILTER_FUNCTION(getblock)
 FILTER_FUNCTION(getlastblockinfo)
-FILTER_FUNCTION(listassets)
-FILTER_FUNCTION(liststreams)
-FILTER_FUNCTION(listpermissions)
+FILTER_FUNCTION(getassetinfo)
+FILTER_FUNCTION(getstreaminfo)
+FILTER_FUNCTION(verifypermission)
 FILTER_FUNCTION(verifymessage)
 
 } // namespace mc_v8

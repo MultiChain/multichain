@@ -85,12 +85,12 @@ int V8Filter::Initialize(std::string script, std::string functionName, std::stri
     REGISTER_RPC(getfiltertxid);
     REGISTER_RPC(getfiltertransaction);
     REGISTER_RPC(setfilterparam);
-    REGISTER_RPC(gettxout);
+    REGISTER_RPC(getfiltertxinput);
     REGISTER_RPC(getblock);
     REGISTER_RPC(getlastblockinfo);
-    REGISTER_RPC(listassets);
-    REGISTER_RPC(liststreams);
-    REGISTER_RPC(listpermissions);
+    REGISTER_RPC(getassetinfo);
+    REGISTER_RPC(getstreaminfo);
+    REGISTER_RPC(verifypermission);
     REGISTER_RPC(verifymessage);
     auto context = v8::Context::New(m_isolate, nullptr, global);
     m_context.Reset(m_isolate, context);

@@ -501,6 +501,27 @@ Value gettxoutsetinfo(const Array& params, bool fHelp)
     return ret;
 }
 
+Value getfiltertxinput(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)                       
+        throw runtime_error("Help message not found\n");
+    
+    int64_t vin = params[0].get_int64();                                          
+    int64_t n;
+    
+    if( (vin < 0) || (vin >= (unsigned int)pMultiChainFilterEngine->m_Tx.vin.size()) )
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "vin out of range");                    
+    }
+    
+    
+    Array getxoutparams;
+    getxoutparams.push_back(pMultiChainFilterEngine->m_Tx.vin[vin].prevout.hash.ToString());
+    getxoutparams.push_back((int64_t)pMultiChainFilterEngine->m_Tx.vin[vin].prevout.n);
+        
+    return gettxout(getxoutparams,false);
+}
+
 Value gettxout(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 3)                        // MCHN

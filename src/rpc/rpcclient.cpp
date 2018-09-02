@@ -66,6 +66,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "issuemore", 4 },                                                            
     { "getassetinfo", 1 },                                                            
     { "getstreaminfo", 1 },                                                            
+    { "getfiltertxinput", 0 },                                                            
     { "listassets", 0 },
     { "listassets", 1 },                                                            
     { "listassets", 2 },                                                            
