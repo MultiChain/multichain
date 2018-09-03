@@ -4,6 +4,7 @@
 #ifndef V8UTILS_H_
 #define V8UTILS_H_
 
+#include "utils/util.h"
 #include <fstream>
 #include <v8.h>
 #include <boost/filesystem.hpp>
@@ -44,7 +45,7 @@ inline v8::Local<v8::String> String2V8(v8::Isolate* isolate, std::string str)
  */
 inline fs::path GetTemporaryPidDirectory()
 {
-    return fs::path("/tmp") / "multichain" / std::to_string(getpid());
+    return GetDataDir() / std::to_string(getpid());
 }
 
 /**
