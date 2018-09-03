@@ -77,7 +77,7 @@ void CallRpcFunction(std::string name, rpcfn_type rpcFunction, const v8::Functio
                 success = (it == obj.end());
             }
             callbackData.push_back(json_spirit::Pair("success", success));
-            callbackData.push_back(json_spirit::Pair("result", result));
+            callbackData.push_back(json_spirit::Pair(success ? "result" : "error", result));
         }
     } catch (json_spirit::Object& e)
     {
@@ -85,7 +85,7 @@ void CallRpcFunction(std::string name, rpcfn_type rpcFunction, const v8::Functio
         if (isolateData.withCallbackLog)
         {
             callbackData.push_back(json_spirit::Pair("success", false));
-            callbackData.push_back(json_spirit::Pair("result", e));
+            callbackData.push_back(json_spirit::Pair("error", e));
         }
         ok = false;
     } catch (std::exception& e)
