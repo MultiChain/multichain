@@ -110,13 +110,13 @@ Value getstreaminfo(const Array& params, bool fHelp)
     mc_EntityDetails entity;
     ParseEntityIdentifier(params[0].get_str(),&entity, MC_ENT_TYPE_STREAM);           
 
-    output_level=0x1E;
+    output_level=0x06;
     
     if (params.size() > 1)    
     {
         if(paramtobool(params[1]))
         {
-            output_level=0x3E;            
+            output_level=0x26;            
         }
     }
     

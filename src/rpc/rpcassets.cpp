@@ -1492,7 +1492,7 @@ Value getassetinfo(const Array& params, bool fHelp)
     mc_EntityDetails entity;
     ParseEntityIdentifier(params[0].get_str(),&entity, MC_ENT_TYPE_ASSET);           
 
-    output_level=0x0F;
+    output_level=0x07;
     
     if (params.size() > 1)    
     {
