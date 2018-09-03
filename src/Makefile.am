@@ -170,8 +170,14 @@ obj/build.h: FORCE
 	  $(abs_top_srcdir)
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
+V8_SOURCES = \
+  v8/v8isolatemanager.cpp \
+  v8/v8engine.cpp \
+  v8/v8filter.cpp \
+  v8/callbacks.cpp
+
 # server: shared between bitcoind and bitcoin-qt
-libbitcoin_server_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(V8_INCLUDE)
+libbitcoin_server_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS)
 libbitcoin_server_a_SOURCES = \
   storage/addrman.cpp \
   structs/alert.cpp \
@@ -185,11 +191,6 @@ libbitcoin_server_a_SOURCES = \
   protocol/multichainblock.cpp \
   custom/custom_server.cpp \
   protocol/multichainfilter.cpp \
-  protocol/filter.cpp \
-  v8/v8isolatemanager.cpp \
-  v8/v8engine.cpp \
-  v8/v8filter.cpp \
-  v8/callbacks.cpp \
   protocol/relay.cpp \
   protocol/handshake.cpp \
   chain/merkleblock.cpp \
@@ -454,7 +455,7 @@ multichaind_LDADD = \
 #if ENABLE_WALLET
 #multichaind_LDADD += libbitcoin_wallet.a
 #endif
-multichaind_SOURCES = multichain/multichaind.cpp rpc/rpclist.cpp chainparams/buildgenesis.cpp
+multichaind_SOURCES = multichain/multichaind.cpp rpc/rpclist.cpp chainparams/buildgenesis.cpp protocol/filter.cpp $(V8_SOURCES)
 #
 
 if TARGET_WINDOWS
@@ -462,7 +463,7 @@ multichaind_SOURCES += multichaind-res.rc
 endif
 
 multichaind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
-multichaind_CPPFLAGS = $(BITCOIN_INCLUDES)
+multichaind_CPPFLAGS = $(BITCOIN_INCLUDES) $(V8_INCLUDE)
 multichaind_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) $(V8_LIBS) -pthread
 
 # multichaind-cold binary #
@@ -472,7 +473,6 @@ multichaind_cold_LDADD = \
   $(LIBBITCOIN_UNIVALUE) \
   $(LIBBITCOIN_WALLET) \
   $(LIBBITCOIN_MULTICHAIN) \
-  $(LIBBITCOIN_V8DATA) \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBLEVELDB) \
@@ -482,7 +482,7 @@ multichaind_cold_LDADD = \
 #if ENABLE_WALLET
 #multichaind_cold_LDADD += libbitcoin_wallet.a
 #endif
-multichaind_cold_SOURCES = multichain/multichaind-cold.cpp core/init-cold.cpp rpc/rpclist-cold.cpp chainparams/buildgenesis.cpp
+multichaind_cold_SOURCES = multichain/multichaind-cold.cpp core/init-cold.cpp rpc/rpclist-cold.cpp chainparams/buildgenesis.cpp protocol/filter_cold.cpp
 #
 
 if TARGET_WINDOWS
@@ -491,7 +491,7 @@ endif
 
 multichaind_cold_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
 multichaind_cold_CPPFLAGS = $(BITCOIN_INCLUDES)
-multichaind_cold_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) $(V8_LIBS) -pthread
+multichaind_cold_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -pthread
 
 # multichain-cli binary #
 multichain_cli_LDADD = \
