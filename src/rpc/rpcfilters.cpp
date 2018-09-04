@@ -77,64 +77,12 @@ void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript)
 
 string ParseFilterDetails(Value param)
 {
-    string js;
-    bool field_parsed,already_found;
-    
     if(param.type() != str_type)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filter code, expecting string");                            
     }
     
-    if(param.type() == str_type)
-    {
-        return param.get_str();
-    }
-    
-    if(param.type() == obj_type)
-    {
-        Object objParams = param.get_obj();
-        already_found=false;
-        BOOST_FOREACH(const Pair& s, objParams) 
-        {
-            field_parsed=false;
-            if(s.name_ == "js")
-            {
-                if(s.value_.type() == str_type)
-                {
-                    if(already_found)
-                    {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER,"js field can appear only once in the object");                               
-                    }
-                    js=s.value_.get_str();
-                    already_found=true;
-                    field_parsed=true;
-                }
-                else
-                {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid js field, should be string");                    
-                }
-            }            
-            if(!field_parsed)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid field: %s",s.name_.c_str()));                           
-            }
-        }
-        if(!already_found)
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER,"js field is required");                                           
-        }
-        if(js.size() == 0)
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER,"js cannot be empty");                                                       
-        }        
-        
-    }
-    else
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid details, expecting object");                    
-    }
-
-    return js;
+    return param.get_str();
 }
 
 Value createtxfilterfromcmd(const Array& params, bool fHelp)

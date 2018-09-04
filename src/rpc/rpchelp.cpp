@@ -4486,3 +4486,23 @@ Value purehelpitem(const Array& params, bool fHelp)
     
     return Value::null; 
 }
+
+Value purehelpitem_nomethod(const Array& params, bool fHelp)
+{
+    if (fHelp)
+        throw runtime_error("Help message not found\n");
+    
+    throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Method not found");
+
+    return Value::null; 
+}
+
+Value purehelpitem_onlyfilter(const Array& params, bool fHelp)
+{
+    if (fHelp)
+        throw runtime_error("Help message not found\n");
+    
+    throw JSONRPCError(RPC_METHOD_NOT_FOUND, "This method can only be called from within a filter");
+
+    return Value::null; 
+}

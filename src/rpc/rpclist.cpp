@@ -151,14 +151,14 @@ static const CRPCCommand vRPCCommands[] =
     { "hidden",             "invalidateblock",        &invalidateblock,        true,      true,       false },
     { "hidden",             "reconsiderblock",        &reconsiderblock,        true,      true,       false },
     { "hidden",             "setmocktime",            &setmocktime,            true,      false,      false },
-    { "hidden",             "data-all",               &purehelpitem,           true,      true,       true },
-    { "hidden",             "data-with",               &purehelpitem,           true,      true,       true },
-    { "hidden",             "addresses-all",          &purehelpitem,           true,      true,       true },
+    { "hidden",             "data-all",               &purehelpitem_nomethod,           true,      true,       true },
+    { "hidden",             "data-with",              &purehelpitem_nomethod,           true,      true,       true },
+    { "hidden",             "addresses-all",          &purehelpitem_nomethod,           true,      true,       true },
     
-    { "hidden",             "getfiltertxid",          &purehelpitem,          true,      true,       true },
-    { "hidden",             "getfiltertxinput",       &purehelpitem,         true,      true,       true },
-    { "hidden",             "setfilterparam",         &purehelpitem,         true,      true,       true },
-    { "hidden",             "filters",                &purehelpitem,         true,      true,       true },
+    { "hidden",             "getfiltertxid",          &purehelpitem_onlyfilter,          true,      true,       true },
+    { "hidden",             "getfiltertxinput",       &purehelpitem_onlyfilter,         true,      true,       true },
+    { "hidden",             "setfilterparam",         &purehelpitem_onlyfilter,         true,      true,       true },
+    { "hidden",             "filters",                &purehelpitem_nomethod,         true,      true,       true },
 
 #ifdef ENABLE_WALLET
     /* Wallet */

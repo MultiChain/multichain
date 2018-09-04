@@ -282,6 +282,8 @@ extern json_spirit::Value getstreampublishersummary(const json_spirit::Array& pa
 extern json_spirit::Value storechunk(const json_spirit::Array& params, bool fHelp);
 
 extern json_spirit::Value purehelpitem(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value purehelpitem_nomethod(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value purehelpitem_onlyfilter(const json_spirit::Array& params, bool fHelp);
 /* MCHN END */    
 extern json_spirit::Value signmessage(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value verifymessage(const json_spirit::Array& params, bool fHelp);
