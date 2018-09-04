@@ -4277,6 +4277,8 @@ void mc_InitRPCHelpMap18()
             "  \"hash\" : \"hash\",                  (string) The block hash\n"
             "  \"height\" : n,                     (numeric) The block height or index\n"
             "  \"time\" : ttt,                     (numeric) The block time in seconds since epoch (Jan 1 1970 GMT)\n"
+            "  \"txcount\" : n,                    (numeric) Number of transactions in block\n"
+            "  \"miner\" : n,                       (string) The address of the miner\n"
             "}\n"
             "\nExamples:\n"
             + HelpExampleCli("getlastblockinfo", "")
