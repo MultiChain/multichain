@@ -497,9 +497,10 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
 
 Value getfiltertransaction(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() > 1)                        
+    if (fHelp || params.size() != 0)                        
         throw runtime_error("Help message not found\n");
 
+/*    
     CTransaction tx;
     uint256 hashBlock = 0;
     if(pMultiChainFilterEngine->m_TxID != 0)
@@ -522,9 +523,9 @@ Value getfiltertransaction(const Array& params, bool fHelp)
         if (!GetTransaction(hash, tx, hashBlock, true))
             throw JSONRPCError(RPC_TX_NOT_FOUND, "No information available about transaction");
     }
-    
+*/    
     Object result;
-    TxToJSON(tx, 0, result);
+    TxToJSON(pMultiChainFilterEngine->m_Tx, 0, result);
     
     return result;    
 }

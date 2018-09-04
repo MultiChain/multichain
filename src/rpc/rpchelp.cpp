@@ -4263,20 +4263,8 @@ void mc_InitRPCHelpMap18()
         ));
      
      mapHelpStrings.insert(std::make_pair("getfiltertransaction",
-            "getfiltertransaction \"txid\"\n"
-            "\nNOTE: When called from the filter code, txid parameter should be omitted\n"
-            "\nReturns an object with information about filtered transaction as it is received by the filter code.\n"
-
-            "\nArguments:\n"
-            "1. \"txid\"                           (string, required) The transaction id, omitted when called from the filter code\n"
-
-            "\nResult\n"
-            "Object with information about filtered transaction\n"            
-
-            "\nExamples:\n"
-            + HelpExampleCli("getfiltertransaction", "\"mytxid\"")
-            + HelpExampleCli("getfiltertransaction", "\"mytxid\" 1")
-            + HelpExampleRpc("getfiltertransaction", "\"mytxid\", 1")
+            "getfiltertransaction\n"
+            "\nReturns an object with information about filtered transaction.\n"
         ));
     
     mapHelpStrings.insert(std::make_pair("getlastblockinfo",
@@ -4362,13 +4350,13 @@ void mc_InitRPCHelpMap19()
         ));
      mapHelpStrings.insert(std::make_pair("filters",
             "\nThe following APIs are allowed to be called from filter code:\n"
-            "                         getfiltertransaction \n"
             "                         getlastblockinfo \n"
             "                         getassetinfo \n"
             "                         getstreaminfo \n"
             "                         verifypermission \n"
             "                         verifymessage \n"
             "\nThe following additional methods can be called from filter code (see help <method> for details):\n"
+            "                         getfiltertransaction \n"
             "                         getfiltertxid \n"
             "                         getfiltertxinput \n"
             "                         setfilterparam \n"             

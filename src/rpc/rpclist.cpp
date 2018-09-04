@@ -125,7 +125,6 @@ static const CRPCCommand vRPCCommands[] =
     { "rawtransactions",    "decoderawtransaction",   &decoderawtransaction,   true,      false,      false },
     { "rawtransactions",    "decodescript",           &decodescript,           true,      false,      false },
     { "rawtransactions",    "getrawtransaction",      &getrawtransaction,      true,      false,      false },
-    { "rawtransactions",    "getfiltertransaction",   &getfiltertransaction,      true,      false,      false },
     { "rawtransactions",    "sendrawtransaction",     &sendrawtransaction,     false,     false,      false },
     { "rawtransactions",    "signrawtransaction",     &signrawtransaction,     false,     false,      false }, /* uses wallet if enabled */
 /* MCHN START */    
@@ -155,6 +154,7 @@ static const CRPCCommand vRPCCommands[] =
     { "hidden",             "data-with",              &purehelpitem_nomethod,           true,      true,       true },
     { "hidden",             "addresses-all",          &purehelpitem_nomethod,           true,      true,       true },
     
+    { "hidden",             "getfiltertransaction",   &purehelpitem_onlyfilter,      true,      false,      false },
     { "hidden",             "getfiltertxid",          &purehelpitem_onlyfilter,          true,      true,       true },
     { "hidden",             "getfiltertxinput",       &purehelpitem_onlyfilter,         true,      true,       true },
     { "hidden",             "setfilterparam",         &purehelpitem_onlyfilter,         true,      true,       true },
