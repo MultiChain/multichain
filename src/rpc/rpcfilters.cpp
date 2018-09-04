@@ -237,7 +237,6 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
 
     js=ParseFilterDetails(params[4]);
 
-/*    
     mc_Filter *worker=new mc_Filter;
     err=pFilterEngine->CreateFilter(js.c_str(),MC_FLT_MAIN_NAME_TX,worker,strError);
     delete worker;
@@ -247,9 +246,9 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
     }
     if(strError.size())
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER,strprintf("Couldn't create filter: %s",strError.c_str()));                                                                               
+        throw JSONRPCError(RPC_INVALID_PARAMETER,strprintf("Couldn't compile filter code: %s",strError.c_str()));                                                                               
     }
-*/    
+    
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)js.c_str(),js.size());                                                        
     
     
