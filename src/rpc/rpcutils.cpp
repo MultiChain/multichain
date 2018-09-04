@@ -676,11 +676,11 @@ Object TxFilterEntry(const unsigned char *txid,uint32_t output_level)
 
             if(ptr)
             {   
-                entry.push_back(Pair("codelen", value_size));                
+                entry.push_back(Pair("codelength", value_size));                
             }
             else
             {
-                entry.push_back(Pair("codelen", 0));                
+                entry.push_back(Pair("codelength", 0));                
             }
             
             ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_FILTER_ENTITY,&value_size);

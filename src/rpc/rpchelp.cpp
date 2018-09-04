@@ -4303,7 +4303,7 @@ void mc_InitRPCHelpMap18()
             "\nReturns information about stream\n"
             "\nArguments:\n"
             "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: create txid, stream reference, stream name.\n"
-            "2. verbose                          (boolean, optional, default=false) If true, returns list of all issue transactions, including follow-ons \n"
+            "2. verbose                          (boolean, optional, default=false) If true, returns stream list of creators \n"
             "\nResult:\n"
             "Object with stream details\n"            
             "\nExamples:\n"
