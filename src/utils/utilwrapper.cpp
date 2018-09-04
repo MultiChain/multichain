@@ -829,7 +829,6 @@ int mc_MultichainParams::SetGlobals()
         if(MCP_ANYONE_CAN_ISSUE)MCP_ANYONE_CAN_SEND=1;
     }
     MCP_MINIMUM_PER_OUTPUT=mc_gState->m_NetworkParams->GetInt64Param("minimumperoutput");
-    MCP_ALLOW_FILTERS=mc_gState->m_NetworkParams->GetInt64Param("allowfilters");
     MCP_ALLOW_MULTISIG_OUTPUTS=mc_gState->m_NetworkParams->GetInt64Param("allowmultisigoutputs");
     MCP_ALLOW_P2SH_OUTPUTS=mc_gState->m_NetworkParams->GetInt64Param("allowp2shoutputs");
     MCP_WITH_NATIVE_CURRENCY=0;

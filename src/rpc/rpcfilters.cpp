@@ -98,11 +98,6 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
     }   
     
-    if(MCP_ALLOW_FILTERS == 0)
-    {
-        throw JSONRPCError(RPC_NOT_ALLOWED, "Filters are not allowed in this chain.");        
-    }   
-    
     CWalletTx wtx;
     
     mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;    
