@@ -459,12 +459,12 @@ Value verifypermission(const Array& params, bool fHelp)
     if (fHelp || params.size() != 2)
         throw runtime_error("Help message not found\n");
     
-    if(params[0].type() != str_type)
+    if(params[1].type() != str_type)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission, expected string");                                                        
     }
     
-    if(params[1].type() != str_type)
+    if(params[0].type() != str_type)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid address, expected string");                                                        
     }
@@ -473,9 +473,9 @@ Value verifypermission(const Array& params, bool fHelp)
     string entity_identifier, permission_type;
     entity_identifier="";
     permission_type="all";
-    if (params.size() > 0 && params[0].type() != null_type)// && !params[0].get_str().empty())
+    if (params.size() > 0 && params[1].type() != null_type)// && !params[0].get_str().empty())
     {
-        permission_type=params[0].get_str();
+        permission_type=params[1].get_str();
 //        int period_pos=permission_type.find_last_of(".",permission_type.size());
         int period_pos=permission_type.find_last_of(".");
         
@@ -500,7 +500,7 @@ Value verifypermission(const Array& params, bool fHelp)
     if(type == 0)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
 
-    CBitcoinAddress address(params[1].get_str());
+    CBitcoinAddress address(params[0].get_str());
     if (!address.IsValid())
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+params[1].get_str());            
 

@@ -4328,16 +4328,16 @@ void mc_InitRPCHelpMap18()
 void mc_InitRPCHelpMap19()
 {
     mapHelpStrings.insert(std::make_pair("verifypermission",
-            "verifypermission \"permission\" \"address\" \n"
+            "verifypermission \"address\" \"permission\" \n"
             "\nReturns true if address has specified permission.\n"
             "\nArguments:\n"
-            "1. \"permission\"                   (string, required) Permission string. Possible values: " + AllowedPermissions() + ". \n"                
-            "2. \"address\"                      (string, required) The address to verify permission for. \n"
+            "1. \"address\"                      (string, required) The address to verify permission for. \n"
+            "2. \"permission\"                   (string, required) Permission string. Possible values: " + AllowedPermissions() + ". \n"                
             "\nResult:\n"
             "True if address has specified permission\n"            
             "\nExamples:\n"
-            + HelpExampleCli("verifypermission", "send \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\"" )
-            + HelpExampleRpc("verifypermission", "\"send\", \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\"")
+            + HelpExampleCli("verifypermission", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" send" )
+            + HelpExampleRpc("verifypermission", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"send\"")
         ));
     
      mapHelpStrings.insert(std::make_pair("getfiltertxinput",
