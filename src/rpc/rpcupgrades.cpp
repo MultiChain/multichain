@@ -306,24 +306,54 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
 
     mc_EntityDetails entity;
     entity.Zero();
-    ParseEntityIdentifier(entity_identifier,&entity, MC_ENT_TYPE_UPGRADE);           
-
-    if( mc_gState->m_NetworkParams->ProtocolVersion() >= mc_gState->MinProtocolForbiddenDowngradeVersion() )
+    ParseEntityIdentifier(entity_identifier,&entity, MC_ENT_TYPE_ANY);           
+    
+    string entity_nameU; 
+    string entity_nameL; 
+    bool fIsUpgrade=true;
+    
+    switch(entity.GetEntityType())
     {
-        if(entity.UpgradeProtocolVersion())
-        {
-            if(entity.UpgradeProtocolVersion() < mc_gState->m_NetworkParams->ProtocolVersion())
+        case MC_ENT_TYPE_UPGRADE:
+            entity_nameU="Upgrade";
+            entity_nameL="upgrade";
+            break;
+        case MC_ENT_TYPE_FILTER:
+            if(mc_gState->m_Features->Filters() == 0)
             {
-                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid protocol version, cannot downgrade from current version");
-            }                    
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
+            }   
+            entity_nameU="Filter";
+            entity_nameL="filter";
+            fIsUpgrade=false;
+            break;
+        default:
+            throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Invalid identifier, should be upgrade or filter");                                
+            break;
+    }
+
+    if(fIsUpgrade)
+    {
+        if( mc_gState->m_NetworkParams->ProtocolVersion() >= mc_gState->MinProtocolForbiddenDowngradeVersion() )
+        {
+            if(entity.UpgradeProtocolVersion())
+            {
+                if(entity.UpgradeProtocolVersion() < mc_gState->m_NetworkParams->ProtocolVersion())
+                {
+                    throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid protocol version, cannot downgrade from current version");
+                }                    
+            }
         }
     }
     
-    if(mc_gState->m_Permissions->IsApproved(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,0))
+    if(fIsUpgrade)
     {
-        throw JSONRPCError(RPC_NOT_ALLOWED, "Upgrade already approved");                                
+        if(mc_gState->m_Permissions->IsApproved(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,0))
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Upgrade already approved");                                
+        }
     }
-
+    
     vector<CTxDestination> fromaddresses;       
     fromaddresses=ParseAddresses(params[0].get_str(),false,false);
 
@@ -352,21 +382,33 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
     mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
     lpScript->Clear();
     
-    lpScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);        
-    lpScript->SetApproval(approval, timestamp);
-    
-    size_t elem_size;
-    const unsigned char *elem;
     CScript scriptOpReturn=CScript();
     
-    for(int e=0;e<lpScript->GetNumElements();e++)
+    if(fIsUpgrade)
     {
-        elem = lpScript->GetData(e,&elem_size);
-        scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
-    }    
-    scriptOpReturn << OP_RETURN;
+        lpScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);        
+        lpScript->SetApproval(approval, timestamp);
+        size_t elem_size;
+        const unsigned char *elem;
+
+        for(int e=0;e<lpScript->GetNumElements();e++)
+        {
+            elem = lpScript->GetData(e,&elem_size);
+            scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
+        }    
+        scriptOpReturn << OP_RETURN;
+    }
+    else
+    {
+        lpScript->SetPermission(MC_PTP_FILTER,0,approval ? 4294967295U : 0,timestamp);
+        uint160 filter_address;
+        filter_address=0;
+        memcpy(&filter_address,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+        addresses.push_back(CKeyID(filter_address));
+    }
     
-    LogPrintf("mchn: %s upgrade %s (%s) from address %s\n",(approval != 0) ? "Approving" : "Disapproving",
+    
+    LogPrintf("mchn: %s %s %s (%s) from address %s\n",(approval != 0) ? "Approving" : "Disapproving",entity_nameL.c_str(),
             ((uint256*)entity.GetTxID())->ToString().c_str(),entity.GetName(),CBitcoinAddress(fromaddresses[0]).ToString().c_str());
         
     

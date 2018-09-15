@@ -16,19 +16,19 @@ src/qt/test/test_bitcoin-qt
 Makefile.in
 aclocal.m4
 autom4te.cache/
-build-aux/config.guess
-build-aux/config.sub
-build-aux/depcomp
-build-aux/install-sh
-build-aux/ltmain.sh
-build-aux/m4/libtool.m4
-build-aux/m4/lt~obsolete.m4
-build-aux/m4/ltoptions.m4
-build-aux/m4/ltsugar.m4
-build-aux/m4/ltversion.m4
-build-aux/missing
-build-aux/compile
-build-aux/test-driver
+**/build-aux/config.guess
+**/build-aux/config.sub
+**/build-aux/depcomp
+**/build-aux/install-sh
+**/build-aux/ltmain.sh
+**/build-aux/m4/libtool.m4
+**/build-aux/m4/lt~obsolete.m4
+**/build-aux/m4/ltoptions.m4
+**/build-aux/m4/ltsugar.m4
+**/build-aux/m4/ltversion.m4
+**/build-aux/missing
+**/build-aux/compile
+**/build-aux/test-driver
 config.log
 config.status
 configure
@@ -115,7 +115,14 @@ qa/pull-tester/run-bitcoind-for-test.sh
 qa/pull-tester/tests-config.sh
 qa/pull-tester/cache/*
 qa/pull-tester/test.*/*
+test_filters.sh
 
 !src/leveldb*/Makefile
 
 /doc/doxygen/
+
+# Eclipse CDT
+.autotools
+.cproject
+.project
+.settings/

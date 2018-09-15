@@ -35,6 +35,8 @@
 
 extern mc_WalletTxs* pwalletTxsMain;
 extern mc_RelayManager* pRelayManager;
+extern mc_FilterEngine* pFilterEngine;
+extern mc_MultiChainFilterEngine* pMultiChainFilterEngine;
 
 /* MCHN END */
 
@@ -2833,6 +2835,10 @@ bool static DisconnectTip(CValidationState &state) {
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Rolling back permission and asset databases\n");
     mc_gState->m_Permissions->RollBack(old_height-1);
     mc_gState->m_Assets->RollBack(old_height-1);
+    if(pMultiChainFilterEngine)
+    {
+        pMultiChainFilterEngine->Reset(old_height-1);
+    }
     
     MultichainNode_ApplyUpgrades(old_height-1);        
     if(mc_gState->m_WalletMode & MC_WMD_TXS)
@@ -2908,6 +2914,10 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     int64_t nTime2 = GetTimeMicros(); nTimeReadFromDisk += nTime2 - nTime1;
     int64_t nTime3;
     if(fDebug)LogPrint("bench", "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
+    if(pMultiChainFilterEngine)
+    {
+        pMultiChainFilterEngine->Reset(pindexNew->nHeight-1);
+    }
     {
         CCoinsViewCache view(pcoinsTip);
         CInv inv(MSG_BLOCK, pindexNew->GetBlockHash());
@@ -3331,7 +3341,11 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     {
         mc_gState->m_Permissions->ClearMemPool();
         mc_gState->m_Assets->ClearMemPool();
-
+        if(pMultiChainFilterEngine)
+        {
+            pMultiChainFilterEngine->Reset(chainActive.Height());
+        }
+        
         if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Replaying mempool\n");
         ReplayMemPool(mempool,0,true);
         if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Defragmenting mempool hash list\n");

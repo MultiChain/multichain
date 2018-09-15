@@ -639,11 +639,13 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                             int n=(int)mc_GetLE(ptr,4);
                             if(n >= 0)
                             {
-                                param_value=((double)n+mc_gState->m_NetworkParams->ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
+//                                param_value=((double)n+mc_gState->m_NetworkParams->ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
+                                param_value=((double)n)/MC_PRM_DECIMAL_GRANULARITY;
                             }
                             else
                             {
-                                param_value=-((double)(-n)+mc_gState->m_NetworkParams->ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;                                        
+//                                param_value=-((double)(-n)+mc_gState->m_NetworkParams->ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;                                        
+                                param_value=-((double)(-n))/MC_PRM_DECIMAL_GRANULARITY;                                        
                             }
                         }
                         else
@@ -654,7 +656,8 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                     case MC_PRM_UINT32:
                         if((mc_gState->m_NetworkParams->m_lpParams+i)->m_Type & MC_PRM_DECIMAL)
                         {
-                            param_value=((double)mc_GetLE(ptr,4)+mc_gState->m_NetworkParams->ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
+//                            param_value=((double)mc_GetLE(ptr,4)+mc_gState->m_NetworkParams->ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
+                            param_value=((double)mc_GetLE(ptr,4))/MC_PRM_DECIMAL_GRANULARITY;
                         }
                         else
                         {

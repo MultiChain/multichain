@@ -77,6 +77,7 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "getblockchaininfo",      &getblockchaininfo,      true,      false,      false },
     { "blockchain",         "getbestblockhash",       &getbestblockhash,       true,      false,      false },
     { "blockchain",         "getblockcount",          &getblockcount,          true,      false,      false },
+    { "blockchain",         "getlastblockinfo",       &getlastblockinfo,       true,      false,      false },
     { "blockchain",         "getblock",               &getblock,               true,      false,      false },
     { "blockchain",         "getblockhash",           &getblockhash,           true,      false,      false },
     { "blockchain",         "getchaintips",           &getchaintips,           true,      false,      false },
@@ -94,7 +95,14 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "listpermissions",        &listpermissions,        true,      false,      false },
     { "blockchain",         "liststreams",            &liststreams,            true,      false,      false },
     { "blockchain",         "listupgrades",           &listupgrades,           true,      false,      false },
+    { "blockchain",         "listtxfilters",          &listtxfilters,            true,      false,      false },
+    { "blockchain",         "getfiltercode",          &getfiltercode,          true,      false,      false },
+    { "blockchain",         "testtxfilter",           &testtxfilter,           true,      false,      false },
+    { "blockchain",         "runtxfilter",            &runtxfilter,            true,      false,      false },
     { "blockchain",         "listblocks",             &listblocks,             true,      false,      false },
+    { "blockchain",         "getassetinfo",           &getassetinfo,           true,      false,      false },
+    { "blockchain",         "getstreaminfo",          &getstreaminfo,          true,      false,      false },
+    { "blockchain",         "verifypermission",       &verifypermission,       true,      false,      false },
 /* MCHN END */    
     
     /* Mining */
@@ -142,9 +150,15 @@ static const CRPCCommand vRPCCommands[] =
     { "hidden",             "invalidateblock",        &invalidateblock,        true,      true,       false },
     { "hidden",             "reconsiderblock",        &reconsiderblock,        true,      true,       false },
     { "hidden",             "setmocktime",            &setmocktime,            true,      false,      false },
-    { "hidden",             "data-all",               &purehelpitem,           true,      true,       true },
-    { "hidden",             "data-with",               &purehelpitem,           true,      true,       true },
-    { "hidden",             "addresses-all",          &purehelpitem,           true,      true,       true },
+    { "hidden",             "data-all",               &purehelpitem_nomethod,           true,      true,       true },
+    { "hidden",             "data-with",              &purehelpitem_nomethod,           true,      true,       true },
+    { "hidden",             "addresses-all",          &purehelpitem_nomethod,           true,      true,       true },
+    
+    { "hidden",             "getfiltertransaction",   &purehelpitem_onlyfilter,      true,      false,      false },
+    { "hidden",             "getfiltertxid",          &purehelpitem_onlyfilter,          true,      true,       true },
+    { "hidden",             "getfiltertxinput",       &purehelpitem_onlyfilter,         true,      true,       true },
+    { "hidden",             "setfilterparam",         &purehelpitem_onlyfilter,         true,      true,       true },
+    { "hidden",             "filters",                &purehelpitem_nomethod,         true,      true,       true },
 
 #ifdef ENABLE_WALLET
     /* Wallet */

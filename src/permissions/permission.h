@@ -15,16 +15,31 @@
 #define MC_PTP_ISSUE            0x00000010
 #define MC_PTP_CREATE           0x00000020
 #define MC_PTP_MINE             0x00000100
+#define MC_PTP_CUSTOM1          0x00000200
+#define MC_PTP_CUSTOM2          0x00000400
+#define MC_PTP_CUSTOM3          0x00000800
 #define MC_PTP_ADMIN            0x00001000
 #define MC_PTP_ACTIVATE         0x00002000
 #define MC_PTP_UPGRADE          0x00010000
+#define MC_PTP_CUSTOM4          0x00020000
+#define MC_PTP_CUSTOM5          0x00040000
+#define MC_PTP_CUSTOM6          0x00080000
 #define MC_PTP_BLOCK_MINER      0x01000000
 #define MC_PTP_BLOCK_INDEX      0x02000000
+#define MC_PTP_FILTER           0x04000000
 #define MC_PTP_SPECIFIED        0x80000000
 #define MC_PTP_ALL              0x00FFFFFF
 #define MC_PTP_GLOBAL_ALL       0x00003137
+#define MC_PTP_CUSTOM_ALL       0x000E0E00
 
 #define MC_PTP_CACHED_SCRIPT_REQUIRED      0x02000000                           // Special temporary value for coin selection
+
+#define MC_PTN_CUSTOM1          "low1"
+#define MC_PTN_CUSTOM2          "low2"
+#define MC_PTN_CUSTOM3          "low3"
+#define MC_PTN_CUSTOM4          "high1"
+#define MC_PTN_CUSTOM5          "high2"
+#define MC_PTN_CUSTOM6          "high3"
 
 
 #define MC_PFL_NONE             0x00000000
@@ -297,6 +312,8 @@ typedef struct mc_Permissions
     uint32_t GetPermissionType(const char *str,const void *entity_details);
     uint32_t GetPossiblePermissionTypes(uint32_t entity_type);
     uint32_t GetPossiblePermissionTypes(const void *entity_details);
+    uint32_t GetCustomLowPermissionTypes();
+    uint32_t GetCustomHighPermissionTypes();
     
     int GetAdminCount();
     int GetMinerCount();
@@ -316,6 +333,8 @@ typedef struct mc_Permissions
     int CanMine(const void* lpEntity,const void* lpAddress);
     int CanAdmin(const void* lpEntity,const void* lpAddress);    
     int CanActivate(const void* lpEntity,const void* lpAddress);    
+    int CanCustom(const void* lpEntity,const void* lpAddress,uint32_t permission);    
+    int FilterApproved(const void* lpEntity,const void* lpAddress);
     
     int CanMineBlock(const void* lpAddress,uint32_t block);
     

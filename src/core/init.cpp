@@ -66,6 +66,8 @@ CWallet* pwalletMain = NULL;
 mc_WalletTxs* pwalletTxsMain = NULL;
 #endif
 mc_RelayManager* pRelayManager = NULL;
+mc_FilterEngine* pFilterEngine = NULL;
+mc_MultiChainFilterEngine* pMultiChainFilterEngine = NULL;
 bool fFeeEstimatesInitialized = false;
 extern int JSON_DOUBLE_DECIMAL_DIGITS;                             
 
@@ -225,6 +227,19 @@ void Shutdown()
         delete pRelayManager;
         pRelayManager=NULL;        
     }
+    
+    if(pMultiChainFilterEngine)
+    {
+        delete pMultiChainFilterEngine;
+        pMultiChainFilterEngine=NULL;        
+    }
+    
+    if(pFilterEngine)
+    {
+        delete pFilterEngine;
+        pFilterEngine=NULL;        
+    }
+    
 /* MCHN END */  
 #endif
     globalVerifyHandle.reset();
@@ -1873,6 +1888,20 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             return InitError(_("Failed to listen on any port. Use -listen=0 if you want this."));
     }
 /* MCHN START */    
+    std::string strResult;
+    pFilterEngine=new mc_FilterEngine();
+    if (pFilterEngine->Initialize(strResult) != MC_ERR_NOERROR)
+    {
+        return InitError(strprintf(_("Couldn't initialize filter engine: '%s'"), strResult));
+    }
+    
+    pMultiChainFilterEngine=new mc_MultiChainFilterEngine;
+    if(pMultiChainFilterEngine->Initialize())
+    {
+        return InitError(_("Couldn't initialize filter engine."));        
+    }
+    
+    
     pRelayManager=new mc_RelayManager;
     
     int max_ips=64;

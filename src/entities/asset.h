@@ -31,14 +31,15 @@
 
 
 
-#define MC_ENT_REF_SIZE                 10
-#define MC_ENT_REF_PREFIX_SIZE           2
-#define MC_ENT_MAX_NAME_SIZE            32
-#define MC_ENT_MAX_ITEM_KEY_SIZE       256
-#define MC_ENT_MAX_SCRIPT_SIZE        4096
-#define MC_ENT_MAX_FIXED_FIELDS_SIZE   128 
-#define MC_ENT_MAX_STORED_ISSUERS      128 
-#define MC_ENT_SCRIPT_ALLOC_SIZE      8192 // > MC_ENT_MAX_SCRIPT_SIZE + MC_ENT_MAX_FIXED_FIELDS_SIZE + 27*MC_ENT_MAX_STORED_ISSUERS
+#define MC_ENT_REF_SIZE                                10
+#define MC_ENT_REF_PREFIX_SIZE                          2
+#define MC_ENT_MAX_NAME_SIZE                           32
+#define MC_ENT_MAX_ITEM_KEY_SIZE                      256
+#define MC_ENT_MAX_SCRIPT_SIZE_BEFORE_FILTERS        4096
+#define MC_ENT_MAX_SCRIPT_SIZE                      65536
+#define MC_ENT_MAX_FIXED_FIELDS_SIZE                  128 
+#define MC_ENT_MAX_STORED_ISSUERS                     128 
+#define MC_ENT_SCRIPT_ALLOC_SIZE                    66000 // > MC_ENT_MAX_SCRIPT_SIZE + MC_ENT_MAX_FIXED_FIELDS_SIZE + 27*MC_ENT_MAX_STORED_ISSUERS
 
 #define MC_ENT_KEY_SIZE              32
 #define MC_ENT_KEYTYPE_TXID           0x00000001
@@ -54,7 +55,8 @@
 #define MC_ENT_TYPE_STREAM            0x02
 #define MC_ENT_TYPE_STREAM_MAX        0x0F
 #define MC_ENT_TYPE_UPGRADE           0x10
-#define MC_ENT_TYPE_MAX               0x10
+#define MC_ENT_TYPE_FILTER            0x11
+#define MC_ENT_TYPE_MAX               0x11
 
 #define MC_ENT_SPRM_NAME                      0x01
 #define MC_ENT_SPRM_FOLLOW_ONS                0x02
@@ -67,6 +69,9 @@
 #define MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION  0x42
 #define MC_ENT_SPRM_UPGRADE_START_BLOCK       0x43
 #define MC_ENT_SPRM_UPGRADE_CHAIN_PARAMS      0x44
+#define MC_ENT_SPRM_FILTER_ENTITY             0x45
+#define MC_ENT_SPRM_FILTER_CODE               0x46
+#define MC_ENT_SPRM_FILTER_TYPE               0x47
 
 #define MC_ENT_SPRM_TIMESTAMP                 0x81
 #define MC_ENT_SPRM_CHUNK_HASH                0x82
@@ -227,6 +232,7 @@ typedef struct mc_AssetDB
     mc_EntityLedger *m_Ledger;
     
     mc_Buffer   *m_MemPool;
+    mc_Buffer   *m_TmpRelevantEntities;
     
     char m_Name[MC_PRM_NETWORK_NAME_MAX_SIZE+1]; 
     int m_Block;
@@ -275,6 +281,7 @@ typedef struct mc_AssetDB
     
     void RemoveFiles();
     uint32_t MaxEntityType();
+    int MaxScriptSize();
     int MaxStoredIssuers();
     
 //Internal functions    
