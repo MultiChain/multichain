@@ -495,6 +495,41 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     }
 }
 
+Value getfiltertransaction(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)                        
+        throw runtime_error("Help message not found\n");
+
+/*    
+    CTransaction tx;
+    uint256 hashBlock = 0;
+    if(pMultiChainFilterEngine->m_TxID != 0)
+    {
+        if(params.size())
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMS, "TxID parameter should be omitted when called from filter");            
+        }
+        tx=pMultiChainFilterEngine->m_Tx;
+    }
+    else
+    {
+        if(params.size() == 0)
+        {
+            throw runtime_error("Help message not found\n");
+        }        
+        uint256 hash = ParseHashV(params[0], "parameter 1");
+
+
+        if (!GetTransaction(hash, tx, hashBlock, true))
+            throw JSONRPCError(RPC_TX_NOT_FOUND, "No information available about transaction");
+    }
+*/    
+    Object result;
+    TxToJSON(pMultiChainFilterEngine->m_Tx, 0, result);
+    
+    return result;    
+}
+
 Value getrawtransaction(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)                        // MCHN

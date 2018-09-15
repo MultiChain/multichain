@@ -720,11 +720,16 @@ uint32_t mc_Permissions::GetPossiblePermissionTypes(const void* entity_details)
     {
         if(entity->GetEntityType())
         {
-            return entity->Permissions();
+            full_type = entity->Permissions();
+            full_type |= GetCustomLowPermissionTypes();
+            full_type |= GetCustomHighPermissionTypes();
+            return full_type;
         }
     }
     
     full_type = MC_PTP_GLOBAL_ALL;
+    full_type |= GetCustomLowPermissionTypes();
+    full_type |= GetCustomHighPermissionTypes();
     
     return full_type;
 }
@@ -753,6 +758,24 @@ uint32_t mc_Permissions::GetPossiblePermissionTypes(uint32_t entity_type)
             break;
     }
     return full_type;
+}
+
+uint32_t mc_Permissions::GetCustomLowPermissionTypes()
+{
+    if(mc_gState->m_Features->CustomPermissions())
+    {
+        return MC_PTP_CUSTOM1 | MC_PTP_CUSTOM2 | MC_PTP_CUSTOM3;        
+    }
+    return MC_PTP_NONE;
+}
+
+uint32_t mc_Permissions::GetCustomHighPermissionTypes()
+{
+    if(mc_gState->m_Features->CustomPermissions())
+    {
+        return MC_PTP_CUSTOM4 | MC_PTP_CUSTOM5 | MC_PTP_CUSTOM6;        
+    }
+    return MC_PTP_NONE;    
 }
 
 
@@ -798,8 +821,14 @@ uint32_t mc_Permissions::GetPermissionType(const char *str,uint32_t full_type)
                 if(mc_MemcmpCheckSize(start,"mine",     ptr-start) == 0)perm_type = MC_PTP_MINE;
                 if(mc_MemcmpCheckSize(start,"admin",    ptr-start) == 0)perm_type = MC_PTP_ADMIN;
                 if(mc_MemcmpCheckSize(start,"activate", ptr-start) == 0)perm_type = MC_PTP_ACTIVATE;
-                if(mc_MemcmpCheckSize(start,"create", ptr-start) == 0)perm_type = MC_PTP_CREATE;
-                if(mc_MemcmpCheckSize(start,"write", ptr-start) == 0)perm_type = MC_PTP_WRITE;
+                if(mc_MemcmpCheckSize(start,"create",   ptr-start) == 0)perm_type = MC_PTP_CREATE;
+                if(mc_MemcmpCheckSize(start,"write",    ptr-start) == 0)perm_type = MC_PTP_WRITE;
+                if(mc_MemcmpCheckSize(start,MC_PTN_CUSTOM1,  ptr-start) == 0)perm_type = MC_PTP_CUSTOM1;
+                if(mc_MemcmpCheckSize(start,MC_PTN_CUSTOM2,  ptr-start) == 0)perm_type = MC_PTP_CUSTOM2;
+                if(mc_MemcmpCheckSize(start,MC_PTN_CUSTOM3,  ptr-start) == 0)perm_type = MC_PTP_CUSTOM3;
+                if(mc_MemcmpCheckSize(start,MC_PTN_CUSTOM4,  ptr-start) == 0)perm_type = MC_PTP_CUSTOM4;
+                if(mc_MemcmpCheckSize(start,MC_PTN_CUSTOM5,  ptr-start) == 0)perm_type = MC_PTP_CUSTOM5;
+                if(mc_MemcmpCheckSize(start,MC_PTN_CUSTOM6,  ptr-start) == 0)perm_type = MC_PTP_CUSTOM6;
                 
                 if(perm_type == 0)
                 {
@@ -1219,6 +1248,32 @@ int mc_Permissions::CanWrite(const void* lpEntity,const void* lpAddress)
     return result;
 }
 
+/** Returns non-zero value if filter is approved */
+
+int mc_Permissions::FilterApproved(const void* lpEntity,const void* lpAddress)
+{
+    int result;
+    mc_MempoolPermissionRow row;
+
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    
+    Lock(0);
+    
+    result = GetPermission(lpEntity,lpAddress,MC_PTP_FILTER);    
+    
+    if(result)
+    {
+        result = MC_PTP_FILTER; 
+    }
+    
+    UnLock();
+    
+    return result;
+}
+
 /** Returns non-zero value if (entity,address) can write */
 
 int mc_Permissions::CanCreate(const void* lpEntity,const void* lpAddress)
@@ -1280,6 +1335,20 @@ int mc_Permissions::CanIssue(const void* lpEntity,const void* lpAddress)
     
     return result;    
 }
+
+int mc_Permissions::CanCustom(const void* lpEntity,const void* lpAddress,uint32_t permission)
+{
+    int result;
+    
+    Lock(0);
+            
+    result=GetPermission(lpEntity,lpAddress,permission);
+    
+    UnLock();
+    
+    return result;        
+}
+
 
 /** Returns 1 if we are still in setup period (NULL entity only) */
 
@@ -2178,6 +2247,7 @@ int mc_Permissions::AdminConsensus(const void* lpEntity,uint32_t type)
             case MC_PTP_ACTIVATE:
             case MC_PTP_ISSUE:
             case MC_PTP_CREATE:
+            case MC_PTP_FILTER:
                 if(IsSetupPeriod())            
                 {
                     return 1;
@@ -2203,6 +2273,10 @@ int mc_Permissions::AdminConsensus(const void* lpEntity,uint32_t type)
                 if(type == MC_PTP_CREATE)
                 {
                     consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensuscreate");
+                }
+                if(type == MC_PTP_FILTER)
+                {
+                    consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensustxfilter");
                 }
 
                 if(consensus==0)
@@ -2945,10 +3019,14 @@ void mc_Permissions::FreePermissionList(mc_Buffer *permissions)
 
 int mc_Permissions::IsActivateEnough(uint32_t type)
 {
-    if(type & ( MC_PTP_ADMIN | MC_PTP_ISSUE | MC_PTP_MINE | MC_PTP_ACTIVATE | MC_PTP_CREATE))
+    if(type & ( MC_PTP_ADMIN | MC_PTP_ISSUE | MC_PTP_MINE | MC_PTP_ACTIVATE | MC_PTP_CREATE | MC_PTP_FILTER))
     {
         return 0;
     }    
+    if(type & GetCustomHighPermissionTypes())
+    {
+        return 0;        
+    }
     return 1;
 }
 
@@ -3040,6 +3118,13 @@ int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAdd
     types[num_types]=MC_PTP_ACTIVATE;num_types++;        
     types[num_types]=MC_PTP_ADMIN;num_types++;        
     types[num_types]=MC_PTP_UPGRADE;num_types++;                        
+    types[num_types]=MC_PTP_FILTER;num_types++;                        
+    types[num_types]=MC_PTP_CUSTOM1;num_types++;                        
+    types[num_types]=MC_PTP_CUSTOM2;num_types++;                        
+    types[num_types]=MC_PTP_CUSTOM3;num_types++;                        
+    types[num_types]=MC_PTP_CUSTOM4;num_types++;                        
+    types[num_types]=MC_PTP_CUSTOM5;num_types++;                        
+    types[num_types]=MC_PTP_CUSTOM6;num_types++;                        
     
     err=MC_ERR_NOERROR;
 

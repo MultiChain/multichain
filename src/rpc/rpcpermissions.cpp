@@ -90,7 +90,10 @@ Value grantoperation(const Array& params)
         to=(uint32_t)params[6].get_int64();
     }
     
-    if(((type & MC_PTP_RECEIVE) == 0) || (from >= to))
+    bool require_receive=true;
+    
+/*    
+    if( ((type & MC_PTP_RECEIVE) == 0) || (from >= to))
     {        
         if(nAmount > 0)
         {
@@ -103,6 +106,7 @@ Value grantoperation(const Array& params)
             }
         }
     }
+*/    
     timestamp=mc_TimeNowAsUInt();
 
     mc_EntityDetails entity;
@@ -129,10 +133,30 @@ Value grantoperation(const Array& params)
         if(type == 0)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
         
+        if(type & MC_PTP_RECEIVE)
+        {
+            if(from < to)
+            {
+                require_receive=false;
+            }
+        }
+        
         LogPrintf("mchn: Granting %s permission(s) to address %s (%ld-%ld)\n",permission_type,params[1].get_str(),from,to);
     }
     
-    
+    if(require_receive)
+    {
+        if(nAmount > 0)
+        {
+            BOOST_FOREACH(CTxDestination& txdest, addresses) 
+            {
+                if(!AddressCanReceive(txdest))
+                {
+                    throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Destination address doesn't have receive permission");        
+                }
+            }
+        }        
+    }
     
     lpScript->SetPermission(type,from,to,timestamp);
     
@@ -430,6 +454,105 @@ Value revokecmd(const Array& params, bool fHelp)
     
 }
 
+Value verifypermission(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 2)
+        throw runtime_error("Help message not found\n");
+    
+    if(params[1].type() != str_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission, expected string");                                                        
+    }
+    
+    if(params[0].type() != str_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid address, expected string");                                                        
+    }
+    
+    uint32_t type;
+    string entity_identifier, permission_type;
+    entity_identifier="";
+    permission_type="all";
+    if (params.size() > 0 && params[1].type() != null_type)// && !params[0].get_str().empty())
+    {
+        permission_type=params[1].get_str();
+//        int period_pos=permission_type.find_last_of(".",permission_type.size());
+        int period_pos=permission_type.find_last_of(".");
+        
+        if(period_pos >= 0)
+        {
+            entity_identifier=permission_type.substr(0,period_pos);
+            permission_type=permission_type.substr(period_pos+1,permission_type.size());
+        }
+    }
+        
+    mc_EntityDetails entity;
+    const unsigned char *lpEntity;
+    lpEntity=NULL;
+    entity.Zero();
+    if (entity_identifier.size())
+    {        
+        ParseEntityIdentifier(entity_identifier,&entity, MC_ENT_TYPE_ANY);           
+        lpEntity=entity.GetTxID();
+    }
+    
+    type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),&entity);
+    if(type == 0)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
+
+    CBitcoinAddress address(params[0].get_str());
+    if (!address.IsValid())
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+params[1].get_str());            
+
+    CTxDestination dest=address.Get();
+    CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
+    CScriptID *lpScriptID=boost::get<CScriptID> (&dest);
+    
+    void* lpAddress=NULL;
+
+    if(((lpKeyID == NULL) && (lpScriptID == NULL)))
+    {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+params[1].get_str());            
+        return false;                
+    }
+            
+    if(lpKeyID != NULL)
+    {
+        lpAddress=lpKeyID;
+    }
+    else
+    {
+        lpAddress=lpScriptID;
+    }
+    
+    
+    int result=0;
+    switch(type)
+    {
+        case MC_PTP_CONNECT : result = mc_gState->m_Permissions->CanConnect   (lpEntity,lpAddress); break;
+        case MC_PTP_SEND:     result = mc_gState->m_Permissions->CanSend      (lpEntity,lpAddress); break;
+        case MC_PTP_RECEIVE:  result = mc_gState->m_Permissions->CanReceive   (lpEntity,lpAddress); break;
+        case MC_PTP_WRITE:    result = mc_gState->m_Permissions->CanWrite     (lpEntity,lpAddress); break;
+        case MC_PTP_CREATE:   result = mc_gState->m_Permissions->CanCreate    (lpEntity,lpAddress); break;
+        case MC_PTP_ISSUE:    result = mc_gState->m_Permissions->CanIssue     (lpEntity,lpAddress); break;
+        case MC_PTP_ACTIVATE: result = mc_gState->m_Permissions->CanActivate  (lpEntity,lpAddress); break;
+        case MC_PTP_MINE:     result = mc_gState->m_Permissions->CanMine      (lpEntity,lpAddress); break;
+        case MC_PTP_ADMIN:    result = mc_gState->m_Permissions->CanAdmin     (lpEntity,lpAddress); break;
+        case MC_PTP_CUSTOM1:
+        case MC_PTP_CUSTOM2:
+        case MC_PTP_CUSTOM3:
+        case MC_PTP_CUSTOM4:
+        case MC_PTP_CUSTOM5:
+        case MC_PTP_CUSTOM6:
+            result = mc_gState->m_Permissions->CanCustom(lpEntity,lpAddress,type);
+            break;
+        default:
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
+    }    
+    
+    return (result != 0);
+}
+
 Value listpermissions(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 3)
@@ -579,6 +702,23 @@ Value listpermissions(const Array& params, bool fHelp)
             case MC_PTP_ADMIN  :entry.push_back(Pair("type", "admin"));break;
             case MC_PTP_ACTIVATE  :entry.push_back(Pair("type", "activate"));break;                
             default:take_it=false;
+        }
+        if(!take_it)
+        {
+            take_it=true;
+            if(mc_gState->m_Features->CustomPermissions())
+            {
+                switch(plsRow->m_Type)
+                {
+                    case MC_PTP_CUSTOM1  :entry.push_back(Pair("type", MC_PTN_CUSTOM1));break;
+                    case MC_PTP_CUSTOM2  :entry.push_back(Pair("type", MC_PTN_CUSTOM2));break;
+                    case MC_PTP_CUSTOM3  :entry.push_back(Pair("type", MC_PTN_CUSTOM3));break;
+                    case MC_PTP_CUSTOM4  :entry.push_back(Pair("type", MC_PTN_CUSTOM4));break;
+                    case MC_PTP_CUSTOM5  :entry.push_back(Pair("type", MC_PTN_CUSTOM5));break;
+                    case MC_PTP_CUSTOM6  :entry.push_back(Pair("type", MC_PTN_CUSTOM6));break;
+                    default:take_it=false;
+                }
+            }
         }
         entry.push_back(Pair("startblock", (int64_t)plsRow->m_BlockFrom));
         entry.push_back(Pair("endblock", (int64_t)plsRow->m_BlockTo));                        

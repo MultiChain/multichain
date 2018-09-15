@@ -160,6 +160,24 @@ void Shutdown_Cold()
     }
 /* MCHN END */  
 #endif
+    if(pRelayManager)
+    {
+        delete pRelayManager;
+        pRelayManager=NULL;        
+    }
+    
+    if(pMultiChainFilterEngine)
+    {
+        delete pMultiChainFilterEngine;
+        pMultiChainFilterEngine=NULL;        
+    }
+    
+    if(pFilterEngine)
+    {
+        delete pFilterEngine;
+        pFilterEngine=NULL;        
+    }
+    
     globalVerifyHandle.reset();
     ECC_Stop();
     LogPrintf("%s: done\n", __func__);
@@ -852,6 +870,20 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
 */    
 /* MCHN END */    
 
+    std::string strResult;
+    
+    pFilterEngine=new mc_FilterEngine();
+    if (pFilterEngine->Initialize(strResult) != MC_ERR_NOERROR)
+    {
+        return InitError(strprintf(_("Couldn't initialize filter engine: '%s'"), strResult));
+    }
+    
+    pMultiChainFilterEngine=new mc_MultiChainFilterEngine;
+    if(pMultiChainFilterEngine->Initialize())
+    {
+        return InitError(_("Couldn't initialize filter engine."));        
+    }
+    
     // ********************************************************* Step 7: load block chain
 
     fReindex = GetBoolArg("-reindex", false);

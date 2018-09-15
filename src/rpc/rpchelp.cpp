@@ -214,7 +214,7 @@ void mc_InitRPCHelpMap01()
             "\nArguments:\n"
             "1. \"txid\"                           (string, required) The transaction id\n"
             "2. n                                (numeric, required) vout value\n"
-            "3. includemempool                   (boolean, optional) Whether to included the mem pool\n"
+            "3. includemempool                   (boolean, optional, default true) Whether to included the mem pool\n"
             "\nResult:\n"
             "{\n"
             "  \"bestblock\" : \"hash\",             (string) the block hash\n"
@@ -269,7 +269,7 @@ void mc_InitRPCHelpMap02()
             "listassets ( asset-identifier(s) verbose count start )\n"
             "\nReturns list of defined assets\n"
             "\nArguments:\n"
-            "1. \"asset-identifier\"               (string, optional) Asset identifier - one of the following: issue txid, asset reference, asset name.\n"
+            "1. \"asset-identifier\"               (string, optional, default=*) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             " or\n"
             "1. asset-identifier(s)              (array, optional) A json array of asset identifiers \n"                
             "2. verbose                          (boolean, optional, default=false) If true, returns list of all issue transactions, including follow-ons \n"
@@ -286,8 +286,8 @@ void mc_InitRPCHelpMap02()
             "listpermissions ( \"permission(s)\" address(es) verbose )\n"
             "\nReturns a list of all permissions which have been explicitly granted to addresses.\n"
             "\nArguments:\n"
-            "1. \"permission(s)\"                  (string, optional) Permission strings, comma delimited. Possible values: " + AllowedPermissions() + ". Default: all. \n"                
-            "2. \"address(es)\"                    (string, optional, default \"*\") The addresses to retrieve permissions for. \"*\" for all addresses\n"
+            "1. \"permission(s)\"                  (string, optional, default=*) Permission strings, comma delimited. Possible values: " + AllowedPermissions() + "\n"                
+            "2. \"address(es)\"                    (string, optional, default=*) The addresses to retrieve permissions for. \"*\" for all addresses\n"
             " or\n"
             "2. address(es)                      (array, optional) A json array of addresses to return permissions for\n"                
             "3. verbose                          (boolean, optional, default=false) If true, returns list of pending grants \n"
@@ -303,10 +303,10 @@ void mc_InitRPCHelpMap02()
             "liststreams ( stream-identifier(s) verbose count start )\n"
             "\nReturns list of defined streams\n"
             "\nArguments:\n"
-            "1. \"stream-identifier(s)\"           (string, optional, default=*, all streams) Stream identifier - one of the following: issue txid, stream reference, stream name.\n"
+            "1. \"stream-identifier(s)\"           (string, optional, default=*) Stream identifier - one of: create txid, stream reference, stream name.\n"
             " or\n"
             "1. stream-identifier(s)             (array, optional) A json array of stream identifiers \n"                
-            "2. verbose                          (boolean, optional, default=false) If true, returns stream list of creators \n"
+            "2. verbose                          (boolean, optional, default=false) If true, returns list of stream creators \n"
             "3. count                            (number, optional, default=INT_MAX - all) The number of streams to display\n"
             "4. start                            (number, optional, default=-count - last) Start from specific stream, 0 based, if negative - from the end\n"
             "\nResult:\n"
@@ -843,7 +843,7 @@ void mc_InitRPCHelpMap05()
             " or\n"
             "2. issuemore-details                  (object, required) A json object with issuemore metadata\n"
             "    {\n"
-            "      \"update\" : asset-identifier     (string,required) Asset identifier - one of the following: asset txid, asset reference, asset name.\n"
+            "      \"update\" : asset-identifier     (string,required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             "      \"details\" :                     (object, optional)  a json object with custom fields\n"           
             "        {\n"
             "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
@@ -865,7 +865,7 @@ void mc_InitRPCHelpMap05()
             " or\n"
             "2. publish-new-stream-item            (object, required) A json object with stream item\n"
             "    {\n"                
-            "      \"for\" : stream-identifier       (string,required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "      \"for\" : stream-identifier       (string,required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "      \"key\" : key                     (string,optional, default: \"\") Item key\n"
             "      \"keys\" : keys                   (array,optional) Item keys, array of strings\n"
             "      \"data\" : data-hex               (string,optional, default: \"\") Data hex string\n"
@@ -895,7 +895,7 @@ void mc_InitRPCHelpMap05()
             "2. approve-upgrade                    (object, required) A json object with approval details\n"
             "    {\n"                
             "      \"approve\" : approve             (boolean,required) Approve or disapprove\n"
-            "      \"for\" : upgrade-identifier      (string,required)  Upgrade identifier - one of the following: upgrade txid, upgrade name.\n"
+            "      \"for\" : upgrade-identifier      (string,required)  Upgrade identifier - one of: create txid, upgrade name.\n"
             "    }\n"                                
  */ 
             "\nResult:\n"
@@ -945,7 +945,7 @@ void mc_InitRPCHelpMap05()
             "        {                                 (object) A json object describing follow-on asset issue\n"
             "          \"issuemore\" : \n"
             "            {\n"
-            "              \"asset\" : \"asset-identifier\"(string, required) Asset identifier - one of the following: issue txid. asset reference, asset name.\n"
+            "              \"asset\" : \"asset-identifier\"(string, required) Asset identifier - one of: issue txid. asset reference, asset name.\n"
             "              \"raw\" : n                   (numeric, required) The asset total amount in raw units \n"
             "              ,...\n"
             "            }\n"                                
@@ -1410,7 +1410,7 @@ void mc_InitRPCHelpMap06()
             "4  custom-fields                    (object, required)  a json object with custom fields\n"
             "    {\n"
             "      \"protocol-version\": version   (numeric, optional) Protocol version to upgrade to\n"
-            "      \"parameter-name\": value       (numeric, optional) New value for upgradable parameter, one of the following: \n"
+            "      \"parameter-name\": value       (numeric, optional) New value for upgradable parameter, one of: \n"
             "                                                        target-block-time,\n"
             "                                                        maximum-block-size,\n"
             "                                                        max-std-tx-size,\n"
@@ -1422,6 +1422,24 @@ void mc_InitRPCHelpMap06()
 //            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
             "      ,...\n"
             "    }\n"
+            "  or \n"
+            "1. \"entity-type\"                    (string, required) txfilter\n"
+            "2. \"txfilter-name\"                  (string, required) Tx filter name, if not \"\" should be unique.\n"
+            "3. restrictions                     (object, required) A json object with optional filter restrictions\n"
+            "    {\n"
+            "      \"for\": \"entity-identifier\"    (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
+            "        or\n"
+            "      \"for\": entity-identifier(s)   (array, optional) A json array of asset/stream identifiers.\n"    
+            "    }\n"
+            "4. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
+            "                                                       function filtertransaction()\n"
+            "                                                       {\n"
+            "                                                           var tx=getfiltertransaction();\n"
+            "                                                                                        \n"
+            "                                                           if (tx.vout.length<1)\n"
+            "                                                               return \"One output required\";\n"
+            "                                                       }\n"
+
 
             "\nResult:\n"
             "\"transactionid\"  (string) The transaction id.\n"
@@ -1458,7 +1476,7 @@ void mc_InitRPCHelpMap06()
             "5  custom-fields                    (object, required)  a json object with custom fields\n"
             "    {\n"
             "      \"protocol-version\": version   (numeric, optional) Protocol version to upgrade to \n"
-            "      \"parameter-name\": value       (numeric, optional) New value for upgradable parameter, one of the following: \n"
+            "      \"parameter-name\": value       (numeric, optional) New value for upgradable parameter, one of: \n"
             "                                                        target-block-time,\n"
             "                                                        maximum-block-size,\n"
             "                                                        max-std-tx-size,\n"
@@ -1470,6 +1488,25 @@ void mc_InitRPCHelpMap06()
 //            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
             "      ,...\n"
             "    }\n"
+            "  or \n"
+            "1. \"from-address\"                   (string, required) Address used for creating.\n"
+            "2. \"entity-type\"                    (string, required) txfilter\n"
+            "3. \"txfilter-name\"                  (string, required) Tx filter name, if not \"\" should be unique.\n"
+            "4. restrictions                     (object, required)  a json object with filter restrictions\n"
+            "    {\n"
+            "      \"for\": \"entity-identifier\"    (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
+            "        or\n"
+            "      \"for\": entity-identifier(s)   (array, optional) A json array of asset/stream identifiers .\n"    
+            "    }\n"
+            "5. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
+            "                                                         function filtertransaction()\n"
+            "                                                         {\n"
+            "                                                             var tx=getfiltertransaction();\n"
+            "                                                                                          \n"
+            "                                                             if (tx.vout.length<1)\n"
+            "                                                                 return \"One output required\";\n"
+            "                                                         }   \n "
+
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -1758,7 +1795,7 @@ void mc_InitRPCHelpMap08()
             "getassettransaction \"asset-identifier\" \"txid\" ( verbose )\n"
             "\nRetrieves a specific transaction txid involving asset.\n"
             "\nArguments:\n"
-            "1. \"asset-identifier\"               (string, required) Asset identifier - one of the following: asset txid, asset reference, asset name.\n"
+            "1. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             "2. \"txid\"                           (string, required) The transaction id\n"
             "3. verbose                          (boolean, optional, default=false) If true, returns information about item transaction \n"
             "\nResult:\n"
@@ -1798,12 +1835,12 @@ void mc_InitRPCHelpMap08()
             "getmultibalances ( address(es) assets minconf includeLocked includeWatchonly ) \n"
             "\nReturns asset balances for specified address\n"
             "\nArguments:\n"
-            "1. \"address(es)\"                    (string, optional) Address(es) to return balance for, comma delimited. Default - all\n"
+            "1. \"address(es)\"                    (string, optional, default=*) Address(es) to return balance for, comma delimited\n"
             " or\n"
             "1. address(es)                      (array, optional) A json array of addresses to return balance for\n"                
-            "2. \"asset\"                          (string) Single asset identifier to return balance for, default \"*\"\n"                
+            "2. \"asset\"                          (string, optional, default=*) Single asset identifier to return balance for\n"                
             " or\n"
-            "2. assets                           (array, optional) Json array of asset identifiers to return balance for\n"                
+            "2. assets                           (array, optional) A json array of asset identifiers to return balance for\n"                
             "3. minconf                          (numeric, optional, default=1) Only include transactions confirmed at least this many times.\n"
             "4. includeWatchonly                 (bool, optional, default=false) Include transactions to watchonly addresses (see 'importaddress')\n"
             "5. includeLocked                    (bool, optional, default=false) Also take locked outputs into account\n"
@@ -1891,7 +1928,7 @@ void mc_InitRPCHelpMap09()
             "getstreamitem \"stream-identifier\" \"txid\" ( verbose )\n"
             "\nReturns stream item.\n"
             "\nArguments:\n"
-            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "2. \"txid\"                           (string, required) The transaction id\n"
             "3. verbose                          (boolean, optional, default=false) If true, returns information about item transaction \n"
             "\nResult:\n"
@@ -2324,7 +2361,7 @@ void mc_InitRPCHelpMap10()
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"address\"                        (string, required) The address to send newly created asset to.\n"
-            "2. \"asset-identifier\"               (string, required) Asset identifier - one of the following: issue txid, asset reference, asset name.\n"
+            "2. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             "3. quantity                         (numeric, required) The asset total amount in display units. eg. 1234.56\n"
             "4. native-amount                    (numeric, optional) native currency amount to send. eg 0.1, Default: minimum-per-output.\n"
             "5  custom-fields                    (object, optional)  a json object with custom fields\n"
@@ -2347,7 +2384,7 @@ void mc_InitRPCHelpMap10()
             "\nArguments:\n"
             "1. \"from-address\"                   (string, required) Address used for issuing.\n"
             "2. \"to-address\"                     (string, required) The  address to send newly created asset to.\n"
-            "3. \"asset-identifier\"               (string, required) Asset identifier - one of the following: issue txid, asset reference, asset name.\n"
+            "3. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             "4. quantity                         (numeric, required) The asset total amount in display units. eg. 1234.56\n"
             "5. native-amount                    (numeric, optional) native currency amount to send. eg 0.1, Default: minimum-per-output.\n"
             "6  custom-fields                    (object, optional)  a json object with custom fields\n"
@@ -2404,7 +2441,7 @@ void mc_InitRPCHelpMap11()
             "listaddresses ( address(es) verbose count start ) \n"
             "\nReturns asset balances for specified address\n"
             "\nArguments:\n"
-            "1. \"address(es)\"                    (string, optional, default *) Address(es) to return information for, comma delimited. Default - all\n"
+            "1. \"address(es)\"                    (string, optional, default=*) Address(es) to return information for, comma delimited. Default - all\n"
             " or\n"
             "1. address(es)                      (array, optional) A json array of addresses to return information for\n"                
             "2. verbose                          (boolean, optional, default=false) If true return more information about address.\n"
@@ -2492,7 +2529,7 @@ void mc_InitRPCHelpMap11()
              "listassettransactions \"asset-identifier\" ( verbose count start local-ordering )\n"
             "\nLists transactions involving asset.\n"
             "\nArguments:\n"
-            "1. \"asset-identifier\"               (string, required) Asset identifier - one of the following: asset txid, asset reference, asset name.\n"
+            "1. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             "2. verbose                          (boolean, optional, default=false) If true, returns information about transaction \n"
             "3. count                            (number, optional, default=10) The number of transactions to display\n"
             "4. start                            (number, optional, default=-count - last) Start from specific transaction, 0 based, if negative - from the end\n"
@@ -2627,7 +2664,7 @@ void mc_InitRPCHelpMap12()
             "liststreamitems \"stream-identifier\" ( verbose count start local-ordering )\n"
             "\nReturns stream items.\n"
             "\nArguments:\n"
-            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "2. verbose                          (boolean, optional, default=false) If true, returns information about item transaction \n"
             "3. count                            (number, optional, default=10) The number of items to display\n"
             "4. start                            (number, optional, default=-count - last) Start from specific item, 0 based, if negative - from the end\n"
@@ -2645,7 +2682,7 @@ void mc_InitRPCHelpMap12()
             "liststreamkeyitems \"stream-identifier\" \"key\" ( verbose count start local-ordering )\n"
             "\nReturns stream items for specific key.\n"
             "\nArguments:\n"
-            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "2. \"key\"                            (string, required) Stream key\n"
             "3. verbose                          (boolean, optional, default=false) If true, returns information about item transaction \n"
             "4. count                            (number, optional, default=10) The number of items to display\n"
@@ -2664,7 +2701,7 @@ void mc_InitRPCHelpMap12()
             "liststreamkeys \"stream-identifier\" ( key(s) verbose count start local-ordering )\n"
             "\nReturns stream keys.\n"
             "\nArguments:\n"
-            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "2. \"key\"                            (string, optional, default=*) Stream key\n"
             " or\n"
             "2. key(s)                           (array, optional) A json array of stream keys \n"                
@@ -2686,7 +2723,7 @@ void mc_InitRPCHelpMap12()
             "liststreampublisheritems \"stream-identifier\" \"address\" ( verbose count start local-ordering )\n"
             "\nReturns stream items for specific publisher.\n"
             "\nArguments:\n"
-            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "2. \"address\"                        (string, required) Publisher address\n"
             "3. verbose                          (boolean, optional, default=false) If true, returns information about item transaction \n"
             "4. count                            (number, optional, default=10) The number of items to display\n"
@@ -2705,7 +2742,7 @@ void mc_InitRPCHelpMap12()
             "liststreampublishers \"stream-identifier\" ( address(es) verbose count start local-ordering )\n"
             "\nReturns stream publishers.\n"
             "\nArguments:\n"
-            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "2. \"address(es)\"                    (string, optional, default=*) Publisher addresses, comma delimited\n"
             " or\n"
             "2. address(es)                      (array, optional) A json array of publisher addresses \n"                
@@ -2967,7 +3004,7 @@ void mc_InitRPCHelpMap13()
             "\nPublishes stream item\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "2. \"key\"                            (string, required) Item key\n"
             " or\n"    
             "2. keys                             (array, required) Array of item keys\n"
@@ -3007,7 +3044,7 @@ void mc_InitRPCHelpMap13()
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"from-address\"                   (string, required) Address used for issuing.\n"
-            "2. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "2. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "3. \"key\"                            (string, required) Item key\n"
             " or\n"    
             "3. keys                             (array, required) Array of item keys\n"
@@ -3153,7 +3190,7 @@ void mc_InitRPCHelpMap13()
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"address\"                        (string, required) The address to send to.\n"
-            "2. \"asset-identifier\"               (string, required) Asset identifier - one of the following: issue txid, asset reference, asset name.\n"
+            "2. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             "3. asset-qty                        (numeric, required) Asset quantity to send. eg 0.1\n"
             "4. native-amount                    (numeric, optional) native currency amount to send. eg 0.1, Default: minimum-per-output.\n"
             "5. \"comment\"                        (string, optional) A comment used to store what the transaction is for. \n"
@@ -3179,7 +3216,7 @@ void mc_InitRPCHelpMap14()
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"address\"                        (string, required) The address to send to.\n"
-            "2. \"asset-identifier\"               (string, required) Asset identifier - one of the following: issue txid, asset reference, asset name.\n"
+            "2. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             "3. asset-qty                        (numeric, required) Asset quantity to send. eg 0.1\n"
             "4. native-amount                    (numeric, optional) native currency amount to send. eg 0.1, Default: minimum-per-output.\n"
             "5. \"comment\"                        (string, optional) A comment used to store what the transaction is for. \n"
@@ -3202,7 +3239,7 @@ void mc_InitRPCHelpMap14()
             "\nArguments:\n"
             "1. \"from-address\"                   (string, required) Address to send from. \n"
             "2. \"to-address\"                     (string, required) The address to send to.\n"
-            "3. \"asset-identifier\"               (string, required) Asset identifier - one of the following: issue txid, asset reference, asset name.\n"
+            "3. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             "4. asset-qty                        (numeric, required) Asset quantity to send. eg 0.1\n"
             "5. native-amount                    (numeric, optional) native currency amount to send. eg 0.1, Default: minimum-per-output.\n"
             "6. \"comment\"                        (string, optional) A comment used to store what the transaction is for. \n"
@@ -3466,9 +3503,9 @@ void mc_InitRPCHelpMap15()
             "subscribe entity-identifier(s) ( rescan )\n"
             "\nSubscribes to the stream.\n"
             "\nArguments:\n"
-            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             " or\n"
-            "1. \"asset-identifier\"               (string, required) Asset identifier - one of the following: asset txid, asset reference, asset name.\n"
+            "1. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             " or\n"
             "1. entity-identifier(s)             (array, optional) A json array of stream or asset identifiers \n"                
             "2. rescan                           (boolean, optional, default=true) Rescan the wallet for transactions\n"
@@ -3487,9 +3524,9 @@ void mc_InitRPCHelpMap15()
             "unsubscribe entity-identifier(s) ( purge )\n"
             "\nUnsubscribes from the stream.\n"
             "\nArguments:\n"
-            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             " or\n"
-            "1. \"asset-identifier\"               (string, required) Asset identifier - one of the following: asset txid, asset reference, asset name.\n"
+            "1. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             " or\n"
             "1. entity-identifier(s)             (array, optional) A json array of stream or asset identifiers \n"                
             "2. purge                            (boolean, optional, default=false) Purge all offchain data for the stream\n"
@@ -3544,7 +3581,7 @@ void mc_InitRPCHelpMap15()
             "setruntimeparam \"parameter-name\" parameter-value \n"
             "\nSets value for runtime parameter\n"
             "\nArguments:\n"
-            "1. \"parameter-name\"                 (string, required) Parameter name, one of the following:\n"
+            "1. \"parameter-name\"                 (string, required) Parameter name, one of:\n"
             "                                                       miningrequirespeers,\n"
             "                                                       mineemptyrounds,\n"
             "                                                       miningturnover,\n"
@@ -3590,12 +3627,14 @@ void mc_InitRPCHelpMap16()
         ));
     
     mapHelpStrings.insert(std::make_pair("approvefrom",
-            "approvefrom \"from-address\" \"upgrade-identifier\" ( approve )\n"
+            "approvefrom \"from-address\" \"upgrade-identifier\"|\"filter-identifier\" ( approve )\n"
             "\nApprove upgrade using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"from-address\"                   (string, required) Address used for approval.\n"
-            "2. \"upgrade-identifier\"             (string, required) Upgrade identifier - one of the following: upgrade txid, upgrade name.\n"
+            "2. \"upgrade-identifier\"             (string, required) Upgrade identifier - one of: create txid, upgrade name.\n"
+            " or\n"
+            "2. \"filter-identifier\"              (string, required) Filter identifier - one of: create txid, filter name.\n"
             "3. approve                          (boolean, required)  Approve or disapprove\n"
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
@@ -3607,8 +3646,8 @@ void mc_InitRPCHelpMap16()
     
     mapHelpStrings.insert(std::make_pair("listupgrades",
             "listupgrades (upgrade-identifier(s))\n"
-            "1. \"upgrade-identifier(s)\"          (string, optional, default=*, all upgrades) Upgrade identifier - one of the following:\n"
-            "                                                                                upgrade txid, upgrade name.\n"
+            "1. \"upgrade-identifier(s)\"          (string, optional, default=*) Upgrade identifier - one of:\n"
+            "                                                                                create txid, upgrade name.\n"
             " or\n"
             "1. upgrade-identifier(s)            (array, optional) A json array of upgrade identifiers \n"                
             "\nReturns list of defined upgrades\n"
@@ -3684,7 +3723,7 @@ void mc_InitRPCHelpMap16()
             "liststreamblockitems \"stream-identifier\" block-set-identifier ( verbose count start )\n"
             "\nReturns stream items in certain block range.\n"
             "\nArguments:\n"
-            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "2. \"block-set-identifier\"           (string, required) Comma delimited list of block identifiers: \n"
             "                                                       block height,\n"
             "                                                       block hash,\n"
@@ -3713,7 +3752,7 @@ void mc_InitRPCHelpMap16()
             "liststreamtxitems \"stream-identifier\" txids ( verbose )\n"
             "\nReturns stream items.\n"
             "\nArguments:\n"
-            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "2. \"txids\"                          (string, required) Transaction IDs, comma delimited\n"
             " or\n"
             "2. txids                            (array, required) Array of transaction IDs\n"
@@ -3761,7 +3800,7 @@ void mc_InitRPCHelpMap16()
             " or\n"
             "issuemore-details                     (object, required) A json object with issuemore metadata\n"
             "    {\n"
-            "      \"update\" : \"asset-identifier\"   (string, required) Asset identifier - one of the following: asset txid, asset reference, asset name.\n"
+            "      \"update\" : \"asset-identifier\"   (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             "      \"details\" :                     (object, optional) A json object with custom fields\n"           
             "        {\n"
             "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
@@ -3784,7 +3823,7 @@ void mc_InitRPCHelpMap16()
             " or\n"
             "publish-new-stream-item               (object, required) A json object with stream item\n"
             "    {\n"                
-            "      \"for\" : \"stream-identifier\"     (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "      \"for\" : \"stream-identifier\"     (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "      \"options\" : \"options\"           (string, optional) Should be \"offchain\" or omitted\n"
             "      \"key\" : \"key\"                   (string, optional, default: \"\") Item key\n"
             "        or\n"
@@ -3821,7 +3860,7 @@ void mc_InitRPCHelpMap16()
             "      \"details\" :                     (object, optional) A json object with custom fields\n"           
             "        {\n"
             "          \"protocol-version\": version (numeric, optional) Protocol version to upgrade to \n"
-            "          \"parameter-name\": value     (numeric, optional) New value for upgradable parameter, one of the following: \n"
+            "          \"parameter-name\": value     (numeric, optional) New value for upgradable parameter, one of: \n"
             "                                                          target-block-time,\n"
             "                                                          maximum-block-size,\n"
             "                                                          max-std-tx-size,\n"
@@ -3835,7 +3874,7 @@ void mc_InitRPCHelpMap16()
             "approve-upgrade                       (object, required) A json object with approval details\n"
             "    {\n"                
             "      \"approve\" : approve             (boolean, required) Approve or disapprove\n"
-            "      \"for\" : \"upgrade-identifier\"    (string, required)  Upgrade identifier - one of the following: upgrade txid, upgrade name.\n"
+            "      \"for\" : \"upgrade-identifier\"    (string, required)  Upgrade identifier - one of: create txid, upgrade name.\n"
             "    }\n"                                
         ));
 
@@ -3860,7 +3899,7 @@ void mc_InitRPCHelpMap16()
             " or\n"
             "publish-new-stream-item               (object, required) A json object with stream item\n"
             "    {\n"                
-            "      \"for\" : \"stream-identifier\"     (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "      \"for\" : \"stream-identifier\"     (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "      \"options\" : \"options\"           (string, optional) Should be \"offchain\" or omitted\n"
             "      \"key\" : \"key\"                   (string, optional, default: \"\") Item key\n"
             "        or\n"
@@ -3898,7 +3937,7 @@ void mc_InitRPCHelpMap16()
             "   x.xxx                               (numeric, required) The value is the native currency amount\n"
             "     or \n"
             "   {                                   (object) A json object of assets to send\n"
-            "      \"asset-identifier\" :             (string, required) Asset identifier - one of the following: issue txid, asset reference, asset name. \"\" for native currency.\n"
+            "      \"asset-identifier\" :             (string, required) Asset identifier - one of: issue txid, asset reference, asset name. \"\" for native currency.\n"
             "       asset-quantity                  (numeric, required) The asset value. \n"
             "     ,...\n"
             "   }\n"                                
@@ -3913,7 +3952,7 @@ void mc_InitRPCHelpMap16()
             "   {                                   (object) A json object describing follow-on asset issue\n"
             "     \"issuemore\" : \n"
             "       {\n"
-            "          \"asset\" : \"asset-identifier\" (string, required) Asset identifier - one of the following: issue txid. asset reference, asset name.\n"
+            "          \"asset\" : \"asset-identifier\" (string, required) Asset identifier - one of: issue txid. asset reference, asset name.\n"
             "          \"raw\" : n                    (numeric, required) The asset total amount in raw units \n"
             "       }\n"                                
             "   }\n"                                
@@ -3964,7 +4003,7 @@ void mc_InitRPCHelpMap17()
             "getstreamkeysummary \"stream-identifier\" \"key\" \"mode\"\n"
             "\nReturns stream json object items summary for specific key.\n"
             "\nArguments:\n"
-            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "2. \"key\"                            (string, required) Stream key\n"
             "3. \"mode\"                           (string, required) Comma delimited list of the following:\n"
             "                                                       jsonobjectmerge (required) - merge json objects\n"
@@ -3988,7 +4027,7 @@ void mc_InitRPCHelpMap17()
             "getstreampublishersummary \"stream-identifier\" \"address\" \"mode\"\n"
             "\nReturns stream json object items summary for specific publisher.\n"
             "\nArguments:\n"
-            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "2. \"address\"                        (string, required) Publisher address\n"
             "3. \"mode\"                           (string, required) Comma delimited list of the following:\n"
             "                                                       jsonobjectmerge (required) - merge json objects\n"
@@ -4125,7 +4164,7 @@ void mc_InitRPCHelpMap18()
             "liststreamqueryitems \"stream-identifier\" query ( verbose )\n"
             "\nReturns stream items for specific query.\n"
             "\nArguments:\n"
-            "1. \"stream-identifier\"              (string, required) Stream identifier - one of the following: stream txid, stream reference, stream name.\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "2. query                            (object, required) Query\n"
             "    {\n"                
             "      \"key\" : \"key\"                   (string, optional, default: \"\") Item key\n"
@@ -4145,10 +4184,189 @@ void mc_InitRPCHelpMap18()
             + HelpExampleRpc("liststreamqueryitems", "\"test-stream\", \"{\\\"keys\\\":[\\\"key01\\\",\"key02\"],\\\"publisher\\\":\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\\\"}\", false")
         ));
     
-   mapHelpStrings.insert(std::make_pair("AAAAAAA",
+     mapHelpStrings.insert(std::make_pair("listtxfilters",
+            "listtxfilters ( filter-identifier(s) verbose )\n"
+            "\nReturns list of defined filters\n"
+            "\nArguments:\n"
+            "1. \"filter-identifier\"              (string, optional, default=*) Filter identifier - one of: create txid, filter reference, filter name.\n"
+            " or\n"
+            "1. filter-identifier(s)             (array, optional) A json array of filter identifiers \n"                
+            "2. verbose                          (boolean, optional, default=false) If true, returns list of creators and approval details \n"
+            "\nResult:\n"
+            "An array containing list of defined filters\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("listtxfilters", "")
+            + HelpExampleRpc("listtxfilters", "")
+        ));
+     
+     mapHelpStrings.insert(std::make_pair("getfiltercode",
+            "getfiltercode \"filter-identifier\"\n"
+            "\nReturns code for specified filter\n"
+            "\nArguments:\n"
+            "1. \"filter-identifier\"              (string, required) Filter identifier - one of: create txid, filter reference, filter name.\n"
+            "\nResult:\n"
+            "Filter code in plain text\n"            
+           "\nExamples:\n"
+            + HelpExampleCli("getfiltercode", "filter1")
+            + HelpExampleRpc("getfiltercode", "filter1")
+        ));
+     
+     mapHelpStrings.insert(std::make_pair("runtxfilter",
+            "runtxfilter \"filter-identifier\" ( \"tx-hex\" )\n"
+            "\nCompile an existing filter and optionally test it on a transaction\n"
+            "\nArguments:\n"
+            "1. \"filter-identifier\"              (string, required) Filter identifier - one of: create txid, filter reference, filter name.\n"
+            "2. \"tx-hex\"                         (string, optional) The transaction hex string to filter, otherwise filter compiled only\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"compiled\": true|false,           (boolean) Filter passed compilation\n"
+            "  \"passed\": true|false,             (boolean) Transaction passed the filter\n"
+            "  \"callbacks\": callbacks,           (array of objects) Information about callback calls by filter\n"
+            "  \"reason\": \"rejection reason\",     (boolean) Reason for rejection, null if passed\n"
+            "  \"time\": x.xxxxxx,                 (numeric) Seconds to run transaction through the filter\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("runtxfilter", "filter1")
+            + HelpExampleRpc("runtxfilter", "filter1")
+        ));
+     
+     mapHelpStrings.insert(std::make_pair("testtxfilter",
+            "testtxfilter restrictions \"javascript-code\" ( \"tx-hex\" )\n"
+            "\nCompile a test filter and optionally test it on a transaction\n"
+            "\nArguments:\n"
+            "1. restrictions                     (object, required)  a json object with filter restrictions\n"
+            "    {\n"
+             "      \"for\": \"entity-identifier\"   (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
+            "        or\n"
+            "      \"for\": entity-identifier(s)   (array, optional) A json array of asset/stream identifiers .\n"    
+            "    }\n"
+            "2. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
+            "                                                         function filtertransaction()\n"
+            "                                                         {\n"
+            "                                                             var tx=getfiltertransaction();\n"
+            "                                                                                          \n"
+            "                                                             if (tx.vout.length<1)\n"
+            "                                                                 return \"One output required\";\n"
+            "                                                         }   \n "
+            "3. \"tx-hex\"                         (string, optional) The transaction hex string to filter, otherwise filter compiled only\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"compiled\": true|false,           (boolean) Filter passed compilation\n"
+            "  \"passed\": true|false,             (boolean) Transaction passed the filter\n"
+            "  \"callbacks\": callbacks,           (array of objects) Information about callback calls by filter\n"
+            "  \"reason\": \"rejection reason\",     (boolean) Reason for rejection, null if passed\n"
+            "  \"time\": x.xxxxxx,                 (numeric) Seconds to run transaction through the filter\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("testtxfilter", "false \"{\"js\":\"js-code\"}\"")
+            + HelpExampleRpc("testtxfilter", "filter1, \"{\"js\":\"js-code\"}\"")
+        ));
+     
+     mapHelpStrings.insert(std::make_pair("getfiltertransaction",
+            "getfiltertransaction\n"
+            "\nReturns an object with information about the filtered transaction.\n"
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("getlastblockinfo",
+            "getlastblockinfo ( skip )\n"
+            "\nReturns information about the last or recent blocks in the active chain.\n"
+            "\nArguments:\n"
+            "1. skip                            (numeric, optional) The number of blocks back to skip. Default 0.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"hash\" : \"hash\",                  (string) The block hash\n"
+            "  \"height\" : n,                     (numeric) The block height or index\n"
+            "  \"time\" : ttt,                     (numeric) The block time in seconds since epoch (Jan 1 1970 GMT)\n"
+            "  \"txcount\" : n,                    (numeric) Number of transactions in block\n"
+            "  \"miner\" : n,                       (string) The address of the miner\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getlastblockinfo", "")
+            + HelpExampleRpc("getlastblockinfo", "")
+        ));
+    
+     mapHelpStrings.insert(std::make_pair("getassetinfo",
+            "getassetinfo \"asset-identifier\" ( verbose )\n"
+            "\nReturns information about a single asset\n"
+            "\nArguments:\n"
+            "1. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
+            "2. verbose                          (boolean, optional, default=false) If true, returns list of all issue transactions, including follow-ons \n"
+            "\nResult:\n"
+            "Object with asset details\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("getassetinfo", "myasset")
+            + HelpExampleRpc("getassetinfo", "myasset")
+        ));
+      
+     mapHelpStrings.insert(std::make_pair("getstreaminfo",
+            "getstreaminfo \"stream-identifier\" ( verbose )\n"
+            "\nReturns information about a single stream\n"
+            "\nArguments:\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
+            "2. verbose                          (boolean, optional, default=false) If true, returns list of creators \n"
+            "\nResult:\n"
+            "Object with stream details\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("getstreaminfo", "mystream")
+            + HelpExampleRpc("getstreaminfo", "mystream")
+        ));
+      
+    
+   
+}
+
+void mc_InitRPCHelpMap19()
+{
+    mapHelpStrings.insert(std::make_pair("verifypermission",
+            "verifypermission \"address\" \"permission\" \n"
+            "\nChecks whether the address has a specified permission.\n"
+            "\nArguments:\n"
+            "1. \"address\"                      (string, required) The address to verify permission for. \n"
+            "2. \"permission\"                   (string, required) Permission string. Possible values: " + AllowedPermissions() + ". \n"                
+            "\nResult:\n"
+            "True if address has specified permission, false otherwise\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("verifypermission", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" send" )
+            + HelpExampleRpc("verifypermission", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"send\"")
+        ));
+    
+     mapHelpStrings.insert(std::make_pair("getfiltertxinput",
+            "getfiltertxinput(n) \n"
+            "\nReturns details about an unspent transaction output spent in the filtered transaction.\n"
+            "\nArguments:\n"
+            "1. vin                                (numeric, required) Transaction input index\n"
+        ));
+     
+     mapHelpStrings.insert(std::make_pair("getfiltertxid",
+            "getfiltertxid  \n"
+            "\nReturns the transaction id of the filtered transaction.\n"
+        ));
+     
+     mapHelpStrings.insert(std::make_pair("setfilterparam",
+             "setfilterparam(\"parameter-name\",parameter-value) \n"
+            "\nSets value for runtime parameter, used in callbacks while this filter is running\n"
+            "\nArguments:\n"
+            "1. \"parameter-name\"                 (string, required) Parameter name, one of:\n"
+            "                                                       maxshowndata\n"
+            "2. parameter-value                  (required) parameter value\n"
+        ));
+     mapHelpStrings.insert(std::make_pair("filters",
+            "\nThe following APIs are allowed to be called from filter code:\n"
+            "                         getlastblockinfo \n"
+            "                         getassetinfo \n"
+            "                         getstreaminfo \n"
+            "                         verifypermission \n"
+            "                         verifymessage \n"
+            "\nThe following additional methods can be called from filter code (see help <method> for details):\n"
+            "                         getfiltertransaction \n"
+            "                         getfiltertxid \n"
+            "                         getfiltertxinput \n"
+            "                         setfilterparam \n"             
+        ));
+    
+ mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
-       
     
 }
 
@@ -4244,6 +4462,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap16();
     mc_InitRPCHelpMap17();
     mc_InitRPCHelpMap18();
+    mc_InitRPCHelpMap19();
     
     mc_InitRPCLogParamCountMap();
     mc_InitRPCAllowedWhenWaitingForUpgradeSet();    
@@ -4255,5 +4474,25 @@ Value purehelpitem(const Array& params, bool fHelp)
     if (fHelp)
         throw runtime_error("Help message not found\n");
     
+    return Value::null; 
+}
+
+Value purehelpitem_nomethod(const Array& params, bool fHelp)
+{
+    if (fHelp)
+        throw runtime_error("Help message not found\n");
+    
+    throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Method not found");
+
+    return Value::null; 
+}
+
+Value purehelpitem_onlyfilter(const Array& params, bool fHelp)
+{
+    if (fHelp)
+        throw runtime_error("Help message not found\n");
+    
+    throw JSONRPCError(RPC_METHOD_NOT_FOUND, "This method can only be called from within a filter");
+
     return Value::null; 
 }
