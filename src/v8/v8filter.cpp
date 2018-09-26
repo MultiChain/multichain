@@ -82,6 +82,7 @@ int V8Filter::Initialize(std::string script, std::string functionName, std::stri
     v8::Isolate::Scope isolateScope(m_isolate);
     v8::HandleScope handleScope(m_isolate);
     auto global = v8::ObjectTemplate::New(m_isolate);
+    REGISTER_RPC(mcprint);
     REGISTER_RPC(getfiltertxid);
     REGISTER_RPC(getfiltertransaction);
     REGISTER_RPC(setfilterparam);

@@ -9,6 +9,8 @@
 namespace mc_v8
 {
 
+void filter_mcprint(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 void filter_getfiltertxid(const v8::FunctionCallbackInfo<v8::Value>& args);
 void filter_getfiltertransaction(const v8::FunctionCallbackInfo<v8::Value>& args);
 void filter_setfilterparam(const v8::FunctionCallbackInfo<v8::Value>& args);

@@ -13,6 +13,29 @@
 namespace mc_v8
 {
 
+void filter_mcprint(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+    v8::Isolate* isolate = args.GetIsolate();
+    v8::Locker locker(isolate);
+    v8::Isolate::Scope isolateScope(isolate);
+    v8::HandleScope handleScope(isolate);
+    v8::Local<v8::Context> context(isolate->GetCurrentContext());
+    v8::Context::Scope contextScope(context);
+
+    if (args.Length() < 1)
+    {
+        LogPrint("JS", "JS Error: Too few arguments to the print function.\n");
+        return;
+    }
+    if (!args[0]->IsString())
+    {
+        LogPrint("JS", "JS Error: First argument to the print function must be a string.\n");
+        return;
+    }
+
+    LogPrint("JS", (V82String(isolate, args[0]) + "\n").c_str());
+}
+
 /**
  * Signature of a function to remove non-deterministic or sensitive elements from RPC function output.
  *
@@ -45,14 +68,19 @@ void CallRpcFunction(std::string name, rpcfn_type rpcFunction, const v8::Functio
     json_spirit::Object callbackData;
 
     auto args_array = v8::Array::New(isolate, args.Length());
+//    for (int i = 0; i < args.Length(); ++i)
+//    {
+//        args_array->Set(i, args[i]);
+//    }
+//    v8::Local<v8::String> argsJson = v8::JSON::Stringify(context, args_array).ToLocalChecked();
+//    std::string argsString = V82String(isolate, argsJson);
+//    json_spirit::Value params;
+//    json_spirit::read_string(argsString, params);
+    json_spirit::Array params;
     for (int i = 0; i < args.Length(); ++i)
     {
-        args_array->Set(i, args[i]);
+        params.push_back(V82Jsp(isolate, args[i]));
     }
-    v8::Local<v8::String> argsJson = v8::JSON::Stringify(context, args_array).ToLocalChecked();
-    std::string argsString = V82String(isolate, argsJson);
-    json_spirit::Value params;
-    json_spirit::read_string(argsString, params);
     if (isolateData.withCallbackLog)
     {
         callbackData.push_back(json_spirit::Pair("method", name));
@@ -63,7 +91,8 @@ void CallRpcFunction(std::string name, rpcfn_type rpcFunction, const v8::Functio
     json_spirit::Value result;
     try
     {
-        result = rpcFunction(params.get_array(), false);
+        result = rpcFunction(params, false);
+
         if (isolateData.withCallbackLog)
         {
             bool success = true;
@@ -112,9 +141,10 @@ void CallRpcFunction(std::string name, rpcfn_type rpcFunction, const v8::Functio
             sanitize(result);
         }
 
-        std::string resultString = json_spirit::write_string(result, false);
-        v8::Local<v8::String> resultJson = String2V8(isolate, resultString);
-        args.GetReturnValue().Set(v8::JSON::Parse(context, resultJson).ToLocalChecked());
+//        std::string resultString = json_spirit::write_string(result, false);
+//        v8::Local<v8::String> resultJson = String2V8(isolate, resultString);
+//        args.GetReturnValue().Set(v8::JSON::Parse(context, resultJson).ToLocalChecked());
+        args.GetReturnValue().Set(Jsp2V8(isolate, result));
     }
 
     if (isolateData.withCallbackLog)

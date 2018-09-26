@@ -174,7 +174,8 @@ V8_SOURCES = \
   v8/v8isolatemanager.cpp \
   v8/v8engine.cpp \
   v8/v8filter.cpp \
-  v8/callbacks.cpp
+  v8/callbacks.cpp \
+  v8/v8utils.cpp
 
 # server: shared between bitcoind and bitcoin-qt
 libbitcoin_server_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS)

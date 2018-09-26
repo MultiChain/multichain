@@ -12,12 +12,12 @@ MultiChain
 System requirements
 -------------------
 
-These compilation instructions have been tested on Ubuntu 14.04 x64 only.
+These compilation instructions have been tested on Ubuntu 16.04 x64 (xenial) and Ubuntu 18.04 x64 (bionic) only.
 
 C++ compilers are memory-hungry, so it is recommended to have at least 1 GB of memory available when compiling MultiChain. With less memory, compilation may take much longer due to swapfile thrashing.
 
 
-Linux Build Notes (on Ubuntu 14.04 x64)
+Linux Build Notes (on Ubuntu 16.04 x64 or later)
 =================
 
 Install dependencies
@@ -31,6 +31,11 @@ Install dependencies
     sudo add-apt-repository ppa:bitcoin/bitcoin
     sudo apt-get update
     sudo apt-get install libdb4.8-dev libdb4.8++-dev
+
+Build Google's V8 locally
+-------------------------
+
+Please use the instructions in [V8.md](/V8.md/) to build and install V8 for use by Multichain.
 
 Compile MultiChain for Ubuntu (64-bit)
 -----------------------------
