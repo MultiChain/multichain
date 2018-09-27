@@ -35,7 +35,7 @@ Install dependencies
 Build Google's V8 locally
 -------------------------
 
-Please use the instructions in [V8.md](/V8.md/) to build and install V8 for use by Multichain.
+Please use the instructions in [V8.md](/V8.md/) to build and install V8 for use by MultiChain.
 
 Compile MultiChain for Ubuntu (64-bit)
 -----------------------------
