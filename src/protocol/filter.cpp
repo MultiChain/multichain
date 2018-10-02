@@ -60,7 +60,8 @@ int mc_FilterEngine::Initialize(std::string& strResult)
     return v8engine->Initialize(strResult);
 }
 
-int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, mc_Filter* filter, std::string& strResult)
+int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, std::vector<std::string>& callback_names,
+        mc_Filter* filter, std::string& strResult)
 {
     LogPrint("v8filter", "v8filter: mc_FilterEngine::CreateFilter\n");
     strResult.clear();
@@ -72,7 +73,7 @@ int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, mc_
         return result;
     }
     auto v8filter = static_cast<mc_v8::V8Filter*>(filter->m_Impl);
-    result = v8engine->CreateFilter(script, main_name, v8filter, strResult);
+    result = v8engine->CreateFilter(script, main_name, callback_names, v8filter, strResult);
     if (result != MC_ERR_NOERROR || !strResult.empty())
     {
         filter->Destroy();

@@ -175,5 +175,18 @@ FILTER_FUNCTION(getstreaminfo)
 FILTER_FUNCTION(verifypermission)
 FILTER_FUNCTION(verifymessage)
 
+std::map<std::string, FILTER_TYPE> callbackLookup {
+    FILTER_LOOKUP(mcprint),
+    FILTER_LOOKUP(getfiltertxid),
+    FILTER_LOOKUP(getfiltertransaction),
+    FILTER_LOOKUP(setfilterparam),
+    FILTER_LOOKUP(getfiltertxinput),
+    FILTER_LOOKUP(getlastblockinfo),
+    FILTER_LOOKUP(getassetinfo),
+    FILTER_LOOKUP(getstreaminfo),
+    FILTER_LOOKUP(verifypermission),
+    FILTER_LOOKUP(verifymessage)
+};
+
 } // namespace mc_v8
 

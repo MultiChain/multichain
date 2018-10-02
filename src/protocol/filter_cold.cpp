@@ -38,7 +38,8 @@ int mc_FilterEngine::Initialize(std::string& strResult)
     return MC_ERR_NOERROR;
 }
 
-int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, mc_Filter* filter, std::string& strResult)
+int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, std::vector<std::string>& callbackNames,
+        mc_Filter* filter, std::string& strResult)
 {
     strResult.clear();
     return MC_ERR_NOERROR;
