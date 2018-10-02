@@ -7,11 +7,11 @@
 #include "callbacks.h"
 #include "utils/define.h"
 #include "utils/util.h"
+#include "utils/tinyformat.h"
 #include <cassert>
 
 namespace mc_v8
 {
-
 
 static std::string jsFixture =
         R"(
@@ -73,7 +73,8 @@ int V8Filter::Destroy()
 
 #define REGISTER_RPC(name) global->Set(String2V8(m_isolate, #name), v8::FunctionTemplate::New(m_isolate, filter_##name))
 
-int V8Filter::Initialize(std::string script, std::string functionName, std::string& strResult)
+int V8Filter::Initialize(std::string script, std::string functionName, std::vector<std::string>& callback_names,
+        std::string& strResult)
 {
     LogPrint("v8filter", "v8filter: V8Filter::Initialize\n");
     strResult.clear();
@@ -82,16 +83,26 @@ int V8Filter::Initialize(std::string script, std::string functionName, std::stri
     v8::Isolate::Scope isolateScope(m_isolate);
     v8::HandleScope handleScope(m_isolate);
     auto global = v8::ObjectTemplate::New(m_isolate);
-    REGISTER_RPC(mcprint);
-    REGISTER_RPC(getfiltertxid);
-    REGISTER_RPC(getfiltertransaction);
-    REGISTER_RPC(setfilterparam);
-    REGISTER_RPC(getfiltertxinput);
-    REGISTER_RPC(getlastblockinfo);
-    REGISTER_RPC(getassetinfo);
-    REGISTER_RPC(getstreaminfo);
-    REGISTER_RPC(verifypermission);
-    REGISTER_RPC(verifymessage);
+    if (callback_names.empty())
+    {
+        for (auto entry : callbackLookup)
+        {
+            global->Set(String2V8(m_isolate, entry.first), v8::FunctionTemplate::New(m_isolate, entry.second));
+        }
+    }
+    else
+    {
+        for (std::string functionName : callback_names)
+        {
+            if (callbackLookup.find(functionName) == callbackLookup.end())
+            {
+                strResult = strprintf("Invalid callback name: {}", functionName);
+                return MC_ERR_INTERNAL_ERROR;
+            }
+            global->Set(String2V8(m_isolate, functionName),
+                    v8::FunctionTemplate::New(m_isolate, callbackLookup[functionName]));
+        }
+    }
     auto context = v8::Context::New(m_isolate, nullptr, global);
     m_context.Reset(m_isolate, context);
 

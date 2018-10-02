@@ -73,13 +73,16 @@ public:
     /**
      * Initialize a user-defined transaction filter.
      *
-     * @param script    The filter JS code.
-     * @param main_name The expected name of the filtering function in the script.
-     * @param filter    The user-defined transaction filter to initialize.
-     * @param strResult Reason for failure if unsuccessful.
-     * @return          MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
+     * @param script         The filter JS code.
+     * @param main_name      The expected name of the filtering function in the script.
+     * @param callback_names A list of callback function names to register for the filter.
+     *                       If empty, register all possible functions.
+     * @param filter         The user-defined transaction filter to initialize.
+     * @param strResult      Reason for failure if unsuccessful.
+     * @return               MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
      */
-    int CreateFilter(std::string script, std::string main_name, mc_Filter* filter, std::string& strResult);
+    int CreateFilter(std::string script, std::string main_name, std::vector<std::string>& callback_names,
+            mc_Filter* filter, std::string& strResult);
 
     /**
      * Run the filter function in the JS script.

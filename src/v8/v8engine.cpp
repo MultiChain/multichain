@@ -26,11 +26,12 @@ int V8Engine::Initialize(std::string& strResult)
     return MC_ERR_NOERROR;
 }
 
-int V8Engine::CreateFilter(std::string script, std::string main_name, V8Filter* filter, std::string& strResult)
+int V8Engine::CreateFilter(std::string script, std::string main_name, std::vector<std::string>& callback_names,
+        V8Filter* filter, std::string& strResult)
 {
     LogPrint("v8filter", "v8filter: V8Engine::CreateFilter\n");
     strResult.clear();
-    return filter->Initialize(script, main_name, strResult);
+    return filter->Initialize(script, main_name, callback_names,, strResult);
 }
 
 int V8Engine::RunFilter(V8Filter* filter, std::string& strResult)

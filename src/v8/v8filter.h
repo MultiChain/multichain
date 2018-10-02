@@ -36,12 +36,15 @@ public:
     /**
      * Initialize the filter to run the function @p functionName in the JS @p script.
      *
-     * @param script    The filter JS code.
-     * @param main_name The expected name of the filtering function in the script.
-     * @param strResult Reason for failure if unsuccessful.
-     * @return          MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
+     * @param script         The filter JS code.
+     * @param main_name      The expected name of the filtering function in the script.
+     * @param callback_names A list of callback function names to register for the filter.
+     *                       If empty, register all possible functions.
+     * @param strResult      Reason for failure if unsuccessful.
+     * @return               MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
      */
-    int Initialize(std::string script, std::string functionName, std::string& strResult);
+    int Initialize(std::string script, std::string functionName, std::vector<std::string>& callback_names,
+            std::string& strResult);
 
     /**
      * Run the filter function in the JS script.
