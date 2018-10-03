@@ -13,29 +13,6 @@
 namespace mc_v8
 {
 
-void filter_mcprint(const v8::FunctionCallbackInfo<v8::Value>& args)
-{
-    v8::Isolate* isolate = args.GetIsolate();
-    v8::Locker locker(isolate);
-    v8::Isolate::Scope isolateScope(isolate);
-    v8::HandleScope handleScope(isolate);
-    v8::Local<v8::Context> context(isolate->GetCurrentContext());
-    v8::Context::Scope contextScope(context);
-
-    if (args.Length() < 1)
-    {
-        LogPrint("JS", "JS Error: Too few arguments to the print function.\n");
-        return;
-    }
-    if (!args[0]->IsString())
-    {
-        LogPrint("JS", "JS Error: First argument to the print function must be a string.\n");
-        return;
-    }
-
-    LogPrint("JS", (V82String(isolate, args[0]) + "\n").c_str());
-}
-
 /**
  * Signature of a function to remove non-deterministic or sensitive elements from RPC function output.
  *
@@ -176,7 +153,6 @@ FILTER_FUNCTION(verifypermission)
 FILTER_FUNCTION(verifymessage)
 
 std::map<std::string, FILTER_TYPE> callbackLookup {
-    FILTER_LOOKUP(mcprint),
     FILTER_LOOKUP(getfiltertxid),
     FILTER_LOOKUP(getfiltertransaction),
     FILTER_LOOKUP(setfilterparam),
