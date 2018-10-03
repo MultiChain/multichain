@@ -31,7 +31,7 @@ int V8Engine::CreateFilter(std::string script, std::string main_name, std::vecto
 {
     LogPrint("v8filter", "v8filter: V8Engine::CreateFilter\n");
     strResult.clear();
-    return filter->Initialize(script, main_name, callback_names,, strResult);
+    return filter->Initialize(script, main_name, callback_names, strResult);
 }
 
 int V8Engine::RunFilter(V8Filter* filter, std::string& strResult)
