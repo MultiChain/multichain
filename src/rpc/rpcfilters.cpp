@@ -238,7 +238,7 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
     js=ParseFilterDetails(params[4]);
 
     mc_Filter *worker=new mc_Filter;
-    std::vector<string> filterFunctionNames;
+    std::vector<string> filterFunctionNames { "getfiltertransaction" };
 
     err=pFilterEngine->CreateFilter(js.c_str(),MC_FLT_MAIN_NAME_TX,filterFunctionNames,worker,strError);
     delete worker;
@@ -646,7 +646,7 @@ Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, st
     }
     
     mc_Filter *worker=new mc_Filter;
-    std::vector<std::string> filterFunctionNames;
+    std::vector<std::string> filterFunctionNames { "getfiltertransaction" };
 
     err=pFilterEngine->CreateFilter(filter_code,MC_FLT_MAIN_NAME_TX,filterFunctionNames,worker,strError);
     if(err)

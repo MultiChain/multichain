@@ -192,7 +192,7 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid)
     m_Filters.push_back(filter);
     mc_Filter *worker=new mc_Filter;
     m_Workers->Add(&worker);
-    std::vector<string> filterFunctionNames;
+    std::vector<string> filterFunctionNames { "getfiltertransaction" };
     
     err=pFilterEngine->CreateFilter(m_Filters.back().m_FilterCode,m_Filters.back().m_MainName.c_str(),
             filterFunctionNames,worker,m_Filters.back().m_CreateError);
@@ -245,7 +245,7 @@ int mc_MultiChainFilterEngine::Reset(int block)
     for(int i=0;i<(int)m_Filters.size();i++)
     {
         mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
-        std::vector<string> filterFunctionNames;
+        std::vector<string> filterFunctionNames { "getfiltertransaction" };
         
         err=pFilterEngine->CreateFilter(m_Filters[i].m_FilterCode,m_Filters[i].m_MainName,filterFunctionNames,
                 worker,m_Filters[i].m_CreateError);

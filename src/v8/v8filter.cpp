@@ -83,25 +83,15 @@ int V8Filter::Initialize(std::string script, std::string functionName, std::vect
     v8::Isolate::Scope isolateScope(m_isolate);
     v8::HandleScope handleScope(m_isolate);
     auto global = v8::ObjectTemplate::New(m_isolate);
-    if (callback_names.empty())
+    for (std::string functionName : callback_names)
     {
-        for (auto entry : callbackLookup)
+        if (callbackLookup.find(functionName) == callbackLookup.end())
         {
-            global->Set(String2V8(m_isolate, entry.first), v8::FunctionTemplate::New(m_isolate, entry.second));
+            strResult = strprintf("Undefined callback name: {}", functionName);
+            return MC_ERR_INTERNAL_ERROR;
         }
-    }
-    else
-    {
-        for (std::string functionName : callback_names)
-        {
-            if (callbackLookup.find(functionName) == callbackLookup.end())
-            {
-                strResult = strprintf("Invalid callback name: {}", functionName);
-                return MC_ERR_INTERNAL_ERROR;
-            }
-            global->Set(String2V8(m_isolate, functionName),
-                    v8::FunctionTemplate::New(m_isolate, callbackLookup[functionName]));
-        }
+        global->Set(String2V8(m_isolate, functionName),
+                v8::FunctionTemplate::New(m_isolate, callbackLookup[functionName]));
     }
     auto context = v8::Context::New(m_isolate, nullptr, global);
     m_context.Reset(m_isolate, context);
