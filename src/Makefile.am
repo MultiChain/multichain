@@ -1,6 +1,6 @@
 walDIST_SUBDIRS = secp256k1
 AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS)
-CXXFLAGS += -Wno-implicit-fallthrough -std=c++0x
+CXXFLAGS += -std=c++0x
 
 
 if EMBEDDED_LEVELDB

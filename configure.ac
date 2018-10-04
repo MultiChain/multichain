@@ -37,6 +37,13 @@ if test "x${CXXFLAGS+set}" = "xset"; then
 else
   CXXFLAGS_overridden=no
 fi
+
+#if test "x$GXX" = xyes; then
+  AC_MSG_CHECKING(-Wno-implicit-fallthrough)
+  AX_CHECK_COMPILE_FLAG([-Wno-implicit-fallthrough], [CXXFLAGS="$CXXFLAGS -Wno-implicit-fallthrough"],
+    [AC_MSG_NOTICE(-Wno-implicit-fallthrough not supported)])
+#fi
+
 AC_PROG_CXX
 m4_ifdef([AC_PROG_OBJCXX],[AC_PROG_OBJCXX])
 
