@@ -238,9 +238,8 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
     js=ParseFilterDetails(params[4]);
 
     mc_Filter *worker=new mc_Filter;
-    std::vector<string> filterFunctionNames { "getfiltertransaction" };
 
-    err=pFilterEngine->CreateFilter(js.c_str(),MC_FLT_MAIN_NAME_TX,filterFunctionNames,worker,strError);
+    err=pFilterEngine->CreateFilter(js.c_str(),MC_FLT_MAIN_NAME_TX,pMultiChainFilterEngine->m_CallbackNames,worker,strError);
     delete worker;
     if(err)
     {
@@ -646,9 +645,8 @@ Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, st
     }
     
     mc_Filter *worker=new mc_Filter;
-    std::vector<std::string> filterFunctionNames { "getfiltertransaction" };
 
-    err=pFilterEngine->CreateFilter(filter_code,MC_FLT_MAIN_NAME_TX,filterFunctionNames,worker,strError);
+    err=pFilterEngine->CreateFilter(filter_code,MC_FLT_MAIN_NAME_TX,pMultiChainFilterEngine->m_CallbackNames,worker,strError);
     if(err)
     {
         errorCode=RPC_INTERNAL_ERROR;

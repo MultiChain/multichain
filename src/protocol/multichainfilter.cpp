@@ -150,6 +150,7 @@ int mc_MultiChainFilterEngine::Zero()
     m_Filters.clear();
     m_TxID=0;
     m_Workers=NULL;
+    m_CallbackNames.clear();
     
     return MC_ERR_NOERROR;
 }
@@ -192,10 +193,9 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid)
     m_Filters.push_back(filter);
     mc_Filter *worker=new mc_Filter;
     m_Workers->Add(&worker);
-    std::vector<string> filterFunctionNames { "getfiltertransaction" };
     
     err=pFilterEngine->CreateFilter(m_Filters.back().m_FilterCode,m_Filters.back().m_MainName.c_str(),
-            filterFunctionNames,worker,m_Filters.back().m_CreateError);
+            m_CallbackNames,worker,m_Filters.back().m_CreateError);
     if(err)
     {
         LogPrintf("Couldn't create filter with short txid %s, error: %d\n",filter.m_FilterAddress.ToString().c_str(),err);
@@ -245,9 +245,8 @@ int mc_MultiChainFilterEngine::Reset(int block)
     for(int i=0;i<(int)m_Filters.size();i++)
     {
         mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
-        std::vector<string> filterFunctionNames { "getfiltertransaction" };
         
-        err=pFilterEngine->CreateFilter(m_Filters[i].m_FilterCode,m_Filters[i].m_MainName,filterFunctionNames,
+        err=pFilterEngine->CreateFilter(m_Filters[i].m_FilterCode,m_Filters[i].m_MainName,m_CallbackNames,
                 worker,m_Filters[i].m_CreateError);
         if(err)
         {
@@ -348,6 +347,21 @@ int mc_MultiChainFilterEngine::RunFilterWithCallbackLog(const CTransaction& tx,m
     return err;
 }
 
+void mc_MultiChainFilterEngine::SetCallbackNames()
+{
+    m_CallbackNames.clear();
+    
+    m_CallbackNames.push_back("getfiltertxid");
+    m_CallbackNames.push_back("getfiltertransaction");
+    m_CallbackNames.push_back("setfilterparam");
+    m_CallbackNames.push_back("getfiltertxinput");
+    m_CallbackNames.push_back("getlastblockinfo");
+    m_CallbackNames.push_back("getassetinfo");
+    m_CallbackNames.push_back("getstreaminfo");
+    m_CallbackNames.push_back("verifypermission");
+    m_CallbackNames.push_back("verifymessage");    
+}
+
 int mc_MultiChainFilterEngine::Initialize()
 {
     mc_Buffer *filters;
@@ -360,6 +374,7 @@ int mc_MultiChainFilterEngine::Initialize()
     m_Workers=new mc_Buffer;
     m_Workers->Initialize(sizeof(mc_Filter*),sizeof(mc_Filter*),MC_BUF_MODE_DEFAULT);
     
+    SetCallbackNames();
     
     filters=NULL;
     filters=mc_gState->m_Assets->GetEntityList(filters,NULL,MC_ENT_TYPE_FILTER);
