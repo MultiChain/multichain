@@ -13,8 +13,10 @@
 
 #define MC_FLT_TYPE_BAD                    0xFFFFFFFF
 #define MC_FLT_TYPE_TX                     0
+#define MC_FLT_TYPE_STREAM                 1
 
 #define MC_FLT_MAIN_NAME_TX                "filtertransaction"
+#define MC_FLT_MAIN_NAME_STREAM            "filterstreamitem"
 
 std::vector <uint160>  mc_FillRelevantFilterEntitities(const unsigned char *ptr, size_t value_size);
 
@@ -72,7 +74,7 @@ typedef struct mc_MultiChainFilterParams
 typedef struct mc_MultiChainFilterEngine
 {
     std::vector <mc_MultiChainFilter> m_Filters;
-    std::vector <std::string> m_CallbackNames;
+    std::vector <std::vector <std::string>> m_CallbackNames;
     mc_Buffer *m_Workers;
     uint256 m_TxID;
     CTransaction m_Tx;
@@ -92,7 +94,7 @@ typedef struct mc_MultiChainFilterEngine
     void SetCallbackNames();
     int Add(const unsigned char* short_txid);
     int Reset(int block);
-    int Run(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied);            
+    int RunTxFilters(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied);            
     int RunFilter(const CTransaction& tx,mc_Filter *filter,std::string &strResult);            
     int RunFilterWithCallbackLog(const CTransaction& tx,mc_Filter *filter,std::string &strResult, json_spirit::Array& callbacks);
 

@@ -2262,7 +2262,7 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
                 mc_MultiChainFilter* lpFilter;
                 int applied=0;
 
-                if(pMultiChainFilterEngine->Run(tx,details.vRelevantEntities,reason,&lpFilter,&applied) != MC_ERR_NOERROR)
+                if(pMultiChainFilterEngine->RunTxFilters(tx,details.vRelevantEntities,reason,&lpFilter,&applied) != MC_ERR_NOERROR)
                 {
                     reason="Error while running filters";
                     fReject=true;

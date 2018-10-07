@@ -85,14 +85,282 @@ string ParseFilterDetails(Value param)
     return param.get_str();
 }
 
+Value createfilter_operation(const Array& params)
+{
+    if(mc_gState->m_Features->Filters() == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
+    }   
+    
+    CWalletTx wtx;
+    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;    
+    lpScript->Clear();
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
+    lpDetailsScript->Clear();
+    mc_Script *lpDetails=mc_gState->m_TmpBuffers->m_RpcScript2;
+    lpDetails->Clear();
+    
+    int ret,type;
+    string filter_name="";
+    string strError="";
+    int err;
+    int errorCode=RPC_INVALID_PARAMETER;
+    
+    if (params[2].type() != str_type)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filter name, should be string");
+            
+    if(!params[2].get_str().empty())
+    {        
+        filter_name=params[2].get_str();
+    }
+        
+    if(filter_name == "*")
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filter name: *");                                                                                            
+    }
+
+    unsigned char buf_a[MC_AST_ASSET_REF_SIZE];    
+    if(AssetRefDecode(buf_a,filter_name.c_str(),filter_name.size()))
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filter name, looks like a filter reference");                                                                                                    
+    }
+            
+    
+    if(filter_name.size())
+    {
+        ret=ParseAssetKey(filter_name.c_str(),NULL,NULL,NULL,NULL,&type,MC_ENT_TYPE_ANY);
+        if(ret != MC_ASSET_KEY_INVALID_NAME)
+        {
+            if(type == MC_ENT_KEYTYPE_NAME)
+            {
+                throw JSONRPCError(RPC_DUPLICATE_NAME, "Filter, upgrade, stream or asset with this name already exists");                                    
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filter name");                                    
+            }
+        }        
+    }
+
+    vector<CTxDestination> addresses;    
+    
+    vector<CTxDestination> fromaddresses;        
+    mc_EntityDetails entity;
+    entity.Zero();
+    if (strcmp(params[1].get_str().c_str(),"streamfilter") == 0)
+    {
+        ParseEntityIdentifier(params[3].get_str(),&entity, MC_ENT_TYPE_STREAM);           
+    }
+    
+    if(params[0].get_str() != "*")
+    {
+        fromaddresses=ParseAddresses(params[0].get_str(),false,false);
+
+        if(fromaddresses.size() != 1)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
+        }
+
+        if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
+        {
+            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
+        }
+        
+        set<CTxDestination> thisFromAddresses;
+
+        BOOST_FOREACH(const CTxDestination& fromaddress, fromaddresses)
+        {
+            thisFromAddresses.insert(fromaddress);
+        }
+
+        CPubKey pkey;
+        if (entity.GetEntityType() == MC_ENT_TYPE_STREAM)
+        {
+            CKeyID *lpKeyID=boost::get<CKeyID> (&fromaddresses[0]);
+            if(lpKeyID != NULL)
+            {
+                if(mc_gState->m_Permissions->CanAdmin(entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
+                {
+                    throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have admin permission for this stream");                                                                        
+                }                                                 
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Only P2PKH filter admins can create stream filter");                                                
+            }            
+        }
+        else
+        {
+            if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_CREATE | MC_PTP_ADMIN,&thisFromAddresses))
+            {
+                throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have create or admin permission");                
+            }   
+        }
+    }
+    else
+    {
+        BOOST_FOREACH(const PAIRTYPE(CBitcoinAddress, CAddressBookData)& item, pwalletMain->mapAddressBook)
+        {
+            const CBitcoinAddress& address = item.first;
+            CKeyID keyID;
+
+            if(address.GetKeyID(keyID))
+            {
+                if( IsMine(*pwalletMain, keyID) & ISMINE_SPENDABLE )
+                {
+                    if (entity.GetEntityType() == MC_ENT_TYPE_STREAM)
+                    {
+                        if(mc_gState->m_Permissions->CanAdmin(entity.GetTxID(),(unsigned char*)(&keyID)))
+                        {
+                            fromaddresses.push_back(keyID);
+                        }                        
+                    }
+                    else
+                    {
+                        if(mc_gState->m_Permissions->CanCreate(NULL,(unsigned char*)(&keyID)))
+                        {
+                            if(mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)(&keyID)))
+                            {
+                                fromaddresses.push_back(keyID);
+                            }
+                        }
+                    }
+                }
+            }
+        }                    
+        CPubKey pkey;
+        if(fromaddresses.size() == 0)
+        {
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with create and admin permission");                
+        }        
+    }
+    
+    lpScript->Clear();
+    
+    lpDetails->Clear();
+    lpDetails->AddElement();
+    if(filter_name.size())
+    {        
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(unsigned char*)(filter_name.c_str()),filter_name.size());//+1);
+    }
+    
+    size_t bytes;
+    string js;
+    const unsigned char *script;
+    CScript scriptOpReturn=CScript();
+    
+    uint32_t filter_type=MC_FLT_TYPE_TX;
+    string filter_main_name=MC_FLT_MAIN_NAME_TX;
+    if (entity.GetEntityType() == MC_ENT_TYPE_STREAM)
+    {
+        filter_type=MC_FLT_TYPE_STREAM;
+        filter_main_name=MC_FLT_MAIN_NAME_STREAM;
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_ENTITY,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+    }
+    
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_TYPE,(unsigned char*)&filter_type,4);
+
+    ParseFilterRestrictions(params[4],lpDetailsScript);
+    
+    script = lpDetailsScript->GetData(0,&bytes);
+
+    if(bytes)
+    {
+        if (entity.GetEntityType() == MC_ENT_TYPE_STREAM)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Restrictions for stream filter should be empty");                                    
+        }
+    
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_RESTRICTIONS,script,bytes);
+    }
+
+    js=ParseFilterDetails(params[5]);
+
+    mc_Filter *worker=new mc_Filter;
+
+    err=pFilterEngine->CreateFilter(js.c_str(),filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strError);
+    delete worker;
+    if(err)
+    {
+        throw JSONRPCError(RPC_INTERNAL_ERROR,"Couldn't create filter");                                                                   
+    }
+    if(strError.size())
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER,strprintf("Couldn't compile filter code: %s",strError.c_str()));                                                                               
+    }
+    
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)js.c_str(),js.size());                                                        
+    
+    
+    script=lpDetails->GetData(0,&bytes);
+    
+
+    size_t elem_size;
+    const unsigned char *elem;
+    
+    lpDetailsScript->Clear();
+    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_FILTER,0,script,bytes);
+    if(err)
+    {
+        strError="Invalid custom fields or filter name, too long";
+        goto exitlbl;
+    }
+
+    elem = lpDetailsScript->GetData(0,&elem_size);
+    scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;        
+    
+    
+    EnsureWalletIsUnlocked();
+    {
+        LOCK (pwalletMain->cs_wallet_send);
+
+        SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn,fromaddresses);
+    }
+        
+exitlbl:
+
+    if(strError.size())
+    {
+        throw JSONRPCError(errorCode, strError);                        
+    }
+
+    return wtx.GetHash().GetHex();        
+}
+
+Value createstreamfilterfromcmd(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 6)
+        throw runtime_error("Help message not found\n");
+    
+    if (strcmp(params[1].get_str().c_str(),"streamfilter"))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type, should be streamfilter");
+    
+    return createfilter_operation(params);        
+}
+
 Value createtxfilterfromcmd(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 5)
         throw runtime_error("Help message not found\n");
 
     if (strcmp(params[1].get_str().c_str(),"txfilter"))
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type, should be stream");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type, should be txfilter");
 
+    Array ext_params;
+    int param_count=0;
+    BOOST_FOREACH(const Value& value, params)
+    {
+        ext_params.push_back(value);
+        param_count++;
+        if(param_count==3)
+        {
+            ext_params.push_back("");            
+        }
+    }
+    
+    return createfilter_operation(ext_params);    
+/*    
     if(mc_gState->m_Features->Filters() == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
@@ -232,7 +500,7 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
 
     if(bytes)
     {
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_ENTITY,script,bytes);
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_RESTRICTIONS,script,bytes);
     }
 
     js=ParseFilterDetails(params[4]);
@@ -285,6 +553,7 @@ exitlbl:
         throw JSONRPCError(errorCode, strError);                        
     }
     return wtx.GetHash().GetHex();    
+ */ 
 }
 
 Value listtxfilters(const Array& params, bool fHelp)
@@ -646,7 +915,7 @@ Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, st
     
     mc_Filter *worker=new mc_Filter;
 
-    err=pFilterEngine->CreateFilter(filter_code,MC_FLT_MAIN_NAME_TX,pMultiChainFilterEngine->m_CallbackNames,worker,strError);
+    err=pFilterEngine->CreateFilter(filter_code,MC_FLT_MAIN_NAME_TX,pMultiChainFilterEngine->m_CallbackNames[MC_FLT_TYPE_TX],worker,strError);
     if(err)
     {
         errorCode=RPC_INTERNAL_ERROR;
@@ -767,7 +1036,7 @@ Value runtxfilter(const json_spirit::Array& params, bool fHelp)
     size_t value_size;
     string txhex="";
     
-    ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_ENTITY,&value_size);
+    ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_RESTRICTIONS,&value_size);
     
     if(ptr)
     {

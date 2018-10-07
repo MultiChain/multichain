@@ -98,21 +98,27 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
         case MC_FLT_TYPE_TX:
             m_MainName=MC_FLT_MAIN_NAME_TX;
             break;
+        case MC_FLT_TYPE_STREAM:
+            m_MainName=MC_FLT_MAIN_NAME_STREAM;
+            break;
         default:
             m_CreateError="Unsupported filter type";
             return MC_ERR_NOT_SUPPORTED;
     }
     
-    ptr=(unsigned char *)m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_ENTITY,&value_size);
-    
-    if(ptr)
+    if(m_FilterType == MC_FLT_TYPE_TX)
     {
-        if(value_size % MC_AST_SHORT_TXID_SIZE)
+        ptr=(unsigned char *)m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_RESTRICTIONS,&value_size);
+
+        if(ptr)
         {
-            return MC_ERR_ERROR_IN_SCRIPT;                        
-        }
-        m_RelevantEntities=mc_FillRelevantFilterEntitities(ptr, value_size);
-    }    
+            if(value_size % MC_AST_SHORT_TXID_SIZE)
+            {
+                return MC_ERR_ERROR_IN_SCRIPT;                        
+            }
+            m_RelevantEntities=mc_FillRelevantFilterEntitities(ptr, value_size);
+        }    
+    }
     
     
     ptr=(unsigned char *)m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size);
@@ -195,7 +201,7 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid)
     m_Workers->Add(&worker);
     
     err=pFilterEngine->CreateFilter(m_Filters.back().m_FilterCode,m_Filters.back().m_MainName.c_str(),
-            m_CallbackNames,worker,m_Filters.back().m_CreateError);
+            m_CallbackNames[m_Filters.back().m_FilterType],worker,m_Filters.back().m_CreateError);
     if(err)
     {
         LogPrintf("Couldn't create filter with short txid %s, error: %d\n",filter.m_FilterAddress.ToString().c_str(),err);
@@ -246,7 +252,7 @@ int mc_MultiChainFilterEngine::Reset(int block)
     {
         mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
         
-        err=pFilterEngine->CreateFilter(m_Filters[i].m_FilterCode,m_Filters[i].m_MainName,m_CallbackNames,
+        err=pFilterEngine->CreateFilter(m_Filters[i].m_FilterCode,m_Filters[i].m_MainName,m_CallbackNames[m_Filters[i].m_FilterType],
                 worker,m_Filters[i].m_CreateError);
         if(err)
         {
@@ -259,7 +265,7 @@ int mc_MultiChainFilterEngine::Reset(int block)
     return MC_ERR_NOERROR;
 }
 
-int mc_MultiChainFilterEngine::Run(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied)
+int mc_MultiChainFilterEngine::RunTxFilters(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied)
 {
     int err=MC_ERR_NOERROR;
     strResult="";
@@ -351,15 +357,32 @@ void mc_MultiChainFilterEngine::SetCallbackNames()
 {
     m_CallbackNames.clear();
     
-    m_CallbackNames.push_back("getfiltertxid");
-    m_CallbackNames.push_back("getfiltertransaction");
-    m_CallbackNames.push_back("setfilterparam");
-    m_CallbackNames.push_back("getfiltertxinput");
-    m_CallbackNames.push_back("getlastblockinfo");
-    m_CallbackNames.push_back("getassetinfo");
-    m_CallbackNames.push_back("getstreaminfo");
-    m_CallbackNames.push_back("verifypermission");
-    m_CallbackNames.push_back("verifymessage");    
+    std::vector <std::string> callbacks;                                        // Tx filter callbacks
+    
+    callbacks.clear();
+    callbacks.push_back("getfiltertxid");
+    callbacks.push_back("getfiltertransaction");
+    callbacks.push_back("setfilterparam");
+    callbacks.push_back("getfiltertxinput");
+    callbacks.push_back("getlastblockinfo");
+    callbacks.push_back("getassetinfo");
+    callbacks.push_back("getstreaminfo");
+    callbacks.push_back("verifypermission");
+    callbacks.push_back("verifymessage");    
+    
+    m_CallbackNames.push_back(callbacks);                                       // Stream filters callbacks
+    
+    callbacks.clear();
+    callbacks.push_back("getfiltertxid");
+    callbacks.push_back("getfiltertransaction");
+    callbacks.push_back("setfilterparam");
+    callbacks.push_back("getlastblockinfo");
+    callbacks.push_back("getassetinfo");
+    callbacks.push_back("getstreaminfo");
+    callbacks.push_back("verifypermission");
+    callbacks.push_back("verifymessage");    
+    
+    m_CallbackNames.push_back(callbacks);    
 }
 
 int mc_MultiChainFilterEngine::Initialize()

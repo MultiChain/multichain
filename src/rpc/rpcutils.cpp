@@ -683,7 +683,7 @@ Object TxFilterEntry(const unsigned char *txid,uint32_t output_level)
                 entry.push_back(Pair("codelength", 0));                
             }
             
-            ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_FILTER_ENTITY,&value_size);
+            ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_FILTER_RESTRICTIONS,&value_size);
 
             if(ptr)
             {
