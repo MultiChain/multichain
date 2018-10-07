@@ -72,6 +72,7 @@ typedef struct mc_MultiChainFilterParams
 typedef struct mc_MultiChainFilterEngine
 {
     std::vector <mc_MultiChainFilter> m_Filters;
+    std::vector <std::string> m_CallbackNames;
     mc_Buffer *m_Workers;
     uint256 m_TxID;
     CTransaction m_Tx;
@@ -88,6 +89,7 @@ typedef struct mc_MultiChainFilterEngine
     }
     
     int Initialize();
+    void SetCallbackNames();
     int Add(const unsigned char* short_txid);
     int Reset(int block);
     int Run(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied);            
