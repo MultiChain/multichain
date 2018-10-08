@@ -9,8 +9,9 @@
 #include "protocol/multichainfilter.h"
 
 void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
+void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity);
 
-void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript)
+void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript,uint32_t filter_type)
 {
     bool field_parsed,already_found;
     
@@ -25,6 +26,10 @@ void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript)
             field_parsed=false;
             if(s.name_ == "for")
             {
+                if(filter_type != MC_FLT_TYPE_TX)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"for field is allowed only for tx filters");                                                   
+                }
                 if(already_found)
                 {
                     throw JSONRPCError(RPC_INVALID_PARAMETER,"for field can appear only once in the object");                               
@@ -85,12 +90,29 @@ string ParseFilterDetails(Value param)
     return param.get_str();
 }
 
-Value createfilter_operation(const Array& params)
+Value createfilterfromcmd(const Array& params, bool fHelp)
 {
+    if (fHelp || params.size() < 5)
+        throw runtime_error("Help message not found\n");
+    
     if(mc_gState->m_Features->Filters() == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
     }   
+    
+    uint32_t filter_type=MC_FLT_TYPE_TX;
+    if (strcmp(params[1].get_str().c_str(),"streamfilter") == 0)
+    {
+        filter_type=MC_FLT_TYPE_STREAM;
+    }
+    else
+    {
+        if (strcmp(params[1].get_str().c_str(),"txfilter") )
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type, should be txfilter or streamfilter");
+        }
+        
+    }
     
     CWalletTx wtx;
     
@@ -143,15 +165,46 @@ Value createfilter_operation(const Array& params)
         }        
     }
 
+    lpScript->Clear();
+    
+    lpDetails->Clear();
+    lpDetails->AddElement();
+    if(filter_name.size())
+    {        
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(unsigned char*)(filter_name.c_str()),filter_name.size());//+1);
+    }
+    
+    size_t bytes;
+    string js;
+    const unsigned char *script;
+    CScript scriptOpReturn=CScript();
+    
+    
+    
+    string filter_main_name=MC_FLT_MAIN_NAME_TX;
+    uint32_t permission_needed=MC_PTP_ADMIN | MC_PTP_CREATE;
+    string permission_text="create or admin";
+    if (filter_type == MC_FLT_TYPE_STREAM)
+    {
+        filter_main_name=MC_FLT_MAIN_NAME_STREAM;
+        permission_needed=MC_PTP_CREATE;
+        permission_text="create";
+    }
+    
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_TYPE,(unsigned char*)&filter_type,4);
+    
+    ParseFilterRestrictions(params[3],lpDetailsScript,filter_type);
+    
+    script = lpDetailsScript->GetData(0,&bytes);
+
+    if(bytes)
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_RESTRICTIONS,script,bytes);
+    }
+    
     vector<CTxDestination> addresses;    
     
     vector<CTxDestination> fromaddresses;        
-    mc_EntityDetails entity;
-    entity.Zero();
-    if (strcmp(params[1].get_str().c_str(),"streamfilter") == 0)
-    {
-        ParseEntityIdentifier(params[3].get_str(),&entity, MC_ENT_TYPE_STREAM);           
-    }
     
     if(params[0].get_str() != "*")
     {
@@ -175,28 +228,10 @@ Value createfilter_operation(const Array& params)
         }
 
         CPubKey pkey;
-        if (entity.GetEntityType() == MC_ENT_TYPE_STREAM)
+        if(!pwalletMain->GetKeyFromAddressBook(pkey,permission_needed,&thisFromAddresses))
         {
-            CKeyID *lpKeyID=boost::get<CKeyID> (&fromaddresses[0]);
-            if(lpKeyID != NULL)
-            {
-                if(mc_gState->m_Permissions->CanAdmin(entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
-                {
-                    throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have admin permission for this stream");                                                                        
-                }                                                 
-            }
-            else
-            {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Only P2PKH filter admins can create stream filter");                                                
-            }            
-        }
-        else
-        {
-            if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_CREATE | MC_PTP_ADMIN,&thisFromAddresses))
-            {
-                throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have create or admin permission");                
-            }   
-        }
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have " + permission_text + " permission");                
+        }   
     }
     else
     {
@@ -209,18 +244,16 @@ Value createfilter_operation(const Array& params)
             {
                 if( IsMine(*pwalletMain, keyID) & ISMINE_SPENDABLE )
                 {
-                    if (entity.GetEntityType() == MC_ENT_TYPE_STREAM)
+                    if(mc_gState->m_Permissions->CanCreate(NULL,(unsigned char*)(&keyID)))
                     {
-                        if(mc_gState->m_Permissions->CanAdmin(entity.GetTxID(),(unsigned char*)(&keyID)))
+                        if (filter_type == MC_FLT_TYPE_STREAM)
                         {
-                            fromaddresses.push_back(keyID);
-                        }                        
-                    }
-                    else
-                    {
-                        if(mc_gState->m_Permissions->CanCreate(NULL,(unsigned char*)(&keyID)))
+                            fromaddresses.push_back(keyID);                                
+                        }
+                        else
                         {
-                            if(mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)(&keyID)))
+                            if( ((permission_needed & MC_PTP_ADMIN) == 0) ||
+                                (mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)(&keyID)) != 0) )
                             {
                                 fromaddresses.push_back(keyID);
                             }
@@ -228,54 +261,17 @@ Value createfilter_operation(const Array& params)
                     }
                 }
             }
-        }                    
-        CPubKey pkey;
+        }  
+        
         if(fromaddresses.size() == 0)
         {
-            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with create and admin permission");                
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with " + permission_text + " permission");                
         }        
     }
     
-    lpScript->Clear();
-    
-    lpDetails->Clear();
-    lpDetails->AddElement();
-    if(filter_name.size())
-    {        
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(unsigned char*)(filter_name.c_str()),filter_name.size());//+1);
-    }
-    
-    size_t bytes;
-    string js;
-    const unsigned char *script;
-    CScript scriptOpReturn=CScript();
-    
-    uint32_t filter_type=MC_FLT_TYPE_TX;
-    string filter_main_name=MC_FLT_MAIN_NAME_TX;
-    if (entity.GetEntityType() == MC_ENT_TYPE_STREAM)
-    {
-        filter_type=MC_FLT_TYPE_STREAM;
-        filter_main_name=MC_FLT_MAIN_NAME_STREAM;
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_ENTITY,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-    }
-    
-    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_TYPE,(unsigned char*)&filter_type,4);
 
-    ParseFilterRestrictions(params[4],lpDetailsScript);
-    
-    script = lpDetailsScript->GetData(0,&bytes);
 
-    if(bytes)
-    {
-        if (entity.GetEntityType() == MC_ENT_TYPE_STREAM)
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Restrictions for stream filter should be empty");                                    
-        }
-    
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_RESTRICTIONS,script,bytes);
-    }
-
-    js=ParseFilterDetails(params[5]);
+    js=ParseFilterDetails(params[4]);
 
     mc_Filter *worker=new mc_Filter;
 
@@ -328,239 +324,8 @@ exitlbl:
     return wtx.GetHash().GetHex();        
 }
 
-Value createstreamfilterfromcmd(const Array& params, bool fHelp)
+Value listfilters(const Array& params, uint32_t filter_type)
 {
-    if (fHelp || params.size() < 6)
-        throw runtime_error("Help message not found\n");
-    
-    if (strcmp(params[1].get_str().c_str(),"streamfilter"))
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type, should be streamfilter");
-    
-    return createfilter_operation(params);        
-}
-
-Value createtxfilterfromcmd(const Array& params, bool fHelp)
-{
-    if (fHelp || params.size() < 5)
-        throw runtime_error("Help message not found\n");
-
-    if (strcmp(params[1].get_str().c_str(),"txfilter"))
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type, should be txfilter");
-
-    Array ext_params;
-    int param_count=0;
-    BOOST_FOREACH(const Value& value, params)
-    {
-        ext_params.push_back(value);
-        param_count++;
-        if(param_count==3)
-        {
-            ext_params.push_back("");            
-        }
-    }
-    
-    return createfilter_operation(ext_params);    
-/*    
-    if(mc_gState->m_Features->Filters() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
-    }   
-    
-    CWalletTx wtx;
-    
-    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;    
-    lpScript->Clear();
-    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
-    lpDetailsScript->Clear();
-    mc_Script *lpDetails=mc_gState->m_TmpBuffers->m_RpcScript2;
-    lpDetails->Clear();
-    
-    int ret,type;
-    string filter_name="";
-    string strError="";
-    int err;
-    int errorCode=RPC_INVALID_PARAMETER;
-    
-    if (params[2].type() != str_type)
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filter name, should be string");
-            
-    if(!params[2].get_str().empty())
-    {        
-        filter_name=params[2].get_str();
-    }
-        
-    if(filter_name == "*")
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filter name: *");                                                                                            
-    }
-
-    unsigned char buf_a[MC_AST_ASSET_REF_SIZE];    
-    if(AssetRefDecode(buf_a,filter_name.c_str(),filter_name.size()))
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filter name, looks like a filter reference");                                                                                                    
-    }
-            
-    
-    if(filter_name.size())
-    {
-        ret=ParseAssetKey(filter_name.c_str(),NULL,NULL,NULL,NULL,&type,MC_ENT_TYPE_ANY);
-        if(ret != MC_ASSET_KEY_INVALID_NAME)
-        {
-            if(type == MC_ENT_KEYTYPE_NAME)
-            {
-                throw JSONRPCError(RPC_DUPLICATE_NAME, "Filter, upgrade, stream or asset with this name already exists");                                    
-            }
-            else
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filter name");                                    
-            }
-        }        
-    }
-
-    vector<CTxDestination> addresses;    
-    
-    vector<CTxDestination> fromaddresses;        
-    
-    if(params[0].get_str() != "*")
-    {
-        fromaddresses=ParseAddresses(params[0].get_str(),false,false);
-
-        if(fromaddresses.size() != 1)
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
-        }
-
-        if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
-        {
-            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
-        }
-        
-        set<CTxDestination> thisFromAddresses;
-
-        BOOST_FOREACH(const CTxDestination& fromaddress, fromaddresses)
-        {
-            thisFromAddresses.insert(fromaddress);
-        }
-
-        CPubKey pkey;
-        if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_CREATE | MC_PTP_ADMIN,&thisFromAddresses))
-        {
-            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have create or admin permission");                
-        }   
-    }
-    else
-    {
-        BOOST_FOREACH(const PAIRTYPE(CBitcoinAddress, CAddressBookData)& item, pwalletMain->mapAddressBook)
-        {
-            const CBitcoinAddress& address = item.first;
-            CKeyID keyID;
-
-            if(address.GetKeyID(keyID))
-            {
-                if( IsMine(*pwalletMain, keyID) & ISMINE_SPENDABLE )
-                {
-                    if(mc_gState->m_Permissions->CanCreate(NULL,(unsigned char*)(&keyID)))
-                    {
-                        if(mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)(&keyID)))
-                        {
-                            fromaddresses.push_back(keyID);
-                        }
-                    }
-                }
-            }
-        }                    
-        CPubKey pkey;
-        if(fromaddresses.size() == 0)
-        {
-            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with create and admin permission");                
-        }        
-    }
-    
-    lpScript->Clear();
-    
-    lpDetails->Clear();
-    lpDetails->AddElement();
-    if(filter_name.size())
-    {        
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(unsigned char*)(filter_name.c_str()),filter_name.size());//+1);
-    }
-    
-    size_t bytes;
-    string js;
-    const unsigned char *script;
-    CScript scriptOpReturn=CScript();
-    
-    uint32_t filter_type=MC_FLT_TYPE_TX;
-    
-    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_TYPE,(unsigned char*)&filter_type,4);
-
-    ParseFilterRestrictions(params[3],lpDetailsScript);
-    
-    script = lpDetailsScript->GetData(0,&bytes);
-
-    if(bytes)
-    {
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_RESTRICTIONS,script,bytes);
-    }
-
-    js=ParseFilterDetails(params[4]);
-
-    mc_Filter *worker=new mc_Filter;
-
-    err=pFilterEngine->CreateFilter(js.c_str(),MC_FLT_MAIN_NAME_TX,pMultiChainFilterEngine->m_CallbackNames,worker,strError);
-    delete worker;
-    if(err)
-    {
-        throw JSONRPCError(RPC_INTERNAL_ERROR,"Couldn't create filter");                                                                   
-    }
-    if(strError.size())
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER,strprintf("Couldn't compile filter code: %s",strError.c_str()));                                                                               
-    }
-    
-    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)js.c_str(),js.size());                                                        
-    
-    
-    script=lpDetails->GetData(0,&bytes);
-    
-
-    size_t elem_size;
-    const unsigned char *elem;
-    
-    lpDetailsScript->Clear();
-    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_FILTER,0,script,bytes);
-    if(err)
-    {
-        strError="Invalid custom fields or filter name, too long";
-        goto exitlbl;
-    }
-
-    elem = lpDetailsScript->GetData(0,&elem_size);
-    scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;        
-    
-    
-    EnsureWalletIsUnlocked();
-    {
-        LOCK (pwalletMain->cs_wallet_send);
-
-        SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn,fromaddresses);
-    }
-        
-exitlbl:
-
-    if(strError.size())
-    {
-        throw JSONRPCError(errorCode, strError);                        
-    }
-    return wtx.GetHash().GetHex();    
- */ 
-}
-
-Value listtxfilters(const Array& params, bool fHelp)
-{
-    if (fHelp || params.size() > 2)
-        throw runtime_error("Help message not found\n");
-    
     Array results;
     uint32_t output_level;
 
@@ -568,21 +333,39 @@ Value listtxfilters(const Array& params, bool fHelp)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
     }   
+
+    bool check_approval=true;
+    mc_EntityDetails stream_entity;
+    stream_entity.Zero();
+    const unsigned char *lpEntity;
+    lpEntity=NULL;
+    
+    if(filter_type == MC_FLT_TYPE_STREAM)
+    {
+        check_approval=false;
+        if (params.size() > 0 && params[0].type() != null_type && ((params[0].type() != str_type) || (params[0].get_str() !="*" ) ) )
+        {        
+            parseStreamIdentifier(params[0],&stream_entity);           
+            check_approval=true;
+            lpEntity=stream_entity.GetTxID();            
+        }
+    }
+    
     
     vector<string> inputStrings;
-    if (params.size() > 0 && params[0].type() != null_type && ((params[0].type() != str_type) || (params[0].get_str() !="*" ) ) )
+    if (params.size() > 1 && params[1].type() != null_type && ((params[1].type() != str_type) || (params[1].get_str() !="*" ) ) )
     {        
-        if(params[0].type() == str_type)
+        if(params[1].type() == str_type)
         {
-            inputStrings.push_back(params[0].get_str());
-            if(params[0].get_str() == "")
+            inputStrings.push_back(params[1].get_str());
+            if(params[1].get_str() == "")
             {
                 return results;                
             }
         }
         else
         {
-            inputStrings=ParseStringList(params[0]);        
+            inputStrings=ParseStringList(params[1]);        
             if(inputStrings.size() == 0)
             {
                 return results;
@@ -602,6 +385,10 @@ Value listtxfilters(const Array& params, bool fHelp)
 
                 mc_EntityDetails filter_entity;
                 ParseEntityIdentifier(param,&filter_entity,MC_ENT_TYPE_FILTER);
+                if(filter_entity.GetFilterType() != filter_type)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filter identifier, wrong filter type.");                            
+                }
                 filter_list.insert(*(uint256*)filter_entity.GetTxID());
             }
         }
@@ -609,9 +396,9 @@ Value listtxfilters(const Array& params, bool fHelp)
     
     
     bool verbose=false;
-    if (params.size() > 1)    
+    if (params.size() > 2)    
     {
-        if(paramtobool(params[1]))
+        if(paramtobool(params[2]))
         {
             verbose=true;            
         }
@@ -632,7 +419,7 @@ Value listtxfilters(const Array& params, bool fHelp)
         if((filter_list.size() == 0) || 
            (filter_list.find(*(uint256*)pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID()) != filter_list.end()) )
         {
-            entry=TxFilterEntry(pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID(),output_level);
+            entry=FilterEntry(pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID(),output_level,filter_type);
             if(entry.size()>0)
             {
                 bool take_it=false;
@@ -654,8 +441,11 @@ Value listtxfilters(const Array& params, bool fHelp)
                 {
                     bool valid=pMultiChainFilterEngine->m_Filters[i].m_CreateError.size() == 0;
                     entry.push_back(Pair("compiled",valid));
-                    entry.push_back(Pair("approved",mc_gState->m_Permissions->FilterApproved(NULL,&(pMultiChainFilterEngine->m_Filters[i].m_FilterAddress)) !=0 ));
-                    entry.push_back(Pair("address",pMultiChainFilterEngine->m_Filters[i].m_FilterAddress.ToString()));
+                    if(check_approval)
+                    {
+                        entry.push_back(Pair("approved",mc_gState->m_Permissions->FilterApproved(NULL,&(pMultiChainFilterEngine->m_Filters[i].m_FilterAddress)) !=0 ));
+                        entry.push_back(Pair("address",pMultiChainFilterEngine->m_Filters[i].m_FilterAddress.ToString()));
+                    }
                     results.push_back(entry);                                            
                 }
             }            
@@ -671,7 +461,7 @@ Value listtxfilters(const Array& params, bool fHelp)
         {
             Object entry;
 
-            entry=TxFilterEntry(pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID(),output_level);
+            entry=FilterEntry(pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID(),output_level,filter_type);
             if(entry.size()>0)
             {
                 bool take_it=false;
@@ -689,129 +479,158 @@ Value listtxfilters(const Array& params, bool fHelp)
                 {
                     bool valid=pMultiChainFilterEngine->m_Filters[i].m_CreateError.size() == 0;
                     entry.push_back(Pair("compiled",valid));
-                    entry.push_back(Pair("approved",mc_gState->m_Permissions->FilterApproved(NULL,&(pMultiChainFilterEngine->m_Filters[i].m_FilterAddress)) !=0 ));
-                    entry.push_back(Pair("address",pMultiChainFilterEngine->m_Filters[i].m_FilterAddress.ToString()));
+                    if(check_approval)
+                    {
+                        entry.push_back(Pair("approved",mc_gState->m_Permissions->FilterApproved(NULL,&(pMultiChainFilterEngine->m_Filters[i].m_FilterAddress)) !=0 ));
+                        entry.push_back(Pair("address",pMultiChainFilterEngine->m_Filters[i].m_FilterAddress.ToString()));
+                    }
                     results.push_back(entry);                                            
                 }
             }            
         }
     }
 
-    for(int i=0;i<(int)results.size();i++)
+    if(check_approval)
     {
-        uint160 filter_address=0;
-        BOOST_FOREACH(const Pair& p, results[i].get_obj()) 
+        for(int i=0;i<(int)results.size();i++)
         {
-            if(p.name_ == "address")
+            uint160 filter_address=0;
+            BOOST_FOREACH(const Pair& p, results[i].get_obj()) 
             {
-                filter_address.SetHex(p.value_.get_str());
+                if(p.name_ == "address")
+                {
+                    filter_address.SetHex(p.value_.get_str());
+                }
             }
-        }
-        results[i].get_obj().pop_back();
+            results[i].get_obj().pop_back();
         
-        if(verbose)
-        {
-            mc_PermissionDetails *plsRow;
-            mc_PermissionDetails *plsDet;
-            mc_PermissionDetails *plsPend;
-            int flags,consensus,remaining;
-            Array admins;
-            Array pending;
-
-            mc_Buffer *permissions=NULL;
-            permissions=mc_gState->m_Permissions->GetPermissionList(NULL,(unsigned char*)&filter_address,MC_PTP_FILTER,permissions);
-
-            if(permissions->GetCount())
+            if(verbose)
             {
-                plsRow=(mc_PermissionDetails *)(permissions->GetRow(0));
+                mc_PermissionDetails *plsRow;
+                mc_PermissionDetails *plsDet;
+                mc_PermissionDetails *plsPend;
+                int flags,consensus,remaining;
+                Array admins;
+                Array pending;
 
-                flags=plsRow->m_Flags;
-                consensus=plsRow->m_RequiredAdmins;
-                mc_Buffer *details;
+                mc_Buffer *permissions=NULL;
+                permissions=mc_gState->m_Permissions->GetPermissionList(lpEntity,(unsigned char*)&filter_address,MC_PTP_FILTER,permissions);
 
-                if((flags & MC_PFL_HAVE_PENDING) || (consensus>1))
+                if(permissions->GetCount())
                 {
-                    details=mc_gState->m_Permissions->GetPermissionDetails(plsRow);                            
-                }
-                else
-                {
-                    details=NULL;
-                }
+                    plsRow=(mc_PermissionDetails *)(permissions->GetRow(0));
 
-                if(details)
-                {
-                    for(int j=0;j<details->GetCount();j++)
+                    flags=plsRow->m_Flags;
+                    consensus=plsRow->m_RequiredAdmins;
+                    mc_Buffer *details;
+
+                    if((flags & MC_PFL_HAVE_PENDING) || (consensus>1))
                     {
-                        plsDet=(mc_PermissionDetails *)(details->GetRow(j));
-                        remaining=plsDet->m_RequiredAdmins;
-                        if(remaining > 0)
-                        {
-                            uint160 addr;
-                            memcpy(&addr,plsDet->m_LastAdmin,sizeof(uint160));
-                            CKeyID lpKeyID=CKeyID(addr);
-                            admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
-                        }
-                    }                    
-                    for(int j=0;j<details->GetCount();j++)
+                        details=mc_gState->m_Permissions->GetPermissionDetails(plsRow);                            
+                    }
+                    else
                     {
-                        plsDet=(mc_PermissionDetails *)(details->GetRow(j));
-                        remaining=plsDet->m_RequiredAdmins;
-                        if(remaining == 0)
+                        details=NULL;
+                    }
+
+                    if(details)
+                    {
+                        for(int j=0;j<details->GetCount();j++)
                         {
-                            Object pend_obj;
-                            Array pend_admins;
-                            uint32_t block_from=plsDet->m_BlockFrom;
-                            uint32_t block_to=plsDet->m_BlockTo;
-                            for(int k=j;k<details->GetCount();k++)
+                            plsDet=(mc_PermissionDetails *)(details->GetRow(j));
+                            remaining=plsDet->m_RequiredAdmins;
+                            if(remaining > 0)
                             {
-                                plsPend=(mc_PermissionDetails *)(details->GetRow(k));
-                                remaining=plsPend->m_RequiredAdmins;
-
-                                if(remaining == 0)
+                                uint160 addr;
+                                memcpy(&addr,plsDet->m_LastAdmin,sizeof(uint160));
+                                CKeyID lpKeyID=CKeyID(addr);
+                                admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                            }
+                        }                    
+                        for(int j=0;j<details->GetCount();j++)
+                        {
+                            plsDet=(mc_PermissionDetails *)(details->GetRow(j));
+                            remaining=plsDet->m_RequiredAdmins;
+                            if(remaining == 0)
+                            {
+                                Object pend_obj;
+                                Array pend_admins;
+                                uint32_t block_from=plsDet->m_BlockFrom;
+                                uint32_t block_to=plsDet->m_BlockTo;
+                                for(int k=j;k<details->GetCount();k++)
                                 {
-                                    if(block_from == plsPend->m_BlockFrom)
+                                    plsPend=(mc_PermissionDetails *)(details->GetRow(k));
+                                    remaining=plsPend->m_RequiredAdmins;
+
+                                    if(remaining == 0)
                                     {
-                                        if(block_to == plsPend->m_BlockTo)
+                                        if(block_from == plsPend->m_BlockFrom)
                                         {
-                                            uint160 addr;
-                                            memcpy(&addr,plsPend->m_LastAdmin,sizeof(uint160));
-                                            CKeyID lpKeyID=CKeyID(addr);
-    //                                        CKeyID lpKeyID=CKeyID(*(uint160*)((void*)(plsPend->m_LastAdmin)));
-                                            pend_admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
-                                            plsPend->m_RequiredAdmins=0x01010101;
-                                        }                                    
+                                            if(block_to == plsPend->m_BlockTo)
+                                            {
+                                                uint160 addr;
+                                                memcpy(&addr,plsPend->m_LastAdmin,sizeof(uint160));
+                                                CKeyID lpKeyID=CKeyID(addr);
+        //                                        CKeyID lpKeyID=CKeyID(*(uint160*)((void*)(plsPend->m_LastAdmin)));
+                                                pend_admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                                                plsPend->m_RequiredAdmins=0x01010101;
+                                            }                                    
+                                        }
                                     }
-                                }
-                            }          
-                            pend_obj.push_back(Pair("approve", block_from < block_to));                        
-                            pend_obj.push_back(Pair("admins", pend_admins));
-                            pend_obj.push_back(Pair("required", (int64_t)(consensus-pend_admins.size())));
-                            pending.push_back(pend_obj);                            
-                        }
-                    }                    
-                    mc_gState->m_Permissions->FreePermissionList(details);                    
+                                }          
+                                pend_obj.push_back(Pair("approve", block_from < block_to));                        
+                                pend_obj.push_back(Pair("admins", pend_admins));
+                                pend_obj.push_back(Pair("required", (int64_t)(consensus-pend_admins.size())));
+                                pending.push_back(pend_obj);                            
+                            }
+                        }                    
+                        mc_gState->m_Permissions->FreePermissionList(details);                    
+                    }
+                    else
+                    {
+                        uint160 addr;
+                        memcpy(&addr,plsRow->m_LastAdmin,sizeof(uint160));
+                        CKeyID lpKeyID=CKeyID(addr);
+                        admins.push_back(CBitcoinAddress(lpKeyID).ToString());                    
+                    }
+
+                    results[i].get_obj().push_back(Pair("admins", admins));
+                    results[i].get_obj().push_back(Pair("pending", pending));                                            
                 }
                 else
                 {
-                    uint160 addr;
-                    memcpy(&addr,plsRow->m_LastAdmin,sizeof(uint160));
-                    CKeyID lpKeyID=CKeyID(addr);
-                    admins.push_back(CBitcoinAddress(lpKeyID).ToString());                    
+                    results[i].get_obj().push_back(Pair("admins", admins));
+                    results[i].get_obj().push_back(Pair("pending", pending));                                                            
                 }
-
-                results[i].get_obj().push_back(Pair("admins", admins));
-                results[i].get_obj().push_back(Pair("pending", pending));                                            
-            }
-            else
-            {
-                results[i].get_obj().push_back(Pair("admins", admins));
-                results[i].get_obj().push_back(Pair("pending", pending));                                                            
-            }
-            mc_gState->m_Permissions->FreePermissionList(permissions);                    
-        }    
+                mc_gState->m_Permissions->FreePermissionList(permissions);                    
+            }    
+        }
     }
     
     return results;
+}
+
+Value listtxfilters(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 2)
+        throw runtime_error("Help message not found\n");
+
+    Array ext_params;
+    ext_params.push_back("*");            
+    BOOST_FOREACH(const Value& value, params)
+    {
+        ext_params.push_back(value);
+    }
+    
+    return listfilters(ext_params,MC_FLT_TYPE_TX);
+}
+
+Value liststreamfilters(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 3)
+        throw runtime_error("Help message not found\n");
+
+    return listfilters(params,MC_FLT_TYPE_STREAM);
 }
 
 Value getfiltercode(const Array& params, bool fHelp)
@@ -1088,7 +907,7 @@ Value testtxfilter(const json_spirit::Array& params, bool fHelp)
     mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
     lpDetailsScript->Clear();
     
-    ParseFilterRestrictions(params[0],lpDetailsScript);
+    ParseFilterRestrictions(params[0],lpDetailsScript,filter_type);
     
     script = lpDetailsScript->GetData(0,&bytes);
 

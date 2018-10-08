@@ -249,6 +249,7 @@ extern json_spirit::Value listaddresses(const json_spirit::Array& params, bool f
 extern json_spirit::Value liststreams(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listupgrades(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listtxfilters(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value liststreamfilters(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getfiltercode(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getfiltertxid(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value setfilterparam(const json_spirit::Array& params, bool fHelp);

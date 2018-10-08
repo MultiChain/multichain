@@ -589,7 +589,7 @@ exitlbl:
     return results;
 }
 
-Object TxFilterEntry(const unsigned char *txid,uint32_t output_level)
+Object FilterEntry(const unsigned char *txid,uint32_t output_level,uint32_t filter_type)
 {
 // output_level constants
 // 0x0001 type
@@ -611,26 +611,9 @@ Object TxFilterEntry(const unsigned char *txid,uint32_t output_level)
     uint256 hash=*(uint256*)txid;
     if(mc_gState->m_Assets->FindEntityByTxID(&entity,txid))
     {        
-        if(output_level & 0x0001)
+        if(entity.GetFilterType() != filter_type)
         {
-            uint32_t filter_type=MC_FLT_TYPE_TX;
-            ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_FILTER_TYPE,&value_size);
-
-            if(ptr)
-            {
-                if( (value_size <=0) || (value_size > 4) )
-                {
-                    filter_type=MC_FLT_TYPE_BAD;                        
-                }
-                else
-                {
-                    filter_type=mc_GetLE(ptr,value_size);
-                }
-            }                                    
-            if(filter_type != MC_FLT_TYPE_TX)
-            {
-                return entry;
-            }            
+            return entry;            
         }
         
         ptr=(unsigned char *)entity.GetName();
@@ -682,43 +665,46 @@ Object TxFilterEntry(const unsigned char *txid,uint32_t output_level)
             {
                 entry.push_back(Pair("codelength", 0));                
             }
-            
-            ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_FILTER_RESTRICTIONS,&value_size);
 
-            if(ptr)
+            if(filter_type == MC_FLT_TYPE_TX)
             {
-                if(value_size % MC_AST_SHORT_TXID_SIZE)
+                ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_FILTER_RESTRICTIONS,&value_size);
+
+                if(ptr)
                 {
-                    entry.push_back(Pair("for","error"));                    
-                }
+                    if(value_size % MC_AST_SHORT_TXID_SIZE)
+                    {
+                        entry.push_back(Pair("for","error"));                    
+                    }
+                    else
+                    {
+                        for(int i=0;i<(int)value_size/MC_AST_SHORT_TXID_SIZE;i++)
+                        {
+                            mc_EntityDetails relevant_entity;
+                            Object asset_entry;
+                            if(mc_gState->m_Assets->FindEntityByShortTxID(&relevant_entity,ptr+i*MC_AST_SHORT_TXID_SIZE))
+                            {
+                                switch(relevant_entity.GetEntityType())
+                                {
+                                    case MC_ENT_TYPE_ASSET:
+                                        asset_entry=AssetEntry(relevant_entity.GetTxID(),-1,0x00);
+                                        asset_entry.push_back(Pair("type", "asset"));
+                                        entities.push_back(asset_entry);
+                                        break;
+                                    default:
+                                        entities.push_back(StreamEntry(relevant_entity.GetTxID(),0x03));
+                                        break;
+                                }
+                            }                        
+                        }
+                        entry.push_back(Pair("for",entities));                    
+                    }
+                }                           
                 else
                 {
-                    for(int i=0;i<(int)value_size/MC_AST_SHORT_TXID_SIZE;i++)
-                    {
-                        mc_EntityDetails relevant_entity;
-                        Object asset_entry;
-                        if(mc_gState->m_Assets->FindEntityByShortTxID(&relevant_entity,ptr+i*MC_AST_SHORT_TXID_SIZE))
-                        {
-                            switch(relevant_entity.GetEntityType())
-                            {
-                                case MC_ENT_TYPE_ASSET:
-                                    asset_entry=AssetEntry(relevant_entity.GetTxID(),-1,0x00);
-                                    asset_entry.push_back(Pair("type", "asset"));
-                                    entities.push_back(asset_entry);
-                                    break;
-                                default:
-                                    entities.push_back(StreamEntry(relevant_entity.GetTxID(),0x03));
-                                    break;
-                            }
-                        }                        
-                    }
-                    entry.push_back(Pair("for",entities));                    
-                }
-            }                           
-            else
-            {
-                entry.push_back(Pair("for",entities));                                    
-            }            
+                    entry.push_back(Pair("for",entities));                                    
+                }            
+            }
         }
        
         
@@ -767,7 +753,7 @@ Object TxFilterEntry(const unsigned char *txid,uint32_t output_level)
         Value null_value;
         if(output_level & 0x001)
         {
-            entry.push_back(Pair("type", "stream"));                        
+            
         }
         entry.push_back(Pair("name",null_value));
         if(output_level & 0x002)

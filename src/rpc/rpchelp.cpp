@@ -1441,15 +1441,11 @@ void mc_InitRPCHelpMap06()
             "                                                       }\n"
             "  or \n"
             "1. \"entity-type\"                    (string, required) streamfilter\n"
-            "2. \"streamfilter-name\"              (string, required) Tx filter name, if not \"\" should be unique.\n"
-            "3. \"stream-identifier\"              (string, required) Stream (to create filter for) identifier - one of: create txid, stream reference, stream name.\n"
-            "4. restrictions                     (object, required) A json object with optional filter restrictions\n"
+            "2. \"streamfilter-name\"              (string, required) Stream filter name, if not \"\" should be unique.\n"
+            "3. restrictions                     (object, required) A json object with filter restrictions\n"
             "    {\n"
-            "      \"for\": \"entity-identifier\"    (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
-            "        or\n"
-            "      \"for\": entity-identifier(s)   (array, optional) A json array of asset/stream identifiers.\n"    
             "    }\n"
-            "5. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
+            "4. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
             "                                                       function filtertransaction()\n"
             "                                                       {\n"
             "                                                           var tx=getfiltertransaction();\n"
@@ -1527,15 +1523,11 @@ void mc_InitRPCHelpMap06()
             "  or \n"
             "1. \"from-address\"                   (string, required) Address used for creating.\n"
             "2. \"entity-type\"                    (string, required) streamfilter\n"
-            "3. \"streamfilter-name\"              (string, required) Tx filter name, if not \"\" should be unique.\n"
-            "4. \"stream-identifier\"              (string, required) Stream (to create filter for) identifier - one of: create txid, stream reference, stream name.\n"
-            "5. restrictions                     (object, required) A json object with optional filter restrictions\n"
+            "3. \"streamfilter-name\"              (string, required) Stream filter name, if not \"\" should be unique.\n"
+            "4. restrictions                     (object, required) A json object with filter restrictions\n"
             "    {\n"
-            "      \"for\": \"entity-identifier\"    (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
-            "        or\n"
-            "      \"for\": entity-identifier(s)   (array, optional) A json array of asset/stream identifiers.\n"    
             "    }\n"
-            "6. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
+            "5. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
             "                                                       function filtertransaction()\n"
             "                                                       {\n"
             "                                                           var tx=getfiltertransaction();\n"
@@ -4234,6 +4226,22 @@ void mc_InitRPCHelpMap18()
             "\nExamples:\n"
             + HelpExampleCli("listtxfilters", "")
             + HelpExampleRpc("listtxfilters", "")
+        ));
+     
+     mapHelpStrings.insert(std::make_pair("liststreamfilters",
+            "liststreamfilters ( \"stream-identifier\" filter-identifier(s) verbose )\n"
+            "\nReturns list of defined filters\n"
+            "\nArguments:\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
+            "2. \"filter-identifier\"              (string, optional, default=*) Filter identifier - one of: create txid, filter reference, filter name.\n"
+            " or\n"
+            "2. filter-identifier(s)             (array, optional) A json array of filter identifiers \n"                
+            "3. verbose                          (boolean, optional, default=false) If true, returns list of creators and approval details \n"
+            "\nResult:\n"
+            "An array containing list of defined filters\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("liststreamfilters", "")
+            + HelpExampleRpc("liststreamfilters", "")
         ));
      
      mapHelpStrings.insert(std::make_pair("getfiltercode",

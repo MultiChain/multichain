@@ -1950,6 +1950,7 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
     uint32_t timestamp=0;
     set <uint160> stored_openers;
     int update_mempool;
+    bool check_admin=true;
     uint256 txid;
     mc_EntityDetails entity;
         
@@ -1968,8 +1969,34 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
         if(details->IsRelevantInput(i,details->new_entity_output))
         {
             if(mc_gState->m_Permissions->CanCreate(NULL,(unsigned char*)&(details->vInputDestinations[i])))
-            {                            
-                if( (details->new_entity_type <= MC_ENT_TYPE_STREAM_MAX) ||     // Admin persmission is required for upgrades and filters
+            {            
+                if(details->new_entity_type <= MC_ENT_TYPE_STREAM_MAX)
+                {
+                    check_admin=false;
+                }
+                else
+                {                    
+                    if(details->new_entity_type == MC_ENT_TYPE_FILTER)
+                    {
+                        if(mc_gState->m_Features->StreamFilters())
+                        {
+                            uint32_t value_offset;
+                            size_t value_size;
+                            value_offset=mc_FindSpecialParamInDetailsScript(details->details_script,details->details_script_size,MC_ENT_SPRM_FILTER_TYPE,&value_size);
+                            if(value_offset<(uint32_t)details->details_script_size)
+                            {
+                                if((uint32_t)mc_GetLE(details->details_script+value_offset,value_size) == MC_FLT_TYPE_STREAM)
+                                {
+                                    check_admin=false;
+                                }
+                            }                                    
+                            
+                        }
+                    }
+                }
+                
+//                if( (details->new_entity_type <= MC_ENT_TYPE_STREAM_MAX) ||     // Admin persmission is required for upgrades and filters
+                if( !check_admin ||
                     (mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)&(details->vInputDestinations[i])) != 0) )
                 {
                     openers.push_back(details->vInputDestinations[i]);

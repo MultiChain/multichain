@@ -1773,6 +1773,26 @@ int mc_EntityDetails::GetAssetMultiple()
     return multiple;
 }
 
+uint32_t mc_EntityDetails::GetFilterType()
+{
+    uint32_t filter_type=0;
+    size_t size;
+    void* ptr;
+    
+    ptr=NULL;
+    ptr=(void*)GetSpecialParam(MC_ENT_SPRM_FILTER_TYPE,&size);
+    
+    if(ptr)
+    {
+        if(size==sizeof(filter_type))
+        {
+            filter_type=(uint32_t)mc_GetLE(ptr,size);
+        }
+    }
+            
+    return filter_type;
+}
+
 int mc_EntityDetails::IsFollowOn()
 {
     if(m_LedgerRow.m_KeyType & MC_ENT_KEYTYPE_FOLLOW_ON)
