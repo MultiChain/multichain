@@ -201,7 +201,11 @@ Value liststreams(const Array& params, bool fHelp)
     {
         if(paramtobool(params[1]))
         {
-            output_level=0x3E;            
+            output_level=0x3E;           
+            if(mc_gState->m_Features->StreamFilters())
+            {
+                output_level |= 0x40;    
+            }
         }
     }
     

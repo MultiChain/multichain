@@ -4225,30 +4225,29 @@ void mc_InitRPCHelpMap18()
     
      mapHelpStrings.insert(std::make_pair("listtxfilters",
             "listtxfilters ( filter-identifier(s) verbose )\n"
-            "\nReturns list of defined filters\n"
+            "\nReturns list of defined tx filters\n"
             "\nArguments:\n"
             "1. \"filter-identifier\"              (string, optional, default=*) Filter identifier - one of: create txid, filter reference, filter name.\n"
             " or\n"
             "1. filter-identifier(s)             (array, optional) A json array of filter identifiers \n"                
             "2. verbose                          (boolean, optional, default=false) If true, returns list of creators and approval details \n"
             "\nResult:\n"
-            "An array containing list of defined filters\n"            
+            "An array containing list of defined tx filters\n"            
             "\nExamples:\n"
             + HelpExampleCli("listtxfilters", "")
             + HelpExampleRpc("listtxfilters", "")
         ));
      
      mapHelpStrings.insert(std::make_pair("liststreamfilters",
-            "liststreamfilters ( \"stream-identifier\" filter-identifier(s) verbose )\n"
-            "\nReturns list of defined filters\n"
+            "liststreamfilters ( filter-identifier(s) verbose )\n"
+            "\nReturns list of defined stream filters\n"
             "\nArguments:\n"
-            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
-            "2. \"filter-identifier\"              (string, optional, default=*) Filter identifier - one of: create txid, filter reference, filter name.\n"
+            "1. \"filter-identifier\"              (string, optional, default=*) Filter identifier - one of: create txid, filter reference, filter name.\n"
             " or\n"
-            "2. filter-identifier(s)             (array, optional) A json array of filter identifiers \n"                
-            "3. verbose                          (boolean, optional, default=false) If true, returns list of creators and approval details \n"
+            "1. filter-identifier(s)             (array, optional) A json array of filter identifiers \n"                
+            "2. verbose                          (boolean, optional, default=false) If true, returns list of creators and approval details \n"
             "\nResult:\n"
-            "An array containing list of defined filters\n"            
+            "An array containing list of defined stream filters\n"            
             "\nExamples:\n"
             + HelpExampleCli("liststreamfilters", "")
             + HelpExampleRpc("liststreamfilters", "")

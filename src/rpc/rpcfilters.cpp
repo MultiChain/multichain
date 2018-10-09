@@ -630,7 +630,14 @@ Value liststreamfilters(const Array& params, bool fHelp)
     if (fHelp || params.size() > 3)
         throw runtime_error("Help message not found\n");
 
-    return listfilters(params,MC_FLT_TYPE_STREAM);
+    Array ext_params;
+    ext_params.push_back("*");            
+    BOOST_FOREACH(const Value& value, params)
+    {
+        ext_params.push_back(value);
+    }
+    
+    return listfilters(ext_params,MC_FLT_TYPE_STREAM);
 }
 
 Value getfiltercode(const Array& params, bool fHelp)
