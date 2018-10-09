@@ -30,6 +30,7 @@ int mc_Filter::Destroy()
 
 int mc_Filter::Initialize(std::string &strResult)
 {
+    strResult.clear();
     m_Impl = new mc_v8::V8Filter();
     return MC_ERR_NOERROR;
 }

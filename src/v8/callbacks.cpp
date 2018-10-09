@@ -35,7 +35,6 @@ void CallRpcFunction(std::string name, rpcfn_type rpcFunction, const v8::Functio
     IsolateData& isolateData = V8IsolateManager::Instance()->GetIsolateData(isolate);
     json_spirit::Object callbackData;
 
-    auto args_array = v8::Array::New(isolate, args.Length());
     json_spirit::Array params;
     for (int i = 0; i < args.Length(); ++i)
     {

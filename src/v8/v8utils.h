@@ -56,7 +56,7 @@ inline fs::path GetTemporaryPidDirectory()
  * @param data     The data array to write.
  * @param size     The number of bytes to write.
  */
-inline void WriteBinaryFile(fs::path filename, char* data, size_t size)
+inline void WriteBinaryFile(fs::path filename, char* data, std::streamsize size)
 {
     std::ofstream ofs(filename.string(), std::fstream::out | std::fstream::binary);
     ofs.write(data, size);

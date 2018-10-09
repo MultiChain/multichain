@@ -255,7 +255,9 @@ void V8Filter::ReportException(v8::TryCatch* tryCatch, std::string& strResult)
         LogPrint("v8filter", "v8filter: %s:%d %s\n", filename, linenum, strResult);
         std::string sourceline = V82String(m_isolate, message->GetSourceLine(context).ToLocalChecked());
         LogPrint("v8filter", "v8filter: %s\n", sourceline);
-        LogPrint("v8filter", "v8filter: %s%s\n", std::string(start, ' '), std::string(end - start, '^'));
+        LogPrint("v8filter", "v8filter: %s%s\n",
+                 std::string(static_cast<std::string::size_type>(start), ' '),
+                 std::string(static_cast<std::string::size_type>(end - start), '^'));
 //        v8::Local<v8::Value> stackTraceString;
 //        if (try_catch->StackTrace(context).ToLocal(&stackTraceString) && stackTraceString->IsString()
 //                && v8::Local<v8::String>::Cast(stackTraceString)->Length() > 0)
