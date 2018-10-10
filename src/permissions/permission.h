@@ -237,6 +237,15 @@ typedef struct mc_PermissionDetails
 } mc_PermissionDetails;
 
 
+typedef struct mc_RollBackPos
+{
+    int m_Block;
+    int m_Offset;
+    
+    void Zero();
+    int IsOut(int block,int offset);
+    int IsZero();
+} mc_RollBackPos;
 
 
 typedef struct mc_Permissions
@@ -274,7 +283,7 @@ typedef struct mc_Permissions
     int m_CheckForMempoolFlag;
     mc_Buffer               *m_MempoolPermissions;
     mc_Buffer               *m_MempoolPermissionsToReplay;    
-    
+    mc_RollBackPos m_RollBackPos;
     
     void *m_Semaphore;
     uint64_t m_LockedBy;
@@ -305,6 +314,10 @@ typedef struct mc_Permissions
     
     int SetCheckPoint();
     int RollBackToCheckPoint();
+    
+    int SetRollBackPos(int block,int offset);
+    void ResetRollBackPos();
+    int RewindToRollBackPos(mc_PermissionLedgerRow *row);
     
     uint32_t GetAllPermissions(const void* lpEntity,const void* lpAddress,uint32_t type);
     uint32_t GetPermissionType(const char *str,uint32_t full_type);

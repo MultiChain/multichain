@@ -229,11 +229,13 @@ int mc_AssetDB::Zero()
     m_Ledger = NULL;
     m_MemPool = NULL;
     m_TmpRelevantEntities = NULL;
+    m_ShortTxIDCache = NULL;
     m_Name[0]=0x00; 
     m_Block=-1;    
     m_PrevPos=-1;
     m_Pos=0;
-    m_DBRowCount=0;            
+    m_DBRowCount=0;     
+    m_RollBackPos.Zero();
     
     return MC_ERR_NOERROR;
 }
@@ -308,6 +310,9 @@ int mc_AssetDB::Initialize(const char *name,int mode)
     
     m_TmpRelevantEntities=new mc_Buffer;
     err=m_TmpRelevantEntities->Initialize(MC_AST_SHORT_TXID_SIZE,MC_AST_SHORT_TXID_SIZE,MC_BUF_MODE_MAP);
+    
+    m_ShortTxIDCache=new mc_Buffer;    
+    err=m_ShortTxIDCache->Initialize(MC_AST_SHORT_TXID_SIZE,MC_AST_SHORT_TXID_SIZE+MC_PLS_SIZE_ENTITY,MC_BUF_MODE_MAP);
     
     m_Block=adbBlock;
     m_PrevPos=adbLastPos;            
@@ -434,10 +439,30 @@ int mc_AssetDB::Destroy()
         delete m_TmpRelevantEntities;
     }  
     
+    if(m_ShortTxIDCache)
+    {
+        delete m_ShortTxIDCache;
+    }  
+    
     Zero();
     
     return MC_ERR_NOERROR;
 }
+
+int mc_AssetDB::SetRollBackPos(int block,int offset)
+{
+    m_RollBackPos.m_Block=block;
+    m_RollBackPos.m_Offset=offset;
+    
+    return MC_ERR_NOERROR;
+}
+
+void mc_AssetDB::ResetRollBackPos()
+{
+    m_RollBackPos.Zero();
+}
+
+
 
 int mc_AssetDB::GetEntity(mc_EntityLedgerRow* row)
 {    
@@ -474,45 +499,54 @@ int mc_AssetDB::GetEntity(mc_EntityLedgerRow* row)
         row->m_ChainPos=adbRow.m_ChainPos;
         m_Ledger->Close();
         
+        if(!m_RollBackPos.IsZero())
+        {
+            if(m_RollBackPos.IsOut(row->m_Block,row->m_Offset))
+            {
+                result=0;                
+            }
+        }
         return result;
     }
     
-    mprow=m_MemPool->Seek((unsigned char*)row);
-    if(mprow>=0)
+    if(m_RollBackPos.IsZero())
     {
-        if( (((mc_EntityLedgerRow*)(m_MemPool->GetRow(mprow)))->m_KeyType  & MC_ENT_KEYTYPE_MASK) != MC_ENT_KEYTYPE_TXID)
+        mprow=m_MemPool->Seek((unsigned char*)row);
+        if(mprow>=0)
         {
-            mprow--;
-            if(mprow>=0)
+            if( (((mc_EntityLedgerRow*)(m_MemPool->GetRow(mprow)))->m_KeyType  & MC_ENT_KEYTYPE_MASK) != MC_ENT_KEYTYPE_TXID)
             {
-                if( (((mc_EntityLedgerRow*)(m_MemPool->GetRow(mprow)))->m_KeyType  & MC_ENT_KEYTYPE_MASK) != MC_ENT_KEYTYPE_TXID)
+                mprow--;
+                if(mprow>=0)
                 {
-                    mprow--;                    
-                    if(mprow>=0)
+                    if( (((mc_EntityLedgerRow*)(m_MemPool->GetRow(mprow)))->m_KeyType  & MC_ENT_KEYTYPE_MASK) != MC_ENT_KEYTYPE_TXID)
                     {
-                        if( (((mc_EntityLedgerRow*)(m_MemPool->GetRow(mprow)))->m_KeyType  & MC_ENT_KEYTYPE_MASK) != MC_ENT_KEYTYPE_TXID)
+                        mprow--;                    
+                        if(mprow>=0)
                         {
-                            mprow--;                    
-                            if(mprow>=0)
+                            if( (((mc_EntityLedgerRow*)(m_MemPool->GetRow(mprow)))->m_KeyType  & MC_ENT_KEYTYPE_MASK) != MC_ENT_KEYTYPE_TXID)
                             {
-                                if( (((mc_EntityLedgerRow*)(m_MemPool->GetRow(mprow)))->m_KeyType  & MC_ENT_KEYTYPE_MASK) != MC_ENT_KEYTYPE_TXID)
+                                mprow--;                    
+                                if(mprow>=0)
                                 {
-                                    mprow=-1;
+                                    if( (((mc_EntityLedgerRow*)(m_MemPool->GetRow(mprow)))->m_KeyType  & MC_ENT_KEYTYPE_MASK) != MC_ENT_KEYTYPE_TXID)
+                                    {
+                                        mprow=-1;
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+            if(mprow<0)
+            {
+                return 0;
+            }
+            memcpy(row,m_MemPool->GetRow(mprow),sizeof(mc_EntityLedgerRow));
+            return 1;
         }
-        if(mprow<0)
-        {
-            return 0;
-        }
-        memcpy(row,m_MemPool->GetRow(mprow),sizeof(mc_EntityLedgerRow));
-        return 1;
     }
-
 
     return 0;
 }
@@ -1557,6 +1591,26 @@ int mc_AssetDB::FindEntityByShortTxID (mc_EntityDetails *entity, const unsigned 
     }            
 
     return 0;        
+}
+
+
+unsigned char *mc_AssetDB::CachedTxIDFromShortTxID(unsigned char *short_txid)
+{
+    int row;
+    row=m_ShortTxIDCache->Seek(short_txid);
+    if(row >= 0)
+    {
+        return m_ShortTxIDCache->GetRow(row)+m_ShortTxIDCache->m_KeySize;
+    }
+    
+    mc_EntityDetails entity;
+    if(FindEntityByShortTxID(&entity,short_txid))
+    {
+        m_ShortTxIDCache->Add(short_txid,entity.GetTxID());
+        return m_ShortTxIDCache->GetRow(m_ShortTxIDCache->GetCount()-1)+m_ShortTxIDCache->m_KeySize;        
+    }
+    
+    return NULL;
 }
 
 
