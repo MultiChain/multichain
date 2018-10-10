@@ -335,6 +335,7 @@ exitlbl:
     mc_gState->m_Permissions->ResetRollBackPos();
     m_Params.Close();
     m_TxID=0;
+    m_Vout=-1;
     return err;    
 }
 
@@ -344,6 +345,7 @@ int mc_MultiChainFilterEngine::RunTxFilters(const CTransaction& tx,std::set <uin
     strResult="";
     m_Tx=tx;
     m_TxID=m_Tx.GetHash();
+    m_Vout=-1;
     m_Params.Init();
     
     if(applied)
@@ -412,16 +414,18 @@ int mc_MultiChainFilterEngine::RunFilter(const CTransaction& tx,mc_Filter *filte
     return err;
 }
 
-int mc_MultiChainFilterEngine::RunFilterWithCallbackLog(const CTransaction& tx,mc_Filter *filter,std::string &strResult, json_spirit::Array& callbacks)
+int mc_MultiChainFilterEngine::RunFilterWithCallbackLog(const CTransaction& tx,int vout,mc_Filter *filter,std::string &strResult, json_spirit::Array& callbacks)
 {
     int err=MC_ERR_NOERROR;
     m_Tx=tx;
     m_TxID=m_Tx.GetHash();
     m_Params.Init();
+    m_Vout=vout;
 
     err=pFilterEngine->RunFilterWithCallbackLog(filter,strResult, callbacks);
 
     m_Params.Close();
+    m_Vout=-1;
     m_TxID=0;
     return err;
 }
@@ -448,6 +452,7 @@ void mc_MultiChainFilterEngine::SetCallbackNames()
     callbacks.clear();
     callbacks.push_back("getfiltertxid");
     callbacks.push_back("getfiltertransaction");
+    callbacks.push_back("getfilterstreamitem");
     callbacks.push_back("setfilterparam");
     callbacks.push_back("getlastblockinfo");
     callbacks.push_back("getassetinfo");

@@ -894,23 +894,11 @@ int mc_Permissions::RewindToRollBackPos(mc_PermissionLedgerRow *row)
         return MC_ERR_NOERROR;
     }
     
-    if(!m_RollBackPos.IsOut(row->m_BlockReceived,row->m_Offset))
-    {
-        return MC_ERR_NOERROR;
-    }
-        
-    if(row->m_PrevRow == 0)
-    {
-        row->Zero();
-        return MC_ERR_NOERROR;
-    }    
-    
     if(m_Ledger->Open() <= 0)
     {
         LogString("GetPermission: couldn't open ledger");
         return MC_ERR_DBOPEN_ERROR;
     }
-    
     
     m_Ledger->GetRow(row->m_ThisRow,row);
     while( (row->m_PrevRow > 0 ) && m_RollBackPos.IsOut(row->m_BlockReceived,row->m_Offset) )
@@ -918,7 +906,7 @@ int mc_Permissions::RewindToRollBackPos(mc_PermissionLedgerRow *row)
         m_Ledger->GetRow(row->m_PrevRow,row);
     }
 
-    if(!m_RollBackPos.IsOut(row->m_BlockReceived,row->m_Offset))
+    if(m_RollBackPos.IsOut(row->m_BlockReceived,row->m_Offset))
     {
         row->Zero();        
     }

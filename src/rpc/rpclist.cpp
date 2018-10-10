@@ -100,6 +100,8 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "getfiltercode",          &getfiltercode,          true,      false,      false },
     { "blockchain",         "testtxfilter",           &testtxfilter,           true,      false,      false },
     { "blockchain",         "runtxfilter",            &runtxfilter,            true,      false,      false },
+    { "blockchain",         "teststreamfilter",       &teststreamfilter,       true,      false,      false },
+    { "blockchain",         "runstreamfilter",        &runstreamfilter,        true,      false,      false },
     { "blockchain",         "listblocks",             &listblocks,             true,      false,      false },
     { "blockchain",         "getassetinfo",           &getassetinfo,           true,      false,      false },
     { "blockchain",         "getstreaminfo",          &getstreaminfo,          true,      false,      false },
@@ -155,6 +157,7 @@ static const CRPCCommand vRPCCommands[] =
     { "hidden",             "data-with",              &purehelpitem_nomethod,           true,      true,       true },
     { "hidden",             "addresses-all",          &purehelpitem_nomethod,           true,      true,       true },
     
+    { "hidden",             "getfilterstreamitem",    &purehelpitem_onlyfilter,      true,      false,      false },
     { "hidden",             "getfiltertransaction",   &purehelpitem_onlyfilter,      true,      false,      false },
     { "hidden",             "getfiltertxid",          &purehelpitem_onlyfilter,          true,      true,       true },
     { "hidden",             "getfiltertxinput",       &purehelpitem_onlyfilter,         true,      true,       true },

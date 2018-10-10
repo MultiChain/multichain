@@ -4313,12 +4313,17 @@ void mc_InitRPCHelpMap18()
             "}\n"
             "\nExamples:\n"
             + HelpExampleCli("testtxfilter", "false \"{\"js\":\"js-code\"}\"")
-            + HelpExampleRpc("testtxfilter", "filter1, \"{\"js\":\"js-code\"}\"")
+            + HelpExampleRpc("testtxfilter", "false, \"{\"js\":\"js-code\"}\"")
         ));
      
-     mapHelpStrings.insert(std::make_pair("getfiltertransaction",
+    mapHelpStrings.insert(std::make_pair("getfiltertransaction",
             "getfiltertransaction\n"
             "\nReturns an object with information about the filtered transaction.\n"
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("getfilterstreamitem",
+            "getfilterstreamitem\n"
+            "\nReturns an object with information about the filtered stream item.\n"
         ));
     
     mapHelpStrings.insert(std::make_pair("getlastblockinfo",
@@ -4339,32 +4344,6 @@ void mc_InitRPCHelpMap18()
             + HelpExampleRpc("getlastblockinfo", "")
         ));
     
-     mapHelpStrings.insert(std::make_pair("getassetinfo",
-            "getassetinfo \"asset-identifier\" ( verbose )\n"
-            "\nReturns information about a single asset\n"
-            "\nArguments:\n"
-            "1. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
-            "2. verbose                          (boolean, optional, default=false) If true, returns list of all issue transactions, including follow-ons \n"
-            "\nResult:\n"
-            "Object with asset details\n"            
-            "\nExamples:\n"
-            + HelpExampleCli("getassetinfo", "myasset")
-            + HelpExampleRpc("getassetinfo", "myasset")
-        ));
-      
-     mapHelpStrings.insert(std::make_pair("getstreaminfo",
-            "getstreaminfo \"stream-identifier\" ( verbose )\n"
-            "\nReturns information about a single stream\n"
-            "\nArguments:\n"
-            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
-            "2. verbose                          (boolean, optional, default=false) If true, returns list of creators \n"
-            "\nResult:\n"
-            "Object with stream details\n"            
-            "\nExamples:\n"
-            + HelpExampleCli("getstreaminfo", "mystream")
-            + HelpExampleRpc("getstreaminfo", "mystream")
-        ));
-      
     
    
 }
@@ -4414,10 +4393,90 @@ void mc_InitRPCHelpMap19()
             "\nThe following additional methods can be called from filter code (see help <method> for details):\n"
             "                         getfiltertransaction \n"
             "                         getfiltertxid \n"
-            "                         getfiltertxinput \n"
+            "                         getfilterstreamitem (only for stream filters)\n"
+            "                         getfiltertxinput (only for tx filters)\n"
             "                         setfilterparam \n"             
         ));
     
+     mapHelpStrings.insert(std::make_pair("getassetinfo",
+            "getassetinfo \"asset-identifier\" ( verbose )\n"
+            "\nReturns information about a single asset\n"
+            "\nArguments:\n"
+            "1. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
+            "2. verbose                          (boolean, optional, default=false) If true, returns list of all issue transactions, including follow-ons \n"
+            "\nResult:\n"
+            "Object with asset details\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("getassetinfo", "myasset")
+            + HelpExampleRpc("getassetinfo", "myasset")
+        ));
+      
+     mapHelpStrings.insert(std::make_pair("getstreaminfo",
+            "getstreaminfo \"stream-identifier\" ( verbose )\n"
+            "\nReturns information about a single stream\n"
+            "\nArguments:\n"
+            "1. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
+            "2. verbose                          (boolean, optional, default=false) If true, returns list of creators \n"
+            "\nResult:\n"
+            "Object with stream details\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("getstreaminfo", "mystream")
+            + HelpExampleRpc("getstreaminfo", "mystream")
+        ));
+      
+     mapHelpStrings.insert(std::make_pair("runstreamfilter",
+            "runstreamfilter \"filter-identifier\" ( \"tx-hex\" vout )\n"
+            "\nCompile an existing filter and optionally test it on a transaction\n"
+            "\nArguments:\n"
+            "1. \"filter-identifier\"              (string, required) Filter identifier - one of: create txid, filter reference, filter name.\n"
+            "2. \"tx-hex\"                         (string, optional) The transaction hex string to filter, otherwise filter compiled only\n"
+            "3. vout:n                           (numeric, optional) The output number, required if tx-hex is specified\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"compiled\": true|false,           (boolean) Filter passed compilation\n"
+            "  \"passed\": true|false,             (boolean) Transaction passed the filter\n"
+            "  \"callbacks\": callbacks,           (array of objects) Information about callback calls by filter\n"
+            "  \"reason\": \"rejection reason\",     (boolean) Reason for rejection, null if passed\n"
+            "  \"time\": x.xxxxxx,                 (numeric) Seconds to run transaction through the filter\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("runstreamfilter", "filter1")
+            + HelpExampleRpc("runstreamfilter", "filter1")
+        ));
+     
+     mapHelpStrings.insert(std::make_pair("teststreamfilter",
+            "teststreamfilter restrictions \"javascript-code\" ( \"tx-hex\" vout )\n"
+            "\nCompile a test filter and optionally test it on a transaction\n"
+            "\nArguments:\n"
+            "1. restrictions                     (object, required)  a json object with filter restrictions\n"
+            "    {\n"
+             "      \"for\": \"entity-identifier\"   (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
+            "        or\n"
+            "      \"for\": entity-identifier(s)   (array, optional) A json array of asset/stream identifiers .\n"    
+            "    }\n"
+            "2. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
+            "                                                         function filtertransaction()\n"
+            "                                                         {\n"
+            "                                                             var tx=getfiltertransaction();\n"
+            "                                                                                          \n"
+            "                                                             if (tx.vout.length<1)\n"
+            "                                                                 return \"One output required\";\n"
+            "                                                         }   \n"
+            "3. \"tx-hex\"                         (string, optional) The transaction hex string to filter, otherwise filter compiled only\n"
+            "4. vout:n                           (numeric, optional) The output number, required if tx-hex is specified\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"compiled\": true|false,           (boolean) Filter passed compilation\n"
+            "  \"passed\": true|false,             (boolean) Transaction passed the filter\n"
+            "  \"callbacks\": callbacks,           (array of objects) Information about callback calls by filter\n"
+            "  \"reason\": \"rejection reason\",     (boolean) Reason for rejection, null if passed\n"
+            "  \"time\": x.xxxxxx,                 (numeric) Seconds to run transaction through the filter\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("teststreamfilter", "false \"{\"js\":\"js-code\"}\"")
+            + HelpExampleRpc("teststreamfilter", "false, \"{\"js\":\"js-code\"}\"")
+        ));
+     
  mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));

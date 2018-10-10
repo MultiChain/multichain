@@ -720,7 +720,7 @@ Value setfilterparam(const json_spirit::Array& params, bool fHelp)
     return "Set";
 }
 
-Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, string txhex)
+Value testfilter(const vector <uint160>& entities,const  char *filter_code, string txhex,int vout,uint32_t filter_type)
 {
     Object result;
     int err;
@@ -741,7 +741,13 @@ Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, st
     
     mc_Filter *worker=new mc_Filter;
 
-    err=pFilterEngine->CreateFilter(filter_code,MC_FLT_MAIN_NAME_TX,pMultiChainFilterEngine->m_CallbackNames[MC_FLT_TYPE_TX],worker,strError);
+    string filter_main_name=MC_FLT_MAIN_NAME_TX;
+    if (filter_type == MC_FLT_TYPE_STREAM)
+    {
+        filter_main_name=MC_FLT_MAIN_NAME_STREAM;
+    }
+    
+    err=pFilterEngine->CreateFilter(filter_code,filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strError);
     if(err)
     {
         errorCode=RPC_INTERNAL_ERROR;
@@ -802,7 +808,7 @@ Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, st
         strError="";
         if(relevant_filter)
         {
-            err=pMultiChainFilterEngine->RunFilterWithCallbackLog(tx,worker,strError,callbacks);
+            err=pMultiChainFilterEngine->RunFilterWithCallbackLog(tx,vout,worker,strError,callbacks);
             if(err)
             {
                 errorCode=RPC_INTERNAL_ERROR;
@@ -856,6 +862,11 @@ Value runtxfilter(const json_spirit::Array& params, bool fHelp)
     mc_EntityDetails filter_entity;
     ParseEntityIdentifier(params[0],&filter_entity,MC_ENT_TYPE_FILTER);
     
+    if(filter_entity.GetFilterType() != MC_FLT_TYPE_TX)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Wrong filter type");                                
+    }
+    
     char filter_code[MC_ENT_MAX_SCRIPT_SIZE+1];
     std::vector <uint160> entities;   
     unsigned char *ptr;
@@ -895,7 +906,7 @@ Value runtxfilter(const json_spirit::Array& params, bool fHelp)
         }
     }
     
-    return testtxfilter(entities, (char *)filter_code, txhex);
+    return testfilter(entities, (char *)filter_code, txhex, -1, MC_FLT_TYPE_TX);
 }
 
 Value testtxfilter(const json_spirit::Array& params, bool fHelp)
@@ -938,5 +949,124 @@ Value testtxfilter(const json_spirit::Array& params, bool fHelp)
         }
     }
     
-    return testtxfilter(entities, js.c_str(), txhex);
+    return testfilter(entities, js.c_str(), txhex, -1, MC_FLT_TYPE_TX);
 }
+
+Value runstreamfilter(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 3)
+        throw runtime_error("Help message not found\n");
+    
+    mc_EntityDetails filter_entity;
+    ParseEntityIdentifier(params[0],&filter_entity,MC_ENT_TYPE_FILTER);
+    
+    if(filter_entity.GetFilterType() != MC_FLT_TYPE_STREAM)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Wrong filter type");                                
+    }
+    
+    char filter_code[MC_ENT_MAX_SCRIPT_SIZE+1];
+    std::vector <uint160> entities;   
+    unsigned char *ptr;
+    size_t value_size;
+    string txhex="";
+    int vout=-1;
+    
+    ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_RESTRICTIONS,&value_size);
+    
+    if(ptr)
+    {
+        if(value_size % MC_AST_SHORT_TXID_SIZE)
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Specified filter has invalid restriction value");        
+        }
+    }    
+    
+    entities=mc_FillRelevantFilterEntitities(ptr, value_size);
+    
+    ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size);
+    
+    if(ptr)
+    {
+        memcpy(filter_code,ptr,value_size);
+        filter_code[value_size]=0x00;    
+    }                                    
+    
+    if (params.size() > 1)    
+    {
+        if(params.size() != 3)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMS, "vout should be specified");                        
+        }
+        if(params[1].type() != str_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx-hex, should be string");            
+        }
+        if(params[2].type() != int_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid vout, should be integer");            
+        }
+        txhex=params[1].get_str();
+        if(txhex.size() == 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty tx-hex");                        
+        }
+        vout=params[2].get_int();
+    }
+    
+    return testfilter(entities, (char *)filter_code, txhex, vout, MC_FLT_TYPE_STREAM);
+}
+
+Value teststreamfilter(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 2 || params.size() > 4)
+        throw runtime_error("Help message not found\n");
+    
+    size_t bytes;
+    string js;
+    const unsigned char *script;
+    std::vector <uint160> entities;   
+    string txhex="";
+    int vout=-1;
+    
+    uint32_t filter_type=MC_FLT_TYPE_STREAM;
+    
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
+    lpDetailsScript->Clear();
+    
+    ParseFilterRestrictions(params[0],lpDetailsScript,filter_type);
+    
+    script = lpDetailsScript->GetData(0,&bytes);
+
+    if(bytes)
+    {
+        entities=mc_FillRelevantFilterEntitities(script, bytes);
+    }
+
+    js=ParseFilterDetails(params[1]);
+    
+    if (params.size() > 2)    
+    {
+        if(params.size() != 4)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMS, "vout should be specified");                        
+        }
+        if(params[2].type() != str_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx-hex, should be string");            
+        }
+        if(params[3].type() != int_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid vout, should be integer");            
+        }
+        txhex=params[2].get_str();
+        if(txhex.size() == 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty tx-hex");                        
+        }
+        vout=params[3].get_int();
+    }
+    
+    return testfilter(entities, js.c_str(), txhex, vout, MC_FLT_TYPE_STREAM);
+}
+

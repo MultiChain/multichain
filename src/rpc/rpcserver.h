@@ -255,6 +255,8 @@ extern json_spirit::Value getfiltertxid(const json_spirit::Array& params, bool f
 extern json_spirit::Value setfilterparam(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value testtxfilter(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value runtxfilter(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value teststreamfilter(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value runstreamfilter(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getassetinfo(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getstreaminfo(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value verifypermission(const json_spirit::Array& params, bool fHelp);
@@ -319,6 +321,7 @@ extern json_spirit::Value setmocktime(const json_spirit::Array& params, bool fHe
 
 extern json_spirit::Value getrawtransaction(const json_spirit::Array& params, bool fHelp); // in rcprawtransaction.cpp
 extern json_spirit::Value getfiltertransaction(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getfilterstreamitem(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listunspent(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value lockunspent(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listlockunspent(const json_spirit::Array& params, bool fHelp);
