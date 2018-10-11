@@ -6,6 +6,7 @@
 
 
 #include "rpc/rpcwallet.h"
+int VerifyNewTxForStreamFilters(const CTransaction& tx,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied);            
 
 void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry)
 {
@@ -216,6 +217,17 @@ void SendMoneyToSeveralAddresses(const std::vector<CTxDestination> addresses, CA
         LogPrintf("SendMoney() : %s\n", strError);
         throw JSONRPCError(eErrorCode, strError);
     }
+    
+        
+    mc_MultiChainFilter* lpFilter;
+    int applied=0;
+    string filter_error="";
+
+    if(VerifyNewTxForStreamFilters(wtxNew,filter_error,&lpFilter,&applied) == MC_ERR_NOT_ALLOWED)
+    {
+        throw JSONRPCError(RPC_NOT_ALLOWED, "Transaction didn't pass stream filter " + lpFilter->m_FilterCaption + ": " + filter_error);                            
+    }
+
     
     string strRejectReason;
     if (!pwalletMain->CommitTransaction(wtxNew, reservekey, strRejectReason))

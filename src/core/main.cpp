@@ -2530,6 +2530,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     std::vector<std::pair<uint256, CDiskTxPos> > vPos;
     vPos.reserve(block.vtx.size());
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
+    
+    if(fDebug)LogPrint("mchn","mchn: Checking Block with %d transactions\n",block.vtx.size());
+    
     for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
         const CTransaction &tx = block.vtx[i];
@@ -2545,6 +2548,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 /* MCHN END */    
         if (!tx.IsCoinBase())
         {
+    if(fDebug)LogPrint("mchn","mchn: A Tx %d: %s\n",i,tx.GetHash().ToString().c_str());
             if (!view.HaveInputs(tx))
                 return state.DoS(100, error("ConnectBlock() : inputs missing/spent"),
                                  REJECT_INVALID, "bad-txns-inputs-missingorspent");
@@ -2569,13 +2573,14 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             
 /* MCHN START */        
             string reason;
+    if(fDebug)LogPrint("mchn","mchn: B Tx %d: %s\n",i,tx.GetHash().ToString().c_str());
             if(!fJustCheck)
             {
                 if(!AcceptMultiChainTransaction(tx,view,offset,true,reason,NULL,NULL))
                 {
                     return state.DoS(0,
                                      error("ConnectBlock: : AcceptMultiChainTransaction failed %s : %s", tx.GetHash().ToString(),reason),
-                                     REJECT_NONSTANDARD, reason);
+                                     REJECT_INVALID, reason);
                 }
             }
 /* MCHN END */                    
@@ -2600,11 +2605,15 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         if (tx.IsCoinBase())
         {
             string reason;
+    if(fDebug)LogPrint("mchn","mchn: C Tx %d: %s\n",i,tx.GetHash().ToString().c_str());
             if(!fJustCheck)
             {
                 if(!AcceptMultiChainTransaction(tx,view,coinbase_offset,true,reason,NULL,NULL))
                 {
-                    return false;       
+                    return state.DoS(0,
+                                     error("ConnectBlock: : AcceptMultiChainTransaction failed %s : %s", tx.GetHash().ToString(),reason),
+                                     REJECT_INVALID, reason);
+//                    return false;       
                 }
             }
         }            

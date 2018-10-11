@@ -313,8 +313,7 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
                     {
                         *lppFilter=&(m_Filters[i]);
                     }
-                    strResult=strprintf("The transaction did not pass filter %s: %s",m_Filters[i].m_FilterCaption.c_str(),strResult.c_str());
-                    if(fDebug)LogPrint("filter","filter: %s\n",strResult.c_str());
+                    if(fDebug)LogPrint("filter","filter: %s: %s\n",m_Filters[i].m_FilterCaption.c_str(),strResult.c_str());
 
                     goto exitlbl;
                 }

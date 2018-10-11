@@ -4001,6 +4001,7 @@ void mc_InitRPCHelpMap16()
             "        {\n"
             "          \"type\" : \"permission(s)\"     (string, required) Permission strings, comma delimited. Possible values:\n"
             "                                                          " + AllowedPermissions() + " \n"
+            "          \"for\": \"entity-identifier\"   (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
             "          \"startblock\" : n             (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
             "          \"endblock\"  : n              (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
             "          \"timestamp\" : n              (numeric, optional) This helps resolve conflicts between\n"
