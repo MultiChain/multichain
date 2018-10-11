@@ -854,6 +854,7 @@ void mc_RollBackPos::Zero()
 {
     m_Block=-1;
     m_Offset=0;
+    m_InMempool=0;
 }
 
 
@@ -867,15 +868,26 @@ int mc_RollBackPos::IsOut(int block,int offset)
     return (block > m_Block) ? 1 : 0;
 }
 
-int mc_RollBackPos::IsZero()
+int mc_RollBackPos::InBlock()
 {
-    return (m_Block < 0) ? 1 : 0;
+    return (m_Block >= 0) ? 1 : 0;
 }
 
-int mc_Permissions::SetRollBackPos(int block,int offset)
+int mc_RollBackPos::InMempool()
+{
+    return ( (m_Block < 0) && (m_InMempool != 0) ) ? 1 : 0;
+}
+
+int mc_RollBackPos::NotApplied()
+{
+    return ( (m_Block < 0) && (m_InMempool == 0) ) ? 1 : 0;
+}
+
+int mc_Permissions::SetRollBackPos(int block,int offset,int inmempool)
 {
     m_RollBackPos.m_Block=block;
     m_RollBackPos.m_Offset=offset;
+    m_RollBackPos.m_InMempool=inmempool;
     
     return MC_ERR_NOERROR;
 }
@@ -889,7 +901,7 @@ void mc_Permissions::ResetRollBackPos()
 
 int mc_Permissions::RewindToRollBackPos(mc_PermissionLedgerRow *row)
 {
-    if(m_RollBackPos.IsZero())
+    if(m_RollBackPos.InBlock() == 0)
     {
         return MC_ERR_NOERROR;
     }
@@ -1031,18 +1043,21 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
         row->m_FoundInDB=found_in_db;        
  */ 
     }
-    
-    if( (m_RollBackPos.IsZero() != 0) && (checkmempool != 0))
+    if(checkmempool != 0)
     { 
-        mprow=0;
-        while(mprow>=0)
+        if( ( m_RollBackPos.NotApplied() != 0) ||
+            ( (m_RollBackPos.InMempool() != 0) && (type != MC_PTP_FILTER) ) )
         {
-            mprow=m_MemPool->Seek((unsigned char*)&pldRow+m_Ledger->m_KeyOffset);
-            if(mprow>=0)
+            mprow=0;
+            while(mprow>=0)
             {
-                memcpy((unsigned char*)row+m_Ledger->m_KeyOffset,m_MemPool->GetRow(mprow),m_Ledger->m_TotalSize);
-//                row->m_FoundInDB=found_in_db;
-                pldRow.m_PrevRow=row->m_ThisRow;
+                mprow=m_MemPool->Seek((unsigned char*)&pldRow+m_Ledger->m_KeyOffset);
+                if(mprow>=0)
+                {
+                    memcpy((unsigned char*)row+m_Ledger->m_KeyOffset,m_MemPool->GetRow(mprow),m_Ledger->m_TotalSize);
+    //                row->m_FoundInDB=found_in_db;
+                    pldRow.m_PrevRow=row->m_ThisRow;
+                }
             }
         }
     }

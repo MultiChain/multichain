@@ -2400,10 +2400,17 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                             string filter_error;
                             int filter_block=-1;
                             int filter_offset=0;
-                            if( (imp->m_ImportID > 0) && (block >= 0) )
+                            if( imp->m_ImportID > 0 )
                             {
-                                filter_block=block;
-                                filter_offset=block_pos->nTxOffset;
+                                if(block >= 0)
+                                {
+                                    filter_block=block;
+                                    filter_offset=block_pos->nTxOffset;
+                                }
+                                else
+                                {
+                                    filter_offset=-1;                                    
+                                }
                             }
                             if(pMultiChainFilterEngine->RunStreamFilters(tx,i,entity.m_EntityID,filter_block, filter_offset, 
                                     filter_error,&lpFilter,&applied) != MC_ERR_NOERROR)

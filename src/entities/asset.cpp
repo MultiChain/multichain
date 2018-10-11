@@ -449,10 +449,11 @@ int mc_AssetDB::Destroy()
     return MC_ERR_NOERROR;
 }
 
-int mc_AssetDB::SetRollBackPos(int block,int offset)
+int mc_AssetDB::SetRollBackPos(int block,int offset,int inmempool)
 {
     m_RollBackPos.m_Block=block;
     m_RollBackPos.m_Offset=offset;
+    m_RollBackPos.m_InMempool=inmempool;
     
     return MC_ERR_NOERROR;
 }
@@ -499,7 +500,7 @@ int mc_AssetDB::GetEntity(mc_EntityLedgerRow* row)
         row->m_ChainPos=adbRow.m_ChainPos;
         m_Ledger->Close();
         
-        if(!m_RollBackPos.IsZero())
+        if(m_RollBackPos.InBlock())
         {
             if(m_RollBackPos.IsOut(row->m_Block,row->m_Offset))
             {
@@ -509,7 +510,7 @@ int mc_AssetDB::GetEntity(mc_EntityLedgerRow* row)
         return result;
     }
     
-    if(m_RollBackPos.IsZero())
+    if(m_RollBackPos.InBlock() == 0)
     {
         mprow=m_MemPool->Seek((unsigned char*)row);
         if(mprow>=0)

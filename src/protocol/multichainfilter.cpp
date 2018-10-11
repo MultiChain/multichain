@@ -290,11 +290,9 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
     {
         goto exitlbl;
     }
-    if(block >= 0)
-    {
-        mc_gState->m_Permissions->SetRollBackPos(block,offset);
-        mc_gState->m_Assets->SetRollBackPos(block,offset);
-    }
+    
+    mc_gState->m_Permissions->SetRollBackPos(block,offset,(offset != 0) ? 1 : 0);
+    mc_gState->m_Assets->SetRollBackPos(block,offset,(offset != 0) ? 1 : 0);
     
     for(int i=0;i<(int)m_Filters.size();i++)
     {

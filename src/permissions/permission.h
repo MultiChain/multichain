@@ -241,10 +241,13 @@ typedef struct mc_RollBackPos
 {
     int m_Block;
     int m_Offset;
+    int m_InMempool;
     
     void Zero();
     int IsOut(int block,int offset);
-    int IsZero();
+    int InBlock();
+    int InMempool();
+    int NotApplied();
 } mc_RollBackPos;
 
 
@@ -315,7 +318,7 @@ typedef struct mc_Permissions
     int SetCheckPoint();
     int RollBackToCheckPoint();
     
-    int SetRollBackPos(int block,int offset);
+    int SetRollBackPos(int block,int offset,int inmempool);
     void ResetRollBackPos();
     int RewindToRollBackPos(mc_PermissionLedgerRow *row);
     

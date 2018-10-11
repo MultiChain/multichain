@@ -276,7 +276,7 @@ typedef struct mc_AssetDB
     int FindEntityByFullRef (mc_EntityDetails *entity, unsigned char* full_ref);
     
     unsigned char *CachedTxIDFromShortTxID(unsigned char *short_txid);
-    int SetRollBackPos(int block,int offset);
+    int SetRollBackPos(int block,int offset,int inmempool);
     void ResetRollBackPos();
     
     
