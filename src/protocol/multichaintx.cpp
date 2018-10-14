@@ -39,6 +39,7 @@ typedef struct CMultiChainTxDetails
     bool fFullReplayCheckRequired;                                              // Tx should be rechecked when mempool is replayed
     bool fAdminMinerGrant;                                                      // Admin/miner grant in this transaction
     bool fAssetIssuance;                                                        // New/followon issuance in this tx 
+    bool fIsStandardCoinbase;                                                   // Tx is standard coinbase - filters should not be applied
     
     vector <txnouttype> vInputScriptTypes;                                      // Input script types
     vector <uint160> vInputDestinations;                                        // Addresses used in input scripts
@@ -106,6 +107,7 @@ void CMultiChainTxDetails::Zero()
     fFullReplayCheckRequired=false;
     fAdminMinerGrant=false;
     fAssetIssuance=false;
+    fIsStandardCoinbase=false;
     
     details_script_size=0;
     details_script_type=-1;
@@ -2218,6 +2220,84 @@ bool MultiChainTransaction_VerifyNotFilteredRestrictions(const CTransaction& tx,
     return true;
 }
 
+bool MultiChainTransaction_VerifyStandardCoinbase(const CTransaction& tx,        // Tx to check
+                                                        CMultiChainTxDetails *details, // Tx details object
+                                                        string& reason)                // Error message
+{
+    details->fIsStandardCoinbase=false;
+    
+    if(!tx.IsCoinBase())
+    {
+        return true;
+    }
+    
+    if(mc_gState->m_Features->FixedIn20005() == 0)
+    {
+        return true;        
+    }
+    
+    bool value_output=false;
+    bool signature_output=false;
+    for (unsigned int vout = 0; vout < tx.vout.size(); vout++)
+    {
+        MultiChainTransaction_SetTmpOutputScript(tx.vout[vout].scriptPubKey);
+
+        if(mc_gState->m_TmpScript->IsOpReturnScript())                    
+        {
+            if(signature_output)
+            {
+                LogPrintf("Non-standard coinbase: Multiple signatures\n");
+                return true;                                                    
+            }
+            if(mc_gState->m_TmpScript->GetNumElements() != 1)
+            {
+                if(mc_gState->m_Permissions->m_Block >= 0)
+                {
+                    LogPrintf("Non-standard coinbase: Non-standard signature\n");
+                    return true;                                                    
+                }
+            }
+            signature_output=true;
+        }   
+        else
+        {
+            if(tx.vout[vout].nValue == 0)
+            {
+                if(value_output)
+                {
+                    LogPrintf("Non-standard coinbase: Multiple value outputs\n");
+                    return true;                                                // Only single "value" output is allowed
+                }
+                if(mc_gState->m_Permissions->m_Block > 0)
+                {
+                    LogPrintf("Non-standard coinbase: Value output for chain without native currency\n");
+                    return true;                                                // No "value" outputs for the blocks 2+
+                }
+            }
+            value_output=true;
+        }
+        
+    }
+    
+    if(!value_output)
+    {
+        if(mc_gState->m_Permissions->m_Block <= 0)
+        {
+            LogPrintf("Non-standard coinbase: Missing value output\n");
+        }        
+    }
+    
+    if(signature_output == (mc_gState->m_NetworkParams->IsProtocolMultichain() == 0))
+    {
+        LogPrintf("Non-standard coinbase: Sigature output doesn't match protocol\n");
+        return true;                                                            // Signature output should appear only if protocol=multichain
+    }
+        
+    details->fIsStandardCoinbase=true;
+    
+    return true;    
+}
+
 bool AcceptMultiChainTransaction   (const CTransaction& tx,                     // Tx to check
                                     const CCoinsViewCache &inputs,              // Tx inputs from UTXO database
                                     int offset,                                 // Tx offset in block, -1 if in memppol
@@ -2281,7 +2361,13 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
         goto exitlbl;                                                                                
     }        
     
-    if(details.emergency_disapproval_output < 0)
+    if(!MultiChainTransaction_VerifyStandardCoinbase(tx,&details,reason))           
+    {
+        fReject=true;
+        goto exitlbl;                                                                                
+    }        
+    
+    if( (details.emergency_disapproval_output < 0) && !details.fIsStandardCoinbase)
     {
         if(mc_gState->m_Features->Filters())
         {
