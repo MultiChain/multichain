@@ -776,6 +776,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
 // 0x0010 stats
 // 0x0020 creators    
 // 0x0040 filters
+// 0x0800 skip name and ref
     
     Object entry;
     mc_EntityDetails entity;
@@ -799,9 +800,12 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
             entry.push_back(Pair("type", "stream"));                        
         }
         
-        if(ptr && strlen((char*)ptr))
+        if( (output_level & 0x0800) == 0 )
         {
-            entry.push_back(Pair("name", string((char*)ptr)));            
+            if(ptr && strlen((char*)ptr))
+            {
+                entry.push_back(Pair("name", string((char*)ptr)));            
+            }
         }
         if(output_level & 0x002)
         {
@@ -809,26 +813,29 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
         }
         ptr=(unsigned char *)entity.GetRef();
         string streamref="";
-        if(entity.IsUnconfirmedGenesis())
+        if( (output_level & 0x0800) == 0 )
         {
-            Value null_value;
-            entry.push_back(Pair("streamref",null_value));
-        }
-        else
-        {
-            if((int)mc_GetLE(ptr,4))
+            if(entity.IsUnconfirmedGenesis())
             {
-                streamref += itostr((int)mc_GetLE(ptr,4));
-                streamref += "-";
-                streamref += itostr((int)mc_GetLE(ptr+4,4));
-                streamref += "-";
-                streamref += itostr((int)mc_GetLE(ptr+8,2));
+                Value null_value;
+                entry.push_back(Pair("streamref",null_value));
             }
             else
             {
-                streamref="0-0-0";                
+                if((int)mc_GetLE(ptr,4))
+                {
+                    streamref += itostr((int)mc_GetLE(ptr,4));
+                    streamref += "-";
+                    streamref += itostr((int)mc_GetLE(ptr+4,4));
+                    streamref += "-";
+                    streamref += itostr((int)mc_GetLE(ptr+8,2));
+                }
+                else
+                {
+                    streamref="0-0-0";                
+                }
+                entry.push_back(Pair("streamref", streamref));
             }
-            entry.push_back(Pair("streamref", streamref));
         }
 
         if(output_level & 0x0004)
@@ -1498,6 +1505,8 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
 Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uint32_t stream_output_level)
 {
     // 0x0100 No offchain data
+    // 0x0200 Skip available
+    // 0x0400 Top-level format/size
     
     Object entry;
     Array publishers;
@@ -1647,16 +1656,36 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     entry.push_back(Pair("offchain", (retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN));        
     if( ( retrieve_status & MC_OST_CONTROL_NO_DATA ) == 0)
     {
-        entry.push_back(Pair("available", AvailableFromStatus(retrieve_status)));        
-        if(retrieve_status & MC_OST_ERROR_MASK)
+        if( (stream_output_level & 0x0200) == 0)                                // USed only for getfilterstreamitem, calloed only if available = true and there is no retrieval error
         {
-            string error_str;
-            int errorCode;
-            error_str=OffChainError(retrieve_status,&errorCode);
-            entry.push_back(Pair("error", error_str));        
+            entry.push_back(Pair("available", AvailableFromStatus(retrieve_status)));        
+            if(retrieve_status & MC_OST_ERROR_MASK)
+            {
+                string error_str;
+                int errorCode;
+                error_str=OffChainError(retrieve_status,&errorCode);
+                entry.push_back(Pair("error", error_str));        
+            }
         }
     }
-    entry.push_back(Pair("data", format_item_value));   
+    
+    if(stream_output_level & 0x0400)     
+    {
+        entry.push_back(Pair("format", OpReturnFormatToText(format)));
+        entry.push_back(Pair("size", out_size));
+        if(format_text_str == "gettxoutdata")
+        {
+            entry.push_back(Pair("data", Value::null));                           
+        }
+        else
+        {
+            entry.push_back(Pair("data", format_item_value));               
+        }
+    }    
+    else
+    {
+        entry.push_back(Pair("data", format_item_value));   
+    }
     
     
     if(retrieve_status & MC_OST_CONTROL_NO_DATA)

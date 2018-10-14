@@ -457,7 +457,8 @@ Value revokecmd(const Array& params, bool fHelp)
 Value verifypermission(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 2)
-        throw runtime_error("Help message not found\n");
+        mc_ThrowHelpMessage("verifypermission");        
+//        throw runtime_error("Help message not found\n");
     
     if(params[1].type() != str_type)
     {

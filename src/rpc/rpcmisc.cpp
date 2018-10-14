@@ -1107,7 +1107,7 @@ Value createmultisig(const Array& params, bool fHelp)
 Value verifymessage(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 3)                                            // MCHN
-        throw runtime_error("Help message not found\n");
+        mc_ThrowHelpMessage("verifymessage");
 
     string strAddress  = params[0].get_str();
     string strSign     = params[1].get_str();

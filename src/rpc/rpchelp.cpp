@@ -33,6 +33,15 @@ std::string mc_RPCHelpString(std::string strMethod)
     return strHelp;
 }
 
+void mc_ThrowHelpMessage(std::string strMethod)
+{
+    if(pMultiChainFilterEngine->m_TxID != 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");          
+        //throw JSONRPCError(RPC_MISC_ERROR, mc_RPCHelpString(strMethod));
+    }
+    throw runtime_error("Help message not found\n");
+}
 
 void mc_InitRPCHelpMap01()
 {
@@ -1446,13 +1455,13 @@ void mc_InitRPCHelpMap06()
             "    {\n"
             "    }\n"
             "4. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
-            "                                                       function filtertransaction()\n"
+            "                                                       function filterstreamitem()\n"
             "                                                       {\n"
-            "                                                           var tx=getfiltertransaction();\n"
+            "                                                           var item=getfilterstreamitem();\n"
             "                                                                                        \n"
-            "                                                           if (tx.vout.length<1)\n"
-            "                                                               return \"One output required\";\n"
-            "                                                       }\n"
+            "                                                           if (item.keys.length<2)\n"
+            "                                                               return \"At least two keys required\";\n"
+            "                                                       }   \n"
 
 
             "\nResult:\n"
@@ -1528,13 +1537,13 @@ void mc_InitRPCHelpMap06()
             "    {\n"
             "    }\n"
             "5. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
-            "                                                       function filtertransaction()\n"
-            "                                                       {\n"
-            "                                                           var tx=getfiltertransaction();\n"
-            "                                                                                        \n"
-            "                                                           if (tx.vout.length<1)\n"
-            "                                                               return \"One output required\";\n"
-            "                                                       }\n"
+            "                                                         function filterstreamitem()\n"
+            "                                                         {\n"
+            "                                                             var item=getfilterstreamitem();\n"
+            "                                                                                          \n"
+            "                                                             if (item.keys.length<2)\n"
+            "                                                                 return \"At least two keys required\";\n"
+            "                                                         }   \n"
 
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
@@ -4451,17 +4460,14 @@ void mc_InitRPCHelpMap19()
             "\nArguments:\n"
             "1. restrictions                     (object, required)  a json object with filter restrictions\n"
             "    {\n"
-             "      \"for\": \"entity-identifier\"   (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
-            "        or\n"
-            "      \"for\": entity-identifier(s)   (array, optional) A json array of asset/stream identifiers .\n"    
             "    }\n"
             "2. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
-            "                                                         function filtertransaction()\n"
+            "                                                         function filterstreamitem()\n"
             "                                                         {\n"
-            "                                                             var tx=getfiltertransaction();\n"
+            "                                                             var item=getfilterstreamitem();\n"
             "                                                                                          \n"
-            "                                                             if (tx.vout.length<1)\n"
-            "                                                                 return \"One output required\";\n"
+            "                                                             if (item.keys.length<2)\n"
+            "                                                                 return \"At least two keys required\";\n"
             "                                                         }   \n"
             "3. \"tx-hex\"                         (string, optional) The transaction hex string to filter, otherwise filter compiled only\n"
             "4. vout:n                           (numeric, optional) The output number, required if tx-hex is specified\n"

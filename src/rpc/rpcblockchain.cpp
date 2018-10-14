@@ -390,7 +390,8 @@ Value listblocks(const Array& params, bool fHelp)
 Value getlastblockinfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)
-        throw runtime_error("Help message not found\n");
+        mc_ThrowHelpMessage("getlastblockinfo");        
+//        throw runtime_error("Help message not found\n");
     
     CBlockIndex* pblockindex = chainActive.Tip();
     
@@ -547,7 +548,8 @@ Value gettxoutsetinfo(const Array& params, bool fHelp)
 Value getfiltertxinput(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)                       
-        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
+        mc_ThrowHelpMessage("getfiltertxinput");        
+//        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
     
     int64_t vin = params[0].get_int64();                                          
     int64_t n;
