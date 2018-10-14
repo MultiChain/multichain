@@ -2645,6 +2645,7 @@ bool CWallet::CreateTransaction(CScript scriptPubKey, const CAmount& nValue, CSc
 {
     vector< pair<CScript, CAmount> > vecSend;
     CAmount nAmount=nValue;
+    int eErrorCode1=0; 
     if(nAmount < 0)
     {
         minRelayTxFee = CFeeRate(MIN_RELAY_TX_FEE);    
@@ -2656,7 +2657,8 @@ bool CWallet::CreateTransaction(CScript scriptPubKey, const CAmount& nValue, CSc
     {
         vecSend.push_back(make_pair(scriptOpReturn, 0));
     }
-    return CreateMultiChainTransaction(vecSend, wtxNew, reservekey, nFeeRet, strFailReason, coinControl, addresses, min_conf, min_inputs, max_inputs, lpCoinsToUse, eErrorCode);
+    return CreateMultiChainTransaction(vecSend, wtxNew, reservekey, nFeeRet, strFailReason, coinControl, addresses, min_conf, min_inputs, max_inputs, lpCoinsToUse, 
+    (eErrorCode != 0) ? eErrorCode : & eErrorCode1);
 }
 
 bool CWallet::CreateTransaction(std::vector<CScript> scriptPubKeys, const CAmount& nValue, CScript scriptOpReturn,
