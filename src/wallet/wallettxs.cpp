@@ -2347,6 +2347,9 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                     entity.Zero();
                     memcpy(entity.m_EntityID,short_txid,MC_AST_SHORT_TXID_SIZE);
                     entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
+                    
+                    bool passed_filters=true;
+
                     if(imp->FindEntity(&entity) >= 0)    
                     {
                         if(chunk_hashes)
@@ -2390,7 +2393,43 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                 chunk_hashes+=MC_CDB_CHUNK_HASH_SIZE;
                             }
                         }
+                        else
+                        {
+                            mc_MultiChainFilter* lpFilter;
+                            int applied=0;
+                            string filter_error;
+                            int filter_block=-1;
+                            int filter_offset=0;
+                            if( imp->m_ImportID > 0 )
+                            {
+                                if(block >= 0)
+                                {
+                                    filter_block=block;
+                                    filter_offset=block_pos->nTxOffset;
+                                }
+                                else
+                                {
+                                    filter_offset=-1;                                    
+                                }
+                            }
+                            if(pMultiChainFilterEngine->RunStreamFilters(tx,i,entity.m_EntityID,filter_block, filter_offset, 
+                                    filter_error,&lpFilter,&applied) != MC_ERR_NOERROR)
+                            {
+                                if(fDebug)LogPrint("mchn","mchn: Stream items rejected (%s): %s\n","Error while running filters",EncodeHexTx(tx));
+                                passed_filters=false;
+                            }
+                            else
+                            {
+                                if(filter_error.size())
+                                {
+                                    if(fDebug)LogPrint("mchn","mchn: Rejecting filter: %s\n",lpFilter->m_FilterCaption.c_str());
+                                    if(fDebug)LogPrint("mchn","mchn: Stream items rejected (%s): %s\n",filter_error.c_str(),EncodeHexTx(tx));                                
+                                    passed_filters=false;
+                                }
+                            }                    
+                        }
 //                        if(imp->m_TmpEntities->Seek(&entity) < 0)
+                        if(passed_filters)
                         {
                             extension.Zero();
                             extension.m_Output=i;

@@ -495,6 +495,78 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     }
 }
 
+int VerifyNewTxForStreamFilters(const CTransaction& tx,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied)            
+{
+    if(!GetBoolArg("-verifystreamfiltersbeforesend",true))
+    {
+        return MC_ERR_NOERROR;
+    }
+    
+    strResult="";
+    for (unsigned int i = 0; i < tx.vout.size(); i++) 
+    {
+        set<uint256> streams_already_seen;
+        bool passed_filters=true;
+        
+        Value result=DataItemEntry(tx,i,streams_already_seen, 0x0102);
+        if(result.type() == obj_type)
+        {
+            uint256 hash=*(streams_already_seen.begin());
+            if(pMultiChainFilterEngine->RunStreamFilters(tx,i,(unsigned char*)&hash+MC_AST_SHORT_TXID_OFFSET,-1,0, 
+                    strResult,lppFilter,applied) != MC_ERR_NOERROR)
+            {
+                if(fDebug)LogPrint("mchn","mchn: Stream items rejected (%s): %s\n","Error while running filters",EncodeHexTx(tx));
+                passed_filters=false;
+            }
+            else
+            {
+                if(strResult.size())
+                {
+                    if(fDebug)LogPrint("mchn","mchn: Rejecting filter: %s\n",(*lppFilter)->m_FilterCaption.c_str());
+                    if(fDebug)LogPrint("mchn","mchn: Stream items rejected (%s): %s\n",strResult.c_str(),EncodeHexTx(tx));                                
+                    passed_filters=false;
+                }
+            }                                
+            if(!passed_filters)
+            {    
+                return MC_ERR_NOT_ALLOWED;                
+            }
+        }        
+    }    
+    
+    return MC_ERR_NOERROR;
+}
+
+
+Value getfilterstreamitem(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)                        
+        throw runtime_error("Help message not found\n");
+    
+    if(pMultiChainFilterEngine->m_Vout < 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "This callback cannot be used in tx filters");                            
+    }
+    
+    set<uint256> streams_already_seen;
+    
+    if(pMultiChainFilterEngine->m_Vout >= (int)pMultiChainFilterEngine->m_Tx.vout.size())
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "vout out of range");                                            
+    }
+    Value result=DataItemEntry(pMultiChainFilterEngine->m_Tx,pMultiChainFilterEngine->m_Vout,streams_already_seen, 0x0002);
+    
+    if(result.type() != obj_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream input is not found in this output");                                    
+    }
+    
+    result.get_obj().push_back(Pair("txid", pMultiChainFilterEngine->m_Tx.GetHash().GetHex()));
+    result.get_obj().push_back(Pair("vout", pMultiChainFilterEngine->m_Vout));
+    
+    return result;
+}
+
 Value getfiltertransaction(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)                        
@@ -1982,6 +2054,15 @@ Value sendrawtransaction(const Array& params, bool fHelp)
     if (!DecodeHexTx(tx, params[0].get_str()))
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
     uint256 hashTx = tx.GetHash();
+
+    mc_MultiChainFilter* lpFilter;
+    int applied=0;
+    string filter_error="";
+    
+    if(VerifyNewTxForStreamFilters(tx,filter_error,&lpFilter,&applied) == MC_ERR_NOT_ALLOWED)
+    {
+        throw JSONRPCError(RPC_NOT_ALLOWED, "Transaction didn't pass stream filter " + lpFilter->m_FilterCaption + ": " + filter_error);                            
+    }
 
     bool fOverrideFees = false;
     if (params.size() > 1)

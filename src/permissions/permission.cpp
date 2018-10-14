@@ -292,6 +292,7 @@ int mc_Permissions::Zero()
     m_MempoolPermissions=NULL;
     m_MempoolPermissionsToReplay=NULL;
     m_CheckForMempoolFlag=0;
+    m_RollBackPos.Zero();
     
     return MC_ERR_NOERROR;
 }
@@ -849,6 +850,84 @@ uint32_t mc_Permissions::GetPermissionType(const char *str,uint32_t full_type)
     return  result;
 }
 
+void mc_RollBackPos::Zero()
+{
+    m_Block=-1;
+    m_Offset=0;
+    m_InMempool=0;
+}
+
+
+int mc_RollBackPos::IsOut(int block,int offset)
+{
+    if(block == m_Block)
+    {
+        return (offset > m_Offset) ? 1 : 0;
+    }
+    
+    return (block > m_Block) ? 1 : 0;
+}
+
+int mc_RollBackPos::InBlock()
+{
+    return (m_Block >= 0) ? 1 : 0;
+}
+
+int mc_RollBackPos::InMempool()
+{
+    return ( (m_Block < 0) && (m_InMempool != 0) ) ? 1 : 0;
+}
+
+int mc_RollBackPos::NotApplied()
+{
+    return ( (m_Block < 0) && (m_InMempool == 0) ) ? 1 : 0;
+}
+
+int mc_Permissions::SetRollBackPos(int block,int offset,int inmempool)
+{
+    m_RollBackPos.m_Block=block;
+    m_RollBackPos.m_Offset=offset;
+    m_RollBackPos.m_InMempool=inmempool;
+    
+    return MC_ERR_NOERROR;
+}
+
+void mc_Permissions::ResetRollBackPos()
+{
+    m_RollBackPos.Zero();
+}
+
+/** Rewinds permission sequence to specific position, returns true if mempool should be checked */
+
+int mc_Permissions::RewindToRollBackPos(mc_PermissionLedgerRow *row)
+{
+    if(m_RollBackPos.InBlock() == 0)
+    {
+        return MC_ERR_NOERROR;
+    }
+    
+    if(m_Ledger->Open() <= 0)
+    {
+        LogString("GetPermission: couldn't open ledger");
+        return MC_ERR_DBOPEN_ERROR;
+    }
+    
+    m_Ledger->GetRow(row->m_ThisRow,row);
+    while( (row->m_PrevRow > 0 ) && m_RollBackPos.IsOut(row->m_BlockReceived,row->m_Offset) )
+    {
+        m_Ledger->GetRow(row->m_PrevRow,row);
+    }
+
+    if(m_RollBackPos.IsOut(row->m_BlockReceived,row->m_Offset))
+    {
+        row->Zero();        
+    }
+    
+    m_Ledger->Close();
+    
+    return MC_ERR_NOERROR;
+}
+
 /** Returns permission value and details for key (entity,address,type) */
 
 uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddress,uint32_t type,mc_PermissionLedgerRow *row,int checkmempool)
@@ -931,7 +1010,19 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
             
             m_Ledger->Close();
         }        
-               
+    
+        if(ptr)
+        {
+            if(RewindToRollBackPos(&pldRow))
+            {
+                return 0;                
+            }            
+            if(pldRow.m_Type == MC_PTP_NONE)
+            {
+                ptr=NULL;
+            }
+        }
+        
         if(ptr)
         {
             row->m_BlockFrom=pldRow.m_BlockFrom;
@@ -952,18 +1043,21 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
         row->m_FoundInDB=found_in_db;        
  */ 
     }
-    
-    if(checkmempool)
+    if(checkmempool != 0)
     { 
-        mprow=0;
-        while(mprow>=0)
+        if( ( m_RollBackPos.NotApplied() != 0) ||
+            ( (m_RollBackPos.InMempool() != 0) && (type != MC_PTP_FILTER) ) )
         {
-            mprow=m_MemPool->Seek((unsigned char*)&pldRow+m_Ledger->m_KeyOffset);
-            if(mprow>=0)
+            mprow=0;
+            while(mprow>=0)
             {
-                memcpy((unsigned char*)row+m_Ledger->m_KeyOffset,m_MemPool->GetRow(mprow),m_Ledger->m_TotalSize);
-//                row->m_FoundInDB=found_in_db;
-                pldRow.m_PrevRow=row->m_ThisRow;
+                mprow=m_MemPool->Seek((unsigned char*)&pldRow+m_Ledger->m_KeyOffset);
+                if(mprow>=0)
+                {
+                    memcpy((unsigned char*)row+m_Ledger->m_KeyOffset,m_MemPool->GetRow(mprow),m_Ledger->m_TotalSize);
+    //                row->m_FoundInDB=found_in_db;
+                    pldRow.m_PrevRow=row->m_ThisRow;
+                }
             }
         }
     }

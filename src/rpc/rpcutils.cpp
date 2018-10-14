@@ -775,6 +775,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
 // 0x0008 subscribed/synchronized    
 // 0x0010 stats
 // 0x0020 creators    
+// 0x0040 filters
     
     Object entry;
     mc_EntityDetails entity;
@@ -924,6 +925,23 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
         {
             entry.push_back(Pair("creators",openers));                    
         }
+        
+        if( ( (output_level & 0x0040)  != 0) && (pMultiChainFilterEngine->m_TxID == 0) )
+        {
+            Array filters;
+            for(int i=0;i<(int)pMultiChainFilterEngine->m_Filters.size();i++)
+            {
+                if(pMultiChainFilterEngine->m_Filters[i].m_FilterType == MC_FLT_TYPE_STREAM)
+                {
+                    if(mc_gState->m_Permissions->FilterApproved(entity.GetTxID(),&(pMultiChainFilterEngine->m_Filters[i].m_FilterAddress)))
+                    {
+                        filters.push_back(FilterEntry(pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID(),0x02,MC_FLT_TYPE_STREAM));
+                    }
+                }
+            }            
+            entry.push_back(Pair("filters",filters));                    
+        }
+        
         if( ( (output_level & 0x0018)  != 0) && (pMultiChainFilterEngine->m_TxID == 0) )
         {
             entStat.Zero();

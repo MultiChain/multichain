@@ -234,12 +234,14 @@ typedef struct mc_AssetDB
     
     mc_Buffer   *m_MemPool;
     mc_Buffer   *m_TmpRelevantEntities;
+    mc_Buffer   *m_ShortTxIDCache;
     
     char m_Name[MC_PRM_NETWORK_NAME_MAX_SIZE+1]; 
     int m_Block;
     int64_t m_PrevPos;
     int64_t m_Pos;
     int m_DBRowCount;
+    mc_RollBackPos m_RollBackPos;
 
     mc_AssetDB()
     {
@@ -272,6 +274,11 @@ typedef struct mc_AssetDB
     int FindEntityByName(mc_EntityDetails *entity, const char* name);    
     int FindEntityByFollowOn(mc_EntityDetails *entity, const unsigned char* txid);    
     int FindEntityByFullRef (mc_EntityDetails *entity, unsigned char* full_ref);
+    
+    unsigned char *CachedTxIDFromShortTxID(unsigned char *short_txid);
+    int SetRollBackPos(int block,int offset,int inmempool);
+    void ResetRollBackPos();
+    
     
     void Dump();
     mc_Buffer *GetEntityList(mc_Buffer *old_result,const void* txid,uint32_t entity_type);

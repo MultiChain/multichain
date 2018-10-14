@@ -552,6 +552,11 @@ Value getfiltertxinput(const Array& params, bool fHelp)
     int64_t vin = params[0].get_int64();                                          
     int64_t n;
     
+    if(pMultiChainFilterEngine->m_Vout >= 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "This callback cannot be used in stream filters");                            
+    }
+    
     if( (vin < 0) || (vin >= (unsigned int)pMultiChainFilterEngine->m_Tx.vin.size()) )
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "vin out of range");                    

@@ -280,6 +280,75 @@ exitlbl:
     return wtx.GetHash().GetHex();    
 }
 
+bool ParseStreamFilterApproval(Value param,mc_EntityDetails *stream_entity)
+{
+    bool field_parsed,for_found,approve_found;
+    bool approval=false;
+    
+    if(param.type() == obj_type)
+    {
+        Object objParams = param.get_obj();
+        for_found=false;
+        approve_found=false;
+        BOOST_FOREACH(const Pair& s, objParams) 
+        {
+            field_parsed=false;
+            if(s.name_ == "for")
+            {
+                if(for_found)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"for field can appear only once in the object");                               
+                }
+                if(s.value_.type() == str_type)
+                {
+                    ParseEntityIdentifier(s.value_.get_str(),stream_entity, MC_ENT_TYPE_STREAM);           
+                }
+                else
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"stream identifier should be string");                               
+                }
+                field_parsed=true;
+                for_found=true;
+            }            
+            if(s.name_ == "approve")
+            {
+                if(approve_found)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"for field can appear only once in the object");                               
+                }
+                if(s.value_.type() == bool_type)
+                {
+                    approval=s.value_.get_bool();
+                }
+                else
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"approve should be boolean");                               
+                }       
+                field_parsed=true;
+                approve_found=true;
+            }
+            if(!field_parsed)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid field: %s",s.name_.c_str()));                           
+            }
+        }
+        if(!for_found)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER,"missing stream identifier");                                           
+        }
+        if(!approve_found)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER,"missing approve filed");                                           
+        }
+    }
+    else
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid stream approval, should be object");                                        
+    }        
+    
+    return approval;
+}
+
 Value approvefrom(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 3)
@@ -293,15 +362,6 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
     string entity_identifier;
     entity_identifier=params[1].get_str();
     
-    approval=1;
-    if (params.size() > 2)    
-    {
-        if(!paramtobool(params[2]))
-        {
-            approval=0;
-        }
-    }
-    
     timestamp=mc_TimeNowAsUInt();
 
     mc_EntityDetails entity;
@@ -311,6 +371,7 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
     string entity_nameU; 
     string entity_nameL; 
     bool fIsUpgrade=true;
+    bool fIsStreamFilter=false;
     
     switch(entity.GetEntityType())
     {
@@ -323,6 +384,17 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
             {
                 throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
             }   
+            if(entity.GetFilterType() != MC_FLT_TYPE_TX)
+            {
+                if(mc_gState->m_Features->StreamFilters() == 0)
+                {
+                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Only Tx filters can be approved/disapproved in this protocol version.");        
+                }        
+                if(entity.GetFilterType() == MC_FLT_TYPE_STREAM)
+                {
+                    fIsStreamFilter=true;
+                }
+            }
             entity_nameU="Filter";
             entity_nameL="filter";
             fIsUpgrade=false;
@@ -331,6 +403,30 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
             throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Invalid identifier, should be upgrade or filter");                                
             break;
     }
+
+    mc_EntityDetails stream_entity;
+    stream_entity.Zero();
+    
+    if(fIsStreamFilter)
+    {
+        if (params.size() <= 2)    
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMS, "Missing stream identifier");                    
+        }        
+        approval=ParseStreamFilterApproval(params[2],&stream_entity);
+    }
+    else
+    {
+        approval=1;
+        if (params.size() > 2)    
+        {
+            if(!paramtobool(params[2]))
+            {
+                approval=0;
+            }
+        }
+    }
+    
 
     if(fIsUpgrade)
     {
@@ -365,18 +461,35 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
     {
         throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
     }
-        
+            
     CKeyID *lpKeyID=boost::get<CKeyID> (&fromaddresses[0]);
-    if(lpKeyID != NULL)
+    if(fIsStreamFilter)
     {
-        if(mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)(lpKeyID)) == 0)
+        if(lpKeyID != NULL)
         {
-            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have admin permission");                                                                        
-        }                                                                     
+            if(mc_gState->m_Permissions->CanAdmin(stream_entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
+            {
+                throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have admin permission for specified stream");                                                                        
+            }                                                                     
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Please use raw transactions to approve filters from P2SH addresses");                                                
+        }
     }
     else
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Please use raw transactions to approve upgrades from P2SH addresses");                                                
+        if(lpKeyID != NULL)
+        {
+            if(mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)(lpKeyID)) == 0)
+            {
+                throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have admin permission");                                                                        
+            }                                                                     
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Please use raw transactions to approve upgrades from P2SH addresses");                                                
+        }
     }
     
     mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
@@ -400,6 +513,10 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
     }
     else
     {
+        if(fIsStreamFilter)
+        {
+            lpScript->SetEntity(stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);                    
+        }
         lpScript->SetPermission(MC_PTP_FILTER,0,approval ? 4294967295U : 0,timestamp);
         uint160 filter_address;
         filter_address=0;

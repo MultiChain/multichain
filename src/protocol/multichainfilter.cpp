@@ -265,12 +265,84 @@ int mc_MultiChainFilterEngine::Reset(int block)
     return MC_ERR_NOERROR;
 }
 
+int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout, unsigned char *stream_short_txid,int block,int offset,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied)            
+{
+    if(mc_gState->m_Features->StreamFilters() == 0)
+    {
+        return MC_ERR_NOERROR;
+    }
+    
+    int err=MC_ERR_NOERROR;
+    strResult="";
+    m_Tx=tx;
+    m_TxID=m_Tx.GetHash();
+    m_Vout=vout;
+    m_Params.Init();
+    
+    unsigned char *stream_entity_txid=mc_gState->m_Assets->CachedTxIDFromShortTxID(stream_short_txid); 
+    
+    if(applied)
+    {
+        *applied=0;
+    }
+    
+    if(stream_entity_txid == NULL)
+    {
+        goto exitlbl;
+    }
+    
+    mc_gState->m_Permissions->SetRollBackPos(block,offset,(offset != 0) ? 1 : 0);
+    mc_gState->m_Assets->SetRollBackPos(block,offset,(offset != 0) ? 1 : 0);
+    
+    for(int i=0;i<(int)m_Filters.size();i++)
+    {
+        if( (m_Filters[i].m_FilterType == MC_FLT_TYPE_STREAM) && (m_Filters[i].m_CreateError.size() == 0) )
+        {
+            if(mc_gState->m_Permissions->FilterApproved(stream_entity_txid,&(m_Filters[i].m_FilterAddress)))
+            {
+                mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
+                err=pFilterEngine->RunFilter(worker,strResult);
+                if(err)
+                {
+                    LogPrintf("Error while running filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
+                    goto exitlbl;
+                }
+                if(strResult.size())
+                {
+                    if(lppFilter)
+                    {
+                        *lppFilter=&(m_Filters[i]);
+                    }
+                    if(fDebug)LogPrint("filter","filter: %s: %s\n",m_Filters[i].m_FilterCaption.c_str(),strResult.c_str());
+
+                    goto exitlbl;
+                }
+                if(fDebug)LogPrint("filter","filter: Tx %s accepted, filter: %s\n",m_TxID.ToString().c_str(),m_Filters[i].m_FilterCaption.c_str());
+                if(applied)
+                {
+                    *applied+=1;
+                }
+            }
+        }
+    }    
+
+exitlbl:
+    
+    mc_gState->m_Assets->ResetRollBackPos();
+    mc_gState->m_Permissions->ResetRollBackPos();
+    m_Params.Close();
+    m_TxID=0;
+    m_Vout=-1;
+    return err;    
+}
+
 int mc_MultiChainFilterEngine::RunTxFilters(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied)
 {
     int err=MC_ERR_NOERROR;
     strResult="";
     m_Tx=tx;
     m_TxID=m_Tx.GetHash();
+    m_Vout=-1;
     m_Params.Init();
     
     if(applied)
@@ -280,7 +352,7 @@ int mc_MultiChainFilterEngine::RunTxFilters(const CTransaction& tx,std::set <uin
     
     for(int i=0;i<(int)m_Filters.size();i++)
     {
-        if(m_Filters[i].m_CreateError.size() == 0)
+        if( (m_Filters[i].m_FilterType == MC_FLT_TYPE_TX) && (m_Filters[i].m_CreateError.size() == 0) )
         {
             if(mc_gState->m_Permissions->FilterApproved(NULL,&(m_Filters[i].m_FilterAddress)))
             {
@@ -339,16 +411,18 @@ int mc_MultiChainFilterEngine::RunFilter(const CTransaction& tx,mc_Filter *filte
     return err;
 }
 
-int mc_MultiChainFilterEngine::RunFilterWithCallbackLog(const CTransaction& tx,mc_Filter *filter,std::string &strResult, json_spirit::Array& callbacks)
+int mc_MultiChainFilterEngine::RunFilterWithCallbackLog(const CTransaction& tx,int vout,mc_Filter *filter,std::string &strResult, json_spirit::Array& callbacks)
 {
     int err=MC_ERR_NOERROR;
     m_Tx=tx;
     m_TxID=m_Tx.GetHash();
     m_Params.Init();
+    m_Vout=vout;
 
     err=pFilterEngine->RunFilterWithCallbackLog(filter,strResult, callbacks);
 
     m_Params.Close();
+    m_Vout=-1;
     m_TxID=0;
     return err;
 }
@@ -375,6 +449,7 @@ void mc_MultiChainFilterEngine::SetCallbackNames()
     callbacks.clear();
     callbacks.push_back("getfiltertxid");
     callbacks.push_back("getfiltertransaction");
+    callbacks.push_back("getfilterstreamitem");
     callbacks.push_back("setfilterparam");
     callbacks.push_back("getlastblockinfo");
     callbacks.push_back("getassetinfo");
