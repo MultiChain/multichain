@@ -3631,6 +3631,7 @@ void mc_InitRPCHelpMap15()
             "                                                       autosubscribe,\n"
             "                                                       handshakelocal,\n"
             "                                                       hideknownopdrops\n"
+            "                                                       sendskipstreamfilters\n"
             "2. parameter-value                  (required) parameter value\n"
             "\nResult:\n"
             "\nExamples:\n"

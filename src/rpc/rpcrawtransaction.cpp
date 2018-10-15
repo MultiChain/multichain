@@ -497,7 +497,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
 
 int VerifyNewTxForStreamFilters(const CTransaction& tx,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied)            
 {
-    if(!GetBoolArg("-verifystreamfiltersbeforesend",true))
+    if(GetBoolArg("-sendskipstreamfilters",false))
     {
         return MC_ERR_NOERROR;
     }

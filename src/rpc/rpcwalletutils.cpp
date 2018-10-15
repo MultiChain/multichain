@@ -904,7 +904,14 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
         }
     }
     
-    entry.push_back(Pair("data", format_item_value));        
+    if(full_error.size() == 0)
+    {
+        entry.push_back(Pair("data", format_item_value));        
+    }
+    else
+    {
+        entry.push_back(Pair("data", Value::null));                
+    }
     
     if(verbose)
     {
