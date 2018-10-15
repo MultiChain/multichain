@@ -2512,7 +2512,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 {
                     if(!AcceptMultiChainTransaction(tx,view,coinbase_offset,true,reason,NULL))
                     {
-                        return false;       
+                        return state.DoS(0,
+                                     error("ConnectBlock: : AcceptMultiChainTransaction failed %s : %s", tx.GetHash().ToString(),reason),
+                                     REJECT_INVALID, reason);
+//                        return false;       
                     }
                 }
                 else
