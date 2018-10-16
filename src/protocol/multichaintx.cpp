@@ -1715,7 +1715,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                 return false;                                                                        
             }            
         }
-        
+                
         if(entity.AllowedFollowOns() == 0)
         {
             reason="Asset follow-on script rejected - follow-ons not allowed for this asset";
@@ -1728,6 +1728,10 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                 reason="Asset follow-on script rejected - mismatch in follow-on quantity asset and details script";
                 return false;                                                                                                    
             }
+        }
+        if(mc_gState->m_Features->FixedIn20005())
+        {
+            details->SetRelevantEntity((unsigned char*)entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
         }
         if(ptrOut)
         {
