@@ -677,7 +677,8 @@ Value getfiltercode(const Array& params, bool fHelp)
 Value getfiltertxid(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
-        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
+        mc_ThrowHelpMessage("getfiltertxid");        
+//        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
     
     return pMultiChainFilterEngine->m_TxID.ToString();
 }
@@ -685,7 +686,8 @@ Value getfiltertxid(const Array& params, bool fHelp)
 Value setfilterparam(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 2)                                            
-        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
+        mc_ThrowHelpMessage("setfilterparam");        
+//        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
     
     string param_name=params[0].get_str();
     bool fFound=false;
@@ -745,6 +747,19 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, stri
     if (filter_type == MC_FLT_TYPE_STREAM)
     {
         filter_main_name=MC_FLT_MAIN_NAME_STREAM;
+        
+        set<uint256> streams_already_seen;
+
+        if( (vout >= (int)tx.vout.size()) || (vout < 0) )
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "vout out of range");                                            
+        }
+        Value result=DataItemEntry(tx,vout,streams_already_seen, 0x0102);
+
+        if(result.type() != obj_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream input is not found in this output");                                    
+        }        
     }
     
     err=pFilterEngine->CreateFilter(filter_code,filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strError);

@@ -1481,7 +1481,8 @@ Value gettotalbalances(const Array& params, bool fHelp)
 Value getassetinfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
-       throw runtime_error("Help message not found\n");
+        mc_ThrowHelpMessage("getassetinfo");        
+//       throw runtime_error("Help message not found\n");
     
     if(params[0].type() != str_type)
     {

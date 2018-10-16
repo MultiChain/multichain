@@ -2548,7 +2548,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 /* MCHN END */    
         if (!tx.IsCoinBase())
         {
-    if(fDebug)LogPrint("mchn","mchn: A Tx %d: %s\n",i,tx.GetHash().ToString().c_str());
             if (!view.HaveInputs(tx))
                 return state.DoS(100, error("ConnectBlock() : inputs missing/spent"),
                                  REJECT_INVALID, "bad-txns-inputs-missingorspent");
@@ -2573,7 +2572,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             
 /* MCHN START */        
             string reason;
-    if(fDebug)LogPrint("mchn","mchn: B Tx %d: %s\n",i,tx.GetHash().ToString().c_str());
             if(!fJustCheck)
             {
                 if(!AcceptMultiChainTransaction(tx,view,offset,true,reason,NULL,NULL))
@@ -2605,7 +2603,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         if (tx.IsCoinBase())
         {
             string reason;
-    if(fDebug)LogPrint("mchn","mchn: C Tx %d: %s\n",i,tx.GetHash().ToString().c_str());
             if(!fJustCheck)
             {
                 if(!AcceptMultiChainTransaction(tx,view,coinbase_offset,true,reason,NULL,NULL))

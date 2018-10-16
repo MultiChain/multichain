@@ -497,7 +497,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
 
 int VerifyNewTxForStreamFilters(const CTransaction& tx,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied)            
 {
-    if(!GetBoolArg("-verifystreamfiltersbeforesend",true))
+    if(GetBoolArg("-sendskipstreamfilters",false))
     {
         return MC_ERR_NOERROR;
     }
@@ -541,7 +541,8 @@ int VerifyNewTxForStreamFilters(const CTransaction& tx,std::string &strResult,mc
 Value getfilterstreamitem(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)                        
-        throw runtime_error("Help message not found\n");
+        mc_ThrowHelpMessage("getfilterstreamitem");        
+//        throw runtime_error("Help message not found\n");
     
     if(pMultiChainFilterEngine->m_Vout < 0)
     {
@@ -554,14 +555,14 @@ Value getfilterstreamitem(const Array& params, bool fHelp)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "vout out of range");                                            
     }
-    Value result=DataItemEntry(pMultiChainFilterEngine->m_Tx,pMultiChainFilterEngine->m_Vout,streams_already_seen, 0x0002);
+    Value result=DataItemEntry(pMultiChainFilterEngine->m_Tx,pMultiChainFilterEngine->m_Vout,streams_already_seen, 0x0E00);
     
     if(result.type() != obj_type)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream input is not found in this output");                                    
     }
     
-    result.get_obj().push_back(Pair("txid", pMultiChainFilterEngine->m_Tx.GetHash().GetHex()));
+//    result.get_obj().push_back(Pair("txid", pMultiChainFilterEngine->m_Tx.GetHash().GetHex()));
     result.get_obj().push_back(Pair("vout", pMultiChainFilterEngine->m_Vout));
     
     return result;
@@ -570,7 +571,8 @@ Value getfilterstreamitem(const Array& params, bool fHelp)
 Value getfiltertransaction(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)                        
-        throw runtime_error("Help message not found\n");
+        mc_ThrowHelpMessage("getfiltertransaction");        
+//        throw runtime_error("Help message not found\n");
 
 /*    
     CTransaction tx;

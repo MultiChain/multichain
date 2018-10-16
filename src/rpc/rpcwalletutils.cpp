@@ -846,8 +846,9 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
         entry.push_back(Pair("key", keys[0]));        
     }
     entry.push_back(Pair("offchain", (retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN));        
+    string full_error="";
     if( ( retrieve_status & MC_OST_CONTROL_NO_DATA ) == 0)
-    {
+    {        
         entry.push_back(Pair("available", AvailableFromStatus(retrieve_status)));        
         if(retrieve_status & MC_OST_ERROR_MASK)
         {
@@ -856,8 +857,61 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
             error_str=OffChainError(retrieve_status,&errorCode);
             entry.push_back(Pair("error", error_str));        
         }
+        else
+        {
+            if( AvailableFromStatus(retrieve_status) && ((retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN ))
+            {
+                mc_MultiChainFilter* lpFilter;
+                int applied=0;
+                string filter_error="";
+                mc_TxDefRow txdef;
+                if(pwalletTxsMain->FindWalletTx(wtx.GetHash(),&txdef))
+                {
+                    full_error="Error while retreiving tx from the wallet";
+                }
+                else
+                {        
+                    int filter_block=-1;
+                    int filter_offset=0;
+                    if( (txdef.m_Block >= 0) && (txdef.m_Block <= chainActive.Height()))
+                    {
+                        filter_block=txdef.m_Block;
+                        filter_offset=txdef.m_BlockTxOffset;
+                    }
+                    else
+                    {
+                        filter_offset=-1;                                    
+                    }
+                    
+                    if(pMultiChainFilterEngine->RunStreamFilters(wtx,stream_output,(unsigned char *)stream_id,filter_block,filter_offset, 
+                            filter_error,&lpFilter,&applied) != MC_ERR_NOERROR)
+                    {
+                        full_error="Error while running stream filters";
+                    }
+                    else
+                    {
+                        if(filter_error.size())
+                        {
+                            full_error=strprintf("Stream item did not pass filter %s: %s",lpFilter->m_FilterCaption.c_str(),filter_error.c_str());
+                        }
+                    }                                
+                }
+                if(full_error.size())
+                {    
+                    entry.push_back(Pair("error", full_error));        
+                }                
+            }
+        }
     }
-    entry.push_back(Pair("data", format_item_value));        
+    
+    if(full_error.size() == 0)
+    {
+        entry.push_back(Pair("data", format_item_value));        
+    }
+    else
+    {
+        entry.push_back(Pair("data", Value::null));                
+    }
     
     if(verbose)
     {

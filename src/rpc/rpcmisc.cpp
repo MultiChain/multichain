@@ -233,6 +233,7 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     obj.push_back(Pair("lockadminminerounds",Params().LockAdminMineRounds()));                    
     obj.push_back(Pair("gen",GetBoolArg("-gen", true)));                    
     obj.push_back(Pair("genproclimit",GetArg("-genproclimit", 1)));                    
+    obj.push_back(Pair("sendskipstreamfilters",GetBoolArg("-sendskipstreamfilters", false)));                    
 /*
     obj.push_back(Pair("shortoutput",GetBoolArg("-shortoutput",false)));                    
     obj.push_back(Pair("walletdbversion", mc_gState->GetWalletDBVersion()));                
@@ -306,6 +307,11 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         fFound=true;
     }
     if(param_name == "hideknownopdrops")
+    {
+        mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
+        fFound=true;
+    }
+    if(param_name == "sendskipstreamfilters")
     {
         mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
         fFound=true;
@@ -1107,7 +1113,7 @@ Value createmultisig(const Array& params, bool fHelp)
 Value verifymessage(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 3)                                            // MCHN
-        throw runtime_error("Help message not found\n");
+        mc_ThrowHelpMessage("verifymessage");
 
     string strAddress  = params[0].get_str();
     string strSign     = params[1].get_str();

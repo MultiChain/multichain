@@ -99,7 +99,8 @@ void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
 Value getstreaminfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
-       throw runtime_error("Help message not found\n");
+        mc_ThrowHelpMessage("getstreaminfo");        
+//       throw runtime_error("Help message not found\n");
     
     if(params[0].type() != str_type)
     {

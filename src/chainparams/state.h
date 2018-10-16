@@ -148,6 +148,7 @@ typedef struct mc_Features
     int CustomPermissions();
     int StreamFilters();
     int FixedIn20005();
+    int FilterLimitedMathSet();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo

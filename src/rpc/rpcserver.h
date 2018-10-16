@@ -129,6 +129,7 @@ extern std::vector<CRPCCommand> vStaticRPCCommands;
 extern std::vector<CRPCCommand> vStaticRPCWalletReadCommands;
 void mc_InitRPCHelpMap();
 std::string mc_RPCHelpString(std::string strMethod);
+void mc_ThrowHelpMessage(std::string strMethod);
 void mc_InitRPCList(std::vector<CRPCCommand>& vStaticRPCCommands,std::vector<CRPCCommand>& vStaticRPCWalletReadCommands);
 
 
