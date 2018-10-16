@@ -2314,7 +2314,6 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
     bool fReject=false;
     int64_t mandatory_fee=0;
             
-    if(fDebug)LogPrint("mchn","mchn: Checking Tx (%s): %s\n",tx.GetHash().ToString().c_str(),EncodeHexTx(tx));
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)                 
     {
         return true;

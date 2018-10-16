@@ -2400,14 +2400,14 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                             string filter_error;
                             int filter_block=-1;
                             int filter_offset=0;
-                            if( imp->m_ImportID > 0 )
+                            if(block >= 0)
                             {
-                                if(block >= 0)
-                                {
-                                    filter_block=block;
-                                    filter_offset=block_pos->nTxOffset;
-                                }
-                                else
+                                filter_block=block;
+                                filter_offset=block_pos->nTxOffset;
+                            }
+                            else
+                            {
+                                if( imp->m_ImportID > 0 )
                                 {
                                     filter_offset=-1;                                    
                                 }
