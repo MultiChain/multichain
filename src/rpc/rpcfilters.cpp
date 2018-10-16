@@ -722,7 +722,7 @@ Value setfilterparam(const json_spirit::Array& params, bool fHelp)
     return "Set";
 }
 
-Value testfilter(const vector <uint160>& entities,const  char *filter_code, string txhex,int vout,uint32_t filter_type)
+Value testfilter(const vector <uint160>& entities,const  char *filter_code, string txhex,int vout_in,uint32_t filter_type)
 {
     Object result;
     int err;
@@ -732,6 +732,7 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, stri
     string strFatal="";
     bool relevant_filter=true;
     int64_t nStart;
+    int vout=vout_in;
     
     CTransaction tx;
 
@@ -748,18 +749,51 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, stri
     {
         filter_main_name=MC_FLT_MAIN_NAME_STREAM;
         
-        set<uint256> streams_already_seen;
-
-        if( (vout >= (int)tx.vout.size()) || (vout < 0) )
+        if(txhex.size())
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "vout out of range");                                            
+            int vout_min,vout_max,vout_count;
+            vout_count=0;
+            vout_min=0;
+            vout_max=(int)tx.vout.size()-1;
+            if(vout >= 0)
+            {
+                if(vout >= (int)tx.vout.size())
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "vout out of range");                                            
+                }
+                vout_min=vout;
+                vout_max=vout;
+            }
+            
+            for(int i=vout_min;i<=vout_max;i++)
+            {
+                set<uint256> streams_already_seen;
+
+                Value result=DataItemEntry(tx,i,streams_already_seen, 0x0102);
+
+                if(result.type() == obj_type)
+                {
+                    vout_count++;
+                    vout=i;
+                }                        
+            }
+            
+            if(vout_count != 1)
+            {
+                if(vout_in < 0)
+                {
+                    if(vout_count == 0)
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream input is not found in this transaction");                                                                                
+                    }
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "More than one stream item is found in this transaction, please specify output number");                                                                                
+                }                
+                else
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream item is not found in this output");                                                                                                    
+                }
+            }
         }
-        Value result=DataItemEntry(tx,vout,streams_already_seen, 0x0102);
-
-        if(result.type() != obj_type)
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream input is not found in this output");                                    
-        }        
     }
     
     err=pFilterEngine->CreateFilter(filter_code,filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strError);
@@ -1009,24 +1043,23 @@ Value runstreamfilter(const json_spirit::Array& params, bool fHelp)
     
     if (params.size() > 1)    
     {
-        if(params.size() != 3)
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMS, "vout should be specified");                        
-        }
         if(params[1].type() != str_type)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx-hex, should be string");            
         }
-        if(params[2].type() != int_type)
+        if(params.size() > 2)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid vout, should be integer");            
+            if(params[2].type() != int_type)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid vout, should be integer");            
+            }
+            vout=params[2].get_int();
         }
         txhex=params[1].get_str();
         if(txhex.size() == 0)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty tx-hex");                        
         }
-        vout=params[2].get_int();
     }
     
     return testfilter(entities, (char *)filter_code, txhex, vout, MC_FLT_TYPE_STREAM);
@@ -1062,24 +1095,23 @@ Value teststreamfilter(const json_spirit::Array& params, bool fHelp)
     
     if (params.size() > 2)    
     {
-        if(params.size() != 4)
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMS, "vout should be specified");                        
-        }
         if(params[2].type() != str_type)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx-hex, should be string");            
         }
-        if(params[3].type() != int_type)
+        if(params.size() > 3)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid vout, should be integer");            
+            if(params[3].type() != int_type)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid vout, should be integer");            
+            }
+            vout=params[3].get_int();
         }
         txhex=params[2].get_str();
         if(txhex.size() == 0)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty tx-hex");                        
         }
-        vout=params[3].get_int();
     }
     
     return testfilter(entities, js.c_str(), txhex, vout, MC_FLT_TYPE_STREAM);
