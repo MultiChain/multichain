@@ -79,8 +79,16 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
     
     uint256 txid;
     txid=*(uint256*)m_Details.GetTxID();
-    m_FilterCaption=strprintf("%s (txid %s)",
-            m_Details.m_Name,txid.ToString().c_str());
+    if(m_Details.m_Name[0])
+    {
+        m_FilterCaption=strprintf("%s",
+                m_Details.m_Name);
+    }
+    else
+    {
+        m_FilterCaption=strprintf("(txid %s)",
+                txid.ToString().c_str());        
+    }
     
     ptr=(unsigned char *)m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_TYPE,&value_size);
     
