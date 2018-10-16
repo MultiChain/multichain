@@ -8,13 +8,13 @@
 #include "utils/define.h"
 #include "utils/util.h"
 #include "utils/tinyformat.h"
+#include "chainparams/state.h"
 #include <cassert>
 
 namespace mc_v8
 {
 
-static std::string jsFixture =
-        R"(
+static std::string jsFixture = R"(
 Math.random = function() {
     return 0;
 };
@@ -51,11 +51,16 @@ Date = function (Date) {
         return instantiate(Date, arguments);
     }
 }(Date);
+)";
 
-console.log(`Math.randon()=${Math.random()}`);
-console.log(`Date.now()=${Date.now()}`);
-console.log(`Date()=${Date()}`);
-console.log("Finished loading fixture.js");
+static std::string jsLimitMathSet = R"(
+var mathKeep = new Set(["abs", "ceil", "floor", "max", "min", "round", "sign", "trunc", "log", "log10", "log2", "pow",
+    "sqrt", "E", "LN10", "LN2", "LOG10E", "LOG2E", "PI", "SQRT1_2", "SQRT2" ]);
+for (var fn of Object.getOwnPropertyNames(Math)) {
+    if (! mathKeep.has(fn)) {
+        delete Math[fn];
+    }
+}
 )";
 
 void V8Filter::Zero()
@@ -70,8 +75,6 @@ int V8Filter::Destroy()
     this->Zero();
     return MC_ERR_NOERROR;
 }
-
-#define REGISTER_RPC(name) global->Set(String2V8(m_isolate, #name), v8::FunctionTemplate::New(m_isolate, filter_##name))
 
 int V8Filter::Initialize(std::string script, std::string functionName, std::vector<std::string>& callback_names,
         std::string& strResult)
@@ -96,7 +99,13 @@ int V8Filter::Initialize(std::string script, std::string functionName, std::vect
     auto context = v8::Context::New(m_isolate, nullptr, global);
     m_context.Reset(m_isolate, context);
 
-    int status = this->CompileAndLoadScript(jsFixture, "", "fixture", strResult);
+    std::string jsPreamble = jsFixture;
+    if (mc_gState->m_Features->FilterLimitedMathSet())
+    {
+        jsPreamble += jsLimitMathSet;
+    }
+
+    int status = this->CompileAndLoadScript(jsPreamble, "", "preamble", strResult);
     if (status != MC_ERR_NOERROR || !strResult.empty())
     {
         m_context.Reset();

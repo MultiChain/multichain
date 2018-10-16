@@ -45,7 +45,7 @@ public:
      * @param script         The filter JS code.
      * @param main_name      The expected name of the filtering function in the script.
      * @param callback_names A list of callback function names to register for the filter.
-     *                       If empty, register all possible functions.
+     *                       If empty, register no callback functions.
      * @param filter         The filter object to initialize.
      * @param strResult      Reason for failure if unsuccessful.
      * @return               MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
