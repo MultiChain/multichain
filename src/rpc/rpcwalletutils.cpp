@@ -7,6 +7,7 @@
 
 #include "rpc/rpcwallet.h"
 int VerifyNewTxForStreamFilters(const CTransaction& tx,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied);            
+string OpReturnFormatToText(int format);
 
 void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry)
 {
@@ -849,9 +850,9 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
     string full_error="";
     if( ( retrieve_status & MC_OST_CONTROL_NO_DATA ) == 0)
     {        
-        entry.push_back(Pair("available", AvailableFromStatus(retrieve_status)));        
         if(retrieve_status & MC_OST_ERROR_MASK)
         {
+            entry.push_back(Pair("available", AvailableFromStatus(retrieve_status)));        
             string error_str;
             int errorCode;
             error_str=OffChainError(retrieve_status,&errorCode);
@@ -898,20 +899,24 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
                 }
                 if(full_error.size())
                 {    
-                    entry.push_back(Pair("error", full_error));        
+                    entry.push_back(Pair("available", false));                        
+                    entry.push_back(Pair("error", full_error));  
+                    Object metadata_object;
+                    metadata_object.push_back(Pair("txid", wtx.GetHash().ToString()));
+                    metadata_object.push_back(Pair("vout", stream_output));
+                    metadata_object.push_back(Pair("format", OpReturnFormatToText(format)));
+                    metadata_object.push_back(Pair("size", out_size));
+                    format_item_value=metadata_object;
                 }                
+            }
+            else
+            {
+                entry.push_back(Pair("available", AvailableFromStatus(retrieve_status)));                        
             }
         }
     }
     
-    if(full_error.size() == 0)
-    {
-        entry.push_back(Pair("data", format_item_value));        
-    }
-    else
-    {
-        entry.push_back(Pair("data", Value::null));                
-    }
+    entry.push_back(Pair("data", format_item_value));        
     
     if(verbose)
     {
