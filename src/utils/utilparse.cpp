@@ -492,7 +492,10 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                         {
                             if(mc_gState->m_NetworkParams->GetInt64Param("supportminerprecheck"))                                
                             {
-                                *required |= MC_PTP_CACHED_SCRIPT_REQUIRED;
+                                if(entity.GetEntityType() == MC_ENT_TYPE_NONE)
+                                {
+                                    *required |= MC_PTP_CACHED_SCRIPT_REQUIRED;
+                                }
                             }        
                         }
                         
