@@ -18,10 +18,7 @@ void mc_MapStringIndex::Init()
 
 void mc_MapStringIndex::Destroy()
 {
-    if(mapObject)
-    {
-        delete (std::map<string, int>*)mapObject;
-    }
+    delete (std::map<string, int>*)mapObject;
 }
 
 void mc_MapStringIndex::Clear()
@@ -86,10 +83,7 @@ void mc_MapStringString::Init()
 
 void mc_MapStringString::Destroy()
 {
-    if(mapObject)
-    {
-        delete (std::map<string, string>*)mapObject;
-    }
+    delete (std::map<string, string>*)mapObject;
 }
 
 void mc_MapStringString::Add(const char* key, const char*  value)

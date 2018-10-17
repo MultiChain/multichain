@@ -85,21 +85,9 @@ int mc_ChunkCollector::Destroy()
         m_DB=NULL;
     }
 
-    if(m_MarkPool)
-    {
-        delete m_MarkPool;
-    }
-    
-    if(m_MemPool1)
-    {
-        delete m_MemPool1;
-    }
-    
-    if(m_MemPool2)
-    {
-        delete m_MemPool2;
-    }
-
+    delete m_MarkPool;
+    delete m_MemPool1;
+    delete m_MemPool2;
     if(m_Semaphore)
     {
         __US_SemDestroy(m_Semaphore);

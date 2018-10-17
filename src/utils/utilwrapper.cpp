@@ -851,10 +851,7 @@ void mc_SHA256::Init()
 
 void mc_SHA256::Destroy()
 {
-    if(m_HashObject)
-    {
-        delete (CSHA256*)m_HashObject;
-    }
+    delete (CSHA256*)m_HashObject;
 }
 
 void mc_SHA256::Reset()
