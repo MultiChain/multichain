@@ -796,7 +796,8 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, stri
         }
     }
     
-    err=pFilterEngine->CreateFilter(filter_code,filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strError);
+//    err=pFilterEngine->CreateFilter(filter_code,filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strError);
+    err=pFilterEngine->CreateFilter(filter_code,filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,5000, strError);
     if(err)
     {
         errorCode=RPC_INTERNAL_ERROR;

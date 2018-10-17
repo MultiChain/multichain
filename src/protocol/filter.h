@@ -8,6 +8,7 @@
 #include <string>
 
 class mc_FilterEngine;
+class FilterWatchdog;
 
 /**
  * A user-defined transaction filter.
@@ -84,6 +85,10 @@ public:
     int CreateFilter(std::string script, std::string main_name, std::vector<std::string>& callback_names,
             mc_Filter* filter, std::string& strResult);
 
+    int CreateFilter(std::string script, std::string main_name, std::vector<std::string>& callback_names,
+            mc_Filter* filter, int timeout, std::string& strResult);
+
+
     /**
      * Run the filter function in the JS script.
      *
@@ -105,9 +110,19 @@ public:
      */
     int RunFilterWithCallbackLog(const mc_Filter* filter, std::string& strResult, json_spirit::Array& callbacks);
 
+    /**
+     * @brief Abort the currently running filter (if any).
+     */
+    void TerminateFilter();
+
 private:
     void *m_Impl;
+    int m_timeout;
+    const mc_Filter* m_runningFilter;
+    FilterWatchdog* m_watchdog;
 
+    void SetRunningFilter(const mc_Filter* filter);
+    void ResetRunningFilter();
 }; // class mc_FilterEngine
 
 #endif /* MULTICHAIN_FILTER_H */

@@ -18,6 +18,7 @@ int mc_Filter::Destroy()
 
 int mc_Filter::Initialize(std::string &strResult)
 {
+    strResult.clear();
     return MC_ERR_NOERROR;
 }
 
@@ -38,22 +39,31 @@ int mc_FilterEngine::Initialize(std::string& strResult)
     return MC_ERR_NOERROR;
 }
 
-int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, std::vector<std::string>& callbackNames,
-        mc_Filter* filter, std::string& strResult)
+int mc_FilterEngine::CreateFilter(std::string, std::string, std::vector<std::string>&, mc_Filter*, std::string& strResult)
 {
     strResult.clear();
     return MC_ERR_NOERROR;
 }
 
-int mc_FilterEngine::RunFilter(const mc_Filter* filter, std::string& strResult)
+int mc_FilterEngine::CreateFilter(std::string, std::string, std::vector<std::string>&, mc_Filter*, int, std::string& strResult)
 {
     strResult.clear();
     return MC_ERR_NOERROR;
 }
 
-int mc_FilterEngine::RunFilterWithCallbackLog(const mc_Filter* filter, std::string& strResult, json_spirit::Array& callbacks)
+int mc_FilterEngine::RunFilter(const mc_Filter*, std::string& strResult)
+{
+    strResult.clear();
+    return MC_ERR_NOERROR;
+}
+
+int mc_FilterEngine::RunFilterWithCallbackLog(const mc_Filter*, std::string& strResult, json_spirit::Array& callbacks)
 {
     strResult.clear();
     callbacks.clear();
     return MC_ERR_NOERROR;
+}
+
+void mc_FilterEngine::TerminateFilter()
+{
 }

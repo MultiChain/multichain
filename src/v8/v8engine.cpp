@@ -56,4 +56,12 @@ int V8Engine::RunFilterWithCallbackLog(V8Filter* filter, std::string& strResult,
     return filter->RunWithCallbackLog(strResult, callbacks);
 }
 
+void V8Engine::TerminateFilter(V8Filter *filter)
+{
+    if (filter != nullptr && filter->IsRunning())
+    {
+        filter->GetIsolate()->TerminateExecution();
+    }
+}
+
 } // namespace mc_v8

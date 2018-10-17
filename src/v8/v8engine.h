@@ -73,6 +73,13 @@ public:
      * @return          MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
      */
     int RunFilterWithCallbackLog(V8Filter* filter, std::string& strResult, json_spirit::Array& callbacks);
+
+    /**
+     * @brief Abort the currently running filter (if any).
+     *
+     * @param filter  The filter to abort.
+     */
+    void TerminateFilter(V8Filter* filter);
 };
 
 } // namespace mc_v8

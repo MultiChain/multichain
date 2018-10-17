@@ -456,7 +456,13 @@ multichaind_LDADD = \
 #if ENABLE_WALLET
 #multichaind_LDADD += libbitcoin_wallet.a
 #endif
-multichaind_SOURCES = multichain/multichaind.cpp rpc/rpclist.cpp chainparams/buildgenesis.cpp protocol/filter.cpp $(V8_SOURCES)
+multichaind_SOURCES = \
+    multichain/multichaind.cpp \
+    rpc/rpclist.cpp \
+    chainparams/buildgenesis.cpp \
+    protocol/filter.cpp \
+    protocol/filterwatchdog.cpp \
+    $(V8_SOURCES)
 #
 
 if TARGET_WINDOWS
