@@ -324,7 +324,6 @@ typedef struct mc_Permissions
     
     uint32_t GetAllPermissions(const void* lpEntity,const void* lpAddress,uint32_t type);
     uint32_t GetPermissionType(const char *str,uint32_t full_type);
-//    uint32_t GetPermissionType(const char *str,int entity_type);
     uint32_t GetPermissionType(const char *str,const void *entity_details);
     uint32_t GetPossiblePermissionTypes(uint32_t entity_type);
     uint32_t GetPossiblePermissionTypes(const void *entity_details);

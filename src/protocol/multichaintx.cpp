@@ -1729,7 +1729,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                 return false;                                                                                                    
             }
         }
-        if(mc_gState->m_Features->FixedIn20005())
+        if(mc_gState->m_Features->FixedIn20005())                               // Issumore was missed before 20005
         {
             details->SetRelevantEntity((unsigned char*)entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
         }
@@ -2235,7 +2235,7 @@ bool MultiChainTransaction_VerifyStandardCoinbase(const CTransaction& tx,       
         return true;
     }
     
-    if(mc_gState->m_Features->FixedIn20005() == 0)
+    if(mc_gState->m_Features->FixedIn20005() == 0)                              // Coinbase is checked like all other txs before 20005
     {
         return true;        
     }
