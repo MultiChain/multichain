@@ -461,7 +461,6 @@ multichaind_SOURCES = \
     rpc/rpclist.cpp \
     chainparams/buildgenesis.cpp \
     protocol/filter.cpp \
-    protocol/filterwatchdog.cpp \
     $(V8_SOURCES)
 #
 

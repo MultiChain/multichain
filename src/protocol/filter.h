@@ -5,10 +5,10 @@
 #define MULTICHAIN_FILTER_H
 
 #include "json/json_spirit.h"
-#include <string>
+#include <boost/thread.hpp>
 
 class mc_FilterEngine;
-class FilterWatchdog;
+class mc_FilterWatchdog;
 
 /**
  * A user-defined transaction filter.
@@ -119,10 +119,62 @@ private:
     void *m_Impl;
     int m_timeout;
     const mc_Filter* m_runningFilter;
-    FilterWatchdog* m_watchdog;
+    mc_FilterWatchdog* m_watchdog;
 
     void SetRunningFilter(const mc_Filter* filter);
     void ResetRunningFilter();
 }; // class mc_FilterEngine
+
+/**
+ * @brief Monitor filter execution and stop the filer function if it takes more than a specified timeout.
+ */
+class mc_FilterWatchdog
+{
+  public:
+    mc_FilterWatchdog()
+    {
+        Zero();
+    }
+    ~mc_FilterWatchdog()
+    {
+        Destroy();
+    }
+
+    void Zero();
+    int Destroy();
+
+    /**
+     * @brief Notfies the watchdog that a filter started runnug, with a given timeout.
+     * @param timeout   The number of millisecond to allow the filtr to run.
+     */
+    void FilterStarted(int timeout = 1000);
+
+    /**
+     * @brief Notfies the watchdog that a filter stopped running.
+     */
+    void FilterEnded();
+
+    /**
+     * @brief Terminate the watchdog.
+     */
+    void Shutdown();
+
+  private:
+    enum State
+    {
+        IDLE,
+        RUNNING,
+        POISON_PILL
+    };
+
+    boost::thread *m_thread;
+    boost::condition_variable m_condVar;
+    boost::mutex m_mutex;
+    int m_timeout;
+    State m_state;
+
+    std::string StateStr() const;
+    void watchdogTask();
+};
 
 #endif /* MULTICHAIN_FILTER_H */
