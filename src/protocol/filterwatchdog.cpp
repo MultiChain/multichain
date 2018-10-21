@@ -36,7 +36,6 @@ void FilterWatchdog::FilterStarted(int timeout)
         }
         {
             boost::lock_guard<boost::mutex> lock(m_mutex);
-            LogPrint("v8filter", "v8filter: Watchdog::FilterStarted set timeout and RUNNING\n");
             m_timeout = timeout;
             m_state = State::RUNNING;
         }
@@ -52,7 +51,6 @@ void FilterWatchdog::FilterEnded()
     {
         {
             boost::lock_guard<boost::mutex> lock(m_mutex);
-            LogPrint("v8filter", "v8filter: Watchdog::FilterEnded set IDLE\n");
             m_state = State::IDLE;
         }
         LogPrint("v8filter", "v8filter: Watchdog::FilterEnded notify m_state=%s\n", this->StateStr());
@@ -84,7 +82,7 @@ std::string FilterWatchdog::StateStr() const
     case State::POISON_PILL:
         return "POISON_PILL";
     }
-    return tinyformat::format("UNKNOWN (%d)", m_state);
+    return tfm::format("UNKNOWN (%d)", m_state);
 }
 
 void FilterWatchdog::watchdogTask()
@@ -94,7 +92,6 @@ void FilterWatchdog::watchdogTask()
     while (true)
     {
         std::string msg = tfm::format("v8filter: Watchdog::watchdogTask %s - ", this->StateStr());
-//        LogPrint("v8filter", (msg + "idling\n").c_str());
         m_condVar.wait(lock);
         if (m_state == State::POISON_PILL)
         {
