@@ -541,7 +541,6 @@ Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong)
             {                
                 Object entry;
                 entry.push_back(Pair("for", PermissionForFieldEntry(&entity)));            
-//                full_type=mc_gState->m_Permissions->GetPossiblePermissionTypes(entity.GetEntityType());
                 full_type=mc_gState->m_Permissions->GetPossiblePermissionTypes(&entity);
                 if(full_type & MC_PTP_CONNECT)entry.push_back(Pair("connect", (type & MC_PTP_CONNECT) ? true : false));
                 if(full_type & MC_PTP_SEND)entry.push_back(Pair("send", (type & MC_PTP_SEND) ? true : false));
@@ -2314,7 +2313,6 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                 if(type_string.size())
                 {
                     type=mc_gState->m_Permissions->GetPermissionType(type_string.c_str(),&entity);
-//                    type=mc_gState->m_Permissions->GetPermissionType(type_string.c_str(),entity.GetEntityType());
                     if(entity.GetEntityType() == MC_ENT_TYPE_NONE)
                     {
                         if(required)

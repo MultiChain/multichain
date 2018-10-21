@@ -722,6 +722,13 @@ uint32_t mc_Permissions::GetPossiblePermissionTypes(const void* entity_details)
         if(entity->GetEntityType())
         {
             full_type = entity->Permissions();
+            if(entity->GetEntityType() == MC_ENT_TYPE_ASSET)
+            {
+                if(mc_gState->m_Features->FixedIn20005())               
+                {
+                    full_type |= MC_PTP_SEND | MC_PTP_RECEIVE;
+                }
+            }
             full_type |= GetCustomLowPermissionTypes();
             full_type |= GetCustomHighPermissionTypes();
             return full_type;
@@ -794,9 +801,7 @@ uint32_t mc_Permissions::GetPermissionType(const char *str,uint32_t full_type)
     char* start;
     char* ptrEnd;
     char c;
-    
-//    full_type=GetPossiblePermissionTypes(entity_details);
-    
+        
     ptr=(char*)str;
     ptrEnd=ptr+strlen(ptr);
     start=ptr;

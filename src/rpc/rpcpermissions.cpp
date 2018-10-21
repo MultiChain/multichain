@@ -117,7 +117,6 @@ Value grantoperation(const Array& params)
         LogPrintf("mchn: Granting %s permission(s) to address %s (%ld-%ld), Entity TxID: %s, Name: %s\n",permission_type,params[1].get_str(),from,to,
                 ((uint256*)entity.GetTxID())->ToString().c_str(),entity.GetName());
         
-//        type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),entity.GetEntityType());
         type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),&entity);
         
         if(type == 0)
@@ -128,7 +127,6 @@ Value grantoperation(const Array& params)
     else
     {
         type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),&entity);
-//        type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),MC_ENT_TYPE_NONE);
         
         if(type == 0)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
@@ -551,6 +549,33 @@ Value verifypermission(const Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
     }    
     
+    if(result == 0)                                                         // No entity restrictions
+    {
+        if(entity.GetEntityType())
+        {
+            if(mc_gState->m_Features->FixedIn20005())
+            {
+                if(entity.GetEntityType() == MC_ENT_TYPE_ASSET)
+                {
+                    if( (entity.Permissions() & type) == 0)
+                    {
+                        result=1;
+                    }
+                }
+                else
+                {
+                    if(entity.GetEntityType() <= MC_ENT_TYPE_STREAM_MAX)
+                    {
+                        if(entity.AnyoneCanWrite())
+                        {
+                            result=1;                            
+                        }
+                    }                    
+                }
+            }
+        }
+    }
+    
     return (result != 0);
 }
 
@@ -593,7 +618,6 @@ Value listpermissions(const Array& params, bool fHelp)
         lpEntity=entity.GetTxID();
     }
     
-//    type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),entity.GetEntityType());
     type=mc_gState->m_Permissions->GetPermissionType(permission_type.c_str(),&entity);
     if(type == 0)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");

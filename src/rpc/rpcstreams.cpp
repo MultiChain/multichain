@@ -2211,7 +2211,7 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
     {
         int min_size=max_size+1;
         int min_condition=conditions_count;
-        for(i=0;i<=conditions_count;i++)
+        for(i=0;i<conditions_count;i++)
         {
             if(vConditionMerged[i] == 0)
             {
