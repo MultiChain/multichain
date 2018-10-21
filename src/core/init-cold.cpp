@@ -846,10 +846,11 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     
     pwalletMain=NULL;
 
+    string rpc_threads_error="";
     if (fServer)
     {
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
-        StartRPCThreads();
+        StartRPCThreads(rpc_threads_error);
     }
 /* MCHN END*/        
     
@@ -1052,6 +1053,14 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
             sprintf(bufOutput,"Listening for API requests on port %d (local only - see rpcallowip setting)\n\n",(int)GetArg("-rpcport", BaseParams().RPCPort()));                            
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
         }
+    }
+    if(rpc_threads_error.size())
+    {
+        if(!GetBoolArg("-shortoutput", false))
+        {    
+            sprintf(bufOutput,"%s\n",rpc_threads_error.c_str());                            
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+        }            
     }
     
 

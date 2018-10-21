@@ -34,7 +34,7 @@ public:
 };
 
 /** Start RPC threads */
-void StartRPCThreads();
+void StartRPCThreads(std::string& strError);
 /**
  * Alternative to StartRPCThreads for the GUI, when no server is
  * used. The RPC thread in this case is only used to handle timeouts.
