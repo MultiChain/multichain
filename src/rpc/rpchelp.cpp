@@ -3632,6 +3632,7 @@ void mc_InitRPCHelpMap15()
             "                                                       handshakelocal,\n"
             "                                                       hideknownopdrops\n"
             "                                                       sendskipstreamfilters\n"
+            "                                                       filtertimeout\n"
             "2. parameter-value                  (required) parameter value\n"
             "\nResult:\n"
             "\nExamples:\n"

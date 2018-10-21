@@ -2843,7 +2843,7 @@ bool static DisconnectTip(CValidationState &state) {
     mc_gState->m_Assets->RollBack(old_height-1);
     if(pMultiChainFilterEngine)
     {
-        pMultiChainFilterEngine->Reset(old_height-1);
+        pMultiChainFilterEngine->Reset(old_height-1,0);
     }
     
     MultichainNode_ApplyUpgrades(old_height-1);        
@@ -2922,7 +2922,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     if(fDebug)LogPrint("bench", "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
     if(pMultiChainFilterEngine)
     {
-        pMultiChainFilterEngine->Reset(pindexNew->nHeight-1);
+        pMultiChainFilterEngine->Reset(pindexNew->nHeight-1,1);
     }
     {
         CCoinsViewCache view(pcoinsTip);
@@ -3349,7 +3349,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
         mc_gState->m_Assets->ClearMemPool();
         if(pMultiChainFilterEngine)
         {
-            pMultiChainFilterEngine->Reset(chainActive.Height());
+            pMultiChainFilterEngine->Reset(chainActive.Height(),0);
         }
         
         if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Replaying mempool\n");

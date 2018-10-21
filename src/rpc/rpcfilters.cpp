@@ -275,7 +275,7 @@ Value createfilterfromcmd(const Array& params, bool fHelp)
 
     mc_Filter *worker=new mc_Filter;
 
-    err=pFilterEngine->CreateFilter(js.c_str(),filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strError);
+    err=pFilterEngine->CreateFilter(js.c_str(),filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,pMultiChainFilterEngine->GetTimeout(),strError);
     delete worker;
     if(err)
     {
@@ -797,7 +797,7 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, stri
     }
     
 //    err=pFilterEngine->CreateFilter(filter_code,filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strError);
-    err=pFilterEngine->CreateFilter(filter_code,filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,5000, strError);
+    err=pFilterEngine->CreateFilter(filter_code,filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,pMultiChainFilterEngine->GetTimeout(), strError);
     if(err)
     {
         errorCode=RPC_INTERNAL_ERROR;

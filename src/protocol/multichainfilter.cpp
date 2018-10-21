@@ -192,7 +192,13 @@ int mc_MultiChainFilterEngine::Destroy()
     return MC_ERR_NOERROR;
 }
 
-int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid)
+int mc_MultiChainFilterEngine::GetTimeout()
+{    
+    return GetArg("-filtertimeout",DEFAULT_FILTER_TIMEOUT);
+}
+
+
+int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid,int for_block)
 {    
     int err;
     mc_MultiChainFilter filter;
@@ -209,7 +215,7 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid)
     m_Workers->Add(&worker);
     
     err=pFilterEngine->CreateFilter(m_Filters.back().m_FilterCode,m_Filters.back().m_MainName.c_str(),
-            m_CallbackNames[m_Filters.back().m_FilterType],worker,m_Filters.back().m_CreateError);
+            m_CallbackNames[m_Filters.back().m_FilterType],worker,(for_block == 0) ? GetTimeout() : 0,m_Filters.back().m_CreateError);
     if(err)
     {
         LogPrintf("Couldn't create filter with short txid %s, error: %d\n",filter.m_FilterAddress.ToString().c_str(),err);
@@ -223,11 +229,11 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid)
     return MC_ERR_NOERROR;
 }
 
-int mc_MultiChainFilterEngine::Reset(int block)
+int mc_MultiChainFilterEngine::Reset(int block,int for_block)
 {
     int filter_block;
     int err;
-    
+
     if(m_Filters.size() == 0)
     {
         return MC_ERR_NOERROR;        
@@ -261,7 +267,7 @@ int mc_MultiChainFilterEngine::Reset(int block)
         mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
         
         err=pFilterEngine->CreateFilter(m_Filters[i].m_FilterCode,m_Filters[i].m_MainName,m_CallbackNames[m_Filters[i].m_FilterType],
-                worker,m_Filters[i].m_CreateError);
+                worker,(for_block == 0) ? GetTimeout() : 0,m_Filters[i].m_CreateError);
         if(err)
         {
             LogPrintf("Couldn't prepare filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
@@ -521,7 +527,7 @@ int mc_MultiChainFilterEngine::Initialize()
     
     for(it=filter_refs.begin();it != filter_refs.end();it++)
     {
-        err=Add((unsigned char*)&(it->second)+MC_AST_SHORT_TXID_OFFSET);
+        err=Add((unsigned char*)&(it->second)+MC_AST_SHORT_TXID_OFFSET,0);
         if(err)
         {
             goto exitlbl;

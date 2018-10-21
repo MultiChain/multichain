@@ -2114,7 +2114,7 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
             }
             if(details->new_entity_type == MC_ENT_TYPE_FILTER)
             {
-                pMultiChainFilterEngine->Add((unsigned char*)&txid+MC_AST_SHORT_TXID_OFFSET);
+                pMultiChainFilterEngine->Add((unsigned char*)&txid+MC_AST_SHORT_TXID_OFFSET,(offset < 0) ? 0 : 1);
             }
         }
         else
