@@ -93,7 +93,9 @@ typedef struct mc_MultiChainFilterEngine
     
     int Initialize();
     void SetCallbackNames();
-    int GetTimeout();
+    int GetAcceptTimeout();
+    int GetSendTimeout();
+    int SetTimeout(int timeout);    
     int Add(const unsigned char* short_txid,int for_block);
     int Reset(int block,int for_block);
     int RunTxFilters(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied);            

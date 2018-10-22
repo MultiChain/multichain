@@ -192,9 +192,32 @@ int mc_MultiChainFilterEngine::Destroy()
     return MC_ERR_NOERROR;
 }
 
-int mc_MultiChainFilterEngine::GetTimeout()
+int mc_MultiChainFilterEngine::GetAcceptTimeout()
 {    
-    return GetArg("-filtertimeout",DEFAULT_FILTER_TIMEOUT);
+    return GetArg("-acceptfiltertimeout",DEFAULT_ACCEPT_FILTER_TIMEOUT);
+}
+
+int mc_MultiChainFilterEngine::GetSendTimeout()
+{    
+    int accept_timeout=GetAcceptTimeout();
+    int timeout=GetArg("-sendfiltertimeout",DEFAULT_SEND_FILTER_TIMEOUT);
+    if(accept_timeout > 0)
+    {
+        if(accept_timeout < timeout)
+        {
+            timeout=accept_timeout;
+        }
+    }
+    return timeout;
+}
+
+int mc_MultiChainFilterEngine::SetTimeout(int timeout)
+{
+    for(int i=0;i<(int)m_Filters.size();i++)
+    {
+        mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
+        worker->SetTimeout(timeout);
+    }    
 }
 
 
@@ -215,7 +238,7 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid,int for_block
     m_Workers->Add(&worker);
     
     err=pFilterEngine->CreateFilter(m_Filters.back().m_FilterCode,m_Filters.back().m_MainName.c_str(),
-            m_CallbackNames[m_Filters.back().m_FilterType],worker,(for_block == 0) ? GetTimeout() : 0,m_Filters.back().m_CreateError);
+            m_CallbackNames[m_Filters.back().m_FilterType],worker,(for_block == 0) ? GetAcceptTimeout() : 0,m_Filters.back().m_CreateError);
     if(err)
     {
         LogPrintf("Couldn't create filter with short txid %s, error: %d\n",filter.m_FilterAddress.ToString().c_str(),err);
@@ -267,13 +290,18 @@ int mc_MultiChainFilterEngine::Reset(int block,int for_block)
         mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
         
         err=pFilterEngine->CreateFilter(m_Filters[i].m_FilterCode,m_Filters[i].m_MainName,m_CallbackNames[m_Filters[i].m_FilterType],
-                worker,(for_block == 0) ? GetTimeout() : 0,m_Filters[i].m_CreateError);
+                worker,m_Filters[i].m_CreateError);
         if(err)
         {
             LogPrintf("Couldn't prepare filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
             return err;
         }        
     }    
+    
+    if(for_block == 0)
+    {
+        SetTimeout(GetAcceptTimeout());
+    }
     
     if(fDebug)LogPrint("filter","filter: Filter engine reset\n");
     return MC_ERR_NOERROR;
@@ -363,7 +391,8 @@ int mc_MultiChainFilterEngine::RunTxFilters(const CTransaction& tx,std::set <uin
     {
         *applied=0;
     }
-    
+    int failure=0;
+    LogPrintf("Starting filtering\n");
     for(int i=0;i<(int)m_Filters.size();i++)
     {
         if( (m_Filters[i].m_FilterType == MC_FLT_TYPE_TX) && (m_Filters[i].m_CreateError.size() == 0) )
@@ -387,7 +416,7 @@ int mc_MultiChainFilterEngine::RunTxFilters(const CTransaction& tx,std::set <uin
                         }
                         strResult=strprintf("The transaction did not pass filter %s: %s",m_Filters[i].m_FilterCaption.c_str(),strResult.c_str());
                         if(fDebug)LogPrint("filter","filter: %s\n",strResult.c_str());
-                        
+                        failure++;
                         goto exitlbl;
                     }
                     if(fDebug)LogPrint("filter","filter: Tx %s accepted, filter: %s\n",m_TxID.ToString().c_str(),m_Filters[i].m_FilterCaption.c_str());
@@ -405,6 +434,7 @@ int mc_MultiChainFilterEngine::RunTxFilters(const CTransaction& tx,std::set <uin
     }    
 
 exitlbl:
+    if(fDebug)LogPrint("filter","Applied filters: success - %d, failure - %d\n",*applied,failure);
             
     m_Params.Close();
     m_TxID=0;
@@ -533,7 +563,7 @@ int mc_MultiChainFilterEngine::Initialize()
             goto exitlbl;
         }
     }
-
+    
     LogPrintf("Filter initialization completed\n");
     
 exitlbl:

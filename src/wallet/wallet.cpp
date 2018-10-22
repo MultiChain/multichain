@@ -4160,7 +4160,18 @@ bool CMerkleTx::AcceptToMemoryPool(bool fLimitFree, bool fRejectInsaneFee)
 bool CMerkleTx::AcceptToMemoryPoolReturnReason(bool fLimitFree, bool fRejectInsaneFee,string& reject_reason)
 {
     CValidationState state;
+    
+    if(pMultiChainFilterEngine)
+    {
+        pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetSendTimeout());
+    }
+
     bool result=::AcceptToMemoryPool(mempool, state, *this, fLimitFree, NULL, fRejectInsaneFee,false);
+
+    if(pMultiChainFilterEngine)
+    {
+        pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetAcceptTimeout());
+    }
 
     if(!result)
     {

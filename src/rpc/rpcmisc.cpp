@@ -234,7 +234,8 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     obj.push_back(Pair("gen",GetBoolArg("-gen", true)));                    
     obj.push_back(Pair("genproclimit",GetArg("-genproclimit", 1)));                    
     obj.push_back(Pair("sendskipstreamfilters",GetBoolArg("-sendskipstreamfilters", false)));                    
-    obj.push_back(Pair("filtertimeout",GetArg("-filtertimeout", DEFAULT_FILTER_TIMEOUT)));                    
+    obj.push_back(Pair("acceptfiltertimeout",GetArg("-acceptfiltertimeout", DEFAULT_ACCEPT_FILTER_TIMEOUT)));                    
+    obj.push_back(Pair("sendfiltertimeout",GetArg("-sendfiltertimeout", DEFAULT_SEND_FILTER_TIMEOUT)));                    
 /*
     obj.push_back(Pair("shortoutput",GetBoolArg("-shortoutput",false)));                    
     obj.push_back(Pair("walletdbversion", mc_gState->GetWalletDBVersion()));                
@@ -369,7 +370,8 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
     if( (param_name == "lockadminminerounds") ||
         (param_name == "maxshowndata") ||
         (param_name == "maxqueryscanitems") ||
-        (param_name == "filtertimeout") ||
+        (param_name == "acceptfiltertimeout") ||
+        (param_name == "sendfiltertimeout") ||
         (param_name == "dropmessagestest") )
     {
         if( (params[1].type() == int_type) || (params[1].type() == str_type) )
@@ -390,7 +392,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
                 {
                     if(pMultiChainFilterEngine)
                     {
-                        pMultiChainFilterEngine->Reset(chainActive.Height(),0);
+                        pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetAcceptTimeout());
                     }
                 }
             }

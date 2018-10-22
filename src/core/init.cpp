@@ -516,7 +516,8 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -chunkrequesttimeout=<n>                 " + _("Timeout, after which chunk request is dropped and another source is tried, default 10s") + "\n";
     strUsage += "  -flushsourcechunks=<n>                   " + _("Flush offchain items created by this node to disk immediately when created, default 1") + "\n";
     strUsage += "  -sendskipstreamfilters=<n>               " + _("Skip checking stream filters when publishing, default 0") + "\n";
-    strUsage += "  -filtertimeout=<n>                       " + strprintf(_("Timeout, after which filter execution will be aborted, in milliseconds, default %u"),DEFAULT_FILTER_TIMEOUT) + "\n";
+    strUsage += "  -acceptfiltertimeout=<n>                 " + strprintf(_("Timeout, after which filter execution will be aborted, when accepting new txs, in milliseconds, default %u"),DEFAULT_ACCEPT_FILTER_TIMEOUT) + "\n";
+    strUsage += "  -sendfiltertimeout=<n>                   " + strprintf(_("Timeout, after which filter execution will be aborted, when tx is sent from this node, in milliseconds, default %u"),DEFAULT_SEND_FILTER_TIMEOUT) + "\n";
 
     strUsage += "\n" + _("MultiChain API response parameters") + "\n";        
     strUsage += "  -hideknownopdrops=<n>  " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON-RPC calls (default: %u)"), 0) + "\n";
