@@ -2,8 +2,8 @@
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "protocol/filter.h"
-#include "utils/util.h"
 #include "utils/define.h"
+#include "utils/util.h"
 
 void mc_Filter::Zero()
 {
@@ -33,37 +33,39 @@ int mc_FilterEngine::Destroy()
     return MC_ERR_NOERROR;
 }
 
-int mc_FilterEngine::Initialize(std::string& strResult)
+int mc_FilterEngine::Initialize(std::string &strResult)
 {
     strResult.clear();
     return MC_ERR_NOERROR;
 }
 
-int mc_FilterEngine::CreateFilter(std::string, std::string, std::vector<std::string>&, mc_Filter*, std::string& strResult)
+int mc_FilterEngine::CreateFilter(std::string, std::string, std::vector<std::string> &, mc_Filter *,
+                                  std::string &strResult)
 {
     strResult.clear();
     return MC_ERR_NOERROR;
 }
 
-int mc_FilterEngine::CreateFilter(std::string, std::string, std::vector<std::string>&, mc_Filter*, int, std::string& strResult)
+int mc_FilterEngine::CreateFilter(std::string, std::string, std::vector<std::string> &, mc_Filter *, int,
+                                  std::string &strResult)
 {
     strResult.clear();
     return MC_ERR_NOERROR;
 }
 
-int mc_FilterEngine::RunFilter(const mc_Filter*, std::string& strResult)
+int mc_FilterEngine::RunFilter(const mc_Filter *, std::string &strResult)
 {
     strResult.clear();
     return MC_ERR_NOERROR;
 }
 
-int mc_FilterEngine::RunFilterWithCallbackLog(const mc_Filter*, std::string& strResult, json_spirit::Array& callbacks)
+int mc_FilterEngine::RunFilterWithCallbackLog(const mc_Filter *, std::string &strResult, json_spirit::Array &callbacks)
 {
     strResult.clear();
     callbacks.clear();
     return MC_ERR_NOERROR;
 }
 
-void mc_FilterEngine::TerminateFilter()
+void mc_FilterEngine::TerminateFilter(std::string reason)
 {
 }

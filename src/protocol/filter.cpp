@@ -2,11 +2,11 @@
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "filter.h"
+#include "core/init.h"
+#include "utils/define.h"
+#include "utils/util.h"
 #include "v8/v8engine.h"
 #include "v8/v8filter.h"
-#include "core/init.h"
-#include "utils/util.h"
-#include "utils/define.h"
 
 namespace mc_v8
 {
@@ -16,13 +16,14 @@ class V8Filter;
 void mc_Filter::Zero()
 {
     m_Impl = nullptr;
+    m_timeout = 0;
 }
 
 int mc_Filter::Destroy()
 {
     if (m_Impl != nullptr)
     {
-        auto v8filter = static_cast<mc_v8::V8Filter*>(m_Impl);
+        auto v8filter = static_cast<mc_v8::V8Filter *>(m_Impl);
         delete v8filter;
     }
     this->Zero();
@@ -39,7 +40,6 @@ int mc_Filter::Initialize(std::string &strResult)
 void mc_FilterEngine::Zero()
 {
     m_Impl = nullptr;
-    m_timeout = 0;
     m_runningFilter = nullptr;
     m_watchdog = nullptr;
 }
@@ -48,7 +48,7 @@ int mc_FilterEngine::Destroy()
 {
     if (m_Impl != nullptr)
     {
-        auto v8engine = static_cast<mc_v8::V8Engine*>(m_Impl);
+        auto v8engine = static_cast<mc_v8::V8Engine *>(m_Impl);
         delete v8engine;
     }
     if (m_watchdog != nullptr)
@@ -61,7 +61,7 @@ int mc_FilterEngine::Destroy()
     return MC_ERR_NOERROR;
 }
 
-int mc_FilterEngine::Initialize(std::string& strResult)
+int mc_FilterEngine::Initialize(std::string &strResult)
 {
     LogPrint("v8filter", "v8filter: mc_FilterEngine::Initialize\n");
     strResult.clear();
@@ -70,19 +70,19 @@ int mc_FilterEngine::Initialize(std::string& strResult)
     return v8engine->Initialize(strResult);
 }
 
-int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, std::vector<std::string>& callback_names,
-        mc_Filter* filter, std::string& strResult)
+int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, std::vector<std::string> &callback_names,
+                                  mc_Filter *filter, std::string &strResult)
 {
     LogPrint("v8filter", "v8filter: mc_FilterEngine::CreateFilter\n");
     strResult.clear();
-    auto v8engine = static_cast<mc_v8::V8Engine*>(m_Impl);
+    auto v8engine = static_cast<mc_v8::V8Engine *>(m_Impl);
     filter->Destroy();
     int result = filter->Initialize(strResult);
     if (result != MC_ERR_NOERROR || !strResult.empty())
     {
         return result;
     }
-    auto v8filter = static_cast<mc_v8::V8Filter*>(filter->m_Impl);
+    auto v8filter = static_cast<mc_v8::V8Filter *>(filter->m_Impl);
     result = v8engine->CreateFilter(script, main_name, callback_names, v8filter, strResult);
     if (result != MC_ERR_NOERROR || !strResult.empty())
     {
@@ -95,41 +95,46 @@ int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, std
                                   mc_Filter *filter, int timeout, std::string &strResult)
 {
     LogPrintf("v8filter: mc_FilterEngine::CreateFilter(timeout=%d)\n", timeout);
-    m_timeout = timeout;
-    return CreateFilter(script, main_name, callback_names, filter, strResult);
+    int result = CreateFilter(script, main_name, callback_names, filter, strResult);
+    if (result == MC_ERR_NOERROR)
+    {
+        filter->SetTimeout(timeout);
+    }
+    return result;
 }
 
-int mc_FilterEngine::RunFilter(const mc_Filter* filter, std::string& strResult)
+int mc_FilterEngine::RunFilter(const mc_Filter *filter, std::string &strResult)
 {
     LogPrint("v8filter", "v8filter: mc_FilterEngine::RunFilter\n");
 
-    auto v8engine = static_cast<mc_v8::V8Engine*>(m_Impl);
-    auto v8filter = static_cast<mc_v8::V8Filter*>(filter->m_Impl);
+    auto v8engine = static_cast<mc_v8::V8Engine *>(m_Impl);
+    auto v8filter = static_cast<mc_v8::V8Filter *>(filter->m_Impl);
     SetRunningFilter(filter);
     int retval = v8engine->RunFilter(v8filter, strResult);
     ResetRunningFilter();
     return retval;
 }
 
-int mc_FilterEngine::RunFilterWithCallbackLog(const mc_Filter* filter, std::string& strResult, json_spirit::Array& callbacks)
+int mc_FilterEngine::RunFilterWithCallbackLog(const mc_Filter *filter, std::string &strResult,
+                                              json_spirit::Array &callbacks)
 {
     LogPrint("v8filter", "v8filter: mc_FilterEngine::RunFilterWithCallbackLog\n");
-    auto v8engine = static_cast<mc_v8::V8Engine*>(m_Impl);
-    auto v8filter = static_cast<mc_v8::V8Filter*>(filter->m_Impl);
+    auto v8engine = static_cast<mc_v8::V8Engine *>(m_Impl);
+    auto v8filter = static_cast<mc_v8::V8Filter *>(filter->m_Impl);
     SetRunningFilter(filter);
     int retval = v8engine->RunFilterWithCallbackLog(v8filter, strResult, callbacks);
     ResetRunningFilter();
     return retval;
 }
 
-void mc_FilterEngine::TerminateFilter()
+void mc_FilterEngine::TerminateFilter(std::string reason)
 {
     LogPrint("v8filter", "v8filter: mc_FilterEngine::TerminateFilter\n");
     if (m_runningFilter != nullptr)
     {
-        auto v8engine = static_cast<mc_v8::V8Engine*>(m_Impl);
-        auto v8filter = static_cast<mc_v8::V8Filter*>(m_runningFilter->m_Impl);
-        v8engine->TerminateFilter(v8filter);
+        auto v8engine = static_cast<mc_v8::V8Engine *>(m_Impl);
+        auto v8filter = static_cast<mc_v8::V8Filter *>(m_runningFilter->m_Impl);
+        v8engine->TerminateFilter(v8filter, reason);
     }
 }
 
@@ -140,7 +145,7 @@ void mc_FilterEngine::SetRunningFilter(const mc_Filter *filter)
     {
         m_watchdog = new mc_FilterWatchdog();
     }
-    m_watchdog->FilterStarted(m_timeout);
+    m_watchdog->FilterStarted(filter->Timeout());
 }
 
 void mc_FilterEngine::ResetRunningFilter()
@@ -192,7 +197,7 @@ void mc_FilterWatchdog::FilterStarted(int timeout)
 
 void mc_FilterWatchdog::FilterEnded()
 {
-    LogPrint("v8filter", "v8filter: Watchdog::FilterEnded m_state=%s\n",  this->StateStr());
+    LogPrint("v8filter", "v8filter: Watchdog::FilterEnded m_state=%s\n", this->StateStr());
     if (m_state == State::RUNNING)
     {
         {
@@ -251,7 +256,7 @@ void mc_FilterWatchdog::watchdogTask()
             if (cvs == boost::cv_status::timeout)
             {
                 LogPrint("v8filter", (msg + "timeout -> terminating filter\n").c_str());
-                pFilterEngine->TerminateFilter();
+                pFilterEngine->TerminateFilter(tfm::format("Filter aborted due to timeout after %d ms", m_timeout));
             }
         }
     }

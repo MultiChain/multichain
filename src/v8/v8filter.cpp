@@ -2,18 +2,18 @@
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "v8filter.h"
-#include "v8utils.h"
+#include "v8engine.h"
 #include "v8isolatemanager.h"
+#include "v8utils.h"
 #include "callbacks.h"
-#include "utils/define.h"
-#include "utils/util.h"
-#include "utils/tinyformat.h"
 #include "chainparams/state.h"
+#include "utils/define.h"
+#include "utils/tinyformat.h"
+#include "utils/util.h"
 #include <cassert>
 
 namespace mc_v8
 {
-
 static std::string jsFixture = R"(
 Math.random = function() {
     return 0;
@@ -81,10 +81,11 @@ int V8Filter::Destroy()
     return MC_ERR_NOERROR;
 }
 
-int V8Filter::Initialize(std::string script, std::string functionName, std::vector<std::string>& callback_names,
-        std::string& strResult)
+int V8Filter::Initialize(V8Engine *engine, std::string script, std::string functionName,
+                         std::vector<std::string> &callback_names, std::string &strResult)
 {
     LogPrint("v8filter", "v8filter: V8Filter::Initialize\n");
+    m_engine = engine;
     strResult.clear();
     this->MaybeCreateIsolate();
     v8::Locker locker(m_isolate);
@@ -99,7 +100,7 @@ int V8Filter::Initialize(std::string script, std::string functionName, std::vect
             return MC_ERR_INTERNAL_ERROR;
         }
         global->Set(String2V8(m_isolate, functionName),
-                v8::FunctionTemplate::New(m_isolate, callbackLookup[functionName]));
+                    v8::FunctionTemplate::New(m_isolate, callbackLookup[functionName]));
     }
     auto context = v8::Context::New(m_isolate, nullptr, global);
     m_context.Reset(m_isolate, context);
@@ -132,7 +133,7 @@ void V8Filter::MaybeCreateIsolate()
     }
 }
 
-int V8Filter::Run(std::string& strResult, bool withCallbackLog)
+int V8Filter::Run(std::string &strResult, bool withCallbackLog)
 {
     LogPrint("v8filter", "v8filter: V8Filter::Run\n");
 
@@ -159,9 +160,8 @@ int V8Filter::Run(std::string& strResult, bool withCallbackLog)
     {
         assert(tryCatch.HasCaught());
         if (tryCatch.Exception()->IsNull() && tryCatch.Message().IsEmpty())
-//        if (m_isolate->IsExecutionTerminating())
         {
-            strResult = "Filter function aborted";
+            strResult = m_engine->TerminationReason();
         }
         else
         {
@@ -178,16 +178,16 @@ int V8Filter::Run(std::string& strResult, bool withCallbackLog)
     return MC_ERR_NOERROR;
 }
 
-int V8Filter::RunWithCallbackLog(std::string& strResult, json_spirit::Array& callbacks)
+int V8Filter::RunWithCallbackLog(std::string &strResult, json_spirit::Array &callbacks)
 {
     int retcode = this->Run(strResult, true);
-    IsolateData& isolateData = V8IsolateManager::Instance()->GetIsolateData(m_isolate);
+    IsolateData &isolateData = V8IsolateManager::Instance()->GetIsolateData(m_isolate);
     callbacks = isolateData.callbacks;
     return retcode;
 }
 
 int V8Filter::CompileAndLoadScript(std::string script, std::string functionName, std::string source,
-        std::string& strResult)
+                                   std::string &strResult)
 {
     LogPrint("v8filter", "v8filter: V8Filter::CompileAndLoadScript %s\n", source);
 
@@ -229,7 +229,7 @@ int V8Filter::CompileAndLoadScript(std::string script, std::string functionName,
     return MC_ERR_NOERROR;
 }
 
-void V8Filter::ReportException(v8::TryCatch* tryCatch, std::string& strResult)
+void V8Filter::ReportException(v8::TryCatch *tryCatch, std::string &strResult)
 {
     LogPrint("v8filter", "v8filter: V8Filter: ReportException\n");
 
@@ -252,16 +252,8 @@ void V8Filter::ReportException(v8::TryCatch* tryCatch, std::string& strResult)
         LogPrint("v8filter", "v8filter: %s:%d %s\n", filename, linenum, strResult);
         std::string sourceline = V82String(m_isolate, message->GetSourceLine(context).ToLocalChecked());
         LogPrint("v8filter", "v8filter: %s\n", sourceline);
-        LogPrint("v8filter", "v8filter: %s%s\n",
-                 std::string(static_cast<std::string::size_type>(start), ' '),
+        LogPrint("v8filter", "v8filter: %s%s\n", std::string(static_cast<std::string::size_type>(start), ' '),
                  std::string(static_cast<std::string::size_type>(end - start), '^'));
-//        v8::Local<v8::Value> stackTraceString;
-//        if (try_catch->StackTrace(context).ToLocal(&stackTraceString) && stackTraceString->IsString()
-//                && v8::Local<v8::String>::Cast(stackTraceString)->Length() > 0)
-//        {
-//            std::string stackTrace = V82String(m_isolate, stackTraceString);
-//            LogPrint("v8filter", "v8filter: %s\n", stackTrace);
-//        }
     }
 }
 

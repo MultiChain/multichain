@@ -9,7 +9,6 @@
 
 namespace mc_v8
 {
-
 class V8Filter;
 
 /**
@@ -17,7 +16,7 @@ class V8Filter;
  */
 class V8Engine
 {
-public:
+  public:
     V8Engine()
     {
         Zero();
@@ -37,7 +36,7 @@ public:
      * @param strResult Reason for failure if unsuccessful.
      * @return          MC_ERR_NOERROR if successful, MC_ERR_INTERNAL_ERROR if not.
      */
-    int Initialize(std::string& strResult);
+    int Initialize(std::string &strResult);
 
     /**
      * Create a new transaction filter.
@@ -50,8 +49,8 @@ public:
      * @param strResult      Reason for failure if unsuccessful.
      * @return               MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
      */
-    int CreateFilter(std::string script, std::string main_name, std::vector<std::string>& callback_names,
-            V8Filter* filter, std::string& strResult);
+    int CreateFilter(std::string script, std::string main_name, std::vector<std::string> &callback_names,
+                     V8Filter *filter, std::string &strResult);
 
     /**
      * Run the filter function in the JS script.
@@ -60,7 +59,7 @@ public:
      * @param strResult Reason for script failure or transaction rejection.
      * @return          MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
      */
-    int RunFilter(V8Filter* filter, std::string& strResult);
+    int RunFilter(V8Filter *filter, std::string &strResult);
 
     /**
      * Run the filter function in the JS script.
@@ -72,14 +71,23 @@ public:
      * @param callbacks An array of RPC callback call data.
      * @return          MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
      */
-    int RunFilterWithCallbackLog(V8Filter* filter, std::string& strResult, json_spirit::Array& callbacks);
+    int RunFilterWithCallbackLog(V8Filter *filter, std::string &strResult, json_spirit::Array &callbacks);
 
     /**
-     * @brief Abort the currently running filter (if any).
+     * Abort the currently running filter (if any).
      *
-     * @param filter  The filter to abort.
+     * @param filter    The filter to abort.
+     * @param reason    The reason the filter is being terminated.
      */
-    void TerminateFilter(V8Filter* filter);
+    void TerminateFilter(V8Filter *filter, std::string reason);
+
+    std::string TerminationReason() const
+    {
+        return m_reason;
+    }
+
+  private:
+    std::string m_reason;
 };
 
 } // namespace mc_v8

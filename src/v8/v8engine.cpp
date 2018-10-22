@@ -8,7 +8,6 @@
 
 namespace mc_v8
 {
-
 void V8Engine::Zero()
 {
 }
@@ -19,22 +18,22 @@ int V8Engine::Destroy()
     return MC_ERR_NOERROR;
 }
 
-int V8Engine::Initialize(std::string& strResult)
+int V8Engine::Initialize(std::string &strResult)
 {
     LogPrint("v8filter", "v8filter: V8Engine::Initialize\n");
     strResult.clear();
     return MC_ERR_NOERROR;
 }
 
-int V8Engine::CreateFilter(std::string script, std::string main_name, std::vector<std::string>& callback_names,
-        V8Filter* filter, std::string& strResult)
+int V8Engine::CreateFilter(std::string script, std::string main_name, std::vector<std::string> &callback_names,
+                           V8Filter *filter, std::string &strResult)
 {
     LogPrint("v8filter", "v8filter: V8Engine::CreateFilter\n");
     strResult.clear();
-    return filter->Initialize(script, main_name, callback_names, strResult);
+    return filter->Initialize(this, script, main_name, callback_names, strResult);
 }
 
-int V8Engine::RunFilter(V8Filter* filter, std::string& strResult)
+int V8Engine::RunFilter(V8Filter *filter, std::string &strResult)
 {
     strResult.clear();
     if (filter == nullptr)
@@ -45,7 +44,7 @@ int V8Engine::RunFilter(V8Filter* filter, std::string& strResult)
     return filter->Run(strResult);
 }
 
-int V8Engine::RunFilterWithCallbackLog(V8Filter* filter, std::string& strResult, json_spirit::Array& callbacks)
+int V8Engine::RunFilterWithCallbackLog(V8Filter *filter, std::string &strResult, json_spirit::Array &callbacks)
 {
     strResult.clear();
     if (filter == nullptr)
@@ -56,10 +55,11 @@ int V8Engine::RunFilterWithCallbackLog(V8Filter* filter, std::string& strResult,
     return filter->RunWithCallbackLog(strResult, callbacks);
 }
 
-void V8Engine::TerminateFilter(V8Filter *filter)
+void V8Engine::TerminateFilter(V8Filter *filter, std::string reason)
 {
     if (filter != nullptr && filter->IsRunning())
     {
+        m_reason = reason;
         filter->GetIsolate()->TerminateExecution();
     }
 }
