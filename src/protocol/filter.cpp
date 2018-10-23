@@ -238,12 +238,18 @@ std::string mc_FilterWatchdog::StateStr() const
 
 void mc_FilterWatchdog::watchdogTask()
 {
+    State known_state = State::IDLE;
+
     LogPrint("v8filter", "v8filter: Watchdog::watchdogTask\n");
     boost::unique_lock<boost::mutex> lock(m_mutex);
     while (true)
     {
         std::string msg = tfm::format("v8filter: Watchdog::watchdogTask %s - ", this->StateStr());
-        m_condVar.wait(lock);
+        while (known_state == m_state)
+        {
+            m_condVar.wait(lock);
+        }
+        known_state = m_state;
         if (m_state == State::POISON_PILL)
         {
             LogPrint("v8filter", (msg + "committing suicide\n").c_str());
@@ -257,6 +263,8 @@ void mc_FilterWatchdog::watchdogTask()
             {
                 LogPrint("v8filter", (msg + "timeout -> terminating filter\n").c_str());
                 pFilterEngine->TerminateFilter(tfm::format("Filter aborted due to timeout after %d ms", m_timeout));
+                // Wait for filter to actually end
+                m_condVar.wait(lock);
             }
         }
     }
