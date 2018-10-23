@@ -722,7 +722,7 @@ Value setfilterparam(const json_spirit::Array& params, bool fHelp)
     return "Set";
 }
 
-Value testfilter(const vector <uint160>& entities,const  char *filter_code, string txhex,int vout_in,uint32_t filter_type)
+Value testfilter(const vector <uint160>& entities,const  char *filter_code, Value txparam,int vout_in,uint32_t filter_type)
 {
     Object result;
     int err;
@@ -733,13 +733,38 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, stri
     bool relevant_filter=true;
     int64_t nStart;
     int vout=vout_in;
+    string txhex="";
     
     CTransaction tx;
 
+    uint256 hash=0;
+    if(txparam.type() != null_type)
+    {
+        if(txparam.type() != str_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx-hex, should be string");            
+        }
+        txhex=txparam.get_str();
+        if(txhex.size() == 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty tx-hex");                        
+        }
+        if(txhex.size() <= 64)
+        {
+            hash = ParseHashV(txparam, "tx-hex");            
+            uint256 hashBlock = 0;
+            if (!GetTransaction(hash, tx, hashBlock, true))
+                throw JSONRPCError(RPC_TX_NOT_FOUND, "No information available about transaction");
+        }
+    }
+    
     if(txhex.size())
     {
-        if (!DecodeHexTx(tx,txhex))
-            throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+        if(hash == 0)
+        {
+            if (!DecodeHexTx(tx,txhex))
+                throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+        }
     }
     
     mc_Filter *worker=new mc_Filter;
@@ -942,21 +967,22 @@ Value runtxfilter(const json_spirit::Array& params, bool fHelp)
         memcpy(filter_code,ptr,value_size);
         filter_code[value_size]=0x00;    
     }                                    
-    
+
+/*    
     if (params.size() > 1)    
     {
         if(params[1].type() != str_type)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx-hex, should be string");            
-        }
+        }        
         txhex=params[1].get_str();
         if(txhex.size() == 0)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty tx-hex");                        
         }
     }
-    
-    return testfilter(entities, (char *)filter_code, txhex, -1, MC_FLT_TYPE_TX);
+*/    
+    return testfilter(entities, (char *)filter_code, (params.size() > 1) ? params[1] : Value::null, -1, MC_FLT_TYPE_TX);
 }
 
 Value testtxfilter(const json_spirit::Array& params, bool fHelp)
@@ -985,7 +1011,7 @@ Value testtxfilter(const json_spirit::Array& params, bool fHelp)
     }
 
     js=ParseFilterDetails(params[1]);
-    
+/*    
     if (params.size() > 2)    
     {
         if(params[2].type() != str_type)
@@ -998,8 +1024,8 @@ Value testtxfilter(const json_spirit::Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty tx-hex");                        
         }
     }
-    
-    return testfilter(entities, js.c_str(), txhex, -1, MC_FLT_TYPE_TX);
+*/    
+    return testfilter(entities, js.c_str(), (params.size() > 2) ? params[2] : Value::null, -1, MC_FLT_TYPE_TX);
 }
 
 Value runstreamfilter(const json_spirit::Array& params, bool fHelp)
@@ -1042,28 +1068,30 @@ Value runstreamfilter(const json_spirit::Array& params, bool fHelp)
         filter_code[value_size]=0x00;    
     }                                    
     
-    if (params.size() > 1)    
+    if(params.size() > 2)
     {
+        if(params[2].type() != int_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid vout, should be integer");            
+        }
+        vout=params[2].get_int();
+    }
+/*    
+    if (params.size() > 1)    
+    {        
         if(params[1].type() != str_type)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx-hex, should be string");            
         }
-        if(params.size() > 2)
-        {
-            if(params[2].type() != int_type)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid vout, should be integer");            
-            }
-            vout=params[2].get_int();
-        }
+ 
         txhex=params[1].get_str();
         if(txhex.size() == 0)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty tx-hex");                        
         }
     }
-    
-    return testfilter(entities, (char *)filter_code, txhex, vout, MC_FLT_TYPE_STREAM);
+*/    
+    return testfilter(entities, (char *)filter_code, (params.size() > 1) ? params[1] : Value::null, vout, MC_FLT_TYPE_STREAM);
 }
 
 Value teststreamfilter(const json_spirit::Array& params, bool fHelp)
@@ -1094,19 +1122,21 @@ Value teststreamfilter(const json_spirit::Array& params, bool fHelp)
 
     js=ParseFilterDetails(params[1]);
     
+    if(params.size() > 3)
+    {
+        if(params[3].type() != int_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid vout, should be integer");            
+        }
+        vout=params[3].get_int();
+    }
+    
+/*    
     if (params.size() > 2)    
     {
         if(params[2].type() != str_type)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx-hex, should be string");            
-        }
-        if(params.size() > 3)
-        {
-            if(params[3].type() != int_type)
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid vout, should be integer");            
-            }
-            vout=params[3].get_int();
         }
         txhex=params[2].get_str();
         if(txhex.size() == 0)
@@ -1114,7 +1144,8 @@ Value teststreamfilter(const json_spirit::Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty tx-hex");                        
         }
     }
+*/
     
-    return testfilter(entities, js.c_str(), txhex, vout, MC_FLT_TYPE_STREAM);
+    return testfilter(entities, js.c_str(), (params.size() > 2) ? params[2] : Value::null, vout, MC_FLT_TYPE_STREAM);
 }
 

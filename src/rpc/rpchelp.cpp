@@ -4279,12 +4279,13 @@ void mc_InitRPCHelpMap18()
         ));
      
      mapHelpStrings.insert(std::make_pair("runtxfilter",
-            "runtxfilter \"filter-identifier\" ( \"tx-hex\" )\n"
+            "runtxfilter \"filter-identifier\" ( \"tx-hex\"|\"txid\" )\n"
             "\nCompile an existing filter and optionally test it on a transaction\n"
             "\nArguments:\n"
             "1. \"filter-identifier\"              (string, required) Filter identifier - one of: create txid, filter reference, filter name.\n"
             "2. \"tx-hex\"                         (string, optional) The transaction hex string to filter, otherwise filter compiled only\n"
-            "\nResult:\n"
+            " or\n"     
+            "2. \"txid\"                           (string, optional) The transaction id\n"
             "{\n"
             "  \"compiled\": true|false,           (boolean) Filter passed compilation\n"
             "  \"passed\": true|false,             (boolean) Transaction passed the filter\n"
@@ -4298,7 +4299,7 @@ void mc_InitRPCHelpMap18()
         ));
      
      mapHelpStrings.insert(std::make_pair("testtxfilter",
-            "testtxfilter restrictions \"javascript-code\" ( \"tx-hex\" )\n"
+            "testtxfilter restrictions \"javascript-code\" ( \"tx-hex\"|\"txid\" )\n"
             "\nCompile a test filter and optionally test it on a transaction\n"
             "\nArguments:\n"
             "1. restrictions                     (object, required)  a json object with filter restrictions\n"
@@ -4316,6 +4317,8 @@ void mc_InitRPCHelpMap18()
             "                                                                 return \"One output required\";\n"
             "                                                         }   \n "
             "3. \"tx-hex\"                         (string, optional) The transaction hex string to filter, otherwise filter compiled only\n"
+            " or\n"     
+            "3. \"txid\"                           (string, optional) The transaction id\n"
             "\nResult:\n"
             "{\n"
             "  \"compiled\": true|false,           (boolean) Filter passed compilation\n"
@@ -4438,11 +4441,13 @@ void mc_InitRPCHelpMap19()
         ));
       
      mapHelpStrings.insert(std::make_pair("runstreamfilter",
-            "runstreamfilter \"filter-identifier\" ( \"tx-hex\" vout )\n"
+            "runstreamfilter \"filter-identifier\" ( \"tx-hex\"|\"txid\" vout )\n"
             "\nCompile an existing filter and optionally test it on a transaction\n"
             "\nArguments:\n"
             "1. \"filter-identifier\"              (string, required) Filter identifier - one of: create txid, filter reference, filter name.\n"
             "2. \"tx-hex\"                         (string, optional) The transaction hex string to filter, otherwise filter compiled only\n"
+            " or\n"     
+            "2. \"txid\"                           (string, optional) The transaction id\n"
             "3. vout:n                           (numeric, optional) The output number, required if tx-hex is specified\n"
             "\nResult:\n"
             "{\n"
@@ -4458,7 +4463,7 @@ void mc_InitRPCHelpMap19()
         ));
      
      mapHelpStrings.insert(std::make_pair("teststreamfilter",
-            "teststreamfilter restrictions \"javascript-code\" ( \"tx-hex\" vout )\n"
+            "teststreamfilter restrictions \"javascript-code\" ( \"tx-hex\"|\"txid\" vout )\n"
             "\nCompile a test filter and optionally test it on a transaction\n"
             "\nArguments:\n"
             "1. restrictions                     (object, required)  a json object with filter restrictions\n"
@@ -4473,6 +4478,8 @@ void mc_InitRPCHelpMap19()
             "                                                                 return \"At least two keys required\";\n"
             "                                                         }   \n"
             "3. \"tx-hex\"                         (string, optional) The transaction hex string to filter, otherwise filter compiled only\n"
+            " or\n"     
+            "3. \"txid\"                           (string, optional) The transaction id\n"
             "4. vout:n                           (numeric, optional) The output number, required if tx-hex is specified\n"
             "\nResult:\n"
             "{\n"
