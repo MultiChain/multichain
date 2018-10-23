@@ -41,6 +41,7 @@ using namespace std;
 
 bool OutputCanSend(COutput out);
 uint32_t mc_CheckSigScriptForMutableTx(const unsigned char *src,int size);
+int mc_MaxOpReturnShown();
 
 /* MCHN END */
 
@@ -58,9 +59,40 @@ void ScriptPubKeyToJSON(const CScript& scriptPubKey, Object& out, bool fIncludeH
     if (fIncludeHex)
         out.push_back(Pair("hex", HexStr(scriptPubKey.begin(), scriptPubKey.end())));
  */ 
-    out.push_back(Pair("asm", scriptToShow.ToString()));
-    if (fIncludeHex)
-        out.push_back(Pair("hex", HexStr(scriptToShow.begin(), scriptToShow.end())));
+    
+    int max_hex_size=-1;
+    int script_size=(int)(scriptToShow.end()-scriptToShow.begin());
+    
+    if(mc_gState->m_Features->StreamFilters())
+    {
+        if(pMultiChainFilterEngine->m_TxID != 0)
+        {
+            max_hex_size=mc_MaxOpReturnShown();
+        }
+
+        if(max_hex_size >= 0)
+        {
+            if(script_size <= max_hex_size)
+            {
+                max_hex_size=-1;
+            }
+        }
+    }
+    
+    if(max_hex_size < 0)
+    {    
+        out.push_back(Pair("asm", scriptToShow.ToString()));
+        if (fIncludeHex)
+            out.push_back(Pair("hex", HexStr(scriptToShow.begin(), scriptToShow.end())));
+    }
+    else
+    {
+        Object script_size_object;
+        script_size_object.push_back(Pair("size", script_size));
+        out.push_back(Pair("asm", script_size_object));
+        if (fIncludeHex)
+            out.push_back(Pair("hex", script_size_object));        
+    }
 /* MCHN END */
 
 
