@@ -860,7 +860,8 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
         }
         else
         {
-            if( AvailableFromStatus(retrieve_status) && ((retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN ))
+//            if( AvailableFromStatus(retrieve_status) && ((retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN ))
+            if( AvailableFromStatus(retrieve_status) )
             {
                 mc_MultiChainFilter* lpFilter;
                 int applied=0;

@@ -392,7 +392,7 @@ int mc_MultiChainFilterEngine::RunTxFilters(const CTransaction& tx,std::set <uin
         *applied=0;
     }
     int failure=0;
-    LogPrintf("Starting filtering\n");
+    if(fDebug)LogPrint("filter","filter: Starting filtering for tx %s\n",tx.GetHash().ToString().c_str());
     for(int i=0;i<(int)m_Filters.size();i++)
     {
         if( (m_Filters[i].m_FilterType == MC_FLT_TYPE_TX) && (m_Filters[i].m_CreateError.size() == 0) )
@@ -434,7 +434,7 @@ int mc_MultiChainFilterEngine::RunTxFilters(const CTransaction& tx,std::set <uin
     }    
 
 exitlbl:
-    if(fDebug)LogPrint("filter","Applied filters: success - %d, failure - %d\n",*applied,failure);
+    if(fDebug)LogPrint("filter","filter: Applied filters: success - %d, failure - %d\n",*applied,failure);
             
     m_Params.Close();
     m_TxID=0;

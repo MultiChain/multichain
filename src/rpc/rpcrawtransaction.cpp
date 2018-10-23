@@ -512,8 +512,20 @@ int VerifyNewTxForStreamFilters(const CTransaction& tx,std::string &strResult,mc
         if(result.type() == obj_type)
         {
             uint256 hash=*(streams_already_seen.begin());
-            if(pMultiChainFilterEngine->RunStreamFilters(tx,i,(unsigned char*)&hash+MC_AST_SHORT_TXID_OFFSET,-1,0, 
-                    strResult,lppFilter,applied) != MC_ERR_NOERROR)
+            
+            if(pMultiChainFilterEngine)
+            {
+                pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetSendTimeout());
+            }
+            
+            int err=pMultiChainFilterEngine->RunStreamFilters(tx,i,(unsigned char*)&hash+MC_AST_SHORT_TXID_OFFSET,-1,0, 
+                    strResult,lppFilter,applied);
+            
+            if(pMultiChainFilterEngine)
+            {
+                pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetAcceptTimeout());
+            }
+            if(err != MC_ERR_NOERROR)
             {
                 if(fDebug)LogPrint("mchn","mchn: Stream items rejected (%s): %s\n","Error while running filters",EncodeHexTx(tx));
                 passed_filters=false;

@@ -388,7 +388,7 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
             if( nValue >= 0 )
             {
                 mapArgs ["-" + param_name]=strprintf("%d", nValue);                                
-                if(param_name == "filtertimeout")
+                if(param_name == "acceptfiltertimeout")
                 {
                     if(pMultiChainFilterEngine)
                     {
