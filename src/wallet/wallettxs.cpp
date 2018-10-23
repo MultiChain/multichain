@@ -2393,6 +2393,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                 chunk_hashes+=MC_CDB_CHUNK_HASH_SIZE;
                             }
                         }
+/*                        
                         else
                         {
                             mc_MultiChainFilter* lpFilter;
@@ -2428,6 +2429,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                 }
                             }                    
                         }
+*/                            
 //                        if(imp->m_TmpEntities->Seek(&entity) < 0)
                         if(passed_filters)
                         {
