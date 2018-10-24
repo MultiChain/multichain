@@ -5,7 +5,6 @@
 #define MULTICHAIN_FILTER_H
 
 #include "json/json_spirit.h"
-#include <boost/thread.hpp>
 
 class mc_FilterEngine;
 class mc_FilterWatchdog;
@@ -154,6 +153,8 @@ class mc_FilterWatchdog
     void Zero();
     int Destroy();
 
+    int Initialize();
+
     /**
      * @brief Notfies the watchdog that a filter started runnug, with a given timeout.
      * @param timeout   The number of millisecond to allow the filtr to run.
@@ -171,21 +172,7 @@ class mc_FilterWatchdog
     void Shutdown();
 
   private:
-    enum State
-    {
-        IDLE,
-        RUNNING,
-        POISON_PILL
-    };
-
-    boost::thread *m_thread;
-    boost::condition_variable m_condVar;
-    boost::mutex m_mutex;
-    int m_timeout;
-    State m_state;
-
-    std::string StateStr() const;
-    void watchdogTask();
+    void *m_Impl;
 };
 
 #endif /* MULTICHAIN_FILTER_H */

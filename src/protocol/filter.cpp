@@ -2,11 +2,11 @@
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "filter.h"
-#include "core/init.h"
 #include "utils/define.h"
 #include "utils/util.h"
 #include "v8/v8engine.h"
 #include "v8/v8filter.h"
+#include "v8/v8filterwatchdog.h"
 
 namespace mc_v8
 {
@@ -144,6 +144,7 @@ void mc_FilterEngine::SetRunningFilter(const mc_Filter *filter)
     if (m_watchdog == nullptr)
     {
         m_watchdog = new mc_FilterWatchdog();
+        m_watchdog->Initialize();
     }
     m_watchdog->FilterStarted(filter->Timeout());
 }
@@ -157,115 +158,41 @@ void mc_FilterEngine::ResetRunningFilter()
 
 void mc_FilterWatchdog::Zero()
 {
-    m_thread = nullptr;
-    m_timeout = 0;
-    m_state = mc_FilterWatchdog::State::IDLE;
+    m_Impl = nullptr;
 }
 
 int mc_FilterWatchdog::Destroy()
 {
-    if (m_thread != nullptr)
+    if (m_Impl != nullptr)
     {
-        m_thread->interrupt();
-        m_thread->join();
-        delete m_thread;
+        auto v8watchdog = static_cast<mc_v8::V8FilterWatchdog *>(m_Impl);
+        delete v8watchdog;
     }
     this->Zero();
     return MC_ERR_NOERROR;
 }
 
+int mc_FilterWatchdog::Initialize()
+{
+    auto v8watchdog = new mc_v8::V8FilterWatchdog();
+    m_Impl = v8watchdog;
+    return MC_ERR_NOERROR;
+}
+
 void mc_FilterWatchdog::FilterStarted(int timeout)
 {
-    LogPrint("v8filter", "v8filter: Watchdog::FilterStarted(timeout=%d) m_state=%s\n", timeout, this->StateStr());
-    if (m_state == State::IDLE)
-    {
-        if (m_thread == nullptr)
-        {
-            LogPrint("v8filter", "v8filter: Watchdog::FilterStarted create thread with watchdogTask\n");
-            m_thread = new boost::thread(boost::bind(&mc_FilterWatchdog::watchdogTask, this));
-            boost::this_thread::sleep_for(boost::chrono::microseconds(100));
-        }
-        {
-            boost::lock_guard<boost::mutex> lock(m_mutex);
-            m_timeout = timeout;
-            m_state = State::RUNNING;
-        }
-        LogPrint("v8filter", "v8filter: Watchdog::FilterStarted notify m_state=%s\n", this->StateStr());
-        m_condVar.notify_one();
-    }
+    auto v8watchdog = static_cast<mc_v8::V8FilterWatchdog *>(m_Impl);
+    v8watchdog->FilterStarted(timeout);
 }
 
 void mc_FilterWatchdog::FilterEnded()
 {
-    LogPrint("v8filter", "v8filter: Watchdog::FilterEnded m_state=%s\n", this->StateStr());
-    if (m_state == State::RUNNING)
-    {
-        {
-            boost::lock_guard<boost::mutex> lock(m_mutex);
-            m_state = State::IDLE;
-        }
-        LogPrint("v8filter", "v8filter: Watchdog::FilterEnded notify m_state=%s\n", this->StateStr());
-        m_condVar.notify_one();
-    }
+    auto v8watchdog = static_cast<mc_v8::V8FilterWatchdog *>(m_Impl);
+    v8watchdog->FilterEnded();
 }
 
 void mc_FilterWatchdog::Shutdown()
 {
-    LogPrint("v8filter", "v8filter: Watchdog::Shutdown\n");
-    {
-        boost::lock_guard<boost::mutex> lock(m_mutex);
-        m_state = State::POISON_PILL;
-    }
-    LogPrint("v8filter", "v8filter: Watchdog::Shutdown notify m_state=%s\n", this->StateStr());
-    m_condVar.notify_one();
-    boost::this_thread::sleep_for(boost::chrono::microseconds(100));
-    this->Destroy();
-}
-
-std::string mc_FilterWatchdog::StateStr() const
-{
-    switch (m_state)
-    {
-    case State::IDLE:
-        return "IDLE";
-    case State::RUNNING:
-        return "RUNNING";
-    case State::POISON_PILL:
-        return "POISON_PILL";
-    }
-    return tfm::format("UNKNOWN (%d)", m_state);
-}
-
-void mc_FilterWatchdog::watchdogTask()
-{
-    State known_state = State::IDLE;
-
-    LogPrint("v8filter", "v8filter: Watchdog::watchdogTask\n");
-    boost::unique_lock<boost::mutex> lock(m_mutex);
-    while (true)
-    {
-        std::string msg = tfm::format("v8filter: Watchdog::watchdogTask %s - ", this->StateStr());
-        while (known_state == m_state)
-        {
-            m_condVar.wait(lock);
-        }
-        known_state = m_state;
-        if (m_state == State::POISON_PILL)
-        {
-            LogPrint("v8filter", (msg + "committing suicide\n").c_str());
-            return;
-        }
-        else if (m_state == State::RUNNING && m_timeout > 0)
-        {
-            LogPrint("v8filter", (msg + "entering timed wait\n").c_str());
-            boost::cv_status cvs = m_condVar.wait_for(lock, boost::chrono::milliseconds(m_timeout));
-            if (cvs == boost::cv_status::timeout)
-            {
-                LogPrint("v8filter", (msg + "timeout -> terminating filter\n").c_str());
-                pFilterEngine->TerminateFilter(tfm::format("Filter aborted due to timeout after %d ms", m_timeout));
-                // Wait for filter to actually end
-                m_condVar.wait(lock);
-            }
-        }
-    }
+    auto v8watchdog = static_cast<mc_v8::V8FilterWatchdog *>(m_Impl);
+    v8watchdog->Shutdown();
 }

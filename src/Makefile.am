@@ -174,6 +174,7 @@ V8_SOURCES = \
   v8/v8isolatemanager.cpp \
   v8/v8engine.cpp \
   v8/v8filter.cpp \
+  v8/v8filterwatchdog.cpp \
   v8/callbacks.cpp \
   v8/v8utils.cpp
 
