@@ -40,6 +40,7 @@
 #define MC_TET_DB_STAT                          0x01000000
 #define MC_TET_IMPORT                           0x02000000
 #define MC_TET_DELETED                          0x04000000
+#define MC_TET_GETDB_ADD_TX                     0x10000000   
 #define MC_TET_SPECIALMASK                      0xFF000000
 
 #define MC_EFL_NOT_IN_SYNC                      0x01000000
@@ -314,6 +315,11 @@ typedef struct mc_TxDB
     int GetTx(                                                                  // Returns tx definition if found, error if not found
               mc_TxDefRow *txdef,                                               // Output. Tx def
               const unsigned char *hash);                                       // Input. Tx hash
+    
+    int GetTx(                                                                  // Returns tx definition if found, error if not found
+              mc_TxDefRow *txdef,                                               // Output. Tx def
+              const unsigned char *hash,                                        // Input. Tx hash
+              int skip_db);                                       
     
     int GetList(
                 mc_TxImport *import,                                            // Import object, if NULL - chain
