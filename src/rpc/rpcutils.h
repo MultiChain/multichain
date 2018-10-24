@@ -148,6 +148,7 @@ void mc_RemoveBinaryCacheFile(string id);
 bool AvailableFromStatus(uint32_t status);
 string OffChainError(uint32_t status,int *errorCode); 
 bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,string *strError);
+void CheckWalletError(int err);
 
 
 #endif	/* RPCMULTICHAINUTILS_H */

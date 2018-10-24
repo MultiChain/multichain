@@ -162,6 +162,23 @@ Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total)
     return value;
 }
 
+void CheckWalletError(int err)
+{
+    if(err)
+    {
+        switch(err)
+        {
+            case MC_ERR_NOT_SUPPORTED:
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is not supported in this build");                                        
+                break;
+            case MC_ERR_INTERNAL_ERROR:
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Internal wallet error");                                        
+                break;
+            default:
+                break;
+        }
+    }
+}
 
 int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset_ref,char *name,int *multiple,int *type,int entity_type)
 {
