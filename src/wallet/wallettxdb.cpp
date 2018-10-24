@@ -17,6 +17,11 @@ void sprintf_hex(char *hex,const unsigned char *bin,int size)
     hex[64]=0;      
 }
 
+int IsCSkipped(int type)
+{
+    return 0;
+}
+
 
 void mc_TxEntity::Zero()
 {
@@ -881,6 +886,11 @@ int mc_TxDB::DecrementSubKey(
     
     err=MC_ERR_NOERROR;
     
+    if(IsCSkipped(entity->m_EntityType))
+    {
+        return err;
+    }
+    
     imp=m_Imports;
     mempool=m_MemPools[0];
     if(import)                                                                  // Find import
@@ -965,6 +975,11 @@ int mc_TxDB::IncrementSubKey(
     unsigned char *ptr;
     
     err=MC_ERR_NOERROR;
+    
+    if(IsCSkipped(entity->m_EntityType))
+    {
+        return err;
+    }
     
     imp=m_Imports;
     mempool=m_MemPools[0];
@@ -1133,7 +1148,7 @@ int mc_TxDB::AddTx(mc_TxImport *import,
 
     newtx=0;
     ondisk=0;
-    err=GetTx(&txdef,hash);
+    err=GetTx(&txdef,hash,IsCSkipped(MC_TET_GETDB_ADD_TX));
     if(err == MC_ERR_NOT_FOUND)                                                 // Tx is not found, neither on disk, nor in the mempool    
     {
         err=MC_ERR_NOERROR;
@@ -1232,6 +1247,11 @@ int mc_TxDB::AddTx(mc_TxImport *import,
                 imp->AddEntity((mc_TxEntity*)entities->GetRow(i));              // New entities added to chain import
                 isrelevant=1;
             }
+        }
+        
+        if(IsCSkipped(((mc_TxEntity*)entities->GetRow(i))->m_EntityType))
+        {
+            isrelevant=0;
         }
         
         if(isrelevant)
@@ -1427,6 +1447,13 @@ int mc_TxDB::SaveTxFlag(const unsigned char *hash,uint32_t flag,int set_flag)
 int mc_TxDB::GetTx(mc_TxDefRow *txdef,
               const unsigned char *hash)
 {
+    return GetTx(txdef,hash,0);
+}
+
+int mc_TxDB::GetTx(mc_TxDefRow *txdef,
+              const unsigned char *hash,
+              int skip_db)
+{
     int err,value_len,mprow; 
     unsigned char *ptr;
 
@@ -1454,6 +1481,11 @@ int mc_TxDB::GetTx(mc_TxDefRow *txdef,
             txdef->m_Block=-1;
         }
         return MC_ERR_NOERROR;
+    }
+    
+    if(skip_db)
+    {
+        return MC_ERR_NOT_FOUND;
     }
     
     memcpy(txdef->m_TxId,hash, MC_TDB_TXID_SIZE);
@@ -2000,6 +2032,11 @@ int mc_TxDB::GetList(
     
     txs->Clear();
     
+    if(IsCSkipped(entity->m_EntityType))
+    {
+        return MC_ERR_NOT_SUPPORTED;
+    }
+    
     int row;
     mc_TxEntityStat *stat;
     
@@ -2120,6 +2157,11 @@ int mc_TxDB::GetList(
     char msg[256];
     
     txs->Clear();
+    
+    if(IsCSkipped(entity->m_EntityType))
+    {
+        return MC_ERR_NOT_SUPPORTED;
+    }
     
     mempool=m_MemPools[import-m_Imports];
     
