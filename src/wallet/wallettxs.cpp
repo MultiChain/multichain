@@ -2025,11 +2025,19 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     
     fFound=false;
     txdef.Zero();
+    
+    m_Database->SetTxCache((unsigned char*)&hash);
+    if(m_Database->m_TxCachedFlags == MC_TCF_FOUND)
+    {
+        fFound=true;
+        memcpy(&txdef,&(m_Database->m_TxCachedDef),sizeof(mc_TxDefRow));
+    }
+/*    
     if(m_Database->GetTx(&txdef,(unsigned char*)&hash) == MC_ERR_NOERROR)
     {
         fFound=true;        
     }
-    
+*/    
     if(!fFound)
     {
         for(i=0;i<(int)tx.vout.size();i++)                                      // Checking that tx has long OP_RETURN
