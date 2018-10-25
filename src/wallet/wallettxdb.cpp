@@ -1085,6 +1085,29 @@ exitlbl:
     return err;
 }
 
+int mc_TxDB::SetTxCache(                                                             // Returns tx definition if found, error if not found
+              const unsigned char *hash)
+{
+    m_TxCachedDef.Zero();
+    m_TxCachedFlags=MC_TCF_ERROR;
+    
+    int err=GetTx(&m_TxCachedDef,hash,IsCSkipped(MC_TET_GETDB_ADD_TX));    
+    if(err == MC_ERR_NOERROR)
+    {
+        m_TxCachedFlags=MC_TCF_FOUND;   
+    }
+    else
+    {
+        if (err == MC_ERR_NOT_FOUND)
+        {
+            m_TxCachedFlags=MC_TCF_NOT_FOUND;
+        }
+    }
+    
+    return MC_ERR_NOERROR;
+}
+
+
 /*
  * Adds tx to specific import
  */
@@ -1161,7 +1184,20 @@ int mc_TxDB::AddTx(mc_TxImport *import,
 
     newtx=0;
     ondisk=0;
-    err=GetTx(&txdef,hash,IsCSkipped(MC_TET_GETDB_ADD_TX));
+//    err=GetTx(&txdef,hash,IsCSkipped(MC_TET_GETDB_ADD_TX));
+    if(m_TxCachedFlags & MC_TCF_FOUND)
+    {
+        memcpy(&txdef,&(m_TxCachedDef),sizeof(mc_TxDefRow));
+    }
+    if(m_TxCachedFlags & MC_TCF_NOT_FOUND)
+    {
+        err=MC_ERR_NOT_FOUND;
+    }
+    if(m_TxCachedFlags & MC_TCF_ERROR)
+    {
+        err=MC_ERR_INTERNAL_ERROR;
+    }
+    
     if(err == MC_ERR_NOT_FOUND)                                                 // Tx is not found, neither on disk, nor in the mempool    
     {
         err=MC_ERR_NOERROR;
