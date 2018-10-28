@@ -3634,6 +3634,7 @@ void mc_InitRPCHelpMap15()
             "                                                       sendskipstreamfilters\n"
             "                                                       acceptfiltertimeout\n"
             "                                                       sendfiltertimeout\n"
+            "                                                       lockinlinemetadata\n"
             "2. parameter-value                  (required) parameter value\n"
             "\nResult:\n"
             "\nExamples:\n"

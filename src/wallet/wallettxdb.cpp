@@ -8,6 +8,28 @@
 
 int IsCSkipped(int type)
 {
+    switch(type)
+    {
+        case MC_TET_WALLET_ALL | MC_TET_TIMERECEIVED:
+        case MC_TET_WALLET_SPENDABLE | MC_TET_CHAINPOS:
+        case MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS:
+        case MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS:
+        case MC_TET_WALLET_SPENDABLE | MC_TET_TIMERECEIVED:
+        case MC_TET_PUBKEY_ADDRESS | MC_TET_TIMERECEIVED:
+        case MC_TET_SCRIPT_ADDRESS | MC_TET_TIMERECEIVED:
+        case MC_TET_STREAM | MC_TET_TIMERECEIVED:
+        case MC_TET_STREAM_KEY | MC_TET_TIMERECEIVED:
+        case MC_TET_STREAM | MC_TET_CHAINPOS:
+        case MC_TET_STREAM_KEY | MC_TET_CHAINPOS:
+        case MC_TET_STREAM_PUBLISHER | MC_TET_TIMERECEIVED:
+        case MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS:
+        case MC_TET_ASSET | MC_TET_TIMERECEIVED:
+        case MC_TET_SUBKEY_STREAM_KEY | MC_TET_TIMERECEIVED:
+        case MC_TET_SUBKEY_STREAM_PUBLISHER | MC_TET_TIMERECEIVED:
+        case MC_TET_SUBKEY_STREAM_PUBLISHER | MC_TET_CHAINPOS:
+        case MC_TET_GETDB_ADD_TX:
+            return 1;
+    }
     return 0;
 }
 
@@ -1067,15 +1089,18 @@ int mc_TxDB::IncrementSubKey(
         
         if(last_pos == 0)
         {
-            erow.Zero();
-            memcpy(&erow.m_Entity,&stat->m_Entity,sizeof(mc_TxEntity));
-            erow.m_Generation=stat->m_Generation;
-            memcpy(erow.m_TxId,subkey_hash,MC_TDB_ENTITY_ID_SIZE);
-            erow.m_Block=block;
-            erow.m_Flags=flags;
-            stat->m_LastPos+=1;
-            erow.m_TempPos=stat->m_LastPos;                                     // Will be copied to m_LastPos on commit. m_LastPos=0 to allow Seek() above
-            mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);            
+            if(IsCSkipped(stat->m_Entity.m_EntityType) == 0)
+            {
+                erow.Zero();
+                memcpy(&erow.m_Entity,&stat->m_Entity,sizeof(mc_TxEntity));
+                erow.m_Generation=stat->m_Generation;
+                memcpy(erow.m_TxId,subkey_hash,MC_TDB_ENTITY_ID_SIZE);
+                erow.m_Block=block;
+                erow.m_Flags=flags;
+                stat->m_LastPos+=1;
+                erow.m_TempPos=stat->m_LastPos;                                     // Will be copied to m_LastPos on commit. m_LastPos=0 to allow Seek() above
+                mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);            
+            }
         }
     }
 

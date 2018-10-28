@@ -518,6 +518,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -sendskipstreamfilters=<n>               " + _("Skip checking stream filters when publishing, default 0") + "\n";
     strUsage += "  -acceptfiltertimeout=<n>                 " + strprintf(_("Timeout, after which filter execution will be aborted, when accepting new txs, in milliseconds, default %u"),DEFAULT_ACCEPT_FILTER_TIMEOUT) + "\n";
     strUsage += "  -sendfiltertimeout=<n>                   " + strprintf(_("Timeout, after which filter execution will be aborted, when tx is sent from this node, in milliseconds, default %u"),DEFAULT_SEND_FILTER_TIMEOUT) + "\n";
+    strUsage += "  -lockinlinemetadata=<n>                  " + _("Outputs with inline metadata can be sent only using create/appendrawtransaction, default 1") + "\n";
 
     strUsage += "\n" + _("MultiChain API response parameters") + "\n";        
     strUsage += "  -hideknownopdrops=<n>  " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON-RPC calls (default: %u)"), 0) + "\n";

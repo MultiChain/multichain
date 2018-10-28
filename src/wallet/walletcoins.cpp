@@ -766,6 +766,7 @@ bool FindRelevantCoins(CWallet *lpWallet,                                       
                        mc_Buffer *out_amounts,                                  // IN  assets amounts to be found
                        int expected_required,                                   // IN  expected permissions
                        bool *no_send_coins,                                     // OUT flag, there are relevant coins without send permission
+                       bool *inline_coins,                                      // OUT flag, there are relevant coins without send permission
                        mc_Buffer *in_amounts,                                   // OUT Buffer to fill, rows - assets, columns - coins
                        mc_Buffer *in_map,                                       // OUT txid/vout->coin id map (used in coin selection)
                        mc_Buffer *tmp_amounts,                                  // TMP temporary asset-quantity buffer
@@ -778,6 +779,9 @@ bool FindRelevantCoins(CWallet *lpWallet,                                       
     int coin_id=0;
     int group_id;
     int64_t pure_native;
+    
+    bool check_for_inline_coins=GetBoolArg("-lockinlinemetadata",true);
+    bool txout_with_inline_data;
     
     if(debug_print)printf("debg: Inputs - normal\n");
     BOOST_FOREACH(const COutput& out, vCoins)
@@ -860,17 +864,30 @@ bool FindRelevantCoins(CWallet *lpWallet,                                       
                     }
                 }
                     
-                if(allowed & MC_PTP_SEND)
-                {                    
-                    if(!InsertCoinIntoMatrix(coin_id,hash,out_i,tmp_amounts,out_amounts,in_amounts,in_map,in_row,in_size,in_special_row,pure_native))
+                txout_with_inline_data=false;
+                if(check_for_inline_coins)
+                {
+                    txout_with_inline_data=HasPerOutputDataEntries(txout,lpScript);
+                }
+                
+                if(!txout_with_inline_data)
+                {
+                    if(allowed & MC_PTP_SEND)
+                    {                    
+                        if(!InsertCoinIntoMatrix(coin_id,hash,out_i,tmp_amounts,out_amounts,in_amounts,in_map,in_row,in_size,in_special_row,pure_native))
+                        {
+                            strFailReason=_("Internal error: Cannot update input amount matrix");
+                            return false;
+                        }
+                    }
+                    else
                     {
-                        strFailReason=_("Internal error: Cannot update input amount matrix");
-                        return false;
+                        *no_send_coins=true;
                     }
                 }
                 else
                 {
-                    *no_send_coins=true;
+                    *inline_coins=true;
                 }
             }
         }
@@ -922,6 +939,8 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
     CAmount total_native;
     int total_native_hit;
     vector <pair<int,int> > active_groups;                                      // Groups found in UTXOs
+    bool check_for_inline_coins=GetBoolArg("-lockinlinemetadata",true);
+    bool txout_with_inline_data;
     
     group_count=lpWallet->lpAssetGroups->GroupCount();
     pure_native_count=0;
@@ -948,7 +967,12 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
             if(custom_good_for_coin_selection(txout.scriptPubKey) && 
                     ParseMultichainTxOutToBuffer(hash,txout,tmp_amounts,lpScript,&allowed,&required,strError))
             {
-                if( (required & MC_PTP_ISSUE) == 0 )                            // Ignore txouts containing unconfirmed geneses
+                txout_with_inline_data=false;
+                if(check_for_inline_coins)
+                {
+                    txout_with_inline_data=HasPerOutputDataEntries(txout,lpScript);
+                }
+                if( !txout_with_inline_data && ((required & MC_PTP_ISSUE) == 0) )                            // Ignore txouts containing unconfirmed geneses
                 {
                     group_id=lpWallet->lpAssetGroups->GetGroup(tmp_amounts,1);      // Find group id, insert new assets if needed
                     if(debug_print)printf("%s-%d: group %d\n",hash.ToString().c_str(),out.i,group_id);
@@ -2116,6 +2140,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
     uint256 hash;
     int32_t type;
     bool no_send_coins;
+    bool inline_coins;
     vector<COutput> vCoins;
     CTxDestination change_address;
     CAmount min_output;
@@ -2342,10 +2367,11 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
             last_time=this_time;
     
             no_send_coins=false;
+            inline_coins=false;
             if(vecSend.size())                                                  // Normal transaction
             {
                                                                                 // Find coins for relevant assets
-                if(!FindRelevantCoins(lpWallet,vCoins,out_amounts,required,&no_send_coins,in_amounts,in_map,tmp_amounts,in_row,in_size,lpScript,in_special_row,&mapSpecialEntity,strFailReason))
+                if(!FindRelevantCoins(lpWallet,vCoins,out_amounts,required,&no_send_coins,&inline_coins,in_amounts,in_map,tmp_amounts,in_row,in_size,lpScript,in_special_row,&mapSpecialEntity,strFailReason))
                 {
                     goto exitlbl;
                 }
@@ -2375,7 +2401,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                         {
                             if(!SelectAssetCoins(lpWallet,nTotalOutValue,vCoins,in_map,in_amounts,in_special_row,in_asset_row,coinControl))
                             {
-                                strFailReason = _("Insufficient funds");
+                                strFailReason = _("Insufficient funds.");
                                 if(eErrorCode)*eErrorCode=RPC_WALLET_INSUFFICIENT_FUNDS;
                                 if(mc_GetABRefType(out_amounts->GetRow(asset)) == MC_AST_ASSET_REF_TYPE_SPECIAL)
                                 {
@@ -2383,27 +2409,27 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                                     {
                                         case MC_PTP_ISSUE | MC_PTP_SEND:
                                             if(eErrorCode)*eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
-                                            strFailReason = _("No unspent output with issue permission");                                         
+                                            strFailReason = _("No unspent output with issue permission.");                                         
                                             break;
                                         case MC_PTP_CREATE | MC_PTP_SEND:
                                             if(eErrorCode)*eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
-                                            strFailReason = _("No unspent output with create permission");                                         
+                                            strFailReason = _("No unspent output with create permission.");                                         
                                             break;
                                         case MC_PTP_ACTIVATE | MC_PTP_SEND:
                                             if(eErrorCode)*eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
-                                            strFailReason = _("No unspent output with activate or admin permission");                                         
+                                            strFailReason = _("No unspent output with activate or admin permission.");                                         
                                             break;
                                         case MC_PTP_ADMIN | MC_PTP_SEND:
                                             if(eErrorCode)*eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
-                                            strFailReason = _("No unspent output with admin permission");                                         
+                                            strFailReason = _("No unspent output with admin permission.");                                         
                                             break;
                                         case MC_PTP_WRITE | MC_PTP_SEND:
                                             if(eErrorCode)*eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
-                                            strFailReason = _("No unspent output with write permission");                                         
+                                            strFailReason = _("No unspent output with write permission.");                                         
                                             break;
                                         case MC_PTP_SEND:
                                             if(nTotalOutValue > 0)
-                                            {
+                                            {                                                
                                                 if(no_send_coins)
                                                 {
                                                     if(eErrorCode)*eErrorCode=RPC_INSUFFICIENT_PERMISSIONS;
@@ -2451,6 +2477,10 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                                     }                                    
                                 }
                                 
+                                if(inline_coins)
+                                {
+                                    strFailReason += " There are outputs with inline metadata (lockinlinemetadata runtime parameter).";
+                                }                                
                                 goto exitlbl;                            
                             }                             
                         }                                                        
