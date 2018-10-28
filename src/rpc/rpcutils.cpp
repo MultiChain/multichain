@@ -782,7 +782,7 @@ Object FilterEntry(const unsigned char *txid,uint32_t output_level,uint32_t filt
     return entry;    
 }
 
-Object StreamEntry(const unsigned char *txid,uint32_t output_level)
+Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDetails *raw_entity)
 {
 // output_level constants
 // 0x0001 type
@@ -806,9 +806,14 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
         return entry;
     }
     
+    
     uint256 hash=*(uint256*)txid;
-    if(mc_gState->m_Assets->FindEntityByTxID(&entity,txid))
+    if( (raw_entity != NULL ) || (mc_gState->m_Assets->FindEntityByTxID(&entity,txid) != 0) )
     {        
+        if(raw_entity)
+        {
+            memcpy(&entity,raw_entity,sizeof(mc_EntityDetails));
+        }
         ptr=(unsigned char *)entity.GetName();
         
         if(output_level & 0x001)
@@ -1018,6 +1023,11 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level)
     }
     
     return entry;
+}
+
+Object StreamEntry(const unsigned char *txid,uint32_t output_level)
+{
+    return StreamEntry(txid,output_level,NULL);
 }
 
 map<string, Value> ParamsToUpgrade(mc_EntityDetails *entity,int version)   

@@ -503,7 +503,27 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     if(new_entity_type == MC_ENT_TYPE_STREAM)
     {
         uint256 txid=tx.GetHash();
-        entry.push_back(Pair("create", StreamEntry((unsigned char*)&txid,0x05)));
+        
+        mc_EntityDetails entity;
+        mc_EntityDetails *lpEntity=NULL;
+        entity.Zero();
+        if(mc_gState->m_Assets->FindEntityByTxID(&entity,(unsigned char*)&txid) == 0)
+        {
+            mc_EntityLedgerRow entity_row;
+            entity_row.Zero();
+            memcpy(entity_row.m_Key,&txid,MC_ENT_KEY_SIZE);
+            entity_row.m_EntityType=MC_ENT_TYPE_STREAM;
+            entity_row.m_Block=mc_gState->m_Assets->m_Block;
+            entity_row.m_Offset=-1;
+            entity_row.m_ScriptSize=details_script_size;
+            if(details_script_size)
+            {
+                memcpy(entity_row.m_Script,details_script,details_script_size);
+            }
+            entity.Set(&entity_row);
+            lpEntity=&entity;
+        }
+        entry.push_back(Pair("create", StreamEntry((unsigned char*)&txid,0x05,lpEntity)));
     }
     
     if(mc_gState->m_Compatibility & MC_VCM_1_0)
