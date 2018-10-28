@@ -2122,7 +2122,10 @@ Value sendrawtransaction(const Array& params, bool fHelp)
     
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-flushsourcechunks",true) ? (MC_CDB_FLUSH_MODE_FILE | MC_CDB_FLUSH_MODE_DATASYNC) : MC_CDB_FLUSH_MODE_NONE);
+        if(pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-flushsourcechunks",true) ? (MC_CDB_FLUSH_MODE_FILE | MC_CDB_FLUSH_MODE_DATASYNC) : MC_CDB_FLUSH_MODE_NONE))
+        {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't store offchain items, probably chunk database is corrupted");                                        
+        }
     }
     
     if (!fHaveMempool && !fHaveChain) {
