@@ -853,10 +853,9 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
         if(retrieve_status & MC_OST_ERROR_MASK)
         {
             entry.push_back(Pair("available", AvailableFromStatus(retrieve_status)));        
-            string error_str;
             int errorCode;
-            error_str=OffChainError(retrieve_status,&errorCode);
-            entry.push_back(Pair("error", error_str));        
+            full_error=OffChainError(retrieve_status,&errorCode);
+            entry.push_back(Pair("error", full_error));        
         }
         else
         {
@@ -917,7 +916,14 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
         }
     }
     
-    entry.push_back(Pair("data", format_item_value));        
+    if(full_error.size())
+    {    
+        entry.push_back(Pair("data", Value::null));        
+    }
+    else
+    {    
+        entry.push_back(Pair("data", format_item_value));        
+    }
     
     if(verbose)
     {
