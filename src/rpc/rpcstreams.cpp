@@ -1484,6 +1484,7 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     Object obj;
     int i,n,c,m,err,pcount;
     bool available;
+    bool first_item=true;
     err=MC_ERR_NOERROR;
     n=pwalletTxsMain->GetListSize(&entity,entStat.m_Generation,NULL);
     i=0;
@@ -1583,13 +1584,17 @@ Value getstreamsummary(const Array& params, bool fPublisher)
             {
                 if(available)
                 {
-                    if(i == 0)
+                    if(a.value_.type() != null_type)                            // Returned in case of error
                     {
-                        result=a.value_;
-                    }
-                    else
-                    {
-                        result=mc_MergeValues(&result,&(a.value_),mode,0,&err);
+                        if(first_item)
+                        {
+                            result=a.value_;
+                            first_item=false;
+                        }
+                        else
+                        {
+                            result=mc_MergeValues(&result,&(a.value_),mode,0,&err);
+                        }
                     }
                 }
                 else
