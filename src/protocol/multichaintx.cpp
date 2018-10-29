@@ -1186,6 +1186,13 @@ bool MultiChainTransaction_ProcessPermissions(const CTransaction& tx,
                         {
                             details->emergency_disapproval_output=-2;
                         }
+                        if(mc_gState->m_Features->FixedIn20005())               // Not standard disapproval
+                        {
+                            if( (to != 0) || (from != 0) )
+                            {
+                                details->emergency_disapproval_output=-2;                            
+                            }
+                        }
                     }
                     
                     for (unsigned int i = 0; i < tx.vin.size(); i++)
@@ -2166,10 +2173,21 @@ bool MultiChainTransaction_VerifyNotFilteredRestrictions(const CTransaction& tx,
             
     for (unsigned int vout = 0; vout < tx.vout.size(); vout++)
     {
-        if(details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_NOT_OP_RETURN)
+        if(mc_gState->m_Features->FixedIn20005())
         {
-            details->emergency_disapproval_output=-2;
-            return true;            
+            if( (details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_NOT_OP_RETURN) == 0)
+            {
+                details->emergency_disapproval_output=-2;
+                return true;            
+            }            
+        }
+        else
+        {
+            if(details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_NOT_OP_RETURN)
+            {
+                details->emergency_disapproval_output=-2;
+                return true;            
+            }
         }
         
         MultiChainTransaction_SetTmpOutputScript(tx.vout[vout].scriptPubKey);
@@ -2221,6 +2239,10 @@ bool MultiChainTransaction_VerifyNotFilteredRestrictions(const CTransaction& tx,
         }
     }
     
+    if(details->emergency_disapproval_output >= 0)
+    {
+        if(fDebug)LogPrint("filter","Standard filter disapproval - tx will bypass all filter\n");
+    }
     return true;
 }
 
