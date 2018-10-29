@@ -61,6 +61,7 @@ for (var fn of Object.getOwnPropertyNames(Math)) {
         delete Math[fn];
     }
 }
+delete Date.now;
 )";
 
 void V8Filter::Zero()
