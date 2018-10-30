@@ -1926,10 +1926,15 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
     
     mc_EntityDetails asset_entity;
     mc_EntityDetails* lpAsset=NULL;
-    double multiple=(double)COIN;
+    double multiple=1.;
+    if(COIN > 0)
+    {
+        multiple=(double)COIN;
+    }
+    
     int64_t quantity;
     bool raw_value=false;
-    
+
     if (params.size() > 1)    
     {
         raw_value=paramtobool(params[1]);
@@ -1955,14 +1960,14 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
     mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
     lpScript->Clear();    
     
-    for(int i=0;i<(int)pMultiChainFilterEngine->m_Tx.vin.size();i++)
+    for(int j=0;j<(int)pMultiChainFilterEngine->m_Tx.vin.size();j++)
     {
-        int n=pMultiChainFilterEngine->m_Tx.vin[i].prevout.n;
+        int n=pMultiChainFilterEngine->m_Tx.vin[j].prevout.n;
         CCoins coins;
         {
             LOCK(mempool.cs);
             CCoinsViewMemPool view(pcoinsTip, mempool);
-            if (!view.GetCoins(pMultiChainFilterEngine->m_Tx.vin[i].prevout.hash, coins))
+            if (!view.GetCoins(pMultiChainFilterEngine->m_Tx.vin[j].prevout.hash, coins))
             {
                 throw JSONRPCError(RPC_NOT_ALLOWED, "Input spent");                                                                        
             }
@@ -2004,7 +2009,7 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
             else
             {
                 quantity=coins.vout[n].nValue;
-            }            
+            }    
             if(quantity >= 0)
             {                        
                 map<CTxDestination, int64_t>::iterator itold = mAddresses.find(address);
@@ -2053,7 +2058,11 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
                         }
                     }
                 }
-            }            
+            }         
+            else
+            {
+                quantity=txout.nValue;                
+            }
             if(quantity >= 0)
             {
                 map<CTxDestination, int64_t>::iterator itold = mAddresses.find(address);

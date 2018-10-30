@@ -480,7 +480,6 @@ void mc_MultiChainFilterEngine::SetCallbackNames()
     callbacks.clear();
     callbacks.push_back("getfiltertxid");
     callbacks.push_back("getfiltertransaction");
-    callbacks.push_back("getfilterassetbalances");
     callbacks.push_back("setfilterparam");
     callbacks.push_back("getfiltertxinput");
     callbacks.push_back("getlastblockinfo");
@@ -489,19 +488,29 @@ void mc_MultiChainFilterEngine::SetCallbackNames()
     callbacks.push_back("verifypermission");
     callbacks.push_back("verifymessage");    
     
+    
+    if(mc_gState->m_NetworkParams->ProtocolVersion() >= 20005)
+    {
+        callbacks.push_back("getfilterassetbalances");
+    }
+    
     m_CallbackNames.push_back(callbacks);                                       // Stream filters callbacks
     
     callbacks.clear();
     callbacks.push_back("getfiltertxid");
     callbacks.push_back("getfiltertransaction");
-    callbacks.push_back("getfilterassetbalances");
-    callbacks.push_back("getfilterstreamitem");
     callbacks.push_back("setfilterparam");
     callbacks.push_back("getlastblockinfo");
     callbacks.push_back("getassetinfo");
     callbacks.push_back("getstreaminfo");
     callbacks.push_back("verifypermission");
     callbacks.push_back("verifymessage");    
+    
+    if(mc_gState->m_NetworkParams->ProtocolVersion() >= 20005)
+    {
+        callbacks.push_back("getfilterassetbalances");
+        callbacks.push_back("getfilterstreamitem");        
+    }
     
     m_CallbackNames.push_back(callbacks);    
 }
