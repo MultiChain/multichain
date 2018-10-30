@@ -112,6 +112,7 @@ void CallRpcFunction(std::string name, rpcfn_type rpcFunction, const v8::Functio
 FILTER_FUNCTION(getfiltertxid)
 FILTER_FUNCTION(getfiltertransaction)
 FILTER_FUNCTION(getfilterstreamitem)
+FILTER_FUNCTION(getfilterassetbalances)
 FILTER_FUNCTION(setfilterparam)
 FILTER_FUNCTION(getfiltertxinput)
 FILTER_FUNCTION(getlastblockinfo)
@@ -126,6 +127,7 @@ std::map<std::string, v8::FunctionCallback> callbackLookup {
     FILTER_LOOKUP(getfiltertxid),
     FILTER_LOOKUP(getfiltertransaction),
     FILTER_LOOKUP(getfilterstreamitem),
+    FILTER_LOOKUP(getfilterassetbalances),
     FILTER_LOOKUP(setfilterparam),
     FILTER_LOOKUP(getfiltertxinput),
     FILTER_LOOKUP(getlastblockinfo),

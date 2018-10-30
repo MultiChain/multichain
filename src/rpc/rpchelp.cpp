@@ -4495,7 +4495,17 @@ void mc_InitRPCHelpMap19()
             + HelpExampleRpc("teststreamfilter", "false, \"{\"js\":\"js-code\"}\"")
         ));
      
- mapHelpStrings.insert(std::make_pair("AAAAAAA",
+     mapHelpStrings.insert(std::make_pair("getfilterassetbalances",
+            "getfilterassetbalances \"asset-identifier\" ( raw )\n"
+            "\nReturns information about the last or recent blocks in the active chain.\n"
+            "\nArguments:\n"
+            "1. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name. \"\" for native currency.\n"
+            "2. raw                              (boolean, optional, default false) Return raw value\n"
+            "\nResult:\n"
+            "Object with balances for every address involved in transaction\n"            
+        ));
+     
+     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
     

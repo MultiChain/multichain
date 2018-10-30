@@ -480,6 +480,7 @@ void mc_MultiChainFilterEngine::SetCallbackNames()
     callbacks.clear();
     callbacks.push_back("getfiltertxid");
     callbacks.push_back("getfiltertransaction");
+    callbacks.push_back("getfilterassetbalances");
     callbacks.push_back("setfilterparam");
     callbacks.push_back("getfiltertxinput");
     callbacks.push_back("getlastblockinfo");
@@ -493,6 +494,7 @@ void mc_MultiChainFilterEngine::SetCallbackNames()
     callbacks.clear();
     callbacks.push_back("getfiltertxid");
     callbacks.push_back("getfiltertransaction");
+    callbacks.push_back("getfilterassetbalances");
     callbacks.push_back("getfilterstreamitem");
     callbacks.push_back("setfilterparam");
     callbacks.push_back("getlastblockinfo");
