@@ -449,6 +449,23 @@ int mc_AssetDB::Destroy()
     return MC_ERR_NOERROR;
 }
 
+int mc_AssetDB::SetCheckPoint()
+{
+    m_CheckPointPos=m_Pos;
+    m_CheckPointMemPoolSize=m_MemPool->GetCount();
+    
+    return MC_ERR_NOERROR;
+}
+
+int mc_AssetDB::RollBackToCheckPoint()
+{
+    m_Pos=m_CheckPointPos;
+    m_MemPool->SetCount(m_CheckPointMemPoolSize);
+    
+    return MC_ERR_NOERROR;
+}
+
+
 int mc_AssetDB::SetRollBackPos(int block,int offset,int inmempool)
 {
     m_RollBackPos.m_Block=block;

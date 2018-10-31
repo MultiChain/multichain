@@ -240,6 +240,8 @@ typedef struct mc_AssetDB
     int m_Block;
     int64_t m_PrevPos;
     int64_t m_Pos;
+    int64_t m_CheckPointPos;
+    uint64_t m_CheckPointMemPoolSize;
     int m_DBRowCount;
     mc_RollBackPos m_RollBackPos;
 
@@ -265,6 +267,9 @@ typedef struct mc_AssetDB
     int RollBack(int block);
     int RollBack();
     int ClearMemPool();
+
+    int SetCheckPoint();
+    int RollBackToCheckPoint();
     
     int GetEntity(mc_EntityLedgerRow *row);
 

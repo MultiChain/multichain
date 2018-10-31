@@ -2354,7 +2354,8 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
     }
    
     mc_gState->m_Permissions->SetCheckPoint();                                  // if there is an error after this point or it is just check, permission mempool should be restored
-
+    mc_gState->m_Assets->SetCheckPoint();    
+    
     if(!MultiChainTransaction_CheckOutputs(tx,inputs,offset,&details,reason))   // Outputs        
     {
         fReject=true;
@@ -2446,6 +2447,7 @@ exitlbl:
     if(!accept || fReject)                                                      // Rolling back permission database if we were just checking or error occurred    
     {
         mc_gState->m_Permissions->RollBackToCheckPoint();
+        mc_gState->m_Assets->RollBackToCheckPoint();
     }
 
     if(mandatory_fee_out)
