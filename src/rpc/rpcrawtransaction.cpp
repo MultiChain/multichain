@@ -549,10 +549,15 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
 
 int VerifyNewTxForStreamFilters(const CTransaction& tx,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied)            
 {
-    if(GetBoolArg("-sendskipstreamfilters",false))
+    if(mc_gState->m_Features->StreamFilters() == 0)
     {
-        return MC_ERR_NOERROR;
+        if(GetBoolArg("-sendskipstreamfilters",false))                          
+        {
+            return MC_ERR_NOERROR;
+        }
+        return MC_ERR_NOERROR;        
     }
+    
     
     strResult="";
     for (unsigned int i = 0; i < tx.vout.size(); i++) 

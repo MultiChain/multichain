@@ -3631,7 +3631,6 @@ void mc_InitRPCHelpMap15()
             "                                                       autosubscribe,\n"
             "                                                       handshakelocal,\n"
             "                                                       hideknownopdrops\n"
-            "                                                       sendskipstreamfilters\n"
             "                                                       acceptfiltertimeout\n"
             "                                                       sendfiltertimeout\n"
             "                                                       lockinlinemetadata\n"
