@@ -508,7 +508,6 @@ void mc_MultiChainFilterEngine::SetCallbackNames()
     
     if(mc_gState->m_NetworkParams->ProtocolVersion() >= 20005)
     {
-        callbacks.push_back("getfilterassetbalances");
         callbacks.push_back("getfilterstreamitem");        
     }
     

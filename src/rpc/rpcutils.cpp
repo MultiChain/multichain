@@ -1492,8 +1492,12 @@ Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 tx
     {
         *format_text_out="gettxoutdata";
     }
-    metadata_object.push_back(Pair("txid", txid.ToString()));
-    metadata_object.push_back(Pair("vout", vout));
+    
+    if( (pMultiChainFilterEngine->m_TxID == 0) && (mc_gState->m_Features->StreamFilters() != 0) )
+    {        
+        metadata_object.push_back(Pair("txid", txid.ToString()));
+        metadata_object.push_back(Pair("vout", vout));
+    }
     metadata_object.push_back(Pair("format", OpReturnFormatToText(format)));
     metadata_object.push_back(Pair("size", elem_size));
 /*    

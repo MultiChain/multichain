@@ -4412,6 +4412,7 @@ void mc_InitRPCHelpMap19()
             "                         getfiltertxid \n"
             "                         getfilterstreamitem (only for stream filters)\n"
             "                         getfiltertxinput (only for tx filters)\n"
+            "                         getfilterassetbalances (only for tx filters)\n"
             "                         setfilterparam \n"             
         ));
     
