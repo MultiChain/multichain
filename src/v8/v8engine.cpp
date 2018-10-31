@@ -20,7 +20,7 @@ int V8Engine::Destroy()
 
 int V8Engine::Initialize(std::string &strResult)
 {
-    LogPrint("v8filter", "v8filter: V8Engine::Initialize\n");
+    if(fDebug)LogPrint("v8filter", "v8filter: V8Engine::Initialize\n");
     strResult.clear();
     return MC_ERR_NOERROR;
 }
@@ -28,7 +28,7 @@ int V8Engine::Initialize(std::string &strResult)
 int V8Engine::CreateFilter(std::string script, std::string main_name, std::vector<std::string> &callback_names,
                            V8Filter *filter, std::string &strResult)
 {
-    LogPrint("v8filter", "v8filter: V8Engine::CreateFilter\n");
+    if(fDebug)LogPrint("v8filter", "v8filter: V8Engine::CreateFilter\n");
     strResult.clear();
     return filter->Initialize(this, script, main_name, callback_names, strResult);
 }

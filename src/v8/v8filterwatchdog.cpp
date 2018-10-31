@@ -91,10 +91,10 @@ int V8FilterWatchdog::Destroy()
 
 void V8FilterWatchdog::FilterStarted(int timeout)
 {
-    LogPrint("v8filter", "v8filter: Watchdog::FilterStarted(timeout=%d) %s\n", timeout, m_actualState.Str());
+    if(fDebug)LogPrint("v8filter", "v8filter: Watchdog::FilterStarted(timeout=%d) %s\n", timeout, m_actualState.Str());
     if (m_thread == nullptr)
     {
-        LogPrint("v8filter", "v8filter: Watchdog::FilterStarted create thread with watchdogTask\n");
+        if(fDebug)LogPrint("v8filter", "v8filter: Watchdog::FilterStarted create thread with watchdogTask\n");
         m_thread = new std::thread(std::bind(&V8FilterWatchdog::WatchdogTask, this));
         std::this_thread::sleep_for(std::chrono::microseconds(100));
     }
@@ -106,7 +106,7 @@ void V8FilterWatchdog::FilterStarted(int timeout)
 
 void V8FilterWatchdog::FilterEnded()
 {
-    LogPrint("v8filter", "v8filter: Watchdog::FilterEnded %s\n", m_actualState.Str());
+    if(fDebug)LogPrint("v8filter", "v8filter: Watchdog::FilterEnded %s\n", m_actualState.Str());
     m_actualState.WaitState(V8WatchdogState::State::RUNNING);
     m_requestedState.Set(V8WatchdogState::State::IDLE);
     m_actualState.WaitState(V8WatchdogState::State::IDLE);
@@ -114,7 +114,7 @@ void V8FilterWatchdog::FilterEnded()
 
 void V8FilterWatchdog::Shutdown()
 {
-    LogPrint("v8filter", "v8filter: Watchdog::Shutdown\n");
+    if(fDebug)LogPrint("v8filter", "v8filter: Watchdog::Shutdown\n");
     m_requestedState.Set(V8WatchdogState::State::POISON_PILL);
     m_actualState.WaitState(V8WatchdogState::State::POISON_PILL);
     // Make sure thread terminates
@@ -124,14 +124,14 @@ void V8FilterWatchdog::Shutdown()
 
 void V8FilterWatchdog::WatchdogTask()
 {
-    LogPrint("v8filter", "v8filter: Watchdog::watchdogTask\n");
+    if(fDebug)LogPrint("v8filter", "v8filter: Watchdog::watchdogTask\n");
     while (true)
     {
         std::string msg = tfm::format("v8filter: Watchdog::watchdogTask %s - %%s", m_requestedState.Str());
         switch (m_requestedState.Get())
         {
         case V8WatchdogState::State::POISON_PILL:
-            LogPrint("v8filter", msg.c_str(), "committing suicide\n");
+            if(fDebug)LogPrint("v8filter", msg.c_str(), "committing suicide\n");
             m_actualState.Set(V8WatchdogState::State::POISON_PILL);
             return;
 
@@ -139,25 +139,25 @@ void V8FilterWatchdog::WatchdogTask()
             m_actualState.Set(V8WatchdogState::State::RUNNING);
             if (m_timeout > 0)
             {
-                LogPrint("v8filter", msg.c_str(), "entering timed wait\n");
+                if(fDebug)LogPrint("v8filter", msg.c_str(), "entering timed wait\n");
                 bool finished = m_requestedState.WaitNotStateFor(V8WatchdogState::State::RUNNING,
                                                                  std::chrono::milliseconds(m_timeout));
                 if (!finished)
                 {
-                    LogPrint("v8filter", msg.c_str(), "timeout -> terminating filter\n");
+                    if(fDebug)LogPrint("v8filter", msg.c_str(), "timeout -> terminating filter\n");
                     pFilterEngine->TerminateFilter(tfm::format("Filter aborted due to timeout after %d ms", m_timeout));
                     m_requestedState.WaitNotState(V8WatchdogState::State::RUNNING);
                 }
             }
             else
             {
-                LogPrint("v8filter", msg.c_str(), "entering inifinte wait\n");
+                if(fDebug)LogPrint("v8filter", msg.c_str(), "entering inifinte wait\n");
                 m_requestedState.WaitNotState(V8WatchdogState::State::RUNNING);
             }
             break;
 
         case V8WatchdogState::State::IDLE:
-            LogPrint("v8filter", msg.c_str(), "entering idle state\n");
+            if(fDebug)LogPrint("v8filter", msg.c_str(), "entering idle state\n");
             m_actualState.Set(V8WatchdogState::State::IDLE);
             m_requestedState.WaitNotState(V8WatchdogState::State::IDLE);
             break;

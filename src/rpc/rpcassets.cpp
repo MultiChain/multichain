@@ -1969,7 +1969,7 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
             CCoinsViewMemPool view(pcoinsTip, mempool);
             if (!view.GetCoins(pMultiChainFilterEngine->m_Tx.vin[j].prevout.hash, coins))
             {
-                throw JSONRPCError(RPC_NOT_ALLOWED, "Input spent");                                                                        
+                return Value::null;                                                                 
             }
             if (n<0 || (unsigned int)n>=coins.vout.size() || coins.vout[n].IsNull())
                 return Value::null;

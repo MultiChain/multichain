@@ -129,7 +129,7 @@ json_spirit::Value V82Jsp(v8::Isolate* isolate, v8::Local<v8::Value> v)
         return json_spirit::Value(v->NumberValue(context).FromJust());
     }
 
-    LogPrint("v8filter", "v8filter: V8 type '%s' is not recognized\n", V82String(isolate, v->TypeOf(isolate)).c_str());
+    if(fDebug)LogPrint("v8filter", "v8filter: V8 type '%s' is not recognized\n", V82String(isolate, v->TypeOf(isolate)).c_str());
     return json_spirit::Value();
 }
 

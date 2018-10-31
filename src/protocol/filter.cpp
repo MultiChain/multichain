@@ -63,7 +63,7 @@ int mc_FilterEngine::Destroy()
 
 int mc_FilterEngine::Initialize(std::string &strResult)
 {
-    LogPrint("v8filter", "v8filter: mc_FilterEngine::Initialize\n");
+    if(fDebug)LogPrint("v8filter", "v8filter: mc_FilterEngine::Initialize\n");
     strResult.clear();
     auto v8engine = new mc_v8::V8Engine();
     m_Impl = v8engine;
@@ -73,7 +73,7 @@ int mc_FilterEngine::Initialize(std::string &strResult)
 int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, std::vector<std::string> &callback_names,
                                   mc_Filter *filter, std::string &strResult)
 {
-    LogPrint("v8filter", "v8filter: mc_FilterEngine::CreateFilter\n");
+    if(fDebug)LogPrint("v8filter", "v8filter: mc_FilterEngine::CreateFilter\n");
     strResult.clear();
     auto v8engine = static_cast<mc_v8::V8Engine *>(m_Impl);
     filter->Destroy();
@@ -94,7 +94,7 @@ int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, std
 int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, std::vector<std::string> &callback_names,
                                   mc_Filter *filter, int timeout, std::string &strResult)
 {
-    LogPrintf("v8filter: mc_FilterEngine::CreateFilter(timeout=%d)\n", timeout);
+    if(fDebug)LogPrint("v8filter","v8filter: mc_FilterEngine::CreateFilter(timeout=%d)\n", timeout);
     int result = CreateFilter(script, main_name, callback_names, filter, strResult);
     if (result == MC_ERR_NOERROR)
     {
@@ -105,7 +105,7 @@ int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, std
 
 int mc_FilterEngine::RunFilter(const mc_Filter *filter, std::string &strResult)
 {
-    LogPrint("v8filter", "v8filter: mc_FilterEngine::RunFilter\n");
+    if(fDebug)LogPrint("v8filter", "v8filter: mc_FilterEngine::RunFilter\n");
 
     auto v8engine = static_cast<mc_v8::V8Engine *>(m_Impl);
     auto v8filter = static_cast<mc_v8::V8Filter *>(filter->m_Impl);
@@ -118,7 +118,7 @@ int mc_FilterEngine::RunFilter(const mc_Filter *filter, std::string &strResult)
 int mc_FilterEngine::RunFilterWithCallbackLog(const mc_Filter *filter, std::string &strResult,
                                               json_spirit::Array &callbacks)
 {
-    LogPrint("v8filter", "v8filter: mc_FilterEngine::RunFilterWithCallbackLog\n");
+    if(fDebug)LogPrint("v8filter", "v8filter: mc_FilterEngine::RunFilterWithCallbackLog\n");
     auto v8engine = static_cast<mc_v8::V8Engine *>(m_Impl);
     auto v8filter = static_cast<mc_v8::V8Filter *>(filter->m_Impl);
     SetRunningFilter(filter);
@@ -129,7 +129,7 @@ int mc_FilterEngine::RunFilterWithCallbackLog(const mc_Filter *filter, std::stri
 
 void mc_FilterEngine::TerminateFilter(std::string reason)
 {
-    LogPrint("v8filter", "v8filter: mc_FilterEngine::TerminateFilter\n");
+    if(fDebug)LogPrint("v8filter", "v8filter: mc_FilterEngine::TerminateFilter\n");
     if (m_runningFilter != nullptr)
     {
         auto v8engine = static_cast<mc_v8::V8Engine *>(m_Impl);

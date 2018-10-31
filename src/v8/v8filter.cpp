@@ -85,7 +85,7 @@ int V8Filter::Destroy()
 int V8Filter::Initialize(V8Engine *engine, std::string script, std::string functionName,
                          std::vector<std::string> &callback_names, std::string &strResult)
 {
-    LogPrint("v8filter", "v8filter: V8Filter::Initialize\n");
+    if(fDebug)LogPrint("v8filter", "v8filter: V8Filter::Initialize\n");
     m_engine = engine;
     strResult.clear();
     this->MaybeCreateIsolate();
@@ -136,7 +136,7 @@ void V8Filter::MaybeCreateIsolate()
 
 int V8Filter::Run(std::string &strResult, bool withCallbackLog)
 {
-    LogPrint("v8filter", "v8filter: V8Filter::Run\n");
+    if(fDebug)LogPrint("v8filter", "v8filter: V8Filter::Run\n");
 
     strResult.clear();
     if (m_context.IsEmpty() || m_filterFunction.IsEmpty())
@@ -190,7 +190,7 @@ int V8Filter::RunWithCallbackLog(std::string &strResult, json_spirit::Array &cal
 int V8Filter::CompileAndLoadScript(std::string script, std::string functionName, std::string source,
                                    std::string &strResult)
 {
-    LogPrint("v8filter", "v8filter: V8Filter::CompileAndLoadScript %s\n", source);
+    if(fDebug)LogPrint("v8filter", "v8filter: V8Filter::CompileAndLoadScript %s\n", source);
 
     strResult.clear();
     v8::HandleScope handleScope(m_isolate);
@@ -232,14 +232,14 @@ int V8Filter::CompileAndLoadScript(std::string script, std::string functionName,
 
 void V8Filter::ReportException(v8::TryCatch *tryCatch, std::string &strResult)
 {
-    LogPrint("v8filter", "v8filter: V8Filter: ReportException\n");
+    if(fDebug)LogPrint("v8filter", "v8filter: V8Filter: ReportException\n");
 
     v8::HandleScope handlecope(m_isolate);
     strResult = V82String(m_isolate, tryCatch->Exception());
     v8::Local<v8::Message> message = tryCatch->Message();
     if (message.IsEmpty())
     {
-        LogPrint("v8filter", "v8filter: %s", strResult);
+        if(fDebug)LogPrint("v8filter", "v8filter: %s", strResult);
     }
     else
     {
@@ -250,10 +250,10 @@ void V8Filter::ReportException(v8::TryCatch *tryCatch, std::string &strResult)
         int start = message->GetStartColumn(context).FromJust();
         int end = message->GetEndColumn(context).FromJust();
         assert(linenum >= 0 && start >= 0 && end >= 0);
-        LogPrint("v8filter", "v8filter: %s:%d %s\n", filename, linenum, strResult);
+        if(fDebug)LogPrint("v8filter", "v8filter: %s:%d %s\n", filename, linenum, strResult);
         std::string sourceline = V82String(m_isolate, message->GetSourceLine(context).ToLocalChecked());
-        LogPrint("v8filter", "v8filter: %s\n", sourceline);
-        LogPrint("v8filter", "v8filter: %s%s\n", std::string(static_cast<std::string::size_type>(start), ' '),
+        if(fDebug)LogPrint("v8filter", "v8filter: %s\n", sourceline);
+        if(fDebug)LogPrint("v8filter", "v8filter: %s%s\n", std::string(static_cast<std::string::size_type>(start), ' '),
                  std::string(static_cast<std::string::size_type>(end - start), '^'));
     }
 }

@@ -767,7 +767,6 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, Valu
         }
     }
     
-    mc_Filter *worker=new mc_Filter;
 
     string filter_main_name=MC_FLT_MAIN_NAME_TX;
     if (filter_type == MC_FLT_TYPE_STREAM)
@@ -821,6 +820,7 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, Valu
         }
     }
     
+    mc_Filter *worker=new mc_Filter;
 //    err=pFilterEngine->CreateFilter(filter_code,filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strError);
     err=pFilterEngine->CreateFilter(filter_code,filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,pMultiChainFilterEngine->GetSendTimeout(), strError);
     if(err)
