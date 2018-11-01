@@ -1625,21 +1625,24 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     Array chunks;
     if(retrieve_status & MC_OST_CONTROL_NO_DATA)
     {
-        if(format_item_value.type() == obj_type)
+        if((retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN)
         {
-            for(int chunk=0;chunk<chunk_count;chunk++)
+            if(format_item_value.type() == obj_type)
             {
-                int chunk_shift,chunk_size;
-                Object chunk_obj;
-                
-                chunk_size=mc_GetVarInt(chunk_hashes,MC_CDB_CHUNK_HASH_SIZE+16,-1,&chunk_shift);
-                chunk_hashes+=chunk_shift;
-                chunk_obj.push_back(Pair("hash", ((uint256*)chunk_hashes)->ToString()));
-                chunk_obj.push_back(Pair("size", chunk_size));
-                chunks.push_back(chunk_obj);
-                chunk_hashes+=MC_CDB_CHUNK_HASH_SIZE;
-            }        
-//            format_item_value.get_obj().push_back(Pair("chunks", chunks));
+                for(int chunk=0;chunk<chunk_count;chunk++)
+                {
+                    int chunk_shift,chunk_size;
+                    Object chunk_obj;
+
+                    chunk_size=mc_GetVarInt(chunk_hashes,MC_CDB_CHUNK_HASH_SIZE+16,-1,&chunk_shift);
+                    chunk_hashes+=chunk_shift;
+                    chunk_obj.push_back(Pair("hash", ((uint256*)chunk_hashes)->ToString()));
+                    chunk_obj.push_back(Pair("size", chunk_size));
+                    chunks.push_back(chunk_obj);
+                    chunk_hashes+=MC_CDB_CHUNK_HASH_SIZE;
+                }        
+    //            format_item_value.get_obj().push_back(Pair("chunks", chunks));
+            }
         }
     }
     
