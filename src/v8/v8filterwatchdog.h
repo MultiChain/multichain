@@ -1,8 +1,7 @@
 #ifndef V8FILTERWATCHDOG_H
 #define V8FILTERWATCHDOG_H
 
-#include <condition_variable>
-#include <thread>
+#include <boost/thread.hpp>
 
 namespace mc_v8
 {
@@ -11,12 +10,13 @@ class V8WatchdogState
   public:
     enum State
     {
+        INIT,
         IDLE,
         RUNNING,
         POISON_PILL
     };
 
-    V8WatchdogState(std::string name, State state = State::IDLE) : m_name(name), m_state(state)
+    V8WatchdogState(std::string name, State state = State::INIT) : m_name(name), m_state(state)
     {
     }
 
@@ -30,14 +30,14 @@ class V8WatchdogState
     void WaitState(State state);
     void WaitNotState(State state);
     template <class Rep, class Period>
-    bool WaitStateFor(State state, const std::chrono::duration<Rep, Period> &timeout);
+    bool WaitStateFor(State state, const boost::chrono::duration<Rep, Period> &timeout);
     template <class Rep, class Period>
-    bool WaitNotStateFor(State state, const std::chrono::duration<Rep, Period> &timeout);
+    bool WaitNotStateFor(State state, const boost::chrono::duration<Rep, Period> &timeout);
 
   protected:
     std::string m_name;
-    std::condition_variable m_condVar;
-    std::mutex m_mutex;
+    boost::condition_variable m_condVar;
+    boost::mutex m_mutex;
     State m_state;
 };
 
@@ -74,7 +74,7 @@ class V8FilterWatchdog
     void Shutdown();
 
   private:
-    std::thread *m_thread;
+    boost::thread *m_thread;
     int m_timeout;
     V8WatchdogState m_requestedState{"requested"};
     V8WatchdogState m_actualState{"actual"};
