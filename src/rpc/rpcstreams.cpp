@@ -1490,7 +1490,7 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     i=0;
     m=10;
     
-    Value result;
+    Value result=obj;
     
     while(i<n)
     {
@@ -1646,9 +1646,12 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     }            
     else
     {
-        if( (mode & MC_VMM_IGNORE_OTHER) == 0)
+        if(!first_item)
         {
-            err=MC_ERR_INVALID_PARAMETER_VALUE;
+            if( (mode & MC_VMM_IGNORE_OTHER) == 0)
+            {
+                err=MC_ERR_INVALID_PARAMETER_VALUE;
+            }
         }
         obj.push_back(Pair("json", empty_object));        
     }
