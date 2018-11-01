@@ -850,11 +850,11 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
     string full_error="";
     if( ( retrieve_status & MC_OST_CONTROL_NO_DATA ) == 0)
     {        
-        entry.push_back(Pair("available", AvailableFromStatus(retrieve_status)));        
         if(retrieve_status & MC_OST_ERROR_MASK)
         {
             int errorCode;
             full_error=OffChainError(retrieve_status,&errorCode);
+            entry.push_back(Pair("available", false));        
             entry.push_back(Pair("error", full_error));        
         }
         else
@@ -899,6 +899,7 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
                 }
                 if(full_error.size())
                 {    
+                    entry.push_back(Pair("available", false));                            
                     entry.push_back(Pair("error", full_error));  
                     Object metadata_object;
                     metadata_object.push_back(Pair("txid", wtx.GetHash().ToString()));
@@ -907,6 +908,14 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
                     metadata_object.push_back(Pair("size", out_size));
                     format_item_value=metadata_object;
                 }                
+                else
+                {
+                    entry.push_back(Pair("available", AvailableFromStatus(retrieve_status)));                            
+                }
+            }
+            else
+            {
+                entry.push_back(Pair("available", AvailableFromStatus(retrieve_status)));                        
             }
         }
     }
