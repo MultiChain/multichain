@@ -390,7 +390,8 @@ Value listblocks(const Array& params, bool fHelp)
 Value getlastblockinfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)
-        throw runtime_error("Help message not found\n");
+        mc_ThrowHelpMessage("getlastblockinfo");        
+//        throw runtime_error("Help message not found\n");
     
     CBlockIndex* pblockindex = chainActive.Tip();
     
@@ -547,10 +548,16 @@ Value gettxoutsetinfo(const Array& params, bool fHelp)
 Value getfiltertxinput(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)                       
-        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
+        mc_ThrowHelpMessage("getfiltertxinput");        
+//        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
     
     int64_t vin = params[0].get_int64();                                          
     int64_t n;
+    
+    if(pMultiChainFilterEngine->m_Vout >= 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "This callback cannot be used in stream filters");                            
+    }
     
     if( (vin < 0) || (vin >= (unsigned int)pMultiChainFilterEngine->m_Tx.vin.size()) )
     {
@@ -585,7 +592,10 @@ Value gettxout(const Array& params, bool fHelp)
         CCoinsViewMemPool view(pcoinsTip, mempool);
         if (!view.GetCoins(hash, coins))
             return Value::null;
-        mempool.pruneSpent(hash, coins); // TODO: this should be done by the CCoinsViewMemPool
+        if(pMultiChainFilterEngine->m_TxID == 0)                                // In filter we already checked this input exists, but mempool is dirty
+        {
+            mempool.pruneSpent(hash, coins); // TODO: this should be done by the CCoinsViewMemPool
+        }
     } else {
         if (!pcoinsTip->GetCoins(hash, coins))
             return Value::null;

@@ -666,12 +666,14 @@ void mc_InitRPCListIfLimited()
     }
 }
 
-void StartRPCThreads()
+void StartRPCThreads(string& strError)
 {
     mc_InitRPCList(vStaticRPCCommands,vStaticRPCWalletReadCommands);
     mc_InitRPCListIfLimited();
     tableRPC.initialize();
 
+    strError="";
+    
     rpc_allow_subnets.clear();
     rpc_allow_subnets.push_back(CSubNet("127.0.0.0/8")); // always allow IPv4 local subnet
     rpc_allow_subnets.push_back(CSubNet("::1")); // always allow IPv6 localhost
@@ -734,12 +736,20 @@ void StartRPCThreads()
         filesystem::path pathCertFile(GetArg("-rpcsslcertificatechainfile", "server.cert"));
         if (!pathCertFile.is_complete()) pathCertFile = filesystem::path(GetDataDir()) / pathCertFile;
         if (filesystem::exists(pathCertFile)) rpc_ssl_context->use_certificate_chain_file(pathCertFile.string());
-        else LogPrintf("ThreadRPCServer ERROR: missing server certificate file %s\n", pathCertFile.string());
+        else
+        {
+            LogPrintf("ThreadRPCServer ERROR: missing server certificate file %s\n", pathCertFile.string());
+            strError += strprintf("Missing server certificate file %s\n", pathCertFile.string().c_str());
+        }
 
         filesystem::path pathPKFile(GetArg("-rpcsslprivatekeyfile", "server.pem"));
         if (!pathPKFile.is_complete()) pathPKFile = filesystem::path(GetDataDir()) / pathPKFile;
         if (filesystem::exists(pathPKFile)) rpc_ssl_context->use_private_key_file(pathPKFile.string(), ssl::context::pem);
-        else LogPrintf("ThreadRPCServer ERROR: missing server private key file %s\n", pathPKFile.string());
+        else
+        {
+            LogPrintf("ThreadRPCServer ERROR: missing server private key file %s\n", pathPKFile.string());
+            strError += strprintf("Missing server private key file %s\n", pathPKFile.string().c_str());
+        }
 
         string strCiphers = GetArg("-rpcsslciphers", "TLSv1.2+HIGH:TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!3DES:@STRENGTH");
         SSL_CTX_set_cipher_list(rpc_ssl_context->impl(), strCiphers.c_str());
@@ -828,6 +838,11 @@ void StartRPCThreads()
         rpc_worker_group->create_thread(boost::bind(&asio::io_service::run, rpc_io_service));
     
     fRPCRunning = true;
+    
+    if(strError.size())
+    {
+        strError += "Node may be unable to process API requests.\n";
+    }
 }
 
 void StartDummyRPCThread()

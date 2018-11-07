@@ -69,7 +69,7 @@
 #define MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION  0x42
 #define MC_ENT_SPRM_UPGRADE_START_BLOCK       0x43
 #define MC_ENT_SPRM_UPGRADE_CHAIN_PARAMS      0x44
-#define MC_ENT_SPRM_FILTER_ENTITY             0x45
+#define MC_ENT_SPRM_FILTER_RESTRICTIONS       0x45
 #define MC_ENT_SPRM_FILTER_CODE               0x46
 #define MC_ENT_SPRM_FILTER_TYPE               0x47
 
@@ -176,6 +176,7 @@ typedef struct mc_EntityDetails
     
     int IsUnconfirmedGenesis();    
     int GetAssetMultiple();
+    uint32_t GetFilterType();
     int IsFollowOn(); 
 //    int HasFollowOns(); 
     int AllowedFollowOns(); 
@@ -233,12 +234,16 @@ typedef struct mc_AssetDB
     
     mc_Buffer   *m_MemPool;
     mc_Buffer   *m_TmpRelevantEntities;
+    mc_Buffer   *m_ShortTxIDCache;
     
     char m_Name[MC_PRM_NETWORK_NAME_MAX_SIZE+1]; 
     int m_Block;
     int64_t m_PrevPos;
     int64_t m_Pos;
+    int64_t m_CheckPointPos;
+    uint64_t m_CheckPointMemPoolSize;
     int m_DBRowCount;
+    mc_RollBackPos m_RollBackPos;
 
     mc_AssetDB()
     {
@@ -262,6 +267,9 @@ typedef struct mc_AssetDB
     int RollBack(int block);
     int RollBack();
     int ClearMemPool();
+
+    int SetCheckPoint();
+    int RollBackToCheckPoint();
     
     int GetEntity(mc_EntityLedgerRow *row);
 
@@ -271,6 +279,11 @@ typedef struct mc_AssetDB
     int FindEntityByName(mc_EntityDetails *entity, const char* name);    
     int FindEntityByFollowOn(mc_EntityDetails *entity, const unsigned char* txid);    
     int FindEntityByFullRef (mc_EntityDetails *entity, unsigned char* full_ref);
+    
+    unsigned char *CachedTxIDFromShortTxID(unsigned char *short_txid);
+    int SetRollBackPos(int block,int offset,int inmempool);
+    void ResetRollBackPos();
+    
     
     void Dump();
     mc_Buffer *GetEntityList(mc_Buffer *old_result,const void* txid,uint32_t entity_type);

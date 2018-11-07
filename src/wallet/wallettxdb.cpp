@@ -6,6 +6,12 @@
 
 #define MC_TDB_MAX_TXS_FILE_SIZE             0x8000000                          // Maximal data file size, 128MB
 
+int IsCSkipped(int type)
+{
+    return 0;
+}
+
+
 void mc_TxEntityRowExtension::Zero()
 {
     memset(this,0,sizeof(mc_TxEntityRowExtension));    
@@ -882,6 +888,11 @@ int mc_TxDB::DecrementSubKey(
     
     err=MC_ERR_NOERROR;
     
+    if(IsCSkipped(entity->m_EntityType))
+    {
+        return err;
+    }
+    
     imp=m_Imports;
     mempool=m_MemPools[0];
     if(import)                                                                  // Find import
@@ -968,6 +979,11 @@ int mc_TxDB::IncrementSubKey(
     
     err=MC_ERR_NOERROR;
     
+    if(IsCSkipped(entity->m_EntityType))
+    {
+        return err;
+    }
+    
     imp=m_Imports;
     mempool=m_MemPools[0];
     if(import)                                                                  // Find import
@@ -1051,15 +1067,18 @@ int mc_TxDB::IncrementSubKey(
         
         if(last_pos == 0)
         {
-            erow.Zero();
-            memcpy(&erow.m_Entity,&stat->m_Entity,sizeof(mc_TxEntity));
-            erow.m_Generation=stat->m_Generation;
-            memcpy(erow.m_TxId,subkey_hash,MC_TDB_ENTITY_ID_SIZE);
-            erow.m_Block=block;
-            erow.m_Flags=flags;
-            stat->m_LastPos+=1;
-            erow.m_TempPos=stat->m_LastPos;                                     // Will be copied to m_LastPos on commit. m_LastPos=0 to allow Seek() above
-            mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);            
+            if(IsCSkipped(stat->m_Entity.m_EntityType) == 0)
+            {
+                erow.Zero();
+                memcpy(&erow.m_Entity,&stat->m_Entity,sizeof(mc_TxEntity));
+                erow.m_Generation=stat->m_Generation;
+                memcpy(erow.m_TxId,subkey_hash,MC_TDB_ENTITY_ID_SIZE);
+                erow.m_Block=block;
+                erow.m_Flags=flags;
+                stat->m_LastPos+=1;
+                erow.m_TempPos=stat->m_LastPos;                                     // Will be copied to m_LastPos on commit. m_LastPos=0 to allow Seek() above
+                mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);            
+            }
         }
     }
 
@@ -1068,6 +1087,29 @@ exitlbl:
 
     return err;
 }
+
+int mc_TxDB::SetTxCache(                                                             // Returns tx definition if found, error if not found
+              const unsigned char *hash)
+{
+    m_TxCachedDef.Zero();
+    m_TxCachedFlags=MC_TCF_ERROR;
+    
+    int err=GetTx(&m_TxCachedDef,hash,IsCSkipped(MC_TET_GETDB_ADD_TX));    
+    if(err == MC_ERR_NOERROR)
+    {
+        m_TxCachedFlags=MC_TCF_FOUND;   
+    }
+    else
+    {
+        if (err == MC_ERR_NOT_FOUND)
+        {
+            m_TxCachedFlags=MC_TCF_NOT_FOUND;
+        }
+    }
+    
+    return MC_ERR_NOERROR;
+}
+
 
 /*
  * Adds tx to specific import
@@ -1145,7 +1187,20 @@ int mc_TxDB::AddTx(mc_TxImport *import,
 
     newtx=0;
     ondisk=0;
-    err=GetTx(&txdef,hash);
+//    err=GetTx(&txdef,hash,IsCSkipped(MC_TET_GETDB_ADD_TX));
+    if(m_TxCachedFlags & MC_TCF_FOUND)
+    {
+        memcpy(&txdef,&(m_TxCachedDef),sizeof(mc_TxDefRow));
+    }
+    if(m_TxCachedFlags & MC_TCF_NOT_FOUND)
+    {
+        err=MC_ERR_NOT_FOUND;
+    }
+    if(m_TxCachedFlags & MC_TCF_ERROR)
+    {
+        err=MC_ERR_INTERNAL_ERROR;
+    }
+    
     if(err == MC_ERR_NOT_FOUND)                                                 // Tx is not found, neither on disk, nor in the mempool    
     {
         err=MC_ERR_NOERROR;
@@ -1244,6 +1299,11 @@ int mc_TxDB::AddTx(mc_TxImport *import,
                 imp->AddEntity((mc_TxEntity*)entities->GetRow(i));              // New entities added to chain import
                 isrelevant=1;
             }
+        }
+        
+        if(IsCSkipped(((mc_TxEntity*)entities->GetRow(i))->m_EntityType))
+        {
+            isrelevant=0;
         }
         
         if(isrelevant)
@@ -1443,9 +1503,15 @@ int mc_TxDB::SaveTxFlag(const unsigned char *hash,uint32_t flag,int set_flag)
     return MC_ERR_NOERROR;
 }
 
-
 int mc_TxDB::GetTx(mc_TxDefRow *txdef,
               const unsigned char *hash)
+{
+    return GetTx(txdef,hash,0);
+}
+
+int mc_TxDB::GetTx(mc_TxDefRow *txdef,
+              const unsigned char *hash,
+              int skip_db)
 {
     int err,value_len,mprow; 
     unsigned char *ptr;
@@ -1474,6 +1540,11 @@ int mc_TxDB::GetTx(mc_TxDefRow *txdef,
             txdef->m_Block=-1;
         }
         return MC_ERR_NOERROR;
+    }
+    
+    if(skip_db)
+    {
+        return MC_ERR_NOT_FOUND;
     }
     
     memcpy(txdef->m_TxId,hash, MC_TDB_TXID_SIZE);
@@ -2020,6 +2091,11 @@ int mc_TxDB::GetList(
     
     txs->Clear();
     
+    if(IsCSkipped(entity->m_EntityType))
+    {
+        return MC_ERR_NOT_SUPPORTED;
+    }
+    
     int row;
     mc_TxEntityStat *stat;
     
@@ -2140,6 +2216,11 @@ int mc_TxDB::GetList(
     char msg[256];
     
     txs->Clear();
+    
+    if(IsCSkipped(entity->m_EntityType))
+    {
+        return MC_ERR_NOT_SUPPORTED;
+    }
     
     mempool=m_MemPools[import-m_Imports];
     

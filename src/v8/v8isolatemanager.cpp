@@ -49,7 +49,7 @@ IsolateData& V8IsolateManager::GetIsolateData(v8::Isolate* isolate)
 
 V8IsolateManager::V8IsolateManager()
 {
-    LogPrint("v8filter", "v8filter: V8IsolateManager::V8IsolateManager\n");
+    if(fDebug)LogPrint("v8filter", "v8filter: V8IsolateManager::V8IsolateManager\n");
 
     fs::path tempDir = GetTemporaryPidDirectory();
     fs::path v8TempDir = tempDir / "v8";

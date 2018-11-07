@@ -4,7 +4,7 @@
 #ifndef V8ISOLATEMANAGER_H_
 #define V8ISOLATEMANAGER_H_
 
-#include <json/json_spirit.h>
+#include "json/json_spirit.h"
 #include <v8.h>
 #include <libplatform/libplatform.h>
 

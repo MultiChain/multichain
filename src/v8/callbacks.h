@@ -5,19 +5,12 @@
 #define MULTICHAIN_CALLBACKS_H_
 
 #include <v8.h>
+#include <map>
 
 namespace mc_v8
 {
 
-void filter_getfiltertxid(const v8::FunctionCallbackInfo<v8::Value>& args);
-void filter_getfiltertransaction(const v8::FunctionCallbackInfo<v8::Value>& args);
-void filter_setfilterparam(const v8::FunctionCallbackInfo<v8::Value>& args);
-void filter_getfiltertxinput(const v8::FunctionCallbackInfo<v8::Value>& args);
-void filter_getlastblockinfo(const v8::FunctionCallbackInfo<v8::Value>& args);
-void filter_getassetinfo(const v8::FunctionCallbackInfo<v8::Value>& args);
-void filter_getstreaminfo(const v8::FunctionCallbackInfo<v8::Value>& args);
-void filter_verifypermission(const v8::FunctionCallbackInfo<v8::Value>& args);
-void filter_verifymessage(const v8::FunctionCallbackInfo<v8::Value>& args);
+extern std::map<std::string, v8::FunctionCallback> callbackLookup;
 
 } // namespace mc_v8
 

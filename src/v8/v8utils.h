@@ -4,6 +4,7 @@
 #ifndef V8UTILS_H_
 #define V8UTILS_H_
 
+#include "json/json_spirit.h"
 #include "utils/util.h"
 #include <fstream>
 #include <v8.h>
@@ -55,12 +56,16 @@ inline fs::path GetTemporaryPidDirectory()
  * @param data     The data array to write.
  * @param size     The number of bytes to write.
  */
-inline void WriteBinaryFile(fs::path filename, char* data, size_t size)
+inline void WriteBinaryFile(fs::path filename, char* data, std::streamsize size)
 {
     std::ofstream ofs(filename.string(), std::fstream::out | std::fstream::binary);
     ofs.write(data, size);
     ofs.close();
 }
+
+v8::Local<v8::Value> Jsp2V8(v8::Isolate* isolate, const json_spirit::Value& j);
+json_spirit::Value V82Jsp(v8::Isolate* isolate, v8::Local<v8::Value> v);
+
 } // namespace mc_v8
 
 #endif /* V8UTILS_H_ */

@@ -1481,7 +1481,8 @@ Value gettotalbalances(const Array& params, bool fHelp)
 Value getassetinfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
-       throw runtime_error("Help message not found\n");
+        mc_ThrowHelpMessage("getassetinfo");        
+//       throw runtime_error("Help message not found\n");
     
     if(params[0].type() != str_type)
     {
@@ -1741,9 +1742,9 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
 
     aFormatMetaDataPerOutput.resize(wtx.vout.size());
 
-    for (int i = 0; i < (int)wtx.vout.size(); ++i)
+    for (int j = 0; j < (int)wtx.vout.size(); ++j)
     {
-        const CTxOut& txout = wtx.vout[i];
+        const CTxOut& txout = wtx.vout[j];
         if(!txout.scriptPubKey.IsUnspendable())
         {
             string strFailReason;
@@ -1791,7 +1792,7 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
         }
         else
         {            
-            const CScript& script2 = wtx.vout[i].scriptPubKey;        
+            const CScript& script2 = wtx.vout[j].scriptPubKey;        
             CScript::const_iterator pc2 = script2.begin();
 
             lpScript->Clear();
@@ -1807,9 +1808,9 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
                 {
 //                    elem = lpScript->GetData(lpScript->GetNumElements()-1,&elem_size);
                     retrieve_status = GetFormattedData(lpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
-                    Value metadata=OpReturnFormatEntry(elem,out_size,wtx.GetHash(),i,format,NULL,retrieve_status);
+                    Value metadata=OpReturnFormatEntry(elem,out_size,wtx.GetHash(),j,format,NULL,retrieve_status);
                     aFormatMetaData.push_back(metadata);
-                    aFormatMetaDataPerOutput[i].push_back(metadata);
+                    aFormatMetaDataPerOutput[j].push_back(metadata);
                 }                        
             }
             else
@@ -1821,7 +1822,7 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
                     if(out_size)
                     {
 //                        aMetaData.push_back(OpReturnEntry(elem,elem_size,wtx.GetHash(),i));
-                        aFormatMetaData.push_back(OpReturnFormatEntry(elem,out_size,wtx.GetHash(),i,format,NULL,retrieve_status));
+                        aFormatMetaData.push_back(OpReturnFormatEntry(elem,out_size,wtx.GetHash(),j,format,NULL,retrieve_status));
                     }
                 }
                 
@@ -1918,6 +1919,189 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
     return entry;    
 }
 
+Value getfilterassetbalances(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)                        
+        mc_ThrowHelpMessage("getfilterassetbalances");        
+    
+    mc_EntityDetails asset_entity;
+    mc_EntityDetails* lpAsset=NULL;
+    double multiple=1.;
+    if(COIN > 0)
+    {
+        multiple=(double)COIN;
+    }
+    
+    int64_t quantity;
+    bool raw_value=false;
+
+    if (params.size() > 1)    
+    {
+        raw_value=paramtobool(params[1]);
+    }
+    
+    if(params[0].type() != str_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset identifier, expected string");                                                        
+    }
+    
+    if(params[0].get_str().size())
+    {
+        ParseEntityIdentifier(params[0],&asset_entity,MC_ENT_TYPE_ASSET);
+        lpAsset=&asset_entity;
+        multiple=(double)(lpAsset->GetAssetMultiple());
+    }
+    
+    map <CTxDestination,int64_t> mAddresses;
+    
+    mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
+    asset_amounts->Clear();
+    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();    
+    
+    for(int j=0;j<(int)pMultiChainFilterEngine->m_Tx.vin.size();j++)
+    {
+        int n=pMultiChainFilterEngine->m_Tx.vin[j].prevout.n;
+        CCoins coins;
+        {
+            LOCK(mempool.cs);
+            CCoinsViewMemPool view(pcoinsTip, mempool);
+            if (!view.GetCoins(pMultiChainFilterEngine->m_Tx.vin[j].prevout.hash, coins))
+            {
+                return Value::null;                                                                 
+            }
+            if (n<0 || (unsigned int)n>=coins.vout.size() || coins.vout[n].IsNull())
+                return Value::null;
+
+            CTxDestination address;
+            int required=0;
+
+            ExtractDestination(coins.vout[n].scriptPubKey, address);
+    
+            quantity=-1;
+            
+            if(lpAsset)
+            {
+                asset_amounts->Clear();
+                if(CreateAssetBalanceList(coins.vout[n],asset_amounts,lpScript,&required))
+                {
+                    for(int i=0;i<asset_amounts->GetCount();i++)
+                    {
+                        if(memcmp(lpAsset->GetFullRef(),asset_amounts->GetRow(i),MC_AST_ASSET_FULLREF_SIZE) == 0)
+                        {
+                            quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
+                        }
+                        else
+                        {
+                            if(memcmp(lpAsset->GetTxID(),&(pMultiChainFilterEngine->m_Tx.vin[i].prevout.hash),sizeof(uint256)) == 0)
+                            {
+                                if( mc_GetABRefType(asset_amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_GENESIS )                    
+                                {
+                                    quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
+                                }                            
+                            }
+                        }
+
+                    }
+                }
+            }
+            else
+            {
+                quantity=coins.vout[n].nValue;
+            }    
+            if(quantity >= 0)
+            {                        
+                map<CTxDestination, int64_t>::iterator itold = mAddresses.find(address);
+                if (itold == mAddresses.end())
+                {
+                    mAddresses.insert(make_pair(address, -quantity));
+                }
+                else
+                {
+                    itold->second-=quantity;
+                }                            
+            }
+        }        
+    }
+    for (int j = 0; j < (int)pMultiChainFilterEngine->m_Tx.vout.size(); ++j)
+    {
+        const CTxOut& txout = pMultiChainFilterEngine->m_Tx.vout[j];
+        if(!txout.scriptPubKey.IsUnspendable())
+        {
+            CTxDestination address;
+            int required=0;
+
+            ExtractDestination(txout.scriptPubKey, address);
+    
+            quantity=-1;
+            if(lpAsset)
+            {
+                asset_amounts->Clear();
+                if(CreateAssetBalanceList(txout,asset_amounts,lpScript,&required))
+                {
+                    for(int i=0;i<asset_amounts->GetCount();i++)
+                    {
+                        if(memcmp(lpAsset->GetFullRef(),asset_amounts->GetRow(i),MC_AST_ASSET_FULLREF_SIZE) == 0)
+                        {
+                            quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
+                        }
+                        else
+                        {
+                            if(memcmp(lpAsset->GetTxID(),&(pMultiChainFilterEngine->m_TxID),sizeof(uint256)) == 0)
+                            {
+                                if( mc_GetABRefType(asset_amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_GENESIS )                    
+                                {
+                                    quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
+                                }                            
+                            }
+                        }
+                    }
+                }
+            }         
+            else
+            {
+                quantity=txout.nValue;                
+            }
+            if(quantity >= 0)
+            {
+                map<CTxDestination, int64_t>::iterator itold = mAddresses.find(address);
+                if (itold == mAddresses.end())
+                {
+                    mAddresses.insert(make_pair(address, +quantity));
+                }
+                else
+                {
+                    itold->second+=quantity;
+                }                            
+            }
+        }        
+    }
+    
+    int64_t other_amount=0;
+    
+    Object oBalance;
+    BOOST_FOREACH(const PAIRTYPE(CTxDestination, int64_t)& item, mAddresses)
+    {
+        const CTxDestination dest=item.first;
+        const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
+        const CScriptID *lpScript=boost::get<CScriptID> (&dest);
+        if( (lpKeyID == NULL) && (lpScript == NULL) )
+        {
+            other_amount=item.second;
+        }
+        else            
+        {
+            oBalance.push_back(Pair(CBitcoinAddress(item.first).ToString(), raw_value ? item.second : item.second/multiple));            
+        }
+    }
+    if(other_amount != 0)
+    {
+        oBalance.push_back(Pair("", raw_value ? other_amount : other_amount/multiple));                    
+    }
+
+    return oBalance;
+}
 
 Value getassettransaction(const Array& params, bool fHelp)
 {
@@ -2038,7 +2222,7 @@ Value listassettransactions(const Array& params, bool fHelp)
     mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
     lpScript->Clear();    
 
-    pwalletTxsMain->GetList(&entStat.m_Entity,1,1,entity_rows);
+    CheckWalletError(pwalletTxsMain->GetList(&entStat.m_Entity,1,1,entity_rows));
     shift=1;
     if(entity_rows->GetCount())
     {
@@ -2066,7 +2250,7 @@ Value listassettransactions(const Array& params, bool fHelp)
         }
     }
     
-    pwalletTxsMain->GetList(&entStat.m_Entity,start+1,count,entity_rows);
+    CheckWalletError(pwalletTxsMain->GetList(&entStat.m_Entity,start+1,count,entity_rows));
     
     
     for(int i=0;i<entity_rows->GetCount()+shift;i++)

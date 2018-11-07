@@ -79,8 +79,16 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
     
     uint256 txid;
     txid=*(uint256*)m_Details.GetTxID();
-    m_FilterCaption=strprintf("%s (txid %s)",
-            m_Details.m_Name,txid.ToString().c_str());
+    if(m_Details.m_Name[0])
+    {
+        m_FilterCaption=strprintf("%s",
+                m_Details.m_Name);
+    }
+    else
+    {
+        m_FilterCaption=strprintf("(txid %s)",
+                txid.ToString().c_str());        
+    }
     
     ptr=(unsigned char *)m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_TYPE,&value_size);
     
@@ -98,21 +106,27 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
         case MC_FLT_TYPE_TX:
             m_MainName=MC_FLT_MAIN_NAME_TX;
             break;
+        case MC_FLT_TYPE_STREAM:
+            m_MainName=MC_FLT_MAIN_NAME_STREAM;
+            break;
         default:
             m_CreateError="Unsupported filter type";
             return MC_ERR_NOT_SUPPORTED;
     }
     
-    ptr=(unsigned char *)m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_ENTITY,&value_size);
-    
-    if(ptr)
+    if(m_FilterType == MC_FLT_TYPE_TX)
     {
-        if(value_size % MC_AST_SHORT_TXID_SIZE)
+        ptr=(unsigned char *)m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_RESTRICTIONS,&value_size);
+
+        if(ptr)
         {
-            return MC_ERR_ERROR_IN_SCRIPT;                        
-        }
-        m_RelevantEntities=mc_FillRelevantFilterEntitities(ptr, value_size);
-    }    
+            if(value_size % MC_AST_SHORT_TXID_SIZE)
+            {
+                return MC_ERR_ERROR_IN_SCRIPT;                        
+            }
+            m_RelevantEntities=mc_FillRelevantFilterEntitities(ptr, value_size);
+        }    
+    }
     
     
     ptr=(unsigned char *)m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size);
@@ -150,6 +164,7 @@ int mc_MultiChainFilterEngine::Zero()
     m_Filters.clear();
     m_TxID=0;
     m_Workers=NULL;
+    m_CallbackNames.clear();
     
     return MC_ERR_NOERROR;
 }
@@ -177,7 +192,36 @@ int mc_MultiChainFilterEngine::Destroy()
     return MC_ERR_NOERROR;
 }
 
-int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid)
+int mc_MultiChainFilterEngine::GetAcceptTimeout()
+{    
+    return GetArg("-acceptfiltertimeout",DEFAULT_ACCEPT_FILTER_TIMEOUT);
+}
+
+int mc_MultiChainFilterEngine::GetSendTimeout()
+{    
+    int accept_timeout=GetAcceptTimeout();
+    int timeout=GetArg("-sendfiltertimeout",DEFAULT_SEND_FILTER_TIMEOUT);
+    if(accept_timeout > 0)
+    {
+        if(accept_timeout < timeout)
+        {
+            timeout=accept_timeout;
+        }
+    }
+    return timeout;
+}
+
+int mc_MultiChainFilterEngine::SetTimeout(int timeout)
+{
+    for(int i=0;i<(int)m_Filters.size();i++)
+    {
+        mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
+        worker->SetTimeout(timeout);
+    }    
+}
+
+
+int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid,int for_block)
 {    
     int err;
     mc_MultiChainFilter filter;
@@ -193,7 +237,8 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid)
     mc_Filter *worker=new mc_Filter;
     m_Workers->Add(&worker);
     
-    err=pFilterEngine->CreateFilter(m_Filters.back().m_FilterCode,m_Filters.back().m_MainName.c_str(),worker,m_Filters.back().m_CreateError);    
+    err=pFilterEngine->CreateFilter(m_Filters.back().m_FilterCode,m_Filters.back().m_MainName.c_str(),
+            m_CallbackNames[m_Filters.back().m_FilterType],worker,(for_block == 0) ? GetAcceptTimeout() : 0,m_Filters.back().m_CreateError);
     if(err)
     {
         LogPrintf("Couldn't create filter with short txid %s, error: %d\n",filter.m_FilterAddress.ToString().c_str(),err);
@@ -207,11 +252,11 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid)
     return MC_ERR_NOERROR;
 }
 
-int mc_MultiChainFilterEngine::Reset(int block)
+int mc_MultiChainFilterEngine::Reset(int block,int for_block)
 {
     int filter_block;
     int err;
-    
+
     if(m_Filters.size() == 0)
     {
         return MC_ERR_NOERROR;        
@@ -244,7 +289,8 @@ int mc_MultiChainFilterEngine::Reset(int block)
     {
         mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
         
-        err=pFilterEngine->CreateFilter(m_Filters[i].m_FilterCode,m_Filters[i].m_MainName.c_str(),worker,m_Filters[i].m_CreateError);
+        err=pFilterEngine->CreateFilter(m_Filters[i].m_FilterCode,m_Filters[i].m_MainName,m_CallbackNames[m_Filters[i].m_FilterType],
+                worker,m_Filters[i].m_CreateError);
         if(err)
         {
             LogPrintf("Couldn't prepare filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
@@ -252,26 +298,104 @@ int mc_MultiChainFilterEngine::Reset(int block)
         }        
     }    
     
+    if(for_block == 0)
+    {
+        SetTimeout(GetAcceptTimeout());
+    }
+    
     if(fDebug)LogPrint("filter","filter: Filter engine reset\n");
     return MC_ERR_NOERROR;
 }
 
-int mc_MultiChainFilterEngine::Run(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied)
+int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout, unsigned char *stream_short_txid,int block,int offset,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied)            
 {
+    if(mc_gState->m_Features->StreamFilters() == 0)
+    {
+        return MC_ERR_NOERROR;
+    }
+    
     int err=MC_ERR_NOERROR;
     strResult="";
     m_Tx=tx;
     m_TxID=m_Tx.GetHash();
+    m_Vout=vout;
     m_Params.Init();
+    
+    unsigned char *stream_entity_txid=mc_gState->m_Assets->CachedTxIDFromShortTxID(stream_short_txid); 
     
     if(applied)
     {
         *applied=0;
     }
     
+    if(stream_entity_txid == NULL)
+    {
+        goto exitlbl;
+    }
+    
+    mc_gState->m_Permissions->SetRollBackPos(block,offset,(offset != 0) ? 1 : 0);
+    mc_gState->m_Assets->SetRollBackPos(block,offset,(offset != 0) ? 1 : 0);
+    
     for(int i=0;i<(int)m_Filters.size();i++)
     {
-        if(m_Filters[i].m_CreateError.size() == 0)
+        if( (m_Filters[i].m_FilterType == MC_FLT_TYPE_STREAM) && (m_Filters[i].m_CreateError.size() == 0) )
+        {
+            if(mc_gState->m_Permissions->FilterApproved(stream_entity_txid,&(m_Filters[i].m_FilterAddress)))
+            {
+                mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
+                err=pFilterEngine->RunFilter(worker,strResult);
+                if(err)
+                {
+                    LogPrintf("Error while running filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
+                    goto exitlbl;
+                }
+                if(strResult.size())
+                {
+                    if(lppFilter)
+                    {
+                        *lppFilter=&(m_Filters[i]);
+                    }
+                    if(fDebug)LogPrint("filter","filter: %s: %s\n",m_Filters[i].m_FilterCaption.c_str(),strResult.c_str());
+
+                    goto exitlbl;
+                }
+                if(fDebug)LogPrint("filter","filter: Tx %s accepted, filter: %s\n",m_TxID.ToString().c_str(),m_Filters[i].m_FilterCaption.c_str());
+                if(applied)
+                {
+                    *applied+=1;
+                }
+            }
+        }
+    }    
+
+exitlbl:
+    
+    mc_gState->m_Assets->ResetRollBackPos();
+    mc_gState->m_Permissions->ResetRollBackPos();
+    m_Params.Close();
+    m_TxID=0;
+    m_Vout=-1;
+    return err;    
+}
+
+int mc_MultiChainFilterEngine::RunTxFilters(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied)
+{
+    int err=MC_ERR_NOERROR;
+    strResult="";
+    m_Tx=tx;
+    m_TxID=m_Tx.GetHash();
+    m_Vout=-1;
+    m_Params.Init();
+    
+    if(applied)
+    {
+        *applied=0;
+    }
+    int failure=0;
+    if(fDebug)LogPrint("filter","filter: Starting filtering for tx %s\n",tx.GetHash().ToString().c_str());
+    for(int i=0;i<(int)m_Filters.size();i++)
+    {
+        if( (m_Filters[i].m_FilterType == MC_FLT_TYPE_TX) && (m_Filters[i].m_CreateError.size() == 0) )
         {
             if(mc_gState->m_Permissions->FilterApproved(NULL,&(m_Filters[i].m_FilterAddress)))
             {
@@ -292,7 +416,7 @@ int mc_MultiChainFilterEngine::Run(const CTransaction& tx,std::set <uint160>& sR
                         }
                         strResult=strprintf("The transaction did not pass filter %s: %s",m_Filters[i].m_FilterCaption.c_str(),strResult.c_str());
                         if(fDebug)LogPrint("filter","filter: %s\n",strResult.c_str());
-                        
+                        failure++;
                         goto exitlbl;
                     }
                     if(fDebug)LogPrint("filter","filter: Tx %s accepted, filter: %s\n",m_TxID.ToString().c_str(),m_Filters[i].m_FilterCaption.c_str());
@@ -310,6 +434,7 @@ int mc_MultiChainFilterEngine::Run(const CTransaction& tx,std::set <uint160>& sR
     }    
 
 exitlbl:
+    if(fDebug)LogPrint("filter","filter: Applied filters: success - %d, failure - %d\n",*applied,failure);
             
     m_Params.Close();
     m_TxID=0;
@@ -330,18 +455,63 @@ int mc_MultiChainFilterEngine::RunFilter(const CTransaction& tx,mc_Filter *filte
     return err;
 }
 
-int mc_MultiChainFilterEngine::RunFilterWithCallbackLog(const CTransaction& tx,mc_Filter *filter,std::string &strResult, json_spirit::Array& callbacks)
+int mc_MultiChainFilterEngine::RunFilterWithCallbackLog(const CTransaction& tx,int vout,mc_Filter *filter,std::string &strResult, json_spirit::Array& callbacks)
 {
     int err=MC_ERR_NOERROR;
     m_Tx=tx;
     m_TxID=m_Tx.GetHash();
     m_Params.Init();
+    m_Vout=vout;
 
     err=pFilterEngine->RunFilterWithCallbackLog(filter,strResult, callbacks);
 
     m_Params.Close();
+    m_Vout=-1;
     m_TxID=0;
     return err;
+}
+
+void mc_MultiChainFilterEngine::SetCallbackNames()
+{
+    m_CallbackNames.clear();
+    
+    std::vector <std::string> callbacks;                                        // Tx filter callbacks
+    
+    callbacks.clear();
+    callbacks.push_back("getfiltertxid");
+    callbacks.push_back("getfiltertransaction");
+    callbacks.push_back("setfilterparam");
+    callbacks.push_back("getfiltertxinput");
+    callbacks.push_back("getlastblockinfo");
+    callbacks.push_back("getassetinfo");
+    callbacks.push_back("getstreaminfo");
+    callbacks.push_back("verifypermission");
+    callbacks.push_back("verifymessage");    
+    
+    
+    if(mc_gState->m_NetworkParams->ProtocolVersion() >= 20005)
+    {
+        callbacks.push_back("getfilterassetbalances");
+    }
+    
+    m_CallbackNames.push_back(callbacks);                                       // Stream filters callbacks
+    
+    callbacks.clear();
+    callbacks.push_back("getfiltertxid");
+    callbacks.push_back("getfiltertransaction");
+    callbacks.push_back("setfilterparam");
+    callbacks.push_back("getlastblockinfo");
+    callbacks.push_back("getassetinfo");
+    callbacks.push_back("getstreaminfo");
+    callbacks.push_back("verifypermission");
+    callbacks.push_back("verifymessage");    
+    
+    if(mc_gState->m_NetworkParams->ProtocolVersion() >= 20005)
+    {
+        callbacks.push_back("getfilterstreamitem");        
+    }
+    
+    m_CallbackNames.push_back(callbacks);    
 }
 
 int mc_MultiChainFilterEngine::Initialize()
@@ -356,6 +526,7 @@ int mc_MultiChainFilterEngine::Initialize()
     m_Workers=new mc_Buffer;
     m_Workers->Initialize(sizeof(mc_Filter*),sizeof(mc_Filter*),MC_BUF_MODE_DEFAULT);
     
+    SetCallbackNames();
     
     filters=NULL;
     filters=mc_gState->m_Assets->GetEntityList(filters,NULL,MC_ENT_TYPE_FILTER);
@@ -396,13 +567,13 @@ int mc_MultiChainFilterEngine::Initialize()
     
     for(it=filter_refs.begin();it != filter_refs.end();it++)
     {
-        err=Add((unsigned char*)&(it->second)+MC_AST_SHORT_TXID_OFFSET);
+        err=Add((unsigned char*)&(it->second)+MC_AST_SHORT_TXID_OFFSET,0);
         if(err)
         {
             goto exitlbl;
         }
     }
-
+    
     LogPrintf("Filter initialization completed\n");
     
 exitlbl:

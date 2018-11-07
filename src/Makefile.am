@@ -1,6 +1,6 @@
 walDIST_SUBDIRS = secp256k1
 AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS)
-CXXFLAGS += -Wno-implicit-fallthrough -std=c++0x
+CXXFLAGS += -std=c++0x
 
 
 if EMBEDDED_LEVELDB
@@ -34,7 +34,6 @@ LIBBITCOIN_MULTICHAIN=multichain/libbitcoin_multichain.a
 LIBBITCOIN_UNIVALUE=univalue/libbitcoin_univalue.a
 LIBBITCOINQT=qt/libbitcoinqt.a
 LIBSECP256K1=secp256k1/libsecp256k1.la
-LIBBITCOIN_V8DATA=v8/libbitcoin_v8data.a
 
 $(LIBSECP256K1): $(wildcard secp256k1/src/*) $(wildcard secp256k1/include/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
@@ -48,8 +47,7 @@ EXTRA_LIBRARIES = \
   libbitcoin_common.a \
   univalue/libbitcoin_univalue.a \
   libbitcoin_server.a \
-  libbitcoin_cli.a \
-  v8/libbitcoin_v8data.a
+  libbitcoin_cli.a
 if ENABLE_WALLET
 BITCOIN_INCLUDES += $(BDB_CPPFLAGS)
 EXTRA_LIBRARIES += libbitcoin_wallet.a
@@ -174,7 +172,9 @@ V8_SOURCES = \
   v8/v8isolatemanager.cpp \
   v8/v8engine.cpp \
   v8/v8filter.cpp \
-  v8/callbacks.cpp
+  v8/v8filterwatchdog.cpp \
+  v8/callbacks.cpp \
+  v8/v8utils.cpp
 
 # server: shared between bitcoind and bitcoin-qt
 libbitcoin_server_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS)
@@ -417,26 +417,21 @@ endif
 
 # MCHN START
 
-V8_RELEASE = $(HOME)/local/v8
-V8_DATA_DIR = $(V8_RELEASE)/data
-V8_INCLUDE = -I$(V8_RELEASE)/include
-V8_LIB_DIR = $(V8_RELEASE)/lib
+V8_ROOT = $(top_builddir)/v8build/v8
+V8_INCLUDE = -I$(V8_ROOT)/include
+V8_LIB_DIR = $(V8_ROOT)/out.gn/x64.release/obj
 V8_LIBS = \
-    -L$(V8_RELEASE)/lib \
+    -L$(V8_LIB_DIR) -L$(V8_LIB_DIR)/third_party/icu \
     -Wl,--start-group \
         -lv8_libbase \
         -lv8_libplatform \
         -lv8_base \
         -lv8_external_snapshot \
         -lv8_libsampler \
+        -lv8_data \
         -licuuc \
         -licui18n \
     -lrt -ldl
-
-v8_libbitcoin_v8data_a_SOURCES = \
-  $(V8_DATA_DIR)/icudtl.dat \
-  $(V8_DATA_DIR)/natives_blob.bin \
-  $(V8_DATA_DIR)/snapshot_blob.bin
 
 # multichaind binary #
 multichaind_LDADD = \
@@ -607,12 +602,6 @@ clean-local:
 %.pb.cc %.pb.h: %.proto
 	@test -f $(PROTOC)
 	$(AM_V_GEN) $(PROTOC) --cpp_out=$(@D) --proto_path=$(abspath $(<D) $<)
-
-.bin.o:
-	cd $(dir $<) && objcopy -B i386 -I binary -O elf64-x86-64 $(notdir $<) $(notdir $@)
-
-.dat.o:
-	cd $(dir $<) && objcopy -B i386 -I binary -O elf64-x86-64 $(notdir $<) $(notdir $@)
 
 #if ENABLE_TESTS
 #include Makefile.test.include

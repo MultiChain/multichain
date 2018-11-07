@@ -234,7 +234,7 @@ bool AppInit(int argc, char* argv[])
     {
         char fileName[MC_DCT_DB_MAX_PATH];
         mc_GetFullFileName(mc_gState->m_Params->NetworkName(),"params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
-        fprintf(stderr,"ERROR: Parameter set for blockchain %s is not valid.\n\nThe file %s must be copied manually from an existing node.\n\n",
+        fprintf(stderr,"ERROR: Parameter set for blockchain %s is not valid.\n\nThe file %s must be copied manually from an existing node into empty blockchain directory.\n\n",
                 mc_gState->m_Params->NetworkName(),fileName);                        
         delete mc_gState;                
         return false;        

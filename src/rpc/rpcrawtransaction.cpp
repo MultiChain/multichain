@@ -41,6 +41,7 @@ using namespace std;
 
 bool OutputCanSend(COutput out);
 uint32_t mc_CheckSigScriptForMutableTx(const unsigned char *src,int size);
+int mc_MaxOpReturnShown();
 
 /* MCHN END */
 
@@ -58,9 +59,40 @@ void ScriptPubKeyToJSON(const CScript& scriptPubKey, Object& out, bool fIncludeH
     if (fIncludeHex)
         out.push_back(Pair("hex", HexStr(scriptPubKey.begin(), scriptPubKey.end())));
  */ 
-    out.push_back(Pair("asm", scriptToShow.ToString()));
-    if (fIncludeHex)
-        out.push_back(Pair("hex", HexStr(scriptToShow.begin(), scriptToShow.end())));
+    
+    int max_hex_size=-1;
+    int script_size=(int)(scriptToShow.end()-scriptToShow.begin());
+    
+    if(mc_gState->m_Features->StreamFilters())
+    {
+        if(pMultiChainFilterEngine->m_TxID != 0)
+        {
+            max_hex_size=mc_MaxOpReturnShown();
+        }
+
+        if(max_hex_size >= 0)
+        {
+            if(script_size <= max_hex_size)
+            {
+                max_hex_size=-1;
+            }
+        }
+    }
+    
+    if(max_hex_size < 0)
+    {    
+        out.push_back(Pair("asm", scriptToShow.ToString()));
+        if (fIncludeHex)
+            out.push_back(Pair("hex", HexStr(scriptToShow.begin(), scriptToShow.end())));
+    }
+    else
+    {
+        Object script_size_object;
+        script_size_object.push_back(Pair("size", script_size));
+        out.push_back(Pair("asm", script_size_object));
+        if (fIncludeHex)
+            out.push_back(Pair("hex", script_size_object));        
+    }
 /* MCHN END */
 
 
@@ -471,7 +503,27 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     if(new_entity_type == MC_ENT_TYPE_STREAM)
     {
         uint256 txid=tx.GetHash();
-        entry.push_back(Pair("create", StreamEntry((unsigned char*)&txid,0x05)));
+        
+        mc_EntityDetails entity;
+        mc_EntityDetails *lpEntity=NULL;
+        entity.Zero();
+        if(mc_gState->m_Assets->FindEntityByTxID(&entity,(unsigned char*)&txid) == 0)
+        {
+            mc_EntityLedgerRow entity_row;
+            entity_row.Zero();
+            memcpy(entity_row.m_Key,&txid,MC_ENT_KEY_SIZE);
+            entity_row.m_EntityType=MC_ENT_TYPE_STREAM;
+            entity_row.m_Block=mc_gState->m_Assets->m_Block;
+            entity_row.m_Offset=-1;
+            entity_row.m_ScriptSize=details_script_size;
+            if(details_script_size)
+            {
+                memcpy(entity_row.m_Script,details_script,details_script_size);
+            }
+            entity.Set(&entity_row);
+            lpEntity=&entity;
+        }
+        entry.push_back(Pair("create", StreamEntry((unsigned char*)&txid,0x05,lpEntity)));
     }
     
     if(mc_gState->m_Compatibility & MC_VCM_1_0)
@@ -495,10 +547,101 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     }
 }
 
+int VerifyNewTxForStreamFilters(const CTransaction& tx,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied)            
+{
+    if(mc_gState->m_Features->StreamFilters() == 0)
+    {
+        if(GetBoolArg("-sendskipstreamfilters",false))                          
+        {
+            return MC_ERR_NOERROR;
+        }
+        return MC_ERR_NOERROR;        
+    }
+    
+    
+    strResult="";
+    for (unsigned int i = 0; i < tx.vout.size(); i++) 
+    {
+        set<uint256> streams_already_seen;
+        bool passed_filters=true;
+        
+        Value result=DataItemEntry(tx,i,streams_already_seen, 0x0102);
+        if(result.type() == obj_type)
+        {
+            uint256 hash=*(streams_already_seen.begin());
+            
+            if(pMultiChainFilterEngine)
+            {
+                pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetSendTimeout());
+            }
+            
+            int err=pMultiChainFilterEngine->RunStreamFilters(tx,i,(unsigned char*)&hash+MC_AST_SHORT_TXID_OFFSET,-1,0, 
+                    strResult,lppFilter,applied);
+            
+            if(pMultiChainFilterEngine)
+            {
+                pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetAcceptTimeout());
+            }
+            if(err != MC_ERR_NOERROR)
+            {
+                if(fDebug)LogPrint("mchn","mchn: Stream items rejected (%s): %s\n","Error while running filters",EncodeHexTx(tx));
+                passed_filters=false;
+            }
+            else
+            {
+                if(strResult.size())
+                {
+                    if(fDebug)LogPrint("mchn","mchn: Rejecting filter: %s\n",(*lppFilter)->m_FilterCaption.c_str());
+                    if(fDebug)LogPrint("mchn","mchn: Stream items rejected (%s): %s\n",strResult.c_str(),EncodeHexTx(tx));                                
+                    passed_filters=false;
+                }
+            }                                
+            if(!passed_filters)
+            {    
+                return MC_ERR_NOT_ALLOWED;                
+            }
+        }        
+    }    
+    
+    return MC_ERR_NOERROR;
+}
+
+
+Value getfilterstreamitem(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)                        
+        mc_ThrowHelpMessage("getfilterstreamitem");        
+//        throw runtime_error("Help message not found\n");
+    
+    if(pMultiChainFilterEngine->m_Vout < 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "This callback cannot be used in tx filters");                            
+    }
+    
+    set<uint256> streams_already_seen;
+    
+    if(pMultiChainFilterEngine->m_Vout >= (int)pMultiChainFilterEngine->m_Tx.vout.size())
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "vout out of range");                                            
+    }
+    Value result=DataItemEntry(pMultiChainFilterEngine->m_Tx,pMultiChainFilterEngine->m_Vout,streams_already_seen, 0x0E00);
+    
+    if(result.type() != obj_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream input is not found in this output");                                    
+    }
+    
+//    result.get_obj().push_back(Pair("txid", pMultiChainFilterEngine->m_Tx.GetHash().GetHex()));
+    result.get_obj().push_back(Pair("vout", pMultiChainFilterEngine->m_Vout));
+    
+    return result;
+}
+
 Value getfiltertransaction(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)                        
-        throw runtime_error("Help message not found\n");
+        mc_ThrowHelpMessage("getfiltertransaction");        
+//        throw runtime_error("Help message not found\n");
 
 /*    
     CTransaction tx;
@@ -1983,6 +2126,15 @@ Value sendrawtransaction(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
     uint256 hashTx = tx.GetHash();
 
+    mc_MultiChainFilter* lpFilter;
+    int applied=0;
+    string filter_error="";
+    
+    if(VerifyNewTxForStreamFilters(tx,filter_error,&lpFilter,&applied) == MC_ERR_NOT_ALLOWED)
+    {
+        throw JSONRPCError(RPC_NOT_ALLOWED, "Transaction didn't pass stream filter " + lpFilter->m_FilterCaption + ": " + filter_error);                            
+    }
+
     bool fOverrideFees = false;
     if (params.size() > 1)
         fOverrideFees = params[1].get_bool();
@@ -1995,13 +2147,25 @@ Value sendrawtransaction(const Array& params, bool fHelp)
     
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
-        pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-flushsourcechunks",true) ? (MC_CDB_FLUSH_MODE_FILE | MC_CDB_FLUSH_MODE_DATASYNC) : MC_CDB_FLUSH_MODE_NONE);
+        if(pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-flushsourcechunks",true) ? (MC_CDB_FLUSH_MODE_FILE | MC_CDB_FLUSH_MODE_DATASYNC) : MC_CDB_FLUSH_MODE_NONE))
+        {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't store offchain items, probably chunk database is corrupted");                                        
+        }
     }
     
     if (!fHaveMempool && !fHaveChain) {
         // push to local node and sync with wallets
         CValidationState state;
-        if (!AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, !fOverrideFees)) {
+        if(pMultiChainFilterEngine)
+        {
+            pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetSendTimeout());
+        }
+        bool accepted=AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, !fOverrideFees);
+        if(pMultiChainFilterEngine)
+        {
+            pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetAcceptTimeout());
+        }
+        if (!accepted) {
             if(state.IsInvalid())
                 throw JSONRPCError(RPC_TRANSACTION_REJECTED, strprintf("%i: %s", state.GetRejectCode(), state.GetRejectReason()));
             else

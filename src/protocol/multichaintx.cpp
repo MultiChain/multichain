@@ -39,6 +39,7 @@ typedef struct CMultiChainTxDetails
     bool fFullReplayCheckRequired;                                              // Tx should be rechecked when mempool is replayed
     bool fAdminMinerGrant;                                                      // Admin/miner grant in this transaction
     bool fAssetIssuance;                                                        // New/followon issuance in this tx 
+    bool fIsStandardCoinbase;                                                   // Tx is standard coinbase - filters should not be applied
     
     vector <txnouttype> vInputScriptTypes;                                      // Input script types
     vector <uint160> vInputDestinations;                                        // Addresses used in input scripts
@@ -106,6 +107,7 @@ void CMultiChainTxDetails::Zero()
     fFullReplayCheckRequired=false;
     fAdminMinerGrant=false;
     fAssetIssuance=false;
+    fIsStandardCoinbase=false;
     
     details_script_size=0;
     details_script_type=-1;
@@ -1184,6 +1186,13 @@ bool MultiChainTransaction_ProcessPermissions(const CTransaction& tx,
                         {
                             details->emergency_disapproval_output=-2;
                         }
+                        if(mc_gState->m_Features->FixedIn20005())               // Not standard disapproval
+                        {
+                            if( (to != 0) || (from != 0) )
+                            {
+                                details->emergency_disapproval_output=-2;                            
+                            }
+                        }
                     }
                     
                     for (unsigned int i = 0; i < tx.vin.size(); i++)
@@ -1713,7 +1722,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                 return false;                                                                        
             }            
         }
-        
+                
         if(entity.AllowedFollowOns() == 0)
         {
             reason="Asset follow-on script rejected - follow-ons not allowed for this asset";
@@ -1726,6 +1735,10 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                 reason="Asset follow-on script rejected - mismatch in follow-on quantity asset and details script";
                 return false;                                                                                                    
             }
+        }
+        if(mc_gState->m_Features->FixedIn20005())                               // Issumore was missed before 20005
+        {
+            details->SetRelevantEntity((unsigned char*)entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
         }
         if(ptrOut)
         {
@@ -1950,6 +1963,7 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
     uint32_t timestamp=0;
     set <uint160> stored_openers;
     int update_mempool;
+    bool check_admin=true;
     uint256 txid;
     mc_EntityDetails entity;
         
@@ -1968,8 +1982,34 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
         if(details->IsRelevantInput(i,details->new_entity_output))
         {
             if(mc_gState->m_Permissions->CanCreate(NULL,(unsigned char*)&(details->vInputDestinations[i])))
-            {                            
-                if( (details->new_entity_type <= MC_ENT_TYPE_STREAM_MAX) ||     // Admin persmission is required for upgrades and filters
+            {            
+                if(details->new_entity_type <= MC_ENT_TYPE_STREAM_MAX)
+                {
+                    check_admin=false;
+                }
+                else
+                {                    
+                    if(details->new_entity_type == MC_ENT_TYPE_FILTER)
+                    {
+                        if(mc_gState->m_Features->StreamFilters())
+                        {
+                            uint32_t value_offset;
+                            size_t value_size;
+                            value_offset=mc_FindSpecialParamInDetailsScript(details->details_script,details->details_script_size,MC_ENT_SPRM_FILTER_TYPE,&value_size);
+                            if(value_offset<(uint32_t)details->details_script_size)
+                            {
+                                if((uint32_t)mc_GetLE(details->details_script+value_offset,value_size) == MC_FLT_TYPE_STREAM)
+                                {
+                                    check_admin=false;
+                                }
+                            }                                    
+                            
+                        }
+                    }
+                }
+                
+//                if( (details->new_entity_type <= MC_ENT_TYPE_STREAM_MAX) ||     // Admin persmission is required for upgrades and filters
+                if( !check_admin ||
                     (mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)&(details->vInputDestinations[i])) != 0) )
                 {
                     openers.push_back(details->vInputDestinations[i]);
@@ -2081,7 +2121,7 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
             }
             if(details->new_entity_type == MC_ENT_TYPE_FILTER)
             {
-                pMultiChainFilterEngine->Add((unsigned char*)&txid+MC_AST_SHORT_TXID_OFFSET);
+                pMultiChainFilterEngine->Add((unsigned char*)&txid+MC_AST_SHORT_TXID_OFFSET,(offset < 0) ? 0 : 1);
             }
         }
         else
@@ -2133,10 +2173,21 @@ bool MultiChainTransaction_VerifyNotFilteredRestrictions(const CTransaction& tx,
             
     for (unsigned int vout = 0; vout < tx.vout.size(); vout++)
     {
-        if(details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_NOT_OP_RETURN)
+        if(mc_gState->m_Features->FixedIn20005())
         {
-            details->emergency_disapproval_output=-2;
-            return true;            
+            if( (details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_NOT_OP_RETURN) == 0)
+            {
+                details->emergency_disapproval_output=-2;
+                return true;            
+            }            
+        }
+        else
+        {
+            if(details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_NOT_OP_RETURN)
+            {
+                details->emergency_disapproval_output=-2;
+                return true;            
+            }
         }
         
         MultiChainTransaction_SetTmpOutputScript(tx.vout[vout].scriptPubKey);
@@ -2188,7 +2239,89 @@ bool MultiChainTransaction_VerifyNotFilteredRestrictions(const CTransaction& tx,
         }
     }
     
+    if(details->emergency_disapproval_output >= 0)
+    {
+        if(fDebug)LogPrint("filter","Standard filter disapproval - tx will bypass all filter\n");
+    }
     return true;
+}
+
+bool MultiChainTransaction_VerifyStandardCoinbase(const CTransaction& tx,        // Tx to check
+                                                        CMultiChainTxDetails *details, // Tx details object
+                                                        string& reason)                // Error message
+{
+    details->fIsStandardCoinbase=false;
+    
+    if(!tx.IsCoinBase())
+    {
+        return true;
+    }
+    
+    if(mc_gState->m_Features->FixedIn20005() == 0)                              // Coinbase is checked like all other txs before 20005
+    {
+        return true;        
+    }
+    
+    bool value_output=false;
+    bool signature_output=false;
+    for (unsigned int vout = 0; vout < tx.vout.size(); vout++)
+    {
+        MultiChainTransaction_SetTmpOutputScript(tx.vout[vout].scriptPubKey);
+
+        if(mc_gState->m_TmpScript->IsOpReturnScript())                    
+        {
+            if(signature_output)
+            {
+                LogPrintf("Non-standard coinbase: Multiple signatures\n");
+                return true;                                                    
+            }
+            if(mc_gState->m_TmpScript->GetNumElements() != 1)
+            {
+                if(mc_gState->m_Permissions->m_Block >= 0)
+                {
+                    LogPrintf("Non-standard coinbase: Non-standard signature\n");
+                    return true;                                                    
+                }
+            }
+            signature_output=true;
+        }   
+        else
+        {
+            if(tx.vout[vout].nValue == 0)
+            {
+                if(value_output)
+                {
+                    LogPrintf("Non-standard coinbase: Multiple value outputs\n");
+                    return true;                                                // Only single "value" output is allowed
+                }
+                if(mc_gState->m_Permissions->m_Block > 0)
+                {
+                    LogPrintf("Non-standard coinbase: Value output for chain without native currency\n");
+                    return true;                                                // No "value" outputs for the blocks 2+
+                }
+            }
+            value_output=true;
+        }
+        
+    }
+    
+    if(!value_output)
+    {
+        if(mc_gState->m_Permissions->m_Block <= 0)
+        {
+            LogPrintf("Non-standard coinbase: Missing value output\n");
+        }        
+    }
+    
+    if(signature_output == (mc_gState->m_NetworkParams->IsProtocolMultichain() == 0))
+    {
+        LogPrintf("Non-standard coinbase: Sigature output doesn't match protocol\n");
+        return true;                                                            // Signature output should appear only if protocol=multichain
+    }
+        
+    details->fIsStandardCoinbase=true;
+    
+    return true;    
 }
 
 bool AcceptMultiChainTransaction   (const CTransaction& tx,                     // Tx to check
@@ -2221,7 +2354,8 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
     }
    
     mc_gState->m_Permissions->SetCheckPoint();                                  // if there is an error after this point or it is just check, permission mempool should be restored
-
+    mc_gState->m_Assets->SetCheckPoint();    
+    
     if(!MultiChainTransaction_CheckOutputs(tx,inputs,offset,&details,reason))   // Outputs        
     {
         fReject=true;
@@ -2253,7 +2387,13 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
         goto exitlbl;                                                                                
     }        
     
-    if(details.emergency_disapproval_output < 0)
+    if(!MultiChainTransaction_VerifyStandardCoinbase(tx,&details,reason))           
+    {
+        fReject=true;
+        goto exitlbl;                                                                                
+    }        
+    
+    if( (details.emergency_disapproval_output < 0) && !details.fIsStandardCoinbase)
     {
         if(mc_gState->m_Features->Filters())
         {
@@ -2262,7 +2402,7 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
                 mc_MultiChainFilter* lpFilter;
                 int applied=0;
 
-                if(pMultiChainFilterEngine->Run(tx,details.vRelevantEntities,reason,&lpFilter,&applied) != MC_ERR_NOERROR)
+                if(pMultiChainFilterEngine->RunTxFilters(tx,details.vRelevantEntities,reason,&lpFilter,&applied) != MC_ERR_NOERROR)
                 {
                     reason="Error while running filters";
                     fReject=true;
@@ -2307,6 +2447,7 @@ exitlbl:
     if(!accept || fReject)                                                      // Rolling back permission database if we were just checking or error occurred    
     {
         mc_gState->m_Permissions->RollBackToCheckPoint();
+        mc_gState->m_Assets->RollBackToCheckPoint();
     }
 
     if(mandatory_fee_out)
