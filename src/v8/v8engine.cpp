@@ -2,9 +2,9 @@
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "v8engine.h"
-#include "v8filter.h"
 #include "utils/define.h"
 #include "utils/util.h"
+#include "v8filter.h"
 
 namespace mc_v8
 {
@@ -20,7 +20,8 @@ int V8Engine::Destroy()
 
 int V8Engine::Initialize(std::string &strResult)
 {
-    if(fDebug)LogPrint("v8filter", "v8filter: V8Engine::Initialize\n");
+    if (fDebug)
+        LogPrint("v8filter", "v8filter: V8Engine::Initialize\n");
     strResult.clear();
     return MC_ERR_NOERROR;
 }
@@ -28,9 +29,10 @@ int V8Engine::Initialize(std::string &strResult)
 int V8Engine::CreateFilter(std::string script, std::string main_name, std::vector<std::string> &callback_names,
                            V8Filter *filter, std::string &strResult)
 {
-    if(fDebug)LogPrint("v8filter", "v8filter: V8Engine::CreateFilter\n");
+    if (fDebug)
+        LogPrint("v8filter", "v8filter: V8Engine::CreateFilter\n");
     strResult.clear();
-    return filter->Initialize(this, script, main_name, callback_names, strResult);
+    return filter->Initialize(script, main_name, callback_names, strResult);
 }
 
 int V8Engine::RunFilter(V8Filter *filter, std::string &strResult)
@@ -59,8 +61,7 @@ void V8Engine::TerminateFilter(V8Filter *filter, std::string reason)
 {
     if (filter != nullptr && filter->IsRunning())
     {
-        m_reason = reason;
-        filter->GetIsolate()->TerminateExecution();
+        filter->Terminate(reason);
     }
 }
 

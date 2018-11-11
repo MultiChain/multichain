@@ -5,8 +5,7 @@
 
 namespace mc_v8
 {
-
-v8::Local<v8::Value> Jsp2V8(v8::Isolate* isolate, const json_spirit::Value& j)
+v8::Local<v8::Value> Jsp2V8(v8::Isolate *isolate, const json_spirit::Value &j)
 {
     v8::Isolate::Scope isolateScope(isolate);
     v8::EscapableHandleScope handleScope(isolate);
@@ -18,13 +17,12 @@ v8::Local<v8::Value> Jsp2V8(v8::Isolate* isolate, const json_spirit::Value& j)
     case json_spirit::obj_type:
     {
         auto v8obj = v8::Object::New(isolate);
-        for (auto pair : j.get_obj())
+        for (auto property : j.get_obj())
         {
-            v8obj->Set(String2V8(isolate, pair.name_), Jsp2V8(isolate, pair.value_));
+            v8obj->Set(String2V8(isolate, property.name_), Jsp2V8(isolate, property.value_));
         }
         return handleScope.Escape(v8obj);
     }
-        break;
 
     case json_spirit::array_type:
     {
@@ -36,42 +34,27 @@ v8::Local<v8::Value> Jsp2V8(v8::Isolate* isolate, const json_spirit::Value& j)
         }
         return handleScope.Escape(v8array);
     }
-        break;
 
     case json_spirit::str_type:
-    {
-        v8::Local<v8::String> v8str = String2V8(isolate, j.get_str());
-        return handleScope.Escape(v8str);
-    }
-        break;
+        return handleScope.Escape(String2V8(isolate, j.get_str()));
 
     case json_spirit::bool_type:
-    {
-        auto v8bool = v8::Boolean::New(isolate, j.get_bool());
-        return handleScope.Escape(v8bool);
-    }
-        break;
+        return handleScope.Escape(v8::Boolean::New(isolate, j.get_bool()));
 
     case json_spirit::int_type:
-    {
-        auto v8int = v8::Integer::New(isolate, j.get_int());
-        return handleScope.Escape(v8int);
-    }
-        break;
+        return handleScope.Escape(v8::Integer::New(isolate, j.get_int()));
 
     case json_spirit::real_type:
-    {
-        auto v8real = v8::Number::New(isolate, j.get_real());
-        return handleScope.Escape(v8real);
-    }
-        break;
+        return handleScope.Escape(v8::Number::New(isolate, j.get_real()));
 
-    default:
+    case json_spirit::null_type:
         return handleScope.Escape(v8::Null(isolate));
     };
+
+    return handleScope.Escape(v8::Null(isolate));
 }
 
-json_spirit::Value V82Jsp(v8::Isolate* isolate, v8::Local<v8::Value> v)
+json_spirit::Value V82Jsp(v8::Isolate *isolate, v8::Local<v8::Value> v)
 {
     v8::Isolate::Scope isolateScope(isolate);
     v8::HandleScope handleScope(isolate);
@@ -129,7 +112,9 @@ json_spirit::Value V82Jsp(v8::Isolate* isolate, v8::Local<v8::Value> v)
         return json_spirit::Value(v->NumberValue(context).FromJust());
     }
 
-    if(fDebug)LogPrint("v8filter", "v8filter: V8 type '%s' is not recognized\n", V82String(isolate, v->TypeOf(isolate)).c_str());
+    if (fDebug)
+        LogPrint("v8filter", "v8filter: V8 type '%s' is not recognized\n",
+                 V82String(isolate, v->TypeOf(isolate)).c_str());
     return json_spirit::Value();
 }
 

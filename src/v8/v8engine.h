@@ -80,14 +80,6 @@ class V8Engine
      * @param reason    The reason the filter is being terminated.
      */
     void TerminateFilter(V8Filter *filter, std::string reason);
-
-    std::string TerminationReason() const
-    {
-        return m_reason;
-    }
-
-  private:
-    std::string m_reason;
 };
 
 } // namespace mc_v8
