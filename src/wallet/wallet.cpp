@@ -3158,6 +3158,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
             LogPrintf("CommitTransaction() : Error: Transaction not valid: %s\n",reject_reason.c_str());  // MCHN
             return false;
         }
+/*        
         else
         {
             pwalletTxsMain->AddTx(NULL,wtxNew,-1,NULL,-1,0);   
@@ -3166,7 +3167,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
                 SyncWithWallets(wtxNew, NULL);            
             }
         }
-    
+*/    
         for (unsigned int i = 0; i < wtxNew.vin.size(); i++) 
         {
             COutPoint outp=wtxNew.vin[i].prevout;
@@ -4170,7 +4171,7 @@ bool CMerkleTx::AcceptToMemoryPoolReturnReason(bool fLimitFree, bool fRejectInsa
         pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetSendTimeout());
     }
 
-    bool result=::AcceptToMemoryPool(mempool, state, *this, fLimitFree, NULL, fRejectInsaneFee,false);
+    bool result=::AcceptToMemoryPool(mempool, state, *this, fLimitFree, NULL, fRejectInsaneFee,true);
 
     if(pMultiChainFilterEngine)
     {
