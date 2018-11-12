@@ -480,7 +480,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
             char fileName[MC_DCT_DB_MAX_PATH];
             mc_GetFullFileName(mc_gState->m_Params->NetworkName(),"params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
             string seed_error=strprintf("Couldn't retrieve blockchain parameters from the seed node in offline mode.\n"
-                        "The file %s must be copied manually from an existing node.\n",                
+                        "The file %s must be copied manually from an existing node into empty blockchain directory.\n",                
                     fileName);
             return InitError(seed_error);                        
         }        
@@ -846,10 +846,11 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     
     pwalletMain=NULL;
 
+    string rpc_threads_error="";
     if (fServer)
     {
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
-        StartRPCThreads();
+        StartRPCThreads(rpc_threads_error);
     }
 /* MCHN END*/        
     
@@ -985,7 +986,8 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
                 // If the loaded chain has a wrong genesis, bail out immediately
                 // (we're likely using a testnet datadir, or the other way around).
                 if (!mapBlockIndex.empty() && mapBlockIndex.count(Params().HashGenesisBlock()) == 0)
-                    return InitError(_("Incorrect or no genesis block found. Wrong datadir for network?"));
+                    return InitError(_("This blockchain was created with a different params.dat file, please restore the original."));
+//                    return InitError(_("Incorrect or no genesis block found. Wrong datadir for network?"));
 
                 // Initialize the block index (no-op if non-empty database was already loaded)
                 if (!InitBlockIndex()) {
@@ -1052,6 +1054,14 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
             sprintf(bufOutput,"Listening for API requests on port %d (local only - see rpcallowip setting)\n\n",(int)GetArg("-rpcport", BaseParams().RPCPort()));                            
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
         }
+    }
+    if(rpc_threads_error.size())
+    {
+        if(!GetBoolArg("-shortoutput", false))
+        {    
+            sprintf(bufOutput,"%s\n",rpc_threads_error.c_str());                            
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+        }            
     }
     
 

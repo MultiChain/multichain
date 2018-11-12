@@ -233,6 +233,9 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     obj.push_back(Pair("lockadminminerounds",Params().LockAdminMineRounds()));                    
     obj.push_back(Pair("gen",GetBoolArg("-gen", true)));                    
     obj.push_back(Pair("genproclimit",GetArg("-genproclimit", 1)));                    
+    obj.push_back(Pair("lockinlinemetadata",GetBoolArg("-lockinlinemetadata", false)));                    
+    obj.push_back(Pair("acceptfiltertimeout",GetArg("-acceptfiltertimeout", DEFAULT_ACCEPT_FILTER_TIMEOUT)));                    
+    obj.push_back(Pair("sendfiltertimeout",GetArg("-sendfiltertimeout", DEFAULT_SEND_FILTER_TIMEOUT)));                    
 /*
     obj.push_back(Pair("shortoutput",GetBoolArg("-shortoutput",false)));                    
     obj.push_back(Pair("walletdbversion", mc_gState->GetWalletDBVersion()));                
@@ -310,6 +313,11 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
         fFound=true;
     }
+    if(param_name == "lockinlinemetadata")
+    {
+        mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
+        fFound=true;
+    }
     if(param_name == "mineemptyrounds")
     {
         if( (params[1].type() == real_type) || (params[1].type() == str_type) )
@@ -362,6 +370,8 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
     if( (param_name == "lockadminminerounds") ||
         (param_name == "maxshowndata") ||
         (param_name == "maxqueryscanitems") ||
+        (param_name == "acceptfiltertimeout") ||
+        (param_name == "sendfiltertimeout") ||
         (param_name == "dropmessagestest") )
     {
         if( (params[1].type() == int_type) || (params[1].type() == str_type) )
@@ -378,6 +388,13 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
             if( nValue >= 0 )
             {
                 mapArgs ["-" + param_name]=strprintf("%d", nValue);                                
+                if(param_name == "acceptfiltertimeout")
+                {
+                    if(pMultiChainFilterEngine)
+                    {
+                        pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetAcceptTimeout());
+                    }
+                }
             }
             else
             {
@@ -1107,7 +1124,7 @@ Value createmultisig(const Array& params, bool fHelp)
 Value verifymessage(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 3)                                            // MCHN
-        throw runtime_error("Help message not found\n");
+        mc_ThrowHelpMessage("verifymessage");
 
     string strAddress  = params[0].get_str();
     string strSign     = params[1].get_str();

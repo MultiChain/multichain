@@ -34,7 +34,7 @@ public:
 };
 
 /** Start RPC threads */
-void StartRPCThreads();
+void StartRPCThreads(std::string& strError);
 /**
  * Alternative to StartRPCThreads for the GUI, when no server is
  * used. The RPC thread in this case is only used to handle timeouts.
@@ -129,6 +129,7 @@ extern std::vector<CRPCCommand> vStaticRPCCommands;
 extern std::vector<CRPCCommand> vStaticRPCWalletReadCommands;
 void mc_InitRPCHelpMap();
 std::string mc_RPCHelpString(std::string strMethod);
+void mc_ThrowHelpMessage(std::string strMethod);
 void mc_InitRPCList(std::vector<CRPCCommand>& vStaticRPCCommands,std::vector<CRPCCommand>& vStaticRPCWalletReadCommands);
 
 
@@ -249,11 +250,14 @@ extern json_spirit::Value listaddresses(const json_spirit::Array& params, bool f
 extern json_spirit::Value liststreams(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listupgrades(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listtxfilters(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value liststreamfilters(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getfiltercode(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getfiltertxid(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value setfilterparam(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value testtxfilter(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value runtxfilter(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value teststreamfilter(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value runstreamfilter(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getassetinfo(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getstreaminfo(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value verifypermission(const json_spirit::Array& params, bool fHelp);
@@ -318,6 +322,8 @@ extern json_spirit::Value setmocktime(const json_spirit::Array& params, bool fHe
 
 extern json_spirit::Value getrawtransaction(const json_spirit::Array& params, bool fHelp); // in rcprawtransaction.cpp
 extern json_spirit::Value getfiltertransaction(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getfilterstreamitem(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getfilterassetbalances(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listunspent(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value lockunspent(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listlockunspent(const json_spirit::Array& params, bool fHelp);

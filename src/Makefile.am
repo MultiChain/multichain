@@ -1,6 +1,6 @@
 walDIST_SUBDIRS = secp256k1
 AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS)
-CXXFLAGS += -Wno-implicit-fallthrough -std=c++0x
+CXXFLAGS += -std=c++0x
 
 
 if EMBEDDED_LEVELDB
@@ -172,6 +172,7 @@ V8_SOURCES = \
   v8/v8isolatemanager.cpp \
   v8/v8engine.cpp \
   v8/v8filter.cpp \
+  v8/v8filterwatchdog.cpp \
   v8/callbacks.cpp \
   v8/v8utils.cpp
 
@@ -416,9 +417,9 @@ endif
 
 # MCHN START
 
-V8_RELEASE = $(top_builddir)/v8build/v8
-V8_INCLUDE = -I$(V8_RELEASE)/include
-V8_LIB_DIR = $(V8_RELEASE)/out.gn/x64.release/obj
+V8_ROOT = $(top_builddir)/v8build/v8
+V8_INCLUDE = -I$(V8_ROOT)/include
+V8_LIB_DIR = $(V8_ROOT)/out.gn/x64.release/obj
 V8_LIBS = \
     -L$(V8_LIB_DIR) -L$(V8_LIB_DIR)/third_party/icu \
     -Wl,--start-group \
@@ -427,7 +428,7 @@ V8_LIBS = \
         -lv8_base \
         -lv8_external_snapshot \
         -lv8_libsampler \
-				-lv8_data \
+        -lv8_data \
         -licuuc \
         -licui18n \
     -lrt -ldl

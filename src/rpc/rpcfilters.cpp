@@ -9,8 +9,9 @@
 #include "protocol/multichainfilter.h"
 
 void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
+void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity);
 
-void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript)
+void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript,uint32_t filter_type)
 {
     bool field_parsed,already_found;
     
@@ -25,6 +26,10 @@ void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript)
             field_parsed=false;
             if(s.name_ == "for")
             {
+                if(filter_type != MC_FLT_TYPE_TX)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"for field is allowed only for tx filters");                                                   
+                }
                 if(already_found)
                 {
                     throw JSONRPCError(RPC_INVALID_PARAMETER,"for field can appear only once in the object");                               
@@ -85,18 +90,29 @@ string ParseFilterDetails(Value param)
     return param.get_str();
 }
 
-Value createtxfilterfromcmd(const Array& params, bool fHelp)
+Value createfilterfromcmd(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 5)
         throw runtime_error("Help message not found\n");
-
-    if (strcmp(params[1].get_str().c_str(),"txfilter"))
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type, should be stream");
-
+    
     if(mc_gState->m_Features->Filters() == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
     }   
+    
+    uint32_t filter_type=MC_FLT_TYPE_TX;
+    if (strcmp(params[1].get_str().c_str(),"streamfilter") == 0)
+    {
+        filter_type=MC_FLT_TYPE_STREAM;
+    }
+    else
+    {
+        if (strcmp(params[1].get_str().c_str(),"txfilter") )
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type, should be txfilter or streamfilter");
+        }
+        
+    }
     
     CWalletTx wtx;
     
@@ -149,6 +165,43 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
         }        
     }
 
+    lpScript->Clear();
+    
+    lpDetails->Clear();
+    lpDetails->AddElement();
+    if(filter_name.size())
+    {        
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(unsigned char*)(filter_name.c_str()),filter_name.size());//+1);
+    }
+    
+    size_t bytes;
+    string js;
+    const unsigned char *script;
+    CScript scriptOpReturn=CScript();
+    
+    
+    
+    string filter_main_name=MC_FLT_MAIN_NAME_TX;
+    uint32_t permission_needed=MC_PTP_ADMIN | MC_PTP_CREATE;
+    string permission_text="create or admin";
+    if (filter_type == MC_FLT_TYPE_STREAM)
+    {
+        filter_main_name=MC_FLT_MAIN_NAME_STREAM;
+        permission_needed=MC_PTP_CREATE;
+        permission_text="create";
+    }
+    
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_TYPE,(unsigned char*)&filter_type,4);
+    
+    ParseFilterRestrictions(params[3],lpDetailsScript,filter_type);
+    
+    script = lpDetailsScript->GetData(0,&bytes);
+
+    if(bytes)
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_RESTRICTIONS,script,bytes);
+    }
+    
     vector<CTxDestination> addresses;    
     
     vector<CTxDestination> fromaddresses;        
@@ -175,9 +228,9 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
         }
 
         CPubKey pkey;
-        if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_CREATE | MC_PTP_ADMIN,&thisFromAddresses))
+        if(!pwalletMain->GetKeyFromAddressBook(pkey,permission_needed,&thisFromAddresses))
         {
-            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have create or admin permission");                
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have " + permission_text + " permission");                
         }   
     }
     else
@@ -193,52 +246,36 @@ Value createtxfilterfromcmd(const Array& params, bool fHelp)
                 {
                     if(mc_gState->m_Permissions->CanCreate(NULL,(unsigned char*)(&keyID)))
                     {
-                        if(mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)(&keyID)))
+                        if (filter_type == MC_FLT_TYPE_STREAM)
                         {
-                            fromaddresses.push_back(keyID);
+                            fromaddresses.push_back(keyID);                                
+                        }
+                        else
+                        {
+                            if( ((permission_needed & MC_PTP_ADMIN) == 0) ||
+                                (mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)(&keyID)) != 0) )
+                            {
+                                fromaddresses.push_back(keyID);
+                            }
                         }
                     }
                 }
             }
-        }                    
-        CPubKey pkey;
+        }  
+        
         if(fromaddresses.size() == 0)
         {
-            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with create and admin permission");                
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with " + permission_text + " permission");                
         }        
     }
     
-    lpScript->Clear();
-    
-    lpDetails->Clear();
-    lpDetails->AddElement();
-    if(filter_name.size())
-    {        
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(unsigned char*)(filter_name.c_str()),filter_name.size());//+1);
-    }
-    
-    size_t bytes;
-    string js;
-    const unsigned char *script;
-    CScript scriptOpReturn=CScript();
-    
-    uint32_t filter_type=MC_FLT_TYPE_TX;
-    
-    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_TYPE,(unsigned char*)&filter_type,4);
 
-    ParseFilterRestrictions(params[3],lpDetailsScript);
-    
-    script = lpDetailsScript->GetData(0,&bytes);
-
-    if(bytes)
-    {
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_ENTITY,script,bytes);
-    }
 
     js=ParseFilterDetails(params[4]);
 
     mc_Filter *worker=new mc_Filter;
-    err=pFilterEngine->CreateFilter(js.c_str(),MC_FLT_MAIN_NAME_TX,worker,strError);
+
+    err=pFilterEngine->CreateFilter(js.c_str(),filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strError);
     delete worker;
     if(err)
     {
@@ -283,14 +320,12 @@ exitlbl:
     {
         throw JSONRPCError(errorCode, strError);                        
     }
-    return wtx.GetHash().GetHex();    
+
+    return wtx.GetHash().GetHex();        
 }
 
-Value listtxfilters(const Array& params, bool fHelp)
+Value listfilters(const Array& params, uint32_t filter_type)
 {
-    if (fHelp || params.size() > 2)
-        throw runtime_error("Help message not found\n");
-    
     Array results;
     uint32_t output_level;
 
@@ -298,21 +333,39 @@ Value listtxfilters(const Array& params, bool fHelp)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
     }   
+
+    bool check_approval=true;
+    mc_EntityDetails stream_entity;
+    stream_entity.Zero();
+    const unsigned char *lpEntity;
+    lpEntity=NULL;
+    
+    if(filter_type == MC_FLT_TYPE_STREAM)
+    {
+        check_approval=false;
+        if (params.size() > 0 && params[0].type() != null_type && ((params[0].type() != str_type) || (params[0].get_str() !="*" ) ) )
+        {        
+            parseStreamIdentifier(params[0],&stream_entity);           
+            check_approval=true;
+            lpEntity=stream_entity.GetTxID();            
+        }
+    }
+    
     
     vector<string> inputStrings;
-    if (params.size() > 0 && params[0].type() != null_type && ((params[0].type() != str_type) || (params[0].get_str() !="*" ) ) )
+    if (params.size() > 1 && params[1].type() != null_type && ((params[1].type() != str_type) || (params[1].get_str() !="*" ) ) )
     {        
-        if(params[0].type() == str_type)
+        if(params[1].type() == str_type)
         {
-            inputStrings.push_back(params[0].get_str());
-            if(params[0].get_str() == "")
+            inputStrings.push_back(params[1].get_str());
+            if(params[1].get_str() == "")
             {
                 return results;                
             }
         }
         else
         {
-            inputStrings=ParseStringList(params[0]);        
+            inputStrings=ParseStringList(params[1]);        
             if(inputStrings.size() == 0)
             {
                 return results;
@@ -332,6 +385,10 @@ Value listtxfilters(const Array& params, bool fHelp)
 
                 mc_EntityDetails filter_entity;
                 ParseEntityIdentifier(param,&filter_entity,MC_ENT_TYPE_FILTER);
+                if(filter_entity.GetFilterType() != filter_type)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filter identifier, wrong filter type.");                            
+                }
                 filter_list.insert(*(uint256*)filter_entity.GetTxID());
             }
         }
@@ -339,9 +396,9 @@ Value listtxfilters(const Array& params, bool fHelp)
     
     
     bool verbose=false;
-    if (params.size() > 1)    
+    if (params.size() > 2)    
     {
-        if(paramtobool(params[1]))
+        if(paramtobool(params[2]))
         {
             verbose=true;            
         }
@@ -362,7 +419,7 @@ Value listtxfilters(const Array& params, bool fHelp)
         if((filter_list.size() == 0) || 
            (filter_list.find(*(uint256*)pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID()) != filter_list.end()) )
         {
-            entry=TxFilterEntry(pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID(),output_level);
+            entry=FilterEntry(pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID(),output_level,filter_type);
             if(entry.size()>0)
             {
                 bool take_it=false;
@@ -384,8 +441,11 @@ Value listtxfilters(const Array& params, bool fHelp)
                 {
                     bool valid=pMultiChainFilterEngine->m_Filters[i].m_CreateError.size() == 0;
                     entry.push_back(Pair("compiled",valid));
-                    entry.push_back(Pair("approved",mc_gState->m_Permissions->FilterApproved(NULL,&(pMultiChainFilterEngine->m_Filters[i].m_FilterAddress)) !=0 ));
-                    entry.push_back(Pair("address",pMultiChainFilterEngine->m_Filters[i].m_FilterAddress.ToString()));
+                    if(check_approval)
+                    {
+                        entry.push_back(Pair("approved",mc_gState->m_Permissions->FilterApproved(lpEntity,&(pMultiChainFilterEngine->m_Filters[i].m_FilterAddress)) !=0 ));
+                        entry.push_back(Pair("address",pMultiChainFilterEngine->m_Filters[i].m_FilterAddress.ToString()));
+                    }
                     results.push_back(entry);                                            
                 }
             }            
@@ -401,7 +461,7 @@ Value listtxfilters(const Array& params, bool fHelp)
         {
             Object entry;
 
-            entry=TxFilterEntry(pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID(),output_level);
+            entry=FilterEntry(pMultiChainFilterEngine->m_Filters[i].m_Details.GetTxID(),output_level,filter_type);
             if(entry.size()>0)
             {
                 bool take_it=false;
@@ -419,129 +479,165 @@ Value listtxfilters(const Array& params, bool fHelp)
                 {
                     bool valid=pMultiChainFilterEngine->m_Filters[i].m_CreateError.size() == 0;
                     entry.push_back(Pair("compiled",valid));
-                    entry.push_back(Pair("approved",mc_gState->m_Permissions->FilterApproved(NULL,&(pMultiChainFilterEngine->m_Filters[i].m_FilterAddress)) !=0 ));
-                    entry.push_back(Pair("address",pMultiChainFilterEngine->m_Filters[i].m_FilterAddress.ToString()));
+                    if(check_approval)
+                    {
+                        entry.push_back(Pair("approved",mc_gState->m_Permissions->FilterApproved(lpEntity,&(pMultiChainFilterEngine->m_Filters[i].m_FilterAddress)) !=0 ));
+                        entry.push_back(Pair("address",pMultiChainFilterEngine->m_Filters[i].m_FilterAddress.ToString()));
+                    }
                     results.push_back(entry);                                            
                 }
             }            
         }
     }
 
-    for(int i=0;i<(int)results.size();i++)
+    if(check_approval)
     {
-        uint160 filter_address=0;
-        BOOST_FOREACH(const Pair& p, results[i].get_obj()) 
+        for(int i=0;i<(int)results.size();i++)
         {
-            if(p.name_ == "address")
+            uint160 filter_address=0;
+            BOOST_FOREACH(const Pair& p, results[i].get_obj()) 
             {
-                filter_address.SetHex(p.value_.get_str());
+                if(p.name_ == "address")
+                {
+                    filter_address.SetHex(p.value_.get_str());
+                }
             }
-        }
-        results[i].get_obj().pop_back();
+            results[i].get_obj().pop_back();
         
-        if(verbose)
-        {
-            mc_PermissionDetails *plsRow;
-            mc_PermissionDetails *plsDet;
-            mc_PermissionDetails *plsPend;
-            int flags,consensus,remaining;
-            Array admins;
-            Array pending;
-
-            mc_Buffer *permissions=NULL;
-            permissions=mc_gState->m_Permissions->GetPermissionList(NULL,(unsigned char*)&filter_address,MC_PTP_FILTER,permissions);
-
-            if(permissions->GetCount())
+            if(verbose)
             {
-                plsRow=(mc_PermissionDetails *)(permissions->GetRow(0));
+                mc_PermissionDetails *plsRow;
+                mc_PermissionDetails *plsDet;
+                mc_PermissionDetails *plsPend;
+                int flags,consensus,remaining;
+                Array admins;
+                Array pending;
 
-                flags=plsRow->m_Flags;
-                consensus=plsRow->m_RequiredAdmins;
-                mc_Buffer *details;
+                mc_Buffer *permissions=NULL;
+                permissions=mc_gState->m_Permissions->GetPermissionList(lpEntity,(unsigned char*)&filter_address,MC_PTP_FILTER,permissions);
 
-                if((flags & MC_PFL_HAVE_PENDING) || (consensus>1))
+                if(permissions->GetCount())
                 {
-                    details=mc_gState->m_Permissions->GetPermissionDetails(plsRow);                            
-                }
-                else
-                {
-                    details=NULL;
-                }
+                    plsRow=(mc_PermissionDetails *)(permissions->GetRow(0));
 
-                if(details)
-                {
-                    for(int j=0;j<details->GetCount();j++)
+                    flags=plsRow->m_Flags;
+                    consensus=plsRow->m_RequiredAdmins;
+                    mc_Buffer *details;
+
+                    if((flags & MC_PFL_HAVE_PENDING) || (consensus>1))
                     {
-                        plsDet=(mc_PermissionDetails *)(details->GetRow(j));
-                        remaining=plsDet->m_RequiredAdmins;
-                        if(remaining > 0)
-                        {
-                            uint160 addr;
-                            memcpy(&addr,plsDet->m_LastAdmin,sizeof(uint160));
-                            CKeyID lpKeyID=CKeyID(addr);
-                            admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
-                        }
-                    }                    
-                    for(int j=0;j<details->GetCount();j++)
+                        details=mc_gState->m_Permissions->GetPermissionDetails(plsRow);                            
+                    }
+                    else
                     {
-                        plsDet=(mc_PermissionDetails *)(details->GetRow(j));
-                        remaining=plsDet->m_RequiredAdmins;
-                        if(remaining == 0)
+                        details=NULL;
+                    }
+
+                    if(details)
+                    {
+                        for(int j=0;j<details->GetCount();j++)
                         {
-                            Object pend_obj;
-                            Array pend_admins;
-                            uint32_t block_from=plsDet->m_BlockFrom;
-                            uint32_t block_to=plsDet->m_BlockTo;
-                            for(int k=j;k<details->GetCount();k++)
+                            plsDet=(mc_PermissionDetails *)(details->GetRow(j));
+                            remaining=plsDet->m_RequiredAdmins;
+                            if(remaining > 0)
                             {
-                                plsPend=(mc_PermissionDetails *)(details->GetRow(k));
-                                remaining=plsPend->m_RequiredAdmins;
-
-                                if(remaining == 0)
+                                uint160 addr;
+                                memcpy(&addr,plsDet->m_LastAdmin,sizeof(uint160));
+                                CKeyID lpKeyID=CKeyID(addr);
+                                admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                            }
+                        }                    
+                        for(int j=0;j<details->GetCount();j++)
+                        {
+                            plsDet=(mc_PermissionDetails *)(details->GetRow(j));
+                            remaining=plsDet->m_RequiredAdmins;
+                            if(remaining == 0)
+                            {
+                                Object pend_obj;
+                                Array pend_admins;
+                                uint32_t block_from=plsDet->m_BlockFrom;
+                                uint32_t block_to=plsDet->m_BlockTo;
+                                for(int k=j;k<details->GetCount();k++)
                                 {
-                                    if(block_from == plsPend->m_BlockFrom)
+                                    plsPend=(mc_PermissionDetails *)(details->GetRow(k));
+                                    remaining=plsPend->m_RequiredAdmins;
+
+                                    if(remaining == 0)
                                     {
-                                        if(block_to == plsPend->m_BlockTo)
+                                        if(block_from == plsPend->m_BlockFrom)
                                         {
-                                            uint160 addr;
-                                            memcpy(&addr,plsPend->m_LastAdmin,sizeof(uint160));
-                                            CKeyID lpKeyID=CKeyID(addr);
-    //                                        CKeyID lpKeyID=CKeyID(*(uint160*)((void*)(plsPend->m_LastAdmin)));
-                                            pend_admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
-                                            plsPend->m_RequiredAdmins=0x01010101;
-                                        }                                    
+                                            if(block_to == plsPend->m_BlockTo)
+                                            {
+                                                uint160 addr;
+                                                memcpy(&addr,plsPend->m_LastAdmin,sizeof(uint160));
+                                                CKeyID lpKeyID=CKeyID(addr);
+        //                                        CKeyID lpKeyID=CKeyID(*(uint160*)((void*)(plsPend->m_LastAdmin)));
+                                                pend_admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                                                plsPend->m_RequiredAdmins=0x01010101;
+                                            }                                    
+                                        }
                                     }
-                                }
-                            }          
-                            pend_obj.push_back(Pair("approve", block_from < block_to));                        
-                            pend_obj.push_back(Pair("admins", pend_admins));
-                            pend_obj.push_back(Pair("required", (int64_t)(consensus-pend_admins.size())));
-                            pending.push_back(pend_obj);                            
-                        }
-                    }                    
-                    mc_gState->m_Permissions->FreePermissionList(details);                    
+                                }          
+                                pend_obj.push_back(Pair("approve", block_from < block_to));                        
+                                pend_obj.push_back(Pair("admins", pend_admins));
+                                pend_obj.push_back(Pair("required", (int64_t)(consensus-pend_admins.size())));
+                                pending.push_back(pend_obj);                            
+                            }
+                        }                    
+                        mc_gState->m_Permissions->FreePermissionList(details);                    
+                    }
+                    else
+                    {
+                        uint160 addr;
+                        memcpy(&addr,plsRow->m_LastAdmin,sizeof(uint160));
+                        CKeyID lpKeyID=CKeyID(addr);
+                        admins.push_back(CBitcoinAddress(lpKeyID).ToString());                    
+                    }
+
+                    results[i].get_obj().push_back(Pair("admins", admins));
+                    results[i].get_obj().push_back(Pair("pending", pending));                                            
                 }
                 else
                 {
-                    uint160 addr;
-                    memcpy(&addr,plsRow->m_LastAdmin,sizeof(uint160));
-                    CKeyID lpKeyID=CKeyID(addr);
-                    admins.push_back(CBitcoinAddress(lpKeyID).ToString());                    
+                    results[i].get_obj().push_back(Pair("admins", admins));
+                    results[i].get_obj().push_back(Pair("pending", pending));                                                            
                 }
-
-                results[i].get_obj().push_back(Pair("admins", admins));
-                results[i].get_obj().push_back(Pair("pending", pending));                                            
-            }
-            else
-            {
-                results[i].get_obj().push_back(Pair("admins", admins));
-                results[i].get_obj().push_back(Pair("pending", pending));                                                            
-            }
-            mc_gState->m_Permissions->FreePermissionList(permissions);                    
-        }    
+                mc_gState->m_Permissions->FreePermissionList(permissions);                    
+            }    
+        }
     }
     
     return results;
+}
+
+Value listtxfilters(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 2)
+        throw runtime_error("Help message not found\n");
+
+    Array ext_params;
+    ext_params.push_back("*");            
+    BOOST_FOREACH(const Value& value, params)
+    {
+        ext_params.push_back(value);
+    }
+    
+    return listfilters(ext_params,MC_FLT_TYPE_TX);
+}
+
+Value liststreamfilters(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 3)
+        throw runtime_error("Help message not found\n");
+
+    Array ext_params;
+    ext_params.push_back("*");            
+    BOOST_FOREACH(const Value& value, params)
+    {
+        ext_params.push_back(value);
+    }
+    
+    return listfilters(ext_params,MC_FLT_TYPE_STREAM);
 }
 
 Value getfiltercode(const Array& params, bool fHelp)
@@ -581,7 +677,8 @@ Value getfiltercode(const Array& params, bool fHelp)
 Value getfiltertxid(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
-        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
+        mc_ThrowHelpMessage("getfiltertxid");        
+//        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
     
     return pMultiChainFilterEngine->m_TxID.ToString();
 }
@@ -589,7 +686,8 @@ Value getfiltertxid(const Array& params, bool fHelp)
 Value setfilterparam(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 2)                                            
-        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
+        mc_ThrowHelpMessage("setfilterparam");        
+//        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
     
     string param_name=params[0].get_str();
     bool fFound=false;
@@ -624,7 +722,7 @@ Value setfilterparam(const json_spirit::Array& params, bool fHelp)
     return "Set";
 }
 
-Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, string txhex)
+Value testfilter(const vector <uint160>& entities,const  char *filter_code, Value txparam,int vout_in,uint32_t filter_type)
 {
     Object result;
     int err;
@@ -634,17 +732,97 @@ Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, st
     string strFatal="";
     bool relevant_filter=true;
     int64_t nStart;
+    int vout=vout_in;
+    string txhex="";
     
     CTransaction tx;
 
+    uint256 hash=0;
+    if(txparam.type() != null_type)
+    {
+        if(txparam.type() != str_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx-hex, should be string");            
+        }
+        txhex=txparam.get_str();
+        if(txhex.size() == 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty tx-hex");                        
+        }
+        if(txhex.size() <= 64)
+        {
+            hash = ParseHashV(txparam, "tx-hex");            
+            uint256 hashBlock = 0;
+            if (!GetTransaction(hash, tx, hashBlock, true))
+                throw JSONRPCError(RPC_TX_NOT_FOUND, "No information available about transaction");
+        }
+    }
+    
     if(txhex.size())
     {
-        if (!DecodeHexTx(tx,txhex))
-            throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+        if(hash == 0)
+        {
+            if (!DecodeHexTx(tx,txhex))
+                throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+        }
+    }
+    
+
+    string filter_main_name=MC_FLT_MAIN_NAME_TX;
+    if (filter_type == MC_FLT_TYPE_STREAM)
+    {
+        filter_main_name=MC_FLT_MAIN_NAME_STREAM;
+        
+        if(txhex.size())
+        {
+            int vout_min,vout_max,vout_count;
+            vout_count=0;
+            vout_min=0;
+            vout_max=(int)tx.vout.size()-1;
+            if(vout >= 0)
+            {
+                if(vout >= (int)tx.vout.size())
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "vout out of range");                                            
+                }
+                vout_min=vout;
+                vout_max=vout;
+            }
+            
+            for(int i=vout_min;i<=vout_max;i++)
+            {
+                set<uint256> streams_already_seen;
+
+                Value result=DataItemEntry(tx,i,streams_already_seen, 0x0102);
+
+                if(result.type() == obj_type)
+                {
+                    vout_count++;
+                    vout=i;
+                }                        
+            }
+            
+            if(vout_count != 1)
+            {
+                if(vout_in < 0)
+                {
+                    if(vout_count == 0)
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream input is not found in this transaction");                                                                                
+                    }
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "More than one stream item is found in this transaction, please specify output number");                                                                                
+                }                
+                else
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream item is not found in this output");                                                                                                    
+                }
+            }
+        }
     }
     
     mc_Filter *worker=new mc_Filter;
-    err=pFilterEngine->CreateFilter(filter_code,MC_FLT_MAIN_NAME_TX,worker,strError);
+//    err=pFilterEngine->CreateFilter(filter_code,filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strError);
+    err=pFilterEngine->CreateFilter(filter_code,filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,pMultiChainFilterEngine->GetSendTimeout(), strError);
     if(err)
     {
         errorCode=RPC_INTERNAL_ERROR;
@@ -705,7 +883,7 @@ Value testtxfilter(const vector <uint160>& entities,const  char *filter_code, st
         strError="";
         if(relevant_filter)
         {
-            err=pMultiChainFilterEngine->RunFilterWithCallbackLog(tx,worker,strError,callbacks);
+            err=pMultiChainFilterEngine->RunFilterWithCallbackLog(tx,vout,worker,strError,callbacks);
             if(err)
             {
                 errorCode=RPC_INTERNAL_ERROR;
@@ -759,13 +937,118 @@ Value runtxfilter(const json_spirit::Array& params, bool fHelp)
     mc_EntityDetails filter_entity;
     ParseEntityIdentifier(params[0],&filter_entity,MC_ENT_TYPE_FILTER);
     
+    if(filter_entity.GetFilterType() != MC_FLT_TYPE_TX)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Wrong filter type");                                
+    }
+    
     char filter_code[MC_ENT_MAX_SCRIPT_SIZE+1];
     std::vector <uint160> entities;   
     unsigned char *ptr;
     size_t value_size;
     string txhex="";
     
-    ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_ENTITY,&value_size);
+    ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_RESTRICTIONS,&value_size);
+    
+    if(ptr)
+    {
+        if(value_size % MC_AST_SHORT_TXID_SIZE)
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Specified filter has invalid restriction value");        
+        }
+    }    
+    
+    entities=mc_FillRelevantFilterEntitities(ptr, value_size);
+    
+    ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size);
+    
+    if(ptr)
+    {
+        memcpy(filter_code,ptr,value_size);
+        filter_code[value_size]=0x00;    
+    }                                    
+
+/*    
+    if (params.size() > 1)    
+    {
+        if(params[1].type() != str_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx-hex, should be string");            
+        }        
+        txhex=params[1].get_str();
+        if(txhex.size() == 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty tx-hex");                        
+        }
+    }
+*/    
+    return testfilter(entities, (char *)filter_code, (params.size() > 1) ? params[1] : Value::null, -1, MC_FLT_TYPE_TX);
+}
+
+Value testtxfilter(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 2 || params.size() > 3)
+        throw runtime_error("Help message not found\n");
+    
+    size_t bytes;
+    string js;
+    const unsigned char *script;
+    std::vector <uint160> entities;   
+    string txhex="";
+    
+    uint32_t filter_type=MC_FLT_TYPE_TX;
+    
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
+    lpDetailsScript->Clear();
+    
+    ParseFilterRestrictions(params[0],lpDetailsScript,filter_type);
+    
+    script = lpDetailsScript->GetData(0,&bytes);
+
+    if(bytes)
+    {
+        entities=mc_FillRelevantFilterEntitities(script, bytes);
+    }
+
+    js=ParseFilterDetails(params[1]);
+/*    
+    if (params.size() > 2)    
+    {
+        if(params[2].type() != str_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx-hex, should be string");            
+        }
+        txhex=params[2].get_str();
+        if(txhex.size() == 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty tx-hex");                        
+        }
+    }
+*/    
+    return testfilter(entities, js.c_str(), (params.size() > 2) ? params[2] : Value::null, -1, MC_FLT_TYPE_TX);
+}
+
+Value runstreamfilter(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 3)
+        throw runtime_error("Help message not found\n");
+    
+    mc_EntityDetails filter_entity;
+    ParseEntityIdentifier(params[0],&filter_entity,MC_ENT_TYPE_FILTER);
+    
+    if(filter_entity.GetFilterType() != MC_FLT_TYPE_STREAM)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Wrong filter type");                                
+    }
+    
+    char filter_code[MC_ENT_MAX_SCRIPT_SIZE+1];
+    std::vector <uint160> entities;   
+    unsigned char *ptr;
+    size_t value_size;
+    string txhex="";
+    int vout=-1;
+    
+    ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_RESTRICTIONS,&value_size);
     
     if(ptr)
     {
@@ -785,25 +1068,35 @@ Value runtxfilter(const json_spirit::Array& params, bool fHelp)
         filter_code[value_size]=0x00;    
     }                                    
     
-    if (params.size() > 1)    
+    if(params.size() > 2)
     {
+        if(params[2].type() != int_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid vout, should be integer");            
+        }
+        vout=params[2].get_int();
+    }
+/*    
+    if (params.size() > 1)    
+    {        
         if(params[1].type() != str_type)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx-hex, should be string");            
         }
+ 
         txhex=params[1].get_str();
         if(txhex.size() == 0)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty tx-hex");                        
         }
     }
-    
-    return testtxfilter(entities, (char *)filter_code, txhex);
+*/    
+    return testfilter(entities, (char *)filter_code, (params.size() > 1) ? params[1] : Value::null, vout, MC_FLT_TYPE_STREAM);
 }
 
-Value testtxfilter(const json_spirit::Array& params, bool fHelp)
+Value teststreamfilter(const json_spirit::Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 2 || params.size() > 3)
+    if (fHelp || params.size() < 2 || params.size() > 4)
         throw runtime_error("Help message not found\n");
     
     size_t bytes;
@@ -811,13 +1104,14 @@ Value testtxfilter(const json_spirit::Array& params, bool fHelp)
     const unsigned char *script;
     std::vector <uint160> entities;   
     string txhex="";
+    int vout=-1;
     
-    uint32_t filter_type=MC_FLT_TYPE_TX;
+    uint32_t filter_type=MC_FLT_TYPE_STREAM;
     
     mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
     lpDetailsScript->Clear();
     
-    ParseFilterRestrictions(params[0],lpDetailsScript);
+    ParseFilterRestrictions(params[0],lpDetailsScript,filter_type);
     
     script = lpDetailsScript->GetData(0,&bytes);
 
@@ -828,6 +1122,16 @@ Value testtxfilter(const json_spirit::Array& params, bool fHelp)
 
     js=ParseFilterDetails(params[1]);
     
+    if(params.size() > 3)
+    {
+        if(params[3].type() != int_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid vout, should be integer");            
+        }
+        vout=params[3].get_int();
+    }
+    
+/*    
     if (params.size() > 2)    
     {
         if(params[2].type() != str_type)
@@ -840,6 +1144,8 @@ Value testtxfilter(const json_spirit::Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Empty tx-hex");                        
         }
     }
+*/
     
-    return testtxfilter(entities, js.c_str(), txhex);
+    return testfilter(entities, js.c_str(), (params.size() > 2) ? params[2] : Value::null, vout, MC_FLT_TYPE_STREAM);
 }
+

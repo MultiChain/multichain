@@ -29,10 +29,10 @@ v8::Local<v8::Value> Jsp2V8(v8::Isolate* isolate, const json_spirit::Value& j)
     case json_spirit::array_type:
     {
         auto jspArray = j.get_array();
-        auto v8array = v8::Array::New(isolate, jspArray.size());
-        for (int i = 0; i < jspArray.size(); ++i)
+        auto v8array = v8::Array::New(isolate, static_cast<int>(jspArray.size()));
+        for (size_t i = 0; i < jspArray.size(); ++i)
         {
-            v8array->Set(i, Jsp2V8(isolate, jspArray[i]));
+            v8array->Set(static_cast<unsigned>(i), Jsp2V8(isolate, jspArray[i]));
         }
         return handleScope.Escape(v8array);
     }
@@ -88,7 +88,7 @@ json_spirit::Value V82Jsp(v8::Isolate* isolate, v8::Local<v8::Value> v)
         auto v8obj = v8::Local<v8::Object>::Cast(v);
         v8::Local<v8::Array> v8propNames = v8obj->GetOwnPropertyNames(context).ToLocalChecked();
         json_spirit::Object jspObj;
-        for (int i = 0; i < v8propNames->Length(); ++i)
+        for (unsigned i = 0; i < v8propNames->Length(); ++i)
         {
             v8::Local<v8::String> v8propName = v8propNames->Get(context, i).ToLocalChecked()->ToString();
             v8::Local<v8::Value> v8value = v8obj->Get(context, v8propName).ToLocalChecked();
@@ -101,7 +101,7 @@ json_spirit::Value V82Jsp(v8::Isolate* isolate, v8::Local<v8::Value> v)
     {
         auto v8array = v8::Local<v8::Array>::Cast(v);
         json_spirit::Array jspArray;
-        for (int i = 0; i < v8array->Length(); ++i)
+        for (unsigned i = 0; i < v8array->Length(); ++i)
         {
             v8::Local<v8::Value> v8value = v8array->Get(context, i).ToLocalChecked();
             jspArray.push_back(V82Jsp(isolate, v8value));
@@ -129,7 +129,7 @@ json_spirit::Value V82Jsp(v8::Isolate* isolate, v8::Local<v8::Value> v)
         return json_spirit::Value(v->NumberValue(context).FromJust());
     }
 
-    LogPrint("v8filter", "v8filter: V8 type '%s' is not recognized\n", V82String(isolate, v->TypeOf(isolate)).c_str());
+    if(fDebug)LogPrint("v8filter", "v8filter: V8 type '%s' is not recognized\n", V82String(isolate, v->TypeOf(isolate)).c_str());
     return json_spirit::Value();
 }
 

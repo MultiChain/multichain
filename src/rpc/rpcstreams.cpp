@@ -21,7 +21,7 @@
 
 
 Value createupgradefromcmd(const Array& params, bool fHelp);
-Value createtxfilterfromcmd(const Array& params, bool fHelp);
+Value createfilterfromcmd(const Array& params, bool fHelp);
 
 void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
 {
@@ -99,7 +99,8 @@ void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
 Value getstreaminfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
-       throw runtime_error("Help message not found\n");
+        mc_ThrowHelpMessage("getstreaminfo");        
+//       throw runtime_error("Help message not found\n");
     
     if(params[0].type() != str_type)
     {
@@ -201,7 +202,11 @@ Value liststreams(const Array& params, bool fHelp)
     {
         if(paramtobool(params[1]))
         {
-            output_level=0x3E;            
+            output_level=0x3E;           
+            if(mc_gState->m_Features->StreamFilters())
+            {
+                output_level |= 0x40;    
+            }
         }
     }
     
@@ -550,7 +555,11 @@ Value createfromcmd(const Array& params, bool fHelp)
     }
     if (strcmp(params[1].get_str().c_str(),"txfilter") == 0)
     {
-        return createtxfilterfromcmd(params,fHelp);    
+        return createfilterfromcmd(params,fHelp);    
+    }
+    if (strcmp(params[1].get_str().c_str(),"streamfilter") == 0)
+    {
+        return createfilterfromcmd(params,fHelp);    
     }
     
     throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type, should be stream");
@@ -1162,7 +1171,7 @@ Value liststreamitems(const Array& params, bool fHelp)
     mc_AdjustStartAndCount(&count,&start,entStat.m_LastPos);
     
     Array retArray;
-    pwalletTxsMain->GetList(&entStat.m_Entity,start+1,count,entity_rows);
+    CheckWalletError(pwalletTxsMain->GetList(&entStat.m_Entity,start+1,count,entity_rows));
 
     for(int i=0;i<entity_rows->GetCount();i++)
     {
@@ -1192,7 +1201,7 @@ void getTxsForBlockRange(vector <uint256>& txids,mc_TxEntity *entity,int height_
         count=last_item-first_item+1;
         if(count > 0)
         {
-            pwalletTxsMain->GetList(entity,first_item,count,entity_rows);
+            CheckWalletError(pwalletTxsMain->GetList(entity,first_item,count,entity_rows));
             
             mc_TxEntityRow *lpEntTx;
             uint256 hash;
@@ -1475,12 +1484,13 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     Object obj;
     int i,n,c,m,err,pcount;
     bool available;
+    bool first_item=true;
     err=MC_ERR_NOERROR;
     n=pwalletTxsMain->GetListSize(&entity,entStat.m_Generation,NULL);
     i=0;
     m=10;
     
-    Value result;
+    Value result=obj;
     
     while(i<n)
     {
@@ -1491,7 +1501,7 @@ Value getstreamsummary(const Array& params, bool fPublisher)
             {
                 c=n-i;
             }
-            pwalletTxsMain->GetList(&entity,entStat.m_Generation,i+1,c,entity_rows);
+            CheckWalletError(pwalletTxsMain->GetList(&entity,entStat.m_Generation,i+1,c,entity_rows));
         }
         mc_TxEntityRow *lpEntTx;
         lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i % m);
@@ -1574,13 +1584,17 @@ Value getstreamsummary(const Array& params, bool fPublisher)
             {
                 if(available)
                 {
-                    if(i == 0)
+                    if(a.value_.type() != null_type)                            // Returned in case of error
                     {
-                        result=a.value_;
-                    }
-                    else
-                    {
-                        result=mc_MergeValues(&result,&(a.value_),mode,0,&err);
+                        if(first_item)
+                        {
+                            result=a.value_;
+                            first_item=false;
+                        }
+                        else
+                        {
+                            result=mc_MergeValues(&result,&(a.value_),mode,0,&err);
+                        }
                     }
                 }
                 else
@@ -1632,9 +1646,12 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     }            
     else
     {
-        if( (mode & MC_VMM_IGNORE_OTHER) == 0)
+        if(!first_item)
         {
-            err=MC_ERR_INVALID_PARAMETER_VALUE;
+            if( (mode & MC_VMM_IGNORE_OTHER) == 0)
+            {
+                err=MC_ERR_INVALID_PARAMETER_VALUE;
+            }
         }
         obj.push_back(Pair("json", empty_object));        
     }
@@ -1750,7 +1767,7 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
     mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->GetListSize(&entity,entStat.m_Generation,NULL));
     
     Array retArray;
-    pwalletTxsMain->GetList(&entity,entStat.m_Generation,start+1,count,entity_rows);
+    CheckWalletError(pwalletTxsMain->GetList(&entity,entStat.m_Generation,start+1,count,entity_rows));
     
     for(int i=0;i<entity_rows->GetCount();i++)
     {
@@ -1855,7 +1872,7 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
     mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->GetListSize(&entity,entStat.m_Generation,NULL));
     
     Array retArray;
-    pwalletTxsMain->GetList(&entity,entStat.m_Generation,start+1,count,entity_rows);
+    CheckWalletError(pwalletTxsMain->GetList(&entity,entStat.m_Generation,start+1,count,entity_rows));
     
     for(int i=0;i<entity_rows->GetCount();i++)
     {
@@ -1898,7 +1915,7 @@ Value liststreammap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& in
     {
         mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->GetListSize(parent_entity,NULL));
         entity_rows->Clear();
-        pwalletTxsMain->GetList(parent_entity,start+1,count,entity_rows);
+        CheckWalletError(pwalletTxsMain->GetList(parent_entity,start+1,count,entity_rows));
         enitity_count=entity_rows->GetCount();
     }
     else
@@ -2202,7 +2219,7 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
     {
         int min_size=max_size+1;
         int min_condition=conditions_count;
-        for(i=0;i<=conditions_count;i++)
+        for(i=0;i<conditions_count;i++)
         {
             if(vConditionMerged[i] == 0)
             {
@@ -2223,7 +2240,7 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
                 {
                     throw JSONRPCError(RPC_NOT_SUPPORTED, "This query may take too much time");                                                    
                 }          
-                pwalletTxsMain->GetList(&vConditionEntities[min_condition],entStat.m_Generation,1,min_size,entity_rows);         
+                CheckWalletError(pwalletTxsMain->GetList(&vConditionEntities[min_condition],entStat.m_Generation,1,min_size,entity_rows));         
                 conditions_used++;
                 clean_count=0;
                 dirty_count=0;

@@ -121,6 +121,30 @@ bool mc_VerifyAssetPermissions(mc_Buffer *assets, vector<CTxDestination> address
     return true;
 }
 
+bool HasPerOutputDataEntries(const CTxOut& txout,mc_Script *lpScript)
+{
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    {
+        unsigned char *ptr;
+        int size;
+        const CScript& script1 = txout.scriptPubKey;        
+        CScript::const_iterator pc1 = script1.begin();
+        lpScript->Clear();
+        lpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+
+        for (int e = 0; e < lpScript->GetNumElements(); e++)
+        {
+            lpScript->SetElement(e);
+            if(lpScript->GetRawData(&ptr,&size) == 0)      
+            {
+                return true;
+            }
+        }        
+    }
+
+    return false;
+}
+
 
 /* 
  * Parses txout script into asset-quantity buffer
@@ -492,7 +516,10 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                         {
                             if(mc_gState->m_NetworkParams->GetInt64Param("supportminerprecheck"))                                
                             {
-                                *required |= MC_PTP_CACHED_SCRIPT_REQUIRED;
+                                if(entity.GetEntityType() == MC_ENT_TYPE_NONE)
+                                {
+                                    *required |= MC_PTP_CACHED_SCRIPT_REQUIRED;
+                                }
                             }        
                         }
                         

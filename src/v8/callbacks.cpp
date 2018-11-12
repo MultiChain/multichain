@@ -13,36 +13,6 @@
 namespace mc_v8
 {
 
-void filter_mcprint(const v8::FunctionCallbackInfo<v8::Value>& args)
-{
-    v8::Isolate* isolate = args.GetIsolate();
-    v8::Locker locker(isolate);
-    v8::Isolate::Scope isolateScope(isolate);
-    v8::HandleScope handleScope(isolate);
-    v8::Local<v8::Context> context(isolate->GetCurrentContext());
-    v8::Context::Scope contextScope(context);
-
-    if (args.Length() < 1)
-    {
-        LogPrint("JS", "JS Error: Too few arguments to the print function.\n");
-        return;
-    }
-    if (!args[0]->IsString())
-    {
-        LogPrint("JS", "JS Error: First argument to the print function must be a string.\n");
-        return;
-    }
-
-    LogPrint("JS", (V82String(isolate, args[0]) + "\n").c_str());
-}
-
-/**
- * Signature of a function to remove non-deterministic or sensitive elements from RPC function output.
- *
- * @param value The RPC function output value. Transform this value in-place.
- */
-typedef void (*fnSanitize)(json_spirit::Value& value);
-
 /**
  * Call an RPC function from a V8 JS callback.
  *
@@ -52,10 +22,8 @@ typedef void (*fnSanitize)(json_spirit::Value& value);
  * @param name        The name of the RPC function.
  * @param rpcFunction The RPC function to call.
  * @param args        The V8 arguments/return value.
- * @param sanitize    An optional function to transform the RPC function result before returning it to JS.
  */
-void CallRpcFunction(std::string name, rpcfn_type rpcFunction, const v8::FunctionCallbackInfo<v8::Value>& args,
-        fnSanitize sanitize = nullptr)
+void CallRpcFunction(std::string name, rpcfn_type rpcFunction, const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     v8::Isolate* isolate = args.GetIsolate();
     v8::Locker locker(isolate);
@@ -67,15 +35,6 @@ void CallRpcFunction(std::string name, rpcfn_type rpcFunction, const v8::Functio
     IsolateData& isolateData = V8IsolateManager::Instance()->GetIsolateData(isolate);
     json_spirit::Object callbackData;
 
-    auto args_array = v8::Array::New(isolate, args.Length());
-//    for (int i = 0; i < args.Length(); ++i)
-//    {
-//        args_array->Set(i, args[i]);
-//    }
-//    v8::Local<v8::String> argsJson = v8::JSON::Stringify(context, args_array).ToLocalChecked();
-//    std::string argsString = V82String(isolate, argsJson);
-//    json_spirit::Value params;
-//    json_spirit::read_string(argsString, params);
     json_spirit::Array params;
     for (int i = 0; i < args.Length(); ++i)
     {
@@ -135,15 +94,6 @@ void CallRpcFunction(std::string name, rpcfn_type rpcFunction, const v8::Functio
             args.GetReturnValue().SetUndefined();
             ok = false;
         }
-
-        if (sanitize != nullptr)
-        {
-            sanitize(result);
-        }
-
-//        std::string resultString = json_spirit::write_string(result, false);
-//        v8::Local<v8::String> resultJson = String2V8(isolate, resultString);
-//        args.GetReturnValue().Set(v8::JSON::Parse(context, resultJson).ToLocalChecked());
         args.GetReturnValue().Set(Jsp2V8(isolate, result));
     }
 
@@ -159,14 +109,10 @@ void CallRpcFunction(std::string name, rpcfn_type rpcFunction, const v8::Functio
         CallRpcFunction(#name, name, args);                             \
     }
 
-#define FILTER_FUNCTION_SANITIZE(name, sanitize)                        \
-    void filter_##name(const v8::FunctionCallbackInfo<v8::Value>& args) \
-    {                                                                   \
-        CallRpcFunction(#name, name, args, sanitize);                   \
-    }
-
 FILTER_FUNCTION(getfiltertxid)
 FILTER_FUNCTION(getfiltertransaction)
+FILTER_FUNCTION(getfilterstreamitem)
+FILTER_FUNCTION(getfilterassetbalances)
 FILTER_FUNCTION(setfilterparam)
 FILTER_FUNCTION(getfiltertxinput)
 FILTER_FUNCTION(getlastblockinfo)
@@ -174,6 +120,22 @@ FILTER_FUNCTION(getassetinfo)
 FILTER_FUNCTION(getstreaminfo)
 FILTER_FUNCTION(verifypermission)
 FILTER_FUNCTION(verifymessage)
+
+#define FILTER_LOOKUP(name) { #name, filter_##name }
+
+std::map<std::string, v8::FunctionCallback> callbackLookup {
+    FILTER_LOOKUP(getfiltertxid),
+    FILTER_LOOKUP(getfiltertransaction),
+    FILTER_LOOKUP(getfilterstreamitem),
+    FILTER_LOOKUP(getfilterassetbalances),
+    FILTER_LOOKUP(setfilterparam),
+    FILTER_LOOKUP(getfiltertxinput),
+    FILTER_LOOKUP(getlastblockinfo),
+    FILTER_LOOKUP(getassetinfo),
+    FILTER_LOOKUP(getstreaminfo),
+    FILTER_LOOKUP(verifypermission),
+    FILTER_LOOKUP(verifymessage)
+};
 
 } // namespace mc_v8
 

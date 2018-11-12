@@ -13,8 +13,8 @@ int mc_State::VersionInfo(int version)
         return custom_version;
     }
     
-    int this_build=20000105;
-    int this_protocol=20004;   
+    int this_build=20000106;
+    int this_protocol=20005;   
     
     if(version < 0)
     {

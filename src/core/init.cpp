@@ -515,6 +515,9 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -chunkquerytimeout=<n>                   " + _("Timeout, after which undelivered chunk is moved to the end of the chunk queue, default 25s") + "\n";
     strUsage += "  -chunkrequesttimeout=<n>                 " + _("Timeout, after which chunk request is dropped and another source is tried, default 10s") + "\n";
     strUsage += "  -flushsourcechunks=<n>                   " + _("Flush offchain items created by this node to disk immediately when created, default 1") + "\n";
+    strUsage += "  -acceptfiltertimeout=<n>                 " + strprintf(_("Timeout, after which filter execution will be aborted, when accepting new txs, in milliseconds, default %u"),DEFAULT_ACCEPT_FILTER_TIMEOUT) + "\n";
+    strUsage += "  -sendfiltertimeout=<n>                   " + strprintf(_("Timeout, after which filter execution will be aborted, when tx is sent from this node, in milliseconds, default %u"),DEFAULT_SEND_FILTER_TIMEOUT) + "\n";
+    strUsage += "  -lockinlinemetadata=<n>                  " + _("Outputs with inline metadata can be sent only using create/appendrawtransaction, default 1") + "\n";
 
     strUsage += "\n" + _("MultiChain API response parameters") + "\n";        
     strUsage += "  -hideknownopdrops=<n>  " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON-RPC calls (default: %u)"), 0) + "\n";
@@ -876,42 +879,6 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     }
 
 #ifdef ENABLE_WALLET
-    if (mapArgs.count("-mintxfee"))
-    {
-        CAmount n = 0;
-        if (ParseMoney(mapArgs["-mintxfee"], n) && n > 0)
-            CWallet::minTxFee = CFeeRate(n);
-        else
-            return InitError(strprintf(_("Invalid amount for -mintxfee=<amount>: '%s'"), mapArgs["-mintxfee"]));
-    }
-    if (mapArgs.count("-paytxfee"))
-    {
-        CAmount nFeePerK = 0;
-        if (!ParseMoney(mapArgs["-paytxfee"], nFeePerK))
-            return InitError(strprintf(_("Invalid amount for -paytxfee=<amount>: '%s'"), mapArgs["-paytxfee"]));
-        if (nFeePerK > nHighTransactionFeeWarning)
-            InitWarning(_("Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction."));
-        payTxFee = CFeeRate(nFeePerK, 1000);
-        if (payTxFee < ::minRelayTxFee)
-        {
-            return InitError(strprintf(_("Invalid amount for -paytxfee=<amount>: '%s' (must be at least %s)"),
-                                       mapArgs["-paytxfee"], ::minRelayTxFee.ToString()));
-        }
-    }
-    if (mapArgs.count("-maxtxfee"))
-    {
-        CAmount nMaxFee = 0;
-        if (!ParseMoney(mapArgs["-maxtxfee"], nMaxFee))
-            return InitError(strprintf(_("Invalid amount for -maxtxfee=<amount>: '%s'"), mapArgs["-maptxfee"]));
-        if (nMaxFee > nHighTransactionMaxFeeWarning)
-            InitWarning(_("Warning: -maxtxfee is set very high! Fees this large could be paid on a single transaction."));
-        maxTxFee = nMaxFee;
-        if (CFeeRate(maxTxFee, 1000) < ::minRelayTxFee)
-        {
-            return InitError(strprintf(_("Invalid amount for -maxtxfee=<amount>: '%s' (must be at least the minrelay fee of %s to prevent stuck transactions)"),
-                                       mapArgs["-maxtxfee"], ::minRelayTxFee.ToString()));
-        }
-    }
     nTxConfirmTarget = GetArg("-txconfirmtarget", 1);
     bSpendZeroConfChange = GetArg("-spendzeroconfchange", true);
     fSendFreeTransactions = GetArg("-sendfreetransactions", false);
@@ -1778,15 +1745,53 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     
     pwalletMain=NULL;
 
+    string rpc_threads_error="";
     if (fServer)
     {
         JSON_DOUBLE_DECIMAL_DIGITS=GetArg("-apidecimaldigits",-1);        
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
-        StartRPCThreads();
+        StartRPCThreads(rpc_threads_error);
     }
 /* MCHN END*/        
     
-
+        ::minRelayTxFee = CFeeRate(MIN_RELAY_TX_FEE); 
+        if (mapArgs.count("-mintxfee"))
+        {
+            CAmount n = 0;
+            if (ParseMoney(mapArgs["-mintxfee"], n) && n > 0)
+                CWallet::minTxFee = CFeeRate(n);
+            else
+                return InitError(strprintf(_("Invalid amount for -mintxfee=<amount>: '%s'"), mapArgs["-mintxfee"]));
+        }
+        if (mapArgs.count("-paytxfee"))
+        {
+            CAmount nFeePerK = 0;
+            if (!ParseMoney(mapArgs["-paytxfee"], nFeePerK))
+                return InitError(strprintf(_("Invalid amount for -paytxfee=<amount>: '%s'"), mapArgs["-paytxfee"]));
+            if (nFeePerK > nHighTransactionFeeWarning)
+                InitWarning(_("Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction."));
+            payTxFee = CFeeRate(nFeePerK, 1000);
+            if (payTxFee < ::minRelayTxFee)
+            {
+                return InitError(strprintf(_("Invalid amount for -paytxfee=<amount>: '%s' (must be at least %s)"),
+                                           mapArgs["-paytxfee"], ::minRelayTxFee.ToString()));
+            }
+        }
+        if (mapArgs.count("-maxtxfee"))
+        {
+            CAmount nMaxFee = 0;
+            if (!ParseMoney(mapArgs["-maxtxfee"], nMaxFee))
+                return InitError(strprintf(_("Invalid amount for -maxtxfee=<amount>: '%s'"), mapArgs["-maptxfee"]));
+            if (nMaxFee > nHighTransactionMaxFeeWarning)
+                InitWarning(_("Warning: -maxtxfee is set very high! Fees this large could be paid on a single transaction."));
+            maxTxFee = nMaxFee;
+            if (CFeeRate(maxTxFee, 1000) < ::minRelayTxFee)
+            {
+                return InitError(strprintf(_("Invalid amount for -maxtxfee=<amount>: '%s' (must be at least the minrelay fee of %s to prevent stuck transactions)"),
+                                           mapArgs["-maxtxfee"], ::minRelayTxFee.ToString()));
+            }
+        }
+        
 #endif // ENABLE_WALLET
     // ********************************************************* Step 6: network initialization
 
@@ -2202,6 +2207,14 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             sprintf(bufOutput,"Listening for API requests on port %d (local only - see rpcallowip setting)\n\n",(int)GetArg("-rpcport", BaseParams().RPCPort()));                            
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
         }
+    }
+    if(rpc_threads_error.size())
+    {
+        if(!GetBoolArg("-shortoutput", false))
+        {    
+            sprintf(bufOutput,"%s\n",rpc_threads_error.c_str());                            
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+        }            
     }
     
 //    int version=mc_gState->m_NetworkParams->GetInt64Param("protocolversion");

@@ -2645,6 +2645,7 @@ bool CWallet::CreateTransaction(CScript scriptPubKey, const CAmount& nValue, CSc
 {
     vector< pair<CScript, CAmount> > vecSend;
     CAmount nAmount=nValue;
+    int eErrorCode1=0; 
     if(nAmount < 0)
     {
         minRelayTxFee = CFeeRate(MIN_RELAY_TX_FEE);    
@@ -2656,7 +2657,8 @@ bool CWallet::CreateTransaction(CScript scriptPubKey, const CAmount& nValue, CSc
     {
         vecSend.push_back(make_pair(scriptOpReturn, 0));
     }
-    return CreateMultiChainTransaction(vecSend, wtxNew, reservekey, nFeeRet, strFailReason, coinControl, addresses, min_conf, min_inputs, max_inputs, lpCoinsToUse, eErrorCode);
+    return CreateMultiChainTransaction(vecSend, wtxNew, reservekey, nFeeRet, strFailReason, coinControl, addresses, min_conf, min_inputs, max_inputs, lpCoinsToUse, 
+    (eErrorCode != 0) ? eErrorCode : & eErrorCode1);
 }
 
 bool CWallet::CreateTransaction(std::vector<CScript> scriptPubKeys, const CAmount& nValue, CScript scriptOpReturn,
@@ -3143,7 +3145,11 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
         if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
         {
 //            pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-chunkflushmode",MC_CDB_FLUSH_MODE_COMMIT));
-            pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-flushsourcechunks",true) ? (MC_CDB_FLUSH_MODE_FILE | MC_CDB_FLUSH_MODE_DATASYNC) : MC_CDB_FLUSH_MODE_NONE);
+            if(pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-flushsourcechunks",true) ? (MC_CDB_FLUSH_MODE_FILE | MC_CDB_FLUSH_MODE_DATASYNC) : MC_CDB_FLUSH_MODE_NONE))
+            {
+                reject_reason="Couldn't store offchain items, probably chunk database is corrupted";                                        
+                return false;
+            }
         }
         
         if (!wtxNew.AcceptToMemoryPoolReturnReason(false,true,reject_reason))   // MCHN
@@ -4158,7 +4164,18 @@ bool CMerkleTx::AcceptToMemoryPool(bool fLimitFree, bool fRejectInsaneFee)
 bool CMerkleTx::AcceptToMemoryPoolReturnReason(bool fLimitFree, bool fRejectInsaneFee,string& reject_reason)
 {
     CValidationState state;
+    
+    if(pMultiChainFilterEngine)
+    {
+        pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetSendTimeout());
+    }
+
     bool result=::AcceptToMemoryPool(mempool, state, *this, fLimitFree, NULL, fRejectInsaneFee,false);
+
+    if(pMultiChainFilterEngine)
+    {
+        pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetAcceptTimeout());
+    }
 
     if(!result)
     {
