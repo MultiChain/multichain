@@ -4,12 +4,11 @@
 #ifndef MULTICHAIN_CALLBACKS_H_
 #define MULTICHAIN_CALLBACKS_H_
 
-#include <v8.h>
 #include <map>
+#include <v8.h>
 
 namespace mc_v8
 {
-
 extern std::map<std::string, v8::FunctionCallback> callbackLookup;
 
 } // namespace mc_v8
