@@ -169,7 +169,6 @@ obj/build.h: FORCE
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
 V8_SOURCES = \
-  v8/v8isolatemanager.cpp \
   v8/v8engine.cpp \
   v8/v8filter.cpp \
   v8/v8filterwatchdog.cpp \

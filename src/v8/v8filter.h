@@ -9,28 +9,19 @@
 
 namespace mc_v8
 {
+class V8Engine;
+
 /**
  * Implementation of a filter based on the V8 JS engine.
  */
 class V8Filter
 {
   public:
-    V8Filter()
-    {
-        Zero();
-    }
+    V8Filter();
 
-    ~V8Filter()
-    {
-        Destroy();
-    }
+    ~V8Filter();
     void Zero();
     int Destroy();
-
-    v8::Isolate *GetIsolate()
-    {
-        return m_isolate;
-    }
 
     bool IsRunning() const
     {
@@ -48,8 +39,8 @@ class V8Filter
      * @return               MC_ERR_INTERNAL_ERROR if the engine failed,
      * MC_ERR_NOERROR otherwise.
      */
-    int Initialize(std::string script, std::string functionName, std::vector<std::string> &callback_names,
-                   std::string &strResult);
+    int Initialize(V8Engine *engine, std::string script, std::string functionName,
+                   std::vector<std::string> &callback_names, std::string &strResult);
 
     /**
      * Run the filter function in the JS script.
@@ -73,23 +64,14 @@ class V8Filter
      */
     int RunWithCallbackLog(std::string &strResult, json_spirit::Array &callbacks);
 
-    /**
-     * Abort this filter.
-     *
-     * @param reason    The reason the filter is being terminated.
-     */
-    void Terminate(std::string reason);
-
   private:
-    void MaybeCreateIsolate();
     int CompileAndLoadScript(std::string script, std::string functionName, std::string source, std::string &strResult);
     void ReportException(v8::TryCatch *tryCatch, std::string &strResult);
 
-    v8::Isolate *m_isolate;
+    V8Engine *m_engine;
     v8::Global<v8::Context> m_context;
     v8::Global<v8::Function> m_filterFunction;
     bool m_isRunning;
-    std::string m_reason;
 };
 
 } // namespace mc_v8
