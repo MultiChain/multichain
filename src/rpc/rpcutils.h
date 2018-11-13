@@ -20,7 +20,7 @@
 #include "multichain/multichain.h"
 #include "utils/utilparse.h"
 #include "wallet/chunkdb.h"
-#include "protocol/multichainfilter.h"
+#include "filters/multichainfilter.h"
 
 using namespace std;
 using namespace json_spirit;
