@@ -1,6 +1,6 @@
 #include "v8filterwatchdog.h"
 #include "core/init.h"
-#include "protocol/filter.h"
+#include "filters/filter.h"
 #include "utils/define.h"
 #include "utils/util.h"
 

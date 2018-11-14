@@ -49,20 +49,7 @@ class V8Filter
      * @param withCallbackLog Indicates that callback tracking will be used.
      * @return                MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
      */
-    int Run(std::string &strResult, bool withCallbackLog = false);
-
-    /**
-     * Run the filter function in the JS script.
-     *
-     * This variant provides detailed data about RPC callback calls: parameters,
-     * results, success/failure and errors.
-     *
-     * @param strResult Reason for script failure or rejection.
-     * @param callbacks An array of RPC callback call data.
-     * @return          MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR
-     * otherwise.
-     */
-    int RunWithCallbackLog(std::string &strResult, json_spirit::Array &callbacks);
+    int Run(std::string &strResult);
 
   private:
     int CompileAndLoadScript(std::string script, std::string functionName, std::string source, std::string &strResult);

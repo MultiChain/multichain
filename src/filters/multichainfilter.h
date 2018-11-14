@@ -9,7 +9,8 @@
 #include "utils/util.h"
 #include "utils/utilparse.h"
 #include "multichain/multichain.h"
-#include "protocol/filter.h"
+#include "json/json_spirit_value.h"
+//#include "filters/filter.h"
 
 #define MC_FLT_TYPE_BAD                    0xFFFFFFFF
 #define MC_FLT_TYPE_TX                     0
@@ -19,6 +20,8 @@
 #define MC_FLT_MAIN_NAME_STREAM            "filterstreamitem"
 
 std::vector <uint160>  mc_FillRelevantFilterEntitities(const unsigned char *ptr, size_t value_size);
+
+class mc_Filter;
 
 typedef struct mc_MultiChainFilter
 {

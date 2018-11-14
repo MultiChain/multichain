@@ -449,7 +449,13 @@ multichaind_LDADD = \
 #if ENABLE_WALLET
 #multichaind_LDADD += libbitcoin_wallet.a
 #endif
-multichaind_SOURCES = multichain/multichaind.cpp rpc/rpclist.cpp chainparams/buildgenesis.cpp protocol/filter.cpp $(V8_SOURCES)
+multichaind_SOURCES = \
+    multichain/multichaind.cpp \
+    rpc/rpclist.cpp \
+    chainparams/buildgenesis.cpp \
+    filters/filter.cpp \
+    filters/filtercallback.cpp \
+    $(V8_SOURCES)
 #
 
 if TARGET_WINDOWS
@@ -476,7 +482,13 @@ multichaind_cold_LDADD = \
 #if ENABLE_WALLET
 #multichaind_cold_LDADD += libbitcoin_wallet.a
 #endif
-multichaind_cold_SOURCES = multichain/multichaind-cold.cpp core/init-cold.cpp rpc/rpclist-cold.cpp chainparams/buildgenesis.cpp protocol/filter_cold.cpp
+multichaind_cold_SOURCES = \
+    multichain/multichaind-cold.cpp \
+    core/init-cold.cpp \
+    rpc/rpclist-cold.cpp \
+    chainparams/buildgenesis.cpp \
+    filters/filter_cold.cpp \
+    filters/filtercallback.cpp
 #
 
 if TARGET_WINDOWS
