@@ -120,7 +120,7 @@ void mcd_CloseDatabase(mc_Database *m_DB)
 
 int64_t mcd_AddRows(mc_Database *m_DB,int key_size,int value_size,int row_count,int64_t prev_rows)
 {
-    int err;
+    int err,value_len;
     int per_commit_count=1000;
     int commit_count=row_count/per_commit_count;
     int64_t total_rows=prev_rows;
@@ -137,6 +137,7 @@ int64_t mcd_AddRows(mc_Database *m_DB,int key_size,int value_size,int row_count,
         {    
             GetRandBytes((unsigned char*)kbuf, key_size);
             GetRandBytes((unsigned char*)vbuf, value_size);
+            m_DB->Read(kbuf,key_size,&value_len,0,&err);
             err=m_DB->Write(kbuf,key_size,vbuf,value_size,MC_OPT_DB_DATABASE_TRANSACTIONAL);
             if(err)
             {
