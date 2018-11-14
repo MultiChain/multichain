@@ -266,6 +266,8 @@ extern json_spirit::Value createcmd(const json_spirit::Array& params, bool fHelp
 extern json_spirit::Value createfromcmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value publish(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value publishfrom(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value publishmulti(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value publishmultifrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value subscribe(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value unsubscribe(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listassettransactions(const json_spirit::Array& params, bool fHelp);

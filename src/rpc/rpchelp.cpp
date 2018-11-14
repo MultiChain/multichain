@@ -3081,7 +3081,7 @@ void mc_InitRPCHelpMap13()
             "\nPublishes stream item from specific address\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. \"from-address\"                   (string, required) Address used for issuing.\n"
+            "1. \"from-address\"                   (string, required) Address used for publishsing.\n"
             "2. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
             "3. \"key\"                            (string, required) Item key\n"
             " or\n"    
@@ -4505,6 +4505,91 @@ void mc_InitRPCHelpMap19()
             "Object with balances for every address involved in transaction\n"            
         ));
      
+}
+
+void mc_InitRPCHelpMap20()
+{
+     mapHelpStrings.insert(std::make_pair("publishmulti",
+            "publishmulti \"stream-identifier\" items \"options\" \n"
+            "\nPublishes several stream items\n"
+            + HelpRequiringPassphraseWrapper() +
+            "\nArguments:\n"
+            "1. \"stream-identifier\"                (string, required) Stream identifier - one of: create txid, stream reference, stream name. Default for items if \"for\" field is omitted\n"     
+            "2. items                              (array, required) Array of stream items. \n"
+            "  [\n"                
+            "    {\n"                
+            "      \"for\" : \"stream-identifier\"     (string, optional) Stream identifier, if omitted,  - one of: create txid, stream reference, stream name.\n"
+            "      \"options\" : \"options\"           (string, optional) Should be \"offchain\" or omitted\n"
+            "      \"key\" : \"key\"                   (string, optional, default: \"\") Item key\n"
+            "        or\n"
+            "      \"keys\" : keys                   (array, optional) Item keys, array of strings\n"
+            "      \"data\" : \"data-hex\"             (string, optional, default: \"\") Data hex string\n"
+            "        or\n"
+            "      \"data\" :                        (object, required) JSON data object\n"
+            "        {\n"
+            "          \"json\" : data-json          (object, required) Valid JSON string\n" 
+            "        }\n"                                
+            "        or\n"
+            "      \"data\" :                        (object, required) Text data object\n"
+            "        {\n"
+            "          \"text\" : \"data-text\"        (string, required) Data string\n" 
+            "        }\n"                                
+            "        or\n"
+            "      \"data\"                          (object, required) Binary raw data created with appendbinarycache\n"
+            "        {\n"
+            "          \"cache\" : \"identifier\"      (string, required) Binary cache identifier\n" 
+            "        }\n"                              
+            "    }\n"                                
+            "  ]\n"                                
+            "3. \"options\"                          (string, optional) Should be \"offchain\" or omitted. Default for items if \"options\" field is omitted\n"
+            "\nResult:\n"
+            "\"transactionid\"                       (string) The transaction id.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("publishmulti", "test [{\"key\":\"hello world\",\"data\":\"48656C6C6F20576F726C64210A\"}]")
+            + HelpExampleRpc("publishmulti", "\"test\", [{\"key\":\"hello world\",\"data\":\"48656C6C6F20576F726C64210A\"}]")
+        ));
+
+     mapHelpStrings.insert(std::make_pair("publishmultifrom",
+            "publishmultifrom \"from-address\" \"stream-identifier\" items \"options\" \n"
+            "\nPublishes several stream items\n"
+            + HelpRequiringPassphraseWrapper() +
+            "\nArguments:\n"
+            "1. \"from-address\"                     (string, required) Address used for publishing.\n"
+            "2. \"stream-identifier\"                (string, required) Stream identifier - one of: create txid, stream reference, stream name. Default for items if \"for\" field is omitted\n"     
+            "3. items                              (array, required) Array of stream items. \n"
+            "  [\n"                
+            "    {\n"                
+            "      \"for\" : \"stream-identifier\"     (string, optional) Stream identifier, if omitted,  - one of: create txid, stream reference, stream name.\n"
+            "      \"options\" : \"options\"           (string, optional) Should be \"offchain\" or omitted\n"
+            "      \"key\" : \"key\"                   (string, optional, default: \"\") Item key\n"
+            "        or\n"
+            "      \"keys\" : keys                   (array, optional) Item keys, array of strings\n"
+            "      \"data\" : \"data-hex\"             (string, optional, default: \"\") Data hex string\n"
+            "        or\n"
+            "      \"data\" :                        (object, required) JSON data object\n"
+            "        {\n"
+            "          \"json\" : data-json          (object, required) Valid JSON string\n" 
+            "        }\n"                                
+            "        or\n"
+            "      \"data\" :                        (object, required) Text data object\n"
+            "        {\n"
+            "          \"text\" : \"data-text\"        (string, required) Data string\n" 
+            "        }\n"                                
+            "        or\n"
+            "      \"data\"                          (object, required) Binary raw data created with appendbinarycache\n"
+            "        {\n"
+            "          \"cache\" : \"identifier\"      (string, required) Binary cache identifier\n" 
+            "        }\n"                              
+            "    }\n"                                
+            "  ]\n"                                
+            "4. \"options\"                          (string, optional) Should be \"offchain\" or omitted. Default for items if \"options\" field is omitted\n"
+            "\nResult:\n"
+            "\"transactionid\"                       (string) The transaction id.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("publishmultifrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" test [{\"key\":\"hello world\",\"data\":\"48656C6C6F20576F726C64210A\"}]")
+            + HelpExampleRpc("publishmultifrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"test\", [{\"key\":\"hello world\",\"data\":\"48656C6C6F20576F726C64210A\"}]")
+        ));
+     
      mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
@@ -4604,6 +4689,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap17();
     mc_InitRPCHelpMap18();
     mc_InitRPCHelpMap19();
+    mc_InitRPCHelpMap20();
     
     mc_InitRPCLogParamCountMap();
     mc_InitRPCAllowedWhenWaitingForUpgradeSet();    

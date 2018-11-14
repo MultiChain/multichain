@@ -595,6 +595,226 @@ Value publish(const Array& params, bool fHelp)
     return publishfrom(ext_params,fHelp);    
 }
 
+Value publishmulti(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 2 || params.size() > 3)
+        throw runtime_error("Help message not found\n");
+        
+    Array ext_params;
+    ext_params.push_back("*");
+    BOOST_FOREACH(const Value& value, params)
+    {
+        ext_params.push_back(value);
+    }
+    
+    return publishmultifrom(ext_params,fHelp);    
+}
+
+Value publishmultifrom(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 3 || params.size() > 4)
+        throw runtime_error("Help message not found\n");
+    
+    Array out_params;
+    
+    mc_EntityDetails stream_entity;
+    parseStreamIdentifier(params[1],&stream_entity);           
+    
+    vector<CTxDestination> fromaddresses;        
+    set<uint256> stream_hashes;
+    set<CTxDestination> valid_addresses;        
+    set<CTxDestination> next_addresses;        
+    
+    string default_options="";
+    if(params.size() > 3 )
+    {
+        if(params[3].type() != str_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream item options must be offchain or empty");                                                                                                                            
+        }
+        if( mc_gState->m_Features->OffChainData() == 0 )
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Format options are not supported by this protocol version");                                                                                                                            
+        }        
+        if(params[3].get_str().size())
+        {
+            if(params[3].get_str() == "offchain")
+            {
+                default_options = "offchain";
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream item options must be offchain or empty");                                                                                                                            
+            }
+        }
+    }
+    
+    if(params[0].get_str() != "*")
+    {
+        fromaddresses=ParseAddresses(params[0].get_str(),false,false);
+
+        if(fromaddresses.size() != 1)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
+        }
+        if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
+        {
+            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
+        }
+    }
+
+    FindAddressesWithPublishPermission(fromaddresses,&stream_entity);
+    
+    BOOST_FOREACH(const CTxDestination& from_address, fromaddresses) 
+    {
+        valid_addresses.insert(from_address);
+    }    
+            
+    stream_hashes.insert(*(uint256*)stream_entity.GetTxID());
+    if(params[2].type() != array_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Items should be array");                                
+    }    
+
+    if(params[2].get_array().size() > MCP_MAX_STD_OP_RETURN_COUNT)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Number of items exceeds %d (max-std-op-returns-count)",MCP_MAX_STD_OP_RETURN_COUNT));                                                    
+    }
+    
+    Array out_items;
+    
+    
+    BOOST_FOREACH(const Value& data, params[2].get_array()) 
+    {
+        if(data.type() != obj_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Items should be array of objects");                                            
+        }
+        
+        bool for_found=false;
+        bool options_found=false;
+        Object out_item;
+        
+        BOOST_FOREACH(const Pair& d, data.get_obj()) 
+        {
+            if(d.name_ == "for")
+            {
+                uint256 hash;
+                mc_EntityDetails item_entity;
+                parseStreamIdentifier(d.value_,&item_entity);       
+                hash=*(uint256*)item_entity.GetTxID();
+                if(stream_hashes.find(hash) == stream_hashes.end())
+                {
+                    stream_hashes.insert(hash);
+                    vector<CTxDestination> other_addresses;        
+                    FindAddressesWithPublishPermission(other_addresses,&item_entity);
+                    next_addresses.clear();
+                    BOOST_FOREACH(const CTxDestination& other_address, other_addresses) 
+                    {
+                        if(valid_addresses.find(other_address) != valid_addresses.end())
+                        {
+                            next_addresses.insert(other_address);                            
+                        }
+                    }    
+                    valid_addresses=next_addresses;
+                    if(valid_addresses.size() == 0)
+                    {
+                        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet contains no addresses with permission to write to all streams and global send permission.");                                                                                                                    
+                    }
+                }
+                for_found=true;
+            }
+            if(d.name_ == "options")
+            {
+                options_found=true;
+            }                    
+        }   
+        
+        out_item=data.get_obj();
+        if(!for_found)
+        {
+            out_item.push_back(Pair("for",params[1]));
+        }
+        if(default_options.size())
+        {
+            if(!options_found)
+            {
+                out_item.push_back(Pair("options",default_options));
+            }            
+        }
+        
+        out_items.push_back(out_item);
+    }
+    
+    CTxDestination out_address;
+    
+    if(fromaddresses.size() == 1)
+    {
+        out_address=fromaddresses[0];
+    }
+    else
+    {
+        set<uint160> setAddressUints;
+        set<uint160> *lpSetAddressUint=NULL;
+
+        BOOST_FOREACH(const CTxDestination& from_address, valid_addresses) 
+        {
+            const CKeyID *lpKeyID=boost::get<CKeyID> (&from_address);
+            const CScriptID *lpScriptID=boost::get<CScriptID> (&from_address);
+            if(lpKeyID)
+            {
+                setAddressUints.insert(*(uint160*)lpKeyID);
+            }
+            else
+            {
+                if(lpScriptID)
+                {
+                    setAddressUints.insert(*(uint160*)lpScriptID);
+                }
+           }        
+        }
+        lpSetAddressUint=&setAddressUints;
+
+        uint32_t flags= MC_CSF_ALLOW_SPENDABLE_P2SH | MC_CSF_ALLOWED_COINS_ARE_MINE;
+        vector<COutput> vecOutputs;
+
+        pwalletMain->AvailableCoins(vecOutputs, false, NULL, true, true, 0, lpSetAddressUint,flags);
+        if(vecOutputs.size() == 0)
+        {
+            throw JSONRPCError(RPC_WALLET_NO_UNSPENT_OUTPUTS, "Addresses with permission to write to all streams don't have unlocked unspent outputs.");
+        }
+
+        COutput deepest_coin=vecOutputs[0];
+        int max_depth=deepest_coin.nDepth;
+
+        for(int i=1;i<(int)vecOutputs.size();i++)
+        {
+            if(vecOutputs[i].nDepth > max_depth)
+            {
+                deepest_coin=vecOutputs[i];
+                max_depth=deepest_coin.nDepth;
+            }
+        }
+
+        CTxOut txout;
+        uint256 hash=deepest_coin.GetHashAndTxOut(txout);
+
+        if (!ExtractDestination(txout.scriptPubKey, out_address))
+        {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Addresses with permission to write to all streams don't have unlocked unspent outputs.");        
+        }
+    }
+    
+    Object empty_object;
+    
+    out_params.push_back(CBitcoinAddress(out_address).ToString());
+    out_params.push_back(empty_object);
+    out_params.push_back(out_items);
+    out_params.push_back("send");
+    
+    return createrawsendfrom(out_params,false);
+}
+
 Value publishfrom(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 4 || params.size() > 5)

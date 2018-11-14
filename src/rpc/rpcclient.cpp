@@ -91,6 +91,8 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "publishfrom", 3 },                                                            
     { "publish", 1 },
     { "publish", 2 },                                                            
+    { "publishmultifrom", 2 },                                                            
+    { "publishmulti", 1 },                                                            
     { "getassetbalances", 1 },
     { "getassetbalances", 2 },
     { "getassetbalances", 3 },

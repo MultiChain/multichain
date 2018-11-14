@@ -252,6 +252,8 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "createfrom",             &createfromcmd,            false,     false,      true },
     { "wallet",             "publish",                &publish,                false,     false,      true },
     { "wallet",             "publishfrom",            &publishfrom,            false,     false,      true },
+    { "wallet",             "publishmulti",           &publishmulti,                false,     false,      true },
+    { "wallet",             "publishmultifrom",       &publishmultifrom,            false,     false,      true },
     { "wallet",             "subscribe",              &subscribe,              false,     false,      true },
     { "wallet",             "unsubscribe",            &unsubscribe,            false,     false,      true },
     { "wallet",             "listassettransactions",  &listassettransactions,         false,     false,      true },
