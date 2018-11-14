@@ -8,7 +8,7 @@
 #include "json/json_spirit.h"
 
 class mc_FilterEngine;
-class mc_FilterWatchdog;
+class Watchdog;
 
 /**
  * A user-defined transaction filter.
@@ -133,51 +133,11 @@ class mc_FilterEngine
   private:
     void *m_Impl;
     const mc_Filter *m_runningFilter;
-    mc_FilterWatchdog *m_watchdog;
+    Watchdog *m_watchdog;
     FilterCallback m_filterCallback;
 
     void SetRunningFilter(const mc_Filter *filter);
     void ResetRunningFilter();
 }; // class mc_FilterEngine
-
-/**
- * @brief Monitor filter execution and stop the filer function if it takes more than a specified timeout.
- */
-class mc_FilterWatchdog
-{
-  public:
-    mc_FilterWatchdog()
-    {
-        Zero();
-    }
-    ~mc_FilterWatchdog()
-    {
-        Destroy();
-    }
-
-    void Zero();
-    int Destroy();
-
-    int Initialize();
-
-    /**
-     * @brief Notfies the watchdog that a filter started runnug, with a given timeout.
-     * @param timeout   The number of millisecond to allow the filtr to run.
-     */
-    void FilterStarted(int timeout = 1000);
-
-    /**
-     * @brief Notfies the watchdog that a filter stopped running.
-     */
-    void FilterEnded();
-
-    /**
-     * @brief Terminate the watchdog.
-     */
-    void Shutdown();
-
-  private:
-    void *m_Impl;
-};
 
 #endif /* MULTICHAIN_FILTER_H */

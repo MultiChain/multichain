@@ -3,11 +3,13 @@
 
 #include "filters/filter.h"
 #include "filters/filtercallback.h"
+#include "filters/watchdog.h"
 #include "utils/define.h"
 #include "utils/util.h"
 #include "v8/v8engine.h"
 #include "v8/v8filter.h"
-#include "v8/v8filterwatchdog.h"
+
+using namespace boost::placeholders;
 
 namespace mc_v8
 {
@@ -55,7 +57,7 @@ int mc_FilterEngine::Destroy()
     }
     if (m_watchdog != nullptr)
     {
-        m_watchdog->Shutdown();
+        m_watchdog->PostPoisonPill();
         delete m_watchdog;
     }
 
@@ -108,7 +110,8 @@ int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, std
     return result;
 }
 
-int mc_FilterEngine::RunFilter(const mc_Filter *filter, std::string &strResult, bool createCallbackLog, json_spirit::Array *callbacks)
+int mc_FilterEngine::RunFilter(const mc_Filter *filter, std::string &strResult, bool createCallbackLog,
+                               json_spirit::Array *callbacks)
 {
     if (fDebug)
         LogPrint("v8filter", "v8filter: mc_FilterEngine::RunFilter\n");
@@ -153,56 +156,14 @@ void mc_FilterEngine::SetRunningFilter(const mc_Filter *filter)
     m_runningFilter = filter;
     if (m_watchdog == nullptr)
     {
-        m_watchdog = new mc_FilterWatchdog();
-        m_watchdog->Initialize();
+        m_watchdog = new Watchdog(boost::bind(&mc_FilterEngine::TerminateFilter, this, _1));
     }
-    m_watchdog->FilterStarted(filter->Timeout());
+    m_watchdog->PostTaskStarted(filter->Timeout());
 }
 
 void mc_FilterEngine::ResetRunningFilter()
 {
     assert(m_watchdog != nullptr);
     m_runningFilter = nullptr;
-    m_watchdog->FilterEnded();
-}
-
-void mc_FilterWatchdog::Zero()
-{
-    m_Impl = nullptr;
-}
-
-int mc_FilterWatchdog::Destroy()
-{
-    if (m_Impl != nullptr)
-    {
-        auto v8watchdog = static_cast<mc_v8::V8FilterWatchdog *>(m_Impl);
-        delete v8watchdog;
-    }
-    this->Zero();
-    return MC_ERR_NOERROR;
-}
-
-int mc_FilterWatchdog::Initialize()
-{
-    auto v8watchdog = new mc_v8::V8FilterWatchdog();
-    m_Impl = v8watchdog;
-    return MC_ERR_NOERROR;
-}
-
-void mc_FilterWatchdog::FilterStarted(int timeout)
-{
-    auto v8watchdog = static_cast<mc_v8::V8FilterWatchdog *>(m_Impl);
-    v8watchdog->FilterStarted(timeout);
-}
-
-void mc_FilterWatchdog::FilterEnded()
-{
-    auto v8watchdog = static_cast<mc_v8::V8FilterWatchdog *>(m_Impl);
-    v8watchdog->FilterEnded();
-}
-
-void mc_FilterWatchdog::Shutdown()
-{
-    auto v8watchdog = static_cast<mc_v8::V8FilterWatchdog *>(m_Impl);
-    v8watchdog->Shutdown();
+    m_watchdog->PostTaskEnded();
 }

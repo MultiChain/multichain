@@ -5,32 +5,23 @@
 #include "json/json_spirit_writer.h"
 
 const int MAX_DEPTH = 100;
+#define CALLBACK_LOOKUP(name) { #name, &name }
 
-static std::map<std::string, rpcfn_type> FilterCallbackFunctions{{"getfiltertransaction", &getfiltertransaction},
-                                                                 {"getfilterstreamitem", &getfilterstreamitem},
-                                                                 {"getfilterassetbalances", &getfilterassetbalances},
-                                                                 {"getfiltertxid", &getfiltertxid},
-                                                                 {"getfiltertxinput", &getfiltertxinput},
-                                                                 {"setfilterparam", &setfilterparam}};
+static std::map<std::string, rpcfn_type> FilterCallbackFunctions{
+    CALLBACK_LOOKUP(getfiltertxid),
+    CALLBACK_LOOKUP(getfiltertransaction),
+    CALLBACK_LOOKUP(getfilterstreamitem),
+    CALLBACK_LOOKUP(getfilterassetbalances),
+    CALLBACK_LOOKUP(setfilterparam),
+    CALLBACK_LOOKUP(getfiltertxinput),
+    CALLBACK_LOOKUP(getlastblockinfo),
+    CALLBACK_LOOKUP(getassetinfo),
+    CALLBACK_LOOKUP(getstreaminfo),
+    CALLBACK_LOOKUP(verifypermission),
+    CALLBACK_LOOKUP(verifymessage)
+};
 
-void FilterCallback::JspCallback(string name, Array args, Value &result)
-{
-    result = Value::null;
-    try
-    {
-        result = FilterCallbackFunctions[name](args, false);
-        this->CreateCallbackLog(name, args, result);
-    }
-    catch (Object &e)
-    {
-        this->CreateCallbackLogError(name, args, e);
-    }
-    catch (exception &e)
-    {
-        this->CreateCallbackLogError(name, args, e);
-    }
-}
-
+#ifdef WIN32
 void FilterCallback::UbjCallback(const char *name, const unsigned char *args, unsigned char **result, int *resultSize)
 {
     int err;
@@ -54,6 +45,25 @@ void FilterCallback::UbjCallback(const char *name, const unsigned char *args, un
     ubjson_write(jspResult, &script, MAX_DEPTH);
     script.GetRawData(result, resultSize);
 }
+#else
+void FilterCallback::JspCallback(string name, Array args, Value &result)
+{
+    result = Value::null;
+    try
+    {
+        result = FilterCallbackFunctions[name](args, false);
+        this->CreateCallbackLog(name, args, result);
+    }
+    catch (Object &e)
+    {
+        this->CreateCallbackLogError(name, args, e);
+    }
+    catch (exception &e)
+    {
+        this->CreateCallbackLogError(name, args, e);
+    }
+}
+#endif // WIN32
 
 void FilterCallback::CreateCallbackLog(string name, Array args, Value result)
 {

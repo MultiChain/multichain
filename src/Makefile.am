@@ -171,7 +171,6 @@ libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 V8_SOURCES = \
   v8/v8engine.cpp \
   v8/v8filter.cpp \
-  v8/v8filterwatchdog.cpp \
   v8/callbacks.cpp \
   v8/v8utils.cpp
 
@@ -455,6 +454,7 @@ multichaind_SOURCES = \
     chainparams/buildgenesis.cpp \
     filters/filter.cpp \
     filters/filtercallback.cpp \
+    filters/watchdog.cpp \
     $(V8_SOURCES)
 #
 
@@ -488,7 +488,8 @@ multichaind_cold_SOURCES = \
     rpc/rpclist-cold.cpp \
     chainparams/buildgenesis.cpp \
     filters/filter_cold.cpp \
-    filters/filtercallback.cpp
+    filters/filtercallback.cpp \
+    filters/watchdog.cpp
 #
 
 if TARGET_WINDOWS
