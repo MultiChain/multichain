@@ -36,6 +36,7 @@
 #include "structs/base58.h"
 #include "multichain/multichain.h"
 #include "wallet/wallettxs.h"
+#include "filters/filter.h"
 std::string BurnAddress(const std::vector<unsigned char>& vchVersion);
 
 void HandleSIGTERM(int);

@@ -4,10 +4,11 @@
 #ifndef MULTICHAIN_FILTER_H
 #define MULTICHAIN_FILTER_H
 
+#include "filters/filtercallback.h"
 #include "json/json_spirit.h"
 
 class mc_FilterEngine;
-class mc_FilterWatchdog;
+class Watchdog;
 
 /**
  * A user-defined transaction filter.
@@ -101,11 +102,14 @@ class mc_FilterEngine
     /**
      * Run the filter function in the JS script.
      *
-     * @param filter    The user-defined transaction filter to use.
-     * @param strResult Reason for script failure or transaction rejection.
-     * @return          MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
+     * @param filter            The user-defined transaction filter to use.
+     * @param strResult         Reason for script failure or transaction rejection.
+     * @param createCallbackLog Indicate if a callbacklog is requested.
+     * @param callbacks         An array of RPC callback call data.
+     * @return                  MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
      */
-    int RunFilter(const mc_Filter *filter, std::string &strResult);
+    int RunFilter(const mc_Filter *filter, std::string &strResult, bool createCallbackLog = false,
+                  json_spirit::Array *callbacks = nullptr);
 
     /**
      * Run the filter function in the JS script.
@@ -117,7 +121,7 @@ class mc_FilterEngine
      * @param callbacks An array of RPC callback call data.
      * @return          MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
      */
-    int RunFilterWithCallbackLog(const mc_Filter *filter, std::string &strResult, json_spirit::Array &callbacks);
+    int RunFilterWithCallbackLog(const mc_Filter *filter, std::string &strResult, json_spirit::Array *callbacks);
 
     /**
      * Abort the currently running filter (if any).
@@ -129,50 +133,11 @@ class mc_FilterEngine
   private:
     void *m_Impl;
     const mc_Filter *m_runningFilter;
-    mc_FilterWatchdog *m_watchdog;
+    Watchdog *m_watchdog;
+    FilterCallback m_filterCallback;
 
     void SetRunningFilter(const mc_Filter *filter);
     void ResetRunningFilter();
 }; // class mc_FilterEngine
-
-/**
- * @brief Monitor filter execution and stop the filer function if it takes more than a specified timeout.
- */
-class mc_FilterWatchdog
-{
-  public:
-    mc_FilterWatchdog()
-    {
-        Zero();
-    }
-    ~mc_FilterWatchdog()
-    {
-        Destroy();
-    }
-
-    void Zero();
-    int Destroy();
-
-    int Initialize();
-
-    /**
-     * @brief Notfies the watchdog that a filter started runnug, with a given timeout.
-     * @param timeout   The number of millisecond to allow the filtr to run.
-     */
-    void FilterStarted(int timeout = 1000);
-
-    /**
-     * @brief Notfies the watchdog that a filter stopped running.
-     */
-    void FilterEnded();
-
-    /**
-     * @brief Terminate the watchdog.
-     */
-    void Shutdown();
-
-  private:
-    void *m_Impl;
-};
 
 #endif /* MULTICHAIN_FILTER_H */

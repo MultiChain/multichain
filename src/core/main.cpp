@@ -2974,7 +2974,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
         err=pwalletTxsMain->AddTx(NULL,tx,pindexNew->nHeight,&pos,i,pindexNew->GetBlockHash());
         if(err)
         {
-            return error("ConnectTip() : ConnectBlock %s failed, Wtxs AddTx %s, error: %d", pindexNew->GetBlockHash().ToString(),tx.GetHash().ToString(),err);
+            LogPrintf("Wallet error when connecting block %s, Tx %s, error: %d\n", pindexNew->GetBlockHash().ToString(),tx.GetHash().ToString(),err);
         }
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
     }

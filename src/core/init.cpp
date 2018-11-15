@@ -37,6 +37,7 @@
 #include "multichain/multichain.h"
 #include "wallet/wallettxs.h"
 #include "protocol/relay.h"
+#include "filters/filter.h"
 
 std::string BurnAddress(const std::vector<unsigned char>& vchVersion);
 std::string SetBannedTxs(std::string txlist);

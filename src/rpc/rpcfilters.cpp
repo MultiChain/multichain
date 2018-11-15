@@ -6,7 +6,8 @@
 
 
 #include "rpc/rpcwallet.h"
-#include "protocol/multichainfilter.h"
+#include "filters/multichainfilter.h"
+#include "filters/filter.h"
 
 void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
 void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity);

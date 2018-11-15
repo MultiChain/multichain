@@ -1,14 +1,14 @@
 // Copyright (c) 2014-2018 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
-#include "v8filter.h"
-#include "callbacks.h"
+#include "v8/v8filter.h"
 #include "chainparams/state.h"
 #include "utils/define.h"
 #include "utils/tinyformat.h"
 #include "utils/util.h"
-#include "v8engine.h"
-#include "v8utils.h"
+#include "v8/callbacks.h"
+#include "v8/v8engine.h"
+#include "v8/v8utils.h"
 #include <cassert>
 
 namespace mc_v8
@@ -103,7 +103,7 @@ int V8Filter::Initialize(V8Engine *engine, std::string script, std::string funct
     v8::Isolate::Scope isolateScope(isolate);
     v8::HandleScope handleScope(isolate);
     auto global = v8::ObjectTemplate::New(isolate);
-    auto isolateData = v8::External::New(isolate, m_engine->GetIsolateData());
+    auto filterCallback = v8::External::New(isolate, m_engine->GetFilterCallback());
     for (std::string functionName : callback_names)
     {
         if (callbackLookup.find(functionName) == callbackLookup.end())
@@ -112,7 +112,7 @@ int V8Filter::Initialize(V8Engine *engine, std::string script, std::string funct
             return MC_ERR_INTERNAL_ERROR;
         }
         global->Set(String2V8(isolate, functionName),
-                    v8::FunctionTemplate::New(isolate, callbackLookup[functionName], isolateData));
+                    v8::FunctionTemplate::New(isolate, callbackLookup[functionName], filterCallback));
     }
     auto context = v8::Context::New(isolate, nullptr, global);
     m_context.Reset(isolate, context);
@@ -137,7 +137,7 @@ int V8Filter::Initialize(V8Engine *engine, std::string script, std::string funct
     return status;
 }
 
-int V8Filter::Run(std::string &strResult, bool withCallbackLog)
+int V8Filter::Run(std::string &strResult)
 {
     if (fDebug)
         LogPrint("v8filter", "v8filter: V8Filter::Run\n");
@@ -155,7 +155,6 @@ int V8Filter::Run(std::string &strResult, bool withCallbackLog)
     v8::TryCatch tryCatch(isolate);
     auto context = v8::Local<v8::Context>::New(isolate, m_context);
     v8::Context::Scope contextScope(context);
-    m_engine->GetIsolateData()->Reset(withCallbackLog);
 
     v8::Local<v8::Value> result;
     auto filterFunction = v8::Local<v8::Function>::New(isolate, m_filterFunction);
@@ -182,13 +181,6 @@ int V8Filter::Run(std::string &strResult, bool withCallbackLog)
     }
 
     return MC_ERR_NOERROR;
-}
-
-int V8Filter::RunWithCallbackLog(std::string &strResult, json_spirit::Array &callbacks)
-{
-    int retcode = this->Run(strResult, true);
-    callbacks = m_engine->GetIsolateData()->callbacks;
-    return retcode;
 }
 
 int V8Filter::CompileAndLoadScript(std::string script, std::string functionName, std::string source,

@@ -10,7 +10,7 @@
 #include "multichain/multichain.h"
 #include "structs/base58.h"
 #include "custom/custom.h"
-#include "protocol/multichainfilter.h"
+#include "filters/multichainfilter.h"
 
 extern mc_MultiChainFilterEngine* pMultiChainFilterEngine;
 

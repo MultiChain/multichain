@@ -3,8 +3,9 @@
 
 #include "v8/callbacks.h"
 #include "v8/v8engine.h"
-#include "v8/v8json_spirit.h"
 #include "v8/v8utils.h"
+#include "v8/v8ubjson.h"
+#include "v8/v8blob.h"
 #include <cassert>
 
 namespace mc_v8
@@ -29,21 +30,34 @@ void CallRpcFunction(std::string name, const v8::FunctionCallbackInfo<v8::Value>
 
     IFilterCallback *filterCallback = static_cast<IFilterCallback *>(args.Data().As<v8::External>()->Value());
 
-    json_spirit::Array params;
+    auto v8args = v8::Array::New(isolate, args.Length());
     for (int i = 0; i < args.Length(); ++i)
     {
-        params.push_back(V82Jsp(isolate, args[i]));
+        v8args->Set(static_cast<unsigned>(i), args[i]);
     }
 
-    json_spirit::Value result;
-    filterCallback->JspCallback(name, params, result);
-    if (result.is_null())
+    Blob* argsBlob = Blob::Instance("args");
+    Blob* resultBlob = Blob::Instance("result");
+    V82Ubj(isolate, v8args, argsBlob);
+    unsigned char *result;
+    size_t resultSize;
+
+    filterCallback->UbjCallback(name.c_str(), argsBlob->Data(), &result, &resultSize);
+    resultBlob->Set(result, resultSize);
+
+    if (resultBlob->IsEmpty())
     {
         args.GetReturnValue().SetUndefined();
     }
     else
     {
-        args.GetReturnValue().Set(Jsp2V8(isolate, result));
+        int err;
+        args.GetReturnValue().Set(Ubj2V8(isolate, resultBlob, &err));
+    }
+
+    if (result != nullptr)
+    {
+        delete [] result;
     }
 }
 
