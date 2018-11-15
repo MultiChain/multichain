@@ -643,15 +643,6 @@ Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp)
 
     CWalletTx wtx;
     
-
-    
-    EnsureWalletIsUnlocked();
-    LOCK (pwalletMain->cs_wallet_send);
-    
-    SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(), fromaddresses);
-    
-    int vout=-1;
-    
     CScript scriptPubKey = GetScriptForDestination(addresses[0]);
     
     for(int element=0;element < lpScript->GetNumElements();element++)
@@ -666,6 +657,15 @@ Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp)
         else
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
     }
+    
+
+    
+    EnsureWalletIsUnlocked();
+    LOCK (pwalletMain->cs_wallet_send);
+    
+    SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(), fromaddresses);
+    
+    int vout=-1;
     
     CScript::const_iterator pc0 = scriptPubKey.begin();
     
@@ -755,18 +755,6 @@ Value preparelockunspent(const json_spirit::Array& params, bool fHelp)
         }        
     }
 
-    CWalletTx wtx;
-    
-
-    vector<CTxDestination> fromaddresses;    
-    
-    EnsureWalletIsUnlocked();
-    LOCK (pwalletMain->cs_wallet_send);
-       
-    SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(), fromaddresses);
-    
-    int vout=-1;
-    
     CScript scriptPubKey = GetScriptForDestination(addresses[0]);
     
     for(int element=0;element < lpScript->GetNumElements();element++)
@@ -782,8 +770,20 @@ Value preparelockunspent(const json_spirit::Array& params, bool fHelp)
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
     }
     
-    CScript::const_iterator pc0 = scriptPubKey.begin();
+    CWalletTx wtx;
     
+
+    vector<CTxDestination> fromaddresses;    
+    
+    EnsureWalletIsUnlocked();
+    LOCK (pwalletMain->cs_wallet_send);
+       
+    SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(), fromaddresses);
+    
+    int vout=-1;
+    
+    
+    CScript::const_iterator pc0 = scriptPubKey.begin();
     for (unsigned int j = 0; j < wtx.vout.size(); j++)
     {
         CTxOut txout=wtx.vout[j];
