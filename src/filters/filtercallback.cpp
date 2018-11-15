@@ -21,8 +21,8 @@ static std::map<std::string, rpcfn_type> FilterCallbackFunctions{
     CALLBACK_LOOKUP(verifymessage)
 };
 
-#ifdef WIN32
-void FilterCallback::UbjCallback(const char *name, const unsigned char *args, unsigned char **result, int *resultSize)
+//#ifdef WIN32
+void FilterCallback::UbjCallback(const char *name, const unsigned char *args, unsigned char **result, size_t *resultSize)
 {
     int err;
     Array jspArgs = ubjson_read(args, 1, MAX_DEPTH, &err).get_array();
@@ -43,9 +43,16 @@ void FilterCallback::UbjCallback(const char *name, const unsigned char *args, un
     mc_Script script;
     script.AddElement();
     ubjson_write(jspResult, &script, MAX_DEPTH);
-    script.GetRawData(result, resultSize);
+    unsigned char *result_;
+    int resultSize_;
+    if (script.GetRawData(&result_, &resultSize_) == MC_ERR_NOERROR)
+    {
+        *resultSize = static_cast<size_t>(resultSize_);
+        *result = new unsigned char[*resultSize];
+        memcpy(*result, result_, *resultSize);
+    }
 }
-#else
+//#else
 void FilterCallback::JspCallback(string name, Array args, Value &result)
 {
     result = Value::null;
@@ -63,7 +70,7 @@ void FilterCallback::JspCallback(string name, Array args, Value &result)
         this->CreateCallbackLogError(name, args, e);
     }
 }
-#endif // WIN32
+//#endif // WIN32
 
 void FilterCallback::CreateCallbackLog(string name, Array args, Value result)
 {

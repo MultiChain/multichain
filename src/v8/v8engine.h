@@ -6,7 +6,7 @@
 
 #include "filters/ifiltercallback.h"
 #include "rpc/rpcserver.h"
-#include "json/json_spirit.h"
+//#include "json/json_spirit.h"
 #include <v8.h>
 
 namespace mc_v8
@@ -19,12 +19,7 @@ class V8Filter;
 class V8Engine
 {
   public:
-    V8Engine();
-
     ~V8Engine();
-
-    void Zero();
-    int Destroy();
 
     /**
      * Initialize the V8 engine.
@@ -81,8 +76,8 @@ class V8Engine
     }
 
   private:
-    IFilterCallback *m_filterCallback;
-    v8::Isolate *m_isolate;
+    IFilterCallback *m_filterCallback = nullptr;
+    v8::Isolate *m_isolate = nullptr;
     static std::unique_ptr<v8::Platform> m_platform;
     static v8::Isolate::CreateParams m_createParams;
     static bool m_isV8Initialized;

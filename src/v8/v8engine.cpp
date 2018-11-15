@@ -17,30 +17,13 @@ extern char _binary_snapshot_blob_bin_end;
 
 namespace mc_v8
 {
-V8Engine::V8Engine()
-{
-    Zero();
-}
-
 V8Engine::~V8Engine()
-{
-    Destroy();
-}
-
-void V8Engine::Zero()
-{
-    m_isolate = nullptr;
-}
-
-int V8Engine::Destroy()
 {
     if (m_isolate != nullptr)
     {
         m_isolate->Dispose();
         delete m_createParams.array_buffer_allocator;
     }
-    this->Zero();
-    return MC_ERR_NOERROR;
 }
 
 int V8Engine::Initialize(IFilterCallback *filterCallback, std::string &strResult)
@@ -51,6 +34,7 @@ int V8Engine::Initialize(IFilterCallback *filterCallback, std::string &strResult
     if (!m_isV8Initialized)
     {
         this->InitializeV8();
+        m_isV8Initialized = true;
     }
     m_createParams.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
     m_isolate = v8::Isolate::New(m_createParams);
@@ -112,7 +96,6 @@ void V8Engine::InitializeV8()
     m_platform = v8::platform::NewDefaultPlatform();
     v8::V8::InitializePlatform(m_platform.get());
     v8::V8::Initialize();
-    m_isV8Initialized = true;
 }
 
 std::unique_ptr<v8::Platform> V8Engine::m_platform;

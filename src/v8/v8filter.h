@@ -17,11 +17,7 @@ class V8Engine;
 class V8Filter
 {
   public:
-    V8Filter();
-
     ~V8Filter();
-    void Zero();
-    int Destroy();
 
     bool IsRunning() const
     {
@@ -55,10 +51,10 @@ class V8Filter
     int CompileAndLoadScript(std::string script, std::string functionName, std::string source, std::string &strResult);
     void ReportException(v8::TryCatch *tryCatch, std::string &strResult);
 
-    V8Engine *m_engine;
+    V8Engine *m_engine = nullptr;
     v8::Global<v8::Context> m_context;
     v8::Global<v8::Function> m_filterFunction;
-    bool m_isRunning;
+    bool m_isRunning = false;
 };
 
 } // namespace mc_v8

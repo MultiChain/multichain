@@ -8,11 +8,11 @@
 class IFilterCallback
 {
   public:
-#ifdef WIN32
-    virtual void UbjCallback(const char *name, const unsigned char *args, unsigned char **result, int *resultSize) = 0;
-#else
+//#ifdef WIN32
+    virtual void UbjCallback(const char *name, const unsigned char *args, unsigned char **result, size_t *resultSize) = 0;
+//#else
     virtual void JspCallback(std::string name, json_spirit::Array args, json_spirit::Value &result) = 0;
-#endif // WIN32
+//#endif // WIN32
 
     virtual ~IFilterCallback()
     {

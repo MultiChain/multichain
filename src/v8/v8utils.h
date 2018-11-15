@@ -4,18 +4,16 @@
 #ifndef V8UTILS_H_
 #define V8UTILS_H_
 
-#include "json/json_spirit.h"
 #include "utils/util.h"
-#include <fstream>
-#include <v8.h>
 #include <boost/filesystem.hpp>
+#include <fstream>
 #include <unistd.h>
+#include <v8.h>
 
 namespace fs = boost::filesystem;
 
 namespace mc_v8
 {
-
 /**
  * Convert a V8 Value to an std::string.
  *
@@ -23,7 +21,7 @@ namespace mc_v8
  * @param value   The V8 Value to convert.
  * @return        The equivalent std::string.
  */
-inline std::string V82String(v8::Isolate* isolate, v8::Local<v8::Value> value)
+inline std::string V82String(v8::Isolate *isolate, v8::Local<v8::Value> value)
 {
     v8::String::Utf8Value v(isolate, value);
     return v.length() > 0 ? *v : std::string();
@@ -36,7 +34,7 @@ inline std::string V82String(v8::Isolate* isolate, v8::Local<v8::Value> value)
  * @param str     The std::string to convert.
  * @return        The equivalent V8 Value.
  */
-inline v8::Local<v8::String> String2V8(v8::Isolate* isolate, std::string str)
+inline v8::Local<v8::String> String2V8(v8::Isolate *isolate, std::string str)
 {
     return v8::String::NewFromUtf8(isolate, str.c_str(), v8::NewStringType::kNormal).ToLocalChecked();
 }
@@ -56,16 +54,12 @@ inline fs::path GetTemporaryPidDirectory()
  * @param data     The data array to write.
  * @param size     The number of bytes to write.
  */
-inline void WriteBinaryFile(fs::path filename, char* data, std::streamsize size)
+inline void WriteBinaryFile(fs::path filename, char *data, std::streamsize size)
 {
     std::ofstream ofs(filename.string(), std::fstream::out | std::fstream::binary);
     ofs.write(data, size);
     ofs.close();
 }
-
-v8::Local<v8::Value> Jsp2V8(v8::Isolate* isolate, const json_spirit::Value& j);
-json_spirit::Value V82Jsp(v8::Isolate* isolate, v8::Local<v8::Value> v);
-
 } // namespace mc_v8
 
 #endif /* V8UTILS_H_ */
