@@ -34,6 +34,9 @@ LIBBITCOIN_MULTICHAIN=multichain/libbitcoin_multichain.a
 LIBBITCOIN_UNIVALUE=univalue/libbitcoin_univalue.a
 LIBBITCOINQT=qt/libbitcoinqt.a
 LIBSECP256K1=secp256k1/libsecp256k1.la
+if !TARGET_WINDOWS
+LIBBITCOIN_V8=libbitcoin_v8.a
+endif
 
 $(LIBSECP256K1): $(wildcard secp256k1/src/*) $(wildcard secp256k1/include/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
@@ -52,7 +55,9 @@ if ENABLE_WALLET
 BITCOIN_INCLUDES += $(BDB_CPPFLAGS)
 EXTRA_LIBRARIES += libbitcoin_wallet.a
 endif
-
+if !TARGET_WINDOWS
+EXTRA_LIBRARIES += $(LIBBITCOIN_V8)
+endif
 if BUILD_BITCOIN_LIBS
 lib_LTLIBRARIES = libbitcoinconsensus.la
 LIBBITCOIN_CONSENSUS=libbitcoinconsensus.la
@@ -167,12 +172,6 @@ obj/build.h: FORCE
 	@$(top_srcdir)/share/genbuild.sh $(abs_top_builddir)/src/obj/build.h \
 	  $(abs_top_srcdir)
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
-
-V8_SOURCES = \
-  v8/v8engine.cpp \
-  v8/v8filter.cpp \
-  v8/callbacks.cpp \
-  v8/v8utils.cpp
 
 # server: shared between bitcoind and bitcoin-qt
 libbitcoin_server_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS)
@@ -431,6 +430,18 @@ V8_LIBS = \
         -licui18n \
     -lrt -ldl
 
+libbitcoin_v8_a_SOURCES = \
+  v8/v8engine.cpp \
+  v8/v8filter.cpp \
+  v8/callbacks.cpp \
+  v8/v8json_spirit.cpp
+
+if TARGET_WINDOWS
+libbitcoin_v8_a_SOURCES += v8/callbacks_win.cpp
+endif
+
+libbitcoin_v8_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(V8_INCLUDE)
+
 # multichaind binary #
 multichaind_LDADD = \
   $(LIBBITCOIN_SERVER) \
@@ -445,6 +456,10 @@ multichaind_LDADD = \
   $(LIBMEMENV) \
   $(LIBSECP256K1)
 
+if !TARGET_WINDOWS
+  multichaind_LDADD += $(LIBBITCOIN_V8)
+endif
+
 #if ENABLE_WALLET
 #multichaind_LDADD += libbitcoin_wallet.a
 #endif
@@ -454,9 +469,7 @@ multichaind_SOURCES = \
     chainparams/buildgenesis.cpp \
     filters/filter.cpp \
     filters/filtercallback.cpp \
-    filters/watchdog.cpp \
-    $(V8_SOURCES)
-#
+    filters/watchdog.cpp
 
 if TARGET_WINDOWS
 multichaind_SOURCES += multichaind-res.rc

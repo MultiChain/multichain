@@ -26,7 +26,7 @@ class FilterCallback : public IFilterCallback
     }
 
 #ifdef WIN32
-    void UbjCallback(const char *name, const unsigned char *args, unsigned char **result, int *resultSize) override;
+    void UbjCallback(const char *name, const unsigned char *args, unsigned char **result, size_t *resultSize) override;
 #else
     void JspCallback(std::string name, json_spirit::Array args, json_spirit::Value &result) override;
 #endif // WIN32

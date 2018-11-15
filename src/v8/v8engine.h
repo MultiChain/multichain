@@ -6,7 +6,7 @@
 
 #include "filters/ifiltercallback.h"
 #include "rpc/rpcserver.h"
-#include "json/json_spirit.h"
+//#include "json/json_spirit.h"
 #include <v8.h>
 
 namespace mc_v8

@@ -1,7 +1,8 @@
 // Copyright (c) 2014-2018 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
-#include "v8utils.h"
+#include "v8/v8json_spirit.h"
+#include "v8/v8utils.h"
 
 namespace mc_v8
 {
