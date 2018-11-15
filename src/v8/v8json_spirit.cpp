@@ -13,46 +13,54 @@ v8::Local<v8::Value> Jsp2V8(v8::Isolate *isolate, const json_spirit::Value &j)
     v8::Local<v8::Context> context = isolate->GetCurrentContext();
     v8::Context::Scope contextScope(context);
 
+    v8::Local<v8::Value> result = v8::Null(isolate);
     switch (j.type())
     {
     case json_spirit::obj_type:
     {
         auto v8obj = v8::Object::New(isolate);
-        for (auto property : j.get_obj())
+        for (json_spirit::Pair property : j.get_obj())
         {
             v8obj->Set(String2V8(isolate, property.name_), Jsp2V8(isolate, property.value_));
         }
-        return handleScope.Escape(v8obj);
+        result = v8obj;
+        break;
     }
 
     case json_spirit::array_type:
     {
         auto jspArray = j.get_array();
         auto v8array = v8::Array::New(isolate, static_cast<int>(jspArray.size()));
-        for (size_t i = 0; i < jspArray.size(); ++i)
+        for (unsigned i = 0; i < jspArray.size(); ++i)
         {
-            v8array->Set(static_cast<unsigned>(i), Jsp2V8(isolate, jspArray[i]));
+            v8array->Set(i, Jsp2V8(isolate, jspArray[i]));
         }
-        return handleScope.Escape(v8array);
+        result = v8array;
+        break;
     }
 
     case json_spirit::str_type:
-        return handleScope.Escape(String2V8(isolate, j.get_str()));
+        result = String2V8(isolate, j.get_str());
+        break;
 
     case json_spirit::bool_type:
-        return handleScope.Escape(v8::Boolean::New(isolate, j.get_bool()));
+        result = v8::Boolean::New(isolate, j.get_bool());
+        break;
 
     case json_spirit::int_type:
-        return handleScope.Escape(v8::Integer::New(isolate, j.get_int()));
+        v8::Integer::New(isolate, j.get_int());
+        break;
 
     case json_spirit::real_type:
-        return handleScope.Escape(v8::Number::New(isolate, j.get_real()));
+        result = v8::Number::New(isolate, j.get_real());
+        break;
 
     case json_spirit::null_type:
-        return handleScope.Escape(v8::Null(isolate));
+        result = v8::Null(isolate);
+        break;
     };
 
-    return handleScope.Escape(v8::Null(isolate));
+    return handleScope.Escape(result);
 }
 
 json_spirit::Value V82Jsp(v8::Isolate *isolate, v8::Local<v8::Value> v)
@@ -69,12 +77,13 @@ json_spirit::Value V82Jsp(v8::Isolate *isolate, v8::Local<v8::Value> v)
 
     if (v->IsObject())
     {
-        auto v8obj = v8::Local<v8::Object>::Cast(v);
+        auto v8obj = v->ToObject(context).ToLocalChecked();
         v8::Local<v8::Array> v8propNames = v8obj->GetOwnPropertyNames(context).ToLocalChecked();
         json_spirit::Object jspObj;
         for (unsigned i = 0; i < v8propNames->Length(); ++i)
         {
-            v8::Local<v8::String> v8propName = v8propNames->Get(context, i).ToLocalChecked()->ToString();
+            v8::Local<v8::String> v8propName =
+                v8propNames->Get(context, i).ToLocalChecked()->ToString(context).ToLocalChecked();
             v8::Local<v8::Value> v8value = v8obj->Get(context, v8propName).ToLocalChecked();
             jspObj.push_back(json_spirit::Pair(V82String(isolate, v8propName), V82Jsp(isolate, v8value)));
         }

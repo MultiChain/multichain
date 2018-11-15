@@ -25,11 +25,11 @@ class FilterCallback : public IFilterCallback
         m_callbackLog.clear();
     }
 
-#ifdef WIN32
+//#ifdef WIN32
     void UbjCallback(const char *name, const unsigned char *args, unsigned char **result, size_t *resultSize) override;
-#else
+//#else
     void JspCallback(std::string name, json_spirit::Array args, json_spirit::Value &result) override;
-#endif // WIN32
+//#endif // WIN32
 
   private:
     json_spirit::Array m_callbackLog;

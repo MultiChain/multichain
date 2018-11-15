@@ -3,15 +3,12 @@
 
 namespace mc_v8
 {
-std::map<std::string, Blob *> Blob::m_instances;
-
-Blob *Blob::Instance(std::string name)
+BlobPtr Blob::Instance(std::string name)
 {
     auto it = m_instances.find(name);
     if (it == m_instances.end())
     {
-        auto p = m_instances.insert(std::make_pair(name, new Blob()));
-        it = p.first;
+        it = m_instances.insert(std::make_pair(name, std::make_shared<Blob>())).first;
     }
     return it->second;
 }
@@ -42,18 +39,9 @@ void Blob::Append(void *data, size_t size)
     m_size += size;
 }
 
-void Blob::Destroy(std::string name)
+void Blob::Remove(std::string name)
 {
-    auto it = m_instances.find(name);
-    if (it != m_instances.end())
-    {
-        delete it->second;
-        m_instances.erase(it);
-    }
-}
-
-Blob::Blob() : m_buffer(nullptr), m_size(0), m_allocated(0)
-{
+    m_instances.erase(name);
 }
 
 void Blob::Resize(size_t add_size)
@@ -72,4 +60,5 @@ void Blob::Resize(size_t add_size)
     }
 }
 
+std::map<std::string, BlobPtr> Blob::m_instances;
 } // namespace mc_v8

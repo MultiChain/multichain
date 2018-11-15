@@ -36,8 +36,8 @@ void CallRpcFunction(std::string name, const v8::FunctionCallbackInfo<v8::Value>
         v8args->Set(static_cast<unsigned>(i), args[i]);
     }
 
-    Blob* argsBlob = Blob::Instance("args");
-    Blob* resultBlob = Blob::Instance("result");
+    BlobPtr argsBlob = Blob::Instance("args");
+    BlobPtr resultBlob = Blob::Instance("result");
     V82Ubj(isolate, v8args, argsBlob);
     unsigned char *result;
     size_t resultSize;

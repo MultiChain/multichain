@@ -676,7 +676,11 @@ exitlbl:
     return handleScope.Escape(result);
 }
 
+<<<<<<< HEAD
 static int ubjson_int64_write(int64_t int64_value, int known_type, Blob *blob)
+=======
+static int ubjson_int64_write(int64_t int64_value, int known_type, BlobPtr blob)
+>>>>>>> local/2.0-dev
 {
     int type = known_type;
     size_t n, sh;
@@ -708,7 +712,7 @@ static int ubjson_int64_write(int64_t int64_value, int known_type, Blob *blob)
     return MC_ERR_NOERROR;
 }
 
-static int ubjson_write_internal(v8::Isolate *isolate, v8::Local<v8::Value> value, int known_type, Blob *blob,
+static int ubjson_write_internal(v8::Isolate *isolate, v8::Local<v8::Value> value, int known_type, BlobPtr blob,
                                  int max_depth)
 {
     v8::Isolate::Scope isolateScope(isolate);
@@ -972,13 +976,13 @@ exitlbl:
     return err;
 }
 
-int V82Ubj(v8::Isolate *isolate, v8::Local<v8::Value> value, Blob *blob)
+int V82Ubj(v8::Isolate *isolate, v8::Local<v8::Value> value, BlobPtr blob)
 {
     blob->Reset();
     return ubjson_write_internal(isolate, value, UBJ_UNDEFINED, blob, MAX_FORMATTED_DATA_DEPTH);
 }
 
-v8::Local<v8::Value> Ubj2V8(v8::Isolate *isolate, Blob *blob, int *err)
+v8::Local<v8::Value> Ubj2V8(v8::Isolate *isolate, BlobPtr blob, int *err)
 {
     size_t offset = 0;
     return ubjson_read_internal(isolate, blob->Data(), blob->DataSize(), UBJ_UNDEFINED, MAX_FORMATTED_DATA_DEPTH,

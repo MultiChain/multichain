@@ -63,23 +63,7 @@ for (var fn of Object.getOwnPropertyNames(Math)) {
 delete Date.now;
 )";
 
-V8Filter::V8Filter()
-{
-    Zero();
-}
-
 V8Filter::~V8Filter()
-{
-    Destroy();
-}
-
-void V8Filter::Zero()
-{
-    m_engine = nullptr;
-    m_isRunning = false;
-}
-
-int V8Filter::Destroy()
 {
     if (m_isRunning)
     {
@@ -87,8 +71,6 @@ int V8Filter::Destroy()
     }
     m_filterFunction.Reset();
     m_context.Reset();
-    this->Zero();
-    return MC_ERR_NOERROR;
 }
 
 int V8Filter::Initialize(V8Engine *engine, std::string script, std::string functionName,
@@ -142,13 +124,13 @@ int V8Filter::Run(std::string &strResult)
     if (fDebug)
         LogPrint("v8filter", "v8filter: V8Filter::Run\n");
 
-    v8::Isolate *isolate = m_engine->GetIsolate();
     strResult.clear();
     if (m_context.IsEmpty() || m_filterFunction.IsEmpty())
     {
         strResult = "Trying to run an invalid filter";
         return MC_ERR_NOERROR;
     }
+    v8::Isolate *isolate = m_engine->GetIsolate();
     v8::Locker locker(isolate);
     v8::Isolate::Scope isolateScope(isolate);
     v8::HandleScope handleScope(isolate);
@@ -189,8 +171,8 @@ int V8Filter::CompileAndLoadScript(std::string script, std::string functionName,
     if (fDebug)
         LogPrint("v8filter", "v8filter: V8Filter::CompileAndLoadScript %s\n", source);
 
-    v8::Isolate *isolate = m_engine->GetIsolate();
     strResult.clear();
+    v8::Isolate *isolate = m_engine->GetIsolate();
     v8::HandleScope handleScope(isolate);
     v8::TryCatch tryCatch(isolate);
     auto context = v8::Local<v8::Context>::New(isolate, m_context);

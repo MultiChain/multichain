@@ -2,16 +2,20 @@
 #define V8BLOB_H
 
 #include <map>
+#include <memory>
 #include <string>
 
 namespace mc_v8
 {
+class Blob;
+using BlobPtr = std::shared_ptr<Blob>;
+
 class Blob
 {
   public:
     const size_t size_increment = 4096;
 
-    static Blob *Instance(std::string name);
+    static BlobPtr Instance(std::string name = "");
     ~Blob();
 
     void Reset();
@@ -35,19 +39,21 @@ class Blob
         return m_size == 0;
     }
 
-    static void Destroy(std::string name);
+    static void Remove(std::string name);
 
   private:
-    Blob();
+    Blob()
+    {
+    }
+
     void Resize(size_t add_size);
 
-    static std::map<std::string, Blob *> m_instances;
+    static std::map<std::string, BlobPtr> m_instances;
 
-    unsigned char *m_buffer;
-    size_t m_size;
-    size_t m_allocated;
+    unsigned char *m_buffer = nullptr;
+    size_t m_size = 0;
+    size_t m_allocated = 0;
 };
-
 } // namespace mc_v8
 
 #endif // V8BLOB_H
