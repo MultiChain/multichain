@@ -306,6 +306,23 @@ int mc_MultiChainFilterEngine::Reset(int block,int for_block)
     if(fDebug)LogPrint("filter","filter: Filter engine reset\n");
     return MC_ERR_NOERROR;
 }
+int mc_MultiChainFilterEngine::NoStreamFilters()
+{
+    if(mc_gState->m_Features->StreamFilters() == 0)
+    {
+        return 1;
+    }
+    
+    for(int i=0;i<(int)m_Filters.size();i++)
+    {
+        if( (m_Filters[i].m_FilterType == MC_FLT_TYPE_STREAM) && (m_Filters[i].m_CreateError.size() == 0) )
+        {
+            return 0;
+        }
+    }
+    
+    return 1;
+}
 
 int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout, unsigned char *stream_short_txid,int block,int offset,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied)            
 {

@@ -558,6 +558,10 @@ int VerifyNewTxForStreamFilters(const CTransaction& tx,std::string &strResult,mc
         return MC_ERR_NOERROR;        
     }
     
+    if(pMultiChainFilterEngine->NoStreamFilters())
+    {
+        return MC_ERR_NOERROR;
+    }
     
     strResult="";
     for (unsigned int i = 0; i < tx.vout.size(); i++) 
