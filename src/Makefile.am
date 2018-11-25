@@ -1,4 +1,4 @@
-walDIST_SUBDIRS = secp256k1
+FwalDIST_SUBDIRS = secp256k1
 AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS)
 CXXFLAGS += -std=c++0x
 
@@ -427,11 +427,8 @@ V8_LIBS = \
         -lv8_libsampler \
         -lv8_data \
         -licuuc \
-        -licui18n
-
-if !TARGET_WINDOWS
-V8_LIBS += -lrt -ldl
-endif
+        -licui18n \
+    -lrt -ldl
 
 libbitcoin_v8_a_SOURCES = \
   v8/v8engine.cpp \
@@ -458,7 +455,9 @@ multichaind_LDADD = \
   $(LIBMEMENV) \
   $(LIBSECP256K1)
 
-if !TARGET_WINDOWS
+if TARGET_WINDOWS
+  multichaind_LDADD += $(top_builddir)/src/v8_win/build/v8_win.lib
+else
   multichaind_LDADD += $(LIBBITCOIN_V8)
 endif
 
@@ -469,17 +468,21 @@ multichaind_SOURCES = \
     multichain/multichaind.cpp \
     rpc/rpclist.cpp \
     chainparams/buildgenesis.cpp \
-    filters/filter.cpp \
     filters/filtercallback.cpp \
     filters/watchdog.cpp
 
 if TARGET_WINDOWS
-multichaind_SOURCES += multichaind-res.rc
+multichaind_SOURCES += filters/filter_win.cpp multichaind-res.rc
+else
+multichaind_SOURCES += filters/filter.cpp
 endif
 
 multichaind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
 multichaind_CPPFLAGS = $(BITCOIN_INCLUDES) $(V8_INCLUDE)
-multichaind_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) $(V8_LIBS) -pthread
+multichaind_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -pthread
+if !TARGET_WINDOWS
+multichaind_LDFLAGS += $(V8_LIBS)
+endif
 
 # multichaind-cold binary #
 multichaind_cold_LDADD = \

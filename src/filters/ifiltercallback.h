@@ -1,14 +1,12 @@
 #ifndef IFILTERCALLBACK_H
 #define IFILTERCALLBACK_H
 
-#include "stddef.h"
+#include <cstddef>
 
 #ifndef WIN32
 #include "json/json_spirit.h"
 #endif // WIN32
 
-namespace mc_v8
-{
 class IFilterCallback
 {
   public:
@@ -22,6 +20,5 @@ class IFilterCallback
     {
     }
 }; // class IFilterCallback
-} // namespace mc_v8
 
 #endif // IFILTERCALLBACK_H

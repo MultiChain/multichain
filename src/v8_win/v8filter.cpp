@@ -9,6 +9,7 @@
 
 namespace mc_v8
 {
+// clang-format off
 static std::string jsFixture = R"(
 Math.random = function() {
     return 0;
@@ -58,75 +59,82 @@ for (var fn of Object.getOwnPropertyNames(Math)) {
 }
 delete Date.now;
 )";
+// clang-format on
 
 V8Filter::~V8Filter()
 {
-    if (m_isRunning)
-    {
+    if (m_isRunning) {
         m_engine->GetIsolate()->TerminateExecution();
     }
     m_filterFunction.Reset();
     m_context.Reset();
 }
 
-int V8Filter::Initialize(V8Engine *engine, std::string script, std::string functionName,
-                         const std::vector<std::string> &callback_names, bool isFilterLimitedMathSet, std::string &strResult)
+int V8Filter::Initialize(V8Engine* engine, std::string script, std::string functionName,
+                         const std::vector<std::string>& callback_names, bool isFilterLimitedMathSet,
+                         std::string& strResult)
 {
-    //if (fDebug)
-    //    LogPrint("v8filter", "v8filter: V8Filter::Initialize\n");
+    if (fDebug)
+        //        LogPrint("v8filter", "v8filter: V8Filter::Initialize\n");
+        logger->info("v8filter: V8Filter::Initialize");
     m_engine = engine;
-    v8::Isolate *isolate = m_engine->GetIsolate();
+    v8::Isolate* isolate = m_engine->GetIsolate();
     strResult.clear();
     v8::Locker locker(isolate);
     v8::Isolate::Scope isolateScope(isolate);
     v8::HandleScope handleScope(isolate);
     auto global = v8::ObjectTemplate::New(isolate);
     auto filterCallback = v8::External::New(isolate, m_engine->GetFilterCallback());
-    for (std::string functionName : callback_names)
-    {
-        if (callbackLookup.find(functionName) == callbackLookup.end())
-        {
+    if (fDebug)
+        logger->info("v8filter:   Processing RPC callbacks");
+    for (std::string functionName : callback_names) {
+        if (callbackLookup.find(functionName) == callbackLookup.end()) {
+            logger->error("Undefined callback name: {}", functionName);
             strResult = strprintf("Undefined callback name: {}", functionName);
             return MC_ERR_INTERNAL_ERROR;
         }
+        if (fDebug)
+            logger->info("v8filter:     RPC callback: {}", functionName);
         global->Set(String2V8(isolate, functionName),
                     v8::FunctionTemplate::New(isolate, callbackLookup[functionName], filterCallback));
     }
+
+    if (fDebug)
+        logger->info("v8filter:   Prepare context");
     auto context = v8::Context::New(isolate, nullptr, global);
     m_context.Reset(isolate, context);
 
     std::string jsPreamble = jsFixture;
-    if (isFilterLimitedMathSet)
-    {
+    if (isFilterLimitedMathSet) {
         jsPreamble += jsLimitMathSet;
     }
 
+    if (fDebug)
+        logger->info("v8filter:   Processing preamble");
     int status = this->CompileAndLoadScript(jsPreamble, "", "preamble", strResult);
-    if (status != MC_ERR_NOERROR || !strResult.empty())
-    {
+    if (status != MC_ERR_NOERROR || !strResult.empty()) {
         m_context.Reset();
         return status;
     }
     status = this->CompileAndLoadScript(script, functionName, "<script>", strResult);
-    if (status != MC_ERR_NOERROR)
-    {
+    if (status != MC_ERR_NOERROR) {
         m_context.Reset();
     }
     return status;
 }
 
-int V8Filter::Run(std::string &strResult)
+int V8Filter::Run(std::string& strResult)
 {
-    //if (fDebug)
-    //    LogPrint("v8filter", "v8filter: V8Filter::Run\n");
+    if (fDebug)
+        //        LogPrint("v8filter", "v8filter: V8Filter::Run\n");
+        logger->info("v8filter: V8Filter::Run");
 
     strResult.clear();
-    if (m_context.IsEmpty() || m_filterFunction.IsEmpty())
-    {
+    if (m_context.IsEmpty() || m_filterFunction.IsEmpty()) {
         strResult = "Trying to run an invalid filter";
         return MC_ERR_NOERROR;
     }
-    v8::Isolate *isolate = m_engine->GetIsolate();
+    v8::Isolate* isolate = m_engine->GetIsolate();
     v8::Locker locker(isolate);
     v8::Isolate::Scope isolateScope(isolate);
     v8::HandleScope handleScope(isolate);
@@ -139,36 +147,31 @@ int V8Filter::Run(std::string &strResult)
     m_isRunning = true;
     bool ok = filterFunction->Call(context, context->Global(), 0, nullptr).ToLocal(&result);
     m_isRunning = false;
-    if (!ok)
-    {
+    if (!ok) {
         assert(tryCatch.HasCaught());
-        if (tryCatch.Exception()->IsNull() && tryCatch.Message().IsEmpty())
-        {
+        if (tryCatch.Exception()->IsNull() && tryCatch.Message().IsEmpty()) {
             strResult = m_engine->TerminationReason();
-        }
-        else
-        {
+        } else {
             this->ReportException(&tryCatch, strResult);
         }
         return MC_ERR_NOERROR;
     }
 
-    if (result->IsString())
-    {
+    if (result->IsString()) {
         strResult = V82String(isolate, result);
     }
 
     return MC_ERR_NOERROR;
 }
 
-int V8Filter::CompileAndLoadScript(std::string script, std::string functionName, std::string source,
-                                   std::string &strResult)
+int V8Filter::CompileAndLoadScript(std::string script, std::string functionName, std::string source, std::string& strResult)
 {
-    //if (fDebug)
-    //    LogPrint("v8filter", "v8filter: V8Filter::CompileAndLoadScript %s\n", source);
+    if (fDebug)
+        //        LogPrint("v8filter", "v8filter: V8Filter::CompileAndLoadScript %s\n", source);
+        logger->info("v8filter: V8Filter::CompileAndLoadScript {}", source);
 
     strResult.clear();
-    v8::Isolate *isolate = m_engine->GetIsolate();
+    v8::Isolate* isolate = m_engine->GetIsolate();
     v8::HandleScope handleScope(isolate);
     v8::TryCatch tryCatch(isolate);
     auto context = v8::Local<v8::Context>::New(isolate, m_context);
@@ -177,27 +180,23 @@ int V8Filter::CompileAndLoadScript(std::string script, std::string functionName,
     v8::Local<v8::String> v8script = String2V8(isolate, script);
 
     v8::Local<v8::Script> compiledScript;
-    if (!v8::Script::Compile(context, v8script, &scriptOrigin).ToLocal(&compiledScript))
-    {
+    if (!v8::Script::Compile(context, v8script, &scriptOrigin).ToLocal(&compiledScript)) {
         assert(tryCatch.HasCaught());
         this->ReportException(&tryCatch, strResult);
         return MC_ERR_NOERROR;
     }
 
     v8::Local<v8::Value> result;
-    if (!compiledScript->Run(context).ToLocal(&result))
-    {
+    if (!compiledScript->Run(context).ToLocal(&result)) {
         assert(tryCatch.HasCaught());
         this->ReportException(&tryCatch, strResult);
         return MC_ERR_NOERROR;
     }
 
-    if (!functionName.empty())
-    {
+    if (!functionName.empty()) {
         v8::Local<v8::String> processName = String2V8(isolate, functionName);
         v8::Local<v8::Value> processVal;
-        if (!context->Global()->Get(context, processName).ToLocal(&processVal) || !processVal->IsFunction())
-        {
+        if (!context->Global()->Get(context, processName).ToLocal(&processVal) || !processVal->IsFunction()) {
             strResult = tfm::format("Cannot find function '%s' in script", functionName);
             return MC_ERR_NOERROR;
         }
@@ -206,22 +205,21 @@ int V8Filter::CompileAndLoadScript(std::string script, std::string functionName,
     return MC_ERR_NOERROR;
 }
 
-void V8Filter::ReportException(v8::TryCatch *tryCatch, std::string &strResult)
+void V8Filter::ReportException(v8::TryCatch* tryCatch, std::string& strResult)
 {
-    //if (fDebug)
-    //    LogPrint("v8filter", "v8filter: V8Filter: ReportException\n");
+    if (fDebug)
+        //        LogPrint("v8filter", "v8filter: V8Filter: ReportException\n");
+        logger->info("v8filter: V8Filter: ReportException");
 
-    v8::Isolate *isolate = m_engine->GetIsolate();
+    v8::Isolate* isolate = m_engine->GetIsolate();
     v8::HandleScope handlecope(isolate);
     strResult = V82String(isolate, tryCatch->Exception());
     v8::Local<v8::Message> message = tryCatch->Message();
-    if (message.IsEmpty())
-    {
-        //if (fDebug)
-        //    LogPrint("v8filter", "v8filter: %s", strResult);
-    }
-    else
-    {
+    if (message.IsEmpty()) {
+        if (fDebug)
+            //            LogPrint("v8filter", "v8filter: %s", strResult);
+            logger->info("v8filter: {}", strResult);
+    } else {
         std::string filename = V82String(isolate, message->GetScriptResourceName());
         auto context = v8::Local<v8::Context>::New(isolate, m_context);
         v8::Context::Scope contextScope(context);
@@ -229,14 +227,17 @@ void V8Filter::ReportException(v8::TryCatch *tryCatch, std::string &strResult)
         int start = message->GetStartColumn(context).FromJust();
         int end = message->GetEndColumn(context).FromJust();
         assert(linenum >= 0 && start >= 0 && end >= 0);
-		std::string sourceline = V82String(isolate, message->GetSourceLine(context).ToLocalChecked());
-		//if (fDebug)
-		//{
-		//	LogPrint("v8filter", "v8filter: %s:%d %s\n", filename, linenum, strResult);
-		//	LogPrint("v8filter", "v8filter: %s\n", sourceline);
-		//	LogPrint("v8filter", "v8filter: %s%s\n", std::string(static_cast<std::string::size_type>(start), ' '),
-		//		std::string(static_cast<std::string::size_type>(end - start), '^'));
-		//}
+        std::string sourceline = V82String(isolate, message->GetSourceLine(context).ToLocalChecked());
+        if (fDebug) {
+            //	LogPrint("v8filter", "v8filter: %s:%d %s\n", filename, linenum, strResult);
+            //	LogPrint("v8filter", "v8filter: %s\n", sourceline);
+            //	LogPrint("v8filter", "v8filter: %s%s\n", std::string(static_cast<std::string::size_type>(start), ' '),
+            //		std::string(static_cast<std::string::size_type>(end - start), '^'));
+            logger->info("v8filter: {}:{} {}", filename, linenum, strResult);
+            logger->info("v8filter: {}", sourceline);
+            logger->info("v8filter: {}{}", std::string(static_cast<std::string::size_type>(start), ' '),
+                         std::string(static_cast<std::string::size_type>(end - start), '^'));
+        }
     }
 }
 

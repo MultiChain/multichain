@@ -9,6 +9,7 @@
 #include <fstream>
 #include <v8.h>
 #include <process.h>
+#include <spdlog/spdlog.h>
 
 #define MC_ERR_NOERROR                  0x00000000
 #define MC_ERR_INTERNAL_ERROR           0x00000006
@@ -21,6 +22,7 @@ namespace mc_v8
 {
 extern bool fDebug;
 extern fs::path dataDir;
+extern std::shared_ptr<spdlog::logger> logger;
 	
 	/**
  * Convert a V8 Value to an std::string.

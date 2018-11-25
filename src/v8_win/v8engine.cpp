@@ -5,6 +5,7 @@
 #include "v8_win/v8filter.h"
 #include "v8_win/v8utils.h"
 #include <libplatform/libplatform.h>
+#include <cassert>
 
 extern "C"
 {
@@ -31,9 +32,12 @@ int V8Engine::Initialize(IFilterCallback *filterCallback, std::string dataDir_, 
 {
 	fDebug = fDebug_;
 	dataDir = dataDir_;
+    spdlog::set_level(spdlog::level::info);
 
-    //if (fDebug)
-    //    LogPrint("v8filter", "v8filter: V8Engine::Initialize\n");
+    if (fDebug)
+//        LogPrint("v8filter", "v8filter: V8Engine::Initialize\n");
+//        logger->info("v8filter: V8Engine::Initialize dataDir_={} fDebug_={}", dataDir_, fDebug_);
+        logger->info("v8filter: V8Engine::Initialize");
     strResult.clear();
     if (!m_isV8Initialized)
     {
@@ -43,20 +47,25 @@ int V8Engine::Initialize(IFilterCallback *filterCallback, std::string dataDir_, 
     m_createParams.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
     m_isolate = v8::Isolate::New(m_createParams);
     m_filterCallback = filterCallback;
+    if (fDebug)
+        logger->info("v8filter: V8Engine::Initialize - done");
     return MC_ERR_NOERROR;
 }
 
 int V8Engine::CreateFilter(std::string script, std::string main_name, const std::vector<std::string> &callback_names,
                            V8Filter *filter, bool isFilterLimitedMathSet, std::string &strResult)
 {
-    //if (fDebug)
-    //    LogPrint("v8filter", "v8filter: V8Engine::CreateFilter\n");
+    if (fDebug)
+//        LogPrint("v8filter", "v8filter: V8Engine::CreateFilter\n");
+        logger->info("v8filter: V8Engine::CreateFilter");
     strResult.clear();
     return filter->Initialize(this, script, main_name, callback_names, isFilterLimitedMathSet, strResult);
 }
 
 int V8Engine::RunFilter(V8Filter *filter, std::string &strResult)
 {
+    if (fDebug)
+        logger->info("v8filter: V8Engine::RunFilter");
     strResult.clear();
     if (filter == nullptr)
     {
@@ -68,6 +77,8 @@ int V8Engine::RunFilter(V8Filter *filter, std::string &strResult)
 
 void V8Engine::TerminateFilter(V8Filter *filter, std::string reason)
 {
+    if (fDebug)
+        logger->info("v8filter: V8Engine::TerminateFilter");
     if (filter != nullptr && filter->IsRunning())
     {
         m_reason = reason;
@@ -78,6 +89,8 @@ void V8Engine::TerminateFilter(V8Filter *filter, std::string reason)
 void V8Engine::InitializeV8()
 {
     assert(!m_isV8Initialized);
+    if (fDebug)
+        logger->info("v8filter: V8Engine::InitializeV8");
     fs::path tempDir = GetTemporaryPidDirectory();
     fs::path v8TempDir = tempDir / "v8";
     fs::create_directories(v8TempDir);
@@ -100,6 +113,8 @@ void V8Engine::InitializeV8()
     m_platform = v8::platform::NewDefaultPlatform();
     v8::V8::InitializePlatform(m_platform.get());
     v8::V8::Initialize();
+    if (fDebug)
+        logger->info("v8filter: V8Engine::InitializeV8 - done");
 }
 
 std::unique_ptr<v8::Platform> V8Engine::m_platform;

@@ -6,6 +6,9 @@ set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_MULTITHREADED ON)
 find_package(Boost REQUIRED COMPONENTS thread filesystem)
 find_package(OpenSSL REQUIRED)
+find_package(spdlog REQUIRED CONFIG)
+message(STATUS "spdlog_INCLUDE_DIR=${spdlog_INCLUDE_DIR}")
+set(spdlog_INCLUDE_DIR "c:\\Program Files (x86)\\spdlog\\include")
 
 get_filename_component(PROJECT_ROOT "../.." REALPATH)
 
@@ -36,7 +39,7 @@ set(SOURCES
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
 
-include_directories(${PROJECT_ROOT}/src ${V8_INCLUDE_DIR} ${Boost_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR})
+include_directories(${PROJECT_ROOT}/src ${V8_INCLUDE_DIR} ${Boost_INCLUDE_DIR} ${OPENSSL_INCLUDE_DIR} ${spdlog_INCLUDE_DIR})
 link_directories(${V8_LIBRARIES_DIR} ${V8_LIBRARIES_DIR}/third_party/icu ${Boost_LIBRARY_DIRS})
 add_library(${CMAKE_PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
 target_compile_definitions(${CMAKE_PROJECT_NAME} PUBLIC
