@@ -6,6 +6,7 @@
 #include <boost/thread/synchronized_value.hpp>
 #include <boost/thread/thread.hpp>
 #include <functional>
+#include <atomic>
 
 class Watchdog
 {

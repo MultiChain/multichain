@@ -2,7 +2,6 @@
 #include "rpc/rpcserver.h"
 #include "utils/util.h"
 #include "json/json_spirit_ubjson.h"
-#include "json/json_spirit_writer.h"
 
 const int MAX_DEPTH = 100;
 #define CALLBACK_LOOKUP(name) { #name, &name }
@@ -21,7 +20,7 @@ static std::map<std::string, rpcfn_type> FilterCallbackFunctions{
     CALLBACK_LOOKUP(verifymessage)
 };
 
-//#ifdef WIN32
+#ifdef WIN32
 void FilterCallback::UbjCallback(const char *name, const unsigned char *args, unsigned char **result, size_t *resultSize)
 {
     int err;
@@ -52,7 +51,7 @@ void FilterCallback::UbjCallback(const char *name, const unsigned char *args, un
         memcpy(*result, result_, *resultSize);
     }
 }
-//#else
+#else
 void FilterCallback::JspCallback(string name, Array args, Value &result)
 {
     result = Value::null;
@@ -70,7 +69,7 @@ void FilterCallback::JspCallback(string name, Array args, Value &result)
         this->CreateCallbackLogError(name, args, e);
     }
 }
-//#endif // WIN32
+#endif // WIN32
 
 void FilterCallback::CreateCallbackLog(string name, Array args, Value result)
 {

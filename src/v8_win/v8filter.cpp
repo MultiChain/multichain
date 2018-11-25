@@ -1,19 +1,11 @@
 // Copyright (c) 2014-2018 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
-#include "v8/v8filter.h"
-#include "chainparams/state.h"
-//#include "utils/define.h"
-#include "utils/tinyformat.h"
-#include "utils/util.h"
-#include "v8/callbacks.h"
-#include "v8/v8engine.h"
-#include "v8/v8utils.h"
+#include "v8_win/v8filter.h"
+#include "v8_win/callbacks.h"
+#include "v8_win/v8engine.h"
+#include "v8_win/v8utils.h"
 #include <cassert>
-
-#define MC_ERR_NOERROR                  0x00000000
-#define MC_ERR_INTERNAL_ERROR           0x00000006
-
 
 namespace mc_v8
 {
@@ -78,10 +70,10 @@ V8Filter::~V8Filter()
 }
 
 int V8Filter::Initialize(V8Engine *engine, std::string script, std::string functionName,
-                         std::vector<std::string> &callback_names, std::string &strResult)
+                         const std::vector<std::string> &callback_names, bool isFilterLimitedMathSet, std::string &strResult)
 {
-    if (fDebug)
-        LogPrint("v8filter", "v8filter: V8Filter::Initialize\n");
+    //if (fDebug)
+    //    LogPrint("v8filter", "v8filter: V8Filter::Initialize\n");
     m_engine = engine;
     v8::Isolate *isolate = m_engine->GetIsolate();
     strResult.clear();
@@ -104,7 +96,7 @@ int V8Filter::Initialize(V8Engine *engine, std::string script, std::string funct
     m_context.Reset(isolate, context);
 
     std::string jsPreamble = jsFixture;
-    if (mc_gState->m_Features->FilterLimitedMathSet())
+    if (isFilterLimitedMathSet)
     {
         jsPreamble += jsLimitMathSet;
     }
@@ -125,8 +117,8 @@ int V8Filter::Initialize(V8Engine *engine, std::string script, std::string funct
 
 int V8Filter::Run(std::string &strResult)
 {
-    if (fDebug)
-        LogPrint("v8filter", "v8filter: V8Filter::Run\n");
+    //if (fDebug)
+    //    LogPrint("v8filter", "v8filter: V8Filter::Run\n");
 
     strResult.clear();
     if (m_context.IsEmpty() || m_filterFunction.IsEmpty())
@@ -172,8 +164,8 @@ int V8Filter::Run(std::string &strResult)
 int V8Filter::CompileAndLoadScript(std::string script, std::string functionName, std::string source,
                                    std::string &strResult)
 {
-    if (fDebug)
-        LogPrint("v8filter", "v8filter: V8Filter::CompileAndLoadScript %s\n", source);
+    //if (fDebug)
+    //    LogPrint("v8filter", "v8filter: V8Filter::CompileAndLoadScript %s\n", source);
 
     strResult.clear();
     v8::Isolate *isolate = m_engine->GetIsolate();
@@ -216,8 +208,8 @@ int V8Filter::CompileAndLoadScript(std::string script, std::string functionName,
 
 void V8Filter::ReportException(v8::TryCatch *tryCatch, std::string &strResult)
 {
-    if (fDebug)
-        LogPrint("v8filter", "v8filter: V8Filter: ReportException\n");
+    //if (fDebug)
+    //    LogPrint("v8filter", "v8filter: V8Filter: ReportException\n");
 
     v8::Isolate *isolate = m_engine->GetIsolate();
     v8::HandleScope handlecope(isolate);
@@ -225,8 +217,8 @@ void V8Filter::ReportException(v8::TryCatch *tryCatch, std::string &strResult)
     v8::Local<v8::Message> message = tryCatch->Message();
     if (message.IsEmpty())
     {
-        if (fDebug)
-            LogPrint("v8filter", "v8filter: %s", strResult);
+        //if (fDebug)
+        //    LogPrint("v8filter", "v8filter: %s", strResult);
     }
     else
     {
@@ -237,14 +229,14 @@ void V8Filter::ReportException(v8::TryCatch *tryCatch, std::string &strResult)
         int start = message->GetStartColumn(context).FromJust();
         int end = message->GetEndColumn(context).FromJust();
         assert(linenum >= 0 && start >= 0 && end >= 0);
-        if (fDebug)
-            LogPrint("v8filter", "v8filter: %s:%d %s\n", filename, linenum, strResult);
-        std::string sourceline = V82String(isolate, message->GetSourceLine(context).ToLocalChecked());
-        if (fDebug)
-            LogPrint("v8filter", "v8filter: %s\n", sourceline);
-        if (fDebug)
-            LogPrint("v8filter", "v8filter: %s%s\n", std::string(static_cast<std::string::size_type>(start), ' '),
-                     std::string(static_cast<std::string::size_type>(end - start), '^'));
+		std::string sourceline = V82String(isolate, message->GetSourceLine(context).ToLocalChecked());
+		//if (fDebug)
+		//{
+		//	LogPrint("v8filter", "v8filter: %s:%d %s\n", filename, linenum, strResult);
+		//	LogPrint("v8filter", "v8filter: %s\n", sourceline);
+		//	LogPrint("v8filter", "v8filter: %s%s\n", std::string(static_cast<std::string::size_type>(start), ' '),
+		//		std::string(static_cast<std::string::size_type>(end - start), '^'));
+		//}
     }
 }
 
