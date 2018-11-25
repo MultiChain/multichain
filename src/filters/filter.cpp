@@ -8,8 +8,9 @@
 #include "utils/util.h"
 #include "v8/v8engine.h"
 #include "v8/v8filter.h"
+#include <boost/bind.hpp>
 
-using namespace boost::placeholders;
+//using namespace boost::placeholders;
 
 namespace mc_v8
 {

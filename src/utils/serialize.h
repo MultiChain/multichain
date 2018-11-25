@@ -352,7 +352,7 @@ public:
 
     unsigned int GetSerializeSize(int, int=0) const
     {
-        return pend - pbegin;
+        return static_cast<unsigned>(pend - pbegin);
     }
 
     template<typename Stream>

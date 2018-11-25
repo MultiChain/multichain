@@ -427,8 +427,11 @@ V8_LIBS = \
         -lv8_libsampler \
         -lv8_data \
         -licuuc \
-        -licui18n \
-    -lrt -ldl
+        -licui18n
+
+if !TARGET_WINDOWS
+V8_LIBS += -lrt -ldl
+endif
 
 libbitcoin_v8_a_SOURCES = \
   v8/v8engine.cpp \
@@ -436,9 +439,9 @@ libbitcoin_v8_a_SOURCES = \
   v8/callbacks.cpp \
   v8/v8json_spirit.cpp
 
-#if TARGET_WINDOWS
-libbitcoin_v8_a_SOURCES += v8/callbacks_win.cpp v8/v8blob.dpp
-#endif
+##if TARGET_WINDOWS
+#libbitcoin_v8_a_SOURCES += v8/callbacks_win.cpp v8/v8blob.dpp
+##endif
 
 libbitcoin_v8_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(V8_INCLUDE)
 

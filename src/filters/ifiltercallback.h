@@ -1,22 +1,27 @@
 #ifndef IFILTERCALLBACK_H
 #define IFILTERCALLBACK_H
 
+#include "stddef.h"
+
 #ifndef WIN32
-#include "json/json_spirit_value.h"
+#include "json/json_spirit.h"
 #endif // WIN32
 
+namespace mc_v8
+{
 class IFilterCallback
 {
   public:
-//#ifdef WIN32
+#ifdef WIN32
     virtual void UbjCallback(const char *name, const unsigned char *args, unsigned char **result, size_t *resultSize) = 0;
-//#else
+#else
     virtual void JspCallback(std::string name, json_spirit::Array args, json_spirit::Value &result) = 0;
-//#endif // WIN32
+#endif // WIN32
 
     virtual ~IFilterCallback()
     {
     }
 }; // class IFilterCallback
+} // namespace mc_v8
 
 #endif // IFILTERCALLBACK_H

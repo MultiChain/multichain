@@ -1,17 +1,16 @@
 #ifndef V8BLOB_H
 #define V8BLOB_H
 
-#include "v8_win/declspec.h"
 #include <map>
 #include <memory>
 #include <string>
 
 namespace mc_v8
 {
-class V8_WIN_EXPORTS Blob;
+class Blob;
 using BlobPtr = std::shared_ptr<Blob>;
 
-class V8_WIN_EXPORTS Blob
+class Blob
 {
   public:
     const size_t size_increment = 4096;
