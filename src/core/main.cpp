@@ -1399,7 +1399,7 @@ CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowF
 }
 
 bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransaction &tx, bool fLimitFree,
-                        bool* pfMissingInputs, bool fRejectInsaneFee,bool fAddToWallet)
+                        bool* pfMissingInputs, bool fRejectInsaneFee,CWalletTx *wtx)
 {
     AssertLockHeld(cs_main);
     if (pfMissingInputs)
@@ -1677,16 +1677,21 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
         
         
-        if(fAddToWallet)
+        int err=MC_ERR_NOERROR;
+        if(wtx)
         {
-            int err=pwalletTxsMain->AddTx(NULL,tx,-1,NULL,-1,0);
-            if(err)
-            {
-                reason=strprintf("Wallet error %d",err);
-                return state.DoS(0,
-                                 error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
-                                 REJECT_INVALID, reason);            
-            }
+            err=pwalletTxsMain->AddTx(NULL,*wtx,-1,NULL,-1,0);
+        }
+        else
+        {                
+            err=pwalletTxsMain->AddTx(NULL,tx,-1,NULL,-1,0);
+        }
+        if(err)
+        {
+            reason=strprintf("Wallet error %d",err);
+            return state.DoS(0,
+                             error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
+                             REJECT_INVALID, reason);            
         }
         
         permissions_to=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
@@ -1697,12 +1702,9 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         pool.addUnchecked(hash, entry);
     }
 
-    if(fAddToWallet)
+    if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
     {
-        if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
-        {
-            SyncWithWallets(tx, NULL);
-        }
+        SyncWithWallets(tx, NULL);
     }
 
     return true;
@@ -2974,7 +2976,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
         err=pwalletTxsMain->AddTx(NULL,tx,pindexNew->nHeight,&pos,i,pindexNew->GetBlockHash());
         if(err)
         {
-            return error("ConnectTip() : ConnectBlock %s failed, Wtxs AddTx %s, error: %d", pindexNew->GetBlockHash().ToString(),tx.GetHash().ToString(),err);
+            LogPrintf("Wallet error when connecting block %s, Tx %s, error: %d\n", pindexNew->GetBlockHash().ToString(),tx.GetHash().ToString(),err);
         }
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
     }

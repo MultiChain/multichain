@@ -67,8 +67,148 @@ bool DecodeBase58(const char* psz, std::vector<unsigned char>& vch)
         vch.push_back(*(it++));
     return true;
 }
-
 std::string EncodeBase58(const unsigned char* pbegin, const unsigned char* pend)
+{
+    // Skip & count leading zeroes.
+    int i,j,k;
+    int zeroes = 0;
+    while (pbegin != pend && *pbegin == 0) {
+        pbegin++;
+        zeroes++;
+    }
+        
+    int b58_size=(pend - pbegin) * 138 / 100 + 1;// log(256) / log(58), rounded up.
+    int bx_power=5;
+    int64_t bx_base=656356768;//58^5    
+    int bx_size=(b58_size-1)/bx_power+1;
+    int bin_power=4;
+    int64_t bin_base=4294967296;
+    int bin_size=(pend - pbegin-1)/bin_power + 1;    
+    
+    // Allocate enough space in big-endian base58 representation.
+    std::vector<uint32_t> bin(bin_size); 
+    std::vector<unsigned char> b58(b58_size); 
+    std::vector<int64_t> bx(bx_size); 
+    
+    const unsigned char* pfirst=pend-bin_size*bin_power;
+    while (pbegin != pend) {
+        if(pbegin >= pfirst)
+        {
+            bin[(pbegin-pfirst)/bin_power] |= (*pbegin) << ((bin_power - 1 - (pbegin-pfirst)%bin_power) * 8);
+        }
+        pbegin++;
+    }
+    
+    // Process the uint32_ts.
+    for(i=0;i<bin_size;i++)
+    {
+        int64_t carry = bin[i];
+        // Apply "b58 = b58 * 256 + ch".
+        for (std::vector<int64_t>::reverse_iterator it = bx.rbegin(); it != bx.rend(); it++) {
+            carry += bin_base * (*it);
+            *it = carry % bx_base;
+            carry /= bx_base;
+        }
+        assert(carry == 0);
+//        pbegin++;
+    }
+    
+    k=b58_size;
+    i=bx_size;
+    j=0;
+    int64_t value=0;
+    while(k > 0)
+    {
+        k--;
+        if(j == 0)
+        {
+            i--;
+            j=bx_power;
+            value=bx[i];            
+        }
+        b58[k]=(unsigned char)(value%58);
+        value/=58;
+        j--;
+    }
+    
+    // Skip leading zeroes in base58 result.
+    std::vector<unsigned char>::iterator it = b58.begin();
+    while (it != b58.end() && *it == 0)
+        it++;
+    // Translate the result into a string.
+    std::string str;
+    str.reserve(zeroes + (b58.end() - it));
+    str.assign(zeroes, '1');
+    while (it != b58.end())
+        str += pszBase58[*(it++)];
+    return str;
+}
+
+std::string EncodeBase58_19(const unsigned char* pbegin, const unsigned char* pend)
+{
+    // Skip & count leading zeroes.
+    int zeroes = 0;
+    while (pbegin != pend && *pbegin == 0) {
+        pbegin++;
+        zeroes++;
+    }
+    
+    int b58_size=(pend - pbegin) * 138 / 100 + 1;// log(256) / log(58), rounded up.
+    int bx_power=9;
+    int64_t bx_base=195112;//58^3
+    bx_base=bx_base*bx_base*bx_base;//58^9
+    
+    int bx_size=(b58_size-1)/bx_power+1;
+    // Allocate enough space in big-endian base58 representation.
+    std::vector<unsigned char> b58(b58_size); 
+    std::vector<int64_t> bx(bx_size); 
+    // Process the bytes.
+    while (pbegin != pend) {
+        int64_t carry = *pbegin;
+        // Apply "b58 = b58 * 256 + ch".
+        for (std::vector<int64_t>::reverse_iterator it = bx.rbegin(); it != bx.rend(); it++) {
+            carry += 256 * (*it);
+            *it = carry % bx_base;
+            carry /= bx_base;
+        }
+        assert(carry == 0);
+        pbegin++;
+    }
+    
+    int i,j,k;
+    k=b58_size;
+    i=bx_size;
+    j=0;
+    int64_t value=0;
+    while(k > 0)
+    {
+        k--;
+        if(j == 0)
+        {
+            i--;
+            j=bx_power;
+            value=bx[i];            
+        }
+        b58[k]=(unsigned char)(value%58);
+        value/=58;
+        j--;
+    }
+    
+    // Skip leading zeroes in base58 result.
+    std::vector<unsigned char>::iterator it = b58.begin();
+    while (it != b58.end() && *it == 0)
+        it++;
+    // Translate the result into a string.
+    std::string str;
+    str.reserve(zeroes + (b58.end() - it));
+    str.assign(zeroes, '1');
+    while (it != b58.end())
+        str += pszBase58[*(it++)];
+    return str;
+}
+
+
+std::string EncodeBase58_11(const unsigned char* pbegin, const unsigned char* pend)
 {
     // Skip & count leading zeroes.
     int zeroes = 0;

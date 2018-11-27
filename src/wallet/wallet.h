@@ -780,7 +780,6 @@ public:
     bool IsInMainChain() const { const CBlockIndex *pindexRet; return GetDepthInMainChainINTERNAL(pindexRet) > 0; }
     int GetBlocksToMaturity() const;
     bool AcceptToMemoryPool(bool fLimitFree=true, bool fRejectInsaneFee=true);
-    bool AcceptToMemoryPoolReturnReason(bool fLimitFree, bool fRejectInsaneFee,std::string& reject_reason);
     
 };
 
@@ -845,6 +844,8 @@ public:
     {
         Init(pwalletIn);
     }
+    
+    bool AcceptToMemoryPoolReturnReason(bool fLimitFree, bool fRejectInsaneFee,std::string& reject_reason);
 
     void Init(const CWallet* pwalletIn)
     {

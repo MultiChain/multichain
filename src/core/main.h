@@ -22,8 +22,7 @@
 #include "script/script.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
-#include "protocol/filter.h"
-#include "protocol/multichainfilter.h"
+#include "filters/multichainfilter.h"
 #include "utils/sync.h"
 #include "utils/tinyformat.h"
 #include "chain/txmempool.h"
@@ -48,6 +47,7 @@ class CInv;
 class CScriptCheck;
 class CValidationInterface;
 class CValidationState;
+class CWalletTx;
 
 struct CBlockTemplate;
 struct CNodeStateStats;
@@ -234,7 +234,7 @@ void FlushStateToDisk();
 
 /** (try to) add transaction to memory pool **/
 bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransaction &tx, bool fLimitFree,
-                        bool* pfMissingInputs, bool fRejectInsaneFee=false, bool fAddToWallet=true);
+                        bool* pfMissingInputs, bool fRejectInsaneFee=false, CWalletTx *wtx=NULL);
 
 
 struct CNodeStateStats {
