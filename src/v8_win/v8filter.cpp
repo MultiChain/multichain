@@ -144,9 +144,13 @@ int V8Filter::Run(std::string& strResult)
 
     v8::Local<v8::Value> result;
     auto filterFunction = v8::Local<v8::Function>::New(isolate, m_filterFunction);
+    if (fDebug)
+        logger->info("v8filter: About to call filter function");
     m_isRunning = true;
     bool ok = filterFunction->Call(context, context->Global(), 0, nullptr).ToLocal(&result);
     m_isRunning = false;
+    if (fDebug)
+        logger->info("v8filter: Filter function done");
     if (!ok) {
         assert(tryCatch.HasCaught());
         if (tryCatch.Exception()->IsNull() && tryCatch.Message().IsEmpty()) {
