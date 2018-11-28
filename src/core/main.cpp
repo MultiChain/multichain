@@ -2345,16 +2345,22 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if(!pindex->kMiner.IsValid() || (setBannedTxs.size() != 0) )
     {
         if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
-            return false;
+        {
+            return state.DoS(0, error("ConnectBlock() : error on CheckBlock"),
+                             REJECT_INVALID, "bad-check-block");            
+            
+        }
     }
 
     if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-size",true))
     {
-        return false;
+        return state.DoS(100, error("ConnectBlock() : above maximum-block-size"),
+                         REJECT_INVALID, "bad-block-size");                        
     }
     if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-sigops",true))
     {
-        return false;
+        return state.DoS(100, error("ConnectBlock() : above maximum-block-sigops"),
+                         REJECT_INVALID, "bad-block-sigops");                        
     }
     
 /* MCHN START */    
@@ -3274,7 +3280,7 @@ void UpdateChainMiningStatus(const CBlock &block,CBlockIndex *pindexNew)
  * Try to make some progress towards making pindexMostWork the active block.
  * pblock is either NULL or a pointer to a CBlock corresponding to pindexMostWork.
  */
-static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMostWork, CBlock *pblock) {
+static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMostWork, CBlock *pblock, bool* fInvalidFoundOut) {
     AssertLockHeld(cs_main);
     bool fInvalidFound = false;
     const CBlockIndex *pindexOldTip = chainActive.Tip();
@@ -3345,7 +3351,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     }
     
 /* MCHN START */    
-    if (!fInvalidFound)
+//    if (!fInvalidFound)
     {
         mc_gState->m_Permissions->ClearMemPool();
         mc_gState->m_Assets->ClearMemPool();
@@ -3400,6 +3406,10 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
         }
     }
     
+    if(fInvalidFoundOut)
+    {
+        *fInvalidFoundOut=fInvalidFound;
+    }
 /* MCHN END */
     
     return true;
@@ -3473,7 +3483,7 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
             }
 /* MCHN END */            
 
-            if (!ActivateBestChainStep(state, pindexMostWork, pblock && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : NULL))
+            if (!ActivateBestChainStep(state, pindexMostWork, pblock && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : NULL, NULL))
                 return false;
 /* MCHN START */            
             if(pindexMostWork == chainActive.Tip())
@@ -3611,7 +3621,8 @@ string SetLastBlock(uint256 hash,bool *fNotFound)
         
         while(pblockindex != chainActive.Tip())
         {
-            if(!ActivateBestChainStep(state,pblockindex,NULL))
+            bool fInvalidFound;
+            if(!ActivateBestChainStep(state,pblockindex,NULL,&fInvalidFound) || fInvalidFound)
             {
                 string error=state.GetRejectReason();
                 ActivateBestChain(state);
