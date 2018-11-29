@@ -450,7 +450,7 @@ void FindSigner(CBlock *block,unsigned char *sig,int *sig_size,uint32_t *hash_ty
     }
 }
     
-bool VerifyBlockSignature(CBlock *block,bool force)
+bool VerifyBlockSignature(CBlock *block,bool force,bool in_sync)
 {
     unsigned char sig[255];
     int sig_size;//,key_size;
@@ -480,6 +480,28 @@ bool VerifyBlockSignature(CBlock *block,bool force)
     FindSigner(block, sig, &sig_size, &hash_type);
     if(block->vSigner[0])
     {
+        if(in_sync)
+        {
+            if(Params().DisallowUnsignedBlockNonce())
+            {
+                if(hash_type == BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE)
+                {
+                    LogPrintf("mchn: Nonce not covered by block signature\n");
+                    block->nSigHashType=BLOCKSIGHASH_INVALID;
+                    return false;                
+                }
+            }
+            else
+            {
+                if(hash_type == BLOCKSIGHASH_NO_SIGNATURE)
+                {
+                    LogPrintf("mchn: Nonce covered by block signature\n");
+                    block->nSigHashType=BLOCKSIGHASH_INVALID;
+                    return false;                
+                }                
+            }
+        }
+        
         switch(hash_type)
         {
             case BLOCKSIGHASH_HEADER:
@@ -488,6 +510,7 @@ bool VerifyBlockSignature(CBlock *block,bool force)
                 hash_to_verify=block->GetHash();
                 break;
             case BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE:
+            case BLOCKSIGHASH_NO_SIGNATURE:
                 
                 original_merkle_root=block->hashMerkleRoot;
                 original_nonce=block->nNonce;
@@ -495,7 +518,10 @@ bool VerifyBlockSignature(CBlock *block,bool force)
                 block->nMerkleTreeType=MERKLETREE_NO_COINBASE_OP_RETURN;
                 savedMerkleTree=block->vMerkleTree;
                 block->hashMerkleRoot=block->BuildMerkleTree();
-                block->nNonce=0;
+                if(hash_type == BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE)
+                {
+                    block->nNonce=0;                    
+                }
                 hash_to_verify=block->GetHash();
                 
                 block->hashMerkleRoot=original_merkle_root;
