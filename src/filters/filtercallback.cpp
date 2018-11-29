@@ -2,6 +2,7 @@
 #include "rpc/rpcserver.h"
 #include "utils/util.h"
 #include "json/json_spirit_ubjson.h"
+#include "json/json_spirit_writer.h"
 
 const int MAX_DEPTH = 100;
 #define CALLBACK_LOOKUP(name) { #name, &name }
@@ -21,11 +22,18 @@ static std::map<std::string, rpcfn_type> FilterCallbackFunctions{
 };
 
 #ifdef WIN32
-void FilterCallback::UbjCallback(const char *name, const unsigned char *args, unsigned char **result, size_t *resultSize)
+void FilterCallback::UbjCallback(const char *name, Blob_t* argsBlob, Blob_t* resultBlob)
 {
+    if (fDebug)
+        LogPrint("v8filter", "v8filter: UbjCallback(name=%s)\n", name);
+
     int err;
-    Array jspArgs = ubjson_read(args, 1, MAX_DEPTH, &err).get_array();
+    Array jspArgs = ubjson_read(Blob_Data(argsBlob), Blob_DataSize(argsBlob), MAX_DEPTH, &err).get_array();
+    if (fDebug)
+        LogPrint("v8filter", "v8filter: jspArgs[%d]\n", jspArgs.size());
     Value jspResult;
+    if (fDebug)
+        LogPrint("v8filter", "v8filter: About to call native function\n");
     try
     {
         jspResult = FilterCallbackFunctions[name](jspArgs, false);
@@ -39,17 +47,19 @@ void FilterCallback::UbjCallback(const char *name, const unsigned char *args, un
     {
         this->CreateCallbackLogError(name, jspArgs, e);
     }
+    
+    if (fDebug)
+        LogPrint("v8filter", "v8filter: native function retruned jspResult=%s\n", json_spirit::write(jspResult));
+
     mc_Script script;
     script.AddElement();
     ubjson_write(jspResult, &script, MAX_DEPTH);
-    unsigned char *result_;
-    int resultSize_;
-    if (script.GetRawData(&result_, &resultSize_) == MC_ERR_NOERROR)
-    {
-        *resultSize = static_cast<size_t>(resultSize_);
-        *result = new unsigned char[*resultSize];
-        memcpy(*result, result_, *resultSize);
-    }
+    size_t resultSize;
+    const unsigned char *result_ = script.GetData(0, &resultSize);
+    Blob_Set(resultBlob, result_, resultSize);
+
+    if (fDebug)
+        LogPrint("v8filter", "v8filter: UbjCallback - done resultSize=%d\n", Blob_DataSize(resultBlob));
 }
 #else
 void FilterCallback::JspCallback(string name, Array args, Value &result)

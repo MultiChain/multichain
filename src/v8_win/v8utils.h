@@ -7,14 +7,14 @@
 #include "utils/util.h"
 #include <boost/filesystem.hpp>
 #include <fstream>
-#include <v8.h>
 #include <process.h>
 #include <spdlog/spdlog.h>
+#include <v8.h>
 
-#define MC_ERR_NOERROR                  0x00000000
-#define MC_ERR_INTERNAL_ERROR           0x00000006
-#define MC_ERR_NOT_SUPPORTED            0x00000010
-#define MC_ERR_ERROR_IN_SCRIPT          0x00000011
+#define MC_ERR_NOERROR 0x00000000
+#define MC_ERR_INTERNAL_ERROR 0x00000006
+#define MC_ERR_NOT_SUPPORTED 0x00000010
+#define MC_ERR_ERROR_IN_SCRIPT 0x00000011
 
 namespace fs = boost::filesystem;
 
@@ -23,8 +23,13 @@ namespace mc_v8
 extern bool fDebug;
 extern fs::path dataDir;
 extern std::shared_ptr<spdlog::logger> logger;
-	
-	/**
+
+/**
+ * Create a dual logger: console for warnings and up, file for all messages.
+ */
+void CreateLogger();
+
+/**
  * Convert a V8 Value to an std::string.
  *
  * @param isolate The v8::Isolate environment to use.
@@ -54,7 +59,7 @@ inline v8::Local<v8::String> String2V8(v8::Isolate *isolate, std::string str)
  */
 inline fs::path GetTemporaryPidDirectory()
 {
-	return dataDir / std::to_string(_getpid());
+    return dataDir / std::to_string(_getpid());
 }
 
 /**

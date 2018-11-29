@@ -84,6 +84,8 @@ int mc_FilterEngine::Initialize(std::string &strResult)
     auto v8engine = V8Engine_Create();
     m_Impl = v8engine;
     auto dataDir = GetDataDir();
+    if (fDebug)
+        LogPrint("v8filter", "v8filter:   dataDir=%s\n", dataDir.string());
     char result[RESULT_SIZE];
     auto v8filterCallback = reinterpret_cast<IFilterCallback_t *>(&m_filterCallback);
     int retval = V8Engine_Initialize(v8engine, v8filterCallback, dataDir.string().c_str(), fDebug, result);

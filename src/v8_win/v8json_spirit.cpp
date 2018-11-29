@@ -83,7 +83,7 @@ json_spirit::Value V82Jsp(v8::Isolate *isolate, v8::Local<v8::Value> v)
         for (unsigned i = 0; i < v8propNames->Length(); ++i)
         {
             v8::Local<v8::String> v8propName =
-                v8propNames->Get(context, i).ToLocalChecked()->ToString(context).ToLocalChecked();
+                    v8propNames->Get(context, i).ToLocalChecked()->ToString(context).ToLocalChecked();
             v8::Local<v8::Value> v8value = v8obj->Get(context, v8propName).ToLocalChecked();
             jspObj.push_back(json_spirit::Pair(V82String(isolate, v8propName), V82Jsp(isolate, v8value)));
         }
@@ -122,7 +122,7 @@ json_spirit::Value V82Jsp(v8::Isolate *isolate, v8::Local<v8::Value> v)
         return json_spirit::Value(v->NumberValue(context).FromJust());
     }
 
-    //if (fDebug)
+    // if (fDebug)
     //    LogPrint("v8filter", "v8filter: V8 type '%s' is not recognized\n",
     //             V82String(isolate, v->TypeOf(isolate)).c_str());
     return json_spirit::Value();

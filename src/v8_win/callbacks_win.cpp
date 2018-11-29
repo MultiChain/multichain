@@ -2,10 +2,10 @@
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "v8_win/callbacks.h"
-#include "v8_win/v8engine.h"
-#include "v8_win/v8utils.h"
-#include "v8_win/v8ubjson.h"
 #include "v8_win/v8blob.h"
+#include "v8_win/v8engine.h"
+#include "v8_win/v8ubjson.h"
+#include "v8_win/v8utils.h"
 #include <cassert>
 
 namespace mc_v8
@@ -19,46 +19,51 @@ namespace mc_v8
  * @param name        The name of the RPC function.
  * @param args        The V8 arguments/return value.
  */
-void CallRpcFunction(std::string name, const v8::FunctionCallbackInfo<v8::Value> &args)
+void CallRpcFunction(std::string name, const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    v8::Isolate *isolate = args.GetIsolate();
+    logger->debug("CallRpcFunction(name={}) - enter", name);
+
+    v8::Isolate* isolate = args.GetIsolate();
     v8::Locker locker(isolate);
     v8::Isolate::Scope isolateScope(isolate);
     v8::HandleScope handleScope(isolate);
     v8::Local<v8::Context> context(isolate->GetCurrentContext());
     v8::Context::Scope contextScope(context);
 
-    IFilterCallback *filterCallback = static_cast<IFilterCallback *>(args.Data().As<v8::External>()->Value());
+    IFilterCallback* filterCallback = static_cast<IFilterCallback*>(args.Data().As<v8::External>()->Value());
 
     auto v8args = v8::Array::New(isolate, args.Length());
-    for (int i = 0; i < args.Length(); ++i)
-    {
+    for (int i = 0; i < args.Length(); ++i) {
         v8args->Set(static_cast<unsigned>(i), args[i]);
     }
 
     BlobPtr argsBlob = Blob::Instance("args");
     BlobPtr resultBlob = Blob::Instance("result");
     V82Ubj(isolate, v8args, argsBlob);
-    unsigned char *result;
-    size_t resultSize;
+    logger->debug("  argsBlob={}", argsBlob->ToString());
 
-    filterCallback->UbjCallback(name.c_str(), argsBlob->Data(), &result, &resultSize);
-    resultBlob->Set(result, resultSize);
+    filterCallback->UbjCallback(name.c_str(),
+                                reinterpret_cast<Blob_t*>(argsBlob.get()),
+                                reinterpret_cast<Blob_t*>(resultBlob.get()));
+    logger->debug("  resultBlob={}", resultBlob->ToString());
 
-    if (resultBlob->IsEmpty())
-    {
+    if (resultBlob->IsEmpty()) {
         args.GetReturnValue().SetUndefined();
-    }
-    else
-    {
+    } else {
         int err;
-        args.GetReturnValue().Set(Ubj2V8(isolate, resultBlob, &err));
+        logger->debug("  Calling Ubj2V8");
+        v8::MaybeLocal<v8::Value> mv = Ubj2V8(isolate, resultBlob, &err);
+        v8::Local<v8::Value> v;
+        if (mv.ToLocal(&v)) {
+            logger->debug("  Return value:");
+            _v8_internal_Print_Object(*(reinterpret_cast<v8::internal::Object**>(*v)));
+        } else {
+            logger->warn("  Return value is empty (err={})", err);
+        }
+        args.GetReturnValue().Set(v);
     }
 
-    if (result != nullptr)
-    {
-        delete [] result;
-    }
+    logger->debug("CallRpcFunction - leave");
 }
 
 // clang-format off

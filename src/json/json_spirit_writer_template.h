@@ -11,6 +11,8 @@
 #include <cassert>
 #include <sstream>
 #include <iomanip>
+#include <math.h>
+#include <string.h>
 
 extern uint32_t JSON_NO_DOUBLE_FORMATTING;                             
 extern int JSON_DOUBLE_DECIMAL_DIGITS;                             

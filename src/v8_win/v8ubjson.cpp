@@ -4,7 +4,6 @@
 #include <cstring>
 
 const int MAX_FORMATTED_DATA_DEPTH = 100;
-extern void _v8_internal_Print_Object(void *object);
 
 namespace mc_v8
 {
@@ -28,10 +27,10 @@ namespace mc_v8
 #define UBJ_STRONG_TYPE 17
 #define UBJ_COUNT 18
 
-static char UBJ_TYPE[19] = {'?', 'Z', 'N', 'T', 'F', 'C', 'S', 'H', 'i', 'U',
-                            'I', 'l', 'L', 'd', 'D', '[', '{', '$', '#'};
-static int UBJ_SIZE[19] = {0, 0, 0, 0, 0, 1, -1, -1, 1, 1, 2, 4, 8, 4, 8, -2, -3, -4, -5};
-static char UBJ_ISINT[19] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0};
+static char UBJ_TYPE[19] = { '?', 'Z', 'N', 'T', 'F', 'C', 'S', 'H', 'i', 'U',
+                             'I', 'l', 'L', 'd', 'D', '[', '{', '$', '#' };
+static int UBJ_SIZE[19] = { 0, 0, 0, 0, 0, 1, -1, -1, 1, 1, 2, 4, 8, 4, 8, -2, -3, -4, -5 };
+static char UBJ_ISINT[19] = { 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0 };
 // clang-format off
 static int UBJ_INTERNAL_TYPE[256] =
 {
@@ -309,8 +308,8 @@ union Number {
     double_t double_value;
 };
 
-static v8::Local<v8::Value> ubjson_read_internal(v8::Isolate *isolate, const unsigned char *ptrStart, size_t bytes,
-                                                 int known_type, int max_depth, size_t *offset, int *err)
+static v8::MaybeLocal<v8::Value> ubjson_read_internal(v8::Isolate *isolate, const unsigned char *ptrStart, size_t bytes,
+                                                      int known_type, int max_depth, size_t *offset, int *err)
 {
     v8::Isolate::Scope isolateScope(isolate);
     v8::EscapableHandleScope handleScope(isolate);
@@ -492,13 +491,13 @@ static v8::Local<v8::Value> ubjson_read_internal(v8::Isolate *isolate, const uns
                     i = 0;
                     while (i < size)
                     {
-                        array_value->Set(static_cast<unsigned>(i),
-                                         ubjson_read_internal(isolate, ptr, static_cast<size_t>(ptrEnd - ptr), ubj_type,
-                                                              max_depth - 1, &sh, err));
-                        if (*err)
+                        auto v = ubjson_read_internal(isolate, ptr, static_cast<size_t>(ptrEnd - ptr), ubj_type,
+                                                      max_depth - 1, &sh, err);
+                        if (*err || v.IsEmpty())
                         {
                             goto exitlbl;
                         }
+                        array_value->Set(static_cast<unsigned>(i), v.ToLocalChecked());
                         ptr += sh;
                         i++;
                     }
@@ -513,13 +512,13 @@ static v8::Local<v8::Value> ubjson_read_internal(v8::Isolate *isolate, const uns
                     i = 0;
                     while (*ptr != ']')
                     {
-                        array_value->Set(static_cast<unsigned>(i++),
-                                         ubjson_read_internal(isolate, ptr, static_cast<size_t>(ptrEnd - ptr), ubj_type,
-                                                              max_depth - 1, &sh, err));
-                        if (*err)
+                        auto v = ubjson_read_internal(isolate, ptr, static_cast<size_t>(ptrEnd - ptr), ubj_type,
+                                                      max_depth - 1, &sh, err);
+                        if (*err || v.IsEmpty())
                         {
                             goto exitlbl;
                         }
+                        array_value->Set(static_cast<unsigned>(i++), v.ToLocalChecked());
                         ptr += sh;
                         if (ptr + 1 > ptrEnd)
                         {
@@ -592,21 +591,21 @@ static v8::Local<v8::Value> ubjson_read_internal(v8::Isolate *isolate, const uns
                 i = 0;
                 while (i < size)
                 {
-                    v8::Local<v8::Value> string_value = ubjson_read_internal(
-                        isolate, ptr, static_cast<size_t>(ptrEnd - ptr), UBJ_STRING, max_depth - 1, &sh, err);
-                    if (*err)
+                    auto string_value = ubjson_read_internal(isolate, ptr, static_cast<size_t>(ptrEnd - ptr),
+                                                             UBJ_STRING, max_depth - 1, &sh, err);
+                    if (*err || string_value.IsEmpty())
                     {
                         goto exitlbl;
                     }
                     ptr += sh;
 
-                    v8::Local<v8::Value> value_value = ubjson_read_internal(
-                        isolate, ptr, static_cast<size_t>(ptrEnd - ptr), ubj_type, max_depth - 1, &sh, err);
-                    obj_value->Set(string_value, value_value);
-                    if (*err)
+                    auto value_value = ubjson_read_internal(isolate, ptr, static_cast<size_t>(ptrEnd - ptr), ubj_type,
+                                                            max_depth - 1, &sh, err);
+                    if (*err || value_value.IsEmpty())
                     {
                         goto exitlbl;
                     }
+                    obj_value->Set(string_value.ToLocalChecked(), value_value.ToLocalChecked());
                     ptr += sh;
 
                     i++;
@@ -621,30 +620,31 @@ static v8::Local<v8::Value> ubjson_read_internal(v8::Isolate *isolate, const uns
                 }
                 while (*ptr != '}')
                 {
-                    v8::Local<v8::Value> string_value = ubjson_read_internal(
-                        isolate, ptr, static_cast<size_t>(ptrEnd - ptr), UBJ_STRING, max_depth - 1, &sh, err);
+                    auto string_value = ubjson_read_internal(isolate, ptr, static_cast<size_t>(ptrEnd - ptr),
+                                                             UBJ_STRING, max_depth - 1, &sh, err);
                     //                    std::cout << "ubjson_read_internal UBJ_OBJECT key=" << V82String(isolate,
                     //                    string_value)
                     //                              << std::endl;
-                    if (*err)
+                    if (*err || string_value.IsEmpty())
                     {
                         goto exitlbl;
                     }
                     ptr += sh;
 
-                    v8::Local<v8::Value> value_value = ubjson_read_internal(
-                        isolate, ptr, static_cast<size_t>(ptrEnd - ptr), ubj_type, max_depth - 1, &sh, err);
+                    auto value_value = ubjson_read_internal(isolate, ptr, static_cast<size_t>(ptrEnd - ptr), ubj_type,
+                                                            max_depth - 1, &sh, err);
                     //                    std::cout << "ubjson_read_internal UBJ_OBJECT value=";
                     //                    _v8_internal_Print_Object(*((v8::internal::Object **)(*value_value)));
                     //                    std::cout << std::endl;
-                    obj_value->Set(string_value, value_value);
-                    //                    std::cout << "ubjson_read_internal UBJ_OBJECT object=";
-                    //                    _v8_internal_Print_Object(*((v8::internal::Object **)(*obj_value)));
-                    //                    std::cout << std::endl;
-                    if (*err)
+                    if (*err || value_value.IsEmpty())
                     {
                         goto exitlbl;
                     }
+
+                    obj_value->Set(string_value.ToLocalChecked(), value_value.ToLocalChecked());
+                    //                    std::cout << "ubjson_read_internal UBJ_OBJECT object=";
+                    //                    _v8_internal_Print_Object(*((v8::internal::Object **)(*obj_value)));
+                    //                    std::cout << std::endl;
                     ptr += sh;
 
                     if (ptr + 1 > ptrEnd)
@@ -664,7 +664,7 @@ exitlbl:
 
     if (*err)
     {
-        return handleScope.Escape(v8::Null(isolate));
+        return v8::MaybeLocal<v8::Value>();
     }
 
     if (offset)
@@ -672,7 +672,7 @@ exitlbl:
         *offset = static_cast<unsigned>(ptr - ptrStart);
     }
 
-    return handleScope.Escape(result);
+    return v8::MaybeLocal<v8::Value>(handleScope.Escape(result));
 }
 
 static int ubjson_int64_write(int64_t int64_value, int known_type, BlobPtr blob)
@@ -810,7 +810,7 @@ static int ubjson_write_internal(v8::Isolate *isolate, v8::Local<v8::Value> valu
                     }
                 }
                 v8::Local<v8::Integer> length_value =
-                    v8::Integer::New(isolate, static_cast<int32_t>(array_value->Length()));
+                        v8::Integer::New(isolate, static_cast<int32_t>(array_value->Length()));
                 ubj_type = ubjson_best_type(isolate, length_value, 0, nullptr, nullptr, nullptr);
                 int64_t length = static_cast<int64_t>(array_value->Length());
                 if (ssize + length + 1 <= length * UBJ_SIZE[last_type] + UBJ_SIZE[ubj_type] + 4)
@@ -876,8 +876,8 @@ static int ubjson_write_internal(v8::Isolate *isolate, v8::Local<v8::Value> valu
             v8::Local<v8::Array> prop_names = obj_value->GetOwnPropertyNames(context).ToLocalChecked();
             while (i < prop_names->Length())
             {
-                v8::Local<v8::String> name_ = prop_names->Get(context, i).ToLocalChecked()
-                        ->ToString(context).ToLocalChecked();
+                v8::Local<v8::String> name_ =
+                        prop_names->Get(context, i).ToLocalChecked()->ToString(context).ToLocalChecked();
                 v8::Local<v8::Value> value_ = obj_value->Get(context, name_).ToLocalChecked();
                 ubj_type = ubjson_best_type(isolate, value_, last_type, &not_uint8, &usize, &ssize);
                 if (ubj_type > 0)
@@ -909,7 +909,7 @@ static int ubjson_write_internal(v8::Isolate *isolate, v8::Local<v8::Value> valu
                     }
                 }
                 v8::Local<v8::Integer> length_value =
-                    v8::Integer::New(isolate, static_cast<int32_t>(prop_names->Length()));
+                        v8::Integer::New(isolate, static_cast<int32_t>(prop_names->Length()));
                 ubj_type = ubjson_best_type(isolate, length_value, 0, nullptr, nullptr, nullptr);
                 int64_t length = static_cast<int64_t>(prop_names->Length());
                 if (ssize + length + 1 <= length * UBJ_SIZE[last_type] + UBJ_SIZE[ubj_type] + 4)
@@ -934,8 +934,8 @@ static int ubjson_write_internal(v8::Isolate *isolate, v8::Local<v8::Value> valu
             }
             while (i < prop_names->Length())
             {
-                v8::Local<v8::String> name_ = prop_names->Get(context, i).ToLocalChecked()
-                        ->ToString(context).ToLocalChecked();
+                v8::Local<v8::String> name_ =
+                        prop_names->Get(context, i).ToLocalChecked()->ToString(context).ToLocalChecked();
                 v8::Local<v8::Value> value_ = obj_value->Get(context, name_).ToLocalChecked();
                 err = ubjson_write_internal(isolate, name_, UBJ_STRING, blob, max_depth - 1);
                 if (err)
@@ -979,7 +979,7 @@ int V82Ubj(v8::Isolate *isolate, v8::Local<v8::Value> value, BlobPtr blob)
     return ubjson_write_internal(isolate, value, UBJ_UNDEFINED, blob, MAX_FORMATTED_DATA_DEPTH);
 }
 
-v8::Local<v8::Value> Ubj2V8(v8::Isolate *isolate, BlobPtr blob, int *err)
+v8::MaybeLocal<v8::Value> Ubj2V8(v8::Isolate *isolate, BlobPtr blob, int *err)
 {
     size_t offset = 0;
     return ubjson_read_internal(isolate, blob->Data(), blob->DataSize(), UBJ_UNDEFINED, MAX_FORMATTED_DATA_DEPTH,

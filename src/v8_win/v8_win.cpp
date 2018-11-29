@@ -1,4 +1,5 @@
 #include "v8_win/v8_win.h"
+#include "v8_win/v8blob.h"
 #include "v8_win/v8engine.h"
 #include "v8_win/v8filter.h"
 #include "v8_win/v8utils.h"
@@ -14,12 +15,48 @@ std::vector<std::string> cstrs2vec(const char** cstrs, size_t ncstrs)
     return vec;
 }
 
-DLLEXPORT V8Filter_t* V8Filter_Create()
+void Blob_Reset(Blob_t* blob_)
+{
+    auto blob = mc_v8::Blob::Instance(reinterpret_cast<mc_v8::Blob*>(blob_)->Name());
+    blob->Reset();
+}
+
+void Blob_Set(Blob_t* blob_, const void* data_, size_t size_)
+{
+    auto blob = mc_v8::Blob::Instance(reinterpret_cast<mc_v8::Blob*>(blob_)->Name());
+    blob->Set(data_, size_);
+}
+
+void Blob_Append(Blob_t *blob_, const void *data_, size_t size_)
+{
+    auto blob = mc_v8::Blob::Instance(reinterpret_cast<mc_v8::Blob*>(blob_)->Name());
+    blob->Append(data_, size_);
+}
+
+unsigned char* Blob_Data(Blob_t* blob_)
+{
+    auto blob = mc_v8::Blob::Instance(reinterpret_cast<mc_v8::Blob*>(blob_)->Name());
+    return blob->Data();
+}
+
+size_t Blob_DataSize(Blob_t* blob_)
+{
+    auto blob = mc_v8::Blob::Instance(reinterpret_cast<mc_v8::Blob*>(blob_)->Name());
+    return blob->DataSize();
+}
+
+const char* Blob_ToString(Blob_t* blob_)
+{
+    auto blob = mc_v8::Blob::Instance(reinterpret_cast<mc_v8::Blob*>(blob_)->Name());
+    return blob->ToString().c_str();
+}
+
+V8Filter_t* V8Filter_Create()
 {
     return reinterpret_cast<V8Filter_t*>(new mc_v8::V8Filter());
 }
 
-DLLEXPORT void V8Filter_Delete(V8Filter_t** filter_)
+void V8Filter_Delete(V8Filter_t** filter_)
 {
     auto filter = reinterpret_cast<mc_v8::V8Filter*>(*filter_);
     if (filter != nullptr) {
@@ -28,20 +65,20 @@ DLLEXPORT void V8Filter_Delete(V8Filter_t** filter_)
     }
 }
 
-DLLEXPORT bool V8Filter_IsRunning(V8Filter_t* filter_)
+bool V8Filter_IsRunning(V8Filter_t* filter_)
 {
     auto filter = reinterpret_cast<mc_v8::V8Filter*>(filter_);
     return filter->IsRunning();
 }
 
-DLLEXPORT int V8Filter_Initialize(V8Filter_t* filter_,
-                                  V8Engine_t* engine_,
-                                  const char* script_,
-                                  const char* functionName_,
-                                  const char** callbackNames_,
-                                  size_t nCallbackNames_,
-                                  bool isFilterLimitedMathSet_,
-                                  char* strResult_)
+int V8Filter_Initialize(V8Filter_t* filter_,
+                        V8Engine_t* engine_,
+                        const char* script_,
+                        const char* functionName_,
+                        const char** callbackNames_,
+                        size_t nCallbackNames_,
+                        bool isFilterLimitedMathSet_,
+                        char* strResult_)
 {
     auto filter = reinterpret_cast<mc_v8::V8Filter*>(filter_);
     auto engine = reinterpret_cast<mc_v8::V8Engine*>(engine_);
@@ -57,7 +94,7 @@ DLLEXPORT int V8Filter_Initialize(V8Filter_t* filter_,
     return retval;
 }
 
-DLLEXPORT int V8Filter_Run(V8Filter_t* filter_, char* strResult_)
+int V8Filter_Run(V8Filter_t* filter_, char* strResult_)
 {
     auto filter = reinterpret_cast<mc_v8::V8Filter*>(filter_);
     std::string strResult;
@@ -66,12 +103,12 @@ DLLEXPORT int V8Filter_Run(V8Filter_t* filter_, char* strResult_)
     return retval;
 }
 
-DLLEXPORT V8Engine_t* V8Engine_Create()
+V8Engine_t* V8Engine_Create()
 {
     return reinterpret_cast<V8Engine_t*>(new mc_v8::V8Engine());
 }
 
-DLLEXPORT void V8Engine_Delete(V8Engine_t** engine_)
+void V8Engine_Delete(V8Engine_t** engine_)
 {
     auto engine = reinterpret_cast<mc_v8::V8Engine*>(*engine_);
     if (engine != nullptr) {
@@ -80,11 +117,11 @@ DLLEXPORT void V8Engine_Delete(V8Engine_t** engine_)
     }
 }
 
-DLLEXPORT int V8Engine_Initialize(V8Engine_t* engine_,
-                                  IFilterCallback_t* filterCallback_,
-                                  const char* dataDir_,
-                                  bool fDebug_,
-                                  char* strResult_)
+int V8Engine_Initialize(V8Engine_t* engine_,
+                        IFilterCallback_t* filterCallback_,
+                        const char* dataDir_,
+                        bool fDebug_,
+                        char* strResult_)
 {
     auto engine = reinterpret_cast<mc_v8::V8Engine*>(engine_);
     auto filterCallback = reinterpret_cast<IFilterCallback*>(filterCallback_);
@@ -94,14 +131,14 @@ DLLEXPORT int V8Engine_Initialize(V8Engine_t* engine_,
     return retval;
 }
 
-DLLEXPORT int V8Engine_CreateFilter(V8Engine_t* engine_,
-                                    const char* script_,
-                                    const char* main_name_,
-                                    const char** callbackNames_,
-                                    size_t nCallbackNames_,
-                                    V8Filter_t* filter_,
-                                    bool isFilterLimitedMathSet_,
-                                    char* strResult_)
+int V8Engine_CreateFilter(V8Engine_t* engine_,
+                          const char* script_,
+                          const char* main_name_,
+                          const char** callbackNames_,
+                          size_t nCallbackNames_,
+                          V8Filter_t* filter_,
+                          bool isFilterLimitedMathSet_,
+                          char* strResult_)
 {
     auto engine = reinterpret_cast<mc_v8::V8Engine*>(engine_);
     auto filter = reinterpret_cast<mc_v8::V8Filter*>(filter_);
@@ -117,7 +154,7 @@ DLLEXPORT int V8Engine_CreateFilter(V8Engine_t* engine_,
     return retval;
 }
 
-DLLEXPORT int V8Engine_RunFilter(V8Engine_t* engine_, V8Filter_t* filter_, char* strResult_)
+int V8Engine_RunFilter(V8Engine_t* engine_, V8Filter_t* filter_, char* strResult_)
 {
     auto engine = reinterpret_cast<mc_v8::V8Engine*>(engine_);
     auto filter = reinterpret_cast<mc_v8::V8Filter*>(filter_);
@@ -127,9 +164,9 @@ DLLEXPORT int V8Engine_RunFilter(V8Engine_t* engine_, V8Filter_t* filter_, char*
     return retval;
 }
 
-DLLEXPORT void V8Engine_TerminateFilter(V8Engine_t* engine_,
-                                        V8Filter_t* filter_,
-                                        const char* reason_)
+void V8Engine_TerminateFilter(V8Engine_t* engine_,
+                              V8Filter_t* filter_,
+                              const char* reason_)
 {
     auto engine = reinterpret_cast<mc_v8::V8Engine*>(engine_);
     auto filter = reinterpret_cast<mc_v8::V8Filter*>(filter_);

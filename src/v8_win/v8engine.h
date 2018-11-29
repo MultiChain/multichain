@@ -16,7 +16,7 @@ class V8Filter;
  */
 class V8Engine
 {
-  public:
+public:
     ~V8Engine();
 
     /**
@@ -27,15 +27,15 @@ class V8Engine
      */
     int Initialize(IFilterCallback *filterCallback, std::string dataDir_, bool fDebug_, std::string &strResult);
 
-    v8::Isolate *GetIsolate()
-    {
-        return m_isolate;
-    }
+    /**
+     * Get the Isolate used by the engine.
+     */
+    v8::Isolate *GetIsolate() { return m_isolate; }
 
-    IFilterCallback *GetFilterCallback()
-    {
-        return m_filterCallback;
-    }
+    /**
+     * Get the filter callback object for current filter.
+     */
+    IFilterCallback *GetFilterCallback() { return m_filterCallback; }
 
     /**
      * Create a new filter.
@@ -68,12 +68,12 @@ class V8Engine
      */
     void TerminateFilter(V8Filter *filter, std::string reason);
 
-    std::string TerminationReason() const
-    {
-        return m_reason;
-    }
+    /**
+     * Get the reason for the most recent forced filter termination.
+     */
+    std::string TerminationReason() const { return m_reason; }
 
-  private:
+private:
     IFilterCallback *m_filterCallback = nullptr;
     v8::Isolate *m_isolate = nullptr;
     static std::unique_ptr<v8::Platform> m_platform;

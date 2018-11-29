@@ -16,13 +16,13 @@ class V8Engine;
  */
 class V8Filter
 {
-  public:
+public:
     ~V8Filter();
 
-    bool IsRunning() const
-    {
-        return m_isRunning;
-    }
+    /**
+     * Test if the filter fuction is currently executing.
+     */
+    bool IsRunning() const { return m_isRunning; }
 
     /**
      * Initialize the filter to run the function @p functionName in the JS @p script.
@@ -47,7 +47,7 @@ class V8Filter
      */
     int Run(std::string &strResult);
 
-  private:
+private:
     int CompileAndLoadScript(std::string script, std::string functionName, std::string source, std::string &strResult);
     void ReportException(v8::TryCatch *tryCatch, std::string &strResult);
 

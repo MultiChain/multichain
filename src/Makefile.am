@@ -436,9 +436,9 @@ libbitcoin_v8_a_SOURCES = \
   v8/callbacks.cpp \
   v8/v8json_spirit.cpp
 
-##if TARGET_WINDOWS
+#if TARGET_WINDOWS
 #libbitcoin_v8_a_SOURCES += v8/callbacks_win.cpp v8/v8blob.dpp
-##endif
+#endif
 
 libbitcoin_v8_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(V8_INCLUDE)
 
@@ -469,7 +469,8 @@ multichaind_SOURCES = \
     rpc/rpclist.cpp \
     chainparams/buildgenesis.cpp \
     filters/filtercallback.cpp \
-    filters/watchdog.cpp
+    filters/watchdog.cpp \
+    json/json_spirit_writer.cpp
 
 if TARGET_WINDOWS
 multichaind_SOURCES += filters/filter_win.cpp multichaind-res.rc
@@ -506,8 +507,9 @@ multichaind_cold_SOURCES = \
     rpc/rpclist-cold.cpp \
     chainparams/buildgenesis.cpp \
     filters/filter_cold.cpp \
-    filters/filtercallback.cpp \
-    filters/watchdog.cpp
+    filters/filtercallback_cold.cpp \
+    filters/watchdog.cpp \
+    json/json_spirit_writer.cpp
 #
 
 if TARGET_WINDOWS
