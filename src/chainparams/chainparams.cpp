@@ -558,7 +558,7 @@ public:
         {
             if(nTargetTimespan <= 0)
             {
-                if(mc_gState->m_NetworkParams->GetInt64Param("powminimumbits") <= 8)
+                if(mc_gState->m_NetworkParams->GetInt64Param("powminimumbits") <= MAX_NBITS_FOR_SIGNED_NONCE)
                 {
                     fDisallowUnsignedBlockNonce=true;
                 }
