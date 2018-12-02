@@ -528,7 +528,7 @@ Value verifypermission(const Array& params, bool fHelp)
     int result=0;
     switch(type)
     {
-        case MC_PTP_CONNECT : result = mc_gState->m_Permissions->CanConnect   (lpEntity,lpAddress); break;
+        case MC_PTP_CONNECT : result = mc_gState->m_Permissions->CanConnectForVerify   (lpEntity,lpAddress); break;
         case MC_PTP_SEND:     result = mc_gState->m_Permissions->CanSend      (lpEntity,lpAddress); break;
         case MC_PTP_RECEIVE:  result = mc_gState->m_Permissions->CanReceive   (lpEntity,lpAddress); break;
         case MC_PTP_WRITE:    result = mc_gState->m_Permissions->CanWrite     (lpEntity,lpAddress); break;
