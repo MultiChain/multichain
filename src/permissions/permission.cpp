@@ -1043,6 +1043,26 @@ int mc_Permissions::CanConnect(const void* lpEntity,const void* lpAddress)
             
     result=GetPermission(lpEntity,lpAddress,MC_PTP_CONNECT);
     
+    if(result == 0)
+    {
+        result |=  GetPermission(lpEntity,lpAddress,MC_PTP_ADMIN);    
+    }
+
+    if(result == 0)
+    {
+        result |=  GetPermission(lpEntity,lpAddress,MC_PTP_ACTIVATE);    
+    }
+
+    if(result == 0)
+    {
+        result |=  GetPermission(lpEntity,lpAddress,MC_PTP_MINE);    
+    }
+    
+    if(result)
+    {
+        result = MC_PTP_CONNECT; 
+    }
+ 
     UnLock();
     
     return result;
