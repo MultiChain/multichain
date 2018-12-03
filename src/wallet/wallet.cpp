@@ -3158,7 +3158,6 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
             LogPrintf("CommitTransaction() : Error: Transaction not valid: %s\n",reject_reason.c_str());  // MCHN
             return false;
         }
-/*
         else
         {
             pwalletTxsMain->AddTx(NULL,wtxNew,-1,NULL,-1,0);   
@@ -3167,7 +3166,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
                 SyncWithWallets(wtxNew, NULL);            
             }
         }
-*/    
+
         for (unsigned int i = 0; i < wtxNew.vin.size(); i++) 
         {
             COutPoint outp=wtxNew.vin[i].prevout;
@@ -4165,7 +4164,7 @@ bool CMerkleTx::AcceptToMemoryPool(bool fLimitFree, bool fRejectInsaneFee)
 bool CMerkleTx::AcceptToMemoryPoolReturnReason(bool fLimitFree, bool fRejectInsaneFee,string& reject_reason)
 {
     CValidationState state;
-    bool result=::AcceptToMemoryPool(mempool, state, *this, fLimitFree, NULL, fRejectInsaneFee,true);
+    bool result=::AcceptToMemoryPool(mempool, state, *this, fLimitFree, NULL, fRejectInsaneFee,false);
 
     if(!result)
     {
