@@ -29,14 +29,14 @@ public:
      *
      * @param script         The filter JS code.
      * @param main_name      The expected name of the filtering function in the script.
-     * @param callback_names A list of callback function names to register for the filter.
+     * @param callbackNames  A list of callback function names to register for the filter.
      *                       If empty, register no callback functions.
      * @param strResult      Reason for failure if unsuccessful.
      * @return               MC_ERR_INTERNAL_ERROR if the engine failed,
      * MC_ERR_NOERROR otherwise.
      */
     int Initialize(V8Engine *engine, std::string script, std::string functionName,
-                   const std::vector<std::string> &callback_names, bool isFilterLimitedMathSet, std::string &strResult);
+                   const std::vector<std::string> &callbackNames, bool isFilterLimitedMathSet, std::string &strResult);
 
     /**
      * Run the filter function in the JS script.

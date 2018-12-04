@@ -41,14 +41,14 @@ public:
      * Create a new filter.
      *
      * @param script         The filter JS code.
-     * @param main_name      The expected name of the filtering function in the script.
-     * @param callback_names A list of callback function names to register for the filter.
+     * @param mainName       The expected name of the filtering function in the script.
+     * @param callbackNames  A list of callback function names to register for the filter.
      *                       If empty, register no callback functions.
      * @param filter         The filter object to initialize.
      * @param strResult      Reason for failure if unsuccessful.
      * @return               MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
      */
-    int CreateFilter(std::string script, std::string main_name, const std::vector<std::string> &callback_names,
+    int CreateFilter(std::string script, std::string mainName, const std::vector<std::string> &callbackNames,
                      V8Filter *filter, bool isFilterLimitedMathSet, std::string &strResult);
 
     /**

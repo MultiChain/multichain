@@ -71,7 +71,7 @@ V8Filter::~V8Filter()
 }
 
 int V8Filter::Initialize(V8Engine *engine, std::string script, std::string functionName,
-                         const std::vector<std::string> &callback_names, bool isFilterLimitedMathSet,
+                         const std::vector<std::string> &callbackNames, bool isFilterLimitedMathSet,
                          std::string &strResult)
 {
     logger->debug("V8Filter::Initialize - enter");
@@ -85,7 +85,7 @@ int V8Filter::Initialize(V8Engine *engine, std::string script, std::string funct
     auto global = v8::ObjectTemplate::New(isolate);
     auto filterCallback = v8::External::New(isolate, m_engine->GetFilterCallback());
     logger->debug("  Processing RPC callbacks");
-    for (std::string functionName : callback_names)
+    for (std::string functionName : callbackNames)
     {
         if (callbackLookup.find(functionName) == callbackLookup.end())
         {

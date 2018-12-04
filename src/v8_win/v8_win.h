@@ -23,7 +23,7 @@ DLLEXPORT void Blob_Reset(Blob_t* blob_);
  * @param data_ The data to set.
  * @param size_ The size of the data, in bytes.
  */
-DLLEXPORT void Blob_Set(Blob_t* blob_, const void* data_, size_t size_);
+DLLEXPORT void Blob_Set(Blob_t* blob_, const unsigned char* data_, size_t size_);
 
 /**
  * Append content to the Blob.
@@ -31,12 +31,12 @@ DLLEXPORT void Blob_Set(Blob_t* blob_, const void* data_, size_t size_);
  * @param dat_a The data to append.
  * @param size_ The size of the data, in bytes.
  */
-DLLEXPORT void Blob_Append(Blob_t* blob_, const void* data, size_t size_);
+DLLEXPORT void Blob_Append(Blob_t* blob_, const unsigned char* data, size_t size_);
 
 /**
  * Get the data stored in the blob.
  */
-DLLEXPORT unsigned char* Blob_Data(Blob_t* blob_);
+DLLEXPORT const unsigned char* Blob_Data(Blob_t* blob_);
 
 /**
  * Get the size of the data stored in the blob, in bytes.
@@ -119,7 +119,7 @@ DLLEXPORT int V8Engine_Initialize(V8Engine_t* engine_, IFilterCallback_t* filter
  *
  * @param engine_                   The engine to operate on.
  * @param script_                   The filter JS code.
- * @param main_nam_e                The expected name of the filtering function in the script.
+ * @param mainName_                 The expected name of the filtering function in the script.
  * @param callbackNames_            An array of callback function names to register for the filter.
  *                                  If empty, register no callback functions.
  * @param nCallbackNames_           The number of callback names in @p callback_names_
@@ -128,7 +128,7 @@ DLLEXPORT int V8Engine_Initialize(V8Engine_t* engine_, IFilterCallback_t* filter
  * @param strResult_                Reason for failure if unsuccessful.
  * @return                          MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
  */
-DLLEXPORT int V8Engine_CreateFilter(V8Engine_t* engine_, const char* script_, const char* main_name_,
+DLLEXPORT int V8Engine_CreateFilter(V8Engine_t* engine_, const char* script_, const char* mainName_,
                                     const char** callbackNames_, size_t nCallbackNames_, V8Filter_t* filter_,
                                     bool isFilterLimitedMathSet_, char* strResult_);
 

@@ -48,12 +48,12 @@ int V8Engine::Initialize(IFilterCallback *filterCallback, std::string dataDir_, 
     return MC_ERR_NOERROR;
 }
 
-int V8Engine::CreateFilter(std::string script, std::string main_name, const std::vector<std::string> &callback_names,
+int V8Engine::CreateFilter(std::string script, std::string mainName, const std::vector<std::string> &callbackNames,
                            V8Filter *filter, bool isFilterLimitedMathSet, std::string &strResult)
 {
     logger->debug("V8Engine::CreateFilter - enter");
     strResult.clear();
-    int retval = filter->Initialize(this, script, main_name, callback_names, isFilterLimitedMathSet, strResult);
+    int retval = filter->Initialize(this, script, mainName, callbackNames, isFilterLimitedMathSet, strResult);
     logger->debug("V8Engine::CreateFilter - leave retval={} strResult='{}'", retval, strResult);
     return retval;
 }

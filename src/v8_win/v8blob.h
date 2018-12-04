@@ -68,7 +68,7 @@ public:
     /**
      * Get the data stored in the blob.
      */
-    unsigned char *Data() { return m_buffer; }
+    const unsigned char *Data() const { return m_buffer; }
 
     /**
      * Get the size of the data stored in the blob, in bytes.
