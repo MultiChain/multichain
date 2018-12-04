@@ -2137,3 +2137,70 @@ int mc_Features::FilterLimitedMathSet()
     return ret;    
 }
 
+int mc_Features::FixedIn20006()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 20006)
+        {
+            ret=1;
+        }
+    }
+    
+    return ret;    
+}
+
+int mc_Features::NonceInMinerSignature()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 20006)
+        {
+            ret=1;
+        }
+    }
+    
+    return ret;    
+}
+
+int mc_Features::ImplicitConnectPermission()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 20006)
+        {
+            ret=1;
+        }
+        else
+        {
+            if(Filters() == 0)
+            {
+                ret=1;
+            }            
+        }
+    }
+    
+    return ret;    
+}
+

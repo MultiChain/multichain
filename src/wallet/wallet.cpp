@@ -4162,7 +4162,7 @@ bool CMerkleTx::AcceptToMemoryPool(bool fLimitFree, bool fRejectInsaneFee)
 }
 
 /* MCHN START */
-bool CMerkleTx::AcceptToMemoryPoolReturnReason(bool fLimitFree, bool fRejectInsaneFee,string& reject_reason)
+bool CWalletTx::AcceptToMemoryPoolReturnReason(bool fLimitFree, bool fRejectInsaneFee,string& reject_reason)
 {
     CValidationState state;
     
@@ -4171,7 +4171,7 @@ bool CMerkleTx::AcceptToMemoryPoolReturnReason(bool fLimitFree, bool fRejectInsa
         pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetSendTimeout());
     }
 
-    bool result=::AcceptToMemoryPool(mempool, state, *this, fLimitFree, NULL, fRejectInsaneFee,true);
+    bool result=::AcceptToMemoryPool(mempool, state, *this, fLimitFree, NULL, fRejectInsaneFee,this);
 
     if(pMultiChainFilterEngine)
     {

@@ -1994,7 +1994,12 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
                         }
                         else
                         {
-                            if(memcmp(lpAsset->GetTxID(),&(pMultiChainFilterEngine->m_Tx.vin[i].prevout.hash),sizeof(uint256)) == 0)
+                            int gin=j;
+                            if(mc_gState->m_Features->FixedIn20006() == 0)
+                            {
+                                gin=i;
+                            }
+                            if(memcmp(lpAsset->GetTxID(),&(pMultiChainFilterEngine->m_Tx.vin[gin].prevout.hash),sizeof(uint256)) == 0)
                             {
                                 if( mc_GetABRefType(asset_amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_GENESIS )                    
                                 {

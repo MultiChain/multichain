@@ -1164,7 +1164,7 @@ int mc_Permissions::IsApprovedInternal(const void* lpUpgrade, int check_current_
 
 /** Returns non-zero value if (entity,address) can connect */
 
-int mc_Permissions::CanConnect(const void* lpEntity,const void* lpAddress)
+int mc_Permissions::CanConnectInternal(const void* lpEntity,const void* lpAddress,int with_implicit)
 {
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
     {
@@ -1185,9 +1185,43 @@ int mc_Permissions::CanConnect(const void* lpEntity,const void* lpAddress)
             
     result=GetPermission(lpEntity,lpAddress,MC_PTP_CONNECT);
     
+    
+    if(with_implicit)
+    {
+        if(result == 0)
+        {
+            result |=  GetPermission(lpEntity,lpAddress,MC_PTP_ADMIN);    
+        }
+
+        if(result == 0)
+        {
+            result |=  GetPermission(lpEntity,lpAddress,MC_PTP_ACTIVATE);    
+        }
+
+        if(result == 0)
+        {
+            result |=  GetPermission(lpEntity,lpAddress,MC_PTP_MINE);    
+        }
+    }
+    
+    if(result)
+    {
+        result = MC_PTP_CONNECT; 
+    }
+    
     UnLock();
     
     return result;
+}
+
+int mc_Permissions::CanConnect(const void* lpEntity,const void* lpAddress)
+{
+    return CanConnectInternal(lpEntity,lpAddress,1);
+}
+
+int mc_Permissions::CanConnectForVerify(const void* lpEntity,const void* lpAddress)
+{
+    return CanConnectInternal(lpEntity,lpAddress,mc_gState->m_Features->ImplicitConnectPermission());
 }
 
 /** Returns non-zero value if (entity,address) can send */

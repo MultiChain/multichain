@@ -62,7 +62,7 @@ bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs,
 bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& reason);
 bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string& reason);
 bool ReplayMemPool(CTxMemPool& pool, int from,bool accept);
-bool VerifyBlockSignature(CBlock *block,bool force);
+bool VerifyBlockSignature(CBlock *block,bool force,bool in_sync);
 bool VerifyBlockMiner(CBlock *block,CBlockIndex* pindexNew);
 bool CheckBlockPermissions(const CBlock& block,CBlockIndex* prev_block,unsigned char *lpMinerAddress);
 bool ProcessMultichainRelay(CNode* pfrom, CDataStream& vRecv, CValidationState &state);
@@ -1399,7 +1399,7 @@ CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowF
 }
 
 bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransaction &tx, bool fLimitFree,
-                        bool* pfMissingInputs, bool fRejectInsaneFee,bool fAddToWallet)
+                        bool* pfMissingInputs, bool fRejectInsaneFee,CWalletTx *wtx)
 {
     AssertLockHeld(cs_main);
     if (pfMissingInputs)
@@ -1677,16 +1677,21 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
         
         
-        if(fAddToWallet)
+        int err=MC_ERR_NOERROR;
+        if(wtx)
         {
-            int err=pwalletTxsMain->AddTx(NULL,tx,-1,NULL,-1,0);
-            if(err)
-            {
-                reason=strprintf("Wallet error %d",err);
-                return state.DoS(0,
-                                 error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
-                                 REJECT_INVALID, reason);            
-            }
+            err=pwalletTxsMain->AddTx(NULL,*wtx,-1,NULL,-1,0);
+        }
+        else
+        {                
+            err=pwalletTxsMain->AddTx(NULL,tx,-1,NULL,-1,0);
+        }
+        if(err)
+        {
+            reason=strprintf("Wallet error %d",err);
+            return state.DoS(0,
+                             error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
+                             REJECT_INVALID, reason);            
         }
         
         permissions_to=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
@@ -1697,12 +1702,9 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         pool.addUnchecked(hash, entry);
     }
 
-    if(fAddToWallet)
+    if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
     {
-        if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
-        {
-            SyncWithWallets(tx, NULL);
-        }
+        SyncWithWallets(tx, NULL);
     }
 
     return true;
@@ -1833,7 +1835,7 @@ bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex)
     if (block.GetHash() != pindex->GetBlockHash())
         return error("ReadBlockFromDisk(CBlock&, CBlockIndex*) : GetHash() doesn't match index");
 /* MCHN START */    
-    VerifyBlockSignature(&block,true);
+    VerifyBlockSignature(&block,true,false);
 /* MCHN END */    
     return true;
 }
@@ -2343,16 +2345,22 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if(!pindex->kMiner.IsValid() || (setBannedTxs.size() != 0) )
     {
         if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
-            return false;
+        {
+            return state.DoS(0, error("ConnectBlock() : error on CheckBlock"),
+                             REJECT_INVALID, "bad-check-block");            
+            
+        }
     }
 
     if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-size",true))
     {
-        return false;
+        return state.DoS(100, error("ConnectBlock() : above maximum-block-size"),
+                         REJECT_INVALID, "bad-block-size");                        
     }
     if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-sigops",true))
     {
-        return false;
+        return state.DoS(100, error("ConnectBlock() : above maximum-block-sigops"),
+                         REJECT_INVALID, "bad-block-sigops");                        
     }
     
 /* MCHN START */    
@@ -3005,7 +3013,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     }
     // ... and about transactions that got confirmed:
 /* MCHN START */        
-    VerifyBlockSignature(pblock,false);
+    VerifyBlockSignature(pblock,false,true);
     MultichainNode_ApplyUpgrades(chainActive.Height());    
 /* MCHN END */    
     
@@ -3272,7 +3280,7 @@ void UpdateChainMiningStatus(const CBlock &block,CBlockIndex *pindexNew)
  * Try to make some progress towards making pindexMostWork the active block.
  * pblock is either NULL or a pointer to a CBlock corresponding to pindexMostWork.
  */
-static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMostWork, CBlock *pblock) {
+static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMostWork, CBlock *pblock, bool* fInvalidFoundOut) {
     AssertLockHeld(cs_main);
     bool fInvalidFound = false;
     const CBlockIndex *pindexOldTip = chainActive.Tip();
@@ -3343,7 +3351,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     }
     
 /* MCHN START */    
-    if (!fInvalidFound)
+//    if (!fInvalidFound)
     {
         mc_gState->m_Permissions->ClearMemPool();
         mc_gState->m_Assets->ClearMemPool();
@@ -3398,6 +3406,10 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
         }
     }
     
+    if(fInvalidFoundOut)
+    {
+        *fInvalidFoundOut=fInvalidFound;
+    }
 /* MCHN END */
     
     return true;
@@ -3471,7 +3483,7 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
             }
 /* MCHN END */            
 
-            if (!ActivateBestChainStep(state, pindexMostWork, pblock && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : NULL))
+            if (!ActivateBestChainStep(state, pindexMostWork, pblock && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : NULL, NULL))
                 return false;
 /* MCHN START */            
             if(pindexMostWork == chainActive.Tip())
@@ -3609,7 +3621,8 @@ string SetLastBlock(uint256 hash,bool *fNotFound)
         
         while(pblockindex != chainActive.Tip())
         {
-            if(!ActivateBestChainStep(state,pblockindex,NULL))
+            bool fInvalidFound;
+            if(!ActivateBestChainStep(state,pblockindex,NULL,&fInvalidFound) || fInvalidFound)
             {
                 string error=state.GetRejectReason();
                 ActivateBestChain(state);
@@ -4572,7 +4585,7 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
 /* MCHN START*/    
     pindex->dTimeReceived=mc_TimeNowAsDouble();
             
-    if(!VerifyBlockSignature(&block,false))
+    if(!VerifyBlockSignature(&block,false,true))
     {
         return false;
     }    
@@ -4691,7 +4704,7 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
 /* MCHN START*/    
     {
         LOCK(cs_main);
-        if(!VerifyBlockSignature(pblock,true))
+        if(!VerifyBlockSignature(pblock,true,true))
         {
             return false;
         }
