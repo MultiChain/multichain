@@ -2348,7 +2348,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         {
             return state.DoS(0, error("ConnectBlock() : error on CheckBlock"),
                              REJECT_INVALID, "bad-check-block");            
-            
         }
     }
 
@@ -5718,8 +5717,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         // Disconnect if we connected to ourself
         if (nNonce == nLocalHostNonce && nNonce > 1)
-        {
-            LogPrintf("connected to self at %s, disconnecting\n", pfrom->addr.ToString());
+        {            
+            SeenLocalAddr(addrMe);
+            LogPrintf("connected to self at %s (me: %s), disconnecting\n", pfrom->addr.ToString(),addrMe.ToStringIPPort().c_str());
             pfrom->fDisconnect = true;
             return true;
         }
