@@ -2,7 +2,7 @@
 #define DECLSPEC_H
 
 #ifdef WIN32
-#ifdef V8_WIN_EXPORTS
+#ifdef  multichain_v8_EXPORTS
    /*Enabled as "export" while compiling the dll project*/
    #define DLLEXPORT __declspec(dllexport)
 #else

@@ -7,13 +7,18 @@ find_package(Boost REQUIRED COMPONENTS thread filesystem)
 
 include(ExternalProject)
 ExternalProject_Add(spdlog
-    GIT_REPOSITORY https://github.com/gabime/spdlog.git GIT_TAG v1.2.1
-    CONFIGURE_COMMAND ""
-    BUILD_COMMAND ""
-    INSTALL_COMMAND ""
+    GIT_REPOSITORY https://github.com/gabime/spdlog.git
+    GIT_TAG v1.2.1
+    EXCLUDE_FROM_ALL TRUE
+    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
     )
+#UPDATE_COMMAND  ""
+#CONFIGURE_COMMAND ""
+#BUILD_COMMAND ""
+#INSTALL_COMMAND ""
 ExternalProject_Get_Property(spdlog INSTALL_DIR)
-set(SPDLOG_INCLUDE_DIR ${INSTALL_DIR}/src/spdlog/include)
+set(SPDLOG_INCLUDE_DIR ${INSTALL_DIR}/include)
+#find_package(spdlog REQUIRED PATHS ${INSTALL_DIR})
 message(STATUS "SPDLOG_INCLUDE_DIR=${SPDLOG_INCLUDE_DIR}")
 
 get_filename_component(PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." REALPATH)
@@ -53,11 +58,10 @@ include_directories(
 
 link_directories(${V8_LIBRARIES_DIR} ${V8_LIBRARIES_DIR}/third_party/icu ${Boost_LIBRARY_DIRS})
 add_library(${CMAKE_PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
-add_dependencies(${CMAKE_PROJECT_NAME} spdlog)
+#add_dependencies(${CMAKE_PROJECT_NAME} spdlog)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PUBLIC
-    V8_WIN_EXPORTS
-    _SILENCE_FPOS_SEEKPOS_DEPRECATION_WARNING
     HAVE_DECL_STRNLEN=1
+    _SILENCE_FPOS_SEEKPOS_DEPRECATION_WARNING
     _CRT_NONSTDC_NO_WARNINGS
     )
 target_link_libraries(${CMAKE_PROJECT_NAME}
