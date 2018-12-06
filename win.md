@@ -48,7 +48,7 @@ In different stages of the build, build artifacts from one environment need to b
 
         cd %ROOT_DIR%\multichain
 
-  - Follow the instructions in [v8_win](v8_win.md) to fetch, configure and build Google's V8 JavaScript engine.
+  - Follow the instructions in [v8_win.md](/v8_win.md/) to fetch, configure and build Google's V8 JavaScript engine.
 
   - Build an additional library required by MultiChain:
 
