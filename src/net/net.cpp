@@ -79,6 +79,9 @@ bool fListen = true;
 uint64_t nLocalServices = NODE_NETWORK;
 CCriticalSection cs_mapLocalHost;
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
+CCriticalSection cs_setLocalAddr;
+set<CService> setLocalAddr;
+
 static bool vfReachable[NET_MAX] = {};
 static bool vfLimited[NET_MAX] = {};
 static CNode* pnodeLocalHost = NULL;
@@ -325,6 +328,17 @@ bool SeenLocal(const CService& addr)
     return true;
 }
 
+bool SeenLocalAddr(const CService& addr)
+{
+    {
+        LOCK(cs_setLocalAddr);        
+        if (setLocalAddr.find(addr) == setLocalAddr.end())
+        {
+            setLocalAddr.insert(addr);
+        }
+    }
+    return true;
+}
 
 /** check whether a given address is potentially local */
 bool IsLocal(const CService& addr)
@@ -394,6 +408,7 @@ CNode* ConnectNode(CAddress addrConnect, const char *pszDest)
 {
     if (pszDest == NULL) {
 //        if (IsLocal(addrConnect))
+
         if (IsLocal(addrConnect) && (addrConnect.GetPort() == GetListenPort()))
         return NULL;
 
@@ -1399,6 +1414,12 @@ void ThreadOpenConnections()
                 if (!addr.IsValid() || (IsLocal(addr) && (addr.GetPort() == GetListenPort())))
                 {
                     break;                
+                }
+                
+                LOCK(cs_setLocalAddr);        
+                if(setLocalAddr.find(addr) != setLocalAddr.end())
+                {
+                    break;
                 }
                 MilliSleep(100);
             }

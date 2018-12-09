@@ -2348,7 +2348,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         {
             return state.DoS(0, error("ConnectBlock() : error on CheckBlock"),
                              REJECT_INVALID, "bad-check-block");            
-            
         }
     }
 
@@ -4610,6 +4609,41 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
 
     int nHeight = pindex->nHeight;
 
+    if(!VerifyBlockMiner(&block,pindex))
+    {
+        pindex->nStatus |= BLOCK_FAILED_VALID;
+        setDirtyBlockIndex.insert(pindex);
+        return false;
+    }
+    
+    CBlockIndex *pindexTip=pindex;
+    while((pindexTip != NULL) && pindexTip->nHeight > chainActive.Height())
+    {
+        pindexTip=pindexTip->pprev;
+    }
+    if(pindexTip == chainActive.Tip())                                          // If we are on main chain
+                                                                                // If it is the next block, we can check upgradable constraints
+                                                                                // If some blocks are missing and constraints are broken - ignore block
+                                                                                // If it is not an attack and upgrade parameters were indeed upgraded,
+                                                                                // we will download this block again after missing blocks.
+    {        
+        if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-size",true))
+        {
+            return false;
+        }
+    
+        if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-sigops",true))
+        {
+            return false;
+        }        
+    }
+    else
+    {
+        LogPrintf("Accepted header for block %s found on alternative chain at height %d\n",
+                pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);                        
+    }
+    
+    
     // Write block to history file
     try {
         unsigned int nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
@@ -4627,12 +4661,6 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
         return state.Abort(std::string("System error: ") + e.what());
     }
 
-    if(!VerifyBlockMiner(&block,pindex))
-    {
-        pindex->nStatus |= BLOCK_FAILED_VALID;
-        setDirtyBlockIndex.insert(pindex);
-        return false;
-    }
 
     return true;
 }
@@ -5718,8 +5746,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         // Disconnect if we connected to ourself
         if (nNonce == nLocalHostNonce && nNonce > 1)
-        {
-            LogPrintf("connected to self at %s, disconnecting\n", pfrom->addr.ToString());
+        {            
+            SeenLocalAddr(addrMe);
+            LogPrintf("connected to self at %s (me: %s), disconnecting\n", pfrom->addr.ToString(),addrMe.ToStringIPPort().c_str());
             pfrom->fDisconnect = true;
             return true;
         }
