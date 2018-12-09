@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
-project(multichain_v8)
+project(multichain-v8)
 
 set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_STATIC_RUNTIME ON)
