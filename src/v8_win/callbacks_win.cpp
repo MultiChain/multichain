@@ -55,8 +55,10 @@ void CallRpcFunction(std::string name, const v8::FunctionCallbackInfo<v8::Value>
         v8::MaybeLocal<v8::Value> mv = Ubj2V8(isolate, resultBlob, &err);
         v8::Local<v8::Value> v;
         if (mv.ToLocal(&v)) {
-            logger->debug("  Return value:");
-            _v8_internal_Print_Object(*(reinterpret_cast<v8::internal::Object**>(*v)));
+            if (fDebug) {
+                logger->debug("  Return value:");
+                _v8_internal_Print_Object(*(reinterpret_cast<v8::internal::Object **>(*v)));
+            }
         } else {
             logger->warn("  Return value is empty (err={})", err);
         }

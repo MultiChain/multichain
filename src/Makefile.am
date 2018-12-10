@@ -456,7 +456,7 @@ multichaind_LDADD = \
   $(LIBSECP256K1)
 
 if TARGET_WINDOWS
-  multichaind_LDADD += $(top_builddir)/src/v8_win/build/Release/multichain_v8.lib
+  multichaind_LDADD += $(top_builddir)/src/v8_win/build/Release/multichain-v8.lib
 else
   multichaind_LDADD += $(LIBBITCOIN_V8)
 endif
