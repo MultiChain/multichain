@@ -71,6 +71,7 @@ int paramtoint(Value param,bool check_for_min,int min_value,string error_message
 int ParseBlockIdentifier(Value blockset_identifier);
 int ParseRescanParameter(Value rescan_identifier, bool *fRescan);
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
+void CheckWalletError(int err);
 
 
 #endif	/* RPCMULTICHAINUTILS_H */

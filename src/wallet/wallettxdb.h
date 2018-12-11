@@ -38,6 +38,7 @@
 #define MC_TET_ORDERMASK                        0x0000FF00
 #define MC_TET_DB_STAT                          0x01000000
 #define MC_TET_IMPORT                           0x02000000
+#define MC_TET_GETDB_ADD_TX                     0x10000000
 #define MC_TET_SPECIALMASK                      0xFF000000
 
 #define MC_EFL_NOT_IN_SYNC                      0x01000000
@@ -49,6 +50,12 @@
 #define MC_SFL_IS_ADDRESS       0x00000002
 #define MC_SFL_NODATA           0x01000000
 #define MC_SFL_SUBKEY           0x02000000
+
+
+#define MC_TCF_NOT_CACHED                    0x00000000
+#define MC_TCF_ERROR                         0x00000001
+#define MC_TCF_FOUND                         0x00000002
+#define MC_TCF_NOT_FOUND                     0x00000004
 
 
 /** Entity - wallet, address, stream, etc. **/
@@ -229,7 +236,9 @@ typedef struct mc_TxDB
     uint32_t m_Mode;
     void *m_Semaphore;                                                          // mc_TxDB object semaphore
     uint64_t m_LockedBy;                                                        // ID of the thread locking it
-
+    mc_TxDefRow m_TxCachedDef;                                                              
+    uint32_t m_TxCachedFlags;                                                              
+    
     mc_TxDB()
     {
         Zero();
@@ -294,9 +303,17 @@ typedef struct mc_TxDB
               uint32_t timestamp,                                               // timestamp to be stored as timereceived
               mc_Buffer *entities);                                             // List of relevant entities for this tx
     
+    int SetTxCache(                                                             // Returns tx definition if found, error if not found
+              const unsigned char *hash);                                       // Input. Tx hash
+    
     int GetTx(                                                                  // Returns tx definition if found, error if not found
               mc_TxDefRow *txdef,                                               // Output. Tx def
               const unsigned char *hash);                                       // Input. Tx hash
+    
+    int GetTx(                                                                  // Returns tx definition if found, error if not found
+              mc_TxDefRow *txdef,                                               // Output. Tx def
+              const unsigned char *hash,                                        // Input. Tx hash
+              int skip_db);                                       
     
     int GetList(
                 mc_TxImport *import,                                            // Import object, if NULL - chain

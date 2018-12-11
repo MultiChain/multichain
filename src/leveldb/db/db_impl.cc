@@ -1107,7 +1107,7 @@ Status DBImpl::Get(const ReadOptions& options,
       // Done
     } else {
       s = current->Get(options, lkey, value, &stats);
-      have_stat_update = true;
+//      have_stat_update = true;
     }
     mutex_.Lock();
   }

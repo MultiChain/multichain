@@ -1933,7 +1933,7 @@ Value listassettransactions(const Array& params, bool fHelp)
     mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
     lpScript->Clear();    
 
-    pwalletTxsMain->GetList(&entStat.m_Entity,1,1,entity_rows);
+    CheckWalletError(pwalletTxsMain->GetList(&entStat.m_Entity,1,1,entity_rows));
     shift=1;
     if(entity_rows->GetCount())
     {
@@ -1961,7 +1961,7 @@ Value listassettransactions(const Array& params, bool fHelp)
         }
     }
     
-    pwalletTxsMain->GetList(&entStat.m_Entity,start+1,count,entity_rows);
+    CheckWalletError(pwalletTxsMain->GetList(&entStat.m_Entity,start+1,count,entity_rows));
     
     
     for(int i=0;i<entity_rows->GetCount()+shift;i++)
