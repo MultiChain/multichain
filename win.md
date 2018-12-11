@@ -1,89 +1,105 @@
 # Windows Build Notes (on Windows and Ubuntu 16.04, x64)
 
-Building MultiChain for Windows requires Working with two separate development environments:
+Building MultiChain for Windows requires working with two separate development environments:
 
-  - Visual Studio 2017 on Native Windows
-  - GCC MinGW cross compiler on Linux
+-   Visual Studio 2017 on Native Windows
+-   GCC MinGW cross compiler on Linux
 
-In different stages of the build, build artifacts from one environment need to be available to the other environment. If possible, sharing a single physical file system is most helpful. Otherwise, files need to be copied between the two file systems (e.g. via SSH).
+In different stages of the build, build artifacts from one environment need to be available to the other environment. If possible, sharing a single physical file system is most helpful. Otherwise, files need to be copied between the two file systems (e.g. *scp* on Linux, *pscp* from Putty or WinSCP on Windows).
+
+In the reminder of these instructions we assume that the the following variables have the associated meaning:
+
+
+| Variable         | Meaning                                                |
+| ---------------- | -------------------------------------------------------|
+| `MULTICHAIN_HOME`| Root folder of MultiChain                              |
+| `LINUX_FS`       | Location in Linux where Windows files can be copied to |
+
+Variables on Windows are referenced by `%VAR%`, and on Linux by `$VAR` or `${VAR}`.
 
 ## Prerequisites on Windows
 
-  - Visual Studio 2017 (community edition acceptable)
-  - Python 2.7
-  - Git
-  - CMake
-  - Boost, with binaries for release,multithreading,static (suffix is -mt-s)
+-   [Visual Studio 2017](https://visualstudio.microsoft.com/thank-you-downloading-visual-studio/?sku=Community&rel=15) (community edition acceptable)
+-   [Python 2.7](https://www.python.org/ftp/python/2.7.15/python-2.7.15.amd64.msi)
+-   [Git](https://github.com/git-for-windows/git/releases/download/v2.19.1.windows.1/Git-2.19.1-64-bit.exe)
+-   [CMake](https://github.com/Kitware/CMake/releases/download/v3.13.1/cmake-3.13.1-win64-x64.msi)
+-   [Boost](https://sourceforge.net/projects/boost/files/boost-binaries/1.68.0/boost_1_68_0-msvc-14.0-64.exe/download), with binaries for release,multithreading,static (suffix is -mt-s)
 
 ## Prerequisites on Linux
 
-  - libtool autotools-dev automake pkg-config git
-  - g++-mingw-w64-x86-64 mingw-w64-x86-64-dev
+        sudo apt update
+        sudo apt install -y libtool autotools-dev automake pkg-config git
+        sudo apt install -y g++-mingw-w64-x86-64 mingw-w64-x86-64-dev
 
 ## Build Instructions
 
-### Prepare a build area on the Linux machine
+### Prepare a build area on the *Linux* machine
 
-  - Change directory (`cd`) to the location where you want to build MultiChain.
-  - For easier reference, set a variable to this location:
+On Linux:
 
-        ROOT_DIR=$(pwd)
-
-  - Clone the MultiChain repository:
+-   In the location where you want to build MultiChain:
 
         git clone https://github.com/MultiChain/multichain.git
+        cd multichain
+        export MULTICHAIN_HOME=$(pwd)
 
-###Prepare a build area on the Windows machine
+###Prepare a build area on the *Windows* machine
 
-  - Change directory (`cd`) to the location where you want to build MultiChain.
-  - For easier reference, set a variable to this location:
+On Windows:
 
-        set ROOT_DIR=%CD%
-
-  - Clone the MultiChain repository:
+-   In the location where you want to build MultiChain:
 
         git clone https://github.com/MultiChain/multichain.git
+        cd multichain
+        set MULTICHAIN_HOME=%CD%
 
 ### Build the Google V8 JavaScript engine
 
-        cd %ROOT_DIR%\multichain
+On Windows:
 
-  - Follow the instructions in [v8_win.md](v8_win.md) to fetch, configure and build Google's V8 JavaScript engine.
+        cd %MULTICHAIN_HOME%
+        mkdir v8build
+        cd v8build
+        
+-   Follow the instructions in [v8_win.md] to fetch, configure and build Google's V8 JavaScript engine.
 
-  - Build an additional library required by MultiChain:
+[v8_win.md]: v8_win.md
 
-      - Copy the following files to a location accessible to the Linux machine:
+-   To build an additional library required by MultiChain, copy the following files to `$LINUX_FS` on Linux:
 
-            %ROOT_DIR%\v8build\v8\out.gn\x64.release\*.bin
-            %ROOT_DIR%\v8build\v8\out.gn\x64.release\*.dat
+        %MULTICHAIN_HOME%\v8build\v8\out.gn\x64.release\*.bin
+        %MULTICHAIN_HOME%\v8build\v8\out.gn\x64.release\*.dat
 
-      - On the Linux machine, `cd` to the location of these files, and execute the following commands:
+On Linux:
 
-            objs=()
-            for f in *.bin *.dat; do
-                objcopy -B i386 -I binary -O elf64-x86-64 $f ${f%.*}.obj
-                objs+=("${f%.*}.obj")
-            done
-            x86_64-w64-mingw32-ar rvs v8_data.lib ${objs[@]}
+        cd $LINUX_FS
 
-      - Copy the library `v8_data.lib` back to the Windows-accessible location at:
+        objs=()
+        for f in *.bin *.dat; do
+            objcopy -B i386 -I binary -O elf64-x86-64 $f ${f%.*}.obj
+            objs+=("${f%.*}.obj")
+        done
+        x86_64-w64-mingw32-ar rvs v8_data.lib ${objs[@]}
 
-            %ROOT_DIR%\v8build\v8\out.gn\x64.release\obj
+-   Copy `v8_data.lib` to `%MULTICHAIN_HOME%\v8build\v8\out.gn\x64.release\obj` on Windows.
 
-      - On the Windows machine, build the MultiChain V8 interface DLL:
+On Windows:
 
-            cd %ROOT_DIR%\src\v8_win
+            cd %MULTICHAIN_HOME%\src\v8_win
             mkdir build
             cd build
             cmake -G "Visual Studio 15 2017 Win64" ..
+            cmake --build . --config Release --target spdlog
             cmake --build . --config Release
+            
+-   Copy `%MULTICHAIN_HOME%\src\v8_win\build\Release\multichain_v8.lib` to `$MULTICHAIN_HOME/src/v8_win/build/Release` on Linux.
+-   Copy `%MULTICHAIN_HOME%\src\v8_win\build\Release\multichain_v8.dll` to `%MULTICHAIN_HOME%\src` (on local Windows).
 
-      - Copy the export library `%ROOT_DIR%\src\v8_win\build\Release\multichain_v8.lib` to the equivalent directory accessible to the Linux machine.
-      -  Copy the DLL `%ROOT_DIR%\src\v8_win\build\Release\multichain_v8.dll` to `%ROOT_DIR%\src`.
+### Build Multichain and test that it is alive
 
-### Build Multichain on the Linux machine
+On Linux:
 
-        cd $ROOT_DIR/multichain
+        cd $MULTICHAIN_HOME
         ./autogen.sh
         cd depends
         make HOST=x86_64-w64-mingw32
@@ -91,4 +107,14 @@ In different stages of the build, build artifacts from one environment need to b
         ./configure --prefix=$(pwd)/depends/x86_64-w64-mingw32 --enable-cxx --disable-shared --enable-static --with-pic
         make
     
-This will build `multichaind.exe`, `multichain-cli.exe` and `multitchain-util.exe` in the `src` directory.
+-   This will build `multichaind.exe`, `multichain-cli.exe` and `multitchain-util.exe` in the `src` directory[^1].
+  - Copy `src/multichaind.exe`, `src/multichain-cli.exe` and `src/multitchain-util.exe` to `%MULTICHAIN_HOME%\src` on Windows.
+
+On Windows:
+
+        cd %MULTICHAIN_HOME%
+        src\multichaind.exe --help
+    
+-   If all went well, you should see the expected help text from the program.
+
+[^1]: If you have more than one CPU on your machine, you can add the `-j #` flag to the last command (`make`).
