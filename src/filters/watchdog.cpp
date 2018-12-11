@@ -1,132 +1,173 @@
-#include "filters/watchdog.h"
+#include "watchdog.h"
+#include "core/init.h"
+//#include "protocol/filter.h"
+#include "utils/define.h"
 #include "utils/util.h"
 
-Watchdog::Watchdog(std::function<void(const char *)> taskTerminator)
-    : m_thread(nullptr), m_state(Watchdog::State::IDLE), m_timeout(0), m_taskTerminator(taskTerminator)
+void WatchdogState::Set(WatchdogState::State state)
 {
-    m_thread = new boost::thread(&Watchdog::EventLoop, this);
+    if (m_state != state)
+    {
+        {
+            boost::lock_guard<boost::mutex> lock(m_mutex);
+            m_state = state;
+        }
+        m_condVar.notify_all();
+    }
 }
 
-Watchdog::~Watchdog()
+std::string WatchdogState::Str() const
+{
+    std::string stateStr;
+    switch (m_state)
+    {
+    case State::INIT:
+        stateStr = "INIT";
+        break;
+    case State::IDLE:
+        stateStr = "IDLE";
+        break;
+    case State::RUNNING:
+        stateStr = "RUNNING";
+        break;
+    case State::POISON_PILL:
+        stateStr = "POISON_PILL";
+        break;
+    }
+    return tfm::format("%s %s", m_name, stateStr);
+}
+
+void WatchdogState::WaitState(WatchdogState::State state)
+{
+    if (m_state != state)
+    {
+        boost::unique_lock<boost::mutex> lock(m_mutex);
+        m_condVar.wait(lock, [this, state] { return m_state == state; });
+    }
+}
+
+void WatchdogState::WaitNotState(WatchdogState::State state)
+{
+    if (m_state == state)
+    {
+        boost::unique_lock<boost::mutex> lock(m_mutex);
+        m_condVar.wait(lock, [this, state] { return m_state != state; });
+    }
+}
+
+template <class Rep, class Period>
+bool WatchdogState::WaitStateFor(WatchdogState::State state, const boost::chrono::duration<Rep, Period> &timeout)
+{
+    boost::unique_lock<boost::mutex> lock(m_mutex);
+    return m_condVar.wait_for(lock, timeout, [this, state] { return m_state == state; });
+}
+
+template <class Rep, class Period>
+bool WatchdogState::WaitNotStateFor(WatchdogState::State state, const boost::chrono::duration<Rep, Period> &timeout)
+{
+    boost::unique_lock<boost::mutex> lock(m_mutex);
+    return m_condVar.wait_for(lock, timeout, [this, state] { return m_state != state; });
+}
+
+void Watchdog::Watchdog::Zero()
+{
+    m_thread = nullptr;
+    m_timeout = 0;
+}
+
+int Watchdog::Destroy()
 {
     if (m_thread != nullptr)
     {
-        this->PostPoisonPill();
+        m_thread->interrupt();
+        m_thread->join();
+        delete m_thread;
     }
+    this->Zero();
+    return MC_ERR_NOERROR;
 }
 
-void Watchdog::PostTaskStarted(int timeout)
+void Watchdog::FilterStarted(int timeout)
 {
     if (fDebug)
-        LogPrint("v8", "Watchdog::PostStarted(timeout=%d)\n", timeout);
-
-    m_timeout.store(timeout);
-    this->PostEvent(Event::TASK_STARTED);
-}
-
-void Watchdog::PostTaskEnded()
-{
-    if (fDebug)
-        LogPrint("v8", "Watchdog::PostEnded()\n");
-
-    m_timeout.store(0);
-    this->PostEvent(Event::TASK_ENDED);
-    boost::unique_lock<boost::mutex> lock(m_mutex);
-    m_cv.wait(lock, [this] { return m_state.load() != State::TASK_RUNNING; });
-}
-
-void Watchdog::PostPoisonPill()
-{
-    if (fDebug)
-        LogPrint("v8", "Watchdog::PostPoison()\n");
-
-    this->PostEvent(Event::POISON_PILL);
-    m_thread->join();
-    delete m_thread;
-    m_thread = nullptr;
-}
-
-std::string Watchdog::EventStr(Watchdog::Event event)
-{
-    std::string eventStr;
-    switch (event)
-    {
-    case Event::TASK_STARTED:
-        eventStr = "task started";
-        break;
-    case Event::TASK_ENDED:
-        eventStr = "task ended";
-        break;
-    case Event::POISON_PILL:
-        eventStr = "take poison";
-        break;
-    }
-    return eventStr;
-}
-
-void Watchdog::PostEvent(Watchdog::Event event)
-{
-    if (fDebug)
-        LogPrint("v8", "Watchdog::PostEvent(event=%s)\n", EventStr(event));
-
-    {
-        boost::lock_guard<boost::mutex> lock(m_mutex);
-        m_queue.push(event);
-    }
-    m_cv.notify_one();
-}
-
-void Watchdog::EventLoop()
-{
-    Event event;
-    while (true)
+        LogPrint("", ": Watchdog::FilterStarted(timeout=%d) %s\n", timeout, m_actualState.Str());
+    if (m_thread == nullptr)
     {
         if (fDebug)
-            LogPrint("v8", "Watchdog::EventLoop(): wait for queue\n");
-        {
-            boost::unique_lock<boost::mutex> lock(m_mutex);
-            m_cv.wait(lock, [this] { return !m_queue.empty(); });
-        }
-        {
-            boost::lock_guard<boost::mutex> lock(m_mutex);
-            event = m_queue.pull();
-        }
+            LogPrint("", ": Watchdog::FilterStarted create thread with watchdogTask\n");
+        m_thread = new boost::thread(std::bind(&Watchdog::WatchdogTask, this));
+    }
+    m_actualState.WaitState(WatchdogState::State::IDLE);
+    m_timeout = timeout;
+    m_requestedState.Set(WatchdogState::State::RUNNING);
+    m_actualState.WaitState(WatchdogState::State::RUNNING);
+}
 
-        switch (event)
+void Watchdog::FilterEnded()
+{
+    if (fDebug)
+        LogPrint("", ": Watchdog::FilterEnded %s\n", m_actualState.Str());
+    m_actualState.WaitState(WatchdogState::State::RUNNING);
+    m_requestedState.Set(WatchdogState::State::IDLE);
+    m_actualState.WaitState(WatchdogState::State::IDLE);
+}
+
+void Watchdog::Shutdown()
+{
+    if (fDebug)
+        LogPrint("", ": Watchdog::Shutdown\n");
+    m_requestedState.Set(WatchdogState::State::POISON_PILL);
+    m_actualState.WaitState(WatchdogState::State::POISON_PILL);
+    this->Destroy();
+}
+
+void Watchdog::WatchdogTask()
+{
+    if (fDebug)
+        LogPrint("", ": Watchdog::watchdogTask\n");
+    while (true)
+    {
+        std::string msg = tfm::format(": Watchdog::watchdogTask %s - %%s", m_requestedState.Str());
+        switch (m_requestedState.Get())
         {
-        case Event::TASK_STARTED:
+        case WatchdogState::State::POISON_PILL:
             if (fDebug)
-                LogPrint("v8", "Watchdog::EventLoop(): task started timeout=%d\n", m_timeout.load());
-            m_state.store(State::TASK_RUNNING);
+                LogPrint("", msg.c_str(), "committing suicide\n");
+            m_actualState.Set(WatchdogState::State::POISON_PILL);
+            return;
+
+        case WatchdogState::State::RUNNING:
+            m_actualState.Set(WatchdogState::State::RUNNING);
+            if (m_timeout > 0)
             {
-                boost::unique_lock<boost::mutex> lock(m_mutex);
-                if (m_timeout.load() > 0)
+                if (fDebug)
+                    LogPrint("", msg.c_str(), "entering timed wait\n");
+                bool finished = m_requestedState.WaitNotStateFor(WatchdogState::State::RUNNING,
+                                                                 boost::chrono::milliseconds(m_timeout));
+                if (!finished)
                 {
                     if (fDebug)
-                        LogPrint("v8", "Watchdog::EventLoop(): timed wait\n");
-                    if (m_cv.wait_for(lock, boost::chrono::milliseconds(m_timeout.load())) == boost::cv_status::timeout)
-                    {
-                        if (fDebug)
-                            LogPrint("v8", "Watchdog::EvenTLoop(): timeout\n");
-                        m_state.store(State::TASK_TIMED_OUT);
-                        m_taskTerminator(
-                            tinyformat::format("Filter aborted due to timeout after %d ms", m_timeout).c_str());
-                    }
+                        LogPrint("", msg.c_str(), "timeout -> terminating filter\n");
+                    m_taskTerminator(tfm::format("Filter aborted due to timeout after %d ms", m_timeout).c_str());
+                    m_requestedState.WaitNotState(WatchdogState::State::RUNNING);
                 }
+            }
+            else
+            {
+                if (fDebug)
+                    LogPrint("", msg.c_str(), "entering inifinte wait\n");
+                m_requestedState.WaitNotState(WatchdogState::State::RUNNING);
             }
             break;
 
-        case Event::TASK_ENDED:
+        case WatchdogState::State::INIT:
+            // fall through
+        case WatchdogState::State::IDLE:
             if (fDebug)
-                LogPrint("v8", "Watchdog::EventLoop(): task ended\n");
-            m_state.store(State::IDLE);
-            m_cv.notify_one();
+                LogPrint("", msg.c_str(), "entering idle state\n");
+            m_actualState.Set(WatchdogState::State::IDLE);
+            m_requestedState.WaitNotState(WatchdogState::State::IDLE);
             break;
-
-        case Event::POISON_PILL:
-            if (fDebug)
-                LogPrint("v8", "Watchdog::EvenTLoop(): swallowed poison pill\n");
-            return;
         }
     }
 }

@@ -1,49 +1,84 @@
 #ifndef WATCHDOG_H
 #define WATCHDOG_H
 
-#include <boost/thread/condition_variable.hpp>
-#include <boost/thread/sync_queue.hpp>
-#include <boost/thread/synchronized_value.hpp>
-#include <boost/thread/thread.hpp>
-#include <functional>
-#include <atomic>
+#include <boost/thread.hpp>
+
+class WatchdogState
+{
+  public:
+    enum State
+    {
+        INIT,
+        IDLE,
+        RUNNING,
+        POISON_PILL
+    };
+
+    WatchdogState(std::string name, State state = State::INIT) : m_name(name), m_state(state)
+    {
+    }
+
+    State Get() const
+    {
+        return m_state;
+    }
+    void Set(State state);
+    std::string Str() const;
+
+    void WaitState(State state);
+    void WaitNotState(State state);
+    template <class Rep, class Period>
+    bool WaitStateFor(State state, const boost::chrono::duration<Rep, Period> &timeout);
+    template <class Rep, class Period>
+    bool WaitNotStateFor(State state, const boost::chrono::duration<Rep, Period> &timeout);
+
+  protected:
+    std::string m_name;
+    boost::condition_variable m_condVar;
+    boost::mutex m_mutex;
+    State m_state;
+};
 
 class Watchdog
 {
   public:
-    Watchdog(std::function<void(const char *)> taskTerminator);
-    ~Watchdog();
+    Watchdog(std::function<void(const char *)> taskTerminator) : m_taskTerminator(taskTerminator)
+    {
+        this->Zero();
+    }
 
-    void PostTaskStarted(int timeout = 0);
-    void PostTaskEnded();
-    void PostPoisonPill();
+    ~Watchdog()
+    {
+        this->Destroy();
+    }
+
+    void Zero();
+    int Destroy();
+
+    /**
+     * @brief Notfies the watchdog that a filter started runnug, with a given timeout.
+     * @param timeout   The number of millisecond to allow the filtr to run.
+     */
+    void FilterStarted(int timeout);
+
+    /**
+     * @brief Notfies the watchdog that a filter stopped running.
+     */
+    void FilterEnded();
+
+    /**
+     * @brief Terminate the watchdog.
+     */
+    void Shutdown();
 
   private:
-    enum Event
-    {
-        TASK_STARTED,
-        TASK_ENDED,
-        POISON_PILL
-    };
-
-    enum State
-    {
-        IDLE,
-        TASK_RUNNING,
-        TASK_TIMED_OUT
-    };
-
-    boost::sync_queue<Event> m_queue;
-    boost::mutex m_mutex;
-    boost::condition_variable m_cv;
     boost::thread *m_thread;
-    std::atomic<State> m_state;
-    std::atomic_int m_timeout;
+    int m_timeout;
+    WatchdogState m_requestedState{"requested"};
+    WatchdogState m_actualState{"actual"};
     std::function<void(const char *)> m_taskTerminator;
 
-    static std::string EventStr(Event event);
-    void PostEvent(Event event);
-    void EventLoop();
+    void WatchdogTask();
 };
 
-#endif // WATCHDOG_H
+#endif // V8FILTERWATCHDOG_H
