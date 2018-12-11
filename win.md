@@ -61,9 +61,7 @@ On Windows:
         mkdir v8build
         cd v8build
         
--   Follow the instructions in [v8_win.md] to fetch, configure and build Google's V8 JavaScript engine.
-
-[v8_win.md]: v8_win.md
+-   Follow the instructions in [v8_win.md](V8_win.md) to fetch, configure and build Google's V8 JavaScript engine.
 
 -   To build an additional library required by MultiChain, copy the following files to `$LINUX_FS` on Linux:
 
