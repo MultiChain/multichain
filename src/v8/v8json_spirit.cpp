@@ -48,7 +48,7 @@ v8::Local<v8::Value> Jsp2V8(v8::Isolate *isolate, const json_spirit::Value &j)
         break;
 
     case json_spirit::int_type:
-        v8::Integer::New(isolate, j.get_int());
+        result = v8::Integer::New(isolate, j.get_int());
         break;
 
     case json_spirit::real_type:
