@@ -2971,33 +2971,42 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, before commit completed (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
     if(err)
     {
-        return error("ConnectTip() : ConnectBlock %s failed, Wtxs BeforeCommit, error: %d", pindexNew->GetBlockHash().ToString(),err);
+        LogPrintf("ConnectTip() : ConnectBlock %s failed, Wtxs BeforeCommit, error: %d", pindexNew->GetBlockHash().ToString(),err);
     }
     CDiskTxPos pos(pindexNew->GetBlockPos(), GetSizeOfCompactSize(pblock->vtx.size()));
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Adding block txs to wallet\n");
     for (unsigned int i = 0; i < pblock->vtx.size(); i++)
     {
-        const CTransaction &tx = pblock->vtx[i];
-        err=pwalletTxsMain->AddTx(NULL,tx,pindexNew->nHeight,&pos,i,pindexNew->GetBlockHash());
-        if(err)
+        if(err == MC_ERR_NOERROR)
         {
-            LogPrintf("Wallet error when connecting block %s, Tx %s, error: %d\n", pindexNew->GetBlockHash().ToString(),tx.GetHash().ToString(),err);
+            const CTransaction &tx = pblock->vtx[i];
+            err=pwalletTxsMain->AddTx(NULL,tx,pindexNew->nHeight,&pos,i,pindexNew->GetBlockHash());
+            if(err)
+            {
+                LogPrintf("Wallet error when connecting block %s, Tx %s, error: %d\n", pindexNew->GetBlockHash().ToString(),tx.GetHash().ToString(),err);
+            }
+            pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
         }
-        pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
     }
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, commit                  (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
-    err=pwalletTxsMain->Commit(NULL);    
-    if(err)
+    if(err == MC_ERR_NOERROR)
     {
-        return error("ConnectTip() : ConnectBlock %s failed, Wtxs Commit, error: %d", pindexNew->GetBlockHash().ToString(),err);
-    }    
+        err=pwalletTxsMain->Commit(NULL);    
+        if(err)
+        {
+            LogPrintf("ConnectTip() : ConnectBlock %s failed, Wtxs Commit, error: %d", pindexNew->GetBlockHash().ToString(),err);
+        }    
+    }
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, commit completed        (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet cleanup\n");
-    err=pwalletTxsMain->CleanUpAfterBlock(NULL,pindexNew->nHeight,pindexNew->nHeight-1);
-    if(err)
+    if(err == MC_ERR_NOERROR)
     {
-        return error("ConnectTip() : ConnectBlock %s failed, Wtxs CleanUpAfterBlock, error: %d", pindexNew->GetBlockHash().ToString(),err);
-    }    
+        err=pwalletTxsMain->CleanUpAfterBlock(NULL,pindexNew->nHeight,pindexNew->nHeight-1);
+        if(err)
+        {
+            LogPrintf("ConnectTip() : ConnectBlock %s failed, Wtxs CleanUpAfterBlock, error: %d", pindexNew->GetBlockHash().ToString(),err);
+        }    
+    }
 
 /* MCHN END */    
     // Update chainActive & related variables.
