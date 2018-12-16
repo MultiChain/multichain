@@ -1787,7 +1787,10 @@ int mc_TxDB::Commit(mc_TxImport *import)
         }                            
     }
     
-    m_UnsubscribeMemPoolSize=0;
+    if(imp->m_ImportID == 0)
+    {
+        m_UnsubscribeMemPoolSize=0;
+    }
     FlushDataFile(m_DBStat.m_LastFileID);
 
     err=m_Database->m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
@@ -2689,6 +2692,8 @@ int mc_TxDB::Unsubscribe(mc_Buffer* lpEntities)
         return MC_ERR_NOERROR;
     }
     
+    Dump("Before Unsubscribe");
+    
     deleted_items=0;
     unsubscribed_entities=0;
     for(j=0;j<lpEntities->GetCount();j++)                                       // Removing previous generation rows
@@ -2822,6 +2827,7 @@ int mc_TxDB::Unsubscribe(mc_Buffer* lpEntities)
     
 exitlbl:
     
+    Dump("After Unsubscribe");
     return err;
 }
 
