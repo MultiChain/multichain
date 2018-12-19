@@ -31,6 +31,7 @@ CBlockTemplate* CreateNewBlockWithDefaultKey(CWallet *pwallet,int *canMine, cons
 /** Modify the extranonce in a block */
 /* MCHN START */
 void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce,CWallet *pwallet);
+bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet);
 //void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce);
 /* MCHN END */
 /** Check mined block */

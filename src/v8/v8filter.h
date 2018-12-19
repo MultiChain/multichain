@@ -12,27 +12,12 @@ namespace mc_v8
 class V8Engine;
 
 /**
- * Implementation of a transaction filter based on the V8 JS engine.
+ * Implementation of a filter based on the V8 JS engine.
  */
 class V8Filter
 {
   public:
-    V8Filter() : m_engine(nullptr)
-    {
-        Zero();
-    }
-
-    ~V8Filter()
-    {
-        Destroy();
-    }
-    void Zero();
-    int Destroy();
-
-    v8::Isolate *GetIsolate()
-    {
-        return m_isolate;
-    }
+    ~V8Filter();
 
     bool IsRunning() const
     {
@@ -42,7 +27,6 @@ class V8Filter
     /**
      * Initialize the filter to run the function @p functionName in the JS @p script.
      *
-     * @param engine         The containing engine.
      * @param script         The filter JS code.
      * @param main_name      The expected name of the filtering function in the script.
      * @param callback_names A list of callback function names to register for the filter.
@@ -57,35 +41,20 @@ class V8Filter
     /**
      * Run the filter function in the JS script.
      *
-     * @param strResult       Reason for script failure or transaction rejection.
+     * @param strResult       Reason for script failure or rejection.
      * @param withCallbackLog Indicates that callback tracking will be used.
      * @return                MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
      */
-    int Run(std::string &strResult, bool withCallbackLog = false);
-
-    /**
-     * Run the filter function in the JS script.
-     *
-     * This variant provides detailed data about RPC callback calls: parameters,
-     * results, success/failure and errors.
-     *
-     * @param strResult Reason for script failure or transaction rejection.
-     * @param callbacks An array of RPC callback call data.
-     * @return          MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR
-     * otherwise.
-     */
-    int RunWithCallbackLog(std::string &strResult, json_spirit::Array &callbacks);
+    int Run(std::string &strResult);
 
   private:
-    void MaybeCreateIsolate();
     int CompileAndLoadScript(std::string script, std::string functionName, std::string source, std::string &strResult);
     void ReportException(v8::TryCatch *tryCatch, std::string &strResult);
 
-    V8Engine *m_engine;
-    v8::Isolate *m_isolate;
+    V8Engine *m_engine = nullptr;
     v8::Global<v8::Context> m_context;
     v8::Global<v8::Function> m_filterFunction;
-    bool m_isRunning;
+    bool m_isRunning = false;
 };
 
 } // namespace mc_v8

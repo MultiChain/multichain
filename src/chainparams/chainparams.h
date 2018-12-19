@@ -69,6 +69,8 @@ public:
     bool DefaultCheckMemPool() const { return fDefaultCheckMemPool; }
     /** Allow mining of a min-difficulty block */
     bool AllowMinDifficultyBlocks() const { return fAllowMinDifficultyBlocks; }
+    /** Disallow block nonce not covered by miner signature */
+    bool DisallowUnsignedBlockNonce() const { return fDisallowUnsignedBlockNonce; }
     /** Skip proof-of-work check: allow mining of any difficulty block */
     bool SkipProofOfWorkCheck() const { return fSkipProofOfWorkCheck; }
     /** Make standard checks */
@@ -119,6 +121,7 @@ protected:
     bool fMineBlocksOnDemand;
     bool fSkipProofOfWorkCheck;
     bool fTestnetToBeDeprecatedFieldRPC;
+    bool fDisallowUnsignedBlockNonce;
 };
 
 /** 

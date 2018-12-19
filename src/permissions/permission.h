@@ -340,6 +340,7 @@ typedef struct mc_Permissions
     int IsApproved(const void* lpUpgrade, int check_current_block);
     
     int CanConnect(const void* lpEntity,const void* lpAddress);
+    int CanConnectForVerify(const void* lpEntity,const void* lpAddress);
     int CanSend(const void* lpEntity,const void* lpAddress);
     int CanReceive(const void* lpEntity,const void* lpAddress);
     int CanWrite(const void* lpEntity,const void* lpAddress);
@@ -385,6 +386,7 @@ typedef struct mc_Permissions
     
     int SetPermissionInternal(const void* lpEntity,const void* lpAddress,uint32_t type,const void* lpAdmin,uint32_t from,uint32_t to,uint32_t timestamp,
                                                                                                            uint32_t flags,int update_mempool,int offset);
+    int CanConnectInternal(const void* lpEntity,const void* lpAddress,int with_implicit);
     int CommitInternal(const void* lpMiner,const void* lpHash);
     int StoreBlockInfoInternal(const void* lpMiner,const void* lpHash,int update_counts);    
     int RollBackInternal(int block);

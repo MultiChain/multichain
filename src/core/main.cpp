@@ -62,7 +62,7 @@ bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs,
 bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& reason);
 bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string& reason);
 bool ReplayMemPool(CTxMemPool& pool, int from,bool accept);
-bool VerifyBlockSignature(CBlock *block,bool force);
+bool VerifyBlockSignature(CBlock *block,bool force,bool in_sync);
 bool VerifyBlockMiner(CBlock *block,CBlockIndex* pindexNew);
 bool CheckBlockPermissions(const CBlock& block,CBlockIndex* prev_block,unsigned char *lpMinerAddress);
 bool ProcessMultichainRelay(CNode* pfrom, CDataStream& vRecv, CValidationState &state);
@@ -1835,7 +1835,7 @@ bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex)
     if (block.GetHash() != pindex->GetBlockHash())
         return error("ReadBlockFromDisk(CBlock&, CBlockIndex*) : GetHash() doesn't match index");
 /* MCHN START */    
-    VerifyBlockSignature(&block,true);
+    VerifyBlockSignature(&block,true,false);
 /* MCHN END */    
     return true;
 }
@@ -2345,16 +2345,21 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if(!pindex->kMiner.IsValid() || (setBannedTxs.size() != 0) )
     {
         if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
-            return false;
+        {
+            return state.DoS(0, error("ConnectBlock() : error on CheckBlock"),
+                             REJECT_INVALID, "bad-check-block");            
+        }
     }
 
     if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-size",true))
     {
-        return false;
+        return state.DoS(100, error("ConnectBlock() : above maximum-block-size"),
+                         REJECT_INVALID, "bad-block-size");                        
     }
     if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-sigops",true))
     {
-        return false;
+        return state.DoS(100, error("ConnectBlock() : above maximum-block-sigops"),
+                         REJECT_INVALID, "bad-block-sigops");                        
     }
     
 /* MCHN START */    
@@ -2966,33 +2971,42 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, before commit completed (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
     if(err)
     {
-        return error("ConnectTip() : ConnectBlock %s failed, Wtxs BeforeCommit, error: %d", pindexNew->GetBlockHash().ToString(),err);
+        LogPrintf("ConnectTip() : ConnectBlock %s failed, Wtxs BeforeCommit, error: %d", pindexNew->GetBlockHash().ToString(),err);
     }
     CDiskTxPos pos(pindexNew->GetBlockPos(), GetSizeOfCompactSize(pblock->vtx.size()));
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Adding block txs to wallet\n");
     for (unsigned int i = 0; i < pblock->vtx.size(); i++)
     {
-        const CTransaction &tx = pblock->vtx[i];
-        err=pwalletTxsMain->AddTx(NULL,tx,pindexNew->nHeight,&pos,i,pindexNew->GetBlockHash());
-        if(err)
+        if(err == MC_ERR_NOERROR)
         {
-            LogPrintf("Wallet error when connecting block %s, Tx %s, error: %d\n", pindexNew->GetBlockHash().ToString(),tx.GetHash().ToString(),err);
+            const CTransaction &tx = pblock->vtx[i];
+            err=pwalletTxsMain->AddTx(NULL,tx,pindexNew->nHeight,&pos,i,pindexNew->GetBlockHash());
+            if(err)
+            {
+                LogPrintf("Wallet error when connecting block %s, Tx %s, error: %d\n", pindexNew->GetBlockHash().ToString(),tx.GetHash().ToString(),err);
+            }
+            pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
         }
-        pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
     }
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, commit                  (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
-    err=pwalletTxsMain->Commit(NULL);    
-    if(err)
+    if(err == MC_ERR_NOERROR)
     {
-        return error("ConnectTip() : ConnectBlock %s failed, Wtxs Commit, error: %d", pindexNew->GetBlockHash().ToString(),err);
-    }    
+        err=pwalletTxsMain->Commit(NULL);    
+        if(err)
+        {
+            LogPrintf("ConnectTip() : ConnectBlock %s failed, Wtxs Commit, error: %d", pindexNew->GetBlockHash().ToString(),err);
+        }    
+    }
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, commit completed        (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet cleanup\n");
-    err=pwalletTxsMain->CleanUpAfterBlock(NULL,pindexNew->nHeight,pindexNew->nHeight-1);
-    if(err)
+    if(err == MC_ERR_NOERROR)
     {
-        return error("ConnectTip() : ConnectBlock %s failed, Wtxs CleanUpAfterBlock, error: %d", pindexNew->GetBlockHash().ToString(),err);
-    }    
+        err=pwalletTxsMain->CleanUpAfterBlock(NULL,pindexNew->nHeight,pindexNew->nHeight-1);
+        if(err)
+        {
+            LogPrintf("ConnectTip() : ConnectBlock %s failed, Wtxs CleanUpAfterBlock, error: %d", pindexNew->GetBlockHash().ToString(),err);
+        }    
+    }
 
 /* MCHN END */    
     // Update chainActive & related variables.
@@ -3007,7 +3021,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     }
     // ... and about transactions that got confirmed:
 /* MCHN START */        
-    VerifyBlockSignature(pblock,false);
+    VerifyBlockSignature(pblock,false,true);
     MultichainNode_ApplyUpgrades(chainActive.Height());    
 /* MCHN END */    
     
@@ -3274,7 +3288,7 @@ void UpdateChainMiningStatus(const CBlock &block,CBlockIndex *pindexNew)
  * Try to make some progress towards making pindexMostWork the active block.
  * pblock is either NULL or a pointer to a CBlock corresponding to pindexMostWork.
  */
-static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMostWork, CBlock *pblock) {
+static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMostWork, CBlock *pblock, bool* fInvalidFoundOut) {
     AssertLockHeld(cs_main);
     bool fInvalidFound = false;
     const CBlockIndex *pindexOldTip = chainActive.Tip();
@@ -3345,7 +3359,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     }
     
 /* MCHN START */    
-    if (!fInvalidFound)
+//    if (!fInvalidFound)
     {
         mc_gState->m_Permissions->ClearMemPool();
         mc_gState->m_Assets->ClearMemPool();
@@ -3400,6 +3414,10 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
         }
     }
     
+    if(fInvalidFoundOut)
+    {
+        *fInvalidFoundOut=fInvalidFound;
+    }
 /* MCHN END */
     
     return true;
@@ -3473,7 +3491,7 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
             }
 /* MCHN END */            
 
-            if (!ActivateBestChainStep(state, pindexMostWork, pblock && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : NULL))
+            if (!ActivateBestChainStep(state, pindexMostWork, pblock && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : NULL, NULL))
                 return false;
 /* MCHN START */            
             if(pindexMostWork == chainActive.Tip())
@@ -3611,7 +3629,8 @@ string SetLastBlock(uint256 hash,bool *fNotFound)
         
         while(pblockindex != chainActive.Tip())
         {
-            if(!ActivateBestChainStep(state,pblockindex,NULL))
+            bool fInvalidFound;
+            if(!ActivateBestChainStep(state,pblockindex,NULL,&fInvalidFound) || fInvalidFound)
             {
                 string error=state.GetRejectReason();
                 ActivateBestChain(state);
@@ -4574,7 +4593,7 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
 /* MCHN START*/    
     pindex->dTimeReceived=mc_TimeNowAsDouble();
             
-    if(!VerifyBlockSignature(&block,false))
+    if(!VerifyBlockSignature(&block,false,true))
     {
         return false;
     }    
@@ -4599,6 +4618,41 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
 
     int nHeight = pindex->nHeight;
 
+    if(!VerifyBlockMiner(&block,pindex))
+    {
+        pindex->nStatus |= BLOCK_FAILED_VALID;
+        setDirtyBlockIndex.insert(pindex);
+        return false;
+    }
+    
+    CBlockIndex *pindexTip=pindex;
+    while((pindexTip != NULL) && pindexTip->nHeight > chainActive.Height())
+    {
+        pindexTip=pindexTip->pprev;
+    }
+    if(pindexTip == chainActive.Tip())                                          // If we are on main chain
+                                                                                // If it is the next block, we can check upgradable constraints
+                                                                                // If some blocks are missing and constraints are broken - ignore block
+                                                                                // If it is not an attack and upgrade parameters were indeed upgraded,
+                                                                                // we will download this block again after missing blocks.
+    {        
+        if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-size",true))
+        {
+            return false;
+        }
+    
+        if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-sigops",true))
+        {
+            return false;
+        }        
+    }
+    else
+    {
+        LogPrintf("Accepted header for block %s found on alternative chain at height %d\n",
+                pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);                        
+    }
+    
+    
     // Write block to history file
     try {
         unsigned int nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
@@ -4616,12 +4670,6 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
         return state.Abort(std::string("System error: ") + e.what());
     }
 
-    if(!VerifyBlockMiner(&block,pindex))
-    {
-        pindex->nStatus |= BLOCK_FAILED_VALID;
-        setDirtyBlockIndex.insert(pindex);
-        return false;
-    }
 
     return true;
 }
@@ -4693,7 +4741,7 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
 /* MCHN START*/    
     {
         LOCK(cs_main);
-        if(!VerifyBlockSignature(pblock,true))
+        if(!VerifyBlockSignature(pblock,true,true))
         {
             return false;
         }
@@ -5707,8 +5755,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         // Disconnect if we connected to ourself
         if (nNonce == nLocalHostNonce && nNonce > 1)
-        {
-            LogPrintf("connected to self at %s, disconnecting\n", pfrom->addr.ToString());
+        {            
+            SeenLocalAddr(addrMe);
+            LogPrintf("connected to self at %s (me: %s), disconnecting\n", pfrom->addr.ToString(),addrMe.ToStringIPPort().c_str());
             pfrom->fDisconnect = true;
             return true;
         }

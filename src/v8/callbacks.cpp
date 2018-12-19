@@ -1,18 +1,14 @@
 // Copyright (c) 2014-2018 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
-#include "callbacks.h"
-#include "v8engine.h"
-#include "v8utils.h"
-#include "v8isolatemanager.h"
-#include "utils/util.h"
-#include "rpc/rpcserver.h"
-#include "rpc/rpcprotocol.h"
+#include "v8/callbacks.h"
+#include "v8/v8engine.h"
+#include "v8/v8json_spirit.h"
+#include "v8/v8utils.h"
 #include <cassert>
 
 namespace mc_v8
 {
-
 /**
  * Call an RPC function from a V8 JS callback.
  *
@@ -20,93 +16,42 @@ namespace mc_v8
  * Optionally filter the result before returning it to JS.
  *
  * @param name        The name of the RPC function.
- * @param rpcFunction The RPC function to call.
  * @param args        The V8 arguments/return value.
  */
-void CallRpcFunction(std::string name, rpcfn_type rpcFunction, const v8::FunctionCallbackInfo<v8::Value>& args)
+void CallRpcFunction(std::string name, const v8::FunctionCallbackInfo<v8::Value> &args)
 {
-    v8::Isolate* isolate = args.GetIsolate();
+    v8::Isolate *isolate = args.GetIsolate();
     v8::Locker locker(isolate);
     v8::Isolate::Scope isolateScope(isolate);
     v8::HandleScope handleScope(isolate);
     v8::Local<v8::Context> context(isolate->GetCurrentContext());
     v8::Context::Scope contextScope(context);
 
-    IsolateData& isolateData = V8IsolateManager::Instance()->GetIsolateData(isolate);
-    json_spirit::Object callbackData;
+    IFilterCallback *filterCallback = static_cast<IFilterCallback *>(args.Data().As<v8::External>()->Value());
 
     json_spirit::Array params;
     for (int i = 0; i < args.Length(); ++i)
     {
         params.push_back(V82Jsp(isolate, args[i]));
     }
-    if (isolateData.withCallbackLog)
-    {
-        callbackData.push_back(json_spirit::Pair("method", name));
-        callbackData.push_back(json_spirit::Pair("params", params));
-    }
 
-    bool ok = true;
     json_spirit::Value result;
-    try
-    {
-        result = rpcFunction(params, false);
-
-        if (isolateData.withCallbackLog)
-        {
-            bool success = true;
-            if (result.type() == json_spirit::obj_type)
-            {
-                auto obj = result.get_obj();
-                auto it = std::find_if(obj.begin(), obj.end(), [](const json_spirit::Pair& pair) -> bool
-                {
-                    return pair.name_ == "code";
-                });
-                success = (it == obj.end());
-            }
-            callbackData.push_back(json_spirit::Pair("success", success));
-            callbackData.push_back(json_spirit::Pair(success ? "result" : "error", result));
-        }
-    } catch (json_spirit::Object& e)
+    filterCallback->JspCallback(name, params, result);
+    if (result.is_null())
     {
         args.GetReturnValue().SetUndefined();
-        if (isolateData.withCallbackLog)
-        {
-            callbackData.push_back(json_spirit::Pair("success", false));
-            callbackData.push_back(json_spirit::Pair("error", e));
-        }
-        ok = false;
-    } catch (std::exception& e)
-    {
-        args.GetReturnValue().SetUndefined();
-        if (isolateData.withCallbackLog)
-        {
-            callbackData.push_back(json_spirit::Pair("success", false));
-            callbackData.push_back(json_spirit::Pair("result", e.what()));
-        }
-        ok = false;
     }
-
-    if (ok)
+    else
     {
-        if (result.is_null())
-        {
-            args.GetReturnValue().SetUndefined();
-            ok = false;
-        }
         args.GetReturnValue().Set(Jsp2V8(isolate, result));
-    }
-
-    if (isolateData.withCallbackLog)
-    {
-        isolateData.callbacks.push_back(callbackData);
     }
 }
 
+// clang-format off
 #define FILTER_FUNCTION(name)                                           \
-    void filter_##name(const v8::FunctionCallbackInfo<v8::Value>& args) \
+    void filter_##name(const v8::FunctionCallbackInfo<v8::Value> &args) \
     {                                                                   \
-        CallRpcFunction(#name, name, args);                             \
+        CallRpcFunction(#name, args);                                   \
     }
 
 FILTER_FUNCTION(getfiltertxid)
@@ -123,7 +68,7 @@ FILTER_FUNCTION(verifymessage)
 
 #define FILTER_LOOKUP(name) { #name, filter_##name }
 
-std::map<std::string, v8::FunctionCallback> callbackLookup {
+std::map<std::string, v8::FunctionCallback> callbackLookup{
     FILTER_LOOKUP(getfiltertxid),
     FILTER_LOOKUP(getfiltertransaction),
     FILTER_LOOKUP(getfilterstreamitem),
@@ -136,6 +81,5 @@ std::map<std::string, v8::FunctionCallback> callbackLookup {
     FILTER_LOOKUP(verifypermission),
     FILTER_LOOKUP(verifymessage)
 };
-
+// clang-format on
 } // namespace mc_v8
-

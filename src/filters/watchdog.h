@@ -1,11 +1,9 @@
-#ifndef V8FILTERWATCHDOG_H
-#define V8FILTERWATCHDOG_H
+#ifndef WATCHDOG_H
+#define WATCHDOG_H
 
 #include <boost/thread.hpp>
 
-namespace mc_v8
-{
-class V8WatchdogState
+class WatchdogState
 {
   public:
     enum State
@@ -16,7 +14,7 @@ class V8WatchdogState
         POISON_PILL
     };
 
-    V8WatchdogState(std::string name, State state = State::INIT) : m_name(name), m_state(state)
+    WatchdogState(std::string name, State state = State::INIT) : m_name(name), m_state(state)
     {
     }
 
@@ -41,15 +39,15 @@ class V8WatchdogState
     State m_state;
 };
 
-class V8FilterWatchdog
+class Watchdog
 {
   public:
-    V8FilterWatchdog()
+    Watchdog(std::function<void(const char *)> taskTerminator) : m_taskTerminator(taskTerminator)
     {
         this->Zero();
     }
 
-    ~V8FilterWatchdog()
+    ~Watchdog()
     {
         this->Destroy();
     }
@@ -76,10 +74,11 @@ class V8FilterWatchdog
   private:
     boost::thread *m_thread;
     int m_timeout;
-    V8WatchdogState m_requestedState{"requested"};
-    V8WatchdogState m_actualState{"actual"};
+    WatchdogState m_requestedState{"requested"};
+    WatchdogState m_actualState{"actual"};
+    std::function<void(const char *)> m_taskTerminator;
 
     void WatchdogTask();
 };
-} // namespace mc_v8
+
 #endif // V8FILTERWATCHDOG_H

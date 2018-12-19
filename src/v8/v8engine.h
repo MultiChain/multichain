@@ -4,7 +4,9 @@
 #ifndef MULTICHAIN_V8ENGINE_H_
 #define MULTICHAIN_V8ENGINE_H_
 
-#include "json/json_spirit.h"
+#include "filters/ifiltercallback.h"
+#include "rpc/rpcserver.h"
+//#include "json/json_spirit.h"
 #include <v8.h>
 
 namespace mc_v8
@@ -12,23 +14,12 @@ namespace mc_v8
 class V8Filter;
 
 /**
- * Interface to the Google V8 engine to create and run transaction filters.
+ * Interface to the Google V8 engine to create and run filters.
  */
 class V8Engine
 {
   public:
-    V8Engine()
-    {
-        Zero();
-    }
-
-    ~V8Engine()
-    {
-        Destroy();
-    }
-
-    void Zero();
-    int Destroy();
+    ~V8Engine();
 
     /**
      * Initialize the V8 engine.
@@ -36,10 +27,20 @@ class V8Engine
      * @param strResult Reason for failure if unsuccessful.
      * @return          MC_ERR_NOERROR if successful, MC_ERR_INTERNAL_ERROR if not.
      */
-    int Initialize(std::string &strResult);
+    int Initialize(IFilterCallback *filterCallback, std::string &strResult);
+
+    v8::Isolate *GetIsolate()
+    {
+        return m_isolate;
+    }
+
+    IFilterCallback *GetFilterCallback()
+    {
+        return m_filterCallback;
+    }
 
     /**
-     * Create a new transaction filter.
+     * Create a new filter.
      *
      * @param script         The filter JS code.
      * @param main_name      The expected name of the filtering function in the script.
@@ -55,23 +56,11 @@ class V8Engine
     /**
      * Run the filter function in the JS script.
      *
-     * @param filter    The user-defined transaction filter to use.
-     * @param strResult Reason for script failure or transaction rejection.
+     * @param filter    The user-defined filter to use.
+     * @param strResult Reason for script failure or rejection.
      * @return          MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
      */
     int RunFilter(V8Filter *filter, std::string &strResult);
-
-    /**
-     * Run the filter function in the JS script.
-     *
-     * This variant provides detailed data about RPC callback calls: parameters, results, success/failure and errors.
-     *
-     * @param filter    The user-defined transaction filter to use.
-     * @param strResult Reason for script failure or transaction rejection.
-     * @param callbacks An array of RPC callback call data.
-     * @return          MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
-     */
-    int RunFilterWithCallbackLog(V8Filter *filter, std::string &strResult, json_spirit::Array &callbacks);
 
     /**
      * Abort the currently running filter (if any).
@@ -87,7 +76,14 @@ class V8Engine
     }
 
   private:
+    IFilterCallback *m_filterCallback = nullptr;
+    v8::Isolate *m_isolate = nullptr;
+    static std::unique_ptr<v8::Platform> m_platform;
+    static v8::Isolate::CreateParams m_createParams;
+    static bool m_isV8Initialized;
     std::string m_reason;
+
+    static void InitializeV8();
 };
 
 } // namespace mc_v8

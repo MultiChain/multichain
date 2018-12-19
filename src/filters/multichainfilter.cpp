@@ -2,6 +2,7 @@
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "filters/multichainfilter.h"
+#include "filters/filter.h"
 
 using namespace std;
 
@@ -9,6 +10,7 @@ int mc_MultiChainFilterParams::Zero()
 {
     m_MaxShownData=-1;
     m_Compatibility=MC_VCM_NONE;
+    return MC_ERR_NOERROR;
 }
 
 int mc_MultiChainFilterParams::Init()
@@ -16,16 +18,18 @@ int mc_MultiChainFilterParams::Init()
     Zero();
     m_Compatibility=mc_gState->m_Compatibility;
     mc_gState->m_Compatibility=MC_VCM_NONE;    
+    return MC_ERR_NOERROR;
 }
 
 int mc_MultiChainFilterParams::Close()
 {
     mc_gState->m_Compatibility=m_Compatibility;    
+    return MC_ERR_NOERROR;
 }
 
 int mc_MultiChainFilterParams::Destroy()
 {
-    Zero();
+    return Zero();
 }
 
 std::vector <uint160>  mc_FillRelevantFilterEntitities(const unsigned char *ptr, size_t value_size)
@@ -218,6 +222,7 @@ int mc_MultiChainFilterEngine::SetTimeout(int timeout)
         mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
         worker->SetTimeout(timeout);
     }    
+    return MC_ERR_NOERROR;
 }
 
 
@@ -480,7 +485,7 @@ int mc_MultiChainFilterEngine::RunFilterWithCallbackLog(const CTransaction& tx,i
     m_Params.Init();
     m_Vout=vout;
 
-    err=pFilterEngine->RunFilterWithCallbackLog(filter,strResult, callbacks);
+    err=pFilterEngine->RunFilterWithCallbackLog(filter,strResult, &callbacks);
 
     m_Params.Close();
     m_Vout=-1;
