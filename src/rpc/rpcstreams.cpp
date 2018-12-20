@@ -352,6 +352,7 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     if(mc_gState->m_Features->OffChainData())
     {
         string strError;
+        int errorCode=RPC_INVALID_PARAMETER;
         uint32_t permissions=0;
         uint32_t restrict=0;
         if(params[3].type() != bool_type)
@@ -362,7 +363,7 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
                 {
                     if(d.name_ == "restrict")
                     {
-                        if(RawDataParseRestrictParameter(d.value_,&restrict,&permissions,&strError))
+                        if(RawDataParseRestrictParameter(d.value_,&restrict,&permissions,&errorCode,&strError))
                         {
                             if(restrict & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN)
                             {
@@ -374,7 +375,7 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
                         }
                         else
                         {
-                            throw JSONRPCError(RPC_INVALID_PARAMETER, strError);                                                                           
+                            throw JSONRPCError(errorCode, strError);                                                                           
                         }
                     }
                     else

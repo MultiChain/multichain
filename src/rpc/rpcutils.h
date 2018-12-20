@@ -148,7 +148,7 @@ int mc_BinaryCacheFile(string id,int mode);
 void mc_RemoveBinaryCacheFile(string id);
 bool AvailableFromStatus(uint32_t status);
 string OffChainError(uint32_t status,int *errorCode); 
-bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,string *strError);
+bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,int *errorCode,string *strError);
 void CheckWalletError(int err);
 
 

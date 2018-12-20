@@ -62,7 +62,8 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                 }
                 if(entity->GetEntityType() != MC_ENT_TYPE_ASSET)
                 {
-                    *strError=string("Asset with this identifier not found");                                                                        
+                    *strError=string("Asset with this identifier not found");                                                           
+                    *errorCode=RPC_ENTITY_NOT_FOUND;
                     goto exitlbl;                        
                 }                
                 this_param_type=MC_DATA_API_PARAM_TYPE_FOLLOWON;                
@@ -84,6 +85,7 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                 if(this_param_type == MC_DATA_API_PARAM_TYPE_NONE)
                 {
                     *strError=string("Entity with this identifier not found");                            
+                    *errorCode=RPC_ENTITY_NOT_FOUND;
                     goto exitlbl;                        
                 }
             }
@@ -384,7 +386,8 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
                             {
                                 if(*data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
                                 {
-                                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Unsupported item data type: " + d.name_);                                    
+                                    *errorCode=RPC_NOT_SUPPORTED;
+                                    *strError="Unsupported item data type: " + d.name_;
                                 }                    
                             }
                         }
@@ -711,7 +714,7 @@ CScript RawDataScriptFollowOn(Value *param,mc_EntityDetails *entity,mc_Script *l
     return scriptOpReturn;
 }
 
-bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,string *strError)
+bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,int *errorCode,string *strError)
 {
     *restrict=0;
     *permissions=0;
@@ -747,6 +750,7 @@ bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_
                 if(match == 0)
                 {
                     *strError="Unsupported restriction";
+                    *errorCode=RPC_NOT_SUPPORTED;
                     return false;
                 }
                 start=ptr+1;
@@ -843,7 +847,7 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
                 {
                     *strError=string("open/restrict field can appear only once in the object");                                                                                                        
                 }
-                if(RawDataParseRestrictParameter(d.value_,&restrict,&permissions,strError))
+                if(RawDataParseRestrictParameter(d.value_,&restrict,&permissions,errorCode,strError))
                 {
                     if(restrict & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN)
                     {
@@ -1348,6 +1352,7 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
             if(out_options & MC_RFD_OPTION_OFFCHAIN)
             {
                 *strError=string("chunks data type is not allowed with missing options field");                                            
+                *errorCode=RPC_NOT_ALLOWED;
                 goto exitlbl;                
             }
             if(*data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
@@ -1579,6 +1584,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
         if(param_type != MC_DATA_API_PARAM_TYPE_EMPTY_RAW)
         {
             strError=string("Keyword not allowed in this API");       
+            errorCode=RPC_NOT_ALLOWED;
         }
         goto exitlbl;        
     }
