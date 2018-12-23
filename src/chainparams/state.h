@@ -130,7 +130,6 @@ typedef struct mc_UpgradedParameter
 
 typedef struct mc_Features
 {    
-    int MinProtocolVersion();
     int LastVersionNotSendingProtocolVersionInHandShake();
     int AnyoneCanReceiveEmpty();
     int FormattedData();
