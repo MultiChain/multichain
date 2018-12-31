@@ -31,6 +31,18 @@ Install dependencies
     sudo add-apt-repository ppa:bitcoin/bitcoin
     sudo apt-get update
     sudo apt-get install libdb4.8-dev libdb4.8++-dev
+    
+Clone MultiChain
+----------------
+
+    git clone https://github.com/MultiChain/multichain.git
+    
+Prepare to build V8
+-------------------
+
+    cd multichain
+    mkdir v8build
+    cd v8build
 
 Build Google's V8 JavaScript engine locally
 -------------------------

@@ -29,7 +29,7 @@ int mc_State::VersionInfo(int version)
             case MULTICHAIN_VERSION_CODE_PROTOCOL_THIS:                         // last protocol version
                 return this_protocol;
             case MULTICHAIN_VERSION_CODE_PROTOCOL_MIN:
-                return 10004;                                                   // first supported version
+                return 10008;                                                   // first supported version
             case MULTICHAIN_VERSION_CODE_PROTOCOL_MIN_DOWNGRADE:
                 return 10008;                                                   // cannot downgrade below this version
             case MULTICHAIN_VERSION_CODE_PROTOCOL_MIN_NO_DOWNGRADE:
@@ -40,7 +40,7 @@ int mc_State::VersionInfo(int version)
         return 0;        
     }
     if(version < 10002)return 10002;                                            // first version
-    if(version < 10004)return -10000201;                                        // last build supporting this version (negative)
+    if(version < 10008)return -10000201;                                        // last build supporting this version (negative)
     if(version < 10012)return -this_build;                                      // supported by this version    
     if(version < 20001)return 20001;                                            // next version
     if(version < this_protocol+1)return -this_build;                            // supported by this version    

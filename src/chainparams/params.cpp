@@ -1762,11 +1762,6 @@ int mc_MultichainParams::IsProtocolMultichain()
 }
 
 
-int mc_Features::MinProtocolVersion()
-{
-    return 10004;
-}
-
 int mc_Features::LastVersionNotSendingProtocolVersionInHandShake()
 {
     return 10002;
