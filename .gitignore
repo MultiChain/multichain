@@ -136,3 +136,6 @@ v8build
 *.creator
 *.files
 *.includes
+
+.idea/
+depends/
