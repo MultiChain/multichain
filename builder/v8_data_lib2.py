@@ -11,12 +11,12 @@ logger = logging.getLogger(str(Path(__file__).stem))
 asm = """
 section .rodata
 
-global _binary_{NAME}_start;
-global _binary_{NAME}_end;
+global _binary_{NAME}_{EXT}_start;
+global _binary_{NAME}_{EXT}_end;
 
-_binary_{NAME}_start: incbin "{NAME}{EXT}"
-_binary_{NAME}_end:
-_binary_{NAME}_size:  dd _binary_{NAME}_end-_binary_{NAME}_start
+_binary_{NAME}_{EXT}_start: incbin "{NAME}{EXT}"
+_binary_{NAME}_{EXT}_end:
+_binary_{NAME}_{EXT}_size:  dd _binary_{NAME}_{EXT}_end-_binary_{NAME}_{EXT}_start
 """
 
 
