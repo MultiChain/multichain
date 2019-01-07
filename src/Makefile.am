@@ -418,17 +418,25 @@ V8_ROOT = $(top_builddir)/v8build/v8
 V8_INCLUDE = -I$(V8_ROOT)/include
 V8_LIB_DIR = $(V8_ROOT)/out.gn/x64.release/obj
 V8_LIBS = \
-    -L$(V8_LIB_DIR) -L$(V8_LIB_DIR)/third_party/icu \
-    -Wl,--start-group \
+    -L$(V8_LIB_DIR) -L$(V8_LIB_DIR)/third_party/icu
+if !TARGET_DARWIN
+V8_LIBS += \
+    -Wl,--start-group
+endif
+V8_LIBS += \
         -lv8_libbase \
         -lv8_libplatform \
         -lv8_base \
         -lv8_external_snapshot \
         -lv8_libsampler \
-        -lv8_data \
         -licuuc \
         -licui18n \
-    -lrt -ldl
+        -lv8_data \
+    -ldl
+if !TARGET_DARWIN
+V8_LIBS += \
+    -lrt
+endif
 
 libbitcoin_v8_a_SOURCES = \
   v8/v8engine.cpp \

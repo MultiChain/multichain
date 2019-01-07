@@ -675,7 +675,7 @@ Object FilterEntry(const unsigned char *txid,uint32_t output_level,uint32_t filt
 
             if(ptr)
             {   
-                entry.push_back(Pair("codelength", value_size));                
+                entry.push_back(Pair("codelength", static_cast<uint64_t>(value_size)));
             }
             else
             {

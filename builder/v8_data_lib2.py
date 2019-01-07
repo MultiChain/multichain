@@ -11,12 +11,12 @@ logger = logging.getLogger(str(Path(__file__).stem))
 asm = """
 section .rodata
 
-global _binary_{NAME}_{EXT}_start;
-global _binary_{NAME}_{EXT}_end;
+global {USC}binary_{NAME}_{EXT}_start;
+global {USC}binary_{NAME}_{EXT}_end;
 
-_binary_{NAME}_{EXT}_start: incbin "{NAME}{EXT}"
-_binary_{NAME}_{EXT}_end:
-_binary_{NAME}_{EXT}_size:  dd _binary_{NAME}_{EXT}_end-_binary_{NAME}_{EXT}_start
+{USC}binary_{NAME}_{EXT}_start: incbin "{NAME}.{EXT}"
+{USC}binary_{NAME}_{EXT}_end:
+{USC}binary_{NAME}_{EXT}_size:  dd {USC}binary_{NAME}_{EXT}_end-{USC}binary_{NAME}_{EXT}_start
 """
 
 
@@ -36,7 +36,7 @@ def process_bin_file(filepath, platform):
     arch, obj_suffix, _lib_pattern = get_bin_type(platform)
     obj_name = filepath.with_suffix(obj_suffix).name
     obj_path = Path("obj") / obj_name
-    script = asm.format(NAME=filepath.stem, EXT=filepath.suffix)
+    script = asm.format(USC=('__' if arch == "macho64" else '_'), NAME=filepath.stem, EXT=filepath.suffix[1:])
     script_file = filepath.with_suffix(".s").name
     with open(script_file, 'w') as f:
         f.write(script)
