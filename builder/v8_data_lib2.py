@@ -11,12 +11,12 @@ logger = logging.getLogger(str(Path(__file__).stem))
 asm = """
 section .rodata
 
-global {USC}binary_{NAME}_{EXT}_start;
-global {USC}binary_{NAME}_{EXT}_end;
+global {PREFIX}_start;
+global {PREFIX}_end;
 
-{USC}binary_{NAME}_{EXT}_start: incbin "{NAME}.{EXT}"
-{USC}binary_{NAME}_{EXT}_end:
-{USC}binary_{NAME}_{EXT}_size:  dd {USC}binary_{NAME}_{EXT}_end-{USC}binary_{NAME}_{EXT}_start
+{PREFIX}_start: incbin "{NAME}"
+{PREFIX}_end:
+{PREFIX}_size:  dd {PREFIX}_end-{PREFIX}_start
 """
 
 
@@ -26,7 +26,7 @@ def get_bin_type(platform):
     elif platform == "win32":
         bin_type = ("win64", ".obj", "{}.lib")
     else:
-        bin_type = ("elf64", "{}.o", "lib{}.a")
+        bin_type = ("elf64", ".o", "lib{}.a")
     return bin_type
 
 
@@ -36,7 +36,10 @@ def process_bin_file(filepath, platform):
     arch, obj_suffix, _lib_pattern = get_bin_type(platform)
     obj_name = filepath.with_suffix(obj_suffix).name
     obj_path = Path("obj") / obj_name
-    script = asm.format(USC=('__' if arch == "macho64" else '_'), NAME=filepath.stem, EXT=filepath.suffix[1:])
+    symbol_prefix = "_binary_{}_{}".format(filepath.stem, filepath.suffix[1:])
+    if platform == "darwin":
+        symbol_prefix = '_' + symbol_prefix
+    script = asm.format(PREFIX=symbol_prefix, NAME=filepath.name)
     script_file = filepath.with_suffix(".s").name
     with open(script_file, 'w') as f:
         f.write(script)
@@ -52,8 +55,8 @@ def process_bin_files(platform):
     for f in chain(cwd.glob("*.bin"), cwd.glob("*.dat")):
         obj_names.append(process_bin_file(f, platform))
     os.chdir("obj")
-    arch, _obj_suffix, lib_pattern = get_bin_type(platform)
-    ar = "x86_64-w64-mingw32-ar" if arch == "win64" else "ar"
+    _arch, _obj_suffix, lib_pattern = get_bin_type(platform)
+    ar = "x86_64-w64-mingw32-ar" if platform == "win32" else "ar"
     cmd = [ar, "rvs", lib_pattern.format("v8_data")]
     cmd += obj_names
     logger.info(' '.join(cmd))

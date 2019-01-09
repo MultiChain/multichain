@@ -68,7 +68,7 @@ int mc_FilterEngine::Destroy()
     }
     if (m_watchdog != nullptr)
     {
-        m_watchdog->PostPoisonPill();
+        m_watchdog->Shutdown();
         delete m_watchdog;
     }
 
@@ -190,12 +190,12 @@ void mc_FilterEngine::SetRunningFilter(const mc_Filter *filter)
     {
         m_watchdog = new Watchdog(boost::bind(&mc_FilterEngine::TerminateFilter, this, _1));
     }
-    m_watchdog->PostTaskStarted(filter->Timeout());
+    m_watchdog->FilterStarted(filter->Timeout());
 }
 
 void mc_FilterEngine::ResetRunningFilter()
 {
     assert(m_watchdog != nullptr);
     m_runningFilter = nullptr;
-    m_watchdog->PostTaskEnded();
+    m_watchdog->FilterEnded();
 }
