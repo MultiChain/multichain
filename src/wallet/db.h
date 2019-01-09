@@ -12,6 +12,9 @@
 #include "utils/streams.h"
 #include "utils/sync.h"
 #include "version/bcversion.h"
+#include "wallet/dbconst.h"
+#include "multichain/multichain.h"
+
 
 #include <map>
 #include <string>
@@ -26,7 +29,7 @@ class COutPoint;
 
 struct CBlockLocator;
 
-extern unsigned int nWalletDBUpdated;
+//extern unsigned int nWalletDBUpdated;
 
 void ThreadFlushWalletDB(const std::string& strWalletFile);
 
@@ -59,10 +62,9 @@ public:
      * This must be called BEFORE strFile is opened.
      * Returns true if strFile is OK.
      */
-    enum VerifyResult { VERIFY_OK,
-                        RECOVER_OK,
-                        RECOVER_FAIL };
-    VerifyResult Verify(std::string strFile, bool (*recoverFunc)(CDBEnv& dbenv, std::string strFile));
+    
+//    CDBConstEnv::VerifyResult Verify(std::string strFile, bool (*recoverFunc)(CDBWrapEnv& dbenv, std::string strFile));
+    CDBConstEnv::VerifyResult Verify(std::string strFile);
     /**
      * Salvage data from a file that Verify says is bad.
      * fAggressive sets the DB_AGGRESSIVE flag (see berkeley DB->verify() method documentation).
@@ -70,8 +72,7 @@ public:
      * NOTE: reads the entire database into memory, so cannot be used
      * for huge databases.
      */
-    typedef std::pair<std::vector<unsigned char>, std::vector<unsigned char> > KeyValPair;
-    bool Salvage(std::string strFile, bool fAggressive, std::vector<KeyValPair>& vResult);
+    bool Salvage(std::string strFile, bool fAggressive, std::vector<CDBConstEnv::KeyValPair>& vResult);
 
     bool Open(const boost::filesystem::path& path);
     void Close();
@@ -80,6 +81,9 @@ public:
 
     void CloseDb(const std::string& strFile);
     bool RemoveDb(const std::string& strFile);
+    
+    int RenameDb(const std::string& strOldFileName,const std::string& strNewFileName);
+    bool Recover(std::string strFile, std::vector<CDBConstEnv::KeyValPair>& SalvagedData);
 
     DbTxn* TxnBegin(int flags = DB_TXN_WRITE_NOSYNC)
     {
@@ -103,10 +107,10 @@ protected:
     DbTxn* activeTxn;
     bool fReadOnly;
 
-    explicit CDB(const std::string& strFilename, const char* pszMode = "r+");
-    ~CDB() { Close(); }
 
 public:
+    explicit CDB(const std::string& strFilename, const char* pszMode = "r+");
+    ~CDB() { Close(); }
     void Flush();
     void Close();
 
@@ -114,7 +118,7 @@ private:
     CDB(const CDB&);
     void operator=(const CDB&);
 
-protected:
+public:
     template <typename K, typename T>
     bool Read(const K& key, T& value)
     {
@@ -231,6 +235,14 @@ protected:
         return pcursor;
     }
 
+    void CloseCursor(Dbc* pcursor)
+    {
+        if(pcursor)
+        {
+            pcursor->close();
+        }
+    }
+    
     int ReadAtCursor(Dbc* pcursor, CDataStream& ssKey, CDataStream& ssValue, unsigned int fFlags = DB_NEXT)
     {
         // Read at cursor
@@ -267,7 +279,94 @@ protected:
         free(datValue.get_data());
         return 0;
     }
+    
+    bool Read(CDataStream& ssKey, CDataStream& ssValue)
+    {
+        if (!pdb)
+            return false;
 
+        // Key
+        Dbt datKey(&ssKey[0], ssKey.size());
+
+        // Read
+        Dbt datValue;
+        datValue.set_flags(DB_DBT_MALLOC);
+        int ret = pdb->get(activeTxn, &datKey, &datValue, 0);
+        memset(datKey.get_data(), 0, datKey.get_size());
+        if (datValue.get_data() == NULL)
+            return false;
+
+        // Unserialize value
+        try {
+            CDataStream ssValue1((char*)datValue.get_data(), (char*)datValue.get_data() + datValue.get_size(), SER_DISK, CLIENT_VERSION);
+            ssValue=ssValue1;
+        } catch (const std::exception&) {
+            return false;
+        }
+
+        // Clear and free memory
+        memset(datValue.get_data(), 0, datValue.get_size());
+        free(datValue.get_data());
+        return (ret == 0);
+    }
+
+    bool Write(CDataStream& ssKey, CDataStream& ssValue, bool fOverwrite = true)
+    {
+        if (!pdb)
+            return false;
+        if (fReadOnly)
+            assert(!"Write called on database in read-only mode");
+
+        // Key
+        Dbt datKey(&ssKey[0], ssKey.size());
+
+        // Value
+        Dbt datValue(&ssValue[0], ssValue.size());
+
+        // Write
+        int ret = pdb->put(activeTxn, &datKey, &datValue, (fOverwrite ? 0 : DB_NOOVERWRITE));
+
+        // Clear memory in case it was a private key
+        memset(datKey.get_data(), 0, datKey.get_size());
+        memset(datValue.get_data(), 0, datValue.get_size());
+        return (ret == 0);
+    }
+
+    bool Erase(CDataStream& ssKey)
+    {
+        if (!pdb)
+            return false;
+        if (fReadOnly)
+            assert(!"Erase called on database in read-only mode");
+
+        // Key
+        Dbt datKey(&ssKey[0], ssKey.size());
+
+        // Erase
+        int ret = pdb->del(activeTxn, &datKey, 0);
+
+        // Clear memory
+        memset(datKey.get_data(), 0, datKey.get_size());
+        return (ret == 0 || ret == DB_NOTFOUND);
+    }
+
+    bool Exists(CDataStream& ssKey)
+    {
+        if (!pdb)
+            return false;
+
+        // Key
+        Dbt datKey(&ssKey[0], ssKey.size());
+
+        // Exists
+        int ret = pdb->exists(activeTxn, &datKey, 0);
+
+        // Clear memory
+        memset(datKey.get_data(), 0, datKey.get_size());
+        return (ret == 0);
+    }
+
+    
 public:
     bool TxnBegin()
     {

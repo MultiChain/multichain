@@ -21,6 +21,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 #include <boost/version.hpp>
+#include <boost/foreach.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include <openssl/rand.h>
 
@@ -28,7 +30,7 @@ using namespace std;
 using namespace boost;
 
 
-unsigned int nWalletDBUpdated;
+//unsigned int nWalletDBUpdated;
 
 
 //
@@ -153,7 +155,8 @@ void CDBEnv::MakeMock()
     fMockDb = true;
 }
 
-CDBEnv::VerifyResult CDBEnv::Verify(std::string strFile, bool (*recoverFunc)(CDBEnv& dbenv, std::string strFile))
+//CDBConstEnv::VerifyResult CDBEnv::Verify(std::string strFile, bool (*recoverFunc)(CDBWrapEnv& dbenv, std::string strFile))
+CDBConstEnv::VerifyResult CDBEnv::Verify(std::string strFile)
 {
     LOCK(cs_db);
     assert(mapFileUseCount.count(strFile) == 0);
@@ -161,13 +164,17 @@ CDBEnv::VerifyResult CDBEnv::Verify(std::string strFile, bool (*recoverFunc)(CDB
     Db db(&dbenv, 0);
     int result = db.verify(strFile.c_str(), NULL, NULL, 0);
     if (result == 0)
-        return VERIFY_OK;
+        return CDBConstEnv::VERIFY_OK;
+    
+    return CDBConstEnv::RECOVER_FAIL;
+/*    
     else if (recoverFunc == NULL)
-        return RECOVER_FAIL;
+        return CDBConstEnv::RECOVER_FAIL;
 
     // Try to recover:
     bool fRecovered = (*recoverFunc)(*this, strFile);
-    return (fRecovered ? RECOVER_OK : RECOVER_FAIL);
+    return (fRecovered ? CDBConstEnv::RECOVER_OK : CDBConstEnv::RECOVER_FAIL);
+ */ 
 }
 
 /* End of headers, beginning of key/value data */
@@ -175,7 +182,7 @@ static const char *HEADER_END = "HEADER=END";
 /* End of key/value data */
 static const char *DATA_END = "DATA=END";
 
-bool CDBEnv::Salvage(std::string strFile, bool fAggressive, std::vector<CDBEnv::KeyValPair>& vResult)
+bool CDBEnv::Salvage(std::string strFile, bool fAggressive, std::vector<CDBConstEnv::KeyValPair>& vResult)
 {
     LOCK(cs_db);
     assert(mapFileUseCount.count(strFile) == 0);
@@ -243,6 +250,43 @@ void CDBEnv::CheckpointLSN(const std::string& strFile)
     if (fMockDb)
         return;
     dbenv.lsn_reset(strFile.c_str(), 0);
+}
+
+int CDBEnv::RenameDb(const std::string& strOldFileName, const std::string& strNewFileName)
+{
+    return dbenv.dbrename(NULL, strOldFileName.c_str(), NULL,
+                                      strNewFileName.c_str(), DB_AUTO_COMMIT);
+}
+
+bool CDBEnv::Recover(std::string strFile, std::vector<CDBConstEnv::KeyValPair>& SalvagedData)
+{
+    bool fSuccess = true;
+    boost::scoped_ptr<Db> pdbCopy(new Db(&dbenv, 0));
+    int ret = pdbCopy->open(NULL,               // Txn pointer
+                            strFile.c_str(),   // Filename
+                            "main",             // Logical db name
+                            DB_BTREE,           // Database type
+                            DB_CREATE,          // Flags
+                            0);
+    if (ret > 0)
+    {
+        LogPrintf("Cannot create database file %s\n", strFile);
+        return false;
+    }
+
+    DbTxn* ptxn = TxnBegin();
+    BOOST_FOREACH(CDBConstEnv::KeyValPair& row, SalvagedData)
+    {
+        Dbt datKey(&row.first[0], row.first.size());
+        Dbt datValue(&row.second[0], row.second.size());
+        int ret2 = pdbCopy->put(ptxn, &datKey, &datValue, DB_NOOVERWRITE);
+        if (ret2 > 0)
+            fSuccess = false;
+    }
+    ptxn->commit(0);
+    pdbCopy->close(0);
+
+    return fSuccess;        
 }
 
 

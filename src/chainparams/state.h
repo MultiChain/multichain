@@ -41,6 +41,7 @@
 #define MC_WMD_NONE                  0x00000000
 #define MC_WMD_TXS                   0x00000001
 #define MC_WMD_ADDRESS_TXS           0x00000002
+#define MC_WMD_FLAT_DAT_FILE         0x00000100
 #define MC_WMD_MAP_TXS               0x00010000
 #define MC_WMD_MODE_MASK             0x00FFFFFF
 #define MC_WMD_DEBUG                 0x01000000

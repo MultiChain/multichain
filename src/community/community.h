@@ -40,6 +40,7 @@ typedef struct mc_EnterpriseFeatures
     int WLT_NoRetrieve(mc_TxEntity *entity);
     
     std::string ENT_Edition();
+    int ENT_MinWalletDatVersion();
     void ENT_RPCVerifyEdition();
     
     void LIC_RPCVerifyFeature(uint32_t feature);
