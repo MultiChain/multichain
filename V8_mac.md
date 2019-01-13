@@ -1,13 +1,8 @@
-# Fetching, Building and Installing V8 (On Ubuntu 16.04 x64 or later)
+# Fetching, Building and Installing V8 (on MacOS Sierra)
 
 The following instructions fetch the Google V8 JavaScript engine to your local machine and configure it to create static libraries in the location where the MultiChain build system expects to find them.
 
 MultiChain uses V8 version 6.8, and requires at least 4 GB of RAM to build in a reasonable time. It will not build at all with less than 2 GB RAM.
-
-## Install dependencies
-
-    sudo apt-get update
-    sudo apt-get -y install git python pkg-config build-essential
 
 ## Clone Google's depot_tools
 
@@ -29,7 +24,7 @@ The following commands check out V8 and select the branch used by MultiChain. Pl
 
 The V8 build system currently uses a proprietary version of the Ninja build system, called GN. It is part of the `depot_tools` installed earlier.
 
-    find . -name BUILD.gn -exec sed -i '/exe_and_shlib_deps/d' {} \;
+    find . -name BUILD.gn -exec sed -i bak '/exe_and_shlib_deps/d' {} \;
     tools/dev/v8gen.py x64.release
     RELEASE=out.gn/x64.release
     cat > $RELEASE/args.gn << END
@@ -44,6 +39,7 @@ The V8 build system currently uses a proprietary version of the Ninja build syst
 The selected release of the V8 sources requires relaxing two compiler checks to prevent compilation errors.
 
 -   Open the file `build/config/compiler/BUILD.gn` in your favorite editor.
+
 -   Locate the folllowing lines (currently at **1464**):
 
         if (is_clang) {
@@ -61,18 +57,7 @@ Build the V8 libraries:
 
 Create an additional library embedding the V8 initial snapshot blobs:
 
-    sudo easy_install pip
+    brew install python
     pip install pathlib2
     cd $RELEASE
     python $MULTICHAIN_HOME/depends/v8_data_lib.py
-
-<!--
-    cd $RELEASE
-    objs=()
-    for f in *.bin *.dat; do
-        objcopy -B i386 -I binary -O elf64-x86-64 $f obj/${f%.*}.o
-        objs+=("${f%.*}.o")
-    done
-    cd obj
-    ar rvs libv8_data.a ${objs[@]}
--->

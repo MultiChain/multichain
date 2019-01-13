@@ -74,6 +74,12 @@ On Windows:
 
 On Linux:
 
+    sudo easy_install pip
+    pip install pathlib2
+    cd $RELEASE
+    python $MULTICHAIN_HOME/depends/v8_data_lib.py -o win32
+
+<!--
         cd $MULTICHAIN_HOME/v8build/v8/out.gn/x64.release
         objs=()
         for f in *.bin *.dat; do
@@ -81,6 +87,7 @@ On Linux:
             objs+=("${f%.*}.obj")
         done
         x86_64-w64-mingw32-ar rvs v8_data.lib ${objs[@]}
+-->        
 
 -   Copy `v8_data.lib` to `%MULTICHAIN_HOME%\v8build\v8\out.gn\x64.release\obj` on Windows.
 
