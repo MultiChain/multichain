@@ -24,23 +24,25 @@ Install dependencies
 --------------------
 
     sudo apt-get update
-    sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils
-    sudo apt-get install libboost-all-dev
-    sudo apt-get install git
-    sudo apt-get install software-properties-common
+    sudo apt-get install -y software-properties-common
+    sudo apt-get install -y build-essential libtool autotools-dev automake pkg-config libssl-dev git python
     sudo add-apt-repository ppa:bitcoin/bitcoin
-    sudo apt-get update
-    sudo apt-get install libdb4.8-dev libdb4.8++-dev
-    
+    sudo apt-get install -y libdb4.8-dev libdb4.8++-dev
+
+MultiChain requires Boost version no later than 1.65.
+
+    sudo apt-get install -y libboost1.65-all-dev
+
 Clone MultiChain
 ----------------
 
     git clone https://github.com/MultiChain/multichain.git
-    
+
 Prepare to build V8
 -------------------
 
     cd multichain
+    set MULTICHAIN_HOME=$(pwd)
     mkdir v8build
     cd v8build
 
@@ -52,6 +54,7 @@ Please use the instructions in [V8.md](/V8.md/) to build and install V8 for use 
 Compile MultiChain for Ubuntu (64-bit)
 -----------------------------
 
+    cd $MULTICHAIN_HOME
     ./autogen.sh
     ./configure
     make
@@ -133,4 +136,3 @@ Notes
 -----
 
 * This will build `multichaind`, `multichain-cli` and `multichain-util` in the `src` directory.
-
