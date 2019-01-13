@@ -57,6 +57,11 @@ string mc_EnterpriseFeatures::ENT_Edition()
     return "Community";
 }
 
+int mc_EnterpriseFeatures::ENT_MinWalletDatVersion()
+{
+    return 1;
+}
+
 void mc_EnterpriseFeatures::ENT_RPCVerifyEdition() 
 {
     throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is available only in Enterprise edition of MultiChain, please call \"help enterprise\" for details");        

@@ -103,6 +103,7 @@ BITCOIN_CORE_H = \
   utils/core_io.h \
   wallet/crypter.h \
   wallet/db.h \
+  wallet/dbwrap.h \
   structs/hash.h \
   core/init.h \
   keys/key.h \
@@ -222,6 +223,7 @@ libbitcoin_server_a_SOURCES = \
 libbitcoin_wallet_a_CPPFLAGS = $(BITCOIN_INCLUDES)
 libbitcoin_wallet_a_SOURCES = \
   wallet/db.cpp \
+  wallet/dbwrap_com.cpp \
   wallet/crypter.cpp \
   rpc/rpcdump.cpp \
   rpc/rpcwallet.cpp \

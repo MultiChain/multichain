@@ -25,7 +25,7 @@
 #include "utils/util.h"
 #include "utils/utilmoneystr.h"
 #ifdef ENABLE_WALLET
-#include "wallet/db.h"
+#include "wallet/dbwrap.h"
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #endif
@@ -175,7 +175,7 @@ void Shutdown()
     StopRPCThreads();
 #ifdef ENABLE_WALLET
     if (pwalletMain)
-        bitdb.Flush(false);
+        bitdbwrap.Flush(false);
     GenerateBitcoins(false, NULL, 0);
 #endif
     StopNode();
@@ -208,7 +208,7 @@ void Shutdown()
     }
 #ifdef ENABLE_WALLET
     if (pwalletMain)
-        bitdb.Flush(true);
+        bitdbwrap.Flush(true);
 #endif
 #ifndef WIN32
     boost::filesystem::remove(GetPidFile());
@@ -666,7 +666,7 @@ bool InitSanityCheck(void)
  */
 bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 {
-/* MCHN START */    
+/* MCHN START */   
     char bufOutput[4096];
     size_t bytes_written;
 /* MCHN END */        
@@ -938,7 +938,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 /* MCHN END */    
     LogPrintf("Using OpenSSL version %s\n", SSLeay_version(SSLEAY_VERSION));
 #ifdef ENABLE_WALLET
-    LogPrintf("Using BerkeleyDB version %s\n", DbEnv::version(0, 0, 0));
+    WalletDBLogVersionString();
 #endif
     if (!fLogTimestamps)
         LogPrintf("Startup time: %s\n", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", GetTime()));
@@ -974,14 +974,30 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     }
 */
     int64_t nStart;
-
     // ********************************************************* Step 5: verify wallet database integrity
 #ifdef ENABLE_WALLET
+    int currentwalletdatversion=0;
+    int64_t wallet_mode=GetArg("-walletdbversion",0);
+    mc_gState->m_WalletMode=MC_WMD_NONE;
     if (!fDisableWallet) {
         LogPrintf("Using wallet %s\n", strWalletFile);
         uiInterface.InitMessage(_("Verifying wallet..."));
 
-        if (!bitdb.Open(GetDataDir()))
+        boost::filesystem::path pathWalletDat=GetDataDir() / strWalletFile;
+        if (filesystem::exists(pathWalletDat))
+        {
+            currentwalletdatversion=GetWalletDatVersion(pathWalletDat.string());
+        }
+        else
+        {
+            currentwalletdatversion=wallet_mode;
+        }      
+        if(currentwalletdatversion > 2)
+        {
+            mc_gState->m_WalletMode |= MC_WMD_FLAT_DAT_FILE;
+        }
+        
+        if (!bitdbwrap.Open(GetDataDir()))
         {
             // try moving the database env out of the way
             boost::filesystem::path pathDatabase = GetDataDir() / "database";
@@ -994,7 +1010,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             }
 
             // try again
-            if (!bitdb.Open(GetDataDir())) {
+            if (!bitdbwrap.Open(GetDataDir())) {
                 // if it still fails, it probably means we can't even create the database env
                 string msg = strprintf(_("Error initializing wallet database environment %s!"), strDataDir);
                 return InitError(msg);
@@ -1004,14 +1020,20 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         if (GetBoolArg("-salvagewallet", false))
         {
             // Recover readable keypairs:
-            if (!CWalletDB::Recover(bitdb, strWalletFile, true))
+//            if (!CWalletDB::Recover(bitdbwrap, strWalletFile, true))
+            if(!WalletDBRecover(bitdbwrap,strWalletFile,true))
                 return false;
         }
 
         if (filesystem::exists(GetDataDir() / strWalletFile))
         {
-            CDBEnv::VerifyResult r = bitdb.Verify(strWalletFile, CWalletDB::Recover);
-            if (r == CDBEnv::RECOVER_OK)
+//            CDBConstEnv::VerifyResult r = bitdbwrap.Verify(strWalletFile, CWalletDB::Recover);
+            CDBConstEnv::VerifyResult r = bitdbwrap.Verify(strWalletFile);
+            if(r != CDBConstEnv::VERIFY_OK)
+            {
+                r=WalletDBRecover(bitdbwrap,strWalletFile) ? CDBConstEnv::RECOVER_OK : CDBConstEnv::RECOVER_FAIL;
+            }
+            if (r == CDBConstEnv::RECOVER_OK)
             {
                 string msg = strprintf(_("Warning: wallet.dat corrupt, data salvaged!"
                                          " Original wallet.dat saved as wallet.{timestamp}.bak in %s; if"
@@ -1019,7 +1041,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                                          " restore from a backup."), strDataDir);
                 InitWarning(msg);
             }
-            if (r == CDBEnv::RECOVER_FAIL)
+            if (r == CDBConstEnv::RECOVER_FAIL)
                 return InitError(_("wallet.dat corrupt, salvage failed"));
         }
     } // (!fDisableWallet)
@@ -1339,14 +1361,18 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         string strBurnAddress=BurnAddress(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS)); // Caching burn address
         LogPrint("mchn","mchn: Burn address: %s\n",strBurnAddress.c_str());                
         
-        int64_t wallet_mode=GetArg("-walletdbversion",0);
         bool wallet_mode_valid=false;
         if(wallet_mode == 0)
         {
             mc_gState->m_WalletMode=MC_WMD_AUTO;
             wallet_mode_valid=true;
         }
-        if(wallet_mode == MC_TDB_WALLET_VERSION)
+        if(wallet_mode == 3)
+        {
+            mc_gState->m_WalletMode=MC_WMD_TXS | MC_WMD_ADDRESS_TXS | MC_WMD_FLAT_DAT_FILE; 
+            wallet_mode_valid=true;
+        }
+        if(wallet_mode == 2)
         {
             mc_gState->m_WalletMode=MC_WMD_TXS | MC_WMD_ADDRESS_TXS; 
             wallet_mode_valid=true;
@@ -1366,7 +1392,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
         if(!wallet_mode_valid)
         {
-            return InitError(_("Invalid wallet version, possible values 1 or 2.\n"));                                                    
+            return InitError(_("Invalid wallet version, possible values 1-3.\n"));                                                    
         }
 
         vector <mc_TxEntity> vSubscribedEntities;
@@ -1408,11 +1434,16 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         mc_TxEntity entity;
         boost::filesystem::path pathWallet=GetDataDir() / "wallet";
         
+        if(currentwalletdatversion != wallet_mode)
+        {
+                                                                                // Upgrade wallet.dat here
+        }
+        
         if(mc_gState->m_WalletMode == MC_WMD_NONE)
         {
             if(boost::filesystem::exists(pathWallet))
             {
-                return InitError(strprintf("Wallet was created in version 2. To switch to version 1, with worse performance and scalability, run: \nmultichaind %s -walletdbversion=1 -rescan\n",mc_gState->m_NetworkParams->Name()));                                        
+                return InitError(strprintf("Wallet was created in version 2 or higher. To switch to version 1, with worse performance and scalability, run: \nmultichaind %s -walletdbversion=1 -rescan\n",mc_gState->m_NetworkParams->Name()));                                        
             }
         }
         else
@@ -1427,16 +1458,21 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     }
                     if(mc_gState->m_WalletMode != MC_WMD_NONE)
                     {
-                        return InitError(strprintf("Wallet was created in version 1. To switch to version 2, with better performance and scalability, run: \nmultichaind %s -walletdbversion=2 -rescan\n",mc_gState->m_NetworkParams->Name()));                                        
+                        return InitError(strprintf("Wallet was created in version 1. To switch to version %d, with better performance and scalability, run: \nmultichaind %s -walletdbversion=%d -rescan\n",
+                                MC_TDB_WALLET_VERSION,mc_gState->m_NetworkParams->Name(),MC_TDB_WALLET_VERSION));                                        
                     }                    
                 }
                 else
                 {
                     new_wallet_txs=true;
                     if(mc_gState->m_WalletMode == MC_WMD_AUTO)
-                    {
+                    {                        
                         mc_gState->m_WalletMode = MC_WMD_TXS | MC_WMD_ADDRESS_TXS;
                         wallet_mode=MC_TDB_WALLET_VERSION;
+                        if(wallet_mode > 2)
+                        {
+                            mc_gState->m_WalletMode |= MC_WMD_FLAT_DAT_FILE;
+                        }
                     }
                 }
             }
@@ -1483,6 +1519,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     wallet_mode=pwalletTxsMain->m_Database->m_DBStat.m_WalletVersion;
                 }
 
+                if( (pwalletTxsMain->m_Database->m_DBStat.m_WalletVersion == 2) && (wallet_mode == 3) )
+                {
+                                                                                // Update wallet version
+                }
+                                
                 if((pwalletTxsMain->m_Database->m_DBStat.m_WalletVersion) != wallet_mode)
                 {
                     return InitError(strprintf("Wallet tx database was created with different wallet version (%d). Please restart multichaind with reindex=1 \n",pwalletTxsMain->m_Database->m_DBStat.m_WalletVersion));                        
@@ -2458,7 +2499,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 #endif
 
     if (pwalletMain)
-        bitdb.Flush(false);
+        bitdbwrap.Flush(false);
     
     if(!GetBoolArg("-offline",false))
     {
