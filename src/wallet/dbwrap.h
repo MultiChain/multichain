@@ -15,6 +15,7 @@
 #include "utils/sync.h"
 #include "version/bcversion.h"
 #include "wallet/dbconst.h"
+#include "wallet/dbflat.h"
 
 #include <map>
 #include <string>
@@ -32,17 +33,17 @@ extern unsigned int nWalletDBUpdated;
 
 void ThreadFlushWalletDB(const std::string& strWalletFile);
 void WalletDBLogVersionString();
-int GetWalletDatVersion(const std::string& strWalletFile);
 bool RewriteWalletDB(const std::string& strFile, const char* pszSkip = NULL);
 
 class CDBWrapEnv
 {
 private:
     void *m_lpDBEnv;
-     
+    
     void EnvShutdown();
 
 public:
+    CDBFlatEnv m_Env;
     mutable CCriticalSection cs_db;
     std::map<std::string, int>* m_lpMapFileUseCount;
 
@@ -58,6 +59,8 @@ public:
     
 //    CDBConstEnv::VerifyResult Verify(std::string strFile, bool (*recoverFunc)(CDBWrapEnv& dbenv, std::string strFile));
     CDBConstEnv::VerifyResult Verify(std::string strFile);
+    
+    void SetSeekDBName(std::string strFile);
     
     /**
      * Salvage data from a file that Verify says is bad.
@@ -78,7 +81,7 @@ public:
     bool RemoveDb(const std::string& strFile);
 
 //    DbTxn* TxnBegin(int flags = DB_TXN_WRITE_NOSYNC)                          // DEFINE_DB #define	DB_TXN_WRITE_NOSYNC			0x00000020
-    void* TxnBegin(int flags = 0x00000020);            
+    void* TxnBegin(int flags = MC_DBW_CODE_DB_TXN_WRITE_NOSYNC);            
     
     int RenameDb(const std::string& strOldFileName,const std::string& strNewFileName);
     bool Recover(std::string strFile, std::vector<CDBConstEnv::KeyValPair>& SalvagedData);
@@ -95,6 +98,7 @@ class CDBWrap
 protected:
     
     void *m_lpDb;
+    CDBFlat *m_lpDbFlat;
     std::string strFile;
     bool fReadOnly;
 
@@ -185,7 +189,7 @@ public:
     void CloseCursor(void* cursor);
 
 //    int ReadAtCursor(Dbc* pcursor, CDataStream& ssKey, CDataStream& ssValue, unsigned int fFlags = DB_NEXT)
-    int ReadAtCursor(void* pcursor, CDataStream& ssKey, CDataStream& ssValue, unsigned int fFlags = 16);   // DEFINE_DB #define 	DB_NEXT			16	/* Dbc.get, DbLogc->get */
+    int ReadAtCursor(void* pcursor, CDataStream& ssKey, CDataStream& ssValue, unsigned int fFlags = MC_DBW_CODE_DB_NEXT); 
 
 public:
     

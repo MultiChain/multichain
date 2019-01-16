@@ -7,6 +7,14 @@
 #ifndef MULTICHAIN_DBCONST_H
 #define MULTICHAIN_DBCONST_H
 
+// Codes consistent with db.h
+
+#define MC_DBW_CODE_DB_NEXT                      16
+#define MC_DBW_CODE_DB_SET_RANGE                 28
+#define MC_DBW_CODE_DB_NOTFOUND              -30988
+#define MC_DBW_CODE_DB_NOSERVER              -30991
+#define MC_DBW_CODE_DB_TXN_WRITE_NOSYNC  0x00000020
+
 class CDBConstEnv
 {
 public:

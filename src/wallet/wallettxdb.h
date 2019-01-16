@@ -17,7 +17,7 @@
 
 #define MC_TDB_MAX_IMPORTS           16
 
-#define MC_TDB_WALLET_VERSION         2
+#define MC_TDB_WALLET_VERSION         3
 
 
 #define MC_TET_NONE                             0x00000000

@@ -3350,7 +3350,6 @@ bool CWallet::TopUpKeyPool(unsigned int kpSize)
 {
     {
         LOCK(cs_wallet);
-
         if (IsLocked())
             return false;
 

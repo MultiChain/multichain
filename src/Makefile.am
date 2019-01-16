@@ -102,6 +102,7 @@ BITCOIN_CORE_H = \
   primitives/transaction.h \
   utils/core_io.h \
   wallet/crypter.h \
+  wallet/dbflat.h \
   wallet/db.h \
   wallet/dbwrap.h \
   structs/hash.h \
@@ -222,6 +223,7 @@ libbitcoin_server_a_SOURCES = \
 # when wallet enabled
 libbitcoin_wallet_a_CPPFLAGS = $(BITCOIN_INCLUDES)
 libbitcoin_wallet_a_SOURCES = \
+  wallet/dbflat.cpp \
   wallet/db.cpp \
   wallet/dbwrap_com.cpp \
   wallet/crypter.cpp \

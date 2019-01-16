@@ -25,11 +25,6 @@ void WalletDBLogVersionString()
     LogPrintf("Using BerkeleyDB version %s\n", DbEnv::version(0, 0, 0));
 }
 
-int GetWalletDatVersion(const std::string& strWalletFile)
-{
-    return 2;
-}
-
 void CDBWrapEnv::EnvShutdown()
 {
     
@@ -71,6 +66,7 @@ bool CDBWrapEnv::Open(const boost::filesystem::path& pathIn)
         return ((CDBEnv*)m_lpDBEnv)->Open(pathIn);    
     }
     
+    m_Env.Open(pathIn);
     return true;
 }
 
@@ -81,9 +77,16 @@ CDBConstEnv::VerifyResult CDBWrapEnv::Verify(std::string strFile)
         return ((CDBEnv*)m_lpDBEnv)->Verify(strFile);    
     }
     
-    return CDBConstEnv::VERIFY_OK;
+    return m_Env.Verify(strFile);
 }
 
+void CDBWrapEnv::SetSeekDBName(std::string strFile)
+{
+    if(m_lpDBEnv == NULL)
+    {
+        m_Env.m_FileName=strFile;
+    }
+}
 
 bool CDBWrapEnv::Salvage(std::string strFile, bool fAggressive, std::vector<CDBConstEnv::KeyValPair>& vResult)
 {
@@ -92,7 +95,7 @@ bool CDBWrapEnv::Salvage(std::string strFile, bool fAggressive, std::vector<CDBC
         return ((CDBEnv*)m_lpDBEnv)->Salvage(strFile,fAggressive,vResult);    
     }
     
-    return true;    
+    return m_Env.Salvage(strFile,fAggressive,vResult);    
 }
 
 
@@ -111,7 +114,7 @@ int CDBWrapEnv::RenameDb(const std::string& strOldFileName,const std::string& st
         return ((CDBEnv*)m_lpDBEnv)->RenameDb(strOldFileName,strNewFileName);    
     }    
     
-    return 0;
+    return m_Env.RenameDb(strOldFileName,strNewFileName);
 }
 
 bool CDBWrapEnv::Recover(std::string strFile, std::vector<CDBConstEnv::KeyValPair>& SalvagedData)
@@ -120,16 +123,19 @@ bool CDBWrapEnv::Recover(std::string strFile, std::vector<CDBConstEnv::KeyValPai
     {
         return ((CDBEnv*)m_lpDBEnv)->Recover(strFile,SalvagedData);    
     }    
-    return true;
+    return m_Env.Recover(strFile,SalvagedData);
 }
 
 CDBWrap::CDBWrap(const std::string& strFilename, const char* pszMode)
 {
     m_lpDb=NULL;
+    m_lpDbFlat=NULL;
     if( (mc_gState->m_WalletMode & MC_WMD_FLAT_DAT_FILE) == 0 )
     {
         m_lpDb=new CDB(strFilename,pszMode);
+        return;
     }        
+    m_lpDbFlat=new CDBFlat(&bitdbwrap.m_Env,strFilename,pszMode);
 }
 
 CDBWrap::~CDBWrap() 
@@ -137,6 +143,10 @@ CDBWrap::~CDBWrap()
     if(m_lpDb)
     {
         delete (CDB*)m_lpDb;        
+    }
+    if(m_lpDbFlat)
+    {
+        delete m_lpDbFlat;        
     }
 }
 
@@ -147,6 +157,7 @@ void CDBWrap::Flush()
     {
         ((CDB*)m_lpDb)->Flush();
     }    
+    m_lpDbFlat->Flush();
 }
 
 void CDBWrap::Close()
@@ -154,7 +165,9 @@ void CDBWrap::Close()
     if(m_lpDb)
     {
         ((CDB*)m_lpDb)->Close();
+        return;
     }    
+    m_lpDbFlat->Close();
 }
 
 void CDBWrapEnv::CloseDb(const string& strFile)
@@ -172,7 +185,7 @@ bool CDBWrapEnv::RemoveDb(const string& strFile)
         return ((CDBEnv*)m_lpDBEnv)->RemoveDb(strFile);
     }    
     
-    return true;
+    return m_Env.RemoveDb(strFile);
 }
 
 
@@ -190,7 +203,7 @@ bool CDBWrap::Read(CDataStream& key, CDataStream& value)
     {
         return ((CDB*)m_lpDb)->Read(key,value);
     }    
-    return true;
+    return m_lpDbFlat->Read(key,value);
 }
 
 bool CDBWrap::Write(CDataStream& key, CDataStream& value, bool fOverwrite)
@@ -199,7 +212,7 @@ bool CDBWrap::Write(CDataStream& key, CDataStream& value, bool fOverwrite)
     {
         return ((CDB*)m_lpDb)->Write(key,value,fOverwrite);
     }        
-    return true;
+    return m_lpDbFlat->Write(key,value,fOverwrite);
 }
 
 bool CDBWrap::Erase(CDataStream& key)
@@ -208,7 +221,7 @@ bool CDBWrap::Erase(CDataStream& key)
     {
         return ((CDB*)m_lpDb)->Erase(key);
     }            
-    return true;
+    return m_lpDbFlat->Erase(key);
 }
 
 bool CDBWrap::Exists(CDataStream& key)
@@ -217,7 +230,7 @@ bool CDBWrap::Exists(CDataStream& key)
     {
         return ((CDB*)m_lpDb)->Exists(key);
     }            
-    return true;
+    return m_lpDbFlat->Exists(key);
 }
 
 //    Dbc* GetCursor()
@@ -227,7 +240,7 @@ void* CDBWrap::GetCursor()
     {
         return ((CDB*)m_lpDb)->GetCursor();
     }            
-    return NULL;    
+    return m_lpDbFlat->GetCursor();    
 }
 
 void CDBWrap::CloseCursor(void* cursor)
@@ -235,7 +248,9 @@ void CDBWrap::CloseCursor(void* cursor)
     if(m_lpDb)
     {
         ((CDB*)m_lpDb)->CloseCursor((Dbc*)cursor);
+        return;
     }            
+    return m_lpDbFlat->CloseCursor(cursor);    
 }
 
 //    int ReadAtCursor(Dbc* pcursor, CDataStream& ssKey, CDataStream& ssValue, unsigned int fFlags = DB_NEXT)
@@ -245,7 +260,7 @@ int CDBWrap::ReadAtCursor(void* pcursor, CDataStream& ssKey, CDataStream& ssValu
     {
         return ((CDB*)m_lpDb)->ReadAtCursor((Dbc*)pcursor,ssKey,ssValue,fFlags);
     }            
-    return 0;        
+    return m_lpDbFlat->ReadAtCursor((Dbc*)pcursor,ssKey,ssValue,fFlags);        
 }
 
 
@@ -255,7 +270,7 @@ bool CDBWrap::TxnBegin()
     {
         return ((CDB*)m_lpDb)->TxnBegin();
     }            
-    return true;    
+    return m_lpDbFlat->TxnBegin();    
 }
 
 bool CDBWrap::TxnCommit()
@@ -264,7 +279,7 @@ bool CDBWrap::TxnCommit()
     {
         return ((CDB*)m_lpDb)->TxnCommit();
     }            
-    return true;    
+    return m_lpDbFlat->TxnCommit();    
 }
 
 bool CDBWrap::TxnAbort()
@@ -273,7 +288,7 @@ bool CDBWrap::TxnAbort()
     {
         return ((CDB*)m_lpDb)->TxnAbort();
     }            
-    return true;    
+    return m_lpDbFlat->TxnAbort();    
 }
 
 bool CDBWrap::ReadVersion(int& nVersion)
@@ -282,7 +297,7 @@ bool CDBWrap::ReadVersion(int& nVersion)
     {
         return ((CDB*)m_lpDb)->ReadVersion(nVersion);
     }            
-    return true;    
+    return m_lpDbFlat->ReadVersion(nVersion);
 }
 
 
@@ -292,7 +307,7 @@ bool CDBWrap::WriteVersion(int nVersion)
     {
         return ((CDB*)m_lpDb)->WriteVersion(nVersion);
     }            
-    return true;    
+    return m_lpDbFlat->WriteVersion(nVersion);    
 }
 
 
@@ -302,7 +317,7 @@ bool RewriteWalletDB(const std::string& strFile, const char* pszSkip)
     {
         return CDB::Rewrite(strFile,pszSkip);
     }            
-    return true;    
+    return CDBFlat::Rewrite(&bitdbwrap.m_Env,strFile,pszSkip);    
 }
 
 

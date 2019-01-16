@@ -214,20 +214,19 @@ void CWalletDB::ListAccountCreditDebit(const string& strAccount, list<CAccountin
     if (!pcursor)
         throw runtime_error("CWalletDB::ListAccountCreditDebit() : cannot create DB cursor");
 //    unsigned int fFlags = DB_SET_RANGE;
-    unsigned int fFlags = 28;                                                   // DEFINE_DB #define	DB_SET_RANGE		28
+    unsigned int fFlags = MC_DBW_CODE_DB_SET_RANGE;                    
     while (true)
     {
         // Read next record
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);
 //        if (fFlags == DB_SET_RANGE)                                             
-        if (fFlags == 28)                                                       // DEFINE_DB #define	DB_SET_RANGE		28    
+        if (fFlags == MC_DBW_CODE_DB_SET_RANGE)    
             ssKey << std::make_pair(std::string("acentry"), std::make_pair((fAllAccounts ? string("") : strAccount), uint64_t(0)));
         CDataStream ssValue(SER_DISK, CLIENT_VERSION);
         int ret = ReadAtCursor(pcursor, ssKey, ssValue, fFlags);
 //        fFlags = DB_NEXT;                              
-        fFlags = 16;                                                            // DEFINE_DB #define	DB_NEXT			16	/* Dbc.get, DbLogc->get */
-//        if (ret == DB_NOTFOUND)
-        if (ret == -30988)                                                      // DEFINE_DB #define	DB_NOTFOUND		(-30988)/* Key/data pair not found (EOF). */
+        fFlags = MC_DBW_CODE_DB_NEXT;                                           
+        if (ret == MC_DBW_CODE_DB_NOTFOUND) 
 
             break;
         else if (ret != 0)
@@ -618,7 +617,6 @@ DBErrors CWalletDB::LoadWallet(CWallet* pwallet)
     CWalletScanState wss;
     bool fNoncriticalErrors = false;
     DBErrors result = DB_LOAD_OK;
-
     try {
         LOCK(pwallet->cs_wallet);
         int nMinVersion = 0;
@@ -645,7 +643,7 @@ DBErrors CWalletDB::LoadWallet(CWallet* pwallet)
             CDataStream ssValue(SER_DISK, CLIENT_VERSION);
             int ret = ReadAtCursor(pcursor, ssKey, ssValue);
     //        if (ret == DB_NOTFOUND)
-            if (ret == -30988)                                                  // DEFINE_DB #define	DB_NOTFOUND		(-30988)/* Key/data pair not found (EOF). */
+            if (ret == MC_DBW_CODE_DB_NOTFOUND)   
                 break;
             else if (ret != 0)
             {
@@ -748,7 +746,7 @@ DBErrors CWalletDB::FindWalletTx(CWallet* pwallet, vector<uint256>& vTxHash, vec
             CDataStream ssValue(SER_DISK, CLIENT_VERSION);
             int ret = ReadAtCursor(pcursor, ssKey, ssValue);
     //        if (ret == DB_NOTFOUND)
-            if (ret == -30988)                                                  // DEFINE_DB #define	DB_NOTFOUND		(-30988)/* Key/data pair not found (EOF). */
+            if (ret == MC_DBW_CODE_DB_NOTFOUND)  
                 break;
             else if (ret != 0)
             {

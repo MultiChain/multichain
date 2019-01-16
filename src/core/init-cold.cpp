@@ -425,7 +425,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     // ********************************************************* Step 5: verify wallet database integrity
 #ifdef ENABLE_WALLET
     int currentwalletdatversion=0;
-    int64_t wallet_mode=GetArg("-walletdbversion",0);
+    int64_t wallet_mode=GetArg("-walletdbversion",MC_TDB_WALLET_VERSION);
     mc_gState->m_WalletMode=MC_WMD_NONE;
     if (!fDisableWallet) {
         LogPrintf("Using wallet %s\n", strWalletFile);
@@ -435,10 +435,12 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
         if (filesystem::exists(pathWalletDat))
         {
             currentwalletdatversion=GetWalletDatVersion(pathWalletDat.string());
+            LogPrintf("Wallet file exists. WalletDBVersion: %d.\n", currentwalletdatversion);
         }
         else
         {
             currentwalletdatversion=wallet_mode;
+            LogPrintf("Wallet file doesn't exist. New file will be created with version %d.\n", currentwalletdatversion);
         }      
         if(currentwalletdatversion > 2)
         {
@@ -492,6 +494,10 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
             if (r == CDBConstEnv::RECOVER_FAIL)
                 return InitError(_("wallet.dat corrupt, salvage failed"));
         }
+        else
+        {
+            bitdbwrap.SetSeekDBName(strWalletFile);
+        }        
     } // (!fDisableWallet)
 
 /* MCHN START*/    
@@ -540,6 +546,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
         }
         
         bool wallet_mode_valid=false;
+        wallet_mode=GetArg("-walletdbversion",0);
         if(wallet_mode == 0)
         {
             mc_gState->m_WalletMode=MC_WMD_AUTO;
