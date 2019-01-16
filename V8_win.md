@@ -4,9 +4,11 @@ Building Google's V8 on Windows can only be done inside a Windows command prompt
 
 It requires the following software:
 
--   Visual Studio 2017 - the community edition is fine
--   Python 2.7
--   Git
+-   [Visual Studio 2017](https://visualstudio.microsoft.com/thank-you-downloading-visual-studio/?sku=Community&rel=15) (community edition acceptable)
+-   [Python 2.7](https://www.python.org/ftp/python/2.7.15/python-2.7.15.amd64.msi)
+-   [Git](https://github.com/git-for-windows/git/releases/download/v2.19.1.windows.1/Git-2.19.1-64-bit.exe)
+
+The steps described in this document have to be executed in a shell configured for Visual Studio 64 bit (<u>Start</u> / <u>Visual Studio 2017</u> / <u>x64 Native Tools Command Prompt</u>).
 
 # Fetching, Building and Installing V8
 
@@ -19,8 +21,7 @@ MultiChain uses V8 version 6.8, and requires at least 4 GB of RAM to build in a 
 Google's [`depot_tools`](http://dev.chromium.org/developers/how-tos/install-depot-tools) are used to manage Git checkouts and the build system.
 
 -   Download [https://storage.googleapis.com/chrome-infra/depot\_tools.zip]() and expand the archive to the current directory.
--   Edit the PATH environment variable and insert the full path of `depot_tools` **before** the installed `python.exe`.
--   Execute `where python` to make sure that `depot_tools\python.bat` indeed comes *before* `python.exe`.
+-   Edit the PATH environment variable and insert the full path of `depot_tools` **before** the installed `python.exe` and `git.exe`.
 
 ## Fetch V8
 
@@ -35,7 +36,8 @@ The following commands check out V8 and select the branch used by MultiChain. Pl
 
 The V8 build system currently uses a proprietary version of the Ninja build system, called GN. It is part of the `depot_tools` installed earlier.
 
--   Edit the file `BUILD.gn` and remove all lines containing `exe_and_shlib_deps`
+-   Execute `where python` to make sure that `depot_tools\python.bat` indeed comes *before* `python.exe`
+-   Edit the file `BUILD.gn` and remove all lines containing `exe_and_shlib_deps` (8 occurrences)
 -   Execute `python tools\dev\v8gen.py x64.release`
 -   Execute `set RELEASE=out.gn\x64.release`
 -   Edit the file `%RELEASE%\args.gn` to have the following content:
@@ -50,7 +52,5 @@ The V8 build system currently uses a proprietary version of the Ninja build syst
     v8_enable_object_print = true
     treat_warnings_as_errors = false
 
-The folowing steps have to be executed in a shell configured for Visual Studio 64 bit (<u>Start</u> / <u>Visual Studio 2017</u> / <u>x64 Native Tools Command Prompt</u>). There is no harm in performing all the instructions in this document inside such a command shell.
-
 -   Execute `gn gen %RELEASE%`
--   Execute `ninja -C %RELEASE% v8`
+-   Execute `ninja -C %RELEASE% v8 d8`

@@ -8,15 +8,25 @@ from subprocess import call
 from pathlib2 import Path
 
 logger = logging.getLogger(str(Path(__file__).stem))
+asm = """
+section .rodata
+
+global {PREFIX}_start;
+global {PREFIX}_end;
+
+{PREFIX}_start: incbin "{NAME}"
+{PREFIX}_end:
+{PREFIX}_size:  dd {PREFIX}_end-{PREFIX}_start
+"""
 
 
 def get_bin_type(platform):
     if platform == "darwin":
-        bin_type = ("mach-o-x86-64", ".o", "lib{}.a")
+        bin_type = ("macho64", ".o", "lib{}.a")
     elif platform == "win32":
-        bin_type = ("pe-x86-64", ".obj", "{}.lib")
+        bin_type = ("win64", ".obj", "{}.lib")
     else:
-        bin_type = ("elf64-x86-64", "{}.o", "lib{}.a")
+        bin_type = ("elf64", ".o", "lib{}.a")
     return bin_type
 
 
@@ -26,7 +36,14 @@ def process_bin_file(filepath, platform):
     arch, obj_suffix, _lib_pattern = get_bin_type(platform)
     obj_name = filepath.with_suffix(obj_suffix).name
     obj_path = Path("obj") / obj_name
-    cmd = ["objcopy", "-B", "i386", "-I", "binary", "-O", arch, filepath.name, str(obj_path)]
+    symbol_prefix = "_binary_{}_{}".format(filepath.stem, filepath.suffix[1:])
+    if platform == "darwin":
+        symbol_prefix = '_' + symbol_prefix
+    script = asm.format(PREFIX=symbol_prefix, NAME=filepath.name)
+    script_file = filepath.with_suffix(".s").name
+    with open(script_file, 'w') as f:
+        f.write(script)
+    cmd = ["nasm", "-f", arch, "-o", str(obj_path), script_file]
     logger.info(' '.join(cmd))
     call(cmd)
     return obj_name
@@ -39,7 +56,8 @@ def process_bin_files(platform):
         obj_names.append(process_bin_file(f, platform))
     os.chdir("obj")
     _arch, _obj_suffix, lib_pattern = get_bin_type(platform)
-    cmd = ["ar", "rvs", lib_pattern.format("v8_data")]
+    ar = "x86_64-w64-mingw32-ar" if platform == "win32" else "ar"
+    cmd = [ar, "rvs", lib_pattern.format("v8_data")]
     cmd += obj_names
     logger.info(' '.join(cmd))
     call(cmd)

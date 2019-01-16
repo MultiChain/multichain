@@ -24,23 +24,26 @@ Install dependencies
 --------------------
 
     sudo apt-get update
-    sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils
-    sudo apt-get install libboost-all-dev
-    sudo apt-get install git
-    sudo apt-get install software-properties-common
+    sudo apt-get install -y software-properties-common
+    sudo apt-get install -y build-essential libtool autotools-dev automake pkg-config libssl-dev git python python-pip
     sudo add-apt-repository ppa:bitcoin/bitcoin
-    sudo apt-get update
-    sudo apt-get install libdb4.8-dev libdb4.8++-dev
-    
+    sudo apt-get install -y libdb4.8-dev libdb4.8++-dev
+    sudo pip install pathlib2
+
+MultiChain requires Boost version no later than 1.65.
+
+    sudo apt-get install -y libboost1.65-all-dev
+
 Clone MultiChain
 ----------------
 
     git clone https://github.com/MultiChain/multichain.git
-    
+
 Prepare to build V8
 -------------------
 
     cd multichain
+    set MULTICHAIN_HOME=$(pwd)
     mkdir v8build
     cd v8build
 
@@ -52,6 +55,7 @@ Please use the instructions in [V8.md](/V8.md/) to build and install V8 for use 
 Compile MultiChain for Ubuntu (64-bit)
 -----------------------------
 
+    cd $MULTICHAIN_HOME
     ./autogen.sh
     ./configure
     make
@@ -73,64 +77,4 @@ Please see the instructions in [win.md](/win.md/) to build MultiChain for use wi
 Mac Build Notes (on MacOS Sierra)
 ================
 
-Install dependencies
---------------------
-
-    Install XCode and XCode command line tools
-    Install git from git-scm
-    Install brew (follow instructions on brew.sh)
-    brew install autoconf automake berkeley-db4 libtool boost openssl pkg-config rename
-
-on MacOS High Sierra
-
-    brew uninstall boost
-    brew install boost@1.57
-    brew link boost@1.57 --force
-
-Prepare for static linking
---------------------------
-Apple does not support statically linked binaries as [documented here](https://developer.apple.com/library/content/qa/qa1118/_index.html), however, it is convenient for end-users to launch a binary without having to first install brew, a third-party system designed for developers.
-
-To create a statically linked MultiChain which only depends on default MacOS dylibs, the following steps are taken:
-
-1. Hide the brew boost dylibs from the build system:
-    rename -e 's/.dylib/.dylib.hidden/' /usr/local/opt/boost/lib/*.dylib
-
-2. Hide the brew berekley-db dylibs from the build system:
-    rename -e 's/.dylib/.dylib.hidden/' /usr/local/opt/berkeley-db\@4/lib/*.dylib
-
-3. Hide the brew openssl dylibs from the build system:
-    rename -e 's/.dylib/.dylib.hidden/' /usr/local/opt/openssl/lib/*.dylib
-
-The default brew cookbook for berkeley-db and boost builds static libraries, but the default cookbook for openssl only builds dylibs.
-
-3. Tell brew to build openssl static libraries:
-    brew edit openssl
-        In 'def configure_args' change 'shared' to 'no-shared'
-    brew install openssl --force
-
-
-
-Compile MultiChain for Mac (64-bit)
---------------------------
-
-    export LDFLAGS=-L/usr/local/opt/openssl/lib
-    export CPPFLAGS=-I/usr/local/opt/openssl/include
-    ./autogen.sh
-    ./configure --with-gui=no --with-libs=no --with-miniupnpc=no
-    make
-
-Clean up
---------
-
-    rename -e 's/.dylib.hidden/.dylib/' /usr/local/opt/berkeley-db\@4/lib/*.dylib.hidden
-    rename -e 's/.dylib.hidden/.dylib/' /usr/local/opt/boost/lib/*.dylib.hidden
-    rename -e 's/.dylib.hidden/.dylib/' /usr/local/opt/openssl/lib/*.dylib.hidden
-    brew edit openssl
-        In 'def configure_args' change 'no-shared' to 'shared'
-
-Notes
------
-
-* This will build `multichaind`, `multichain-cli` and `multichain-util` in the `src` directory.
-
+Please see the instructions in [mac.md](/mac.md/) to build MultiChain for use with MacOS.

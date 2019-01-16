@@ -138,4 +138,6 @@ v8build
 *.includes
 
 .idea/
-depends/
+cmake-build-debug
+x86_64-w64-mingw32
+*.dll
