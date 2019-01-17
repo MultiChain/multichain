@@ -19,7 +19,8 @@ def process_config_file(options):
     cflags_block = next(idx for idx, line in lines[in_clang_block:] if line.startswith('    cflags += ['))
     lines[cflags_block+1:cflags_block+1] = [
         (0, '      "-Wno-defaulted-function-deleted",\n'),
-        (0, '      "-Wno-null-pointer-arithmetic",\n')
+        (0, '      "-Wno-null-pointer-arithmetic",\n'),
+        (0, '      "-Wno-class-memaccess",\n'),
     ]
 
     if options.inplace:
