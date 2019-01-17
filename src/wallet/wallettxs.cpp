@@ -296,6 +296,19 @@ int mc_WalletTxs::Initialize(
     return err;
 }
 
+int mc_WalletTxs::UpdateMode(uint32_t mode)
+{
+    m_Mode |= mode;
+    if(m_Database)
+    {
+        return m_Database->UpdateMode(mode);
+    }
+    
+    return MC_ERR_INTERNAL_ERROR;
+}
+    
+
+
 int mc_WalletTxs::SetMode(uint32_t mode, uint32_t mask)
 {
     m_Mode &= ~mask;
