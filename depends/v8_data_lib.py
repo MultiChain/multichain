@@ -64,12 +64,11 @@ def process_bin_files(platform):
 
 
 def get_options():
-    default_path = Path.cwd() / ".." / "v8build" / "v8" / "out.gn" / "x64.release"
+    mc_path_default = str(Path.home() / "multichain")
     parser = ArgumentParser(description="Build v8_data.lib from .bin and .dat files")
     parser.add_argument("-v", "--verbose", action="store_true", help="print debug messages to log")
-    parser.add_argument("-p", "--path", metavar="PATH", type=Path, default=default_path.resolve(),
-                        help="path to the V8 build area (default: %(default)s)")
-    parser.add_argument("-b", "--binutils", metavar="PATH", type=Path, help="path to binutils")
+    parser.add_argument("-m", "--multichain", metavar="DIR", default=mc_path_default,
+                        help="MultiChain path prefix (default: %(default)s)")
     parser.add_argument("-o", "--platform", default=sys.platform,
                         help="override platform definition (default: %(default)s)")
 
@@ -78,11 +77,12 @@ def get_options():
     if options.verbose:
         logger.setLevel(logging.DEBUG)
 
+    if not Path(options.multichain).exists():
+        parser.error("{!r}: MultiChain path does not exist".format(options.multichain))
+
     logger.info("{} - {}".format(logger.name, parser.description))
-    logger.info("  Path:     {}".format(options.path))
+    logger.info("  Path:     {}".format(options.multichain))
     logger.info("  Platform: {}".format(options.platform))
-    if options.binutils:
-        logger.info("  Binutils: {}".format(options.binutils))
 
     return options
 
@@ -90,9 +90,7 @@ def get_options():
 def main():
     logging.basicConfig(stream=sys.stdout, level=logging.INFO, format="%(asctime)s %(levelname)-7s %(message)s")
     options = get_options()
-    if options.binutils:
-        os.environ["PATH"] = os.pathsep.join(str(options.binutils / "bin"), os.environ["PATH"])
-    os.chdir(str(options.path))
+    os.chdir(str(Path(options.multichain) / "v8build" / "v8" / "out.gn" / "x64.release"))
     process_bin_files(options.platform)
     return 0
 
