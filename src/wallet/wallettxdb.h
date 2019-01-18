@@ -268,7 +268,9 @@ typedef struct mc_TxDB
     int Initialize(                                                             // Initalization
               const char *name,                                                 // Chain name
               uint32_t mode);                                                   // Unused
-
+    
+    int UpdateMode(uint32_t mode);
+    
     int AddEntity(mc_TxEntity *entity,uint32_t flags);                          // Adds entity to chain import
     int AddEntity(mc_TxImport *import,mc_TxEntity *entity,uint32_t flags);      // Adds entity to import
        

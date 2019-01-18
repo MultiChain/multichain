@@ -435,13 +435,13 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
                 m_Mode |= MC_WMD_FLAT_DAT_FILE;
             }
         }
-        if(m_DBStat.m_WalletVersion == 2)
+        
+        m_DBStat.m_WalletVersion = 2;
+        if(m_Mode & MC_WMD_FLAT_DAT_FILE)
         {
-            if(m_Mode & MC_WMD_FLAT_DAT_FILE)
-            {
-                m_DBStat.m_WalletVersion=3;
-            }
+            m_DBStat.m_WalletVersion=3;
         }
+        
         m_DBStat.m_InitMode=m_Mode & MC_WMD_MODE_MASK;
         err=m_Database->m_DB->Write((char*)&m_DBStat+m_Database->m_KeyOffset,m_Database->m_KeySize,(char*)&m_DBStat+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
         if(err)
@@ -501,6 +501,30 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
    
     
     return err;
+}
+
+int mc_TxDB::UpdateMode(uint32_t mode)
+{
+    m_Mode |= mode;
+    m_DBStat.m_InitMode=m_Mode & MC_WMD_MODE_MASK;
+    m_DBStat.m_WalletVersion = 2;
+    if(m_Mode & MC_WMD_FLAT_DAT_FILE)
+    {
+        m_DBStat.m_WalletVersion=3;
+    }
+    int err=m_Database->m_DB->Write((char*)&m_DBStat+m_Database->m_KeyOffset,m_Database->m_KeySize,(char*)&m_DBStat+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+    if(err)
+    {
+        return err;
+    }                            
+    
+    err=m_Database->m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
+    if(err)
+    {
+        return err;
+    }
+
+    return MC_ERR_NOERROR;
 }
 
 int mc_TxDB::Destroy()

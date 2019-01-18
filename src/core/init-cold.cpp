@@ -427,15 +427,38 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     int currentwalletdatversion=0;
     int64_t wallet_mode=GetArg("-walletdbversion",MC_TDB_WALLET_VERSION);
     mc_gState->m_WalletMode=MC_WMD_NONE;
+    std::vector<CDBConstEnv::KeyValPair> salvagedData;
+    bool wallet_upgrade=false;
     if (!fDisableWallet) {
         LogPrintf("Using wallet %s\n", strWalletFile);
         uiInterface.InitMessage(_("Verifying wallet..."));
 
+        
         boost::filesystem::path pathWalletDat=GetDataDir() / strWalletFile;
         if (filesystem::exists(pathWalletDat))
         {
             currentwalletdatversion=GetWalletDatVersion(pathWalletDat.string());
             LogPrintf("Wallet file exists. WalletDBVersion: %d.\n", currentwalletdatversion);
+            if( (currentwalletdatversion == 3) && (GetArg("-walletdbversion",0) == 2) )
+            {
+                return InitError(_("Wallet downgrade is not allowed"));                                                        
+            }
+            if( (currentwalletdatversion == 2) && (GetArg("-walletdbversion",0) == 3) )
+            {
+                CDBWrapEnv env2;
+                if (!env2.Open(GetDataDir()))
+                {
+                    return InitError(_("Error initializing wallet database environment for upgrade"));                                        
+                }                
+                bool allOK = env2.Salvage(strWalletFile, false, salvagedData);
+                if(!allOK)
+                {
+                    return InitError(_("wallet.dat corrupt, cannot upgrade, you should repair it first.\n Run multichaind normally or with -salvagewallet flag"));                    
+                }
+                
+                currentwalletdatversion=3;
+                wallet_upgrade=true;                
+            }
         }
         else
         {
@@ -467,6 +490,25 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
             }
         }
 
+        
+        if(wallet_upgrade)
+        {
+            LogPrintf("Wallet file will be upgraded to version %d.\n", currentwalletdatversion);
+            if(!bitdbwrap.Recover(strWalletFile,salvagedData))
+            {
+                return InitError(_("Couldn't upgrade wallet.dat"));                                    
+            }
+        }
+        
+        if (filesystem::exists(pathWalletDat))
+        {
+            currentwalletdatversion=GetWalletDatVersion(pathWalletDat.string());
+        }
+        else
+        {
+            currentwalletdatversion=wallet_mode;
+        }      
+        
         if (GetBoolArg("-salvagewallet", false))
         {
             // Recover readable keypairs:
@@ -697,15 +739,13 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
 
                 if( (pwalletTxsMain->m_Database->m_DBStat.m_WalletVersion == 2) && (wallet_mode == 3) )
                 {
-                    if(wallet_mode == 3)
+                    if(wallet_upgrade)
                     {
-                        upgrade_wallet_dat=true;
+                        if(pwalletTxsMain->UpdateMode(MC_WMD_FLAT_DAT_FILE))
+                        {
+                            return InitError(_("Couldn't update wallet mode"));                                    
+                        }                        
                     }
-                }
-                
-                if(upgrade_wallet_dat)
-                {
-                                                                                // Upgrade wallet.dat here
                 }
                 
                 if((pwalletTxsMain->m_Database->m_DBStat.m_WalletVersion) != wallet_mode)

@@ -396,13 +396,32 @@ bool CDBFlatEnv::Recover(std::string strFile, std::vector<CDBConstEnv::KeyValPai
     {
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);
         CDataStream ssValue(SER_DISK, CLIENT_VERSION);
-        string strType;
 
-        ssKey << SalvagedData[i].first;
-        ssValue << SalvagedData[i].second;
+        ssKey.SetType(SER_DISK);
+        ssKey.clear();        
+        ssKey.write((char*)&(SalvagedData[i].first[0]),SalvagedData[i].first.size());
         
-        ssKey >> strType;
-        if ( (strType != "") && (strType != "walletdbversion") )
+        ssValue.SetType(SER_DISK);
+        ssValue.clear();        
+        ssValue.write((char*)&(SalvagedData[i].second[0]),SalvagedData[i].second.size());
+        
+        bool fWalleDBSizeOrVersion=false;
+        if(ssKey.size() == 13)
+        {
+            if( (ssKey[0]==12) && (memcmp(&ssKey[1],"walletdbsize",12) == 0) )
+            {
+                fWalleDBSizeOrVersion=true;
+            }
+        }
+        if(ssKey.size() == 16)
+        {
+            if( (ssKey[0]==15) && (memcmp(&ssKey[1],"walletdbversion",12) == 0) )
+            {
+                fWalleDBSizeOrVersion=true;
+            }
+        }
+        
+        if (!fWalleDBSizeOrVersion)
         {
             if(!dbdst.Write(ssKey,ssValue,false))
             {
@@ -432,6 +451,7 @@ bool CDBFlatEnv::Recover(std::string strFile, std::vector<CDBConstEnv::KeyValPai
     
     if(!CopyDb(strFileCopy,strFile))
     {
+        CopyDb(strFileBackup,strFile);
         return false;        
     }
     
@@ -1114,18 +1134,28 @@ bool CDBFlat::Rewrite(CDBFlatEnv *lpEnv,const string& strFile, const char* pszSk
         // Read next record
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);
         CDataStream ssValue(SER_DISK, CLIENT_VERSION);
-        string strType;
         
         ret = dbsrc.ReadAtCursor(cursor, ssKey, ssValue);
 
         if(ret == 0)
         {
-            strType.clear();
-            if(ssKey.size())
+            bool fWalleDBSizeOrVersion=false;
+            if(ssKey.size() == 13)
             {
-                ssKey >> strType;
+                if( (ssKey[0]==12) && (memcmp(&ssKey[1],"walletdbsize",12) == 0) )
+                {
+                    fWalleDBSizeOrVersion=true;
+                }
             }
-            if ( (strType != "walletdbsize") && (strType != "walletdbversion") )
+            if(ssKey.size() == 16)
+            {
+                if( (ssKey[0]==15) && (memcmp(&ssKey[1],"walletdbversion",12) == 0) )
+                {
+                    fWalleDBSizeOrVersion=true;
+                }
+            }
+        
+            if (!fWalleDBSizeOrVersion)
             {
                 if(!dbdst.Write(ssKey,ssValue,false))
                 {
