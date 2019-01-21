@@ -31,6 +31,9 @@ The following commands check out V8 and select the branch used by MultiChain. Pl
     fetch v8
     cd v8
     git checkout 6.8.290
+    pushd base\trace_event\common
+    git checkout 211b3ed9d0481b4caddbee1322321b86a483ca1f
+    popd
 
 ## Configure and build V8
 
@@ -38,19 +41,15 @@ The V8 build system currently uses a proprietary version of the Ninja build syst
 
 -   Execute `where python` to make sure that `depot_tools\python.bat` indeed comes *before* `python.exe`
 -   Edit the file `BUILD.gn` and remove all lines containing `exe_and_shlib_deps` (8 occurrences)
--   Execute `python tools\dev\v8gen.py x64.release`
 -   Execute `set RELEASE=out.gn\x64.release`
--   Edit the file `%RELEASE%\args.gn` to have the following content:
+-   Execute `gn args $RELEASE`, insert the following content, save and exit Notepad:
 
-`args.gn`:
+            is_debug = false
+            target_cpu = "x64"
+            v8_static_library = true
+            is_component_build = false
+            is_clang = false
+            v8_enable_object_print = true
+            treat_warnings_as_errors = false
 
-    is_debug = false
-    target_cpu = "x64"
-    v8_static_library = true
-    is_component_build = false
-    is_clang = false
-    v8_enable_object_print = true
-    treat_warnings_as_errors = false
-
--   Execute `gn gen %RELEASE%`
 -   Execute `ninja -C %RELEASE% v8 d8`
