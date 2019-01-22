@@ -176,6 +176,7 @@ Value grantoperation(const Array& params)
     {
         scriptOpReturn=ParseRawMetadata(params[3],MC_DATA_API_PARAM_TYPE_SIMPLE,NULL,&found_entity);
     }
+    EnsureWalletIsUnlocked();
     
     if(fromaddresses.size() == 1)
     {
@@ -315,7 +316,6 @@ Value grantoperation(const Array& params)
     }
     
     
-    EnsureWalletIsUnlocked();
     LOCK (pwalletMain->cs_wallet_send);    
 
     SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, scriptOpReturn, fromaddresses);

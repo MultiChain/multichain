@@ -22,6 +22,7 @@ Value createrawsendfrom(const Array& params, bool fHelp)
     set<CTxDestination> thisFromAddresses;
     
     fromaddresses=ParseAddresses(params[0].get_str(),false,true);
+    EnsureWalletIsUnlocked();
 
     if(fromaddresses.size() != 1)
     {
@@ -110,7 +111,6 @@ Value createrawsendfrom(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Either addresses object or data array should not be empty");                                                        
     }
     
-    EnsureWalletIsUnlocked();
     {
         LOCK (pwalletMain->cs_wallet_send);
         int eErrorCode;
@@ -229,6 +229,7 @@ Value sendfromaddress(const Array& params, bool fHelp)
     }
     
 
+    EnsureWalletIsUnlocked();
     vector<CTxDestination> fromaddresses;        
     
     if(params[0].get_str() != "*")
@@ -269,8 +270,6 @@ Value sendfromaddress(const Array& params, bool fHelp)
     }
 
     
-    EnsureWalletIsUnlocked();
-    LOCK (pwalletMain->cs_wallet_send);
     
     SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(), fromaddresses);
     
@@ -333,6 +332,7 @@ Value sendwithmetadatafrom(const Array& params, bool fHelp)
     
     vector<CTxDestination> fromaddresses;        
     set<CTxDestination> thisFromAddresses;
+    EnsureWalletIsUnlocked();
 
     if(params[0].get_str() != "*")
     {
@@ -390,7 +390,6 @@ Value sendwithmetadatafrom(const Array& params, bool fHelp)
     
 
 
-    EnsureWalletIsUnlocked();
     LOCK (pwalletMain->cs_wallet_send);
     
     SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, scriptOpReturn, fromaddresses);
@@ -585,6 +584,7 @@ Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp)
     
     vector<CTxDestination> fromaddresses;        
     fromaddresses=ParseAddresses(params[0].get_str(),false,false);
+    EnsureWalletIsUnlocked();
     
     if(fromaddresses.size() != 1)
     {
@@ -660,7 +660,6 @@ Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp)
     
 
     
-    EnsureWalletIsUnlocked();
     LOCK (pwalletMain->cs_wallet_send);
     
     SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(), fromaddresses);
@@ -731,6 +730,7 @@ Value preparelockunspent(const json_spirit::Array& params, bool fHelp)
     uint256 offer_hash;
     bool lock_it=true;
     
+    EnsureWalletIsUnlocked();
     
     if (params[0].type() != obj_type)
     {
@@ -775,7 +775,6 @@ Value preparelockunspent(const json_spirit::Array& params, bool fHelp)
 
     vector<CTxDestination> fromaddresses;    
     
-    EnsureWalletIsUnlocked();
     LOCK (pwalletMain->cs_wallet_send);
        
     SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(), fromaddresses);
@@ -887,6 +886,7 @@ Value sendassetfrom(const Array& params, bool fHelp)
     
     lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);
     
+    EnsureWalletIsUnlocked();
     vector<CTxDestination> addresses;    
     addresses.push_back(address.Get());
     
@@ -929,7 +929,6 @@ Value sendassetfrom(const Array& params, bool fHelp)
         }        
     }
 
-    EnsureWalletIsUnlocked();
     LOCK (pwalletMain->cs_wallet_send);
     
     SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(),fromaddresses);

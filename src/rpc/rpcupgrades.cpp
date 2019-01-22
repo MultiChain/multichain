@@ -70,6 +70,7 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
     vector<CTxDestination> addresses;    
     
     vector<CTxDestination> fromaddresses;        
+    EnsureWalletIsUnlocked();
     
     if(params[0].get_str() != "*")
     {
@@ -267,7 +268,6 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
     scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;        
     
     
-    EnsureWalletIsUnlocked();
     {
         LOCK (pwalletMain->cs_wallet_send);
 
@@ -455,6 +455,7 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
     
     vector<CTxDestination> fromaddresses;       
     fromaddresses=ParseAddresses(params[0].get_str(),false,false);
+    EnsureWalletIsUnlocked();
 
     if(fromaddresses.size() != 1)
     {
@@ -533,7 +534,6 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
         
     
     CWalletTx wtx;
-    EnsureWalletIsUnlocked();
     LOCK (pwalletMain->cs_wallet_send);    
 
     SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn, fromaddresses);

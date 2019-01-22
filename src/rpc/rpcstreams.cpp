@@ -441,6 +441,7 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     vector<CTxDestination> fromaddresses;
     CScript scriptOpReturn=CScript();
     
+    EnsureWalletIsUnlocked();
     int errorCode=RPC_INVALID_PARAMETER;
     string strError;    
     lpDetailsScript->Clear();
@@ -523,7 +524,6 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     }
     
     
-    EnsureWalletIsUnlocked();
     {
         LOCK (pwalletMain->cs_wallet_send);
 
@@ -849,6 +849,7 @@ Value publishfrom(const Array& params, bool fHelp)
     vector<CTxDestination> addresses;    
     
     vector<CTxDestination> fromaddresses;        
+    EnsureWalletIsUnlocked();
     
     if(params[0].get_str() != "*")
     {
@@ -1038,7 +1039,6 @@ Value publishfrom(const Array& params, bool fHelp)
 
     lpScript->Clear();
          
-    EnsureWalletIsUnlocked();
     LOCK (pwalletMain->cs_wallet_send);
     
     SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn,fromaddresses);
