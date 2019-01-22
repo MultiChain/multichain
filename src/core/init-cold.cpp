@@ -438,8 +438,17 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
         if (filesystem::exists(pathWalletDat))
         {
             currentwalletdatversion=GetWalletDatVersion(pathWalletDat.string());
+            boost::filesystem::path pathWallet=GetDataDir() / "wallet";
+
+            if(currentwalletdatversion == 2)
+            {
+                if(!boost::filesystem::exists(pathWallet))
+                {
+                    currentwalletdatversion=1;
+                }
+            }
             LogPrintf("Wallet file exists. WalletDBVersion: %d.\n", currentwalletdatversion);
-            if( (currentwalletdatversion == 3) && (GetArg("-walletdbversion",0) == 2) )
+            if( (currentwalletdatversion == 3) && (GetArg("-walletdbversion",0) != 3) )
             {
                 return InitError(_("Wallet downgrade is not allowed"));                                                        
             }
@@ -465,9 +474,19 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
             currentwalletdatversion=wallet_mode;
             LogPrintf("Wallet file doesn't exist. New file will be created with version %d.\n", currentwalletdatversion);
         }      
-        if(currentwalletdatversion > 2)
+        switch(currentwalletdatversion)
         {
-            mc_gState->m_WalletMode |= MC_WMD_FLAT_DAT_FILE;
+            case 3:
+                mc_gState->m_WalletMode |= MC_WMD_FLAT_DAT_FILE;
+                break;
+            case 2:
+                break;
+            case 1:
+                return InitError(strprintf("Wallet version 1 is not supported in this version of MultiChain. "
+                        "To upgrade to version 2, run MultiChain 1.0: \n"
+                        "multichaind %s -walletdbversion=2 -rescan\n",mc_gState->m_NetworkParams->Name()));                                        
+            default:
+                return InitError(_("Invalid wallet version, possible values 2, 3.\n"));                                                                    
         }
         
         if (!bitdbwrap.Open(GetDataDir()))
@@ -616,11 +635,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
             wallet_mode_valid=true;
             zap_wallet_txs=false;
         }
-
-        if(!wallet_mode_valid)
-        {
-            return InitError(_("Invalid wallet version, possible values 1-3.\n"));                                                    
-        }
+ 
 
         vector <mc_TxEntity> vSubscribedEntities;
         if(GetBoolArg("-reindex", false) || GetBoolArg("-rescan", false))
