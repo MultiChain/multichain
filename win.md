@@ -30,8 +30,9 @@ Variables on Windows are referenced by `%VAR%`, and on Linux by `$VAR` or `${VAR
 ## Prerequisites on Linux
 
         sudo apt update
-        sudo apt install -y libtool autotools-dev automake pkg-config git python
+        sudo apt install -y libtool autotools-dev automake pkg-config git python python-pip nasm
         sudo apt install -y g++-mingw-w64-x86-64 mingw-w64-x86-64-dev
+        sudo pip install pathlib2
 
 ## Build Instructions
 
@@ -74,10 +75,8 @@ On Windows:
 
 On Linux:
 
-    sudo easy_install pip
-    pip install pathlib2
-    cd $RELEASE
-    python $MULTICHAIN_HOME/depends/v8_data_lib.py -o win32
+        cd $RELEASE
+        python $MULTICHAIN_HOME/depends/v8_data_lib.py -m $MULTICHAIN_HOME -o win32
 
 <!--
         cd $MULTICHAIN_HOME/v8build/v8/out.gn/x64.release
@@ -89,7 +88,7 @@ On Linux:
         x86_64-w64-mingw32-ar rvs v8_data.lib ${objs[@]}
 -->        
 
--   Copy `v8_data.lib` to `%MULTICHAIN_HOME%\v8build\v8\out.gn\x64.release\obj` on Windows.
+-   Copy `obj/v8_data.lib` to `%MULTICHAIN_HOME%\v8build\v8\out.gn\x64.release\obj` on Windows.
 
 On Windows:
 
@@ -125,4 +124,6 @@ On Windows:
 
 -   If all went well, you should see the expected help text from the program.
 
-<a class="anchor" id="f1"></a>1. If you have more than one CPU on your machine, you can speed things up using the `-j #` flag on the `make` command.
+Notes:
+
+<a class="anchor" id="f1"></a>1. If you have more than one CPU on your machine, you can speed things up using the `-j#` flag on the `make` command.
