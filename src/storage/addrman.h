@@ -46,6 +46,10 @@ private:
     int nRandomPos;
 
     friend class CAddrMan;
+    
+    bool fSCInvalid;
+    bool fSCDead;
+    double dSCChance;
 
 public:
 
@@ -67,6 +71,9 @@ public:
         nRefCount = 0;
         fInTried = false;
         nRandomPos = -1;
+        fSCInvalid=false;
+        fSCDead=false;
+        dSCChance=false;
     }
 
     CAddrInfo(const CAddress &addrIn, const CNetAddr &addrSource) : CAddress(addrIn), source(addrSource)
@@ -79,6 +86,23 @@ public:
         Init();
     }
 
+    void SetSC(bool invalid,int64_t nNow)
+    {
+        fSCInvalid=invalid;
+        dSCChance=GetChance(nNow,&fSCDead);
+    }
+    
+    double GetSC(bool *invalid,bool *dead,int64_t *last_attempt = NULL) const
+    {
+        *invalid=fSCInvalid;
+        *dead=fSCDead;
+        if(last_attempt)
+        {
+            *last_attempt=nLastTry;
+        }
+        return dSCChance;
+    }
+    
     //! Calculate in which "tried" bucket this entry belongs
     int GetTriedBucket(const std::vector<unsigned char> &nKey) const;
 
@@ -95,7 +119,7 @@ public:
     bool IsTerrible(int64_t nNow = GetAdjustedTime()) const;
 
     //! Calculate the relative chance this entry should be given when selecting nodes to connect to
-    double GetChance(int64_t nNow = GetAdjustedTime()) const;
+    double GetChance(int64_t nNow = GetAdjustedTime(),bool *fDead = NULL) const;
 
 };
 
@@ -203,6 +227,12 @@ private:
 
     //! list of "new" buckets
     std::vector<std::set<int> > vvNew;
+    
+    std::map<std::string, int> mapSCAlive;    
+    int nSCSelected;
+    double dSCTotalChance;
+    int nSCTotalBad;
+    int64_t nLastRecalculate;
 
 protected:
 
@@ -241,8 +271,14 @@ protected:
 
     //! Select an address to connect to.
     //! nUnkBias determines how much to favor new addresses over tried ones (min=0, max=100)
-    CAddress Select_(int nUnkBias);
+    CAddress Select_(int nUnkBias,int nNodes);
 
+    bool SCSelect_(int nUnkBias,int nNodes, CAddress &addr);
+    void SCRecalculate_(int64_t nNow);
+    
+    void SetSC_(bool invalid,int64_t nNow);
+    
+    
 #ifdef DEBUG_ADDRMAN
     //! Perform consistency check. Returns an error code or zero.
     int Check_();
@@ -406,6 +442,11 @@ public:
          nIdCount = 0;
          nTried = 0;
          nNew = 0;
+         
+         nSCSelected=-1;
+         dSCTotalChance=0.;
+         nSCTotalBad=0;
+         nLastRecalculate=0;
     }
 
     //! Return the number of (unique) addresses in all tables.
@@ -484,16 +525,36 @@ public:
      * Choose an address to connect to.
      * nUnkBias determines how much "new" entries are favored over "tried" ones (0-100).
      */
-    CAddress Select(int nUnkBias = 50)
+    CAddress Select(int nUnkBias = 50,int nNodes = 0)
     {
         CAddress addrRet;
         {
             LOCK(cs);
             Check();
-            addrRet = Select_(nUnkBias);
+            addrRet = Select_(nUnkBias,nNodes);
             Check();
         }
         return addrRet;
+    }
+    
+    void SetSC(bool invalid,int64_t nNow)
+    {
+        {
+            LOCK(cs);
+            Check();
+            SetSC_(invalid,nNow);
+            Check();
+        }        
+    }
+
+    void SCRecalculate(int64_t nNow)
+    {
+        {
+            LOCK(cs);
+            Check();
+            SCRecalculate_(nNow);
+            Check();
+        }        
     }
 
     //! Return a bunch of addresses, selected at random.
@@ -517,6 +578,20 @@ public:
             Check();
             Connected_(addr, nTime);
             Check();
+        }
+    }
+    
+    void Print()
+    {
+        {
+            LOCK(cs);
+            
+            int64_t nNow = GetAdjustedTime();
+            LogPrint("addrman", "Printing %u addresses\n", mapInfo.size());
+            for (std::map<int, CAddrInfo>::const_iterator it = mapInfo.begin(); it != mapInfo.end(); ++it)
+            {
+                LogPrint("addrman", "%d: %s, Last Seen: %lds, Last Tried: %lds\n", it->first,it->second.ToStringIPPort().c_str(),nNow-it->second.nTime,nNow-it->second.nLastTry);                
+            }
         }
     }
 };
