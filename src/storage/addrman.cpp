@@ -59,7 +59,7 @@ bool CAddrInfo::IsTerrible(int64_t nNow) const
     return false;
 }
 
-double CAddrInfo::GetChance(int64_t nNow) const
+double CAddrInfo::GetChance(int64_t nNow,bool *fDead) const
 {
     double fChance = 1.0;
 
@@ -71,6 +71,18 @@ double CAddrInfo::GetChance(int64_t nNow) const
     if (nSinceLastTry < 0)
         nSinceLastTry = 0;
 
+    if(fDead)
+    {
+        *fDead=false;
+        if(nAttempts)
+        {
+            if(nSinceLastSeen > 86400)
+            {
+                *fDead=true;
+            }
+        }
+    }
+    
     fChance *= 600.0 / (600.0 + nSinceLastSeen);
 
     // deprioritize very recent attempts away
@@ -405,10 +417,237 @@ void CAddrMan::Attempt_(const CService& addr, int64_t nTime)
     info.nAttempts++;
 }
 
-CAddress CAddrMan::Select_(int nUnkBias)
+void CAddrMan::SetSC_(bool invalid,int64_t nNow)
+{
+    if(nSCSelected >= 0)
+    {
+        double dOldChance,dNewChance;
+        bool fOldInvalid,fNewInvalid;
+        bool fOldDead,fNewDead;
+        
+        std::map<int,CAddrInfo>::iterator it = mapInfo.find(nSCSelected);
+        if(it == mapInfo.end())
+        {
+            return;
+        }
+                
+        dOldChance=it->second.GetSC(&fOldInvalid,&fOldDead);
+        it->second.SetSC(invalid,nNow);
+        dNewChance=it->second.GetSC(&fNewInvalid,&fNewDead);
+
+        if(!fNewInvalid && fOldInvalid)
+        {
+            nSCTotalBad--;
+        }
+        if(!fOldInvalid && fNewInvalid)
+        {
+            nSCTotalBad++;
+        }
+        
+        std::map<string,int>::iterator scit = mapSCAlive.find(it->second.ToStringIPPort());
+        if(scit != mapSCAlive.end())
+        {
+            dSCTotalChance -= dOldChance;
+            if(!fNewInvalid && !fNewDead)
+            {
+                dSCTotalChance += dNewChance;                
+            }
+            else
+            {
+                mapSCAlive.erase(scit);
+            }
+        }
+        else
+        {
+            if(!fNewInvalid && !fNewDead)
+            {
+                dSCTotalChance += dNewChance;                
+                mapSCAlive.insert(make_pair(it->second.ToStringIPPort(),nSCSelected));
+            }            
+        }
+    }
+}
+
+void CAddrMan::SCRecalculate_(int64_t nNow)
+{
+    if(mapInfo.size() > 10000)
+    {
+        return;
+    }
+    
+    if(nNow - nLastRecalculate < 2 * 60)
+    {
+        return;
+    }
+    
+    LogPrint("addrman","Updating address lists for selection\n");
+    
+    nLastRecalculate=nNow;
+    dSCTotalChance=0;
+    mapSCAlive.clear();
+    
+    for (std::map<int, CAddrInfo>::iterator it = mapInfo.begin(); it != mapInfo.end(); ++it)
+    {
+        double dNewChance;
+        bool fNewInvalid;
+        bool fNewDead;        
+        int64_t nLastTried;
+        
+        dNewChance=it->second.GetSC(&fNewInvalid,&fNewDead,&nLastTried);
+                
+        if(nLastTried)
+        {
+            if(!fNewInvalid && !fNewDead)
+            {
+                dSCTotalChance += dNewChance;                
+                mapSCAlive.insert(make_pair(it->second.ToStringIPPort(),it->first));
+            }
+        }        
+    }    
+}
+
+
+bool CAddrMan::SCSelect_(int nUnkBias,int nNodes,CAddress &addr)
+{
+    nSCSelected=-1;
+    if(mapSCAlive.size() > 200)
+    {
+        return false;
+    }
+    if(mapInfo.size() > 10000)
+    {
+        return false;
+    }
+
+    bool fChooseAlive=true;
+    
+    int nAlive=(int)mapSCAlive.size();
+    int nUnknown=(int)mapInfo.size()-nAlive-nSCTotalBad;
+    int64_t nNow = GetAdjustedTime();
+    int64_t m = 1<<30;
+    
+    
+    if(nAlive <= nNodes) 
+    {
+        fChooseAlive=false;        
+        if(nUnknown <= 0)
+        {
+            return false;            
+        }
+    }
+    else
+    {
+        if(nUnknown>0)
+        {
+            double nCorAlive = sqrt(nAlive) * (100.0 - nUnkBias);               
+            double nCorUnknown = sqrt(nUnknown) * nUnkBias;                     // prefer Unknown addresses if we are well connected
+            double prob = (double)GetRandInt(m) / (double)(m);
+            if ((nCorAlive + nCorUnknown) *prob < nCorUnknown) 
+            {
+                fChooseAlive=false;
+            }        
+        }
+    }
+    
+    if(fChooseAlive)
+    {
+        double prob = (double)GetRandInt(m)* dSCTotalChance / (double)(m);
+        double sum=0;
+        for (std::map<std::string, int>::const_iterator scit = mapSCAlive.begin(); scit != mapSCAlive.end(); ++scit)
+        {
+            std::map<int,CAddrInfo>::iterator it = mapInfo.find(scit->second);
+            if(it != mapInfo.end())
+            {        
+                double dNewChance;
+                bool fNewInvalid;
+                bool fNewDead;
+
+                dNewChance=it->second.GetSC(&fNewInvalid,&fNewDead);
+                sum+=dNewChance;
+                if(sum >= prob)
+                {
+                    nSCSelected=scit->second;
+                    addr=it->second;
+                    LogPrint("addrman","Selected recent address %s, last seen: %ds\n",addr.ToStringIPPort().c_str(),nNow - addr.nTime);
+                    return true;
+                }
+            }    
+        }
+    }
+    else
+    {
+        int nTriedDead=-1;
+        int64_t LastTryDead=nNow;
+        
+        for (std::map<int, CAddrInfo>::const_iterator it = mapInfo.begin(); it != mapInfo.end(); ++it)
+        {
+            double dNewChance;
+            bool fNewInvalid;
+            bool fNewDead;
+            int64_t nLastTried;
+            dNewChance=it->second.GetSC(&fNewInvalid,&fNewDead,&nLastTried);
+            
+            if(!fNewInvalid)
+            {
+                if(nLastTried == 0)
+                {
+                    nSCSelected=it->first;
+                    addr=it->second;
+                    LogPrint("addrman","Selected first-attempt address %s\n",addr.ToStringIPPort().c_str());
+                    return true;                
+                }
+
+                if(fNewDead)
+                {
+                    if(nLastTried <= LastTryDead)
+                    {
+                        LastTryDead=nLastTried;
+                        nTriedDead=it->first;
+                    }                    
+                }
+            }
+        }    
+                
+        if(nTriedDead >= 0)
+        {
+            MilliSleep(100);                                                    // All is dead, no need to hurry
+            
+            if(GetRandInt(m) < (0.09 + 0.01 * nUnkBias) * m)                    // If we are well connected, don't try to connect to confirmed deads too often
+            {
+                addr=CAddress();
+                return true;                
+            }
+            
+            std::map<int,CAddrInfo>::iterator it = mapInfo.find(nTriedDead);
+            if(it != mapInfo.end())
+            {
+                nSCSelected=nTriedDead;
+                addr=it->second;
+                LogPrint("addrman","Selected old address %s, last seen: %.1fhrs\n",addr.ToStringIPPort().c_str(),
+                        (double)(nNow - addr.nTime)/3600.0);
+                return true;                
+            }            
+            
+            return false;
+        }        
+    }
+    
+    return false;            
+}
+    
+
+CAddress CAddrMan::Select_(int nUnkBias,int nNodes)
 {
     if (size() == 0)
         return CAddress();
+    
+    LogPrint("addrman","Selecting address, total: %d, live: %d, invalid: %d, connected: %d\n",(int)mapInfo.size(),(int)mapSCAlive.size(),nSCTotalBad,nNodes);
+    
+    CAddress addr;
+    if(SCSelect_(nUnkBias,nNodes,addr))
+    {
+        return addr;
+    }
 
     double nCorTried = sqrt(nTried) * (100.0 - nUnkBias);
     double nCorNew = sqrt(nNew) * nUnkBias;
@@ -424,7 +663,10 @@ CAddress CAddrMan::Select_(int nUnkBias)
             assert(mapInfo.count(vTried[nPos]) == 1);
             CAddrInfo& info = mapInfo[vTried[nPos]];
             if (GetRandInt(1 << 30) < fChanceFactor * info.GetChance() * (1 << 30))
+            {
+                LogPrint("addrman","Selected tried address %s\n",info.ToStringIPPort().c_str());
                 return info;
+            }
             fChanceFactor *= 1.2;
         }
     } else {
@@ -442,7 +684,10 @@ CAddress CAddrMan::Select_(int nUnkBias)
             assert(mapInfo.count(*it) == 1);
             CAddrInfo& info = mapInfo[*it];
             if (GetRandInt(1 << 30) < fChanceFactor * info.GetChance() * (1 << 30))
+            {
+                LogPrint("addrman","Selected new address %s\n",info.ToStringIPPort().c_str());
                 return info;
+            }
             fChanceFactor *= 1.2;
         }
     }
