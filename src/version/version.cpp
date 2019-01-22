@@ -133,7 +133,11 @@ int mc_State::GetWalletDBVersion()
         }
         else
         {
-            return 2;                
+            if(mc_gState->m_WalletMode & MC_WMD_FLAT_DAT_FILE)
+            {
+                return 3;
+            }
+            return 2;
         }
     }
     
