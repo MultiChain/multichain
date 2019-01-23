@@ -14,6 +14,8 @@
 using namespace std;
 using namespace json_spirit;
 
+void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript,uint32_t filter_type);
+
 uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_EntityDetails *entity,uint32_t *data_format,int *errorCode,string *strError)
 {
     uint32_t param_type=MC_DATA_API_PARAM_TYPE_NONE;   
@@ -46,6 +48,14 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     if(d.value_.get_str() == "upgrade")
                     {
                         this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_UPGRADE;
+                    }
+                    if(d.value_.get_str() == "txfilter")
+                    {
+                        this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_FILTER;
+                    }
+                    if(d.value_.get_str() == "streamfilter")
+                    {
+                        this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_FILTER;
                     }
                 }
                 if(this_param_type == MC_DATA_API_PARAM_TYPE_NONE)
@@ -1053,7 +1063,7 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
         {
             if(!missing_startblock)
             {
-                *strError=string("open field can appear only once in the object");                                                                                                        
+                *strError=string("startblock field can appear only once in the object");                                                                                                        
             }
             if(d.value_.type() == int_type)
             {
@@ -1174,6 +1184,143 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
     return scriptOpReturn;
 }
 
+CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError)
+{
+    CScript scriptOpReturn=CScript();
+    bool field_parsed;
+    size_t bytes;
+    const unsigned char *script;
+    string entity_name;
+    uint32_t filter_type=MC_FLT_TYPE_TX;
+
+    bool missing_name=true;
+    bool missing_code=true;
+    bool missing_for=true;
+    
+    lpDetails->Clear();
+    lpDetails->AddElement();                   
+
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();                   
+        
+    BOOST_FOREACH(const Pair& d, param->get_obj()) 
+    {
+        field_parsed=false;
+        if(d.name_ == "name")
+        {
+            if(!missing_name)
+            {
+                *strError=string("open field can appear only once in the object");                                                                                                        
+            }
+            if(d.value_.type() != null_type && !d.value_.get_str().empty())
+            {
+                entity_name=d.value_.get_str();
+                if(entity_name.size())
+                {
+                    if(entity_name.size() > MC_ENT_MAX_NAME_SIZE)
+                    {
+                        *strError=string("Invalid filter name - too long"); 
+                    }
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());
+                }
+            }
+            else
+            {
+                *strError=string("Invalid name");                            
+            }
+            missing_name=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "restrictions")
+        {
+            if(!missing_for)
+            {
+                *strError=string("restrictions field can appear only once in the object");                                                                                                        
+            }
+                        
+            ParseFilterRestrictions(d.value_,lpDetailsScript,MC_FLT_TYPE_TX);
+                        
+            script = lpDetailsScript->GetData(0,&bytes);
+
+            if(bytes)
+            {
+                lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_RESTRICTIONS,script,bytes);
+            }
+            
+            missing_for=false;
+            field_parsed=true;
+        }
+        
+        if(d.name_ == "code")
+        {
+            if(!missing_code)
+            {
+                *strError=string("code field can appear only once in the object");                                                                                                        
+            }
+            if(d.value_.type() == str_type)
+            {
+                lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)d.value_.get_str().c_str(),d.value_.get_str().size());                                                        
+            }
+            else
+            {
+                *strError=string("Invalid code field type");                            
+            }
+            missing_code=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "create")
+        {
+            if (strcmp(d.value_.get_str().c_str(),"streamfilter") == 0)
+            {
+                filter_type=MC_FLT_TYPE_STREAM;
+            }
+            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_TYPE,(unsigned char*)&filter_type,4);
+            
+            
+            field_parsed=true;
+        }
+        if(!field_parsed)
+        {
+            *strError=strprintf("Invalid field: %s",d.name_.c_str());
+        }
+    }    
+    
+    if(strError->size() == 0)
+    {
+        if(filter_type != MC_FLT_TYPE_TX)
+        {
+            if(!missing_for)
+            {
+                *strError=string("restrictions field is allowed only for tx filters");                                                                                                        
+                *errorCode=RPC_NOT_ALLOWED;                
+            }
+        }
+        
+        if(missing_code)
+        {                    
+            *strError=string("Missing code");                                                                                            
+        }
+    }
+    
+    if(strError->size() == 0)
+    {
+        int err;
+        script=lpDetails->GetData(0,&bytes);
+        lpDetailsScript->Clear();
+        err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_FILTER,0,script,bytes);
+        if(err)
+        {
+            *strError=string("Invalid code, too long");                                                            
+        }
+        else
+        {
+            script = lpDetailsScript->GetData(0,&bytes);
+            scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+        }        
+    }
+    
+    return scriptOpReturn;
+}
 
 CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *data_format,mc_Script *lpDetailsScript,vector<uint256>* vChunkHashes,int *errorCode,string *strError)
 {
@@ -1617,6 +1764,9 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             break;
         case MC_DATA_API_PARAM_TYPE_CREATE_UPGRADE:
             scriptOpReturn=RawDataScriptCreateUpgrade(&param,lpDetails,lpDetailsScript,&errorCode,&strError);
+            break;
+        case MC_DATA_API_PARAM_TYPE_CREATE_FILTER:
+            scriptOpReturn=RawDataScriptCreateFilter(&param,lpDetails,lpDetailsScript,&errorCode,&strError);
             break;
         case MC_DATA_API_PARAM_TYPE_APPROVAL:
             scriptOpReturn=RawDataScriptApprove(&param,&entity,lpDetailsScript,&errorCode,&strError);

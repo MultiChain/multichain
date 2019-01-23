@@ -40,6 +40,8 @@ int c_UTF8_charlen[256]={
  4,4,4,4,4,4,4,4,5,5,5,5,6,6,0,0
 };
 
+bool ParseStreamFilterApproval(Value param,mc_EntityDetails *stream_entity);
+
 CScript RemoveOpDropsIfNeeded(const CScript& scriptInput)
 {
     if(pMultiChainFilterEngine->m_TxID != 0)
@@ -2614,7 +2616,7 @@ bool GetTxInputsAsTxOuts(const CTransaction& tx, vector <CTxOut>& inputs, vector
     return result;    
 }
 
-CScript GetScriptForString(string source)
+CScript GetScriptForString(string source,uint32_t entity_type,mc_EntityDetails *entity)
 {
     vector <string> destinations; 
     
@@ -2640,6 +2642,24 @@ CScript GetScriptForString(string source)
         }
         else
         {
+            entity->Zero();
+            if(entity_type != MC_ENT_TYPE_NONE)
+            {
+                try 
+                {
+                    ParseEntityIdentifier(destinations[0],entity, entity_type);       
+                    uint160 filter_address;
+                    filter_address=0;
+                    memcpy(&filter_address,entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+                    return GetScriptForDestination(CKeyID(filter_address));
+                }
+                catch (Object& objError)
+                {
+                }
+                catch (std::exception& e)
+                {
+                }                    
+            }
             if (IsHex(destinations[0]))
             {
                 CPubKey vchPubKey(ParseHex(destinations[0]));
@@ -2692,35 +2712,48 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
                 setAddress.insert(address);            
             }
         }
-        CScript scriptPubKey = GetScriptForString(s.name_);
         
-        CAmount nAmount;
-        if (s.value_.type() != obj_type)
+        mc_EntityDetails entity;
+        
+        CScript scriptPubKey = GetScriptForString(s.name_,MC_ENT_TYPE_FILTER,&entity);
+        CAmount nAmount=0;
+
+        if(entity.GetEntityType())
         {
-            nAmount = AmountFromValue(s.value_);
-        }
-        else
-        {
-            mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript4;
-            lpScript->Clear();
-//            uint256 offer_hash;
+            uint32_t approval,timestamp;
             size_t elem_size;
             const unsigned char *elem;
-
-            nAmount=0;
-            int eErrorCode;
-
-            string strError=ParseRawOutputObject(s.value_,nAmount,lpScript, required,&eErrorCode);
-            if(strError.size())
-            {
-                throw JSONRPCError(eErrorCode, strError);                            
-            }
-
-/*            
-            if(lpScript->GetNumElements() > MCP_STD_OP_DROP_COUNT )
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid number of elements in script");
-*/
             
+            approval=0;
+            timestamp=mc_TimeNowAsUInt();
+            mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript4;
+            lpScript->Clear();
+            if ( (s.value_.type() != obj_type) || 
+                 (s.value_.get_obj().size() != 1) || 
+                 (s.value_.get_obj()[0].name_ != "approve") )
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Filter approval should be object with single field - approve");                
+            }
+            if(entity.GetFilterType() == MC_FLT_TYPE_STREAM)
+            {
+                mc_EntityDetails stream_entity;
+                stream_entity.Zero();
+                if(mc_gState->m_Features->StreamFilters() == 0)
+                {
+                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Only Tx filters can be approved/disapproved in this protocol version.");        
+                }        
+                approval=ParseStreamFilterApproval(s.value_.get_obj()[0].value_,&stream_entity);
+                lpScript->SetEntity(stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);                    
+            }
+            else
+            {
+                approval=1;
+                if(!paramtobool(s.value_.get_obj()[0].value_))
+                {
+                    approval=0;
+                }
+            }            
+            lpScript->SetPermission(MC_PTP_FILTER,0,approval ? 4294967295U : 0,timestamp);
             for(int element=0;element < lpScript->GetNumElements();element++)
             {
                 elem = lpScript->GetData(element,&elem_size);
@@ -2731,6 +2764,46 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
                 else
                     throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
             }                
+        }        
+        else
+        {
+            if (s.value_.type() != obj_type)
+            {
+                nAmount = AmountFromValue(s.value_);
+            }
+            else
+            {
+                mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript4;
+                lpScript->Clear();
+    //            uint256 offer_hash;
+                size_t elem_size;
+                const unsigned char *elem;
+
+                nAmount=0;
+                int eErrorCode;
+
+                string strError=ParseRawOutputObject(s.value_,nAmount,lpScript, required,&eErrorCode);
+                if(strError.size())
+                {
+                    throw JSONRPCError(eErrorCode, strError);                            
+                }
+
+    /*            
+                if(lpScript->GetNumElements() > MCP_STD_OP_DROP_COUNT )
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid number of elements in script");
+    */
+
+                for(int element=0;element < lpScript->GetNumElements();element++)
+                {
+                    elem = lpScript->GetData(element,&elem_size);
+                    if(elem)
+                    {
+                        scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
+                    }
+                    else
+                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
+                }                
+            }
         }
 
         vecSend.push_back(make_pair(scriptPubKey, nAmount));

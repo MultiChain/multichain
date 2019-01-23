@@ -1001,7 +1001,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 }
             }
             LogPrintf("Wallet file exists. WalletDBVersion: %d.\n", currentwalletdatversion);
-            if( (currentwalletdatversion == 3) && (GetArg("-walletdbversion",0) != 3) )
+            if( (currentwalletdatversion == 3) && (GetArg("-walletdbversion",MC_TDB_WALLET_VERSION) != 3) )
             {
                 return InitError(_("Wallet downgrade is not allowed"));                                                        
             }
