@@ -670,7 +670,10 @@ Value publishmultifrom(const Array& params, bool fHelp)
     
     BOOST_FOREACH(const CTxDestination& from_address, fromaddresses) 
     {
-        valid_addresses.insert(from_address);
+        if( (IsMine(*pwalletMain, from_address) & ISMINE_SPENDABLE) == ISMINE_SPENDABLE )
+        {
+            valid_addresses.insert(from_address);
+        }
     }    
             
     stream_hashes.insert(*(uint256*)stream_entity.GetTxID());
@@ -716,7 +719,10 @@ Value publishmultifrom(const Array& params, bool fHelp)
                     {
                         if(valid_addresses.find(other_address) != valid_addresses.end())
                         {
-                            next_addresses.insert(other_address);                            
+                            if( (IsMine(*pwalletMain, other_address) & ISMINE_SPENDABLE) == ISMINE_SPENDABLE )
+                            {
+                                next_addresses.insert(other_address);                            
+                            }
                         }
                     }    
                     valid_addresses=next_addresses;
