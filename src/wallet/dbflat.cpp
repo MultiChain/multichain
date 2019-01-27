@@ -15,6 +15,7 @@ using namespace boost;
 
 bool fDBFlatDebug=false;
 
+bool mc_CopyFile(boost::filesystem::path& pathDBOld,boost::filesystem::path& pathDBNew);
 void PrintDBFlatPos(char *msg,const mc_DBFlatPos *pos)
 {
     if(fDBFlatDebug)
@@ -354,7 +355,9 @@ bool CDBFlatEnv::CopyDb(const std::string& strOldFileName,const std::string& str
 {
     boost::filesystem::path pathDBOld = m_DirPath / strOldFileName;
     boost::filesystem::path pathDBNew = m_DirPath / strNewFileName;
-    
+
+    return mc_CopyFile(pathDBOld,pathDBNew);
+/*    
     try {
 #if BOOST_VERSION >= 104000
                     filesystem::copy_file(pathDBOld, pathDBNew, filesystem::copy_option::overwrite_if_exists);
@@ -364,8 +367,9 @@ bool CDBFlatEnv::CopyDb(const std::string& strOldFileName,const std::string& str
     } catch(const filesystem::filesystem_error &e) {
         LogPrintf("error copying %s to %s - %s\n", pathDBOld.string(), pathDBNew.string(), e.what());
         return false;
-    }
+    } 
     return true;
+ */ 
 }
 
 int CDBFlatEnv::RenameDb(const std::string& strOldFileName,const std::string& strNewFileName)

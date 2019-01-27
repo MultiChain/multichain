@@ -23,7 +23,7 @@ using namespace boost;
 using namespace std;
 
 static uint64_t nAccountingEntryNumber = 0;
-
+bool mc_CopyFile(boost::filesystem::path& pathDBOld,boost::filesystem::path& pathDBNew);
 //
 // CWalletDB
 //
@@ -885,6 +885,16 @@ bool BackupWallet(const CWallet& wallet, const string& strDest)
                 if (filesystem::is_directory(pathDest))
                     pathDest /= wallet.strWalletFile;
 
+                if(mc_CopyFile(pathSrc,pathDest))
+                {
+                    LogPrintf("copied wallet.dat to %s\n", pathDest.string());                    
+                    return true;
+                }
+                else
+                {
+                    return false;                    
+                }
+/*                
                 try {
 #if BOOST_VERSION >= 104000
                     filesystem::copy_file(pathSrc, pathDest, filesystem::copy_option::overwrite_if_exists);
@@ -897,6 +907,7 @@ bool BackupWallet(const CWallet& wallet, const string& strDest)
                     LogPrintf("error copying wallet.dat to %s - %s\n", pathDest.string(), e.what());
                     return false;
                 }
+ */ 
             }
         }
         MilliSleep(100);

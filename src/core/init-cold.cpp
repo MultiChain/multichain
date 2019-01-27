@@ -442,10 +442,6 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
 
             if(currentwalletdatversion == 2)
             {
-                if(!boost::filesystem::exists(pathWallet))
-                {
-                    currentwalletdatversion=1;
-                }
             }
             LogPrintf("Wallet file exists. WalletDBVersion: %d.\n", currentwalletdatversion);
             if( (currentwalletdatversion == 3) && (GetArg("-walletdbversion",0) != 3) )
@@ -454,19 +450,26 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
             }
             if( (currentwalletdatversion == 2) && (GetArg("-walletdbversion",0) == 3) )
             {
-                CDBWrapEnv env2;
-                if (!env2.Open(GetDataDir()))
+                if(!boost::filesystem::exists(pathWallet))
                 {
-                    return InitError(_("Error initializing wallet database environment for upgrade"));                                        
-                }                
-                bool allOK = env2.Salvage(strWalletFile, false, salvagedData);
-                if(!allOK)
-                {
-                    return InitError(_("wallet.dat corrupt, cannot upgrade, you should repair it first.\n Run multichaind normally or with -salvagewallet flag"));                    
+                    currentwalletdatversion=1;
                 }
-                
-                currentwalletdatversion=3;
-                wallet_upgrade=true;                
+                else
+                {
+                    CDBWrapEnv env2;
+                    if (!env2.Open(GetDataDir()))
+                    {
+                        return InitError(_("Error initializing wallet database environment for upgrade"));                                        
+                    }                
+                    bool allOK = env2.Salvage(strWalletFile, false, salvagedData);
+                    if(!allOK)
+                    {
+                        return InitError(_("wallet.dat corrupt, cannot upgrade, you should repair it first.\n Run multichaind normally or with -salvagewallet flag"));                    
+                    }
+
+                    currentwalletdatversion=3;
+                    wallet_upgrade=true;                
+                }
             }
         }
         else
