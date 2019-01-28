@@ -20,14 +20,18 @@ MultiChain uses V8 version 6.8, and requires at least 4 GB of RAM to build in a 
 
 Google's [`depot_tools`](http://dev.chromium.org/developers/how-tos/install-depot-tools) are used to manage Git checkouts and the build system.
 
--   Download [https://storage.googleapis.com/chrome-infra/depot\_tools.zip]() and expand the archive to the current directory.
+-   Download https://storage.googleapis.com/chrome-infra/depot_tools.zip and expand the archive to the current directory.
 -   Edit the PATH environment variable and insert the full path of `depot_tools` **before** the installed `python.exe` and `git.exe`.
+-   Set the environment variable `DEPOT_TOOLS_WIN_TOOLCHAIN=0`.
 
 ## Fetch V8
 
 The following commands check out V8 and select the branch used by MultiChain. Please note that this step downloads about 2 GB of data, and can take a long time (30 minutes or more).
 
     gclient
+    
+Execute `where python` to make sure that `depot_tools\python.bat` indeed comes *before* `python.exe`
+
     fetch v8
     cd v8
     git checkout 6.8.290
@@ -39,7 +43,6 @@ The following commands check out V8 and select the branch used by MultiChain. Pl
 
 The V8 build system currently uses a proprietary version of the Ninja build system, called GN. It is part of the `depot_tools` installed earlier.
 
--   Execute `where python` to make sure that `depot_tools\python.bat` indeed comes *before* `python.exe`
 -   Edit the file `BUILD.gn` and remove all lines containing `exe_and_shlib_deps` (8 occurrences)
 -   Execute `set RELEASE=out.gn\x64.release`
 -   Execute `gn args $RELEASE`, insert the following content, save and exit Notepad:

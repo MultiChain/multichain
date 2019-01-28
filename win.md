@@ -66,7 +66,7 @@ On Windows:
         mkdir v8build
         cd v8build
 
--   Follow the instructions in [v8_win.md](V8_win.md) to fetch, configure and build Google's V8 JavaScript engine.
+-   Follow the instructions in [V8_win.md](V8_win.md) to fetch, configure and build Google's V8 JavaScript engine.
 
 -   To facilitate building an additional library required by MultiChain, copy the following files to the Linux machine, in the same rlative folder:
 
@@ -77,16 +77,6 @@ On Linux:
 
         cd $RELEASE
         python $MULTICHAIN_HOME/depends/v8_data_lib.py -m $MULTICHAIN_HOME -o win32
-
-<!--
-        cd $MULTICHAIN_HOME/v8build/v8/out.gn/x64.release
-        objs=()
-        for f in *.bin *.dat; do
-            objcopy -B i386 -I binary -O elf64-x86-64 $f ${f%.*}.obj
-            objs+=("${f%.*}.obj")
-        done
-        x86_64-w64-mingw32-ar rvs v8_data.lib ${objs[@]}
--->        
 
 -   Copy `obj/v8_data.lib` to `%MULTICHAIN_HOME%\v8build\v8\out.gn\x64.release\obj` on Windows.
 
