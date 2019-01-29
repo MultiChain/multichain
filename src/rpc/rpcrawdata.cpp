@@ -55,7 +55,7 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                         if( (param_type == MC_DATA_API_PARAM_TYPE_PUBLISH) ||
                             (param_type == MC_DATA_API_PARAM_TYPE_APPROVAL) ) 
                         {
-                            *strError=string("'for' field should preceed 'create'");       
+                            *strError=string("'create' field should preceed 'for'");       
                             goto exitlbl;
                         }
                         this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_FILTER;
