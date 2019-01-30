@@ -14,19 +14,20 @@ using namespace std;
 using namespace boost;
 
 bool fDBFlatDebug=false;
+bool fDBFlatDebugKey=false;
 
 bool mc_CopyFile(boost::filesystem::path& pathDBOld,boost::filesystem::path& pathDBNew);
 void PrintDBFlatPos(char *msg,const mc_DBFlatPos *pos)
 {
     if(fDBFlatDebug)
     {
-        printf("%s: (%u,%u) at offset %u, flags: %08x\n",msg,pos->m_KeyLen,pos->m_ValLen,pos->m_Offset,pos->m_Flags);        
+        printf("%s: (%u,%u) at offset %u (%08x), flags: %08x\n",msg,pos->m_KeyLen,pos->m_ValLen,pos->m_Offset,pos->m_Offset,pos->m_Flags);        
     }
 }
 
 void PrintDataStreamKey(char *msg,const CDataStream& ss)
 {
-    if(fDBFlatDebug)
+    if(fDBFlatDebugKey)
     {
         CDataStream ss_copy(ss);
         string strType;
@@ -59,20 +60,34 @@ void mc_DBFlatPos::Zero()
 
 uint32_t mc_DBFlatPos::NextOffset()
 {
-    return ValueOffset()+m_ValLen;
+    int64_t lres;
+    lres=ValueOffset()+(int64_t)m_ValLen;
+    
+    if(lres>0xffffffff)
+    {
+        return 0xffffffff;
+    }
+    
+    return (uint32_t)lres;
 }
 
 uint32_t mc_DBFlatPos::ValueOffset()
 {
+    int64_t lres;
     uint32_t res;
-    res=m_Offset;
-    res+=MC_DBF_FLAGS_FIELDSIZE+2;
-    res+=m_KeyLen;
-    if(m_Flags & MC_DBF_FLAGS_SIZE_KEY_LOW)res+=1;
-    if(m_Flags & MC_DBF_FLAGS_SIZE_KEY_HIGH)res+=2;
-    if(m_Flags & MC_DBF_FLAGS_SIZE_VALUE_LOW)res+=1;
-    if(m_Flags & MC_DBF_FLAGS_SIZE_VALUE_HIGH)res+=2;
+    lres=m_Offset;
+    lres+=MC_DBF_FLAGS_FIELDSIZE+2;
+    lres+=m_KeyLen;
+    if(m_Flags & MC_DBF_FLAGS_SIZE_KEY_LOW)lres+=1;
+    if(m_Flags & MC_DBF_FLAGS_SIZE_KEY_HIGH)lres+=2;
+    if(m_Flags & MC_DBF_FLAGS_SIZE_VALUE_LOW)lres+=1;
+    if(m_Flags & MC_DBF_FLAGS_SIZE_VALUE_HIGH)lres+=2;
     
+    res=0xffffffff;
+    if(lres<=0xffffffff)
+    {
+        res=(uint32_t)lres;
+    }
     return res;
 }
 
@@ -260,7 +275,7 @@ bool CDBFlatEnv::Salvage(std::string strFile, bool fAggressive, std::vector<CDBC
     uint32_t last_offset;
     uint32_t last_recovery_offset=0;
     bool in_recovery=false;
-    
+
     if(dbsrc.Open(this,strFile,"r"))
     {
         return false;
@@ -279,6 +294,10 @@ bool CDBFlatEnv::Salvage(std::string strFile, bool fAggressive, std::vector<CDBC
         CDataStream ssValue(SER_DISK, CLIENT_VERSION);        
         
         last_offset=((mc_DBFlatPos*)cursor)->m_Offset;
+        if(in_recovery)
+        {
+            dbsrc.SetFileOffset(last_offset);            
+        }
         ret = dbsrc.ReadAtCursor(cursor, ssKey, ssValue, MC_DBW_CODE_DB_NEXT);
 
         if(ret == 0)
@@ -302,6 +321,7 @@ bool CDBFlatEnv::Salvage(std::string strFile, bool fAggressive, std::vector<CDBC
                 {
                     vResult.pop_back();
                     ((mc_DBFlatPos*)cursor)->m_Offset=last_recovery_offset+1;
+                    last_recovery_offset=0;
                 }
                 else
                 {
@@ -448,11 +468,13 @@ bool CDBFlatEnv::Recover(std::string strFile, std::vector<CDBConstEnv::KeyValPai
 
     string strFileBackup = strFile + ".copy";
     
-    if(!CopyDb(strFile,strFileBackup))
+    if (boost::filesystem::exists(this->m_DirPath / strFile))
     {
-        return false;                
+        if(!CopyDb(strFile,strFileBackup))
+        {
+            return false;                
+        }
     }
-    
     if(!CopyDb(strFileCopy,strFile))
     {
         CopyDb(strFileBackup,strFile);
@@ -947,6 +969,8 @@ int CDBFlat::ReadAtCursor(void* pcursor, CDataStream& ssKey, CDataStream& ssValu
             {
                 return MC_DBW_CODE_DB_NOSERVER;  
             }            
+            lpPos->m_KeyLen=0;
+            lpPos->m_ValLen=0;
             if(read(m_FileHan,&(lpPos->m_KeyLen),key_size_bytes) != key_size_bytes)
             {
                 return MC_DBW_CODE_DB_NOSERVER;  

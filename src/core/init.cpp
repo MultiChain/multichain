@@ -1077,6 +1077,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             {
                 return InitError(_("Couldn't upgrade wallet.dat"));                                    
             }
+            
         }
         
         if (filesystem::exists(pathWalletDat))
@@ -1095,6 +1096,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 //            if (!CWalletDB::Recover(bitdbwrap, strWalletFile, true))
             if(!WalletDBRecover(bitdbwrap,strWalletFile,true))
                 return false;
+            sprintf(bufOutput,"\nTo work properly with salvaged addresses, you have to call importaddress API and restart MultiChain with -rescan\n\n");
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                
         }
 
         if (filesystem::exists(GetDataDir() / strWalletFile))
@@ -1159,7 +1162,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
         if (nLoadWalletRetForBuild != DB_LOAD_OK)                                   // MCHN-TODO wallet recovery
         {
-            return InitError(_("wallet.dat corrupted. Please remove it and restart."));            
+            if (GetBoolArg("-salvagewallet", false))
+            {
+                return InitError(_("wallet.dat corrupted. Please remove it and restart."));            
+            }
+            return InitError(_("wallet.dat corrupted. Please try running MultiChain with -salvagewallet."));                            
         }
 
         if(!pwalletMain->vchDefaultKey.IsValid())
@@ -1626,7 +1633,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
             if (nLoadWalletRetForBuild != DB_LOAD_OK)                                   // MCHN-TODO wallet recovery
             {
-                return InitError(_("wallet.dat corrupted. Please remove it and restart."));            
+                if (GetBoolArg("-salvagewallet", false))
+                {
+                    return InitError(_("wallet.dat corrupted. Please remove it and restart."));            
+                }
+                return InitError(_("wallet.dat corrupted. Please try running MultiChain with -salvagewallet."));                            
             }
 
             if(!pwalletMain->vchDefaultKey.IsValid())

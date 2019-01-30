@@ -794,7 +794,11 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
 
             if (nLoadWalletRetForBuild != DB_LOAD_OK)                                   // MCHN-TODO wallet recovery
             {
-                return InitError(_("wallet.dat corrupted. Please remove it and restart."));            
+                if (GetBoolArg("-salvagewallet", false))
+                {
+                    return InitError(_("wallet.dat corrupted. Please remove it and restart."));            
+                }
+                return InitError(_("wallet.dat corrupted. Please try running MultiChain with -salvagewallet."));                            
             }
 
             if(!pwalletMain->vchDefaultKey.IsValid())
