@@ -14,13 +14,14 @@
 using namespace std;
 using namespace json_spirit;
 
-void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript,uint32_t filter_type);
+void ParseFilterRestrictionsForField(Value param,mc_Script *lpDetailsScript,uint32_t filter_type);
 
 uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_EntityDetails *entity,uint32_t *data_format,int *errorCode,string *strError)
 {
     uint32_t param_type=MC_DATA_API_PARAM_TYPE_NONE;   
     uint32_t this_param_type;  
     bool missing_data=true;
+    bool txfilter=false;
     *data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
     entity->Zero();
     
@@ -51,7 +52,14 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     }
                     if(d.value_.get_str() == "txfilter")
                     {
+                        if( (param_type == MC_DATA_API_PARAM_TYPE_PUBLISH) ||
+                            (param_type == MC_DATA_API_PARAM_TYPE_APPROVAL) ) 
+                        {
+                            *strError=string("'create' field should preceed 'for'");       
+                            goto exitlbl;
+                        }
                         this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_FILTER;
+                        txfilter=true;
                     }
                     if(d.value_.get_str() == "streamfilter")
                     {
@@ -80,23 +88,31 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
             }
             if(d.name_ == "for")
             {
-                if(d.value_.type() != null_type && !d.value_.get_str().empty())
+                if(txfilter)
                 {
-                    ParseEntityIdentifier(d.value_,entity, MC_ENT_TYPE_ANY);       
-                }                
-                if(entity->GetEntityType() == MC_ENT_TYPE_STREAM)
-                {
-                    this_param_type=MC_DATA_API_PARAM_TYPE_PUBLISH;                
+                    param_type=MC_DATA_API_PARAM_TYPE_NONE;           
+                    this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_FILTER;
                 }
-                if(entity->GetEntityType() == MC_ENT_TYPE_UPGRADE)
+                else
                 {
-                    this_param_type=MC_DATA_API_PARAM_TYPE_APPROVAL;                
-                }
-                if(this_param_type == MC_DATA_API_PARAM_TYPE_NONE)
-                {
-                    *strError=string("Entity with this identifier not found");                            
-                    *errorCode=RPC_ENTITY_NOT_FOUND;
-                    goto exitlbl;                        
+                    if(d.value_.type() != null_type && !d.value_.get_str().empty())
+                    {
+                        ParseEntityIdentifier(d.value_,entity, MC_ENT_TYPE_ANY);       
+                        if(entity->GetEntityType() == MC_ENT_TYPE_STREAM)
+                        {
+                            this_param_type=MC_DATA_API_PARAM_TYPE_PUBLISH;                
+                        }
+                        if(entity->GetEntityType() == MC_ENT_TYPE_UPGRADE)
+                        {
+                            this_param_type=MC_DATA_API_PARAM_TYPE_APPROVAL;                
+                        }
+                    }                
+                    if(this_param_type == MC_DATA_API_PARAM_TYPE_NONE)
+                    {
+                        *strError=string("Entity with this identifier not found");                            
+                        *errorCode=RPC_ENTITY_NOT_FOUND;
+                        goto exitlbl;                        
+                    }
                 }
             }
             if( (d.name_ == "text") || (d.name_ == "json")  || (d.name_ == "cache") )
@@ -1231,14 +1247,14 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
             missing_name=false;
             field_parsed=true;
         }
-        if(d.name_ == "restrictions")
+        if(d.name_ == "for")
         {
             if(!missing_for)
             {
-                *strError=string("restrictions field can appear only once in the object");                                                                                                        
+                *strError=string("for field can appear only once in the object");                                                                                                        
             }
-                        
-            ParseFilterRestrictions(d.value_,lpDetailsScript,MC_FLT_TYPE_TX);
+             
+            ParseFilterRestrictionsForField(d.value_,lpDetailsScript,MC_FLT_TYPE_TX);
                         
             script = lpDetailsScript->GetData(0,&bytes);
 
@@ -1291,7 +1307,7 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
         {
             if(!missing_for)
             {
-                *strError=string("restrictions field is allowed only for tx filters");                                                                                                        
+                *strError=string("for field is allowed only for tx filters");                                                                                                        
                 *errorCode=RPC_NOT_ALLOWED;                
             }
         }
