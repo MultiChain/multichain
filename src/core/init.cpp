@@ -372,6 +372,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -forcednsseed          " + strprintf(_("Always query for peer addresses via DNS lookup (default: %u)"), 0) + "\n";
     strUsage += "  -listen                " + _("Accept connections from outside (default: 1 if no -proxy or -connect)") + "\n";
     strUsage += "  -maxconnections=<n>    " + strprintf(_("Maintain at most <n> connections to peers (default: %u)"), 125) + "\n";
+    strUsage += "  -maxoutconnections=<n> " + strprintf(_("Open at most <n> outbound connections to peers (1-32, default: %u)"), 8) + "\n";
     strUsage += "  -maxreceivebuffer=<n>  " + strprintf(_("Maximum per-connection receive buffer, <n>*1000 bytes (default: %u)"), 5000) + "\n";
     strUsage += "  -maxsendbuffer=<n>     " + strprintf(_("Maximum per-connection send buffer, <n>*1000 bytes (default: %u)"), 100000) + "\n";
     strUsage += "  -onion=<ip:port>       " + strprintf(_("Use separate SOCKS5 proxy to reach peers via Tor hidden services (default: %s)"), "-proxy") + "\n";
@@ -827,7 +828,14 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     // Check for -tor - as this is a privacy risk to continue, exit here
     if (GetBoolArg("-tor", false))
         return InitError(_("Error: Unsupported argument -tor found, use -onion."));
-
+    int MaxOutConnections=GetArg("-maxoutconnections",8);
+    if ( (MaxOutConnections < 1) || (MaxOutConnections > 32) )
+    {
+        return InitError(_("Error: -maxoutconnections out of range."));        
+    }
+    
+    
+    
     if (GetBoolArg("-benchmark", false))
         InitWarning(_("Warning: Unsupported argument -benchmark ignored, use -debug=bench."));
 

@@ -951,7 +951,7 @@ void ThreadSocketHandler()
                     if (nErr != WSAEWOULDBLOCK)
                         LogPrintf("socket error accept failed: %s\n", NetworkErrorString(nErr));
                 }
-                else if (nInbound >= nMaxConnections - MAX_OUTBOUND_CONNECTIONS)
+                else if (nInbound >= nMaxConnections - GetArg("-maxoutconnections",MAX_OUTBOUND_CONNECTIONS))
                 {
                     CloseSocket(hSocket);
                 }
@@ -1911,7 +1911,7 @@ void StartNode(boost::thread_group& threadGroup)
 
     if (semOutbound == NULL) {
         // initialize semaphore
-        int nMaxOutbound = min(MAX_OUTBOUND_CONNECTIONS, nMaxConnections);
+        int nMaxOutbound = min((int)GetArg("-maxoutconnections",MAX_OUTBOUND_CONNECTIONS), nMaxConnections);
         semOutbound = new CSemaphore(nMaxOutbound);
     }
 
@@ -1954,7 +1954,7 @@ bool StopNode()
     LogPrintf("StopNode()\n");
     MapPort(false);
     if (semOutbound)
-        for (int i=0; i<MAX_OUTBOUND_CONNECTIONS; i++)
+        for (int i=0; i<GetArg("-maxoutconnections",MAX_OUTBOUND_CONNECTIONS); i++)
             semOutbound->post();
 
     if (fAddressesInitialized)

@@ -3931,7 +3931,7 @@ void mc_InitRPCHelpMap16()
             "create-new-filter                     (object, required) A json object with new filter details\n"
             "    {\n"                
             "      \"create\" : \"filter-type\"        (string, required) txfilter or stream filter\n"
-            "      \"name\" : \"filter-name\"          (string, optional) Upgrade name\n"
+            "      \"name\" : \"filter-name\"          (string, optional) Filter name\n"
             "      \"for\": \"entity-identifier\"      (string, optional) Only for tx filters, Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
             "        or\n"
             "      \"for\": entity-identifier(s)     (array, optional) Only for tx filters, A json array of asset/stream identifiers .\n"    
