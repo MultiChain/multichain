@@ -2715,6 +2715,7 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
         
         mc_EntityDetails entity;
         
+        entity.Zero();
         CScript scriptPubKey = GetScriptForString(s.name_,MC_ENT_TYPE_FILTER,&entity);
         CAmount nAmount=0;
 

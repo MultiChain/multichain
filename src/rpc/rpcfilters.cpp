@@ -12,6 +12,31 @@
 void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
 void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity);
 
+void ParseFilterRestrictionsForField(Value param,mc_Script *lpDetailsScript,uint32_t filter_type)
+{
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();                   
+    vector<string> inputStrings;
+    if(param.type() == str_type)
+    {
+        inputStrings.push_back(param.get_str());
+    }
+    else
+    {
+        inputStrings=ParseStringList(param);        
+    }
+    for(int is=0;is<(int)inputStrings.size();is++)
+    {
+        mc_EntityDetails entity;
+        ParseEntityIdentifier(inputStrings[is],&entity, MC_ENT_TYPE_ANY);           
+        if(entity.GetEntityType() > MC_ENT_TYPE_STREAM_MAX)
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Filter can be created only for streams and assets");           
+        }
+        lpDetailsScript->SetData(entity.GetShortRef(),MC_AST_SHORT_TXID_SIZE);
+    }
+}
+
 void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript,uint32_t filter_type)
 {
     bool field_parsed,already_found;
@@ -35,27 +60,7 @@ void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript,uint32_t fil
                 {
                     throw JSONRPCError(RPC_INVALID_PARAMETER,"for field can appear only once in the object");                               
                 }
-                lpDetailsScript->Clear();
-                lpDetailsScript->AddElement();                   
-                vector<string> inputStrings;
-                if(s.value_.type() == str_type)
-                {
-                    inputStrings.push_back(s.value_.get_str());
-                }
-                else
-                {
-                    inputStrings=ParseStringList(s.value_);        
-                }
-                for(int is=0;is<(int)inputStrings.size();is++)
-                {
-                    mc_EntityDetails entity;
-                    ParseEntityIdentifier(inputStrings[is],&entity, MC_ENT_TYPE_ANY);           
-                    if(entity.GetEntityType() > MC_ENT_TYPE_STREAM_MAX)
-                    {
-                        throw JSONRPCError(RPC_NOT_ALLOWED, "Filter can be created only for streams and assets");           
-                    }
-                    lpDetailsScript->SetData(entity.GetShortRef(),MC_AST_SHORT_TXID_SIZE);
-                }
+                ParseFilterRestrictionsForField(s.value_,lpDetailsScript,filter_type);
                 field_parsed=true;
                 already_found=true;
             }
