@@ -3,16 +3,23 @@
 ## Install dependencies
 
 Install XCode and XCode command line tools
+
 Install git from git-scm
+
 Install brew (follow instructions on brew.sh)
 
-    brew install autoconf automake berkeley-db4 libtool boost openssl pkg-config rename
+    brew install autoconf automake berkeley-db4 libtool boost@1.57 openssl pkg-config rename python
+    brew link boost@1.57 --force
 
-<!-- on MacOS High Sierra -->
+If another Boost version was already installed, then do this:
 
     brew uninstall boost
     brew install boost@1.57
     brew link boost@1.57 --force
+	
+The following command may be necessary if XCode was not used yet:
+
+    sudo xcode-select -s /Applications/Xcode.app
 
 ## Prepare for static linking
 
