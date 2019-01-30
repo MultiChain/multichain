@@ -44,6 +44,7 @@ set(SOURCES
     v8ubjson.cpp
     v8utils.cpp
     v8_win.cpp
+    multichain-v8.rc
     )
 
 string(REPLACE "/MD" "/MT" CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
