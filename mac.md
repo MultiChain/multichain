@@ -56,17 +56,15 @@ The default brew cookbook for berkeley-db and boost builds static libraries, but
     git clone https://github.com/MultiChain/multichain.git
 
 
-## Prepare to build V8
+## Prepare to download or build V8
 
     cd multichain
     set MULTICHAIN_HOME=$(pwd)
     mkdir v8build
     cd v8build
 
-## Build Google's V8 JavaScript engine locally
-
-Please use the instructions in [V8_mac.md](/V8_mac.md/) to build and install V8 for use by MultiChain.
-
+    
+You can use pre-built headers and binaries of Google's V8 JavaScript engine by downloading and expanding [macos-v8.tar.gz](https://github.com/MultiChain/multichain-binaries/raw/master/macos-v8.tar.gz) in the current directory. If, on the other hand, you prefer to build the V8 component yourself, please follow the instructions in [V8_mac.md](/V8_mac.md/).
 
 ## Compile MultiChain for Mac (64-bit)
 
