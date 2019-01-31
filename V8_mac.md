@@ -8,7 +8,10 @@ MultiChain uses V8 version 6.8, and requires at least 4 GB of RAM to build in a 
 
 Google's [depot_tools](http://dev.chromium.org/developers/how-tos/install-depot-tools) are used by the Google build system to manage Git checkouts.
 
-    git clone --depth=1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
+    git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+    cd depot_tools
+    git checkout af2ffd933d0e6d8b5bd8c48be7a2b2d568a5eea2
+    cd ..
     export PATH=${PATH}:$(pwd)/depot_tools
 
 ## Fetch V8
@@ -25,16 +28,11 @@ The following commands check out V8 and select the branch used by MultiChain. Pl
 The V8 build system currently uses a proprietary version of the Ninja build system, called GN. It is part of the `depot_tools` installed earlier.
 
     find . -name BUILD.gn -exec sed -i bak '/exe_and_shlib_deps/d' {} \;
-    tools/dev/v8gen.py x64.release
+    pushd base/trace_event/common
+    git checkout 211b3ed9d0481b4caddbee1322321b86a483ca1f
+    popd
     RELEASE=out.gn/x64.release
-    cat > $RELEASE/args.gn << END
-    is_debug = false
-    target_cpu = "x64"
-    is_component_build = false
-    v8_static_library = true
-    use_custom_libcxx = false
-    use_custom_libcxx_for_host = false
-    END
+    gn gen $RELEASE --args='is_debug=false target_cpu="x64" v8_static_library=true is_component_build=false use_custom_libcxx=false use_custom_libcxx_for_host=false'
 
 The selected release of the V8 sources requires relaxing two compiler checks to prevent compilation errors.
 

@@ -8,7 +8,7 @@ Install git from git-scm
 
 Install brew (follow instructions on brew.sh)
 
-    brew install autoconf automake berkeley-db4 libtool boost@1.57 openssl pkg-config rename python
+    brew install autoconf automake berkeley-db4 libtool boost@1.57 openssl pkg-config rename python@2
     brew link boost@1.57 --force
 
 If another Boost version was already installed, then do this:
@@ -29,7 +29,7 @@ To create a statically linked MultiChain which only depends on default MacOS dyl
 
 1. Hide the brew boost dylibs from the build system:
 
-        rename -e 's/.dylib/.dylib.hidden/' /usr/local/opt/boost/lib/*.dylib
+        rename -e 's/.dylib/.dylib.hidden/' /usr/local/opt/boost\@1.57/lib/*.dylib
 
 2. Hide the brew berekley-db dylibs from the build system:
 
