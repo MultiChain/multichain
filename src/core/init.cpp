@@ -1166,7 +1166,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             {
                 return InitError(_("wallet.dat corrupted. Please remove it and restart."));            
             }
-            return InitError(_("wallet.dat corrupted. Please try running MultiChain with -salvagewallet."));                            
+            return InitError(_("wallet.dat is partially corrupted. Please try running MultiChain with -salvagewallet."));                            
         }
 
         if(!pwalletMain->vchDefaultKey.IsValid())
