@@ -72,7 +72,9 @@ If, on the other hand, you prefer to build the V8 component yourself, please per
 
 On Linux:
 
+        export RELEASE_HOME=$MULTICHAIN_HOME/v8build/v8/out.gn/x64.release
         cd $RELEASE
+        mkdir obj
         python $MULTICHAIN_HOME/depends/v8_data_lib.py -m $MULTICHAIN_HOME -o win32
 
 -   Copy `obj/v8_data.lib` to `%MULTICHAIN_HOME%\v8build\v8\out.gn\x64.release\obj` on Windows.
