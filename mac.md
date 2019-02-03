@@ -8,7 +8,7 @@ Install git from git-scm
 
 Install brew (follow instructions on brew.sh)
 
-    brew install autoconf automake berkeley-db4 libtool boost@1.57 openssl pkg-config rename python
+    brew install autoconf automake berkeley-db4 libtool boost@1.57 openssl pkg-config rename python@2
     brew link boost@1.57 --force
 
 If another Boost version was already installed, then do this:
@@ -29,7 +29,7 @@ To create a statically linked MultiChain which only depends on default MacOS dyl
 
 1. Hide the brew boost dylibs from the build system:
 
-        rename -e 's/.dylib/.dylib.hidden/' /usr/local/opt/boost/lib/*.dylib
+        rename -e 's/.dylib/.dylib.hidden/' /usr/local/opt/boost\@1.57/lib/*.dylib
 
 2. Hide the brew berekley-db dylibs from the build system:
 
@@ -56,17 +56,15 @@ The default brew cookbook for berkeley-db and boost builds static libraries, but
     git clone https://github.com/MultiChain/multichain.git
 
 
-## Prepare to build V8
+## Prepare to download or build V8
 
     cd multichain
     set MULTICHAIN_HOME=$(pwd)
     mkdir v8build
     cd v8build
 
-## Build Google's V8 JavaScript engine locally
-
-Please use the instructions in [V8_mac.md](/V8_mac.md/) to build and install V8 for use by MultiChain.
-
+    
+You can use pre-built headers and binaries of Google's V8 JavaScript engine by downloading and expanding [macos-v8.tar.gz](https://github.com/MultiChain/multichain-binaries/raw/master/macos-v8.tar.gz) in the current directory. If, on the other hand, you prefer to build the V8 component yourself, please follow the instructions in [V8_mac.md](/V8_mac.md/).
 
 ## Compile MultiChain for Mac (64-bit)
 

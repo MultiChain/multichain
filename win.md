@@ -50,13 +50,18 @@ On Windows:
         cd multichain
         set MULTICHAIN_HOME=%CD%
 
-### Build the Google V8 JavaScript engine
+### Prepare to download or build V8
 
 On Windows:
 
         cd %MULTICHAIN_HOME%
         mkdir v8build
         cd v8build
+
+    
+You can use pre-built headers and binaries of Google's V8 JavaScript engine by downloading and expanding [windows-v8.zip](https://github.com/MultiChain/multichain-binaries/raw/master/windows-v8.zip) in the current directory.
+
+If, on the other hand, you prefer to build the V8 component yourself, please perform the following:
 
 -   Follow the instructions in [V8_win.md](V8_win.md) to fetch, configure and build Google's V8 JavaScript engine.
 
