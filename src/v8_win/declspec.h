@@ -1,3 +1,6 @@
+// Copyright (c) 2014-2019 Coin Sciences Ltd
+// MultiChain code distributed under the GPLv3 license, see COPYING file.
+
 #ifndef DECLSPEC_H
 #define DECLSPEC_H
 
