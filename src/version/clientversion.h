@@ -41,7 +41,7 @@
 //! Copyright string used in Windows .rc files
 /* MCHN START */
 #define COPYRIGHT_STR "2014-" STRINGIZE(COPYRIGHT_YEAR) " Coin Sciences Ltd"
-#define WIN_VERSION 2.0.0.2
+#define WIN_VERSION_STR "2.0.0.2"
 /* MCHN END */
 /**
  * bitcoind-res.rc includes this file, but it cannot cope with real c++ code.
