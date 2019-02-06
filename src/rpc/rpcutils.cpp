@@ -2388,7 +2388,7 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
             if(a.name_.size())
             {
                 asset_name=a.name_;
-                asset_error=ParseAssetKeyToFullAssetRef(asset_name.c_str(),buf,&multiple,NULL, MC_ENT_TYPE_ASSET);
+                asset_error=ParseAssetKeyToFullAssetRef(asset_name.c_str(),buf,&multiple,NULL, (verify_level & 0x0200) ? MC_ENT_TYPE_ASSET : MC_ENT_TYPE_ANY);
                 if(asset_error)
                 {
                     goto exitlbl;

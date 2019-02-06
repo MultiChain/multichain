@@ -152,6 +152,7 @@ typedef struct mc_Features
     int FixedIn20006();
     int NonceInMinerSignature();
     int ImplicitConnectPermission();
+    int LicenseTokens();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo

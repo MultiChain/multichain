@@ -57,6 +57,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                  string& reason,
                                  int64_t *mandatory_fee_out,     
                                  uint32_t *replay);
+bool Is_MultiChainLicenseTokenTransfer(const CTransaction& tx);
 bool ExtractDestinationScriptValid(const CScript& scriptPubKey, CTxDestination& addressRet);
 bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs, string& reason);
 bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& reason);
@@ -2081,6 +2082,7 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
         CAmount nValueIn = 0;
         CAmount nFees = 0;
         int async_count=0;
+        bool fIsLicenseTokenTransfer=Is_MultiChainLicenseTokenTransfer(tx);
         
         vector <unsigned int> vSendPermissionFlags;
         
@@ -2110,28 +2112,36 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                 CTxDestination addressRet;     
                 if(ExtractDestinationScriptValid(coins->vout[prevout.n].scriptPubKey, addressRet))
                 {
-                    CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
-                    if(lpKeyID != NULL)
-                    {
-                        if(!mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpKeyID)))
+                    if(!fIsLicenseTokenTransfer)
+                    {                        
+                        CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
+                        if(lpKeyID != NULL)
                         {
-                            return state.Invalid(error("CheckInputs() : %s input %d doesn't have send permission", tx.GetHash().ToString(),i));
-                        }                            
-                        send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
-                        async_count++;
+                            if(!mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpKeyID)))
+                            {
+                                return state.Invalid(error("CheckInputs() : %s input %d doesn't have send permission", tx.GetHash().ToString(),i));
+                            }                            
+                            send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
+                            async_count++;
+                        }
+                        else
+                        {
+                            CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
+                            if(lpScriptID)
+                            {
+                                if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpScriptID)))
+                                {
+                                    send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
+                                    async_count++;
+                                }                
+                            }
+                        }                                            
                     }
                     else
                     {
-                        CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
-                        if(lpScriptID)
-                        {
-                            if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpScriptID)))
-                            {
-                                send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
-                                async_count++;
-                            }                
-                        }
-                    }                    
+                        send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
+                        async_count++;                        
+                    }
                 }
             }
 
