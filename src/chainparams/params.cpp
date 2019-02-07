@@ -165,6 +165,11 @@ void* mc_MultichainParams::GetParam(const char *param,int* size)
 
 int mc_MultichainParams::IsParamUpgradeValueInRange(const mc_OneMultichainParam *param,int version,int64_t value)
 {
+    if((param->m_Type & MC_PRM_DATA_TYPE_MASK) == MC_PRM_BOOLEAN)
+    {
+        return 1;
+    }
+    
     if(value >= param->m_MinIntegerValue)
     {
         if(value <= param->m_MaxIntegerValue)
@@ -275,6 +280,20 @@ int mc_MultichainParams::CanBeUpgradedByVersion(const char *param,int version,in
     if(strcmp(param,"maximumchunkcount") == 0)
     {
         if(version >= 20003)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    if( (strcmp(param,"anyonecanconnect") == 0) ||
+        (strcmp(param,"anyonecansend") == 0) ||
+        (strcmp(param,"anyonecanreceive") == 0) ||
+        (strcmp(param,"anyonecanreceiveempty") == 0) ||
+        (strcmp(param,"anyonecancreate") == 0) ||
+        (strcmp(param,"anyonecanissue") == 0) ||
+        (strcmp(param,"anyonecanactivate") == 0) )            
+    {
+        if(version >= 20007)
         {
             return m_lpCoord[2 * index + 1];
         }

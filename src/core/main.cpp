@@ -440,6 +440,41 @@ int SetUpgradedParamValue(const mc_OneMultichainParam *param,int64_t value)
         MAX_CHUNK_COUNT=value;
     }           
     
+    if(strcmp(param->m_Name,"anyonecanconnect") == 0)
+    {
+        MCP_ANYONE_CAN_CONNECT=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecansend") == 0)
+    {
+        MCP_ANYONE_CAN_SEND=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecanreceive") == 0)
+    {
+        MCP_ANYONE_CAN_RECEIVE=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecanreceiveempty") == 0)
+    {
+        MCP_ANYONE_CAN_RECEIVE_EMPTY=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecancreate") == 0)
+    {
+        MCP_ANYONE_CAN_CREATE=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecanissue") == 0)
+    {
+        MCP_ANYONE_CAN_ISSUE=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecanactivate") == 0)
+    {
+        MCP_ANYONE_CAN_ACTIVATE=value;
+    }   
+    
     return MC_ERR_NOERROR;
 }
 

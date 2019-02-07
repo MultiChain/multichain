@@ -742,8 +742,36 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                 {
                     param_value=(int)MAX_CHUNK_COUNT;
                 }
+                if(strcmp("anyonecanconnect",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(MCP_ANYONE_CAN_CONNECT != 0);
+                }
+                if(strcmp("anyonecansend",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(MCP_ANYONE_CAN_SEND != 0);
+                }
+                if(strcmp("anyonecanreceive",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(MCP_ANYONE_CAN_RECEIVE != 0);
+                }
+                if(strcmp("anyonecanreceiveempty",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(MCP_ANYONE_CAN_RECEIVE_EMPTY != 0);
+                }
+                if(strcmp("anyonecancreate",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(MCP_ANYONE_CAN_CREATE != 0);
+                }
+                if(strcmp("anyonecanissue",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(MCP_ANYONE_CAN_ISSUE != 0);
+                }
+                if(strcmp("anyonecanactivate",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(MCP_ANYONE_CAN_ACTIVATE != 0);
+                }
             }
-
+    
             if(!hidden)
             {
                 obj.push_back(Pair(param_name,param_value));        
