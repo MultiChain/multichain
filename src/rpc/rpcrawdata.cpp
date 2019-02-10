@@ -5,6 +5,8 @@
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "rpc/rpcutils.h"
+#include "filters/multichainfilter.h"
+#include "filters/filter.h"
 
 #include "utils/util.h"
 #include "json/json_spirit_ubjson.h"
@@ -1206,7 +1208,7 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
     bool field_parsed;
     size_t bytes;
     const unsigned char *script;
-    string entity_name;
+    string entity_name,filter_code,filter_main_name;
     uint32_t filter_type=MC_FLT_TYPE_TX;
 
     bool missing_name=true;
@@ -1281,6 +1283,7 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
             {
                 *strError=string("Invalid code field type");                            
             }
+            filter_code=d.value_.get_str();
             missing_code=false;
             field_parsed=true;
         }
@@ -1301,20 +1304,46 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
         }
     }    
     
+    filter_main_name=MC_FLT_MAIN_NAME_TX;
+    
     if(strError->size() == 0)
     {
         if(filter_type != MC_FLT_TYPE_TX)
         {
+            filter_main_name=MC_FLT_MAIN_NAME_STREAM;
             if(!missing_for)
             {
                 *strError=string("for field is allowed only for tx filters");                                                                                                        
                 *errorCode=RPC_NOT_ALLOWED;                
             }
         }
-        
+    }
+    
+    if(strError->size() == 0)
+    {
+
         if(missing_code)
         {                    
             *strError=string("Missing code");                                                                                            
+        }        
+        else
+        {
+            mc_Filter *worker=new mc_Filter;
+            string strFilterError;
+            int err=pFilterEngine->CreateFilter(filter_code.c_str(),filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strFilterError);
+            delete worker;
+            if(err)
+            {
+                *strError=string("Couldn't create filter");                                                                                                        
+                *errorCode=RPC_INTERNAL_ERROR;                
+            }
+            else
+            {      
+                if(strFilterError.size())
+                {
+                    *strError=strprintf("Couldn't compile filter code: %s",strFilterError.c_str());                                                                                                      
+                }
+            }            
         }
     }
     
