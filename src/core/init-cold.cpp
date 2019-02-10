@@ -214,7 +214,7 @@ std::string HelpMessage_Cold()
     strUsage += "  -salvagewallet         " + _("Attempt to recover private keys from a corrupt wallet.dat") + " " + _("on startup") + "\n";
     strUsage += "  -wallet=<file>         " + _("Specify wallet file (within data directory)") + " " + strprintf(_("(default: %s)"), "wallet.dat") + "\n";
 /* MCHN START */    
-    strUsage += "  -walletdbversion=1|2   " + _("Specify wallet version, 1 - not scalable, 2 (default) - scalable") + "\n";
+    strUsage += "  -walletdbversion=2|3   " + _("Specify wallet version, 2 - Berkeley DB, 3 (default) - proprietary") + "\n";
 /* MCHN END */    
 #endif
 

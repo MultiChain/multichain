@@ -414,7 +414,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -walletnotifynew=<cmd> " + _("Execute this command when a transaction is first seen, if it relates to an address in the wallet or a subscribed asset or stream. ") + "\n";
     strUsage += "                         " + _("(more details and % substitutions online)") + "\n";
 /* MCHN START */    
-    strUsage += "  -walletdbversion=1|2   " + _("Specify wallet version, 1 - not scalable, 2 (default) - scalable") + "\n";
+    strUsage += "  -walletdbversion=2|3   " + _("Specify wallet version, 2 - Berkeley DB, 3 (default) - proprietary") + "\n";
     strUsage += "  -autosubscribe=streams|assets|\"streams,assets\"|\"assets,streams\" " + _("Automatically subscribe to new streams and/or assets") + "\n";
 /* MCHN END */    
     strUsage += "  -zapwallettxes=<mode>  " + _("Delete all wallet transactions and only recover those parts of the blockchain through -rescan on startup") + "\n";
