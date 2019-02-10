@@ -4066,11 +4066,8 @@ void mc_InitRPCHelpMap16()
             "{\n"
             "  \"stream-filter-identifier\":          (string, required) Stream Filter identifier - one of: create txid, filter reference, filter name.\n"
             "   {\n"
-            "     \"approve\" :                       (object, required) \n"
-            "       {\n"                
-            "          \"approve\" : approve          (boolean, required) Approve or disapprove\n"
-            "          \"for\" : \"stream-identifier\"  (string, required)  Stream identifier - one of: create txid, stream reference, stream name.\n"
-            "       }\n"                                
+            "     \"approve\" : approve               (boolean, required) Approve or disapprove\n"
+            "     \"for\" : \"stream-identifier\"       (string, required)  Stream identifier - one of: create txid, stream reference, stream name.\n"
             "   }\n"                                
             "}\n"
         ));

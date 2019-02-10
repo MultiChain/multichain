@@ -2729,12 +2729,6 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
             timestamp=mc_TimeNowAsUInt();
             mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript4;
             lpScript->Clear();
-            if ( (s.value_.type() != obj_type) || 
-                 (s.value_.get_obj().size() != 1) || 
-                 (s.value_.get_obj()[0].name_ != "approve") )
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Filter approval should be object with single field - approve");                
-            }
             if(entity.GetFilterType() == MC_FLT_TYPE_STREAM)
             {
                 mc_EntityDetails stream_entity;
@@ -2743,11 +2737,18 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
                 {
                     throw JSONRPCError(RPC_NOT_SUPPORTED, "Only Tx filters can be approved/disapproved in this protocol version.");        
                 }        
-                approval=ParseStreamFilterApproval(s.value_.get_obj()[0].value_,&stream_entity);
+//                approval=ParseStreamFilterApproval(s.value_.get_obj()[0].value_,&stream_entity);
+                approval=ParseStreamFilterApproval(s.value_,&stream_entity);
                 lpScript->SetEntity(stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);                    
             }
             else
             {
+                if ( (s.value_.type() != obj_type) || 
+                     (s.value_.get_obj().size() != 1) || 
+                     (s.value_.get_obj()[0].name_ != "approve") )
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Filter approval should be object with single field - approve");                
+                }
                 approval=1;
                 if(!paramtobool(s.value_.get_obj()[0].value_))
                 {
