@@ -1,14 +1,14 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef BITCOIN_WALLETDB_H
 #define BITCOIN_WALLETDB_H
 
 #include "structs/amount.h"
-#include "wallet/db.h"
+#include "wallet/dbwrap.h"
 #include "keys/key.h"
 #include "wallet/keystore.h"
 
@@ -28,6 +28,10 @@ class CWallet;
 class CWalletTx;
 class uint160;
 class uint256;
+
+bool WalletDBRecover(CDBWrapEnv& dbenv, std::string filename, bool fOnlyKeys);
+bool WalletDBRecover(CDBWrapEnv& dbenv, std::string filename);
+
 
 /** Error statuses for the wallet database */
 enum DBErrors
@@ -74,10 +78,10 @@ public:
 };
 
 /** Access to the wallet database (wallet.dat) */
-class CWalletDB : public CDB
+class CWalletDB : public CDBWrap
 {
 public:
-    CWalletDB(const std::string& strFilename, const char* pszMode = "r+") : CDB(strFilename, pszMode)
+    CWalletDB(const std::string& strFilename, const char* pszMode = "r+") : CDBWrap(strFilename, pszMode)
     {
     }
 
@@ -128,8 +132,6 @@ public:
     DBErrors LoadWallet(CWallet* pwallet);
     DBErrors FindWalletTx(CWallet* pwallet, std::vector<uint256>& vTxHash, std::vector<CWalletTx>& vWtx);
     DBErrors ZapWalletTx(CWallet* pwallet, std::vector<CWalletTx>& vWtx);
-    static bool Recover(CDBEnv& dbenv, std::string filename, bool fOnlyKeys);
-    static bool Recover(CDBEnv& dbenv, std::string filename);
 
 private:
     CWalletDB(const CWalletDB&);

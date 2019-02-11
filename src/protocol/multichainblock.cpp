@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "core/main.h"
@@ -191,10 +191,56 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
                                                 if (it != map_last_upgrade.end())
                                                 {
                                                     take_it=false;
-                                                    if( ( (param.m_Param->m_Type & MC_PRM_TIME) == 0 ) ||
-                                                           ((*vParams)[it->second].m_Block + MIN_BLOCKS_BETWEEN_UPGRADES <= upgrade.m_AppliedBlock) )
+                                                    if(( param.m_Param->m_Type & MC_PRM_DATA_TYPE_MASK) == MC_PRM_BOOLEAN )
                                                     {
-                                                        int64_t old_value=(*vParams)[it->second].m_Value;
+                                                        take_it=true;                                                        
+                                                    }
+                                                    else                                                        
+                                                    {                                                    
+                                                        if( ( (param.m_Param->m_Type & MC_PRM_TIME) == 0 ) ||
+                                                               ((*vParams)[it->second].m_Block + MIN_BLOCKS_BETWEEN_UPGRADES <= upgrade.m_AppliedBlock) )
+                                                        {
+                                                            int64_t old_value=(*vParams)[it->second].m_Value;
+                                                            if(param.m_Value >= old_value)
+                                                            {
+                                                                if(param_value <= 2*old_value)
+                                                                {
+                                                                    take_it=true;
+                                                                }
+                                                            }
+                                                            else
+                                                            {
+                                                                if(old_value <= 2*param_value)
+                                                                {
+                                                                    take_it=true;
+                                                                }                                                            
+                                                            }
+                                                            if(!take_it)
+                                                            {
+                                                                param.m_Skipped =MC_PSK_DOUBLE_RANGE;
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            param.m_Skipped = MC_PSK_FRESH_UPGRADE;
+                                                        }
+                                                    }
+                                                    if(take_it)
+                                                    {
+                                                        it->second=(int)vParams->size();
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    take_it=false;
+                                                    if(( param.m_Param->m_Type & MC_PRM_DATA_TYPE_MASK) == MC_PRM_BOOLEAN )
+                                                    {
+                                                        take_it=true;                                                        
+                                                    }
+                                                    else                                                        
+                                                    {
+                                                        int64_t old_value=mc_gState->m_NetworkParams->GetInt64Param(param.m_Param->m_Name);
+
                                                         if(param.m_Value >= old_value)
                                                         {
                                                             if(param_value <= 2*old_value)
@@ -209,38 +255,6 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
                                                                 take_it=true;
                                                             }                                                            
                                                         }
-                                                        if(!take_it)
-                                                        {
-                                                            param.m_Skipped =MC_PSK_DOUBLE_RANGE;
-                                                        }
-                                                    }
-                                                    else
-                                                    {
-                                                        param.m_Skipped = MC_PSK_FRESH_UPGRADE;
-                                                    }
-                                                    if(take_it)
-                                                    {
-                                                        it->second=(int)vParams->size();
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    take_it=false;
-                                                    int64_t old_value=mc_gState->m_NetworkParams->GetInt64Param(param.m_Param->m_Name);
-                                                    
-                                                    if(param.m_Value >= old_value)
-                                                    {
-                                                        if(param_value <= 2*old_value)
-                                                        {
-                                                            take_it=true;
-                                                        }
-                                                    }
-                                                    else
-                                                    {
-                                                        if(old_value <= 2*param_value)
-                                                        {
-                                                            take_it=true;
-                                                        }                                                            
                                                     }
                                                     if(!take_it)
                                                     {

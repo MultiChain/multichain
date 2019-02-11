@@ -1,6 +1,6 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "wallet/wallettxs.h"
@@ -295,6 +295,19 @@ int mc_WalletTxs::Initialize(
     m_ChunkBuffer=(unsigned char*)mc_New(MAX_CHUNK_SIZE);
     return err;
 }
+
+int mc_WalletTxs::UpdateMode(uint32_t mode)
+{
+    m_Mode |= mode;
+    if(m_Database)
+    {
+        return m_Database->UpdateMode(mode);
+    }
+    
+    return MC_ERR_INTERNAL_ERROR;
+}
+    
+
 
 int mc_WalletTxs::SetMode(uint32_t mode, uint32_t mask)
 {

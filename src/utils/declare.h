@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef MULTICHAIN_DECLARE_H
@@ -285,6 +285,8 @@ const char* __US_UserHomeDir();
 char * __US_FullPath(const char* path, char *full_path, int len);
 void __US_FlushFile(int FileHan);
 void __US_FlushFileWithMode(int FileHan,uint32_t use_data_sync);
+int __US_LockFile(int FileHan);
+int __US_UnLockFile(int FileHan);
 int __US_DeleteFile(const char *file_name);
 void sprintf_hex(char *hex,const unsigned char *bin,int size);
 

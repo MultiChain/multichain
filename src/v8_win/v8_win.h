@@ -1,3 +1,6 @@
+// Copyright (c) 2014-2019 Coin Sciences Ltd
+// MultiChain code distributed under the GPLv3 license, see COPYING file.
+
 #ifndef V8_WIN_H
 #define V8_WIN_H
 

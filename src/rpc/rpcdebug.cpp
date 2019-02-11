@@ -1,8 +1,8 @@
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "core/init.h"
-#include "rpc/rpcutils.h"
+#include "rpc/rpcwallet.h"
 #include "protocol/relay.h"
 #include "wallet/wallettxs.h"
 #include "net/net.h"
@@ -222,9 +222,108 @@ double mcd_ReadRows(mc_Database *m_DB,int key_size,int row_count,int read_type)
     return ta-tb; 
 }
 
+Value mcd_DebugIssueLicenseToken(const Object& params)
+{
+    string name=mcd_ParamStringValue(params,"name","");
+    int multiple=mcd_ParamIntValue(params,"multiple",1);
+    int64_t quantity=mcd_ParamIntValue(params,"quantity",1);
+    
+    CBitcoinAddress from_address(mcd_ParamStringValue(params,"from_address",""));
+    if (!from_address.IsValid())
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+    CBitcoinAddress to_address(mcd_ParamStringValue(params,"to_address",""));
+    if (!to_address.IsValid())
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+    CBitcoinAddress req_address(mcd_ParamStringValue(params,"req_address",""));
+    if (!req_address.IsValid())
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();
+
+    unsigned char hash[32];
+    memset(hash,0xbc,32);
+    
+    lpScript->SetAssetGenesis(quantity);
+    lpScript->AddElement();
+    lpScript->SetData(hash,30);
+    lpScript->AddElement();
+    
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;   
+    lpDetailsScript->Clear();
+    mc_Script *lpDetails=mc_gState->m_TmpBuffers->m_RpcScript2;
+    lpDetails->Clear();
+    
+    lpDetails->Clear();
+    lpDetails->AddElement();
+    
+    CKeyID KeyID;
+    req_address.GetKeyID(KeyID);
+    int64_t dummy_int64=0;
+    int version=20000202;
+    int protocol=20007;
+    unsigned int timestamp=mc_TimeNowAsUInt();
+    
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_REQUEST_HASH,hash,32);
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_REQUEST_ADDRESS,(unsigned char*)&KeyID,20);
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(name.c_str()),name.size());//+1);
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,4);    
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_CONFIRMATION_TIME,(unsigned char*)&dummy_int64,4);
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_CONFIRMATION_REF,(unsigned char*)&dummy_int64,2);
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_PUBKEY,(unsigned char*)&dummy_int64,2);
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_MIN_VERSION,(unsigned char*)&version,4);
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_MIN_PROTOCOL,(unsigned char*)&protocol,4);
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_SIGNATURE,(unsigned char*)&dummy_int64,1);
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_TIMESTAMP,(unsigned char*)&timestamp,4);
+    
+    int err;
+    size_t bytes;
+    const unsigned char *script;
+    size_t elem_size;
+    const unsigned char *elem;
+    CScript scriptOpReturn=CScript();
+    
+            
+    vector<CTxDestination> addresses;    
+    vector<CTxDestination> fromaddresses;        
+    
+    
+    script=lpDetails->GetData(0,&bytes);
+    
+    lpDetailsScript->Clear();
+        
+    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_LICENSE_TOKEN,0,script,bytes);
+    if(err)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid custom fields, too long");                                                        
+    }
+
+    elem = lpDetailsScript->GetData(0,&elem_size);
+    scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;                    
+        
+    
+
+    addresses.push_back(to_address.Get());
+    fromaddresses.push_back(from_address.Get());
+    CWalletTx wtx;
+
+    EnsureWalletIsUnlocked();
+    
+    {
+        LOCK (pwalletMain->cs_wallet_send);
+
+        SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn,fromaddresses);
+    }
+                
+    return wtx.GetHash().GetHex();    
+}
 
 Value mcd_DebugRequest(string method,const Object& params)
 {
+    if(method == "issuelicensetoken")
+    {
+        return mcd_DebugIssueLicenseToken(params);
+    }
     if(method == "dbopen")
     {
         mc_Database *m_DB;

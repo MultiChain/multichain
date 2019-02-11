@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef MULTICHAIN_ASSET_H
@@ -56,7 +56,8 @@
 #define MC_ENT_TYPE_STREAM_MAX        0x0F
 #define MC_ENT_TYPE_UPGRADE           0x10
 #define MC_ENT_TYPE_FILTER            0x11
-#define MC_ENT_TYPE_MAX               0x11
+#define MC_ENT_TYPE_LICENSE_TOKEN     0x12
+#define MC_ENT_TYPE_MAX               0x12
 
 #define MC_ENT_SPRM_NAME                      0x01
 #define MC_ENT_SPRM_FOLLOW_ONS                0x02
@@ -72,6 +73,17 @@
 #define MC_ENT_SPRM_FILTER_RESTRICTIONS       0x45
 #define MC_ENT_SPRM_FILTER_CODE               0x46
 #define MC_ENT_SPRM_FILTER_TYPE               0x47
+
+#define MC_ENT_SPRM_LICENSE_REQUEST_HASH      0x60
+#define MC_ENT_SPRM_LICENSE_REQUEST_ADDRESS   0x61
+#define MC_ENT_SPRM_LICENSE_CONFIRMATION_TIME 0x62
+#define MC_ENT_SPRM_LICENSE_CONFIRMATION_REF  0x63
+#define MC_ENT_SPRM_LICENSE_PUBKEY            0x69
+#define MC_ENT_SPRM_LICENSE_MIN_VERSION       0x6A
+#define MC_ENT_SPRM_LICENSE_MIN_PROTOCOL      0x6B
+#define MC_ENT_SPRM_LICENSE_DETAILS           0x6E
+#define MC_ENT_SPRM_LICENSE_SIGNATURE         0x6F
+
 
 #define MC_ENT_SPRM_TIMESTAMP                 0x81
 #define MC_ENT_SPRM_CHUNK_HASH                0x82
@@ -261,7 +273,7 @@ typedef struct mc_AssetDB
     int Initialize(const char *name,int mode);
         
     int InsertEntity(const void* txid, int offset, int entity_type, const void *script,size_t script_size, const void* special_script, size_t special_script_size,int update_mempool);
-    int InsertAsset(const void* txid, int offset, uint64_t quantity,const char *name,int multiple,const void *script,size_t script_size, const void* special_script, size_t special_script_size,int update_mempool);
+    int InsertAsset(const void* txid, int offset, int asset_type, uint64_t quantity,const char *name,int multiple,const void *script,size_t script_size, const void* special_script, size_t special_script_size,int update_mempool);
     int InsertAssetFollowOn(const void* txid, int offset, uint64_t quantity, const void *script,size_t script_size, const void* special_script, size_t special_script_size,const void* original_txid,int update_mempool);
     int Commit();
     int RollBack(int block);

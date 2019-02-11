@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 
@@ -70,6 +70,7 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
     vector<CTxDestination> addresses;    
     
     vector<CTxDestination> fromaddresses;        
+    EnsureWalletIsUnlocked();
     
     if(params[0].get_str() != "*")
     {
@@ -167,12 +168,14 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
                     ( -mc_gState->VersionInfo(protocol_version) != mc_gState->GetNumericVersion() ) )
                 {
                     strError=strprintf("Invalid value for protocol version. Valid range: %s\n",mc_SupportedProtocols().c_str());
+                    errorCode=RPC_NOT_ALLOWED;
                     goto exitlbl;
                 }
                 
                 if( protocol_version < mc_gState->MinProtocolDowngradeVersion() )
                 {
                     strError="Invalid protocol version, cannot downgrade to this version";
+                    errorCode=RPC_NOT_ALLOWED;
                     goto exitlbl;
                 }
                 if( mc_gState->m_NetworkParams->ProtocolVersion() >= mc_gState->MinProtocolForbiddenDowngradeVersion() )
@@ -210,6 +213,7 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
                     else
                     {
                         strError="Some upgrade parameters are not supported by the current protocol, please upgrade protocol separately first.";
+                        errorCode=RPC_NOT_SUPPORTED;
                         goto exitlbl;
                     }
 //                    lpDetails->SetParamValue(s.name_.c_str(),s.name_.size(),(unsigned char*)s.value_.get_str().c_str(),s.value_.get_str().size());                                        
@@ -264,7 +268,6 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
     scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;        
     
     
-    EnsureWalletIsUnlocked();
     {
         LOCK (pwalletMain->cs_wallet_send);
 
@@ -452,6 +455,7 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
     
     vector<CTxDestination> fromaddresses;       
     fromaddresses=ParseAddresses(params[0].get_str(),false,false);
+    EnsureWalletIsUnlocked();
 
     if(fromaddresses.size() != 1)
     {
@@ -530,7 +534,6 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
         
     
     CWalletTx wtx;
-    EnsureWalletIsUnlocked();
     LOCK (pwalletMain->cs_wallet_send);    
 
     SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn, fromaddresses);

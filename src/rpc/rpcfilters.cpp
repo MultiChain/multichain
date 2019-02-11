@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 
@@ -11,6 +11,31 @@
 
 void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
 void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity);
+
+void ParseFilterRestrictionsForField(Value param,mc_Script *lpDetailsScript,uint32_t filter_type)
+{
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();                   
+    vector<string> inputStrings;
+    if(param.type() == str_type)
+    {
+        inputStrings.push_back(param.get_str());
+    }
+    else
+    {
+        inputStrings=ParseStringList(param);        
+    }
+    for(int is=0;is<(int)inputStrings.size();is++)
+    {
+        mc_EntityDetails entity;
+        ParseEntityIdentifier(inputStrings[is],&entity, MC_ENT_TYPE_ANY);           
+        if(entity.GetEntityType() > MC_ENT_TYPE_STREAM_MAX)
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Filter can be created only for streams and assets");           
+        }
+        lpDetailsScript->SetData(entity.GetShortRef(),MC_AST_SHORT_TXID_SIZE);
+    }
+}
 
 void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript,uint32_t filter_type)
 {
@@ -29,33 +54,13 @@ void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript,uint32_t fil
             {
                 if(filter_type != MC_FLT_TYPE_TX)
                 {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER,"for field is allowed only for tx filters");                                                   
+                    throw JSONRPCError(RPC_NOT_ALLOWED,"for field is allowed only for tx filters");                                                   
                 }
                 if(already_found)
                 {
                     throw JSONRPCError(RPC_INVALID_PARAMETER,"for field can appear only once in the object");                               
                 }
-                lpDetailsScript->Clear();
-                lpDetailsScript->AddElement();                   
-                vector<string> inputStrings;
-                if(s.value_.type() == str_type)
-                {
-                    inputStrings.push_back(s.value_.get_str());
-                }
-                else
-                {
-                    inputStrings=ParseStringList(s.value_);        
-                }
-                for(int is=0;is<(int)inputStrings.size();is++)
-                {
-                    mc_EntityDetails entity;
-                    ParseEntityIdentifier(inputStrings[is],&entity, MC_ENT_TYPE_ANY);           
-                    if(entity.GetEntityType() > MC_ENT_TYPE_STREAM_MAX)
-                    {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Filter can be created only for streams and assets");           
-                    }
-                    lpDetailsScript->SetData(entity.GetShortRef(),MC_AST_SHORT_TXID_SIZE);
-                }
+                ParseFilterRestrictionsForField(s.value_,lpDetailsScript,filter_type);
                 field_parsed=true;
                 already_found=true;
             }
@@ -206,6 +211,7 @@ Value createfilterfromcmd(const Array& params, bool fHelp)
     vector<CTxDestination> addresses;    
     
     vector<CTxDestination> fromaddresses;        
+    EnsureWalletIsUnlocked();
     
     if(params[0].get_str() != "*")
     {
@@ -308,7 +314,6 @@ Value createfilterfromcmd(const Array& params, bool fHelp)
     scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;        
     
     
-    EnsureWalletIsUnlocked();
     {
         LOCK (pwalletMain->cs_wallet_send);
 
@@ -679,7 +684,6 @@ Value getfiltertxid(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         mc_ThrowHelpMessage("getfiltertxid");        
-//        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
     
     return pMultiChainFilterEngine->m_TxID.ToString();
 }
@@ -688,7 +692,6 @@ Value setfilterparam(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 2)                                            
         mc_ThrowHelpMessage("setfilterparam");        
-//        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
     
     string param_name=params[0].get_str();
     bool fFound=false;
@@ -717,7 +720,7 @@ Value setfilterparam(const json_spirit::Array& params, bool fHelp)
 
     if(!fFound)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Unsupported runtime parameter: " + param_name);                                                    
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Unsupported runtime parameter: " + param_name);                                                    
     }
     
     return "Set";

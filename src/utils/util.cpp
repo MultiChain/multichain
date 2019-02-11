@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #if defined(HAVE_CONFIG_H)
@@ -924,4 +924,24 @@ std::string mc_BuildDescription(int build)
     char build_desc[32];
     mc_BuildDescription(build,build_desc);
     return std::string(build_desc);
+}
+
+bool mc_CopyFile(boost::filesystem::path& pathDBOld,boost::filesystem::path& pathDBNew)
+{
+#ifndef WIN32
+    
+    try {
+#if BOOST_VERSION >= 104000
+                    boost::filesystem::copy_file(pathDBOld, pathDBNew, boost::filesystem::copy_option::overwrite_if_exists);
+#else
+                    filesystem::copy_file(pathSrc, pathDest);
+#endif
+    } catch(const boost::filesystem::filesystem_error &e) {
+        LogPrintf("error copying %s to %s - %s\n", pathDBOld.string(), pathDBNew.string(), e.what());
+        return false;
+    }
+    return true;
+#else
+    return CopyFile(pathDBOld.string().c_str(),pathDBNew.string().c_str(),false);
+#endif
 }

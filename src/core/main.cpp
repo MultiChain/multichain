@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "core/main.h"
@@ -57,6 +57,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                  string& reason,
                                  int64_t *mandatory_fee_out,     
                                  uint32_t *replay);
+bool Is_MultiChainLicenseTokenTransfer(const CTransaction& tx);
 bool ExtractDestinationScriptValid(const CScript& scriptPubKey, CTxDestination& addressRet);
 bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs, string& reason);
 bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& reason);
@@ -438,6 +439,41 @@ int SetUpgradedParamValue(const mc_OneMultichainParam *param,int64_t value)
     {
         MAX_CHUNK_COUNT=value;
     }           
+    
+    if(strcmp(param->m_Name,"anyonecanconnect") == 0)
+    {
+        MCP_ANYONE_CAN_CONNECT=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecansend") == 0)
+    {
+        MCP_ANYONE_CAN_SEND=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecanreceive") == 0)
+    {
+        MCP_ANYONE_CAN_RECEIVE=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecanreceiveempty") == 0)
+    {
+        MCP_ANYONE_CAN_RECEIVE_EMPTY=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecancreate") == 0)
+    {
+        MCP_ANYONE_CAN_CREATE=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecanissue") == 0)
+    {
+        MCP_ANYONE_CAN_ISSUE=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecanactivate") == 0)
+    {
+        MCP_ANYONE_CAN_ACTIVATE=value;
+    }   
     
     return MC_ERR_NOERROR;
 }
@@ -2081,6 +2117,7 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
         CAmount nValueIn = 0;
         CAmount nFees = 0;
         int async_count=0;
+        bool fIsLicenseTokenTransfer=Is_MultiChainLicenseTokenTransfer(tx);
         
         vector <unsigned int> vSendPermissionFlags;
         
@@ -2110,28 +2147,36 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                 CTxDestination addressRet;     
                 if(ExtractDestinationScriptValid(coins->vout[prevout.n].scriptPubKey, addressRet))
                 {
-                    CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
-                    if(lpKeyID != NULL)
-                    {
-                        if(!mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpKeyID)))
+                    if(!fIsLicenseTokenTransfer)
+                    {                        
+                        CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
+                        if(lpKeyID != NULL)
                         {
-                            return state.Invalid(error("CheckInputs() : %s input %d doesn't have send permission", tx.GetHash().ToString(),i));
-                        }                            
-                        send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
-                        async_count++;
+                            if(!mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpKeyID)))
+                            {
+                                return state.Invalid(error("CheckInputs() : %s input %d doesn't have send permission", tx.GetHash().ToString(),i));
+                            }                            
+                            send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
+                            async_count++;
+                        }
+                        else
+                        {
+                            CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
+                            if(lpScriptID)
+                            {
+                                if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpScriptID)))
+                                {
+                                    send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
+                                    async_count++;
+                                }                
+                            }
+                        }                                            
                     }
                     else
                     {
-                        CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
-                        if(lpScriptID)
-                        {
-                            if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpScriptID)))
-                            {
-                                send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
-                                async_count++;
-                            }                
-                        }
-                    }                    
+                        send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
+                        async_count++;                        
+                    }
                 }
             }
 

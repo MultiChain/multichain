@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "v8_win/v8json_spirit.h"

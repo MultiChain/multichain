@@ -1,6 +1,6 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 
@@ -1426,7 +1426,14 @@ void mc_InitRPCHelpMap06()
             "                                                        max-std-op-returns-count,\n"
             "                                                        max-std-op-return-size,\n"
             "                                                        max-std-op-drops-count,\n"
-            "                                                        max-std-element-size\n"
+            "                                                        max-std-element-size,\n"
+            "                                                        anyone-can-connect,\n"
+            "                                                        anyone-can-send,\n"
+            "                                                        anyone-can-receive,\n"
+            "                                                        anyone-can-receiveempty,\n"
+            "                                                        anyone-can-issue,\n"
+            "                                                        anyone-can-create,\n"
+            "                                                        anyone-can-activate\n"
             "      \"startblock\": block           (numeric, optional, default 0) Block to apply from \n"
 //            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
             "      ,...\n"
@@ -1506,7 +1513,14 @@ void mc_InitRPCHelpMap06()
             "                                                        max-std-op-returns-count,\n"
             "                                                        max-std-op-return-size,\n"
             "                                                        max-std-op-drops-count,\n"
-            "                                                        max-std-element-size\n"
+            "                                                        max-std-element-size,\n"
+            "                                                        anyone-can-connect,\n"
+            "                                                        anyone-can-send,\n"
+            "                                                        anyone-can-receive,\n"
+            "                                                        anyone-can-receiveempty,\n"
+            "                                                        anyone-can-issue,\n"
+            "                                                        anyone-can-create,\n"
+            "                                                        anyone-can-activate\n"
             "      \"start-block\": block          (numeric, optional, default 0) Block to apply from \n"
 //            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
             "      ,...\n"
@@ -3677,15 +3691,15 @@ void mc_InitRPCHelpMap16()
             "3. approve                          (boolean, required)  Approve or disapprove\n"
             " or\n"
             "1. \"from-address\"                   (string, required) Address used for approval.\n"
-            "2. \"tx-filter-identifier\"           (string, required) Tx Filter identifier - one of: create txid, filter name.\n"
+            "2. \"tx-filter-identifier\"           (string, required) Tx Filter identifier - one of: create txid, filter reference, filter name.\n"
             "3. approve                          (boolean, required)  Approve or disapprove\n"
             " or\n"
             "1. \"from-address\"                   (string, required) Address used for approval.\n"
-            "2. \"stream-filter-identifier\"       (string, required) Stream Filter identifier - one of: create txid, filter name.\n"
+            "2. \"stream-filter-identifier\"       (string, required) Stream Filter identifier - one of: create txid, filter reference, filter name.\n"
             "3. approve                          (object, required)  Approve or disapprove\n"
             "    {\n"                
             "      \"approve\" : approve           (boolean, required) Approve or disapprove\n"
-            "      \"for\" : \"stream-identifier\"   (string, required)  Stream identifier - one of: create txid, upgrade name.\n"
+            "      \"for\" : \"stream-identifier\"   (string, required)  Stream identifier - one of: create txid, stream reference, stream name.\n"
             "    }\n"                                
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
@@ -3918,7 +3932,14 @@ void mc_InitRPCHelpMap16()
             "                                                          max-std-op-returns-count,\n"
             "                                                          max-std-op-return-size,\n"
             "                                                          max-std-op-drops-count,\n"
-            "                                                          max-std-element-size\n"
+            "                                                          max-std-element-size,\n"
+            "                                                          anyone-can-connect,\n"
+            "                                                          anyone-can-send,\n"
+            "                                                          anyone-can-receive,\n"
+            "                                                          anyone-can-receiveempty,\n"
+            "                                                          anyone-can-issue,\n"
+            "                                                          anyone-can-create,\n"
+            "                                                          anyone-can-activate\n"
             "        }\n"
             "    }\n"                                
             " or\n"
@@ -3926,6 +3947,16 @@ void mc_InitRPCHelpMap16()
             "    {\n"                
             "      \"approve\" : approve             (boolean, required) Approve or disapprove\n"
             "      \"for\" : \"upgrade-identifier\"    (string, required)  Upgrade identifier - one of: create txid, upgrade name.\n"
+            "    }\n"                                
+            " or\n"
+            "create-new-filter                     (object, required) A json object with new filter details\n"
+            "    {\n"                
+            "      \"create\" : \"filter-type\"        (string, required) txfilter or streamfilter\n"
+            "      \"name\" : \"filter-name\"          (string, optional) Filter name\n"
+            "      \"for\": \"entity-identifier\"      (string, optional) Only for tx filters, Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
+            "        or\n"
+            "      \"for\": entity-identifier(s)     (array, optional) Only for tx filters, A json array of asset/stream identifiers .\n"    
+            "      \"code\"                          (string, required) JavaScript filter code, see help filters.\n"
             "    }\n"                                
         ));
 
@@ -4044,6 +4075,21 @@ void mc_InitRPCHelpMap16()
             "   }\n"                    
      
             " ,...\n"
+            "}\n"
+            "  or \n"
+            "{\n"
+            "  \"tx-filter-identifier\":              (string, required) Tx Filter identifier - one of: create txid, filter reference, filter name.\n"
+            "   {\n"
+            "     \"approve\" : approve               (boolean, required)  Approve or disapprove\n"
+            "   }\n"                                
+            "}\n"
+            "  or \n"
+            "{\n"
+            "  \"stream-filter-identifier\":          (string, required) Stream Filter identifier - one of: create txid, filter reference, filter name.\n"
+            "   {\n"
+            "     \"approve\" : approve               (boolean, required) Approve or disapprove\n"
+            "     \"for\" : \"stream-identifier\"       (string, required)  Stream identifier - one of: create txid, stream reference, stream name.\n"
+            "   }\n"                                
             "}\n"
         ));
     
@@ -4304,7 +4350,7 @@ void mc_InitRPCHelpMap18()
             "\nArguments:\n"
             "1. restrictions                     (object, required)  a json object with filter restrictions\n"
             "    {\n"
-             "      \"for\": \"entity-identifier\"   (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
+            "      \"for\": \"entity-identifier\"    (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
             "        or\n"
             "      \"for\": entity-identifier(s)   (array, optional) A json array of asset/stream identifiers .\n"    
             "    }\n"
@@ -4328,8 +4374,8 @@ void mc_InitRPCHelpMap18()
             "  \"time\": x.xxxxxx,                 (numeric) Seconds to run transaction through the filter\n"
             "}\n"
             "\nExamples:\n"
-            + HelpExampleCli("testtxfilter", "false \"{\"js\":\"js-code\"}\"")
-            + HelpExampleRpc("testtxfilter", "false, \"{\"js\":\"js-code\"}\"")
+            + HelpExampleCli("testtxfilter", "\"{}\" \"javascript-code\"")
+            + HelpExampleRpc("testtxfilter", "\"{}\", \"javascript-code\"")
         ));
      
     mapHelpStrings.insert(std::make_pair("getfiltertransaction",
@@ -4491,8 +4537,8 @@ void mc_InitRPCHelpMap19()
             "  \"time\": x.xxxxxx,                 (numeric) Seconds to run transaction through the filter\n"
             "}\n"
             "\nExamples:\n"
-            + HelpExampleCli("teststreamfilter", "false \"{\"js\":\"js-code\"}\"")
-            + HelpExampleRpc("teststreamfilter", "false, \"{\"js\":\"js-code\"}\"")
+            + HelpExampleCli("teststreamfilter", "\"{}\" \"javascript-code\"")
+            + HelpExampleRpc("teststreamfilter", "\"{}\", \"javascript-code\"")
         ));
      
      mapHelpStrings.insert(std::make_pair("getfilterassetbalances",

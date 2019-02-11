@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef BITCOIN_CLIENTVERSION_H
@@ -27,7 +27,7 @@
  * Copyright year (2009-this)
  * Todo: update this when changing our copyright comments in the source
  */
-#define COPYRIGHT_YEAR 2015
+#define COPYRIGHT_YEAR 2019
 
 #endif //HAVE_CONFIG_H
 
@@ -41,6 +41,7 @@
 //! Copyright string used in Windows .rc files
 /* MCHN START */
 #define COPYRIGHT_STR "2014-" STRINGIZE(COPYRIGHT_YEAR) " Coin Sciences Ltd"
+#define WIN_VERSION_STR "2.0.0.2"
 /* MCHN END */
 /**
  * bitcoind-res.rc includes this file, but it cannot cope with real c++ code.

@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 
@@ -289,6 +289,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
 
     addresses.push_back(address.Get());
     
+    EnsureWalletIsUnlocked();
     
     if(params[0].get_str() != "*")
     {
@@ -337,7 +338,6 @@ Value issuefromcmd(const Array& params, bool fHelp)
         }        
     }
     
-    EnsureWalletIsUnlocked();
     {
         LOCK (pwalletMain->cs_wallet_send);
 
@@ -502,6 +502,7 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     
 
     addresses.push_back(address.Get());
+    EnsureWalletIsUnlocked();
     
     
     if(params[0].get_str() != "*")
@@ -600,7 +601,6 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     }
     
     
-    EnsureWalletIsUnlocked();
     {
         LOCK (pwalletMain->cs_wallet_send);
 

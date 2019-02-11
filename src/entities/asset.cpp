@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "multichain/multichain.h"
@@ -883,7 +883,7 @@ int mc_AssetDB::InsertEntity(const void* txid, int offset, int entity_type, cons
 }
 
 
-int mc_AssetDB::InsertAsset(const void* txid, int offset, uint64_t quantity, const char *name, int multiple, const void* script, size_t script_size, const void* special_script, size_t special_script_size,int update_mempool)
+int mc_AssetDB::InsertAsset(const void* txid, int offset, int asset_type, uint64_t quantity, const char *name, int multiple, const void* script, size_t script_size, const void* special_script, size_t special_script_size,int update_mempool)
 {
     mc_EntityLedgerRow aldRow;
     mc_EntityDetails details;
@@ -903,7 +903,7 @@ int mc_AssetDB::InsertAsset(const void* txid, int offset, uint64_t quantity, con
         aldRow.m_Offset=-(m_MemPool->GetCount()+1);
     }
     aldRow.m_Quantity=quantity;
-    aldRow.m_EntityType=MC_ENT_TYPE_ASSET;
+    aldRow.m_EntityType=asset_type;
     aldRow.m_FirstPos=-(m_MemPool->GetCount()+1);//-1;                          // Unconfirmed issue, from 10007 we can create followons for them, so we should differentiate
     aldRow.m_LastPos=0;
     aldRow.m_ChainPos=-1;
@@ -2088,6 +2088,10 @@ uint32_t mc_AssetDB::MaxEntityType()
     if(mc_gState->m_Features->Filters() == 0)
     {
         return MC_ENT_TYPE_UPGRADE;
+    }
+    if(mc_gState->m_Features->LicenseTokens() == 0)
+    {
+        return MC_ENT_TYPE_FILTER;
     }
     return MC_ENT_TYPE_MAX; 
 }

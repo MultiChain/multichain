@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "core/main.h"
@@ -29,6 +29,7 @@ bool ExtractDestinations10008(const CScript& scriptPubKey, txnouttype& typeRet, 
 #define MC_MTX_OUTPUT_DETAIL_FLAG_NO_DESTINATION         0x00000040                              
 #define MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_FILTER      0x00000080                              
 #define MC_MTX_OUTPUT_DETAIL_FLAG_PERMISSION_NOT_FILTER  0x00000100                              
+#define MC_MTX_OUTPUT_DETAIL_FLAG_LICENSE_TRANSFER       0x00000200
 
 typedef struct CMultiChainTxDetails
 {    
@@ -40,6 +41,8 @@ typedef struct CMultiChainTxDetails
     bool fAdminMinerGrant;                                                      // Admin/miner grant in this transaction
     bool fAssetIssuance;                                                        // New/followon issuance in this tx 
     bool fIsStandardCoinbase;                                                   // Tx is standard coinbase - filters should not be applied
+    bool fLicenseTokenIssuance;                                                 // New license token
+    bool fLicenseTokenTransfer;                                                 // License token transfer
     
     vector <txnouttype> vInputScriptTypes;                                      // Input script types
     vector <uint160> vInputDestinations;                                        // Addresses used in input scripts
@@ -108,6 +111,8 @@ void CMultiChainTxDetails::Zero()
     fAdminMinerGrant=false;
     fAssetIssuance=false;
     fIsStandardCoinbase=false;
+    fLicenseTokenIssuance=false;
+    fLicenseTokenTransfer=false;
     
     details_script_size=0;
     details_script_type=-1;
@@ -1267,6 +1272,123 @@ bool MultiChainTransaction_ProcessPermissions(const CTransaction& tx,
     return true;
 }
 
+bool Is_MultiChainLicenseTokenTransfer(const CTransaction& tx)
+{
+    mc_EntityDetails entity;
+    if(tx.IsCoinBase())
+    {
+        return false;
+    }
+    if(tx.vout.size() != 1)
+    {
+        return false;                                                            
+    }
+    if(tx.vin.size() != 1)
+    {
+        return false;                                                            
+    }
+    if(mc_gState->m_Features->LicenseTokens() == 0)
+    {
+        return false;
+    }
+        
+    MultiChainTransaction_SetTmpOutputScript(tx.vout[0].scriptPubKey);
+    if(mc_gState->m_TmpScript->GetNumElements() == 0)
+    {
+        return false;        
+    }
+        
+    mc_gState->m_TmpAssetsOut->Clear();
+    mc_gState->m_TmpScript->SetElement(0);
+    if(mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER) != MC_ERR_NOERROR)
+    {
+        return false;
+    }
+    
+    if(mc_gState->m_Assets->FindEntityByFullRef(&entity,mc_gState->m_TmpAssetsOut->GetRow(0)))
+    {
+        if(entity.GetEntityType() == MC_ENT_TYPE_LICENSE_TOKEN)
+        {
+            return true;
+        }
+    }
+        
+    return false;
+}
+
+bool MultiChainTransaction_CheckLicenseTokenTransfer(const CTransaction& tx,
+                                               int unchecked_row, 
+                                               CMultiChainTxDetails *details,   
+                                               string& reason)      
+{
+    bool token_transfer=false;
+    int err;
+    mc_EntityDetails entity;
+    uint32_t script_type=MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER;
+    
+    if(mc_gState->m_Features->LicenseTokens() == 0)
+    {
+        return true;
+    }
+    
+    for(int i=unchecked_row;i<mc_gState->m_TmpAssetsOut->GetCount();i++)
+    {
+        if(mc_gState->m_Assets->FindEntityByFullRef(&entity,mc_gState->m_TmpAssetsOut->GetRow(i)))
+        {
+            if(entity.GetEntityType() == MC_ENT_TYPE_LICENSE_TOKEN)
+            {
+                token_transfer=true;
+            }
+        }
+    }
+    
+    if(!token_transfer)
+    {
+        return true;
+    }
+    
+    if(tx.vout.size() != 1)
+    {
+        reason="License token transfer tx should have one output";
+        return false;                                                            
+    }
+
+    if(tx.vin.size() != 1)
+    {
+        reason="License token transfer tx should have one input";
+        return false;                                                            
+    }        
+    
+    if(mc_gState->m_TmpScript->GetNumElements() != 3)
+    {
+        reason="License token transfer script rejected - wrong number of elements";
+        return false;                                                                                                                                                                                
+    }
+    
+    if(details->vInputHashTypes[0] != SIGHASH_ALL)
+    {
+        reason="License token transfer script rejected - wrong signature type";
+        return false;                                                                                                                                                                                        
+    }
+    
+    if(mc_gState->m_TmpAssetsOut->GetCount() != 1)
+    {
+        reason="License token transfer script rejected - wrong script";
+        return false;                                                                                                                                                                                                        
+    }
+        
+    if(mc_GetABQuantity(mc_gState->m_TmpAssetsOut->GetRow(0)) != 1)            
+    {
+        reason="License token transfer script rejected - wrong number of license token units";
+        return false;                                                                                                                                                                                                        
+    }
+
+    details->vOutputScriptFlags[0] |= MC_MTX_OUTPUT_DETAIL_FLAG_LICENSE_TRANSFER;
+    details->fLicenseTokenTransfer=true;
+    return true;
+}
+
+
 bool MultiChainTransaction_CheckAssetTransfers(const CTransaction& tx,
                                                int offset,  
                                                int vout,
@@ -1288,13 +1410,22 @@ bool MultiChainTransaction_CheckAssetTransfers(const CTransaction& tx,
         }
     }
     
+    int unchecked_row=mc_gState->m_TmpAssetsOut->GetCount();
     if(!mc_ExtractOutputAssetQuantities(mc_gState->m_TmpAssetsOut,reason,false))// Filling output asset quantity list
     {
         return false;                                
+    }    
+    
+    if(!MultiChainTransaction_CheckLicenseTokenTransfer(tx,unchecked_row,details,reason))
+    {
+        return false;
     }
+
+    
                                                                                 // Check for dust and receive permissions
                                                                                 // Not required for pure grants
-    if(details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_NOT_PURE_PERMISSION)   
+    if( ( (details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_NOT_PURE_PERMISSION) != 0 ) && 
+        ( (details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_LICENSE_TRANSFER) == 0 ) )
     {
         if((offset < 0) && Params().RequireStandard())                          // If not in block - part of IsStandard check
         {
@@ -1424,8 +1555,6 @@ bool MultiChainTransaction_CheckOutputs(const CTransaction& tx,                 
         }
     }    
 
-    mc_gState->m_TmpAssetsOut->Clear();
-    
     for (unsigned int vout = 0; vout < tx.vout.size(); vout++)
     {
                                                                                 // Entity items (stream items, upgrade approvals, updates)
@@ -1437,7 +1566,22 @@ bool MultiChainTransaction_CheckOutputs(const CTransaction& tx,                 
             {
                 return false;                
             }
-        }        
+        }                                                                                        // Assets quantities and permission checks
+    }    
+
+    return true;
+}
+
+
+bool MultiChainTransaction_CheckTransfers(const CTransaction& tx,               // Tx to check
+                                        int offset,                             // Tx offset in block, -1 if in memppol
+                                        CMultiChainTxDetails *details,          // Tx details object
+                                        string& reason)                         // Error message
+{
+    mc_gState->m_TmpAssetsOut->Clear();
+    
+    for (unsigned int vout = 0; vout < tx.vout.size(); vout++)
+    {
                                                                                 // Assets quantities and permission checks
         if(details->vOutputScriptFlags[vout] & MC_MTX_OUTPUT_DETAIL_FLAG_NOT_OP_RETURN)
         {
@@ -1454,7 +1598,7 @@ bool MultiChainTransaction_CheckOutputs(const CTransaction& tx,                 
     {
         return false;                
     }
-
+    
     return true;
 }
 
@@ -1481,7 +1625,126 @@ bool MultiChainTransaction_CheckMandatoryFee(CMultiChainTxDetails *details,     
     return true;
 }
 
+bool MultiChainTransaction_CheckLicenseTokenDetails(CMultiChainTxDetails *details,     // Tx details object
+                                             void *token_address,               // Address the token is issued to
+                                             string& reason)                    // Error message
+{
+    uint32_t offset,next_offset,param_value_start;
+    unsigned int timestamp;
+    size_t param_value_size;        
+    bool is_open=false;
+    size_t value_sizes[256];
+    int value_starts[256];
+    unsigned char code;
+    
+    memset(value_sizes,0,256*sizeof(size_t));
+    memset(value_starts,0,256*sizeof(int));
+    
+    offset=0;
+            
+    while((int)offset<details->details_script_size)
+    {
+        next_offset=mc_GetParamFromDetailsScript(details->details_script,details->details_script_size,offset,&param_value_start,&param_value_size);
+        if(param_value_start > 0)
+        {
+            if(details->details_script[offset] == 0)
+            {                
+                code=details->details_script[offset+1];
+                if(value_starts[code])
+                {
+                    reason="License token issue script rejected - multiple values for the same code in details script";
+                    return false;                                                                                                                                
+                }
+                value_sizes[code]=param_value_size;
+                value_starts[code]=param_value_start;
+            }
+        }
+        offset=next_offset;
+    }
+    
+    if( (value_starts[MC_ENT_SPRM_NAME] == 0) || (value_sizes[MC_ENT_SPRM_NAME] == 0) )
+    {
+        reason="License token issue script rejected - no name";
+        return false;                                                                                                                                        
+    }
+    if( value_sizes[MC_ENT_SPRM_LICENSE_REQUEST_HASH] == 0 )
+    {
+        reason="License token issue script rejected - invalid request hash";
+        return false;                                                                                                                                        
+    }
+    if( value_sizes[MC_ENT_SPRM_LICENSE_REQUEST_ADDRESS] != sizeof(uint160) )
+    {
+        reason="License token issue script rejected - invalid request address";
+        return false;                                                                                                                                        
+    }
+    if(memcmp(token_address,details->details_script+value_starts[MC_ENT_SPRM_LICENSE_REQUEST_ADDRESS],value_sizes[MC_ENT_SPRM_LICENSE_REQUEST_ADDRESS]))
+    {
+        reason="License token issue script rejected - request address mismatch";
+        return false;                                                                                                                                                
+    }
+    if( value_sizes[MC_ENT_SPRM_LICENSE_CONFIRMATION_TIME] < 4 )
+    {
+        reason="License token issue script rejected - invalid confirmation time";
+        return false;                                                                                                                                        
+    }
+    if( value_sizes[MC_ENT_SPRM_LICENSE_CONFIRMATION_REF] == 0 )
+    {
+        reason="License token issue script rejected - invalid confirmation reference";
+        return false;                                                                                                                                        
+    }
+    if( value_sizes[MC_ENT_SPRM_LICENSE_PUBKEY] == 0 )
+    {
+        reason="License token issue script rejected - invalid pubkey";
+        return false;                                                                                                                                        
+    }
+    if( (value_sizes[MC_ENT_SPRM_LICENSE_MIN_VERSION] < 4 ) || 
+        (value_sizes[MC_ENT_SPRM_LICENSE_MIN_VERSION] > 8 ))
+    {
+        reason="License token issue script rejected - invalid version";
+        return false;                                                                                                                                        
+    }
+    if( mc_gState->GetNumericVersion() < mc_GetLE(details->details_script+value_starts[MC_ENT_SPRM_LICENSE_MIN_VERSION],value_sizes[MC_ENT_SPRM_LICENSE_MIN_VERSION]) )
+    {
+        reason="License token issue script rejected - Not supported in this version of MultiChain";
+        return false;                                                                                                                                        
+    }
+    if( (value_sizes[MC_ENT_SPRM_LICENSE_MIN_PROTOCOL] < 4 ) || 
+        (value_sizes[MC_ENT_SPRM_LICENSE_MIN_PROTOCOL] > 8 ))
+    {
+        reason="License token issue script rejected - invalid protocol";
+        return false;                                                                                                                                        
+    }
+    if( mc_gState->m_NetworkParams->ProtocolVersion() < mc_GetLE(details->details_script+value_starts[MC_ENT_SPRM_LICENSE_MIN_PROTOCOL],value_sizes[MC_ENT_SPRM_LICENSE_MIN_PROTOCOL]) )
+    {
+        reason="License token issue script rejected - Not supported in this protocol version";
+        return false;                                                                                                                                        
+    }
+    if( value_sizes[MC_ENT_SPRM_LICENSE_SIGNATURE] == 0 )
+    {
+        reason="License token issue script rejected - invalid signature";
+        return false;                                                                                                                                        
+    }
+    if( (value_sizes[MC_ENT_SPRM_TIMESTAMP] != 4 ))
+    {
+        reason="License token issue script rejected - invalid timestamp";
+        return false;                                                                                                                                        
+    }
+    
+    timestamp=(unsigned int)mc_GetLE(details->details_script+value_starts[MC_ENT_SPRM_TIMESTAMP],value_sizes[MC_ENT_SPRM_TIMESTAMP]);
 
+    if(timestamp < chainActive.Tip()->nTime-30*86400)
+    {
+        reason="License token issue script rejected - timestamp is too far in the past";
+        return false;                                                                                                                                                
+    }
+    if(timestamp > chainActive.Tip()->nTime+30*86400)
+    {
+        reason="License token issue script rejected - timestamp is too far in the future";
+        return false;                                                                                                                                                
+    }    
+    
+    return true;
+}
 
 bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         // Tx to check
                                                 int offset,                     // Tx offset in block, -1 if in memppol
@@ -1495,7 +1758,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     mc_EntityDetails entity;
     mc_EntityDetails this_entity;
     char asset_name[MC_ENT_MAX_NAME_SIZE+1];
-    int multiple;
+    int multiple,out_count,issue_vout;
     int err;
     int64_t quantity,total;
     uint256 txid;
@@ -1508,6 +1771,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     size_t value_size;
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     CTxDestination addressRet;
+    unsigned char token_address[20];
    
     if(tx.IsCoinBase())
     {
@@ -1526,6 +1790,9 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     multiple=1;
     new_issue=false;
     follow_on=false;
+    out_count=0;
+    issue_vout=-1;
+    
     
     if(details->details_script_type == 0)                                       // New asset with details script
     {
@@ -1582,6 +1849,11 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                 err=mc_gState->m_TmpScript->GetAssetGenesis(&quantity);         
                 if(err == 0)                                                    // Asset genesis issuance 
                 {
+                    out_count++;
+                    if(e == 0)
+                    {
+                        issue_vout=vout;
+                    }
                     issue_in_output=true;
                     new_issue=true;
                     if(quantity+total<0)
@@ -1611,14 +1883,17 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                     if(lpKeyID != NULL)
                     {
                         address=CBitcoinAddress(*lpKeyID);
+                        memcpy(token_address,lpKeyID,sizeof(uint160));
                     }
                     else
                     {
                         address=CBitcoinAddress(*lpScriptID);
+                        memcpy(token_address,lpScriptID,sizeof(uint160));
                     }
                     if(update_mempool)
                     {
-                        if(fDebug)LogPrint("mchn","Found asset issue script in tx %s for %s - (%ld)\n",
+                        if(fDebug)LogPrint("mchn","Found %s issue script in tx %s for %s - (%ld)\n",
+                                (details->new_entity_type == MC_ENT_TYPE_LICENSE_TOKEN) ? "license token" : "asset",
                                 tx.GetHash().GetHex().c_str(),
                                 address.ToString().c_str(),quantity);                    
                     }
@@ -1751,6 +2026,15 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
         }
     }
     
+    if(details->new_entity_type == MC_ENT_TYPE_LICENSE_TOKEN)
+    {
+        if(!new_issue)
+        {
+            reason="License token issue script rejected - issuance output not found";
+            return false;                                                                                                                                            
+        }
+    }
+    
     if(!new_issue && !follow_on)
     {
         return true;
@@ -1762,8 +2046,51 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     {
         if(details->new_entity_type != MC_ENT_TYPE_ASSET)
         {
-            reason="Asset issue script rejected - not allowed in this transaction, conflicts with other entities";
-            return false;                                                                                                        
+            if(details->new_entity_type == MC_ENT_TYPE_LICENSE_TOKEN)
+            {                    
+                if(mc_gState->m_Features->LicenseTokens())
+                {
+                    if(out_count != 1)
+                    {
+                        reason="License token issue script rejected - should have exactly one issuance output";
+                        return false;                                                                                                                                
+                    }
+                    if(multiple != 1)
+                    {
+                        reason="License token issue script rejected - should have multiple=1";
+                        return false;                                                                                                                                
+                    }
+                    if(total != 1)
+                    {
+                        reason="License token issue script rejected - should have single unit";
+                        return false;                                                                                                                                
+                    }
+                    if(issue_vout < 0)
+                    {
+                        reason="License token issue script rejected - issuance element should be the first element in script";
+                        return false;                                                                                                                                                        
+                    }
+                    
+                    MultiChainTransaction_SetTmpOutputScript(tx.vout[issue_vout].scriptPubKey);
+                    if(mc_gState->m_TmpScript->GetNumElements() != 3)
+                    {
+                        reason="License token issue script rejected - wrong number of elements";
+                        return false;                                                                                                                                                                                
+                    }
+                                    
+                    if(!MultiChainTransaction_CheckLicenseTokenDetails(details,token_address,reason))
+                    {
+                        return false;                                                                                                                                                        
+                    }
+                    details->vOutputScriptFlags[issue_vout] |= MC_MTX_OUTPUT_DETAIL_FLAG_LICENSE_TRANSFER;
+                    details->fLicenseTokenIssuance=true;
+                }
+            }
+            if(!details->fLicenseTokenIssuance)
+            {
+                reason="Asset issue script rejected - not allowed in this transaction, conflicts with other entities";
+                return false;                                                                                                        
+            }
         }
     }
     
@@ -1783,6 +2110,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                     {                            
                         can_issue=true;
                     }                            
+                    can_issue |= details->fLicenseTokenIssuance;
                 }
                 else
                 {
@@ -1815,57 +2143,61 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     
     mc_gState->m_TmpScript->Clear();
     mc_gState->m_TmpScript->AddElement();
-    unsigned char issuer_buf[24];
-    memset(issuer_buf,0,sizeof(issuer_buf));
-    flags=MC_PFL_NONE;        
-    uint32_t timestamp=0;
-    set <uint160> stored_issuers;
-
-                                                                                // First per-entity record in permission database
-                                                                                // We'll need it for scanning asset-related rows
-    if(new_issue)                                                               
-    {
-        err=MC_ERR_NOERROR;
-
-        txid=tx.GetHash();
-        err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_CONNECT,
-                (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
-    }
-
-    uint32_t all_permissions=MC_PTP_ADMIN | MC_PTP_ISSUE;
-    if(mc_gState->m_Features->PerAssetPermissions())
-    {
-        all_permissions |= MC_PTP_ACTIVATE | MC_PTP_SEND | MC_PTP_RECEIVE;
-    }
     
-    for (unsigned int i = 0; i < issuers.size(); i++)                           // Setting per-asset permissions and creating issuers script
+    if(!details->fLicenseTokenIssuance)
     {
-        if(err == MC_ERR_NOERROR)
-        {
-            if(stored_issuers.count(issuers[i]) == 0)
-            {
-                memcpy(issuer_buf,issuers[i].begin(),sizeof(uint160));
-                mc_PutLE(issuer_buf+sizeof(uint160),&issuer_flags[i],4);
-                if((int)i < mc_gState->m_Assets->MaxStoredIssuers())            // Adding list of issuers to the asset script
-                {
-                    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,sizeof(issuer_buf));            
-                }
-                if(new_issue)                                                   // Setting first permission record - to scan from
-                {                    
-                    err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,all_permissions,
-                            (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
-                }
-                stored_issuers.insert(issuers[i]);
-            }
-        }
-    }        
+        unsigned char issuer_buf[24];
+        memset(issuer_buf,0,sizeof(issuer_buf));
+        flags=MC_PFL_NONE;        
+        uint32_t timestamp=0;
+        set <uint160> stored_issuers;
 
-    memset(issuer_buf,0,sizeof(issuer_buf));
-    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,1);                    
-    if(err)
-    {
-        reason="Cannot update permission database for issued asset";
-        return false;            
+                                                                                    // First per-entity record in permission database
+                                                                                    // We'll need it for scanning asset-related rows
+        if(new_issue)                                                               
+        {
+            err=MC_ERR_NOERROR;
+
+            txid=tx.GetHash();
+            err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_CONNECT,
+                    (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
+        }
+
+        uint32_t all_permissions=MC_PTP_ADMIN | MC_PTP_ISSUE;
+        if(mc_gState->m_Features->PerAssetPermissions())
+        {
+            all_permissions |= MC_PTP_ACTIVATE | MC_PTP_SEND | MC_PTP_RECEIVE;
+        }
+
+        for (unsigned int i = 0; i < issuers.size(); i++)                           // Setting per-asset permissions and creating issuers script
+        {
+            if(err == MC_ERR_NOERROR)
+            {
+                if(stored_issuers.count(issuers[i]) == 0)
+                {
+                    memcpy(issuer_buf,issuers[i].begin(),sizeof(uint160));
+                    mc_PutLE(issuer_buf+sizeof(uint160),&issuer_flags[i],4);
+                    if((int)i < mc_gState->m_Assets->MaxStoredIssuers())            // Adding list of issuers to the asset script
+                    {
+                        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,sizeof(issuer_buf));            
+                    }
+                    if(new_issue)                                                   // Setting first permission record - to scan from
+                    {                    
+                        err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,all_permissions,
+                                (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
+                    }
+                    stored_issuers.insert(issuers[i]);
+                }
+            }
+        }        
+
+        memset(issuer_buf,0,sizeof(issuer_buf));
+        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,1);                    
+        if(err)
+        {
+            reason="Cannot update permission database for issued asset";
+            return false;            
+        }
     }
     
     const unsigned char *special_script;
@@ -1874,7 +2206,8 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     txid=tx.GetHash();
     if(new_issue)                                                               // Updating entity database
     {        
-        err=mc_gState->m_Assets->InsertAsset(&txid,offset,total,asset_name,multiple,details->details_script,details->details_script_size,special_script,special_script_size,update_mempool);                      
+        err=mc_gState->m_Assets->InsertAsset(&txid,offset,details->fLicenseTokenIssuance ? MC_ENT_TYPE_LICENSE_TOKEN : MC_ENT_TYPE_ASSET,
+                total,asset_name,multiple,details->details_script,details->details_script_size,special_script,special_script_size,update_mempool);                      
     }
     else
     {
@@ -1912,7 +2245,8 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
             {
                 if(new_issue)
                 {
-                    if(fDebug)LogPrint("mchn","New asset. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
+                    if(fDebug)LogPrint("mchn","New %s. TxID: %s, AssetRef: %d-%d-%d, Name: %s\n",
+                            details->fLicenseTokenIssuance ? "license token" : "asset",
                             tx.GetHash().GetHex().c_str(),
                             mc_gState->m_Assets->m_Block+1,offset,(int)(*((unsigned char*)&txid+0))+256*(int)(*((unsigned char*)&txid+1)),
                             this_entity.GetName());                                        
@@ -1949,6 +2283,11 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
     }
     
     if(details->new_entity_type == MC_ENT_TYPE_ASSET)                           // Processed in another place
+    {
+        return true;        
+    }
+    
+    if(details->new_entity_type == MC_ENT_TYPE_LICENSE_TOKEN)                   // Processed in another place
     {
         return true;        
     }
@@ -2189,7 +2528,7 @@ bool MultiChainTransaction_VerifyNotFilteredRestrictions(const CTransaction& tx,
                 return true;            
             }
         }
-        
+                
         MultiChainTransaction_SetTmpOutputScript(tx.vout[vout].scriptPubKey);
         
         if(vout == details->emergency_disapproval_output)
@@ -2361,19 +2700,24 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
         fReject=true;
         goto exitlbl;                                                                    
     }
-
-    if(!MultiChainTransaction_CheckMandatoryFee(&details,&mandatory_fee,reason))
-    {
-        fReject=true;
-        goto exitlbl;                                                                            
-    }
-                                                                                // Asset genesis/followon
-    if(!MultiChainTransaction_ProcessAssetIssuance(tx,offset,accept,&details,reason))           
+    
+    if(!MultiChainTransaction_ProcessAssetIssuance(tx,offset,accept,&details,reason))                // Asset genesis/followon
     {
         fReject=true;
         goto exitlbl;                                                                    
     }
 
+    if(!MultiChainTransaction_CheckMandatoryFee(&details,&mandatory_fee,reason))
+    {
+        fReject=true;
+        goto exitlbl;                                                                            
+    }                                                                           
+
+    if(!MultiChainTransaction_CheckTransfers(tx,offset,&details,reason))        // Transfers and receive permissions
+    {
+        fReject=true;
+        goto exitlbl;                                                                    
+    }
                                                                                 // Creating of (pseudo)streams/upgrades
     if(!MultiChainTransaction_ProcessEntityCreation(tx,offset,accept,&details,reason))           
     {
@@ -2393,7 +2737,7 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
         goto exitlbl;                                                                                
     }        
     
-    if( (details.emergency_disapproval_output < 0) && !details.fIsStandardCoinbase)
+    if( (details.emergency_disapproval_output < 0) && !details.fIsStandardCoinbase && !details.fLicenseTokenTransfer)
     {
         if(mc_gState->m_Features->Filters())
         {

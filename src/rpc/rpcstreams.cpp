@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 
@@ -352,6 +352,7 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     if(mc_gState->m_Features->OffChainData())
     {
         string strError;
+        int errorCode=RPC_INVALID_PARAMETER;
         uint32_t permissions=0;
         uint32_t restrict=0;
         if(params[3].type() != bool_type)
@@ -362,7 +363,7 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
                 {
                     if(d.name_ == "restrict")
                     {
-                        if(RawDataParseRestrictParameter(d.value_,&restrict,&permissions,&strError))
+                        if(RawDataParseRestrictParameter(d.value_,&restrict,&permissions,&errorCode,&strError))
                         {
                             if(restrict & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN)
                             {
@@ -374,7 +375,7 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
                         }
                         else
                         {
-                            throw JSONRPCError(RPC_INVALID_PARAMETER, strError);                                                                           
+                            throw JSONRPCError(errorCode, strError);                                                                           
                         }
                     }
                     else
@@ -440,6 +441,7 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     vector<CTxDestination> fromaddresses;
     CScript scriptOpReturn=CScript();
     
+    EnsureWalletIsUnlocked();
     int errorCode=RPC_INVALID_PARAMETER;
     string strError;    
     lpDetailsScript->Clear();
@@ -522,7 +524,6 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     }
     
     
-    EnsureWalletIsUnlocked();
     {
         LOCK (pwalletMain->cs_wallet_send);
 
@@ -669,7 +670,10 @@ Value publishmultifrom(const Array& params, bool fHelp)
     
     BOOST_FOREACH(const CTxDestination& from_address, fromaddresses) 
     {
-        valid_addresses.insert(from_address);
+        if( (IsMine(*pwalletMain, from_address) & ISMINE_SPENDABLE) == ISMINE_SPENDABLE )
+        {
+            valid_addresses.insert(from_address);
+        }
     }    
             
     stream_hashes.insert(*(uint256*)stream_entity.GetTxID());
@@ -715,7 +719,10 @@ Value publishmultifrom(const Array& params, bool fHelp)
                     {
                         if(valid_addresses.find(other_address) != valid_addresses.end())
                         {
-                            next_addresses.insert(other_address);                            
+                            if( (IsMine(*pwalletMain, other_address) & ISMINE_SPENDABLE) == ISMINE_SPENDABLE )
+                            {
+                                next_addresses.insert(other_address);                            
+                            }
                         }
                     }    
                     valid_addresses=next_addresses;
@@ -848,6 +855,7 @@ Value publishfrom(const Array& params, bool fHelp)
     vector<CTxDestination> addresses;    
     
     vector<CTxDestination> fromaddresses;        
+    EnsureWalletIsUnlocked();
     
     if(params[0].get_str() != "*")
     {
@@ -1037,7 +1045,6 @@ Value publishfrom(const Array& params, bool fHelp)
 
     lpScript->Clear();
          
-    EnsureWalletIsUnlocked();
     LOCK (pwalletMain->cs_wallet_send);
     
     SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn,fromaddresses);

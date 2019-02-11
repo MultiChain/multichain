@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "multichain/multichain.h"
@@ -165,6 +165,11 @@ void* mc_MultichainParams::GetParam(const char *param,int* size)
 
 int mc_MultichainParams::IsParamUpgradeValueInRange(const mc_OneMultichainParam *param,int version,int64_t value)
 {
+    if((param->m_Type & MC_PRM_DATA_TYPE_MASK) == MC_PRM_BOOLEAN)
+    {
+        return 1;
+    }
+    
     if(value >= param->m_MinIntegerValue)
     {
         if(value <= param->m_MaxIntegerValue)
@@ -275,6 +280,20 @@ int mc_MultichainParams::CanBeUpgradedByVersion(const char *param,int version,in
     if(strcmp(param,"maximumchunkcount") == 0)
     {
         if(version >= 20003)
+        {
+            return m_lpCoord[2 * index + 1];
+        }
+    }
+    
+    if( (strcmp(param,"anyonecanconnect") == 0) ||
+        (strcmp(param,"anyonecansend") == 0) ||
+        (strcmp(param,"anyonecanreceive") == 0) ||
+        (strcmp(param,"anyonecanreceiveempty") == 0) ||
+        (strcmp(param,"anyonecancreate") == 0) ||
+        (strcmp(param,"anyonecanissue") == 0) ||
+        (strcmp(param,"anyonecanactivate") == 0) )            
+    {
+        if(version >= 20007)
         {
             return m_lpCoord[2 * index + 1];
         }
@@ -1762,11 +1781,6 @@ int mc_MultichainParams::IsProtocolMultichain()
 }
 
 
-int mc_Features::MinProtocolVersion()
-{
-    return 10004;
-}
-
 int mc_Features::LastVersionNotSendingProtocolVersionInHandShake()
 {
     return 10002;
@@ -2203,4 +2217,32 @@ int mc_Features::ImplicitConnectPermission()
     
     return ret;    
 }
+
+int mc_Features::LicenseTokens()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 20007)
+        {
+            ret=1;
+        }
+        else
+        {
+            if(Filters() == 0)
+            {
+                ret=1;
+            }            
+        }
+    }
+    
+    return ret;    
+}
+
 
