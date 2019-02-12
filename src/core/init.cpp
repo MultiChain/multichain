@@ -92,6 +92,11 @@ enum BindFlags {
 static const char* FEE_ESTIMATES_FILENAME="fee_estimates.dat";
 CClientUIInterface uiInterface;
 
+//! -paytxfee will warn if called with a higher fee than this amount (in satoshis) per KB
+static const CAmount nHighTransactionFeeWarning = 0.01 * COIN;
+//! -maxtxfee will warn if called with a higher fee than this amount (in satoshis)
+static const CAmount nHighTransactionMaxFeeWarning = 100 * nHighTransactionFeeWarning;
+
 //////////////////////////////////////////////////////////////////////////////
 //
 // Shutdown
@@ -1444,34 +1449,28 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         string strBurnAddress=BurnAddress(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS)); // Caching burn address
         LogPrint("mchn","mchn: Burn address: %s\n",strBurnAddress.c_str());                
         
-        bool wallet_mode_valid=false;
         wallet_mode=GetArg("-walletdbversion",0);
         if(wallet_mode == 0)
         {
             mc_gState->m_WalletMode=MC_WMD_AUTO;
-            wallet_mode_valid=true;
         }
         if(wallet_mode == 3)
         {
             mc_gState->m_WalletMode=MC_WMD_TXS | MC_WMD_ADDRESS_TXS | MC_WMD_FLAT_DAT_FILE; 
-            wallet_mode_valid=true;
         }
         if(wallet_mode == 2)
         {
             mc_gState->m_WalletMode=MC_WMD_TXS | MC_WMD_ADDRESS_TXS; 
-            wallet_mode_valid=true;
         }
 
         if(wallet_mode == 1)
         {
             mc_gState->m_WalletMode=MC_WMD_NONE;
-            wallet_mode_valid=true;
             zap_wallet_txs=false;
         }
         if(wallet_mode == -1)
         {
             mc_gState->m_WalletMode=MC_WMD_TXS | MC_WMD_ADDRESS_TXS | MC_WMD_MAP_TXS;            
-            wallet_mode_valid=true;
             zap_wallet_txs=false;
         }
 

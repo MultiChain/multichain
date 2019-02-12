@@ -2,6 +2,7 @@ FwalDIST_SUBDIRS = secp256k1
 AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS)
 CXXFLAGS += -std=c++0x
 
+CPPFLAGS += -Wno-deprecated-declarations -Wno-unused-local-typedefs -Wno-unused-result -DBOOST_SYSTEM_NO_DEPRECATED=1 
 
 if EMBEDDED_LEVELDB
 LEVELDB_CPPFLAGS += -I$(srcdir)/leveldb/include

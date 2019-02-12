@@ -682,7 +682,7 @@ Value publishmultifrom(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Items should be array");                                
     }    
 
-    if(params[2].get_array().size() > MCP_MAX_STD_OP_RETURN_COUNT)
+    if((int)params[2].get_array().size() > MCP_MAX_STD_OP_RETURN_COUNT)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Number of items exceeds %d (max-std-op-returns-count)",MCP_MAX_STD_OP_RETURN_COUNT));                                                    
     }
@@ -814,7 +814,7 @@ Value publishmultifrom(const Array& params, bool fHelp)
         }
 
         CTxOut txout;
-        uint256 hash=deepest_coin.GetHashAndTxOut(txout);
+        deepest_coin.GetHashAndTxOut(txout);
 
         if (!ExtractDestination(txout.scriptPubKey, out_address))
         {
