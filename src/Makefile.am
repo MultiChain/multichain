@@ -180,13 +180,13 @@ obj/build.h: FORCE
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
 if ENABLE_ENTERPRISE
-include enterprise/Makefile.am
+-include enterprise/Makefile.am
 else
-    libbitcoin_enterprise_a_CPPFLAGS = $(BITCOIN_INCLUDES)
-    libbitcoin_enterprise_a_SOURCES = \
-	community/community.cpp \	
-	wallet/db.cpp \
-	wallet/dbwrap_com
+libbitcoin_enterprise_a_CPPFLAGS = $(BITCOIN_INCLUDES)
+libbitcoin_enterprise_a_SOURCES = \
+  community/community.cpp \
+  wallet/db.cpp \
+  wallet/dbwrap_com.cpp
 endif
 
 # server: shared between bitcoind and bitcoin-qt
