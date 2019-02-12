@@ -25,6 +25,7 @@ BITCOIN_INCLUDES=-I$(builddir) -I$(builddir)/obj $(BOOST_CPPFLAGS) $(LEVELDB_CPP
 
 BITCOIN_INCLUDES += -I$(srcdir)/secp256k1/include
 
+LIBBITCOIN_ENTERPRISE=libbitcoin_enterprise.a
 LIBBITCOIN_SERVER=libbitcoin_server.a
 LIBBITCOIN_WALLET=libbitcoin_wallet.a
 LIBBITCOIN_COMMON=libbitcoin_common.a
@@ -50,6 +51,7 @@ EXTRA_LIBRARIES = \
   libbitcoin_util.a \
   libbitcoin_common.a \
   univalue/libbitcoin_univalue.a \
+  libbitcoin_enterprise.a \
   libbitcoin_server.a \
   libbitcoin_cli.a
 if ENABLE_WALLET
@@ -177,6 +179,16 @@ obj/build.h: FORCE
 	  $(abs_top_srcdir)
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
+if ENABLE_ENTERPRISE
+include enterprise/Makefile.am
+else
+    libbitcoin_enterprise_a_CPPFLAGS = $(BITCOIN_INCLUDES)
+    libbitcoin_enterprise_a_SOURCES = \
+	community/community.cpp \	
+	wallet/db.cpp \
+	wallet/dbwrap_com
+endif
+
 # server: shared between bitcoind and bitcoin-qt
 libbitcoin_server_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS)
 libbitcoin_server_a_SOURCES = \
@@ -226,8 +238,6 @@ libbitcoin_server_a_SOURCES = \
 libbitcoin_wallet_a_CPPFLAGS = $(BITCOIN_INCLUDES)
 libbitcoin_wallet_a_SOURCES = \
   wallet/dbflat.cpp \
-  wallet/db.cpp \
-  wallet/dbwrap_com.cpp \
   wallet/crypter.cpp \
   rpc/rpcdump.cpp \
   rpc/rpcwallet.cpp \
@@ -263,6 +273,9 @@ crypto_libbitcoin_crypto_a_SOURCES = \
   crypto/hmac_sha512.h \
   crypto/sha1.h \
   crypto/ripemd160.h
+
+
+
 
 # multichain library
 multichain_libbitcoin_multichain_a_CPPFLAGS = $(BITCOIN_CONFIG_INCLUDES)
@@ -458,6 +471,7 @@ libbitcoin_v8_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(V8_INCLUDE)
 
 # multichaind binary #
 multichaind_LDADD = \
+  $(LIBBITCOIN_ENTERPRISE) \
   $(LIBBITCOIN_SERVER) \
   $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_UNIVALUE) \
@@ -501,6 +515,7 @@ endif
 
 # multichaind-cold binary #
 multichaind_cold_LDADD = \
+  $(LIBBITCOIN_ENTERPRISE) \
   $(LIBBITCOIN_SERVER) \
   $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_UNIVALUE) \

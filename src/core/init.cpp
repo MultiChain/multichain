@@ -69,6 +69,7 @@ mc_WalletTxs* pwalletTxsMain = NULL;
 mc_RelayManager* pRelayManager = NULL;
 mc_FilterEngine* pFilterEngine = NULL;
 mc_MultiChainFilterEngine* pMultiChainFilterEngine = NULL;
+
 bool fFeeEstimatesInitialized = false;
 extern int JSON_DOUBLE_DECIMAL_DIGITS;                             
 
@@ -223,6 +224,7 @@ void Shutdown()
     delete pwalletMain;
     pwalletMain = NULL;
 /* MCHN START */  
+    
     if(pwalletTxsMain)
     {
         delete pwalletTxsMain;
@@ -239,6 +241,7 @@ void Shutdown()
         delete pMultiChainFilterEngine;
         pMultiChainFilterEngine=NULL;        
     }
+
     
     if(pFilterEngine)
     {

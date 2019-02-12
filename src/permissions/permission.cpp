@@ -1386,7 +1386,6 @@ int mc_Permissions::CanWrite(const void* lpEntity,const void* lpAddress)
 int mc_Permissions::FilterApproved(const void* lpEntity,const void* lpAddress)
 {
     int result;
-    mc_MempoolPermissionRow row;
 
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
     {
