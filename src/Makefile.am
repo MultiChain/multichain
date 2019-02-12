@@ -126,6 +126,7 @@ BITCOIN_CORE_H = \
   utils/utilparse.h \
   rpc/rpcclient.h \
   rpc/rpcprotocol.h \
+  rpc/rpcasio.h \
   rpc/rpcutils.h \
   rpc/rpcwallet.h \
   rpc/rpcserver.h \

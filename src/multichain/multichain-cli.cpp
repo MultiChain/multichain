@@ -7,6 +7,7 @@
 #include "version/clientversion.h"
 #include "rpc/rpcclient.h"
 #include "rpc/rpcprotocol.h"
+#include "rpc/rpcasio.h"
 #include "utils/util.h"
 #include "utils/utilstrencodings.h"
 

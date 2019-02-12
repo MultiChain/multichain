@@ -5,6 +5,7 @@
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "rpc/rpcserver.h"
+#include "rpc/rpcasio.h"
 
 #include "structs/base58.h"
 #include "core/init.h"
@@ -47,6 +48,10 @@ static boost::thread_group* rpc_worker_group = NULL;
 static boost::asio::io_service::work *rpc_dummy_work = NULL;
 static std::vector<CSubNet> rpc_allow_subnets; //!< List of subnets to allow RPC connections from
 static std::vector< boost::shared_ptr<ip::tcp::acceptor> > rpc_acceptors;
+
+//! Convert boost::asio address to CNetAddr
+extern CNetAddr BoostAsioToCNetAddr(boost::asio::ip::address address);
+
 
 string JSONRPCRequestForLog(const string& strMethod, const Array& params, const Value& id)
 {
