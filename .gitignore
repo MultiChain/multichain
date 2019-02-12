@@ -12,6 +12,9 @@ src/multichaind-cold
 src/test/test_bitcoin
 src/qt/test/test_bitcoin-qt
 
+local/*
+openssl*
+
 # autoreconf
 Makefile.in
 aclocal.m4
