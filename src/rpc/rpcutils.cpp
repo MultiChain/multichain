@@ -699,15 +699,15 @@ Object FilterEntry(const unsigned char *txid,uint32_t output_level,uint32_t filt
                         for(int i=0;i<(int)value_size/MC_AST_SHORT_TXID_SIZE;i++)
                         {
                             mc_EntityDetails relevant_entity;
-                            Object asset_entry;
+//                            Object asset_entry;
                             if(mc_gState->m_Assets->FindEntityByShortTxID(&relevant_entity,ptr+i*MC_AST_SHORT_TXID_SIZE))
                             {
                                 switch(relevant_entity.GetEntityType())
                                 {
                                     case MC_ENT_TYPE_ASSET:
-                                        asset_entry=AssetEntry(relevant_entity.GetTxID(),-1,0x00);
-                                        asset_entry.push_back(Pair("type", "asset"));
-                                        entities.push_back(asset_entry);
+                                        entities.push_back(AssetEntry(relevant_entity.GetTxID(),-1,0x0104));
+//                                        asset_entry.push_back(Pair("type", "asset"));
+//                                        entities.push_back(asset_entry);
                                         break;
                                     default:
                                         entities.push_back(StreamEntry(relevant_entity.GetTxID(),0x03));
@@ -1745,12 +1745,18 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
 // 0x0020 issuers
 // 0x0040 put given quantity into qty field, even negative
 // 0x0080 put issueqty into qty field
+// 0x0100 skip all quantities and add "type":"asset|
     Object entry;
     mc_EntityDetails entity;
-    mc_EntityDetails genesis_entity;
+    mc_EntityDetails sec_entity;
+    mc_EntityDetails *genesis_entity;
+    mc_EntityDetails *followon;
     mc_TxEntityStat entStat;
     unsigned char *ptr;
 
+    genesis_entity=&sec_entity;
+    followon=&sec_entity;
+    
     if(txid == NULL)
     {
         entry.push_back(Pair("assetref", ""));
@@ -1763,16 +1769,22 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
     
     if(mc_gState->m_Assets->FindEntityByTxID(&entity,txid))
     {
+        genesis_entity->Zero();
         if(entity.IsFollowOn())
         {
-            mc_gState->m_Assets->FindEntityByFollowOn(&genesis_entity,txid);
+            mc_gState->m_Assets->FindEntityByFollowOn(genesis_entity,txid);
         }
         else
         {
-            memcpy(&genesis_entity,&entity,sizeof(mc_EntityDetails));
+            memcpy(genesis_entity,&entity,sizeof(mc_EntityDetails));
         }
         
-        ptr=(unsigned char *)genesis_entity.GetName();
+        if(output_level & 0x100)
+        {
+            entry.push_back(Pair("type", "asset"));                        
+        }
+        
+        ptr=(unsigned char *)genesis_entity->GetName();
         if(ptr && strlen((char*)ptr))
         {
             entry.push_back(Pair("name", string((char*)ptr)));            
@@ -1781,9 +1793,9 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         {
             entry.push_back(Pair("issuetxid", hash.GetHex()));
         }
-        ptr=(unsigned char *)genesis_entity.GetRef();
+        ptr=(unsigned char *)genesis_entity->GetRef();
         string assetref="";
-        if(genesis_entity.IsUnconfirmedGenesis())
+        if(genesis_entity->IsUnconfirmedGenesis())
         {
             Value null_value;
             entry.push_back(Pair("assetref",null_value));
@@ -1798,6 +1810,9 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
             entry.push_back(Pair("assetref", assetref));
         }
 
+        entStat.Zero();
+        memcpy(&entStat,genesis_entity->GetShortRef(),mc_gState->m_NetworkParams->m_AssetRefSize);
+        
         size_t value_size;
         int64_t offset,new_offset;
         int64_t raw_output;
@@ -1808,8 +1823,8 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         uint32_t permissions;
 
         ptr=entity.GetScript();
-        multiple=genesis_entity.GetAssetMultiple();
-        permissions=genesis_entity.Permissions();
+        multiple=genesis_entity->GetAssetMultiple();
+        permissions=genesis_entity->Permissions();
         units= 1./(double)multiple;
         if(output_level & 0x0002)
         {
@@ -1880,26 +1895,27 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
             for(int i=followons->GetCount()-1;i>=0;i--)
             {
                 Object issue;
-                mc_EntityDetails followon;
-                if(mc_gState->m_Assets->FindEntityByTxID(&followon,followons->GetRow(i)))
+//                mc_EntityDetails followon;
+                followon->Zero();
+                if(mc_gState->m_Assets->FindEntityByTxID(followon,followons->GetRow(i)))
                 {
-                    qty=followon.GetQuantity();
+                    qty=followon->GetQuantity();
                     total+=qty;
                     if(output_level & 0x0020)
                     {
-                        issue.push_back(Pair("txid", ((uint256*)(followon.GetTxID()))->ToString().c_str()));    
+                        issue.push_back(Pair("txid", ((uint256*)(followon->GetTxID()))->ToString().c_str()));    
                         issue.push_back(Pair("qty", (double)qty*units));
                         issue.push_back(Pair("raw", qty));                    
 
                         Object followon_fields;
                         Array followon_issuers;
 
-                        vfields=mc_ExtractDetailsJSONObject(&followon);
-                        ptr=followon.GetScript();
+                        vfields=mc_ExtractDetailsJSONObject(followon);
+                        ptr=followon->GetScript();
                         offset=0;
                         while(offset>=0)
                         {
-                            new_offset=followon.NextParam(offset,&value_offset,&value_size);
+                            new_offset=followon->NextParam(offset,&value_offset,&value_size);
                             if(value_offset > 0)
                             {
                                 if(ptr[offset])
@@ -1956,26 +1972,29 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         }
         
         raw_output=quantity;
-        if(output_level & 0x0080)
+        if( (output_level & 0x0100) == 0)
         {
-            raw_output=entity.GetQuantity();
-            entry.push_back(Pair("qty", (double)raw_output*units));
-            entry.push_back(Pair("raw", raw_output));                                    
-        }
-        else
-        {
-            if( (raw_output < 0) && ( (output_level & 0x0040) == 0) )
+            if(output_level & 0x0080)
             {
-                raw_output=total;
-                entry.push_back(Pair("issueqty", (double)raw_output*units));
-                entry.push_back(Pair("issueraw", raw_output));                                    
+                raw_output=entity.GetQuantity();
+                entry.push_back(Pair("qty", (double)raw_output*units));
+                entry.push_back(Pair("raw", raw_output));                                    
             }
             else
             {
-                entry.push_back(Pair("qty", (double)raw_output*units));
-                if(output_level & 0x0001)
+                if( (raw_output < 0) && ( (output_level & 0x0040) == 0) )
                 {
-                    entry.push_back(Pair("raw", raw_output));                                    
+                    raw_output=total;
+                    entry.push_back(Pair("issueqty", (double)raw_output*units));
+                    entry.push_back(Pair("issueraw", raw_output));                                    
+                }
+                else
+                {
+                    entry.push_back(Pair("qty", (double)raw_output*units));
+                    if(output_level & 0x0001)
+                    {
+                        entry.push_back(Pair("raw", raw_output));                                    
+                    }
                 }
             }
         }
@@ -1983,8 +2002,6 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         
         if( ((output_level & 0x0008) != 0) && ((mc_gState->m_WalletMode & MC_WMD_TXS) != 0) && (pMultiChainFilterEngine->m_TxID == 0) )
         {
-            entStat.Zero();
-            memcpy(&entStat,genesis_entity.GetShortRef(),mc_gState->m_NetworkParams->m_AssetRefSize);
             entStat.m_Entity.m_EntityType=MC_TET_ASSET | MC_TET_CHAINPOS;
             if(pwalletTxsMain->FindEntity(&entStat))
             {
