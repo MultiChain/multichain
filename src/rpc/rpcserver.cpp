@@ -841,7 +841,7 @@ void StartRPCThreads(string& strError)
     rpc_worker_group = new boost::thread_group();
     
 
-#ifdef OS_MACOSX
+#ifdef MAC_OSX
     boost::thread::attributes attrs;
     attrs.set_stack_size(8*1024*1024);
     
@@ -850,8 +850,7 @@ void StartRPCThreads(string& strError)
         boost::thread *lpThread=new thread(attrs,boost::bind(&asio::io_service::run, rpc_io_service));
         rpc_worker_group->add_thread(lpThread);
     }    
-#else
-    
+#else    
     for (int i = 0; i < GetArg("-rpcthreads", 4); i++)
         rpc_worker_group->create_thread(boost::bind(&asio::io_service::run, rpc_io_service));
 #endif
