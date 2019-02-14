@@ -6,7 +6,7 @@ MultiChain uses V8 version 6.8, and requires at least 4 GB of RAM to build in a 
 
 ## Clone Google's depot_tools
 
-Google's [depot_tools](http://dev.chromium.org/developers/how-tos/install-depot-tools) are used by the Google build system to manage Git checkouts.
+Google's [depot_tools](https://commondatastorage.googleapis.com/chrome-infra-docs/flat/depot_tools/docs/html/depot_tools_tutorial.html#_setting_up) are used by the Google build system to manage Git checkouts.
 
     git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
     cd depot_tools
@@ -38,12 +38,12 @@ The selected release of the V8 sources requires relaxing two compiler checks to 
 
 -   Open the file `build/config/compiler/BUILD.gn` in your favorite editor.
 
--   Locate the folllowing lines (currently at **1464**):
+-   Locate the following lines (currently at **1469**):
 
         if (is_clang) {
           cflags += [
           
--   Add the following two lines to **the end** of the block and save the file:
+-   Add the following two lines to **the end of the block** and save the file:
 
         "-Wno-defaulted-function-deleted",
         "-Wno-null-pointer-arithmetic",
@@ -55,7 +55,11 @@ Build the V8 libraries:
 
 Create an additional library embedding the V8 initial snapshot blobs:
 
-    brew install python
+    brew install python@2
     pip install pathlib2
     cd $RELEASE
     python $MULTICHAIN_HOME/depends/v8_data_lib.py
+    
+### Note
+
+The environment variable `$MULTICHAIN_HOME` should point to the parent of the V8 build folder (see [mac.md](mac.md) for details).

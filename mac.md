@@ -1,14 +1,43 @@
 # Mac Build Notes (on MacOS Sierra)
 
+## Install XCode and XCode command line tools
+
+-   Test if XCode command line tools are installed:
+        
+        xcode-select -p
+        
+-   If the command does not print the location of the XCode command-line tools successfully:
+
+        xcode-select --install
+        
+-   Select XCode locatioh:
+
+        sudo xcode-select -s <path/to/Xcode.app>
+
+
+## Clone MultiChain
+Install git from git-scm, then
+
+    git clone https://github.com/MultiChain/multichain.git
+
+
+## Prepare to download or build V8
+
+    cd multichain
+    set MULTICHAIN_HOME=$(pwd)
+    mkdir v8build
+    cd v8build
+
+    
+You can use pre-built headers and binaries of Google's V8 JavaScript engine by downloading and expanding [macos-v8.tar.gz](https://github.com/MultiChain/multichain-binaries/raw/master/macos-v8.tar.gz) in the current directory. If, on the other hand, you prefer to build the V8 component yourself, please follow the instructions in [V8_mac.md](/V8_mac.md/).
+
 ## Install dependencies
 
-Install XCode and XCode command line tools
+Install brew (follow instructions on [brew.sh](https://brew.sh/))
 
-Install git from git-scm
-
-Install brew (follow instructions on brew.sh)
-
-    brew install autoconf automake berkeley-db4 libtool boost@1.57 openssl pkg-config rename python@2
+    brew install autoconf automake berkeley-db4 libtool boost@1.57 pkg-config rename python@2
+    export LDFLAGS=-L/usr/local/opt/openssl/lib
+    export CPPFLAGS=-I/usr/local/opt/openssl/include
     brew link boost@1.57 --force
 
 If another Boost version was already installed, then do this:
@@ -16,10 +45,6 @@ If another Boost version was already installed, then do this:
     brew uninstall boost
     brew install boost@1.57
     brew link boost@1.57 --force
-	
-The following command may be necessary if XCode was not used yet:
-
-    sudo xcode-select -s /Applications/Xcode.app
 
 ## Prepare for static linking
 
@@ -45,26 +70,13 @@ The default brew cookbook for berkeley-db and boost builds static libraries, but
 
         brew edit openssl
         
-    In 'def configure_args' change 'shared' to 'no-shared'
+    In 'def install' => 'args =' change 'shared' to 'no-shared'
     
         brew install openssl --force
+<!--
         export LDFLAGS=-L/usr/local/opt/openssl/lib
         export CPPFLAGS=-I/usr/local/opt/openssl/include
-
-## Clone MultiChain
-
-    git clone https://github.com/MultiChain/multichain.git
-
-
-## Prepare to download or build V8
-
-    cd multichain
-    set MULTICHAIN_HOME=$(pwd)
-    mkdir v8build
-    cd v8build
-
-    
-You can use pre-built headers and binaries of Google's V8 JavaScript engine by downloading and expanding [macos-v8.tar.gz](https://github.com/MultiChain/multichain-binaries/raw/master/macos-v8.tar.gz) in the current directory. If, on the other hand, you prefer to build the V8 component yourself, please follow the instructions in [V8_mac.md](/V8_mac.md/).
+-->
 
 ## Compile MultiChain for Mac (64-bit)
 
