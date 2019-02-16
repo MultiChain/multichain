@@ -14,6 +14,7 @@
 
         sudo xcode-select -s <path/to/Xcode.app>
 
+-   Install brew (follow instructions on [brew.sh](https://brew.sh/))
 
 ## Clone MultiChain
 Install git from git-scm, then
@@ -32,8 +33,6 @@ Install git from git-scm, then
 You can use pre-built headers and binaries of Google's V8 JavaScript engine by downloading and expanding [macos-v8.tar.gz](https://github.com/MultiChain/multichain-binaries/raw/master/macos-v8.tar.gz) in the current directory. If, on the other hand, you prefer to build the V8 component yourself, please follow the instructions in [V8_mac.md](/V8_mac.md/).
 
 ## Install dependencies
-
-Install brew (follow instructions on [brew.sh](https://brew.sh/))
 
     brew install autoconf automake berkeley-db4 libtool boost@1.57 pkg-config rename python@2
     export LDFLAGS=-L/usr/local/opt/openssl/lib
@@ -92,7 +91,7 @@ The default brew cookbook for berkeley-db and boost builds static libraries, but
     rename -e 's/.dylib.hidden/.dylib/' /usr/local/opt/openssl/lib/*.dylib.hidden
     brew edit openssl
     
-In 'def configure_args' change 'no-shared' to 'shared'
+In 'def install' => 'args =' change 'no-shared' to 'shared'
 
 ## Notes
 
