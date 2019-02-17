@@ -288,6 +288,7 @@ void __US_FlushFileWithMode(int FileHan,uint32_t use_data_sync);
 int __US_LockFile(int FileHan);
 int __US_UnLockFile(int FileHan);
 int __US_DeleteFile(const char *file_name);
+int __US_GetPID();
 void sprintf_hex(char *hex,const unsigned char *bin,int size);
 
 
