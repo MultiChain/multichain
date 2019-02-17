@@ -552,7 +552,7 @@ void ReadConfigFile(map<string, string>& mapSettingsRet,
     ClearDatadirCache();
 }
 
-#ifndef WIN32
+//#ifndef WIN32
 boost::filesystem::path GetPidFile()
 {
     boost::filesystem::path pathPidFile(GetArg("-pid", "multichain.pid"));
@@ -569,7 +569,7 @@ void CreatePidFile(const boost::filesystem::path &path, pid_t pid)
         fclose(file);
     }
 }
-#endif
+//#endif
 
 bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest)
 {
