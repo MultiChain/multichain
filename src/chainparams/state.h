@@ -65,6 +65,7 @@ typedef struct mc_Params
     char** m_Arguments;
     int m_FirstArgumentType;
     char m_DataDirNetSpecific[MC_DCT_DB_MAX_PATH];
+    char m_LogDirNetSpecific[MC_DCT_DB_MAX_PATH];
     char m_DataDir[MC_DCT_DB_MAX_PATH];
     
     mc_Params()

@@ -54,6 +54,19 @@ bool mc_DoesParentDataDirExist()
     return true;
 }
 
+bool mc_DoesParentLogDirExist()
+{
+    if (mapArgs.count("-logdir"))
+    {
+        boost::filesystem::path path=boost::filesystem::system_complete(mapArgs["-logdir"]);
+        if (!boost::filesystem::is_directory(path)) 
+        {
+            return false;
+        }    
+    }
+    return true;
+}
+
 //////////////////////////////////////////////////////////////////////////////
 //
 // Start
@@ -99,6 +112,12 @@ bool AppInit(int argc, char* argv[])
     if(!mc_DoesParentDataDirExist())
     {
         fprintf(stderr,"\nError: Data directory %s needs to exist before calling multichaind-cold. Exiting...\n\n",mapArgs["-datadir"].c_str());
+        return false;        
+    }
+        
+    if(!mc_DoesParentLogDirExist())
+    {
+        fprintf(stderr,"\nError: Log directory %s needs to exist before calling multichaind-cold. Exiting...\n\n",mapArgs["-logdir"].c_str());
         return false;        
     }
         

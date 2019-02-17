@@ -54,6 +54,20 @@ bool mc_DoesParentDataDirExist()
     return true;
 }
 
+bool mc_DoesParentLogDirExist()
+{
+    if (mapArgs.count("-logdir"))
+    {
+        boost::filesystem::path path=boost::filesystem::system_complete(mapArgs["-logdir"]);
+        if (!boost::filesystem::is_directory(path)) 
+        {
+            return false;
+        }    
+    }
+    return true;
+}
+
+
 //////////////////////////////////////////////////////////////////////////////
 //
 // Start
@@ -103,6 +117,11 @@ bool AppInit(int argc, char* argv[])
         return false;        
     }
         
+    if(!mc_DoesParentLogDirExist())
+    {
+        fprintf(stderr,"\nError: Log directory %s needs to exist before calling multichaind. Exiting...\n\n",mapArgs["-logdir"].c_str());
+        return false;        
+    }
     
     pEF=new mc_EnterpriseFeatures;
     if(pEF->Initialize(mc_gState->m_Params->NetworkName(),0))
@@ -111,7 +130,7 @@ bool AppInit(int argc, char* argv[])
         delete mc_gState;
         return false;        
     }
-    
+
     string edition=pEF->ENT_Edition();
     if(edition.size())
     {

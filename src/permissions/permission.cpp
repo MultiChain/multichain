@@ -328,7 +328,7 @@ int mc_Permissions::Initialize(const char *name,int mode)
      
     m_Ledger->SetName(name);
     m_Database->SetName(name);
-    mc_GetFullFileName(name,"permissions",".log",MC_FOM_RELATIVE_TO_DATADIR,m_LogFileName);
+    mc_GetFullFileName(name,"permissions",".log",MC_FOM_RELATIVE_TO_LOGDIR | MC_FOM_CREATE_DIR,m_LogFileName);
     
     err=m_Database->Open();
     

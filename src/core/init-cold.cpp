@@ -226,6 +226,7 @@ std::string HelpMessage_Cold()
     strUsage += ".\n";
 
     strUsage += "  -printtoconsole        " + _("Send trace/debug info to console instead of debug.log file") + "\n";
+    strUsage += "  -logdir                " + _("Send trace/debug info to specified directory") + "\n";
     strUsage += "  -shrinkdebugfile       " + _("Shrink debug.log file on client startup (default: 1 when no -debug)") + "\n";
 
     strUsage += "\n" + _("RPC server options:") + "\n";

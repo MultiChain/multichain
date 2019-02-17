@@ -296,6 +296,7 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
     int import_count;
     int last_import;
     char msg[256];
+    char dir_name[MC_DCT_DB_MAX_PATH];
     
     mc_TxEntityStat stat;
     mc_TxImportRow edbImport;
@@ -312,7 +313,9 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
     m_Database=new mc_TxEntityDB;
     
     mc_GetFullFileName(name,"wallet/txs","",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,m_LobFileNamePrefix);
-    mc_GetFullFileName(name,"wallet/txs",".log",MC_FOM_RELATIVE_TO_DATADIR,m_LogFileName);
+    mc_GetFullFileName(name,"wallet","",MC_FOM_RELATIVE_TO_LOGDIR | MC_FOM_CREATE_DIR,dir_name);
+    mc_CreateDir(dir_name);
+    mc_GetFullFileName(name,"wallet/txs",".log",MC_FOM_RELATIVE_TO_LOGDIR | MC_FOM_CREATE_DIR,m_LogFileName);
     
     m_Database->SetName(name);
     
