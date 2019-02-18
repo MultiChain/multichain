@@ -34,7 +34,7 @@ You can use pre-built headers and binaries of Google's V8 JavaScript engine by d
 
 ## Install dependencies
 
-    brew install autoconf automake berkeley-db4 libtool boost@1.57 pkg-config rename python@2
+    brew install autoconf automake berkeley-db4 libtool boost@1.57 pkg-config rename python@2 nasm
     export LDFLAGS=-L/usr/local/opt/openssl/lib
     export CPPFLAGS=-I/usr/local/opt/openssl/include
     brew link boost@1.57 --force
