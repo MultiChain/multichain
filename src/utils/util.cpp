@@ -560,7 +560,7 @@ boost::filesystem::path GetPidFile()
     return pathPidFile;
 }
 
-void CreatePidFile(const boost::filesystem::path &path, pid_t pid)
+void CreatePidFile(const boost::filesystem::path &path, int pid)
 {
     FILE* file = fopen(path.string().c_str(), "w");
     if (file)
