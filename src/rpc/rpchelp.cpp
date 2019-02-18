@@ -4636,6 +4636,24 @@ void mc_InitRPCHelpMap20()
             + HelpExampleRpc("publishmultifrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"test\", [{\"key\":\"hello world\",\"data\":\"48656C6C6F20576F726C64210A\"}]")
         ));
      
+    mapHelpStrings.insert(std::make_pair("txouttobinarycache",
+            "txouttobinarycache \"identifier\" \"txid\" vout ( count-bytes start-byte )\n"
+            "\nReturns metadata of transaction output.\n"
+            "\nArguments:\n"
+            "1. \"identifier\"                     (string, required) Binary cache item identifier\n"
+            "2. \"txid\"                           (string, required) The transaction id\n"
+            "3. vout                             (numeric, required) vout value\n"
+            "4. count-bytes                      (numeric, optional, default=INT_MAX) Number of bytes to return\n"
+            "5. start-byte                       (numeric, optional, default=0) start from specific byte \n"
+            "\nResult:\n"
+            "size                                (numeric) Size of the binary cache item\n"
+            "\nExamples:\n"
+            "\nView the data\n"
+            + HelpExampleCli("txouttobinarycache", "\"TjnVWwHYEg4\" \"txid\" 1") +
+            "\nAs a json rpc call\n"
+            + HelpExampleRpc("txouttobinarycache", "\"TjnVWwHYEg4\", \"txid\", 1")
+        ));
+    
      mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));

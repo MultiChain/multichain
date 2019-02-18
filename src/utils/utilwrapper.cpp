@@ -259,8 +259,11 @@ const char *mc_Params::DataDir(int network_specific,int create)
             path=mc_GetLogDir(name,create);        
             strcpy(m_LogDirNetSpecific,path.string().c_str());
             return m_LogDirNetSpecific;
-        }
-    
+        }    
+    }
+    else
+    {
+        path=mc_GetDataDir(name,create);        
     }
     
     strcpy(m_DataDir,path.string().c_str());
