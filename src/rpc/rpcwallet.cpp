@@ -643,7 +643,7 @@ Value txoutdata_operation(const Array& params,int fHan)
 
     uint32_t format;
     unsigned char *chunk_hashes;
-    int chunk_count;   
+    int chunk_count=0;   
     int64_t total_chunk_size,out_size;
     uint32_t retrieve_status;
     size_t elem_size;
@@ -715,7 +715,6 @@ Value txoutdata_operation(const Array& params,int fHan)
         start=paramtoint64(params[3],false,0,"Invalid start");
     }
 
-
     if(start < 0)
     {
         start=out_size+start;
@@ -749,10 +748,6 @@ Value txoutdata_operation(const Array& params,int fHan)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, must include all text or JSON data");                                                                            
         }
     }
-    if(count > 0x4000000)
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, must be below 64MB");                                                                            
-    }
 
     if(fHan)
     {
@@ -760,14 +755,10 @@ Value txoutdata_operation(const Array& params,int fHan)
         {
             if(elem == NULL)
             {
-                elem=GetChunkDataInRange(&out_size,chunk_hashes,chunk_count,start,count);
+                elem=GetChunkDataInRange(&out_size,chunk_hashes,chunk_count,start,count,fHan);
                 if(elem == NULL)
                 {
                     throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't retrieve data for this output");                                                                                            
-                }
-                if(write(fHan,elem,count) != count)
-                {
-                    throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot store binary cache item");                                                                                                                                    
                 }
                 return count;
             }
@@ -782,11 +773,16 @@ Value txoutdata_operation(const Array& params,int fHan)
         }
     }
     
+    if(count > 0x4000000)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, must be below 64MB");                                                                            
+    }
+    
     if(chunk_count > 1)
     {
         if(elem == NULL)
         {
-            elem=GetChunkDataInRange(&out_size,chunk_hashes,chunk_count,start,count);
+            elem=GetChunkDataInRange(&out_size,chunk_hashes,chunk_count,start,count,0);
             if(elem == NULL)
             {
                 throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't retrieve data for this output");                                                                                            

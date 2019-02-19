@@ -4638,7 +4638,7 @@ void mc_InitRPCHelpMap20()
      
     mapHelpStrings.insert(std::make_pair("txouttobinarycache",
             "txouttobinarycache \"identifier\" \"txid\" vout ( count-bytes start-byte )\n"
-            "\nReturns metadata of transaction output.\n"
+            "\nStores metadata of transaction output in binary cache.\n"    
             "\nArguments:\n"
             "1. \"identifier\"                     (string, required) Binary cache item identifier\n"
             "2. \"txid\"                           (string, required) The transaction id\n"

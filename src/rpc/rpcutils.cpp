@@ -1187,7 +1187,7 @@ int mc_IsUTF8(const unsigned char *elem,size_t elem_size)
     return 1;
 }
 
-const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t start,int64_t count)
+const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t start,int64_t count,int fHan)
 {
     mc_ChunkDBRow chunk_def;
     int size,shift,chunk;
@@ -1215,8 +1215,7 @@ const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes
         if(size > MAX_CHUNK_SIZE)
         {
             return NULL;
-        }
-        
+        }        
         
         ptr+=shift;
         if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,ptr,NULL,NULL,-1) == MC_ERR_NOERROR)
@@ -1237,7 +1236,21 @@ const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes
                 elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&elem_size);
                 if(elem)
                 {
-                    mc_gState->m_TmpBuffers->m_RpcChunkScript1->SetData(elem+read_from,read_size);
+                    if(fHan)
+                    {
+                        if(read_size)
+                        {
+                            if(write(fHan,elem+read_from,read_size) != read_size)
+                            {
+                                return NULL;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        mc_gState->m_TmpBuffers->m_RpcChunkScript1->SetData(elem+read_from,read_size);                        
+                    }                    
+                    
                     *out_size+=read_size;
                 }
             }            
