@@ -236,6 +236,9 @@ bool AppInit(int argc, char* argv[])
 
             mc_gState->m_Params->Parse(argc, argv, MC_ETP_DAEMON);
             mc_CheckDataDirInConfFile();
+            
+            pEF=new mc_EnterpriseFeatures;
+            pEF->Initialize(mc_gState->m_Params->NetworkName(),0);
         }
 #endif
         
