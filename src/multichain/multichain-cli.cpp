@@ -412,6 +412,19 @@ int main(int argc, char* argv[])
     boost::filesystem::create_directories(path_cli_log);
     path_cli_log /= string(mc_gState->m_Params->NetworkName() + string(".log"));
     
+    if (mapArgs["-rpcuser"] == "" && mapArgs["-rpcpassword"] == "")
+    {
+        string strMethod=strprintf("%s",mc_gState->m_Params->NetworkName());
+        if(HaveAPIWithThisName(strMethod))
+        {
+            fprintf(stdout,"\nMultiChain %s RPC client\n\n",mc_BuildDescription(mc_gState->GetNumericVersion()).c_str());
+            printf("ERROR: Couldn't read configuration file for blockchain %s. \n\n"
+                    "Be sure include the blockchain name before the command name, e.g.:\n\n"
+                    "multichain-cli chain1 %s\n\n",mc_gState->m_Params->NetworkName(),mc_gState->m_Params->NetworkName());
+            return EXIT_FAILURE;                        
+        }
+    }
+    
  #ifndef WIN32   
     if(mc_gState->m_Params->m_NumArguments == 1)                                // Interactive mode
     {
@@ -518,7 +531,7 @@ int main(int argc, char* argv[])
         return 0;
     }
 #endif
-    
+
     int ret = EXIT_FAILURE;
     try {
         mc_SaveCliCommandToLog(path_cli_log.string().c_str(), argc, argv);
