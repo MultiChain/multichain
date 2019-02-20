@@ -29,6 +29,7 @@
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #endif
+#include "community/community.h"
 
 
 /* MCHN START */
@@ -1011,6 +1012,15 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             boost::filesystem::path pathWallet=GetDataDir() / "wallet";
 
             LogPrintf("Wallet file exists. WalletDBVersion: %d.\n", currentwalletdatversion);
+            if(currentwalletdatversion != 1)
+            {
+                if(pEF->ENT_MinWalletDatVersion() > currentwalletdatversion)
+                {
+                    return InitError(strprintf("Wallet version %d is not supported in this edition of MultiChain. "
+                            "To upgrade to version %d, run MultiChain Offline Daemon: \n"
+                            "multichaind-cold %s -datadir=%s -walletdbversion=3 -rescan\n",currentwalletdatversion,pEF->ENT_MinWalletDatVersion(),mc_gState->m_Params->DataDir(1,0), mc_gState->m_NetworkParams->Name()));                                                            
+                }
+            }
             if( (currentwalletdatversion == 3) && (GetArg("-walletdbversion",MC_TDB_WALLET_VERSION) != 3) )
             {
                 return InitError(_("Wallet downgrade is not allowed"));                                                        
@@ -1042,6 +1052,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         else
         {
             currentwalletdatversion=wallet_mode;
+            if(pEF->ENT_MinWalletDatVersion() > currentwalletdatversion)
+            {
+                return InitError(strprintf("Wallet version %d is not supported in this edition of MultiChain.\n",currentwalletdatversion));                                                            
+            }
+            
             LogPrintf("Wallet file doesn't exist. New file will be created with version %d.\n", currentwalletdatversion);
         }      
         switch(currentwalletdatversion)

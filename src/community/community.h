@@ -10,6 +10,10 @@
 
 #define MC_EFT_NONE                            0x0000000000000000
 #define MC_EFT_LICENSE_TRANSFER                0x0000000000000002
+#define MC_EFT_STREAM_CONDITIONAL_INDEXING     0x0000000000000100
+#define MC_EFT_STREAM_MANUAL_RETRIEVAL         0x0000000000000200
+#define MC_EFT_STREAM_READ_PERMISSIONS         0x0000000000001000
+#define MC_EFT_ALL                             0xFFFFFFFFFFFFFFFF
 
 
 typedef struct mc_EnterpriseFeatures
@@ -43,8 +47,8 @@ typedef struct mc_EnterpriseFeatures
     int ENT_MinWalletDatVersion();
     void ENT_RPCVerifyEdition();
     
-    void LIC_RPCVerifyFeature(uint32_t feature);
-    bool LIC_VerifyFeature(uint32_t feature,std::string& reason);
+    void LIC_RPCVerifyFeature(uint64_t feature);
+    bool LIC_VerifyFeature(uint64_t feature,std::string& reason);
 //    bool LIC_VerifyConfirmation(uint160 address,void *confirmation, size_t size,std::string& reason);
 //    string LIC_LicenseName(void *confirmation, size_t size);
     int LIC_VerifyLicenses();

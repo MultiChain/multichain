@@ -19,6 +19,7 @@
 #include "multichain/multichain.h"
 #include "chainparams/globals.h"
 static bool fDaemon;
+mc_EnterpriseFeatures* pEF = NULL;
 
 void DebugPrintClose();
 std::string HelpMessage_Cold();

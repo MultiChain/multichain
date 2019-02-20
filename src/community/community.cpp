@@ -59,7 +59,7 @@ string mc_EnterpriseFeatures::ENT_Edition()
 
 int mc_EnterpriseFeatures::ENT_MinWalletDatVersion()
 {
-    return 1;
+    return 2;
 }
 
 void mc_EnterpriseFeatures::ENT_RPCVerifyEdition() 
@@ -67,12 +67,12 @@ void mc_EnterpriseFeatures::ENT_RPCVerifyEdition()
     throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is available only in Enterprise edition of MultiChain, please call \"help enterprise\" for details");        
 }
 
-void mc_EnterpriseFeatures::LIC_RPCVerifyFeature(uint32_t feature)
+void mc_EnterpriseFeatures::LIC_RPCVerifyFeature(uint64_t feature)
 {
     throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is available only in Enterprise edition of MultiChain, please call \"help enterprise\" for details");            
 }
 
-bool mc_EnterpriseFeatures::LIC_VerifyFeature(uint32_t feature,std::string& reason)
+bool mc_EnterpriseFeatures::LIC_VerifyFeature(uint64_t feature,std::string& reason)
 {
     reason="Not available in Community efition";
     return false;

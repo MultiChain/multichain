@@ -26,6 +26,7 @@ BITCOIN_INCLUDES=-I$(builddir) -I$(builddir)/obj $(BOOST_CPPFLAGS) $(LEVELDB_CPP
 BITCOIN_INCLUDES += -I$(srcdir)/secp256k1/include
 
 LIBBITCOIN_ENTERPRISE=libbitcoin_enterprise.a
+LIBBITCOIN_COMMUNITY=libbitcoin_community.a
 LIBBITCOIN_SERVER=libbitcoin_server.a
 LIBBITCOIN_WALLET=libbitcoin_wallet.a
 LIBBITCOIN_COMMON=libbitcoin_common.a
@@ -51,6 +52,8 @@ EXTRA_LIBRARIES = \
   libbitcoin_util.a \
   libbitcoin_common.a \
   univalue/libbitcoin_univalue.a \
+  libbitcoin_enterprise.a \
+  libbitcoin_community.a \
   libbitcoin_server.a \
   libbitcoin_cli.a
 if ENABLE_WALLET
@@ -178,11 +181,15 @@ obj/build.h: FORCE
 	  $(abs_top_srcdir)
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
+libbitcoin_community_a_CPPFLAGS = $(BITCOIN_INCLUDES)
+libbitcoin_community_a_SOURCES = \
+  community/community.cpp \
+  wallet/db.cpp \
+  wallet/dbwrap_com.cpp
+
 if ENABLE_ENTERPRISE
-EXTRA_LIBRARIES += libbitcoin_enterprise.a
 include entMakefile.am
 else
-EXTRA_LIBRARIES += libbitcoin_enterprise.a
 libbitcoin_enterprise_a_CPPFLAGS = $(BITCOIN_INCLUDES)
 libbitcoin_enterprise_a_SOURCES = \
   community/community.cpp \
@@ -520,7 +527,7 @@ multichaind_cold_LDADD = \
   $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_UNIVALUE) \
   $(LIBBITCOIN_WALLET) \
-  $(LIBBITCOIN_ENTERPRISE) \
+  $(LIBBITCOIN_COMMUNITY) \
   $(LIBBITCOIN_MULTICHAIN) \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CRYPTO) \
