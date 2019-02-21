@@ -37,6 +37,7 @@
 #define MC_TET_CHAINPOS                         0x00000100
 #define MC_TET_TIMERECEIVED                     0x00000200
 #define MC_TET_ORDERMASK                        0x0000FF00
+#define MC_TET_RESERVEDMASK                     0x00FF0000
 #define MC_TET_DB_STAT                          0x01000000
 #define MC_TET_IMPORT                           0x02000000
 #define MC_TET_DELETED                          0x04000000

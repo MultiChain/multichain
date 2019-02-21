@@ -9,6 +9,7 @@
 #include "json/json_spirit_ubjson.h"
 #include "json/json_spirit_reader_template.h"
 #include "json/json_spirit_writer_template.h"
+#include "community/community.h"
 
 #define MC_QPR_MAX_UNCHECKED_TX_LIST_SIZE    1048576
 #define MC_QPR_MAX_MERGED_TX_LIST_SIZE          1024
@@ -1064,8 +1065,54 @@ Value subscribe(const Array& params, bool fHelp)
        
     // Whether to perform rescan after import
     bool fRescan = true;
+    string indexes="all";
+    bool fRetrieve;
+    bool fSubscription=false;
+    
     if (params.size() > 1)
-        fRescan = params[1].get_bool();
+    {
+        if(params[1].type() == bool_type)
+        {
+            fRescan = params[1].get_bool();
+        }
+        else
+        {
+            if(params[1].type() == obj_type)
+            {
+                bool field_parsed=false;
+                BOOST_FOREACH(const Pair& d, params[1].get_obj()) 
+                {
+                    if(d.name_ == "rescan")
+                    {
+                        fRescan = d.value_.get_bool();
+                        field_parsed=true;
+                    }
+                    if(d.name_ == "retrieve")
+                    {
+                        pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_MANUAL_RETRIEVAL);
+                        fRetrieve = d.value_.get_bool();
+                        field_parsed=true;
+                        fSubscription=true;
+                    }
+                    if(d.name_ == "indexes")
+                    {
+                        pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_CONDITIONAL_INDEXING);
+                        indexes=d.value_.get_str();
+                        field_parsed=true;
+                        fSubscription=true;
+                    }                    
+                    if(!field_parsed)
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid field: %s",d.name_));                                                    
+                    }
+                }
+            }            
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "parameters should be boolean or object");                                
+            }
+        }
+    }
 
     vector<mc_EntityDetails> inputEntities;
     vector<string> inputStrings;
@@ -1098,19 +1145,29 @@ Value subscribe(const Array& params, bool fHelp)
             entity.Zero();
             memcpy(entity.m_EntityID,lpEntity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
             entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
-            if(pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC) != MC_ERR_FOUND)
+            if(fSubscription)
             {
-                entity.m_EntityType=MC_TET_STREAM | MC_TET_TIMERECEIVED;
-                pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
-                entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_CHAINPOS;
-                pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
-                entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_TIMERECEIVED;
-                pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
-                entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS;
-                pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
-                entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_TIMERECEIVED;
-                pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
-                fNewFound=true;
+                if(pEF->STR_CreateSubscription(&entity,fRetrieve,indexes) != MC_ERR_FOUND)
+                {
+                    fNewFound=true;                
+                }
+            }
+            else
+            {
+                if(pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC) != MC_ERR_FOUND)
+                {
+                    entity.m_EntityType=MC_TET_STREAM | MC_TET_TIMERECEIVED;
+                    pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
+                    entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_CHAINPOS;
+                    pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
+                    entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_TIMERECEIVED;
+                    pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
+                    entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS;
+                    pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
+                    entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_TIMERECEIVED;
+                    pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
+                    fNewFound=true;
+                }                
             }
         }
 

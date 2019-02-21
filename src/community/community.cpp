@@ -21,6 +21,12 @@ int mc_EnterpriseFeatures::Initialize(const char *name,uint32_t mode)
     return MC_ERR_NOERROR;
 }
 
+int mc_EnterpriseFeatures::STR_CreateSubscription(mc_TxEntity *entity,const bool retrieve,const std::string indexes)
+{
+    return MC_ERR_NOERROR;        
+}
+
+
 int mc_EnterpriseFeatures::WLT_CreateSubscription(mc_TxEntity *entity,uint32_t retrieve,uint32_t indexes,uint32_t *rescan_mode)
 {
     *rescan_mode=0;

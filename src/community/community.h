@@ -5,7 +5,7 @@
 #define MULTICHAIN_COMMUNITY_H
 
 #include "multichain/multichain.h"
-#include "wallet/wallettxdb.h"
+#include "wallet/wallettxs.h"
 #include "rpc/rpcutils.h"
 
 #define MC_EFT_NONE                            0x0000000000000000
@@ -35,6 +35,8 @@ typedef struct mc_EnterpriseFeatures
     int  Initialize(              
             const char *name,                                                   // Chain name
             uint32_t mode);                                                     // Unused    
+    
+    int STR_CreateSubscription(mc_TxEntity *entity,const bool retrieve,const std::string indexes);
     
     int WLT_CreateSubscription(mc_TxEntity *entity,uint32_t retrieve,uint32_t indexes,uint32_t *rescan_mode);
     int WLT_DeleteSubscription(mc_TxEntity *entity,uint32_t rescan_mode);
