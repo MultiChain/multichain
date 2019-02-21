@@ -1016,9 +1016,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             {
                 if(pEF->ENT_MinWalletDatVersion() > currentwalletdatversion)
                 {
-                    return InitError(strprintf("Wallet version %d is not supported in this edition of MultiChain. "
+                    return InitError(strprintf("Wallet version %d is not supported in this edition of MultiChain.\n"
                             "To upgrade to version %d, run MultiChain Offline Daemon: \n"
-                            "multichaind-cold %s -datadir=%s -walletdbversion=3 -rescan\n",currentwalletdatversion,pEF->ENT_MinWalletDatVersion(),mc_gState->m_Params->DataDir(1,0), mc_gState->m_NetworkParams->Name()));                                                            
+                            "multichaind-cold %s -datadir=%s -walletdbversion=3\n"
+                            "and restart multichaind.\n",
+                            currentwalletdatversion,pEF->ENT_MinWalletDatVersion(), mc_gState->m_NetworkParams->Name(),mc_gState->m_Params->DataDir(0,0)));                                                            
                 }
             }
             if( (currentwalletdatversion == 3) && (GetArg("-walletdbversion",MC_TDB_WALLET_VERSION) != 3) )
