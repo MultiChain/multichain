@@ -67,6 +67,11 @@ void mc_EnterpriseFeatures::ENT_RPCVerifyEdition()
     throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is available only in Enterprise edition of MultiChain, please call \"help enterprise\" for details");        
 }
 
+std::string mc_EnterpriseFeatures::ENT_TextConstant(const char* name)
+{
+    return "";
+}
+
 void mc_EnterpriseFeatures::LIC_RPCVerifyFeature(uint64_t feature)
 {
     throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is available only in Enterprise edition of MultiChain, please call \"help enterprise\" for details");            

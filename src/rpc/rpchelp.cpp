@@ -7,6 +7,7 @@
 #include "core/main.h"
 #include "rpc/rpcserver.h"
 #include "rpc/rpcutils.h"
+#include "community/community.h"
 
 std::string HelpRequiringPassphraseWrapper()
 {
@@ -3561,6 +3562,7 @@ void mc_InitRPCHelpMap15()
             " or\n"
             "1. entity-identifier(s)             (array, optional) A json array of stream or asset identifiers \n"                
             "2. rescan                           (boolean, optional, default=true) Rescan the wallet for transactions\n"
+            + pEF->ENT_TextConstant("help-subscribe-object") +
             "\nNote: This call can take minutes to complete if rescan is true.\n"
             "\nResult:\n"
             "\nExamples:\n"

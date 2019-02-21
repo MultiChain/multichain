@@ -46,6 +46,7 @@ typedef struct mc_EnterpriseFeatures
     std::string ENT_Edition();
     int ENT_MinWalletDatVersion();
     void ENT_RPCVerifyEdition();
+    std::string ENT_TextConstant(const char* name);
     
     void LIC_RPCVerifyFeature(uint64_t feature);
     bool LIC_VerifyFeature(uint64_t feature,std::string& reason);
