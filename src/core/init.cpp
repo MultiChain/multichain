@@ -1019,7 +1019,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     return InitError(strprintf("Wallet version %d is not supported in this edition of MultiChain.\n"
                             "To upgrade to version %d, run MultiChain Offline Daemon: \n"
                             "multichaind-cold %s -datadir=%s -walletdbversion=3\n"
-                            "and restart multichaind.\n",
+                            "and restart multichaind or use Community Edition.\n",
                             currentwalletdatversion,pEF->ENT_MinWalletDatVersion(), mc_gState->m_NetworkParams->Name(),mc_gState->m_Params->DataDir(0,0)));                                                            
                 }
             }
@@ -2583,6 +2583,12 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         return InitError(strErrors.str());
 
     pRelayManager->Initialize();
+    
+    if(pEF->Initialize(mc_gState->m_Params->NetworkName(),0))
+    {
+        fprintf(stderr,"\nError: Cannot intitialize Enterprise features. Exiting...\n\n");
+        return false;        
+    }
     
 //    RandAddSeedPerfmon();
 

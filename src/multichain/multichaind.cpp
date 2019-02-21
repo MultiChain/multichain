@@ -124,13 +124,14 @@ bool AppInit(int argc, char* argv[])
     }
     
     pEF=new mc_EnterpriseFeatures;
+/*    
     if(pEF->Initialize(mc_gState->m_Params->NetworkName(),0))
     {
         fprintf(stderr,"\nError: Data directory %s needs to exist before calling multichaind. Exiting...\n\n",mapArgs["-datadir"].c_str());
         delete mc_gState;
         return false;        
     }
-
+*/
     string edition=pEF->ENT_Edition();
     if(edition.size())
     {
