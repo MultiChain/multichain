@@ -139,7 +139,7 @@ static const std::string vAPINames[] =
 "listaccounts",
 "listaddresses",
 "listaddressgroupings",
-"listaddresstransactions"
+"listaddresstransactions",
 "listassets",
 "listassettransactions",
 "listblocks",
@@ -153,7 +153,7 @@ static const std::string vAPINames[] =
 "liststreamitems",
 "liststreamkeyitems",
 "liststreamkeys",
-"liststreampublisheritems"
+"liststreampublisheritems",
 "liststreampublishers",
 "liststreamqueryitems",
 "liststreams",
@@ -175,7 +175,7 @@ static const std::string vAPINames[] =
 "publishmulti",
 "publishmultifrom",
 "reconsiderblock",
-"resendwallettransactions"
+"resendwallettransactions",
 "resume",
 "revoke",
 "revokefrom",
