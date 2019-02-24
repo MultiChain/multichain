@@ -239,7 +239,6 @@ bool AppInit(int argc, char* argv[])
             mc_CheckDataDirInConfFile();
             
             pEF=new mc_EnterpriseFeatures;
-            pEF->Initialize(mc_gState->m_Params->NetworkName(),0);
         }
 #endif
         

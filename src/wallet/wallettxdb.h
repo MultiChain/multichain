@@ -44,6 +44,7 @@
 #define MC_TET_GETDB_ADD_TX                     0x10000000   
 #define MC_TET_SPECIALMASK                      0xFF000000
 
+#define MC_EFL_RESERVEDMASK                     0x00FF0000
 #define MC_EFL_NOT_IN_SYNC                      0x01000000
 #define MC_EFL_NOT_IN_SYNC_AFTER_IMPORT         0x02000000
 #define MC_EFL_UNSUBSCRIBED                     0x10000000

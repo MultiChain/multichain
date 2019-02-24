@@ -1066,7 +1066,7 @@ Value subscribe(const Array& params, bool fHelp)
     // Whether to perform rescan after import
     bool fRescan = true;
     string indexes="all";
-    bool fRetrieve;
+    bool fRetrieve=true;
     bool fSubscription=false;
     
     if (params.size() > 1)
@@ -1079,9 +1079,10 @@ Value subscribe(const Array& params, bool fHelp)
         {
             if(params[1].type() == obj_type)
             {
-                bool field_parsed=false;
+                bool field_parsed;
                 BOOST_FOREACH(const Pair& d, params[1].get_obj()) 
                 {
+                    field_parsed=false;
                     if(d.name_ == "rescan")
                     {
                         fRescan = d.value_.get_bool();
