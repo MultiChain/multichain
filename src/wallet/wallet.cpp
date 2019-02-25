@@ -1360,7 +1360,7 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, bool fOnlySubscri
             lpent=(mc_TxEntityStat*)m_ChainEntities->GetRow(i);
             if(lpent->m_Entity.IsSubscription())
             {
-                if(lpent->m_Entity.m_EntityType & MC_TET_CHAINPOS)
+//                if(lpent->m_Entity.m_EntityType & MC_TET_CHAINPOS)
                 {
                     if(lpent->m_Flags & MC_EFL_NOT_IN_SYNC)
                     {
@@ -1446,8 +1446,10 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, bool fOnlySubscri
                     memcpy(entity.m_EntityID,vStreamsToImport[i].m_EntityID,MC_TDB_ENTITY_ID_SIZE);
                     entity.m_EntityType=vStreamsToImport[i].m_EntityType;
                     lpEntities->Add(&entity,NULL);
+/*                    
                     entity.m_EntityType=(vStreamsToImport[i].m_EntityType - MC_TET_CHAINPOS) | MC_TET_TIMERECEIVED;
                     lpEntities->Add(&entity,NULL);
+ */ 
                 }
             }            
         }
