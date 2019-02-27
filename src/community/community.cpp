@@ -26,6 +26,30 @@ int mc_EnterpriseFeatures::STR_CreateSubscription(mc_TxEntity *entity,const bool
     return MC_ERR_NOERROR;        
 }
 
+int mc_EnterpriseFeatures::STR_IsIndexSkipped(mc_TxImport *import,mc_TxEntity *parent_entity,mc_TxEntity *entity)
+{
+    return 0;
+}
+
+int mc_EnterpriseFeatures::STR_IsOutOfSync(mc_TxEntity *entity)
+{
+    return 0;
+}
+
+int mc_EnterpriseFeatures::STR_SetSyncFlag(mc_TxEntity *entity,bool confirm)
+{
+    return MC_ERR_NOERROR;
+}
+
+int mc_EnterpriseFeatures::STR_GetSubscriptions(mc_Buffer *subscriptions)
+{
+    return MC_ERR_NOERROR;        
+}
+
+int mc_EnterpriseFeatures::STR_PutSubscriptions(mc_Buffer *subscriptions)
+{
+    return MC_ERR_NOERROR;        
+}
 
 int mc_EnterpriseFeatures::WLT_CreateSubscription(mc_TxEntity *entity,uint32_t retrieve,uint32_t indexes,uint32_t *rescan_mode)
 {

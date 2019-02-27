@@ -384,7 +384,9 @@ typedef struct mc_TxDB
     int RollBack(mc_TxImport *import,int block);                                // Rollback to specific block
 
     int Unsubscribe(mc_Buffer *lpEntities);                                     // List of the entities to unsubscribe from
-    
+
+    int TransferSubKey(mc_TxEntityStat *lpChainEntStat,const mc_TxEntityRow& erow,int slot);
+
     mc_TxImport *StartImport(                                                   // Starts new import
                              mc_Buffer *lpEntities,                             // List of entities to import
                              int block,                                         // Star from this block            

@@ -1235,6 +1235,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     bool zap_wallet_txs=false;
     bool new_wallet_txs=false;
     seed_node=mc_gState->GetSeedNode();
+    mc_Buffer *rescan_subscriptions=NULL;
     
     int seed_attempt=1;
     if(init_privkey.size())
@@ -1520,6 +1521,16 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     }
                 }
                 __US_Sleep(1000);
+                rescan_subscriptions=new mc_Buffer;
+                mc_EnterpriseFeatures* pRescanEF = new mc_EnterpriseFeatures;
+                if(pRescanEF->Initialize(mc_gState->m_Params->NetworkName(),0))
+                {
+                    fprintf(stderr,"\nError: Cannot intitialize Enterprise features. Exiting...\n\n");
+                    return false;        
+                }
+                pRescanEF->STR_GetSubscriptions(rescan_subscriptions);
+                pRescanEF->Destroy();
+                delete pRescanEF;                
             }
             pwalletTxsMain->Destroy();
             delete pwalletTxsMain;            
@@ -2385,6 +2396,18 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         }
     }
     
+        
+    if(pEF->Initialize(mc_gState->m_Params->NetworkName(),0))
+    {
+        fprintf(stderr,"\nError: Cannot intitialize Enterprise features. Exiting...\n\n");
+        return false;        
+    }
+    if(rescan_subscriptions)
+    {
+        pEF->STR_PutSubscriptions(rescan_subscriptions);            
+        delete rescan_subscriptions;
+    }            
+        
     
     // ********************************************************* Step 8: load wallet
 #ifdef ENABLE_WALLET
@@ -2583,12 +2606,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         return InitError(strErrors.str());
 
     pRelayManager->Initialize();
-    
-    if(pEF->Initialize(mc_gState->m_Params->NetworkName(),0))
-    {
-        fprintf(stderr,"\nError: Cannot intitialize Enterprise features. Exiting...\n\n");
-        return false;        
-    }
+
     
 //    RandAddSeedPerfmon();
 

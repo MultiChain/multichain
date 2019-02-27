@@ -19,6 +19,7 @@ extern mc_WalletTxs* pwalletTxsMain;
 #include "utils/timedata.h"
 #include "utils/util.h"
 #include "utils/utilmoneystr.h"
+#include "community/community.h"
 
 #include <assert.h>
 
@@ -1362,7 +1363,8 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, bool fOnlySubscri
             {
 //                if(lpent->m_Entity.m_EntityType & MC_TET_CHAINPOS)
                 {
-                    if(lpent->m_Flags & MC_EFL_NOT_IN_SYNC)
+                    if( ((lpent->m_Flags & MC_EFL_NOT_IN_SYNC) != 0 ) ||
+                        (pEF->STR_IsOutOfSync(&(lpent->m_Entity)) != 0) )    
                     {
                         vStreamsToImport.push_back(lpent->m_Entity);
                     }

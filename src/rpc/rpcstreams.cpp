@@ -1067,7 +1067,6 @@ Value subscribe(const Array& params, bool fHelp)
     bool fRescan = true;
     string indexes="all";
     bool fRetrieve=true;
-    bool fSubscription=false;
     
     if (params.size() > 1)
     {
@@ -1093,14 +1092,12 @@ Value subscribe(const Array& params, bool fHelp)
                         pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_MANUAL_RETRIEVAL);
                         fRetrieve = d.value_.get_bool();
                         field_parsed=true;
-                        fSubscription=true;
                     }
                     if(d.name_ == "indexes")
                     {
                         pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_CONDITIONAL_INDEXING);
                         indexes=d.value_.get_str();
                         field_parsed=true;
-                        fSubscription=true;
                     }                    
                     if(!field_parsed)
                     {
@@ -1146,29 +1143,28 @@ Value subscribe(const Array& params, bool fHelp)
             entity.Zero();
             memcpy(entity.m_EntityID,lpEntity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
             entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
-            if(fSubscription)
-            {
-                if(pEF->STR_CreateSubscription(&entity,fRetrieve,indexes) != MC_ERR_FOUND)
-                {
-                    fNewFound=true;                
-                }
-            }
+/*            
             else
             {
-                if(pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC) != MC_ERR_FOUND)
-                {
-                    entity.m_EntityType=MC_TET_STREAM | MC_TET_TIMERECEIVED;
-                    pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
-                    entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_CHAINPOS;
-                    pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
-                    entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_TIMERECEIVED;
-                    pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
-                    entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS;
-                    pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
-                    entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_TIMERECEIVED;
-                    pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
-                    fNewFound=true;
-                }                
+ */ 
+            if(pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC) != MC_ERR_FOUND)
+            {
+                entity.m_EntityType=MC_TET_STREAM | MC_TET_TIMERECEIVED;
+                pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
+                entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_CHAINPOS;
+                pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
+                entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_TIMERECEIVED;
+                pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
+                entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS;
+                pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
+                entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_TIMERECEIVED;
+                pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
+                fNewFound=true;
+            }                
+//            }
+            if(pEF->STR_CreateSubscription(&entity,fRetrieve,indexes) != MC_ERR_FOUND)
+            {
+                fNewFound=true;                
             }
         }
 
@@ -1620,6 +1616,10 @@ void getSubKeyEntityFromKey(string str,mc_TxEntityStat entStat,mc_TxEntity *enti
     mc_GetCompoundHash160(&stream_subkey_hash,entStat.m_Entity.m_EntityID,&key_string_hash);
     memcpy(entity->m_EntityID,&stream_subkey_hash,MC_TDB_ENTITY_ID_SIZE);
     entity->m_EntityType=entStat.m_Entity.m_EntityType | MC_TET_SUBKEY;    
+    if(pEF->STR_IsIndexSkipped(NULL,&(entStat.m_Entity),entity))
+    {
+        CheckWalletError(MC_ERR_NOT_ALLOWED);
+    }
 }
 
 void getSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity *entity)
@@ -1655,6 +1655,10 @@ void getSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity
 
     memcpy(entity->m_EntityID,&stream_subkey_hash,MC_TDB_ENTITY_ID_SIZE);
     entity->m_EntityType=entStat.m_Entity.m_EntityType | MC_TET_SUBKEY;    
+    if(pEF->STR_IsIndexSkipped(NULL,&(entStat.m_Entity),entity))
+    {
+        CheckWalletError(MC_ERR_NOT_ALLOWED);
+    }
 }
 
 Value getstreamsummary(const Array& params, bool fPublisher)

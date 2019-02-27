@@ -37,6 +37,11 @@ typedef struct mc_EnterpriseFeatures
             uint32_t mode);                                                     // Unused    
     
     int STR_CreateSubscription(mc_TxEntity *entity,const bool retrieve,const std::string indexes);
+    int STR_IsIndexSkipped(mc_TxImport *import,mc_TxEntity *parent_entity,mc_TxEntity *entity);
+    int STR_IsOutOfSync(mc_TxEntity *entity);
+    int STR_SetSyncFlag(mc_TxEntity *entity,bool confirm);
+    int STR_GetSubscriptions(mc_Buffer *subscriptions);
+    int STR_PutSubscriptions(mc_Buffer *subscriptions);
     
     int WLT_CreateSubscription(mc_TxEntity *entity,uint32_t retrieve,uint32_t indexes,uint32_t *rescan_mode);
     int WLT_DeleteSubscription(mc_TxEntity *entity,uint32_t rescan_mode);
