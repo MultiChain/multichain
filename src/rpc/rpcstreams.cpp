@@ -1055,7 +1055,7 @@ Value publishfrom(const Array& params, bool fHelp)
 
 Value subscribe(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > 2)
+    if (fHelp || params.size() < 1 || params.size() > 3)
         throw runtime_error("Help message not found\n");
 
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
@@ -1066,7 +1066,6 @@ Value subscribe(const Array& params, bool fHelp)
     // Whether to perform rescan after import
     bool fRescan = true;
     string indexes="all";
-    bool fRetrieve=true;
     
     if (params.size() > 1)
     {
@@ -1074,44 +1073,13 @@ Value subscribe(const Array& params, bool fHelp)
         {
             fRescan = params[1].get_bool();
         }
-        else
-        {
-            if(params[1].type() == obj_type)
-            {
-                bool field_parsed;
-                BOOST_FOREACH(const Pair& d, params[1].get_obj()) 
-                {
-                    field_parsed=false;
-                    if(d.name_ == "rescan")
-                    {
-                        fRescan = d.value_.get_bool();
-                        field_parsed=true;
-                    }
-                    if(d.name_ == "retrieve")
-                    {
-                        pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_MANUAL_RETRIEVAL);
-                        fRetrieve = d.value_.get_bool();
-                        field_parsed=true;
-                    }
-                    if(d.name_ == "indexes")
-                    {
-                        pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_CONDITIONAL_INDEXING);
-                        indexes=d.value_.get_str();
-                        field_parsed=true;
-                    }                    
-                    if(!field_parsed)
-                    {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid field: %s",d.name_));                                                    
-                    }
-                }
-            }            
-            else
-            {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "parameters should be boolean or object");                                
-            }
-        }
     }
 
+    if (params.size() > 2)
+    {
+        indexes=params[2].get_str();
+    }
+    
     vector<mc_EntityDetails> inputEntities;
     vector<string> inputStrings;
     if(params[0].type() == str_type)
@@ -1143,10 +1111,6 @@ Value subscribe(const Array& params, bool fHelp)
             entity.Zero();
             memcpy(entity.m_EntityID,lpEntity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
             entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
-/*            
-            else
-            {
- */ 
             if(pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC) != MC_ERR_FOUND)
             {
                 entity.m_EntityType=MC_TET_STREAM | MC_TET_TIMERECEIVED;
@@ -1161,8 +1125,8 @@ Value subscribe(const Array& params, bool fHelp)
                 pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
                 fNewFound=true;
             }                
-//            }
-            if(pEF->STR_CreateSubscription(&entity,fRetrieve,indexes) != MC_ERR_FOUND)
+            entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
+            if(pEF->STR_CreateSubscription(&entity,indexes) != MC_ERR_FOUND)
             {
                 fNewFound=true;                
             }

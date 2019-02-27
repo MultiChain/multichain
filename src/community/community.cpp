@@ -21,7 +21,7 @@ int mc_EnterpriseFeatures::Initialize(const char *name,uint32_t mode)
     return MC_ERR_NOERROR;
 }
 
-int mc_EnterpriseFeatures::STR_CreateSubscription(mc_TxEntity *entity,const bool retrieve,const std::string indexes)
+int mc_EnterpriseFeatures::STR_CreateSubscription(mc_TxEntity *entity,const std::string parameters)
 {
     return MC_ERR_NOERROR;        
 }

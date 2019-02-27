@@ -36,7 +36,7 @@ typedef struct mc_EnterpriseFeatures
             const char *name,                                                   // Chain name
             uint32_t mode);                                                     // Unused    
     
-    int STR_CreateSubscription(mc_TxEntity *entity,const bool retrieve,const std::string indexes);
+    int STR_CreateSubscription(mc_TxEntity *entity,const std::string parameters);
     int STR_IsIndexSkipped(mc_TxImport *import,mc_TxEntity *parent_entity,mc_TxEntity *entity);
     int STR_IsOutOfSync(mc_TxEntity *entity);
     int STR_SetSyncFlag(mc_TxEntity *entity,bool confirm);
