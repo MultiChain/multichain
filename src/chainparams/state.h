@@ -154,6 +154,7 @@ typedef struct mc_Features
     int NonceInMinerSignature();
     int ImplicitConnectPermission();
     int LicenseTokens();
+    int FixedJSDateFunctions();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo
