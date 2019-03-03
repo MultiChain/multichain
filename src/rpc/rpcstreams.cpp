@@ -1077,6 +1077,7 @@ Value subscribe(const Array& params, bool fHelp)
 
     if (params.size() > 2)
     {
+        pEF->ENT_RPCVerifyEdition();
         indexes=params[2].get_str();
     }
     

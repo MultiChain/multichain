@@ -23,7 +23,7 @@ int mc_EnterpriseFeatures::Initialize(const char *name,uint32_t mode)
 
 int mc_EnterpriseFeatures::STR_CreateSubscription(mc_TxEntity *entity,const std::string parameters)
 {
-    return MC_ERR_NOERROR;        
+    return MC_ERR_FOUND;        
 }
 
 int mc_EnterpriseFeatures::STR_IsIndexSkipped(mc_TxImport *import,mc_TxEntity *parent_entity,mc_TxEntity *entity)
