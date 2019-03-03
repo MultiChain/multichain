@@ -1055,7 +1055,7 @@ Value publishfrom(const Array& params, bool fHelp)
 
 Value subscribe(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > 3)
+    if (fHelp || params.size() < 1 || params.size() > ((pEF->ENT_EditionNumeric() == 0) ? 2 : 3))
         throw runtime_error("Help message not found\n");
 
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)

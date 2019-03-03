@@ -87,6 +87,11 @@ string mc_EnterpriseFeatures::ENT_Edition()
     return "Community";
 }
 
+int mc_EnterpriseFeatures::ENT_EditionNumeric() 
+{
+    return 0;
+}
+
 int mc_EnterpriseFeatures::ENT_MinWalletDatVersion()
 {
     return 2;

@@ -51,6 +51,7 @@ typedef struct mc_EnterpriseFeatures
     int WLT_NoRetrieve(mc_TxEntity *entity);
     
     std::string ENT_Edition();
+    int ENT_EditionNumeric();
     int ENT_MinWalletDatVersion();
     void ENT_RPCVerifyEdition();
     std::string ENT_TextConstant(const char* name);
