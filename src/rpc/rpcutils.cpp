@@ -986,6 +986,13 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
             {
                 if(output_level & 0x0008)
                 {                
+                    vector<pair<string,uint32_t>> index_types;
+                    index_types.push_back(pair<string,uint32_t>("items",MC_TET_STREAM | MC_TET_CHAINPOS));                                                                            
+                    index_types.push_back(pair<string,uint32_t>("keys",MC_TET_STREAM_KEY | MC_TET_CHAINPOS));                                                                            
+                    index_types.push_back(pair<string,uint32_t>("publishers",MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS));                                                                            
+                    index_types.push_back(pair<string,uint32_t>("items-local",MC_TET_STREAM | MC_TET_TIMERECEIVED));                                                                            
+                    index_types.push_back(pair<string,uint32_t>("keys-local",MC_TET_STREAM_KEY | MC_TET_TIMERECEIVED));                                                                            
+                    index_types.push_back(pair<string,uint32_t>("publishers-local",MC_TET_STREAM_PUBLISHER | MC_TET_TIMERECEIVED));                                                                            
                     entry.push_back(Pair("subscribed",true));                                            
                     if( ((entStat.m_Flags & MC_EFL_NOT_IN_SYNC) != 0) ||
                         (pEF->STR_IsOutOfSync(&(entStat.m_Entity)) != 0) )
@@ -994,21 +1001,33 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
                     }
                     else
                     {
-                        entry.push_back(Pair("synchronized",true));                                                                            
+                        bool fSynchronized=true;
+                        if(pEF->ENT_EditionNumeric() == 0)
+                        {
+                            for(unsigned int ind=1;ind<index_types.size();ind++)
+                            {      
+                                if(fSynchronized)
+                                {
+                                    entStat.m_Entity.m_EntityType=index_types[ind].second;
+                                    if(pwalletTxsMain->FindEntity(&entStat))
+                                    {
+                                        if( (entStat.m_Flags & MC_EFL_NOT_IN_SYNC) != 0)
+                                        {
+                                            fSynchronized=false;
+                                        }
+                                    }                            
+                                }
+                            }
+                        }
+                        entry.push_back(Pair("synchronized",fSynchronized));                                                                            
                     }
                     if(output_level & 0x0080)
                     {                
+                        entStat.m_Entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
                         entry.push_back(Pair("retrieve",(pEF->STR_NoRetrieve(&(entStat.m_Entity))==0)));                                                                            
 
                         mc_TxImport dummy_import;
                         dummy_import.m_ImportID=1;
-                        vector<pair<string,uint32_t>> index_types;
-                        index_types.push_back(pair<string,uint32_t>("items",MC_TET_STREAM | MC_TET_CHAINPOS));                                                                            
-                        index_types.push_back(pair<string,uint32_t>("keys",MC_TET_STREAM_KEY | MC_TET_CHAINPOS));                                                                            
-                        index_types.push_back(pair<string,uint32_t>("publishers",MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS));                                                                            
-                        index_types.push_back(pair<string,uint32_t>("items-local",MC_TET_STREAM | MC_TET_TIMERECEIVED));                                                                            
-                        index_types.push_back(pair<string,uint32_t>("keys-local",MC_TET_STREAM_KEY | MC_TET_TIMERECEIVED));                                                                            
-                        index_types.push_back(pair<string,uint32_t>("publishers-local",MC_TET_STREAM_PUBLISHER | MC_TET_TIMERECEIVED));                                                                            
 
                         Object indexes;
                         for(unsigned int ind=0;ind<index_types.size();ind++)
