@@ -822,6 +822,7 @@ int mc_ChunkDB::Initialize(const char *name,uint32_t mode)
 {
     int err,value_len,new_db;   
     char msg[256];
+    char dir_name[MC_DCT_DB_MAX_PATH];
     
     mc_SubscriptionDBRow subscription;
     
@@ -836,7 +837,9 @@ int mc_ChunkDB::Initialize(const char *name,uint32_t mode)
     mc_GetFullFileName(name,"chunks","",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,m_DirName);
     mc_CreateDir(m_DirName);
     mc_GetFullFileName(name,"chunks/chunks",".db",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,m_DBName);
-    mc_GetFullFileName(name,"chunks/chunks",".log",MC_FOM_RELATIVE_TO_DATADIR,m_LogFileName);
+    mc_GetFullFileName(name,"chunks","",MC_FOM_RELATIVE_TO_LOGDIR | MC_FOM_CREATE_DIR,dir_name);
+    mc_CreateDir(dir_name);
+    mc_GetFullFileName(name,"chunks/chunks",".log",MC_FOM_RELATIVE_TO_LOGDIR | MC_FOM_CREATE_DIR,m_LogFileName);
     
     m_DB->SetOption("KeySize",0,m_KeySize);
     m_DB->SetOption("ValueSize",0,m_ValueSize);

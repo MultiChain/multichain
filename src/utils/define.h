@@ -61,6 +61,7 @@
 
 #define MC_FOM_NONE                     0x00000000
 #define MC_FOM_RELATIVE_TO_DATADIR      0x00000001
+#define MC_FOM_RELATIVE_TO_LOGDIR       0x00000002
 #define MC_FOM_RELATIVE_MASK            0x0000000F
 #define MC_FOM_CREATE_DIR               0x00000100
 

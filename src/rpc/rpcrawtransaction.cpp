@@ -161,6 +161,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     int chunk_count;   
     int64_t total_chunk_size,out_size;
     uint32_t retrieve_status;
+    mc_EntityDetails entity;
     Array aFormatMetaData;
     Array aFullFormatMetaData;
     
@@ -320,7 +321,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                 if( (mc_GetABRefType(ptr) != MC_AST_ASSET_REF_TYPE_SPECIAL) && 
                     (mc_GetABRefType(ptr) != MC_AST_ASSET_REF_TYPE_GENESIS) )
                 {
-                    mc_EntityDetails entity;
+                    entity.Zero();
                     if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptr))
                     {
                         is_genesis=false;                        
@@ -462,21 +463,21 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
             if(is_issuemore)
             {
                 issue.push_back(Pair("type", "issuemore"));            
-                mc_EntityDetails genesis_entity;
+                entity.Zero();
                 unsigned char *ptr;
                 uint256 genesis_hash;
-                if(mc_gState->m_Assets->FindEntityByShortTxID(&genesis_entity,short_txid))
+                if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,short_txid))
                 {
-                    ptr=(unsigned char *)genesis_entity.GetName();
+                    ptr=(unsigned char *)entity.GetName();
                     if(ptr && strlen((char*)ptr))
                     {
                         issue.push_back(Pair("name", string((char*)ptr)));            
                     }
-                    genesis_hash=*(uint256*)genesis_entity.GetTxID();
+                    genesis_hash=*(uint256*)entity.GetTxID();
                     issue.push_back(Pair("issuetxid", genesis_hash.GetHex()));            
-                    ptr=(unsigned char *)genesis_entity.GetRef();
+                    ptr=(unsigned char *)entity.GetRef();
                     string assetref="";
-                    if(genesis_entity.IsUnconfirmedGenesis())
+                    if(entity.IsUnconfirmedGenesis())
                     {
                         Value null_value;
                         issue.push_back(Pair("assetref",null_value));
@@ -504,7 +505,6 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     {
         uint256 txid=tx.GetHash();
         
-        mc_EntityDetails entity;
         mc_EntityDetails *lpEntity=NULL;
         entity.Zero();
         if(mc_gState->m_Assets->FindEntityByTxID(&entity,(unsigned char*)&txid) == 0)

@@ -83,7 +83,7 @@ DLLEXPORT bool V8Filter_IsRunning(V8Filter_t* filter_);
  */
 DLLEXPORT int V8Filter_Initialize(V8Filter_t* filter_, V8Engine_t* engine_, const char* script_,
                                   const char* functionName_, const char** callbackNames_, size_t nCallbackNames_,
-                                  bool isFilterLimitedMathSet_, char* strResult_);
+                                  bool isFilterLimitedMathSet_, bool isFixedJSDateFunctions_, char* strResult_);
 
 /**
  * Run the filter function in the JS script.
@@ -128,12 +128,13 @@ DLLEXPORT int V8Engine_Initialize(V8Engine_t* engine_, IFilterCallback_t* filter
  * @param nCallbackNames_           The number of callback names in @p callback_names_
  * @param filter_                   The filter object to initialize.
  * @param isFilterLimitedMathSet_   @c true if JS Math functions have to be suppressed.
+ * @param isFixedJSDateFunctions_   @c true if limited set of JS Date functions is allowed.
  * @param strResult_                Reason for failure if unsuccessful.
  * @return                          MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
  */
 DLLEXPORT int V8Engine_CreateFilter(V8Engine_t* engine_, const char* script_, const char* mainName_,
                                     const char** callbackNames_, size_t nCallbackNames_, V8Filter_t* filter_,
-                                    bool isFilterLimitedMathSet_, char* strResult_);
+                                    bool isFilterLimitedMathSet_, bool FixedJSDateFunctions_, char* strResult_);
 
 /**
  * Run the filter function in the JS script.

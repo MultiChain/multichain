@@ -29,6 +29,7 @@
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #endif
+#include "community/community.h"
 
 
 /* MCHN START */
@@ -69,6 +70,7 @@ mc_WalletTxs* pwalletTxsMain = NULL;
 mc_RelayManager* pRelayManager = NULL;
 mc_FilterEngine* pFilterEngine = NULL;
 mc_MultiChainFilterEngine* pMultiChainFilterEngine = NULL;
+
 bool fFeeEstimatesInitialized = false;
 extern int JSON_DOUBLE_DECIMAL_DIGITS;                             
 
@@ -91,6 +93,11 @@ enum BindFlags {
 
 static const char* FEE_ESTIMATES_FILENAME="fee_estimates.dat";
 CClientUIInterface uiInterface;
+
+//! -paytxfee will warn if called with a higher fee than this amount (in satoshis) per KB
+static const CAmount nHighTransactionFeeWarning = 0.01 * COIN;
+//! -maxtxfee will warn if called with a higher fee than this amount (in satoshis)
+static const CAmount nHighTransactionMaxFeeWarning = 100 * nHighTransactionFeeWarning;
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -210,14 +217,15 @@ void Shutdown()
     if (pwalletMain)
         bitdbwrap.Flush(true);
 #endif
-#ifndef WIN32
+//#ifndef WIN32
     boost::filesystem::remove(GetPidFile());
-#endif
+//#endif
     UnregisterAllValidationInterfaces();
 #ifdef ENABLE_WALLET
     delete pwalletMain;
     pwalletMain = NULL;
 /* MCHN START */  
+    
     if(pwalletTxsMain)
     {
         delete pwalletTxsMain;
@@ -234,6 +242,7 @@ void Shutdown()
         delete pMultiChainFilterEngine;
         pMultiChainFilterEngine=NULL;        
     }
+
     
     if(pFilterEngine)
     {
@@ -455,6 +464,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     }
     strUsage += "  -minrelaytxfee=<amt>   " + strprintf(_("Fees (in BTC/Kb) smaller than this are considered zero fee for relaying (default: %s)"), FormatMoney(::minRelayTxFee.GetFeePerK())) + "\n";
     strUsage += "  -printtoconsole        " + _("Send trace/debug info to console instead of debug.log file") + "\n";
+    strUsage += "  -logdir                " + _("Send trace/debug info to specified directory") + "\n";
     if (GetBoolArg("-help-debug", false))
     {
         strUsage += "  -printpriority         " + strprintf(_("Log transaction priority and fee per kB when mining blocks (default: %u)"), 0) + "\n";
@@ -930,9 +940,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 #endif
 /* MCHN END */
     
-#ifndef WIN32
-    CreatePidFile(GetPidFile(), getpid());
-#endif
+//#ifndef WIN32
+    CreatePidFile(GetPidFile(), __US_GetPID());
+//#endif
     if (GetBoolArg("-shrinkdebugfile", !fDebug))
         ShrinkDebugFile();
     LogPrintf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
@@ -1002,6 +1012,17 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             boost::filesystem::path pathWallet=GetDataDir() / "wallet";
 
             LogPrintf("Wallet file exists. WalletDBVersion: %d.\n", currentwalletdatversion);
+            if(currentwalletdatversion != 1)
+            {
+                if(pEF->ENT_MinWalletDatVersion() > currentwalletdatversion)
+                {
+                    return InitError(strprintf("Wallet version %d is not supported in this edition of MultiChain.\n"
+                            "To upgrade to version %d, run MultiChain Offline Daemon: \n"
+                            "multichaind-cold %s -datadir=%s -walletdbversion=3\n"
+                            "and restart multichaind or use Community Edition.\n",
+                            currentwalletdatversion,pEF->ENT_MinWalletDatVersion(), mc_gState->m_NetworkParams->Name(),mc_gState->m_Params->DataDir(0,0)));                                                            
+                }
+            }
             if( (currentwalletdatversion == 3) && (GetArg("-walletdbversion",MC_TDB_WALLET_VERSION) != 3) )
             {
                 return InitError(_("Wallet downgrade is not allowed"));                                                        
@@ -1033,6 +1054,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         else
         {
             currentwalletdatversion=wallet_mode;
+            if(pEF->ENT_MinWalletDatVersion() > currentwalletdatversion)
+            {
+                return InitError(strprintf("Wallet version %d is not supported in this edition of MultiChain.\n",currentwalletdatversion));                                                            
+            }
+            
             LogPrintf("Wallet file doesn't exist. New file will be created with version %d.\n", currentwalletdatversion);
         }      
         switch(currentwalletdatversion)
@@ -1209,6 +1235,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     bool zap_wallet_txs=false;
     bool new_wallet_txs=false;
     seed_node=mc_gState->GetSeedNode();
+    mc_Buffer *rescan_subscriptions=NULL;
     
     int seed_attempt=1;
     if(init_privkey.size())
@@ -1444,34 +1471,28 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         string strBurnAddress=BurnAddress(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS)); // Caching burn address
         LogPrint("mchn","mchn: Burn address: %s\n",strBurnAddress.c_str());                
         
-        bool wallet_mode_valid=false;
         wallet_mode=GetArg("-walletdbversion",0);
         if(wallet_mode == 0)
         {
             mc_gState->m_WalletMode=MC_WMD_AUTO;
-            wallet_mode_valid=true;
         }
         if(wallet_mode == 3)
         {
             mc_gState->m_WalletMode=MC_WMD_TXS | MC_WMD_ADDRESS_TXS | MC_WMD_FLAT_DAT_FILE; 
-            wallet_mode_valid=true;
         }
         if(wallet_mode == 2)
         {
             mc_gState->m_WalletMode=MC_WMD_TXS | MC_WMD_ADDRESS_TXS; 
-            wallet_mode_valid=true;
         }
 
         if(wallet_mode == 1)
         {
             mc_gState->m_WalletMode=MC_WMD_NONE;
-            wallet_mode_valid=true;
             zap_wallet_txs=false;
         }
         if(wallet_mode == -1)
         {
             mc_gState->m_WalletMode=MC_WMD_TXS | MC_WMD_ADDRESS_TXS | MC_WMD_MAP_TXS;            
-            wallet_mode_valid=true;
             zap_wallet_txs=false;
         }
 
@@ -1500,6 +1521,16 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     }
                 }
                 __US_Sleep(1000);
+                rescan_subscriptions=new mc_Buffer;
+                mc_EnterpriseFeatures* pRescanEF = new mc_EnterpriseFeatures;
+                if(pRescanEF->Initialize(mc_gState->m_Params->NetworkName(),0))
+                {
+                    fprintf(stderr,"\nError: Cannot intitialize Enterprise features. Exiting...\n\n");
+                    return false;        
+                }
+                pRescanEF->STR_GetSubscriptions(rescan_subscriptions);
+                pRescanEF->Destroy();
+                delete pRescanEF;                
             }
             pwalletTxsMain->Destroy();
             delete pwalletTxsMain;            
@@ -2365,6 +2396,18 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         }
     }
     
+        
+    if(pEF->Initialize(mc_gState->m_Params->NetworkName(),0))
+    {
+        fprintf(stderr,"\nError: Cannot intitialize Enterprise features. Exiting...\n\n");
+        return false;        
+    }
+    if(rescan_subscriptions)
+    {
+        pEF->STR_PutSubscriptions(rescan_subscriptions);            
+        delete rescan_subscriptions;
+    }            
+        
     
     // ********************************************************* Step 8: load wallet
 #ifdef ENABLE_WALLET
@@ -2563,6 +2606,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         return InitError(strErrors.str());
 
     pRelayManager->Initialize();
+
     
 //    RandAddSeedPerfmon();
 

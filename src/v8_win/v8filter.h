@@ -36,7 +36,7 @@ public:
      * MC_ERR_NOERROR otherwise.
      */
     int Initialize(V8Engine *engine, std::string script, std::string functionName,
-                   const std::vector<std::string> &callbackNames, bool isFilterLimitedMathSet, std::string &strResult);
+                   const std::vector<std::string> &callbackNames, bool isFilterLimitedMathSet, bool isFixedJSDateFunctions, std::string &strResult);
 
     /**
      * Run the filter function in the JS script.

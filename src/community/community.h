@@ -5,11 +5,15 @@
 #define MULTICHAIN_COMMUNITY_H
 
 #include "multichain/multichain.h"
-#include "wallet/wallettxdb.h"
+#include "wallet/wallettxs.h"
 #include "rpc/rpcutils.h"
 
 #define MC_EFT_NONE                            0x0000000000000000
 #define MC_EFT_LICENSE_TRANSFER                0x0000000000000002
+#define MC_EFT_STREAM_CONDITIONAL_INDEXING     0x0000000000000100
+#define MC_EFT_STREAM_MANUAL_RETRIEVAL         0x0000000000000200
+#define MC_EFT_STREAM_READ_PERMISSIONS         0x0000000000001000
+#define MC_EFT_ALL                             0xFFFFFFFFFFFFFFFF
 
 
 typedef struct mc_EnterpriseFeatures
@@ -32,6 +36,13 @@ typedef struct mc_EnterpriseFeatures
             const char *name,                                                   // Chain name
             uint32_t mode);                                                     // Unused    
     
+    int STR_CreateSubscription(mc_TxEntity *entity,const std::string parameters);
+    int STR_IsIndexSkipped(mc_TxImport *import,mc_TxEntity *parent_entity,mc_TxEntity *entity);
+    int STR_IsOutOfSync(mc_TxEntity *entity);
+    int STR_SetSyncFlag(mc_TxEntity *entity,bool confirm);
+    int STR_GetSubscriptions(mc_Buffer *subscriptions);
+    int STR_PutSubscriptions(mc_Buffer *subscriptions);
+    
     int WLT_CreateSubscription(mc_TxEntity *entity,uint32_t retrieve,uint32_t indexes,uint32_t *rescan_mode);
     int WLT_DeleteSubscription(mc_TxEntity *entity,uint32_t rescan_mode);
     int WLT_StartImport();
@@ -40,11 +51,13 @@ typedef struct mc_EnterpriseFeatures
     int WLT_NoRetrieve(mc_TxEntity *entity);
     
     std::string ENT_Edition();
+    int ENT_EditionNumeric();
     int ENT_MinWalletDatVersion();
     void ENT_RPCVerifyEdition();
+    std::string ENT_TextConstant(const char* name);
     
-    void LIC_RPCVerifyFeature(uint32_t feature);
-    bool LIC_VerifyFeature(uint32_t feature,std::string& reason);
+    void LIC_RPCVerifyFeature(uint64_t feature);
+    bool LIC_VerifyFeature(uint64_t feature,std::string& reason);
 //    bool LIC_VerifyConfirmation(uint160 address,void *confirmation, size_t size,std::string& reason);
 //    string LIC_LicenseName(void *confirmation, size_t size);
     int LIC_VerifyLicenses();

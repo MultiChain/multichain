@@ -594,13 +594,8 @@ Value storechunk(const Array& params, bool fHelp)
 
 
 
-
-
-Value gettxoutdata(const Array& params, bool fHelp)
+Value txoutdata_operation(const Array& params,int fHan)
 {
-    if (fHelp || params.size() < 2 || params.size() > 4)                        // MCHN
-        throw runtime_error("Help message not found\n");
-    
     uint256 hash(params[0].get_str());
     int n = params[1].get_int();
     
@@ -648,7 +643,7 @@ Value gettxoutdata(const Array& params, bool fHelp)
 
     uint32_t format;
     unsigned char *chunk_hashes;
-    int chunk_count;   
+    int chunk_count=0;   
     int64_t total_chunk_size,out_size;
     uint32_t retrieve_status;
     size_t elem_size;
@@ -720,7 +715,6 @@ Value gettxoutdata(const Array& params, bool fHelp)
         start=paramtoint64(params[3],false,0,"Invalid start");
     }
 
-
     if(start < 0)
     {
         start=out_size+start;
@@ -741,6 +735,10 @@ Value gettxoutdata(const Array& params, bool fHelp)
 
     if( (format == MC_SCR_DATA_FORMAT_UBJSON) || (format == MC_SCR_DATA_FORMAT_UTF8) )
     {
+        if(fHan)
+        {
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "This API is not supported for text and JSON data");                                                                                        
+        }
         if(start != 0)
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start, must be 0 for text and JSON data");                                                                            
@@ -750,16 +748,41 @@ Value gettxoutdata(const Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, must include all text or JSON data");                                                                            
         }
     }
+
+    if(fHan)
+    {
+        if(chunk_count > 1)
+        {
+            if(elem == NULL)
+            {
+                elem=GetChunkDataInRange(&out_size,chunk_hashes,chunk_count,start,count,fHan);
+                if(elem == NULL)
+                {
+                    throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't retrieve data for this output");                                                                                            
+                }
+                return count;
+            }
+        }        
+        else
+        {
+            if(write(fHan,elem+start,count) != count)
+            {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot store binary cache item");                                                                                                                                    
+            }            
+            return count;
+        }
+    }
+    
     if(count > 0x4000000)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, must be below 64MB");                                                                            
     }
-
+    
     if(chunk_count > 1)
     {
         if(elem == NULL)
         {
-            elem=GetChunkDataInRange(&out_size,chunk_hashes,chunk_count,start,count);
+            elem=GetChunkDataInRange(&out_size,chunk_hashes,chunk_count,start,count,0);
             if(elem == NULL)
             {
                 throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't retrieve data for this output");                                                                                            
@@ -767,7 +790,55 @@ Value gettxoutdata(const Array& params, bool fHelp)
             return OpReturnFormatEntry(elem,count,0,0,format,NULL);        
         }
     }
-    return OpReturnFormatEntry(elem+start,count,0,0,format,NULL);        
+    return OpReturnFormatEntry(elem+start,count,0,0,format,NULL);            
+}
+
+Value txouttobinarycache(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 3 || params.size() > 5)                        // MCHN
+        throw runtime_error("Help message not found\n");    
+ 
+    int64_t size;
+    
+    int fHan=mc_BinaryCacheFile(params[0].get_str(),2);
+    if(fHan <= 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Binary cache item with this identifier not found");                                                                                                                        
+    }
+    
+    size=lseek64(fHan,0,SEEK_END);
+    
+    if(size)
+    {
+        close(fHan);
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Binary cache item is not empty");                                                                                                                                            
+    }
+
+    Array ext_params;
+    int param_count=0;
+    BOOST_FOREACH(const Value& value, params)
+    {
+        if(param_count)
+        {
+            ext_params.push_back(value);
+        }
+        param_count++;
+    }
+    
+    size=txoutdata_operation(ext_params,fHan).get_int64();    
+
+    close(fHan);
+        
+    return size;
+    
+}
+
+Value gettxoutdata(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 2 || params.size() > 4)                        // MCHN
+        throw runtime_error("Help message not found\n");
+    
+    return txoutdata_operation(params,0);    
 }
 
 /* MCHN END */

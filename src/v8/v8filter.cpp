@@ -14,6 +14,39 @@
 #define MC_ERR_NOERROR                  0x00000000
 #define MC_ERR_INTERNAL_ERROR           0x00000006
 
+/* Unlocked date functions:
+
+//Date.prototype.getTime = function() {return 0;};
+
+//Date.prototype.getUTCDate = function() {return 0;};
+//Date.prototype.getUTCFullYear = function() {return 0;};
+//Date.prototype.getUTCHours = function() {return 0;};
+//Date.prototype.getUTCMonth = function() {return 0;};
+//Date.prototype.getUTCMinutes = function() {return 0;};
+//Date.prototype.getUTCDay = function() {return 0;};
+//Date.prototype.getUTCSeconds = function() {return 0;};
+//Date.prototype.getUTCMilliseconds = function() {return 0;};
+//Date.prototype.getUTCTime = function() {return 0;};
+
+//Date.prototype.toGMTString = function() {return 0;};
+//Date.prototype.toISOString = function() {return 0;};
+//Date.prototype.toJSON = function() {return 0;};
+//Date.prototype.toUTCString = function() {return 0;};
+//Date.prototype.valueOf = function() {return 0;};
+
+//Date.prototype.setTime = function() {return 0;};
+//Date.prototype.setUTCDate = function() {return 0;};
+//Date.prototype.setUTCFullYear = function() {return 0;};
+//Date.prototype.setUTCHours = function() {return 0;};
+//Date.prototype.setUTCMinutes = function() {return 0;};
+//Date.prototype.setUTCMonth = function() {return 0;};
+//Date.prototype.setUTCYear = function() {return 0;};
+//Date.prototype.setUTCSeconds = function() {return 0;};
+//Date.prototype.setUTCMilliseconds = function() {return 0;};
+//Date.prototype.setUTCTime = function() {return 0;};
+};
+*/
+
 
 namespace mc_v8
 {
@@ -49,6 +82,77 @@ Date = function (Date) {
 
     function MyDate() {
         if (arguments.length == 0) {
+            arguments = [0];
+        }
+        return instantiate(Date, arguments);
+    }
+}(Date);
+)";
+
+static std::string jsFixtureDateFunctions = R"(
+Math.random = function() {
+    return 0;
+};
+
+Date.now = function() {
+    return 0;
+};
+
+var bind = Function.bind;
+var unbind = bind.bind(bind);
+
+function instantiate(constructor, args) {
+    return new (unbind(constructor, null).apply(null, args));
+}
+
+Date.prototype.getDate = function() {return 0;};
+Date.prototype.getFullYear = function() {return 0;};
+Date.prototype.getHours = function() {return 0;};
+Date.prototype.getMonth = function() {return 0;};
+Date.prototype.getMinutes = function() {return 0;};
+Date.prototype.getDay = function() {return 0;};
+Date.prototype.getYear = function() {return 0;};
+Date.prototype.getSeconds = function() {return 0;};
+Date.prototype.getMilliseconds = function() {return 0;};
+Date.prototype.getTimezoneOffset = function() {return 0;};
+
+Date.prototype.toDateString = function() {return "";};
+Date.prototype.toGMTString = function() {return "";};
+Date.prototype.toISOString = function() {return "";};
+Date.prototype.toJSON = function() {return "";};
+Date.prototype.toLocaleDateString = function() {return "";};
+Date.prototype.toLocaleFormat = function() {return "";};
+Date.prototype.toLocaleString = function() {return "";};
+Date.prototype.toLocaleTimeString = function() {return "";};
+Date.prototype.toString = function() {return "";};
+Date.prototype.toTimeString = function() {return "";};
+Date.prototype.toUTCString = function() {return "";};
+
+Date.prototype.setDate = function() {return 0;};
+Date.prototype.setFullYear = function() {return 0;};
+Date.prototype.setHours = function() {return 0;};
+Date.prototype.setMinutes = function() {return 0;};
+Date.prototype.setMonth = function() {return 0;};
+Date.prototype.setYear = function() {return 0;};
+Date.prototype.setSeconds = function() {return 0;};
+Date.prototype.setMilliseconds = function() {return 0;};
+
+Date = function (Date) {
+    var names = Object.getOwnPropertyNames(Date);
+    // Loop through them
+    for (var i = 0; i < names.length; i++) {
+        // Skip props already in the MyDate object
+        if (names[i] in MyDate) continue;
+        // Get property description from o
+        var desc = Object.getOwnPropertyDescriptor(Date, names[i]);
+        // Use it to create property on MyDate
+        Object.defineProperty(MyDate, names[i], desc);
+    }
+
+    return MyDate;
+
+    function MyDate() {
+        if (arguments.length >= 0) {
             arguments = [0];
         }
         return instantiate(Date, arguments);
@@ -104,6 +208,10 @@ int V8Filter::Initialize(V8Engine *engine, std::string script, std::string funct
     m_context.Reset(isolate, context);
 
     std::string jsPreamble = jsFixture;
+    if(mc_gState->m_Features->FixedJSDateFunctions())
+    {
+        jsPreamble=jsFixtureDateFunctions;
+    }
     if (mc_gState->m_Features->FilterLimitedMathSet())
     {
         jsPreamble += jsLimitMathSet;

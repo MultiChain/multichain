@@ -71,6 +71,7 @@
 using namespace std;
 
 const boost::filesystem::path mc_GetDataDir(const char *network_name,int create);
+const boost::filesystem::path mc_GetLogDir(const char *network_name,int create);
 
 void mc_Params::Parse(int argc, const char* const argv[],int exe_type)
 {
@@ -243,12 +244,26 @@ const char *mc_Params::DataDir(int network_specific,int create)
         name=NetworkName();
     }
     
-    boost::filesystem::path path=mc_GetDataDir(name,create);
+    boost::filesystem::path path;
     
     if(network_specific)
     {
-        strcpy(m_DataDirNetSpecific,path.string().c_str());
-        return m_DataDirNetSpecific;
+        if(network_specific == 1)
+        {
+            path=mc_GetDataDir(name,create);
+            strcpy(m_DataDirNetSpecific,path.string().c_str());
+            return m_DataDirNetSpecific;
+        }
+        else
+        {
+            path=mc_GetLogDir(name,create);        
+            strcpy(m_LogDirNetSpecific,path.string().c_str());
+            return m_LogDirNetSpecific;
+        }    
+    }
+    else
+    {
+        path=mc_GetDataDir(name,create);        
     }
     
     strcpy(m_DataDir,path.string().c_str());
@@ -342,6 +357,22 @@ void mc_ExpandDataDirParam()
             }
         }
     }    
+    if (mapArgs.count("-logdir"))
+    {
+        string original=mapArgs["-logdir"];
+        if(original.size() > 1)
+        {
+            if( (*(original.c_str()) == '~') && (*(original.c_str() + 1) == '/') )
+            {
+                const char *homedir=__US_UserHomeDir();
+
+                if(homedir)
+                {
+                    mapArgs["-logdir"]=strprintf("%s%s",homedir,original.c_str()+1);                    
+                }
+            }
+        }
+    }    
 }
 
 void mc_CheckDataDirInConfFile()
@@ -378,6 +409,31 @@ const boost::filesystem::path mc_GetDataDir(const char *network_name,int create)
     else 
     {
         path = mc_GetDefaultDataDir();
+    }
+    if(network_name)
+    {
+        path /= std::string(network_name);
+    }
+    if(create)
+    {
+        boost::filesystem::create_directories(path);
+    }
+    return path;
+}
+
+const boost::filesystem::path mc_GetLogDir(const char *network_name,int create)
+{
+    boost::filesystem::path path;
+    if (mapArgs.count("-logdir")) {
+        path = boost::filesystem::system_complete(mapArgs["-logdir"]);
+        if (!boost::filesystem::is_directory(path)) 
+        {
+            return path;
+        }
+    } 
+    else 
+    {
+        return mc_GetDataDir(network_name,create);
     }
     if(network_name)
     {
@@ -455,6 +511,9 @@ string mc_GetFullFileName(const char *network_name,const char *filename, const c
             break;
         case MC_FOM_RELATIVE_TO_DATADIR:
             pathFile = mc_GetDataDir(network_name,create) / fullName;
+            break;
+        case MC_FOM_RELATIVE_TO_LOGDIR:
+            pathFile = mc_GetLogDir(network_name,create) / fullName;            
             break;
     }
             

@@ -147,9 +147,9 @@ void Shutdown_Cold()
     if (pwalletMain)
         bitdbwrap.Flush(true);
 #endif
-#ifndef WIN32
+//#ifndef WIN32
     boost::filesystem::remove(GetPidFile());
-#endif
+//#endif
 #ifdef ENABLE_WALLET
     delete pwalletMain;
     pwalletMain = NULL;
@@ -226,6 +226,7 @@ std::string HelpMessage_Cold()
     strUsage += ".\n";
 
     strUsage += "  -printtoconsole        " + _("Send trace/debug info to console instead of debug.log file") + "\n";
+    strUsage += "  -logdir                " + _("Send trace/debug info to specified directory") + "\n";
     strUsage += "  -shrinkdebugfile       " + _("Shrink debug.log file on client startup (default: 1 when no -debug)") + "\n";
 
     strUsage += "\n" + _("RPC server options:") + "\n";
@@ -393,9 +394,9 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
 #endif
 /* MCHN END */
     
-#ifndef WIN32
-    CreatePidFile(GetPidFile(), getpid());
-#endif
+//#ifndef WIN32
+    CreatePidFile(GetPidFile(), __US_GetPID());
+//#endif
     if (GetBoolArg("-shrinkdebugfile", !fDebug))
         ShrinkDebugFile();
     LogPrintf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
@@ -608,33 +609,27 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
             return InitError(_(seed_error.c_str()));        
         }
         
-        bool wallet_mode_valid=false;
         wallet_mode=GetArg("-walletdbversion",0);
         if(wallet_mode == 0)
         {
             mc_gState->m_WalletMode=MC_WMD_AUTO;
-            wallet_mode_valid=true;
         }
         if(wallet_mode == 3)
         {
             mc_gState->m_WalletMode=MC_WMD_TXS | MC_WMD_ADDRESS_TXS | MC_WMD_FLAT_DAT_FILE; 
-            wallet_mode_valid=true;
         }
         if(wallet_mode == 2)
         {
             mc_gState->m_WalletMode=MC_WMD_TXS | MC_WMD_ADDRESS_TXS; 
-            wallet_mode_valid=true;
         }
         if(wallet_mode == 1)
         {
             mc_gState->m_WalletMode=MC_WMD_NONE;
-            wallet_mode_valid=true;
             zap_wallet_txs=false;
         }
         if(wallet_mode == -1)
         {
             mc_gState->m_WalletMode=MC_WMD_TXS | MC_WMD_ADDRESS_TXS | MC_WMD_MAP_TXS;            
-            wallet_mode_valid=true;
             zap_wallet_txs=false;
         }
  

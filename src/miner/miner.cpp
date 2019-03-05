@@ -654,8 +654,10 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
         {
             if(canMine)
             {
-                const unsigned char *pubkey_hash=(unsigned char *)Hash160(ppubkey->begin(),ppubkey->end()).begin();
-                *canMine=mc_gState->m_Permissions->CanMine(NULL,pubkey_hash);
+//                const unsigned char *pubkey_hash=(unsigned char *)Hash160(ppubkey->begin(),ppubkey->end()).begin();
+//                *canMine=mc_gState->m_Permissions->CanMine(NULL,pubkey_hash);
+                uint160 pubkey_hash=Hash160(ppubkey->begin(),ppubkey->end());
+                *canMine=mc_gState->m_Permissions->CanMine(NULL,&pubkey_hash);
                 if((*canMine & MC_PTP_MINE) == 0)
                 {
                     if(prevCanMine & MC_PTP_MINE)
@@ -826,7 +828,11 @@ CBlockTemplate* CreateNewBlockWithDefaultKey(CWallet *pwallet,int *canMine,const
         return NULL;        
     }
     
-    const unsigned char *pubkey_hash=(unsigned char *)Hash160(pubkey.begin(),pubkey.end()).begin();
+//    const unsigned char *pubkey_hash=(unsigned char *)Hash160(pubkey.begin(),pubkey.end()).begin();
+    
+    unsigned char pubkey_hash[20];
+    uint160 pkhash=Hash160(pubkey.begin(),pubkey.end());
+    memcpy(pubkey_hash,&pkhash,20);    
     
     CScript scriptPubKey = CScript() << OP_DUP << OP_HASH160 << vector<unsigned char>(pubkey_hash, pubkey_hash + 20) << OP_EQUALVERIFY << OP_CHECKSIG;
     
@@ -1454,7 +1460,10 @@ void static BitcoinMiner(CWallet *pwallet)
             
             if(canMine & MC_PTP_MINE)
             {
-                const unsigned char *pubkey_hash=(unsigned char *)Hash160(kMiner.begin(),kMiner.end()).begin();
+//                const unsigned char *pubkey_hash=(unsigned char *)Hash160(kMiner.begin(),kMiner.end()).begin();
+                unsigned char pubkey_hash[20];
+                uint160 pkhash=Hash160(kMiner.begin(),kMiner.end());
+                memcpy(pubkey_hash,&pkhash,20);    
                 CScript scriptPubKey = CScript() << OP_DUP << OP_HASH160 << vector<unsigned char>(pubkey_hash, pubkey_hash + 20) << OP_EQUALVERIFY << OP_CHECKSIG;
                 canMine=prevCanMine;
                 auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(scriptPubKey,pwallet,&kMiner,&canMine,&pindexPrev));            

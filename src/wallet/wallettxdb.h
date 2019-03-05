@@ -37,12 +37,14 @@
 #define MC_TET_CHAINPOS                         0x00000100
 #define MC_TET_TIMERECEIVED                     0x00000200
 #define MC_TET_ORDERMASK                        0x0000FF00
+#define MC_TET_RESERVEDMASK                     0x00FF0000
 #define MC_TET_DB_STAT                          0x01000000
 #define MC_TET_IMPORT                           0x02000000
 #define MC_TET_DELETED                          0x04000000
 #define MC_TET_GETDB_ADD_TX                     0x10000000   
 #define MC_TET_SPECIALMASK                      0xFF000000
 
+#define MC_EFL_RESERVEDMASK                     0x00FF0000
 #define MC_EFL_NOT_IN_SYNC                      0x01000000
 #define MC_EFL_NOT_IN_SYNC_AFTER_IMPORT         0x02000000
 #define MC_EFL_UNSUBSCRIBED                     0x10000000
@@ -382,7 +384,9 @@ typedef struct mc_TxDB
     int RollBack(mc_TxImport *import,int block);                                // Rollback to specific block
 
     int Unsubscribe(mc_Buffer *lpEntities);                                     // List of the entities to unsubscribe from
-    
+
+    int TransferSubKey(mc_TxEntityStat *lpChainEntStat,const mc_TxEntityRow& erow,int slot);
+
     mc_TxImport *StartImport(                                                   // Starts new import
                              mc_Buffer *lpEntities,                             // List of entities to import
                              int block,                                         // Star from this block            

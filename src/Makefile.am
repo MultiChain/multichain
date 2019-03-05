@@ -2,6 +2,7 @@ FwalDIST_SUBDIRS = secp256k1
 AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS)
 CXXFLAGS += -std=c++0x
 
+CPPFLAGS += -Wno-deprecated-declarations -Wno-unused-local-typedefs -Wno-unused-result -DBOOST_SYSTEM_NO_DEPRECATED=1 
 
 if EMBEDDED_LEVELDB
 LEVELDB_CPPFLAGS += -I$(srcdir)/leveldb/include
@@ -24,6 +25,8 @@ BITCOIN_INCLUDES=-I$(builddir) -I$(builddir)/obj $(BOOST_CPPFLAGS) $(LEVELDB_CPP
 
 BITCOIN_INCLUDES += -I$(srcdir)/secp256k1/include
 
+LIBBITCOIN_ENTERPRISE=libbitcoin_enterprise.a
+LIBBITCOIN_COMMUNITY=libbitcoin_community.a
 LIBBITCOIN_SERVER=libbitcoin_server.a
 LIBBITCOIN_WALLET=libbitcoin_wallet.a
 LIBBITCOIN_COMMON=libbitcoin_common.a
@@ -49,6 +52,8 @@ EXTRA_LIBRARIES = \
   libbitcoin_util.a \
   libbitcoin_common.a \
   univalue/libbitcoin_univalue.a \
+  libbitcoin_enterprise.a \
+  libbitcoin_community.a \
   libbitcoin_server.a \
   libbitcoin_cli.a
 if ENABLE_WALLET
@@ -125,6 +130,7 @@ BITCOIN_CORE_H = \
   utils/utilparse.h \
   rpc/rpcclient.h \
   rpc/rpcprotocol.h \
+  rpc/rpcasio.h \
   rpc/rpcutils.h \
   rpc/rpcwallet.h \
   rpc/rpcserver.h \
@@ -175,6 +181,22 @@ obj/build.h: FORCE
 	  $(abs_top_srcdir)
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
+libbitcoin_community_a_CPPFLAGS = $(BITCOIN_INCLUDES)
+libbitcoin_community_a_SOURCES = \
+  community/community.cpp \
+  wallet/db.cpp \
+  wallet/dbwrap_com.cpp
+
+if ENABLE_ENTERPRISE
+include entMakefile.am
+else
+libbitcoin_enterprise_a_CPPFLAGS = $(BITCOIN_INCLUDES)
+libbitcoin_enterprise_a_SOURCES = \
+  community/community.cpp \
+  wallet/db.cpp \
+  wallet/dbwrap_com.cpp
+endif
+
 # server: shared between bitcoind and bitcoin-qt
 libbitcoin_server_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS)
 libbitcoin_server_a_SOURCES = \
@@ -224,8 +246,6 @@ libbitcoin_server_a_SOURCES = \
 libbitcoin_wallet_a_CPPFLAGS = $(BITCOIN_INCLUDES)
 libbitcoin_wallet_a_SOURCES = \
   wallet/dbflat.cpp \
-  wallet/db.cpp \
-  wallet/dbwrap_com.cpp \
   wallet/crypter.cpp \
   rpc/rpcdump.cpp \
   rpc/rpcwallet.cpp \
@@ -261,6 +281,9 @@ crypto_libbitcoin_crypto_a_SOURCES = \
   crypto/hmac_sha512.h \
   crypto/sha1.h \
   crypto/ripemd160.h
+
+
+
 
 # multichain library
 multichain_libbitcoin_multichain_a_CPPFLAGS = $(BITCOIN_CONFIG_INCLUDES)
@@ -460,6 +483,7 @@ multichaind_LDADD = \
   $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_UNIVALUE) \
   $(LIBBITCOIN_WALLET) \
+  $(LIBBITCOIN_ENTERPRISE) \
   $(LIBBITCOIN_MULTICHAIN) \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CRYPTO) \
@@ -503,6 +527,7 @@ multichaind_cold_LDADD = \
   $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_UNIVALUE) \
   $(LIBBITCOIN_WALLET) \
+  $(LIBBITCOIN_COMMUNITY) \
   $(LIBBITCOIN_MULTICHAIN) \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CRYPTO) \

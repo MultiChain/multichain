@@ -479,6 +479,9 @@ Value debug(const Array& params, bool fHelp)
     mc_ChunkCollector collector;
     bool res_found=false;
             
+    delay=1000;
+    attempts=10;
+    
     if(params[0].type() == str_type)
     {
         if(params[0].get_str() == "findaddress")

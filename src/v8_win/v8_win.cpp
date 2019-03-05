@@ -79,14 +79,14 @@ bool V8Filter_IsRunning(V8Filter_t *filter_)
 }
 
 int V8Filter_Initialize(V8Filter_t *filter_, V8Engine_t *engine_, const char *script_, const char *functionName_,
-                        const char **callbackNames_, size_t nCallbackNames_, bool isFilterLimitedMathSet_,
+                        const char **callbackNames_, size_t nCallbackNames_, bool isFilterLimitedMathSet_, bool isFixedJSDateFunctions_,
                         char *strResult_)
 {
     auto filter = reinterpret_cast<V8Filter *>(filter_);
     auto engine = reinterpret_cast<V8Engine *>(engine_);
     std::vector<std::string> callbackNames = cstrs2vec(callbackNames_, nCallbackNames_);
     std::string strResult;
-    int retval = filter->Initialize(engine, script_, functionName_, callbackNames, isFilterLimitedMathSet_, strResult);
+    int retval = filter->Initialize(engine, script_, functionName_, callbackNames, isFilterLimitedMathSet_, isFixedJSDateFunctions_, strResult);
     strcpy_s(strResult_, RESULT_SIZE, strResult.c_str());
     return retval;
 }
@@ -127,13 +127,13 @@ int V8Engine_Initialize(V8Engine_t *engine_, IFilterCallback_t *filterCallback_,
 }
 
 int V8Engine_CreateFilter(V8Engine_t *engine_, const char *script_, const char *mainName_, const char **callbackNames_,
-                          size_t nCallbackNames_, V8Filter_t *filter_, bool isFilterLimitedMathSet_, char *strResult_)
+                          size_t nCallbackNames_, V8Filter_t *filter_, bool isFilterLimitedMathSet_, bool isFixedJSDateFunctions_, char *strResult_)
 {
     auto engine = reinterpret_cast<V8Engine *>(engine_);
     auto filter = reinterpret_cast<V8Filter *>(filter_);
     std::vector<std::string> callbackNames = cstrs2vec(callbackNames_, nCallbackNames_);
     std::string strResult;
-    int retval = engine->CreateFilter(script_, mainName_, callbackNames, filter, isFilterLimitedMathSet_, strResult);
+    int retval = engine->CreateFilter(script_, mainName_, callbackNames, filter, isFilterLimitedMathSet_, isFixedJSDateFunctions_, strResult);
     strcpy_s(strResult_, RESULT_SIZE, strResult.c_str());
     return retval;
 }

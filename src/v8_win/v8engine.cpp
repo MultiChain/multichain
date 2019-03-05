@@ -49,11 +49,11 @@ int V8Engine::Initialize(IFilterCallback *filterCallback, std::string dataDir_, 
 }
 
 int V8Engine::CreateFilter(std::string script, std::string mainName, const std::vector<std::string> &callbackNames,
-                           V8Filter *filter, bool isFilterLimitedMathSet, std::string &strResult)
+                           V8Filter *filter, bool isFilterLimitedMathSet, bool isFixedJSDateFunctions_, std::string &strResult)
 {
     logger->debug("V8Engine::CreateFilter - enter");
     strResult.clear();
-    int retval = filter->Initialize(this, script, mainName, callbackNames, isFilterLimitedMathSet, strResult);
+    int retval = filter->Initialize(this, script, mainName, callbackNames, isFilterLimitedMathSet, isFixedJSDateFunctions_, strResult);
     logger->debug("V8Engine::CreateFilter - leave retval={} strResult='{}'", retval, strResult);
     return retval;
 }

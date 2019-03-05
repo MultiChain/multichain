@@ -1322,9 +1322,7 @@ bool MultiChainTransaction_CheckLicenseTokenTransfer(const CTransaction& tx,
                                                string& reason)      
 {
     bool token_transfer=false;
-    int err;
     mc_EntityDetails entity;
-    uint32_t script_type=MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER;
     
     if(mc_gState->m_Features->LicenseTokens() == 0)
     {
@@ -1632,7 +1630,6 @@ bool MultiChainTransaction_CheckLicenseTokenDetails(CMultiChainTxDetails *detail
     uint32_t offset,next_offset,param_value_start;
     unsigned int timestamp;
     size_t param_value_size;        
-    bool is_open=false;
     size_t value_sizes[256];
     int value_starts[256];
     unsigned char code;
@@ -2479,8 +2476,6 @@ bool MultiChainTransaction_VerifyNotFilteredRestrictions(const CTransaction& tx,
                                                          CMultiChainTxDetails *details, // Tx details object
                                                          string& reason)                // Error message
 {
-    int change_count=0;
-    
     if(details->emergency_disapproval_output < 0)
     {
         return true;        
@@ -2531,7 +2526,7 @@ bool MultiChainTransaction_VerifyNotFilteredRestrictions(const CTransaction& tx,
                 
         MultiChainTransaction_SetTmpOutputScript(tx.vout[vout].scriptPubKey);
         
-        if(vout == details->emergency_disapproval_output)
+        if((int)vout == details->emergency_disapproval_output)
         {
             if(mc_gState->m_TmpScript->GetNumElements() > 1)
             {

@@ -177,7 +177,7 @@ static void DebugPrintInit()
     assert(fileout == NULL);
     assert(mutexDebugLog == NULL);
 
-    boost::filesystem::path pathDebug = GetDataDir() / "debug.log";
+    boost::filesystem::path pathDebug = GetLogDir() / "debug.log";
     fileout = fopen(pathDebug.string().c_str(), "a");
     if (fileout) setbuf(fileout, NULL); // unbuffered
 
@@ -247,7 +247,7 @@ int LogPrintStr(const std::string &str)
         // reopen the log file, if requested
         if (fReopenDebugLog) {
             fReopenDebugLog = false;
-            boost::filesystem::path pathDebug = GetDataDir() / "debug.log";
+            boost::filesystem::path pathDebug = GetLogDir() / "debug.log";
             if (freopen(pathDebug.string().c_str(),"a",fileout) != NULL)
                 setbuf(fileout, NULL); // unbuffered
         }
@@ -413,6 +413,7 @@ void PrintExceptionContinue(std::exception* pex, const char* pszThread)
 
 /* MCHN START */
 static boost::filesystem::path pathCachedMultiChain;
+static boost::filesystem::path pathCachedMultiChainLog;
 static CCriticalSection csPathCached;
 /* MCHN END */
 
@@ -457,6 +458,19 @@ static boost::filesystem::path pathCached;
 static boost::filesystem::path pathCachedNetSpecific;
 //static CCriticalSection csPathCached;
 
+const boost::filesystem::path &GetLogDir(bool fNetSpecific)
+{
+    namespace fs = boost::filesystem;
+    
+    LOCK(csPathCached);
+
+/* MCHN START */
+    fs::path &path =pathCachedMultiChainLog;
+    if (!path.empty())
+        return path;
+    path=fs::path(string(mc_gState->m_Params->DataDir(2,1)));
+    return pathCachedMultiChainLog;
+}
 
 const boost::filesystem::path &GetDataDir(bool fNetSpecific)
 {
@@ -538,7 +552,7 @@ void ReadConfigFile(map<string, string>& mapSettingsRet,
     ClearDatadirCache();
 }
 
-#ifndef WIN32
+//#ifndef WIN32
 boost::filesystem::path GetPidFile()
 {
     boost::filesystem::path pathPidFile(GetArg("-pid", "multichain.pid"));
@@ -546,7 +560,7 @@ boost::filesystem::path GetPidFile()
     return pathPidFile;
 }
 
-void CreatePidFile(const boost::filesystem::path &path, pid_t pid)
+void CreatePidFile(const boost::filesystem::path &path, int pid)
 {
     FILE* file = fopen(path.string().c_str(), "w");
     if (file)
@@ -555,7 +569,7 @@ void CreatePidFile(const boost::filesystem::path &path, pid_t pid)
         fclose(file);
     }
 }
-#endif
+//#endif
 
 bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest)
 {
@@ -684,7 +698,7 @@ void AllocateFileRange(FILE *file, unsigned int offset, unsigned int length) {
 void ShrinkDebugFile(const char* FileName)
 {
     // Scroll debug.log if it's getting too big
-    boost::filesystem::path pathLog = GetDataDir() / string(FileName);
+    boost::filesystem::path pathLog = GetLogDir() / string(FileName);
     FILE* file = fopen(pathLog.string().c_str(), "r");
 /* MCHN START */    
     size_t bytes_written;
@@ -727,7 +741,7 @@ void ShrinkDebugFile()
     ShrinkDebugFile("wallet/txs.log");
     // Scroll debug.log if it's getting too big
 /*    
-    boost::filesystem::path pathLog = GetDataDir() / "debug.log";
+    boost::filesystem::path pathLog = GetLogDir() / "debug.log";
     FILE* file = fopen(pathLog.string().c_str(), "r");
     int64_t shrink_size=GetArg("-shrinkdebugfilesize",200000);
     if(shrink_size > 67108864)

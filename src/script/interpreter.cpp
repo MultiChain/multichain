@@ -1109,9 +1109,10 @@ bool TransactionSignatureChecker::CheckSig(const vector<unsigned char>& vchSigIn
     {
         if(mc_gState->m_NetworkParams->IsProtocolMultichain())
         {
-            const unsigned char *pubkey_hash=(unsigned char *)Hash160(vchPubKey.begin(),vchPubKey.end()).begin();
-
-            if(mc_gState->m_Permissions->CanSend(NULL,pubkey_hash))
+//            const unsigned char *pubkey_hash=(unsigned char *)Hash160(vchPubKey.begin(),vchPubKey.end()).begin();
+//            if(mc_gState->m_Permissions->CanSend(NULL,pubkey_hash))
+            uint160 hash=Hash160(vchPubKey.begin(),vchPubKey.end());
+            if(mc_gState->m_Permissions->CanSend(NULL,&hash))
             {
                 CheckSendPermission=false;                    
             }                                    

@@ -260,6 +260,10 @@ int __US_DeleteFile(const char *file_name)
     return unlink(file_name);
 }
 
+int __US_GetPID()
+{
+    return getpid();
+}
 #else
 
 #include "windows.h"
@@ -371,5 +375,9 @@ int __US_DeleteFile(const char *file_name)
     return (int)DeleteFile(file_name);
 }
 
+int __US_GetPID()
+{
+    return (int)GetCurrentProcessId();
+}
 
 #endif

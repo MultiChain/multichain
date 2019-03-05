@@ -112,7 +112,7 @@ Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong);
 Object StreamEntry(const unsigned char *txid,uint32_t output_level);
 Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDetails *raw_entity);
 Object UpgradeEntry(const unsigned char *txid);
-const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t start,int64_t count);
+const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t start,int64_t count,int fHan);
 uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t total_size);
 Value OpReturnEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout);
 Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out,uint32_t status);

@@ -77,8 +77,6 @@ void RPCTypeCheck(const json_spirit::Object& o,
  */
 void RPCRunLater(const std::string& name, boost::function<void(void)> func, int64_t nSeconds);
 
-//! Convert boost::asio address to CNetAddr
-extern CNetAddr BoostAsioToCNetAddr(boost::asio::ip::address address);
 
 typedef json_spirit::Value(*rpcfn_type)(const json_spirit::Array& params, bool fHelp);
 
@@ -281,6 +279,7 @@ extern json_spirit::Value liststreampublisheritems(const json_spirit::Array& par
 extern json_spirit::Value liststreamkeys(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreampublishers(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value gettxoutdata(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value txouttobinarycache(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listblocks(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value liststreamblockitems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getstreamkeysummary(const json_spirit::Array& params, bool fHelp);

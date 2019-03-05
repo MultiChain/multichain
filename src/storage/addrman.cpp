@@ -581,11 +581,10 @@ bool CAddrMan::SCSelect_(int nUnkBias,int nNodes,CAddress &addr)
         
         for (std::map<int, CAddrInfo>::const_iterator it = mapInfo.begin(); it != mapInfo.end(); ++it)
         {
-            double dNewChance;
             bool fNewInvalid;
             bool fNewDead;
             int64_t nLastTried;
-            dNewChance=it->second.GetSC(&fNewInvalid,&fNewDead,&nLastTried);
+            it->second.GetSC(&fNewInvalid,&fNewDead,&nLastTried);
             
             if(!fNewInvalid)
             {

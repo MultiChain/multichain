@@ -9,6 +9,7 @@
 #include "json/json_spirit_ubjson.h"
 #include "json/json_spirit_reader_template.h"
 #include "json/json_spirit_writer_template.h"
+#include "community/community.h"
 
 #define MC_QPR_MAX_UNCHECKED_TX_LIST_SIZE    1048576
 #define MC_QPR_MAX_MERGED_TX_LIST_SIZE          1024
@@ -682,7 +683,7 @@ Value publishmultifrom(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Items should be array");                                
     }    
 
-    if(params[2].get_array().size() > MCP_MAX_STD_OP_RETURN_COUNT)
+    if((int)params[2].get_array().size() > MCP_MAX_STD_OP_RETURN_COUNT)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Number of items exceeds %d (max-std-op-returns-count)",MCP_MAX_STD_OP_RETURN_COUNT));                                                    
     }
@@ -814,7 +815,7 @@ Value publishmultifrom(const Array& params, bool fHelp)
         }
 
         CTxOut txout;
-        uint256 hash=deepest_coin.GetHashAndTxOut(txout);
+        deepest_coin.GetHashAndTxOut(txout);
 
         if (!ExtractDestination(txout.scriptPubKey, out_address))
         {
@@ -1054,7 +1055,7 @@ Value publishfrom(const Array& params, bool fHelp)
 
 Value subscribe(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > 2)
+    if (fHelp || params.size() < 1 || params.size() > ((pEF->ENT_EditionNumeric() == 0) ? 2 : 3))
         throw runtime_error("Help message not found\n");
 
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
@@ -1064,9 +1065,22 @@ Value subscribe(const Array& params, bool fHelp)
        
     // Whether to perform rescan after import
     bool fRescan = true;
+    string indexes="all";
+    
     if (params.size() > 1)
-        fRescan = params[1].get_bool();
+    {
+        if(params[1].type() == bool_type)
+        {
+            fRescan = params[1].get_bool();
+        }
+    }
 
+    if (params.size() > 2)
+    {
+        pEF->ENT_RPCVerifyEdition();
+        indexes=params[2].get_str();
+    }
+    
     vector<mc_EntityDetails> inputEntities;
     vector<string> inputStrings;
     if(params[0].type() == str_type)
@@ -1111,6 +1125,11 @@ Value subscribe(const Array& params, bool fHelp)
                 entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_TIMERECEIVED;
                 pwalletTxsMain->AddEntity(&entity,MC_EFL_NOT_IN_SYNC);
                 fNewFound=true;
+            }                
+            entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
+            if(pEF->STR_CreateSubscription(&entity,indexes) != MC_ERR_FOUND)
+            {
+                fNewFound=true;                
             }
         }
 
@@ -1562,6 +1581,10 @@ void getSubKeyEntityFromKey(string str,mc_TxEntityStat entStat,mc_TxEntity *enti
     mc_GetCompoundHash160(&stream_subkey_hash,entStat.m_Entity.m_EntityID,&key_string_hash);
     memcpy(entity->m_EntityID,&stream_subkey_hash,MC_TDB_ENTITY_ID_SIZE);
     entity->m_EntityType=entStat.m_Entity.m_EntityType | MC_TET_SUBKEY;    
+    if(pEF->STR_IsIndexSkipped(NULL,&(entStat.m_Entity),entity))
+    {
+        CheckWalletError(MC_ERR_NOT_ALLOWED);
+    }
 }
 
 void getSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity *entity)
@@ -1597,6 +1620,10 @@ void getSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity
 
     memcpy(entity->m_EntityID,&stream_subkey_hash,MC_TDB_ENTITY_ID_SIZE);
     entity->m_EntityType=entStat.m_Entity.m_EntityType | MC_TET_SUBKEY;    
+    if(pEF->STR_IsIndexSkipped(NULL,&(entStat.m_Entity),entity))
+    {
+        CheckWalletError(MC_ERR_NOT_ALLOWED);
+    }
 }
 
 Value getstreamsummary(const Array& params, bool fPublisher)

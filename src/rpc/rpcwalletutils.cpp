@@ -1091,7 +1091,7 @@ void AppendOffChainFormatData(uint32_t data_format,
     mc_TxEntity entity;
     entity.Zero();
     entity.m_EntityType=MC_TET_AUTHOR;    
-    
+
     if(out_options & MC_RFD_OPTION_OFFCHAIN)
     {
         chunk_count=(int)vValue.size()/MC_CDB_CHUNK_HASH_SIZE;
@@ -1100,7 +1100,7 @@ void AppendOffChainFormatData(uint32_t data_format,
             *strError="Too many chunks in the script";
             return; 
         }
-        
+
         lpDetailsScript->SetChunkDefHeader(data_format,chunk_count);
         for(int i=0;i<chunk_count;i++)
         {
@@ -1208,6 +1208,10 @@ void AppendOffChainFormatData(uint32_t data_format,
                     vChunkHashes->push_back(*(uint256*)&hash);
                 }
             }
+        }
+        else
+        {
+            lpDetailsScript->SetChunkDefHeader(data_format,0);            
         }
         if(fHan > 0)
         {

@@ -9,8 +9,15 @@ src/multichain-cli
 src/multichain-util
 src/multichaind
 src/multichaind-cold
+src/multichain-cli-wdebug
+src/multichain-util-wdebug
+src/multichaind-wdebug
+src/multichaind-cold-wdebug
 src/test/test_bitcoin
 src/qt/test/test_bitcoin-qt
+
+local/*
+openssl*
 
 # autoreconf
 Makefile.in

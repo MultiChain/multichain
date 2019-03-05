@@ -48,6 +48,77 @@ Date = function (Date) {
 }(Date);
 )";
 
+static std::string jsFixtureDateFunctions = R"(
+Math.random = function() {
+    return 0;
+};
+
+Date.now = function() {
+    return 0;
+};
+
+var bind = Function.bind;
+var unbind = bind.bind(bind);
+
+function instantiate(constructor, args) {
+    return new (unbind(constructor, null).apply(null, args));
+}
+
+Date.prototype.getDate = function() {return 0;};
+Date.prototype.getFullYear = function() {return 0;};
+Date.prototype.getHours = function() {return 0;};
+Date.prototype.getMonth = function() {return 0;};
+Date.prototype.getMinutes = function() {return 0;};
+Date.prototype.getDay = function() {return 0;};
+Date.prototype.getYear = function() {return 0;};
+Date.prototype.getSeconds = function() {return 0;};
+Date.prototype.getMilliseconds = function() {return 0;};
+Date.prototype.getTimezoneOffset = function() {return 0;};
+
+Date.prototype.toDateString = function() {return "";};
+Date.prototype.toGMTString = function() {return "";};
+Date.prototype.toISOString = function() {return "";};
+Date.prototype.toJSON = function() {return "";};
+Date.prototype.toLocaleDateString = function() {return "";};
+Date.prototype.toLocaleFormat = function() {return "";};
+Date.prototype.toLocaleString = function() {return "";};
+Date.prototype.toLocaleTimeString = function() {return "";};
+Date.prototype.toString = function() {return "";};
+Date.prototype.toTimeString = function() {return "";};
+Date.prototype.toUTCString = function() {return "";};
+
+Date.prototype.setDate = function() {return 0;};
+Date.prototype.setFullYear = function() {return 0;};
+Date.prototype.setHours = function() {return 0;};
+Date.prototype.setMinutes = function() {return 0;};
+Date.prototype.setMonth = function() {return 0;};
+Date.prototype.setYear = function() {return 0;};
+Date.prototype.setSeconds = function() {return 0;};
+Date.prototype.setMilliseconds = function() {return 0;};
+
+Date = function (Date) {
+    var names = Object.getOwnPropertyNames(Date);
+    // Loop through them
+    for (var i = 0; i < names.length; i++) {
+        // Skip props already in the MyDate object
+        if (names[i] in MyDate) continue;
+        // Get property description from o
+        var desc = Object.getOwnPropertyDescriptor(Date, names[i]);
+        // Use it to create property on MyDate
+        Object.defineProperty(MyDate, names[i], desc);
+    }
+
+    return MyDate;
+
+    function MyDate() {
+        if (arguments.length >= 0) {
+            arguments = [0];
+        }
+        return instantiate(Date, arguments);
+    }
+}(Date);
+)";
+
 static std::string jsLimitMathSet = R"(
 var mathKeep = new Set(["abs", "ceil", "floor", "max", "min", "round", "sign", "trunc", "log", "log10", "log2", "pow",
     "sqrt", "E", "LN10", "LN2", "LOG10E", "LOG2E", "PI", "SQRT1_2", "SQRT2" ]);
@@ -71,7 +142,7 @@ V8Filter::~V8Filter()
 }
 
 int V8Filter::Initialize(V8Engine *engine, std::string script, std::string functionName,
-                         const std::vector<std::string> &callbackNames, bool isFilterLimitedMathSet,
+                         const std::vector<std::string> &callbackNames, bool isFilterLimitedMathSet, bool isFixedJSDateFunctions,
                          std::string &strResult)
 {
     logger->debug("V8Filter::Initialize - enter");
@@ -103,6 +174,10 @@ int V8Filter::Initialize(V8Engine *engine, std::string script, std::string funct
     m_context.Reset(isolate, context);
 
     std::string jsPreamble = jsFixture;
+    if (isFixedJSDateFunctions)
+    {
+        jsPreamble=jsFixtureDateFunctions;
+    }
     if (isFilterLimitedMathSet)
     {
         jsPreamble += jsLimitMathSet;

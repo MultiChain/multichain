@@ -552,7 +552,6 @@ Value getfiltertxinput(const Array& params, bool fHelp)
 //        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
     
     int64_t vin = params[0].get_int64();                                          
-    int64_t n;
     
     if(pMultiChainFilterEngine->m_Vout >= 0)
     {

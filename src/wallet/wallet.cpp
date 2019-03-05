@@ -19,6 +19,7 @@ extern mc_WalletTxs* pwalletTxsMain;
 #include "utils/timedata.h"
 #include "utils/util.h"
 #include "utils/utilmoneystr.h"
+#include "community/community.h"
 
 #include <assert.h>
 
@@ -30,6 +31,10 @@ using namespace std;
 /**
  * Settings
  */
+
+//! -maxtxfee default
+static const CAmount DEFAULT_TRANSACTION_MAXFEE = 0.1 * COIN;
+
 CFeeRate payTxFee(DEFAULT_TRANSACTION_FEE);
 CAmount maxTxFee = DEFAULT_TRANSACTION_MAXFEE;
 unsigned int nTxConfirmTarget = 1;
@@ -1356,9 +1361,10 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, bool fOnlySubscri
             lpent=(mc_TxEntityStat*)m_ChainEntities->GetRow(i);
             if(lpent->m_Entity.IsSubscription())
             {
-                if(lpent->m_Entity.m_EntityType & MC_TET_CHAINPOS)
+//                if(lpent->m_Entity.m_EntityType & MC_TET_CHAINPOS)
                 {
-                    if(lpent->m_Flags & MC_EFL_NOT_IN_SYNC)
+                    if( ((lpent->m_Flags & MC_EFL_NOT_IN_SYNC) != 0 ) ||
+                        (pEF->STR_IsOutOfSync(&(lpent->m_Entity)) != 0) )    
                     {
                         vStreamsToImport.push_back(lpent->m_Entity);
                     }
@@ -1442,8 +1448,10 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, bool fOnlySubscri
                     memcpy(entity.m_EntityID,vStreamsToImport[i].m_EntityID,MC_TDB_ENTITY_ID_SIZE);
                     entity.m_EntityType=vStreamsToImport[i].m_EntityType;
                     lpEntities->Add(&entity,NULL);
+/*                    
                     entity.m_EntityType=(vStreamsToImport[i].m_EntityType - MC_TET_CHAINPOS) | MC_TET_TIMERECEIVED;
                     lpEntities->Add(&entity,NULL);
+ */ 
                 }
             }            
         }

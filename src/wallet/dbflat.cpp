@@ -17,7 +17,7 @@ bool fDBFlatDebug=false;
 bool fDBFlatDebugKey=false;
 
 bool mc_CopyFile(boost::filesystem::path& pathDBOld,boost::filesystem::path& pathDBNew);
-void PrintDBFlatPos(char *msg,const mc_DBFlatPos *pos)
+void PrintDBFlatPos(const char *msg,const mc_DBFlatPos *pos)
 {
     if(fDBFlatDebug)
     {
@@ -25,7 +25,7 @@ void PrintDBFlatPos(char *msg,const mc_DBFlatPos *pos)
     }
 }
 
-void PrintDataStreamKey(char *msg,const CDataStream& ss)
+void PrintDataStreamKey(const char *msg,const CDataStream& ss)
 {
     if(fDBFlatDebugKey)
     {
@@ -35,7 +35,7 @@ void PrintDataStreamKey(char *msg,const CDataStream& ss)
         printf("%s: %s",msg,strType.c_str());
         if(ss_copy.size())
         {
-            printf(" + %u bytes: ",ss_copy.size());
+            printf(" + %lu bytes: ",ss_copy.size());
             if(ss_copy.size() == 4)
             {
                 uint32_t v;
@@ -936,7 +936,6 @@ int CDBFlat::ReadAtCursor(void* pcursor, CDataStream& ssKey, CDataStream& ssValu
     mc_DBFlatPos *lpPos;
     uint32_t key_size_bytes;
     uint32_t val_size_bytes;
-    uint32_t off;
     if(pcursor)
     {        
         while(true)        
@@ -946,7 +945,6 @@ int CDBFlat::ReadAtCursor(void* pcursor, CDataStream& ssKey, CDataStream& ssValu
             {
                 PrintDBFlatPos("Read At Cursor",lpPos);
             }
-            off=lpPos->m_Offset;
             if(lpPos->m_Offset+MC_DBF_FLAGS_FIELDSIZE >= m_FileSize)
             {
                 if(lpPos->m_Offset == m_FileSize)
