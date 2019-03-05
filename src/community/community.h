@@ -37,7 +37,9 @@ typedef struct mc_EnterpriseFeatures
             uint32_t mode);                                                     // Unused    
     
     int STR_CreateSubscription(mc_TxEntity *entity,const std::string parameters);
+    int STR_TrimSubscription(mc_TxEntity *entity,const std::string parameters);
     int STR_IsIndexSkipped(mc_TxImport *import,mc_TxEntity *parent_entity,mc_TxEntity *entity);
+    int STR_NoRetrieve(mc_TxEntity *entity);
     int STR_IsOutOfSync(mc_TxEntity *entity);
     int STR_SetSyncFlag(mc_TxEntity *entity,bool confirm);
     int STR_GetSubscriptions(mc_Buffer *subscriptions);
@@ -55,6 +57,7 @@ typedef struct mc_EnterpriseFeatures
     int ENT_MinWalletDatVersion();
     void ENT_RPCVerifyEdition();
     std::string ENT_TextConstant(const char* name);
+    void ENT_InitRPCHelpMap();
     
     void LIC_RPCVerifyFeature(uint64_t feature);
     bool LIC_VerifyFeature(uint64_t feature,std::string& reason);

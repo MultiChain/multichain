@@ -203,7 +203,7 @@ Value liststreams(const Array& params, bool fHelp)
     {
         if(paramtobool(params[1]))
         {
-            output_level=0x3E;           
+            output_level=0xBE;           
             if(mc_gState->m_Features->StreamFilters())
             {
                 output_level |= 0x40;    
@@ -1052,6 +1052,50 @@ Value publishfrom(const Array& params, bool fHelp)
 
     return wtx.GetHash().GetHex();    
 }
+
+Value trimsubscribe(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 2)
+        throw runtime_error("Help message not found\n");
+    
+    pEF->ENT_RPCVerifyEdition();
+    
+    string indexes=params[1].get_str();
+    
+    vector<mc_EntityDetails> inputEntities;
+    vector<string> inputStrings;
+    if(params[0].type() == str_type)
+    {
+        inputStrings.push_back(params[0].get_str());
+    }
+    else
+    {    
+        inputStrings=ParseStringList(params[0]);
+    }
+    
+    for(int is=0;is<(int)inputStrings.size();is++)
+    {
+        mc_EntityDetails entity_to_subscribe;
+        Value param=inputStrings[is];
+        ParseEntityIdentifier(param,&entity_to_subscribe, MC_ENT_TYPE_STREAM);           
+        inputEntities.push_back(entity_to_subscribe);
+    }
+    
+    for(int is=0;is<(int)inputStrings.size();is++)
+    {
+        mc_EntityDetails* lpEntity;
+        lpEntity=&inputEntities[is];
+        
+        mc_TxEntity entity;
+        entity.Zero();
+        memcpy(entity.m_EntityID,lpEntity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+        entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
+        pEF->STR_TrimSubscription(&entity,indexes);        
+    }
+    
+    return Value::null;
+}
+
 
 Value subscribe(const Array& params, bool fHelp)
 {

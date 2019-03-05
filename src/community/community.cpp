@@ -26,7 +26,17 @@ int mc_EnterpriseFeatures::STR_CreateSubscription(mc_TxEntity *entity,const std:
     return MC_ERR_FOUND;        
 }
 
+int mc_EnterpriseFeatures::STR_TrimSubscription(mc_TxEntity *entity,const std::string parameters)
+{
+    return MC_ERR_NOERROR;        
+}
+
 int mc_EnterpriseFeatures::STR_IsIndexSkipped(mc_TxImport *import,mc_TxEntity *parent_entity,mc_TxEntity *entity)
+{
+    return 0;
+}
+
+int mc_EnterpriseFeatures::STR_NoRetrieve(mc_TxEntity *entity)
 {
     return 0;
 }
@@ -106,6 +116,12 @@ std::string mc_EnterpriseFeatures::ENT_TextConstant(const char* name)
 {
     return "";
 }
+
+void mc_EnterpriseFeatures::ENT_InitRPCHelpMap()
+{
+    
+}
+
 
 void mc_EnterpriseFeatures::LIC_RPCVerifyFeature(uint64_t feature)
 {

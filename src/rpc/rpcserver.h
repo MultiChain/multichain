@@ -268,6 +268,7 @@ extern json_spirit::Value publishmulti(const json_spirit::Array& params, bool fH
 extern json_spirit::Value publishmultifrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value subscribe(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value unsubscribe(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value trimsubscribe(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listassettransactions(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getassettransaction(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getstreamitem(const json_spirit::Array& params, bool fHelp);

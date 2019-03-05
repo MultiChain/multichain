@@ -4757,6 +4757,8 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap19();
     mc_InitRPCHelpMap20();
     
+    pEF->ENT_InitRPCHelpMap();
+    
     mc_InitRPCLogParamCountMap();
     mc_InitRPCAllowedWhenWaitingForUpgradeSet();    
     mc_InitRPCAllowedWhenOffline();    
