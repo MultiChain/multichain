@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "structs/amount.h"
@@ -15,7 +15,7 @@
 #include "rpcserver.h"
 #include "utils/util.h"
 #ifdef ENABLE_WALLET
-#include "wallet/db.h"
+#include "wallet/dbwrap.h"
 #include "wallet/wallet.h"
 #endif
 
@@ -193,11 +193,14 @@ Value setgenerate(const Array& params, bool fHelp)
                 }
             }
                 
+            int64_t nStart = GetTimeMillis();
+            int64_t nCount=1;
             CBlock *pblock = &pblocktemplate->block;
             {
                 LOCK(cs_main);
 /* MCHN START */                
                 IncrementExtraNonce(pblock, pindexPrev, nExtraNonce,pwalletMain);
+                CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE,pwalletMain);
 //                IncrementExtraNonce(pblock, chainActive.Tip(), nExtraNonce);
 /* MCHN START */                
             }
@@ -205,7 +208,12 @@ Value setgenerate(const Array& params, bool fHelp)
                 // Yes, there is a chance every nonce could fail to satisfy the -regtest
                 // target -- 1 in 2^(2^32). That ain't gonna happen.
                 ++pblock->nNonce;
+                CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE,pwalletMain);     
+                nCount++;
             }
+            int64_t nEnd = GetTimeMillis();
+            LogPrintf("RPC Miner      : %ld hashes were tried in %ldms (%8.3fh/ms)\n",nCount,nEnd-nStart,
+                    (nEnd-nStart >0 ) ? (double)nCount/((double)nEnd-(double)nStart) : 0);
             CValidationState state;
             LogPrintf("RPC Miner      : Block Found - %s, prev: %s, height: %d, txs: %d\n",
                     pblock->GetHash().GetHex(),pblock->hashPrevBlock.ToString().c_str(),nHeight+1,(int)pblock->vtx.size());

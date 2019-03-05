@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "multichain/multichain.h"
@@ -93,7 +93,12 @@ int mc_MultichainParams::Build(const unsigned char* pubkey, int pubkey_size)
     uint32_t nBits,timestamp;
     int i;
     const unsigned char *ptr;
-    const unsigned char *pubkey_hash=(unsigned char *)Hash160(pubkey,pubkey+pubkey_size).begin();
+//    const unsigned char *pubkey_hash=(unsigned char *)Hash160(pubkey,pubkey+pubkey_size).begin();
+
+    unsigned char pubkey_hash[20];
+    uint160 pkhash=Hash160(pubkey,pubkey+pubkey_size);
+    memcpy(pubkey_hash,&pkhash,20);
+
     size_t elem_size;
     const unsigned char *elem;
     int root_stream_name_size;
@@ -271,7 +276,7 @@ int mc_MultichainParams::Build(const unsigned char* pubkey, int pubkey_size)
     {
         return err;
     }
-    
+       
    
     CalculateHash(hash);
     

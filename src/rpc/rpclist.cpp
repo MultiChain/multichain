@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #if defined(HAVE_CONFIG_H)
@@ -77,6 +77,7 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "getblockchaininfo",      &getblockchaininfo,      true,      false,      false },
     { "blockchain",         "getbestblockhash",       &getbestblockhash,       true,      false,      false },
     { "blockchain",         "getblockcount",          &getblockcount,          true,      false,      false },
+    { "blockchain",         "getlastblockinfo",       &getlastblockinfo,       true,      false,      false },
     { "blockchain",         "getblock",               &getblock,               true,      false,      false },
     { "blockchain",         "getblockhash",           &getblockhash,           true,      false,      false },
     { "blockchain",         "getchaintips",           &getchaintips,           true,      false,      false },
@@ -94,7 +95,17 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "listpermissions",        &listpermissions,        true,      false,      false },
     { "blockchain",         "liststreams",            &liststreams,            true,      false,      false },
     { "blockchain",         "listupgrades",           &listupgrades,           true,      false,      false },
+    { "blockchain",         "listtxfilters",          &listtxfilters,          true,      false,      false },
+    { "blockchain",         "liststreamfilters",      &liststreamfilters,      true,      false,      false },
+    { "blockchain",         "getfiltercode",          &getfiltercode,          true,      false,      false },
+    { "blockchain",         "testtxfilter",           &testtxfilter,           true,      false,      false },
+    { "blockchain",         "runtxfilter",            &runtxfilter,            true,      false,      false },
+    { "blockchain",         "teststreamfilter",       &teststreamfilter,       true,      false,      false },
+    { "blockchain",         "runstreamfilter",        &runstreamfilter,        true,      false,      false },
     { "blockchain",         "listblocks",             &listblocks,             true,      false,      false },
+    { "blockchain",         "getassetinfo",           &getassetinfo,           true,      false,      false },
+    { "blockchain",         "getstreaminfo",          &getstreaminfo,          true,      false,      false },
+    { "blockchain",         "verifypermission",       &verifypermission,       true,      false,      false },
 /* MCHN END */    
     
     /* Mining */
@@ -142,9 +153,17 @@ static const CRPCCommand vRPCCommands[] =
     { "hidden",             "invalidateblock",        &invalidateblock,        true,      true,       false },
     { "hidden",             "reconsiderblock",        &reconsiderblock,        true,      true,       false },
     { "hidden",             "setmocktime",            &setmocktime,            true,      false,      false },
-    { "hidden",             "data-all",               &purehelpitem,           true,      true,       true },
-    { "hidden",             "data-with",               &purehelpitem,           true,      true,       true },
-    { "hidden",             "addresses-all",          &purehelpitem,           true,      true,       true },
+    { "hidden",             "data-all",               &purehelpitem_nomethod,           true,      true,       true },
+    { "hidden",             "data-with",              &purehelpitem_nomethod,           true,      true,       true },
+    { "hidden",             "addresses-all",          &purehelpitem_nomethod,           true,      true,       true },
+    
+    { "hidden",             "getfilterstreamitem",    &purehelpitem_onlyfilter,      true,      false,      false },
+    { "hidden",             "getfiltertransaction",   &purehelpitem_onlyfilter,      true,      false,      false },
+    { "hidden",             "getfilterassetbalances", &purehelpitem_onlyfilter,      true,      false,      false },
+    { "hidden",             "getfiltertxid",          &purehelpitem_onlyfilter,          true,      true,       true },
+    { "hidden",             "getfiltertxinput",       &purehelpitem_onlyfilter,         true,      true,       true },
+    { "hidden",             "setfilterparam",         &purehelpitem_onlyfilter,         true,      true,       true },
+    { "hidden",             "filters",                &purehelpitem_nomethod,         true,      true,       true },
 
 #ifdef ENABLE_WALLET
     /* Wallet */
@@ -233,6 +252,8 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "createfrom",             &createfromcmd,            false,     false,      true },
     { "wallet",             "publish",                &publish,                false,     false,      true },
     { "wallet",             "publishfrom",            &publishfrom,            false,     false,      true },
+    { "wallet",             "publishmulti",           &publishmulti,                false,     false,      true },
+    { "wallet",             "publishmultifrom",       &publishmultifrom,            false,     false,      true },
     { "wallet",             "subscribe",              &subscribe,              false,     false,      true },
     { "wallet",             "unsubscribe",            &unsubscribe,            false,     false,      true },
     { "wallet",             "listassettransactions",  &listassettransactions,         false,     false,      true },
@@ -246,6 +267,7 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "liststreamkeys",         &liststreamkeys,        false,     false,      true },
     { "wallet",             "liststreampublishers",   &liststreampublishers,  false,     false,      true },
     { "wallet",             "gettxoutdata",           &gettxoutdata,           false,     false,      true },
+    { "wallet",             "txouttobinarycache",     &txouttobinarycache,           false,     false,      true },
     { "wallet",             "liststreamblockitems",   &liststreamblockitems,    false,      false,      false },
     { "wallet",             "getstreamkeysummary",    &getstreamkeysummary,        false,     false,      true },
     { "wallet",             "getstreampublishersummary",   &getstreampublishersummary,        false,     false,      true },

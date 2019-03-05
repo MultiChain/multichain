@@ -1,10 +1,11 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "rpc/rpcserver.h"
+#include "rpc/rpcasio.h"
 
 #include "structs/base58.h"
 #include "core/init.h"
@@ -47,6 +48,10 @@ static boost::thread_group* rpc_worker_group = NULL;
 static boost::asio::io_service::work *rpc_dummy_work = NULL;
 static std::vector<CSubNet> rpc_allow_subnets; //!< List of subnets to allow RPC connections from
 static std::vector< boost::shared_ptr<ip::tcp::acceptor> > rpc_acceptors;
+
+//! Convert boost::asio address to CNetAddr
+extern CNetAddr BoostAsioToCNetAddr(boost::asio::ip::address address);
+
 
 string JSONRPCRequestForLog(const string& strMethod, const Array& params, const Value& id)
 {
@@ -666,12 +671,14 @@ void mc_InitRPCListIfLimited()
     }
 }
 
-void StartRPCThreads()
+void StartRPCThreads(string& strError)
 {
     mc_InitRPCList(vStaticRPCCommands,vStaticRPCWalletReadCommands);
     mc_InitRPCListIfLimited();
     tableRPC.initialize();
 
+    strError="";
+    
     rpc_allow_subnets.clear();
     rpc_allow_subnets.push_back(CSubNet("127.0.0.0/8")); // always allow IPv4 local subnet
     rpc_allow_subnets.push_back(CSubNet("::1")); // always allow IPv6 localhost
@@ -734,12 +741,20 @@ void StartRPCThreads()
         filesystem::path pathCertFile(GetArg("-rpcsslcertificatechainfile", "server.cert"));
         if (!pathCertFile.is_complete()) pathCertFile = filesystem::path(GetDataDir()) / pathCertFile;
         if (filesystem::exists(pathCertFile)) rpc_ssl_context->use_certificate_chain_file(pathCertFile.string());
-        else LogPrintf("ThreadRPCServer ERROR: missing server certificate file %s\n", pathCertFile.string());
+        else
+        {
+            LogPrintf("ThreadRPCServer ERROR: missing server certificate file %s\n", pathCertFile.string());
+            strError += strprintf("Missing server certificate file %s\n", pathCertFile.string().c_str());
+        }
 
         filesystem::path pathPKFile(GetArg("-rpcsslprivatekeyfile", "server.pem"));
         if (!pathPKFile.is_complete()) pathPKFile = filesystem::path(GetDataDir()) / pathPKFile;
         if (filesystem::exists(pathPKFile)) rpc_ssl_context->use_private_key_file(pathPKFile.string(), ssl::context::pem);
-        else LogPrintf("ThreadRPCServer ERROR: missing server private key file %s\n", pathPKFile.string());
+        else
+        {
+            LogPrintf("ThreadRPCServer ERROR: missing server private key file %s\n", pathPKFile.string());
+            strError += strprintf("Missing server private key file %s\n", pathPKFile.string().c_str());
+        }
 
         string strCiphers = GetArg("-rpcsslciphers", "TLSv1.2+HIGH:TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!3DES:@STRENGTH");
         SSL_CTX_set_cipher_list(rpc_ssl_context->impl(), strCiphers.c_str());
@@ -824,10 +839,27 @@ void StartRPCThreads()
     }
 
     rpc_worker_group = new boost::thread_group();
+    
+
+#ifdef MAC_OSX
+    boost::thread::attributes attrs;
+    attrs.set_stack_size(8*1024*1024);
+    
+    for (int i = 0; i < GetArg("-rpcthreads", 4); i++)
+    {
+        boost::thread *lpThread=new thread(attrs,boost::bind(&asio::io_service::run, rpc_io_service));
+        rpc_worker_group->add_thread(lpThread);
+    }    
+#else    
     for (int i = 0; i < GetArg("-rpcthreads", 4); i++)
         rpc_worker_group->create_thread(boost::bind(&asio::io_service::run, rpc_io_service));
-    
+#endif
     fRPCRunning = true;
+    
+    if(strError.size())
+    {
+        strError += "Node may be unable to process API requests.\n";
+    }
 }
 
 void StartDummyRPCThread()

@@ -1,6 +1,6 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef RPCMULTICHAINUTILS_H
@@ -20,6 +20,7 @@
 #include "multichain/multichain.h"
 #include "utils/utilparse.h"
 #include "wallet/chunkdb.h"
+#include "filters/multichainfilter.h"
 
 using namespace std;
 using namespace json_spirit;
@@ -42,6 +43,7 @@ using namespace json_spirit;
 #define MC_DATA_API_PARAM_TYPE_RESERVED1       0x00000010
 #define MC_DATA_API_PARAM_TYPE_APPROVAL        0x00000020
 #define MC_DATA_API_PARAM_TYPE_CREATE_UPGRADE  0x00000040
+#define MC_DATA_API_PARAM_TYPE_CREATE_FILTER   0x00000080
 #define MC_DATA_API_PARAM_TYPE_EMPTY_RAW       0x00000100
 #define MC_DATA_API_PARAM_TYPE_RAW             0x00000200
 #define MC_DATA_API_PARAM_TYPE_FORMATTED       0x00000400
@@ -108,19 +110,21 @@ Value PermissionForFieldEntry(mc_EntityDetails *lpEntity);
 Array PerOutputDataEntries(const CTxOut& txout,mc_Script *lpScript,uint256 txid,int vout);
 Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong);
 Object StreamEntry(const unsigned char *txid,uint32_t output_level);
+Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDetails *raw_entity);
 Object UpgradeEntry(const unsigned char *txid);
-const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t start,int64_t count);
+const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t start,int64_t count,int fHan);
 uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t total_size);
 Value OpReturnEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout);
 Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out,uint32_t status);
 Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format, string *format_text_out);
 Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txid, int vout, uint32_t format);
 Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uint32_t stream_output_level);
+Object FilterEntry(const unsigned char *txid,uint32_t output_level,uint32_t filter_type);
 Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_level);
 string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript,int *eErrorCode);
 bool FindPreparedTxOut(CTxOut& txout,COutPoint outpoint,string& reason);
 bool GetTxInputsAsTxOuts(const CTransaction& tx, vector <CTxOut>& inputs, vector <string>& errors,string& reason);
-CScript GetScriptForString(string source);
+CScript GetScriptForString(string source,uint32_t entity_type,mc_EntityDetails *entity);
 vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *required);
 CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *given_entity,mc_EntityDetails *found_entity);
 vector<string> ParseStringList(Value param);
@@ -145,7 +149,8 @@ int mc_BinaryCacheFile(string id,int mode);
 void mc_RemoveBinaryCacheFile(string id);
 bool AvailableFromStatus(uint32_t status);
 string OffChainError(uint32_t status,int *errorCode); 
-bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,string *strError);
+bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,int *errorCode,string *strError);
+void CheckWalletError(int err);
 
 
 #endif	/* RPCMULTICHAINUTILS_H */

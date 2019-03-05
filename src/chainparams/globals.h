@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef GLOBALS_H
@@ -23,6 +23,8 @@ int64_t MAX_MONEY = 21000000 * COIN;                                            
 unsigned int MAX_SCRIPT_ELEMENT_SIZE=520;                                       // script.h
 int MIN_BLOCKS_BETWEEN_UPGRADES = 100;                                          
 int MAX_OP_RETURN_SHOWN=16384;
+int DEFAULT_ACCEPT_FILTER_TIMEOUT=100;
+int DEFAULT_SEND_FILTER_TIMEOUT= 20;
 int MAX_STREAM_QUERY_ITEMS=5000;
 int MAX_FORMATTED_DATA_DEPTH=100;
 unsigned int MAX_OP_RETURN_OP_DROP_COUNT=100000000;
@@ -30,6 +32,7 @@ uint32_t JSON_NO_DOUBLE_FORMATTING=0;
 int JSON_DOUBLE_DECIMAL_DIGITS=-1;                             
 int MAX_CHUNK_SIZE = 1048576; 
 int MAX_CHUNK_COUNT = 1024; 
+int MAX_NBITS_FOR_SIGNED_NONCE = 12;
 
 int MCP_MAX_STD_OP_RETURN_COUNT=0;
 int64_t MCP_INITIAL_BLOCK_REWARD=0;

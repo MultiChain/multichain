@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef BITCOIN_CHAINPARAMS_H
@@ -69,6 +69,8 @@ public:
     bool DefaultCheckMemPool() const { return fDefaultCheckMemPool; }
     /** Allow mining of a min-difficulty block */
     bool AllowMinDifficultyBlocks() const { return fAllowMinDifficultyBlocks; }
+    /** Disallow block nonce not covered by miner signature */
+    bool DisallowUnsignedBlockNonce() const { return fDisallowUnsignedBlockNonce; }
     /** Skip proof-of-work check: allow mining of any difficulty block */
     bool SkipProofOfWorkCheck() const { return fSkipProofOfWorkCheck; }
     /** Make standard checks */
@@ -119,6 +121,7 @@ protected:
     bool fMineBlocksOnDemand;
     bool fSkipProofOfWorkCheck;
     bool fTestnetToBeDeprecatedFieldRPC;
+    bool fDisallowUnsignedBlockNonce;
 };
 
 /** 

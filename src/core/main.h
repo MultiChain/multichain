@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef BITCOIN_MAIN_H
@@ -22,6 +22,7 @@
 #include "script/script.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
+#include "filters/multichainfilter.h"
 #include "utils/sync.h"
 #include "utils/tinyformat.h"
 #include "chain/txmempool.h"
@@ -46,6 +47,7 @@ class CInv;
 class CScriptCheck;
 class CValidationInterface;
 class CValidationState;
+class CWalletTx;
 
 struct CBlockTemplate;
 struct CNodeStateStats;
@@ -72,6 +74,8 @@ static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 50000;
 static const unsigned int DEFAULT_MAX_SUCCESSORS_FROM_ONE_NODE = 10;
 /* MCHN END */
 extern int MAX_OP_RETURN_SHOWN;
+extern int DEFAULT_ACCEPT_FILTER_TIMEOUT;
+extern int DEFAULT_SEND_FILTER_TIMEOUT;
 extern int MAX_STREAM_QUERY_ITEMS;
 extern int MAX_FORMATTED_DATA_DEPTH;
 extern int MIN_BLOCKS_BETWEEN_UPGRADES;
@@ -230,7 +234,7 @@ void FlushStateToDisk();
 
 /** (try to) add transaction to memory pool **/
 bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransaction &tx, bool fLimitFree,
-                        bool* pfMissingInputs, bool fRejectInsaneFee=false, bool fAddToWallet=true);
+                        bool* pfMissingInputs, bool fRejectInsaneFee=false, CWalletTx *wtx=NULL);
 
 
 struct CNodeStateStats {

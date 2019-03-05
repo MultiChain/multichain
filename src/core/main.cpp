@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "core/main.h"
@@ -35,6 +35,8 @@
 
 extern mc_WalletTxs* pwalletTxsMain;
 extern mc_RelayManager* pRelayManager;
+extern mc_FilterEngine* pFilterEngine;
+extern mc_MultiChainFilterEngine* pMultiChainFilterEngine;
 
 /* MCHN END */
 
@@ -55,12 +57,13 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                  string& reason,
                                  int64_t *mandatory_fee_out,     
                                  uint32_t *replay);
+bool Is_MultiChainLicenseTokenTransfer(const CTransaction& tx);
 bool ExtractDestinationScriptValid(const CScript& scriptPubKey, CTxDestination& addressRet);
 bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs, string& reason);
 bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& reason);
 bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string& reason);
 bool ReplayMemPool(CTxMemPool& pool, int from,bool accept);
-bool VerifyBlockSignature(CBlock *block,bool force);
+bool VerifyBlockSignature(CBlock *block,bool force,bool in_sync);
 bool VerifyBlockMiner(CBlock *block,CBlockIndex* pindexNew);
 bool CheckBlockPermissions(const CBlock& block,CBlockIndex* prev_block,unsigned char *lpMinerAddress);
 bool ProcessMultichainRelay(CNode* pfrom, CDataStream& vRecv, CValidationState &state);
@@ -437,6 +440,41 @@ int SetUpgradedParamValue(const mc_OneMultichainParam *param,int64_t value)
         MAX_CHUNK_COUNT=value;
     }           
     
+    if(strcmp(param->m_Name,"anyonecanconnect") == 0)
+    {
+        MCP_ANYONE_CAN_CONNECT=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecansend") == 0)
+    {
+        MCP_ANYONE_CAN_SEND=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecanreceive") == 0)
+    {
+        MCP_ANYONE_CAN_RECEIVE=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecanreceiveempty") == 0)
+    {
+        MCP_ANYONE_CAN_RECEIVE_EMPTY=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecancreate") == 0)
+    {
+        MCP_ANYONE_CAN_CREATE=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecanissue") == 0)
+    {
+        MCP_ANYONE_CAN_ISSUE=value;
+    }   
+    
+    if(strcmp(param->m_Name,"anyonecanactivate") == 0)
+    {
+        MCP_ANYONE_CAN_ACTIVATE=value;
+    }   
+    
     return MC_ERR_NOERROR;
 }
 
@@ -498,93 +536,6 @@ int MultichainNode_ApplyUpgrades(int current_height)
     return MC_ERR_NOERROR;
 }
 
-
-int MultichainNode_ApplyUpgrades_Old(int current_height)
-{
-    mc_EntityDetails entity;
-    mc_Buffer *permissions;
-    permissions=NULL;
-    map <uint64_t,int> map_sorted;
-
-    int OriginalProtocolVersion=(int)mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
-    int CurrentProtocolVersion=mc_gState->m_NetworkParams->ProtocolVersion();//mc_gState->m_ProtocolVersionToUpgrade;
-    int NewProtocolVersion=OriginalProtocolVersion;
-    int version;
-    
-    permissions=mc_gState->m_Permissions->GetUpgradeList(NULL,NULL);
-
-    for(int i=0;i<permissions->GetCount();i++)
-    {        
-        mc_PermissionDetails *plsRow;
-        plsRow=(mc_PermissionDetails *)(permissions->GetRow(i));
-        if(plsRow->m_Type == MC_PTP_UPGRADE)
-        {
-            map_sorted.insert(std::make_pair(plsRow->m_LastRow,i));
-        }        
-    }
-    
-    BOOST_FOREACH(PAIRTYPE(const uint64_t, int)& item, map_sorted)
-//    for(int i=0;i<upgrades->GetCount();i++)
-    {
-        int i=item.second;
-        mc_PermissionDetails *plsRow;
-        plsRow=(mc_PermissionDetails *)(permissions->GetRow(i));
-        if(plsRow->m_Type == MC_PTP_UPGRADE)
-        {
-            if(plsRow->m_BlockFrom < plsRow->m_BlockTo) 
-            {
-                if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,plsRow->m_Address))
-                {
-                    int applied_height=entity.UpgradeStartBlock();
-                    if((int)plsRow->m_BlockReceived > applied_height)
-                    {
-                        applied_height=plsRow->m_BlockReceived;
-                    }
-                    if(current_height >=applied_height)
-                    {
-                        version=entity.UpgradeProtocolVersion();
-                        if(version >= mc_gState->MinProtocolDowngradeVersion())
-                        {
-                            if((NewProtocolVersion < mc_gState->MinProtocolForbiddenDowngradeVersion()) || (version >= NewProtocolVersion))
-                            {
-                                NewProtocolVersion=version;
-                            }
-                        }
-                    }
-                }
-            }            
-        }
-    }
-    
-    mc_gState->m_Permissions->FreePermissionList(permissions);
-    mc_gState->m_ProtocolVersionToUpgrade=NewProtocolVersion;
-    
-    if(mc_gState->m_ProtocolVersionToUpgrade != CurrentProtocolVersion)
-    {
-        LogPrintf("New protocol upgrade version: %d (was %d)\n",mc_gState->m_ProtocolVersionToUpgrade,CurrentProtocolVersion);
-//        if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->GetProtocolVersion())
-        if( (mc_gState->m_ProtocolVersionToUpgrade > 0) && (mc_gState->IsSupported(mc_gState->m_ProtocolVersionToUpgrade) == 0) )
-        {
-            LogPrintf("NODE SHOULD BE UPGRADED FROM %d TO %d\n",mc_gState->GetProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
-        }
-        else
-        {
-            if(mc_gState->m_ProtocolVersionToUpgrade != mc_gState->m_NetworkParams->ProtocolVersion())
-            {
-                LogPrintf("NODE IS UPGRADED FROM %d TO %d\n",mc_gState->m_NetworkParams->ProtocolVersion(),mc_gState->m_ProtocolVersionToUpgrade);
-                mc_gState->m_NetworkParams->m_ProtocolVersion=mc_gState->m_ProtocolVersionToUpgrade;// UPGRADE CODE HERE
-                mc_gState->m_NetworkParams->SetGlobals();
-                SetMultiChainParams();
-            }        
-        }
-    }
-    else
-    {
-        mc_gState->m_ProtocolVersionToUpgrade=0;        
-    }
-    
-    return MC_ERR_NOERROR;
-}
 
 void MultichainNode_UpdateBlockByHeightList(CBlockIndex *pindex)
 {
@@ -1397,7 +1348,7 @@ CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowF
 }
 
 bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransaction &tx, bool fLimitFree,
-                        bool* pfMissingInputs, bool fRejectInsaneFee,bool fAddToWallet)
+                        bool* pfMissingInputs, bool fRejectInsaneFee,CWalletTx *wtx)
 {
     AssertLockHeld(cs_main);
     if (pfMissingInputs)
@@ -1675,16 +1626,21 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
         
         
-        if(fAddToWallet)
+        int err=MC_ERR_NOERROR;
+        if(wtx)
         {
-            int err=pwalletTxsMain->AddTx(NULL,tx,-1,NULL,-1,0);
-            if(err)
-            {
-                reason=strprintf("Wallet error %d",err);
-                return state.DoS(0,
-                                 error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
-                                 REJECT_INVALID, reason);            
-            }
+            err=pwalletTxsMain->AddTx(NULL,*wtx,-1,NULL,-1,0);
+        }
+        else
+        {                
+            err=pwalletTxsMain->AddTx(NULL,tx,-1,NULL,-1,0);
+        }
+        if(err)
+        {
+            reason=strprintf("Wallet error %d",err);
+            return state.DoS(0,
+                             error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
+                             REJECT_INVALID, reason);            
         }
         
         permissions_to=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
@@ -1695,12 +1651,9 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         pool.addUnchecked(hash, entry);
     }
 
-    if(fAddToWallet)
+    if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
     {
-        if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
-        {
-            SyncWithWallets(tx, NULL);
-        }
+        SyncWithWallets(tx, NULL);
     }
 
     return true;
@@ -1831,7 +1784,7 @@ bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex)
     if (block.GetHash() != pindex->GetBlockHash())
         return error("ReadBlockFromDisk(CBlock&, CBlockIndex*) : GetHash() doesn't match index");
 /* MCHN START */    
-    VerifyBlockSignature(&block,true);
+    VerifyBlockSignature(&block,true,false);
 /* MCHN END */    
     return true;
 }
@@ -2077,6 +2030,7 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
         CAmount nValueIn = 0;
         CAmount nFees = 0;
         int async_count=0;
+        bool fIsLicenseTokenTransfer=Is_MultiChainLicenseTokenTransfer(tx);
         
         vector <unsigned int> vSendPermissionFlags;
         
@@ -2106,28 +2060,36 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                 CTxDestination addressRet;     
                 if(ExtractDestinationScriptValid(coins->vout[prevout.n].scriptPubKey, addressRet))
                 {
-                    CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
-                    if(lpKeyID != NULL)
-                    {
-                        if(!mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpKeyID)))
+                    if(!fIsLicenseTokenTransfer)
+                    {                        
+                        CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
+                        if(lpKeyID != NULL)
                         {
-                            return state.Invalid(error("CheckInputs() : %s input %d doesn't have send permission", tx.GetHash().ToString(),i));
-                        }                            
-                        send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
-                        async_count++;
+                            if(!mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpKeyID)))
+                            {
+                                return state.Invalid(error("CheckInputs() : %s input %d doesn't have send permission", tx.GetHash().ToString(),i));
+                            }                            
+                            send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
+                            async_count++;
+                        }
+                        else
+                        {
+                            CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
+                            if(lpScriptID)
+                            {
+                                if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpScriptID)))
+                                {
+                                    send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
+                                    async_count++;
+                                }                
+                            }
+                        }                                            
                     }
                     else
                     {
-                        CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
-                        if(lpScriptID)
-                        {
-                            if(mc_gState->m_Permissions->CanSend(NULL,(unsigned char*)(lpScriptID)))
-                            {
-                                send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
-                                async_count++;
-                            }                
-                        }
-                    }                    
+                        send_permission_flags=SCRIPT_VERIFY_SKIP_SEND_PERMISSION_CHECK;
+                        async_count++;                        
+                    }
                 }
             }
 
@@ -2341,16 +2303,21 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if(!pindex->kMiner.IsValid() || (setBannedTxs.size() != 0) )
     {
         if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
-            return false;
+        {
+            return state.DoS(0, error("ConnectBlock() : error on CheckBlock"),
+                             REJECT_INVALID, "bad-check-block");            
+        }
     }
 
     if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-size",true))
     {
-        return false;
+        return state.DoS(100, error("ConnectBlock() : above maximum-block-size"),
+                         REJECT_INVALID, "bad-block-size");                        
     }
     if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-sigops",true))
     {
-        return false;
+        return state.DoS(100, error("ConnectBlock() : above maximum-block-sigops"),
+                         REJECT_INVALID, "bad-block-sigops");                        
     }
     
 /* MCHN START */    
@@ -2528,6 +2495,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     std::vector<std::pair<uint256, CDiskTxPos> > vPos;
     vPos.reserve(block.vtx.size());
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
+    
+    if(fDebug)LogPrint("mchn","mchn: Checking Block with %d transactions\n",block.vtx.size());
+    
     for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
         const CTransaction &tx = block.vtx[i];
@@ -2573,7 +2543,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 {
                     return state.DoS(0,
                                      error("ConnectBlock: : AcceptMultiChainTransaction failed %s : %s", tx.GetHash().ToString(),reason),
-                                     REJECT_NONSTANDARD, reason);
+                                     REJECT_INVALID, reason);
                 }
             }
 /* MCHN END */                    
@@ -2602,7 +2572,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             {
                 if(!AcceptMultiChainTransaction(tx,view,coinbase_offset,true,reason,NULL,NULL))
                 {
-                    return false;       
+                    return state.DoS(0,
+                                     error("ConnectBlock: : AcceptMultiChainTransaction failed %s : %s", tx.GetHash().ToString(),reason),
+                                     REJECT_INVALID, reason);
+//                    return false;       
                 }
             }
         }            
@@ -2833,6 +2806,10 @@ bool static DisconnectTip(CValidationState &state) {
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Rolling back permission and asset databases\n");
     mc_gState->m_Permissions->RollBack(old_height-1);
     mc_gState->m_Assets->RollBack(old_height-1);
+    if(pMultiChainFilterEngine)
+    {
+        pMultiChainFilterEngine->Reset(old_height-1,0);
+    }
     
     MultichainNode_ApplyUpgrades(old_height-1);        
     if(mc_gState->m_WalletMode & MC_WMD_TXS)
@@ -2908,6 +2885,10 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     int64_t nTime2 = GetTimeMicros(); nTimeReadFromDisk += nTime2 - nTime1;
     int64_t nTime3;
     if(fDebug)LogPrint("bench", "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
+    if(pMultiChainFilterEngine)
+    {
+        pMultiChainFilterEngine->Reset(pindexNew->nHeight-1,1);
+    }
     {
         CCoinsViewCache view(pcoinsTip);
         CInv inv(MSG_BLOCK, pindexNew->GetBlockHash());
@@ -2948,33 +2929,42 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, before commit completed (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
     if(err)
     {
-        return error("ConnectTip() : ConnectBlock %s failed, Wtxs BeforeCommit, error: %d", pindexNew->GetBlockHash().ToString(),err);
+        LogPrintf("ConnectTip() : ConnectBlock %s failed, Wtxs BeforeCommit, error: %d", pindexNew->GetBlockHash().ToString(),err);
     }
     CDiskTxPos pos(pindexNew->GetBlockPos(), GetSizeOfCompactSize(pblock->vtx.size()));
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Adding block txs to wallet\n");
     for (unsigned int i = 0; i < pblock->vtx.size(); i++)
     {
-        const CTransaction &tx = pblock->vtx[i];
-        err=pwalletTxsMain->AddTx(NULL,tx,pindexNew->nHeight,&pos,i,pindexNew->GetBlockHash());
-        if(err)
+        if(err == MC_ERR_NOERROR)
         {
-            return error("ConnectTip() : ConnectBlock %s failed, Wtxs AddTx %s, error: %d", pindexNew->GetBlockHash().ToString(),tx.GetHash().ToString(),err);
+            const CTransaction &tx = pblock->vtx[i];
+            err=pwalletTxsMain->AddTx(NULL,tx,pindexNew->nHeight,&pos,i,pindexNew->GetBlockHash());
+            if(err)
+            {
+                LogPrintf("Wallet error when connecting block %s, Tx %s, error: %d\n", pindexNew->GetBlockHash().ToString(),tx.GetHash().ToString(),err);
+            }
+            pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
         }
-        pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
     }
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, commit                  (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
-    err=pwalletTxsMain->Commit(NULL);    
-    if(err)
+    if(err == MC_ERR_NOERROR)
     {
-        return error("ConnectTip() : ConnectBlock %s failed, Wtxs Commit, error: %d", pindexNew->GetBlockHash().ToString(),err);
-    }    
+        err=pwalletTxsMain->Commit(NULL);    
+        if(err)
+        {
+            LogPrintf("ConnectTip() : ConnectBlock %s failed, Wtxs Commit, error: %d", pindexNew->GetBlockHash().ToString(),err);
+        }    
+    }
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, commit completed        (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet cleanup\n");
-    err=pwalletTxsMain->CleanUpAfterBlock(NULL,pindexNew->nHeight,pindexNew->nHeight-1);
-    if(err)
+    if(err == MC_ERR_NOERROR)
     {
-        return error("ConnectTip() : ConnectBlock %s failed, Wtxs CleanUpAfterBlock, error: %d", pindexNew->GetBlockHash().ToString(),err);
-    }    
+        err=pwalletTxsMain->CleanUpAfterBlock(NULL,pindexNew->nHeight,pindexNew->nHeight-1);
+        if(err)
+        {
+            LogPrintf("ConnectTip() : ConnectBlock %s failed, Wtxs CleanUpAfterBlock, error: %d", pindexNew->GetBlockHash().ToString(),err);
+        }    
+    }
 
 /* MCHN END */    
     // Update chainActive & related variables.
@@ -2989,7 +2979,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     }
     // ... and about transactions that got confirmed:
 /* MCHN START */        
-    VerifyBlockSignature(pblock,false);
+    VerifyBlockSignature(pblock,false,true);
     MultichainNode_ApplyUpgrades(chainActive.Height());    
 /* MCHN END */    
     
@@ -3256,7 +3246,7 @@ void UpdateChainMiningStatus(const CBlock &block,CBlockIndex *pindexNew)
  * Try to make some progress towards making pindexMostWork the active block.
  * pblock is either NULL or a pointer to a CBlock corresponding to pindexMostWork.
  */
-static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMostWork, CBlock *pblock) {
+static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMostWork, CBlock *pblock, bool* fInvalidFoundOut) {
     AssertLockHeld(cs_main);
     bool fInvalidFound = false;
     const CBlockIndex *pindexOldTip = chainActive.Tip();
@@ -3327,11 +3317,15 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     }
     
 /* MCHN START */    
-    if (!fInvalidFound)
+//    if (!fInvalidFound)
     {
         mc_gState->m_Permissions->ClearMemPool();
         mc_gState->m_Assets->ClearMemPool();
-
+        if(pMultiChainFilterEngine)
+        {
+            pMultiChainFilterEngine->Reset(chainActive.Height(),0);
+        }
+        
         if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Replaying mempool\n");
         ReplayMemPool(mempool,0,true);
         if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Defragmenting mempool hash list\n");
@@ -3378,6 +3372,10 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
         }
     }
     
+    if(fInvalidFoundOut)
+    {
+        *fInvalidFoundOut=fInvalidFound;
+    }
 /* MCHN END */
     
     return true;
@@ -3451,7 +3449,7 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
             }
 /* MCHN END */            
 
-            if (!ActivateBestChainStep(state, pindexMostWork, pblock && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : NULL))
+            if (!ActivateBestChainStep(state, pindexMostWork, pblock && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : NULL, NULL))
                 return false;
 /* MCHN START */            
             if(pindexMostWork == chainActive.Tip())
@@ -3589,7 +3587,8 @@ string SetLastBlock(uint256 hash,bool *fNotFound)
         
         while(pblockindex != chainActive.Tip())
         {
-            if(!ActivateBestChainStep(state,pblockindex,NULL))
+            bool fInvalidFound;
+            if(!ActivateBestChainStep(state,pblockindex,NULL,&fInvalidFound) || fInvalidFound)
             {
                 string error=state.GetRejectReason();
                 ActivateBestChain(state);
@@ -4552,7 +4551,7 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
 /* MCHN START*/    
     pindex->dTimeReceived=mc_TimeNowAsDouble();
             
-    if(!VerifyBlockSignature(&block,false))
+    if(!VerifyBlockSignature(&block,false,true))
     {
         return false;
     }    
@@ -4577,6 +4576,41 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
 
     int nHeight = pindex->nHeight;
 
+    if(!VerifyBlockMiner(&block,pindex))
+    {
+        pindex->nStatus |= BLOCK_FAILED_VALID;
+        setDirtyBlockIndex.insert(pindex);
+        return false;
+    }
+    
+    CBlockIndex *pindexTip=pindex;
+    while((pindexTip != NULL) && pindexTip->nHeight > chainActive.Height())
+    {
+        pindexTip=pindexTip->pprev;
+    }
+    if(pindexTip == chainActive.Tip())                                          // If we are on main chain
+                                                                                // If it is the next block, we can check upgradable constraints
+                                                                                // If some blocks are missing and constraints are broken - ignore block
+                                                                                // If it is not an attack and upgrade parameters were indeed upgraded,
+                                                                                // we will download this block again after missing blocks.
+    {        
+        if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-size",true))
+        {
+            return false;
+        }
+    
+        if(!CheckBlockForUpgardableConstraints(block,state,"maximum-block-sigops",true))
+        {
+            return false;
+        }        
+    }
+    else
+    {
+        LogPrintf("Accepted header for block %s found on alternative chain at height %d\n",
+                pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);                        
+    }
+    
+    
     // Write block to history file
     try {
         unsigned int nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
@@ -4594,12 +4628,6 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
         return state.Abort(std::string("System error: ") + e.what());
     }
 
-    if(!VerifyBlockMiner(&block,pindex))
-    {
-        pindex->nStatus |= BLOCK_FAILED_VALID;
-        setDirtyBlockIndex.insert(pindex);
-        return false;
-    }
 
     return true;
 }
@@ -4671,7 +4699,7 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
 /* MCHN START*/    
     {
         LOCK(cs_main);
-        if(!VerifyBlockSignature(pblock,true))
+        if(!VerifyBlockSignature(pblock,true,true))
         {
             return false;
         }
@@ -5685,8 +5713,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         // Disconnect if we connected to ourself
         if (nNonce == nLocalHostNonce && nNonce > 1)
-        {
-            LogPrintf("connected to self at %s, disconnecting\n", pfrom->addr.ToString());
+        {            
+            SeenLocalAddr(addrMe);
+            LogPrintf("connected to self at %s (me: %s), disconnecting\n", pfrom->addr.ToString(),addrMe.ToStringIPPort().c_str());
             pfrom->fDisconnect = true;
             return true;
         }

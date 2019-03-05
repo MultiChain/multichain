@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "miner/miner.h"
@@ -112,6 +112,21 @@ bool UpdateTime(CBlockHeader* pblock, const CBlockIndex* pindexPrev)
 
 bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet)
 {
+    if(Params().DisallowUnsignedBlockNonce())
+    {
+        if(hash_type != BLOCKSIGHASH_NO_SIGNATURE)
+        {
+            return true;
+        }
+    }
+    else
+    {
+        if(hash_type != BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE)
+        {
+            return true;
+        } 
+    }
+    
     int coinbase_tx,op_return_output;
     uint256 hash_to_verify;
     uint256 original_merkle_root;
@@ -120,6 +135,7 @@ bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet)
     
     block->nMerkleTreeType=MERKLETREE_FULL;
     block->nSigHashType=BLOCKSIGHASH_NONE;
+    
     
     if(!mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
@@ -189,9 +205,13 @@ bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet)
             hash_to_verify=block->GetHash();
             break;
         case BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE:
+        case BLOCKSIGHASH_NO_SIGNATURE:
             block->nMerkleTreeType=MERKLETREE_NO_COINBASE_OP_RETURN;
             block->hashMerkleRoot=block->BuildMerkleTree();
-            block->nNonce=0;
+            if(hash_type == BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE)
+            {
+                block->nNonce=0;
+            }
             hash_to_verify=block->GetHash();
             block->nMerkleTreeType=MERKLETREE_FULL;                
             break;
@@ -249,6 +269,7 @@ bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet)
     switch(hash_type)
     {
         case BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE:
+        case BLOCKSIGHASH_NO_SIGNATURE:
             block->hashMerkleRoot=block->BuildMerkleTree();
             break;
     }
@@ -633,8 +654,10 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn,CWallet *pwallet,CP
         {
             if(canMine)
             {
-                const unsigned char *pubkey_hash=(unsigned char *)Hash160(ppubkey->begin(),ppubkey->end()).begin();
-                *canMine=mc_gState->m_Permissions->CanMine(NULL,pubkey_hash);
+//                const unsigned char *pubkey_hash=(unsigned char *)Hash160(ppubkey->begin(),ppubkey->end()).begin();
+//                *canMine=mc_gState->m_Permissions->CanMine(NULL,pubkey_hash);
+                uint160 pubkey_hash=Hash160(ppubkey->begin(),ppubkey->end());
+                *canMine=mc_gState->m_Permissions->CanMine(NULL,&pubkey_hash);
                 if((*canMine & MC_PTP_MINE) == 0)
                 {
                     if(prevCanMine & MC_PTP_MINE)
@@ -724,20 +747,30 @@ int64_t nHPSTimerStart = 0;
 // nonce is 0xffff0000 or above, the block is rebuilt and nNonce starts over at
 // zero.
 //
-bool static ScanHash(const CBlockHeader *pblock, uint32_t& nNonce, uint256 *phash,uint16_t success_and_mask)
+bool static ScanHash(CBlock *pblock, uint32_t& nNonce, uint256 *phash,uint16_t success_and_mask,CWallet *pwallet)
 {
     // Write the first 76 bytes of the block header to a double-SHA256 state.
     CHash256 hasher;
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-    ss << *pblock;
+    ss << pblock->GetBlockHeader();
+//    ss << *pblock;
     assert(ss.size() == 80);
     hasher.Write((unsigned char*)&ss[0], 76);
     while (true) {
         nNonce++;
 
-        // Write the last 4 bytes of the block header (the nonce) to a copy of
-        // the double-SHA256 state, and compute the result.
-        CHash256(hasher).Write((unsigned char*)&nNonce, 4).Finalize((unsigned char*)phash);
+        if(Params().DisallowUnsignedBlockNonce())
+        {
+            pblock->nNonce=nNonce;
+            CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE,pwallet);
+            *phash=pblock->GetHash();
+        }
+        else
+        {
+            // Write the last 4 bytes of the block header (the nonce) to a copy of
+            // the double-SHA256 state, and compute the result.
+            CHash256(hasher).Write((unsigned char*)&nNonce, 4).Finalize((unsigned char*)phash);
+        }
 
         // Return the nonce if the hash has at least some zero bits,
         // caller will check if it has enough to reach the target
@@ -795,7 +828,11 @@ CBlockTemplate* CreateNewBlockWithDefaultKey(CWallet *pwallet,int *canMine,const
         return NULL;        
     }
     
-    const unsigned char *pubkey_hash=(unsigned char *)Hash160(pubkey.begin(),pubkey.end()).begin();
+//    const unsigned char *pubkey_hash=(unsigned char *)Hash160(pubkey.begin(),pubkey.end()).begin();
+    
+    unsigned char pubkey_hash[20];
+    uint160 pkhash=Hash160(pubkey.begin(),pubkey.end());
+    memcpy(pubkey_hash,&pkhash,20);    
     
     CScript scriptPubKey = CScript() << OP_DUP << OP_HASH160 << vector<unsigned char>(pubkey_hash, pubkey_hash + 20) << OP_EQUALVERIFY << OP_CHECKSIG;
     
@@ -1423,7 +1460,10 @@ void static BitcoinMiner(CWallet *pwallet)
             
             if(canMine & MC_PTP_MINE)
             {
-                const unsigned char *pubkey_hash=(unsigned char *)Hash160(kMiner.begin(),kMiner.end()).begin();
+//                const unsigned char *pubkey_hash=(unsigned char *)Hash160(kMiner.begin(),kMiner.end()).begin();
+                unsigned char pubkey_hash[20];
+                uint160 pkhash=Hash160(kMiner.begin(),kMiner.end());
+                memcpy(pubkey_hash,&pkhash,20);    
                 CScript scriptPubKey = CScript() << OP_DUP << OP_HASH160 << vector<unsigned char>(pubkey_hash, pubkey_hash + 20) << OP_EQUALVERIFY << OP_CHECKSIG;
                 canMine=prevCanMine;
                 auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(scriptPubKey,pwallet,&kMiner,&canMine,&pindexPrev));            
@@ -1461,8 +1501,7 @@ void static BitcoinMiner(CWallet *pwallet)
                         break;
                     }
                 }
-                
-                bool fFound = ScanHash(pblock, nNonce, &hash, success_and_mask);
+                bool fFound = ScanHash(pblock, nNonce, &hash, success_and_mask, pwallet);
                 uint32_t nHashesDone = nNonce - nOldNonce;
                 nOldNonce = nNonce;
 

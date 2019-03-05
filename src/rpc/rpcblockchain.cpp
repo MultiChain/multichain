@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "chain/checkpoints.h"
@@ -387,6 +387,49 @@ Value listblocks(const Array& params, bool fHelp)
     return result;
 }
 
+Value getlastblockinfo(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 1)
+        mc_ThrowHelpMessage("getlastblockinfo");        
+//        throw runtime_error("Help message not found\n");
+    
+    CBlockIndex* pblockindex = chainActive.Tip();
+    
+    if(params.size() == 1)
+    {
+        if(params[0].type() != int_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Skip should be integer");
+        }
+        
+        int skip=params[0].get_int();
+        if (skip < 0 || skip > chainActive.Height())
+            throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Skip out of range");
+        
+        pblockindex=chainActive[chainActive.Height() - skip];
+    }
+   
+    Object result;
+    result.push_back(Pair("hash", pblockindex->GetBlockHash().GetHex()));
+    result.push_back(Pair("height", pblockindex->nHeight));
+    result.push_back(Pair("time", pblockindex->GetBlockTime()));
+    result.push_back(Pair("txcount", (int)pblockindex->nTx));
+    
+    CKeyID keyID;
+    Value miner;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+    {
+        if(mc_gState->m_Permissions->GetBlockMiner(pblockindex->nHeight,(unsigned char*)&keyID) == MC_ERR_NOERROR)
+        {
+            miner=CBitcoinAddress(keyID).ToString();
+        }
+    }
+    result.push_back(Pair("miner", miner));
+    
+    
+    return result;    
+}
+
 /* MCHN END */
 
 
@@ -395,21 +438,37 @@ Value getblock(const Array& params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 2)                        // MCHN
         throw runtime_error("Help message not found\n");
 
-    std::string strHash = params[0].get_str();
-    if(strHash.size() < 64)
+    int nHeight=-1;
+    bool is_hash=true;
+    std::string strHash;
+    
+    if(params[0].type() == int_type)
     {
-        int nHeight;
-        if(!StringToInt(params[0].get_str(),&nHeight))
+        nHeight=params[0].get_int();
+        is_hash=false;
+    }
+    else
+    {
+        strHash = params[0].get_str();
+        if( strHash.size() < 64 )
         {
-            throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height should be integer");
-        }
-        
-//        int nHeight = atoi(params[0].get_str().c_str());
+            if(!StringToInt(params[0].get_str(),&nHeight))
+            {
+                throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height should be integer");
+            }
+            is_hash=false;
+        }        
+    }
+    
+    if(!is_hash)
+    {
         if (nHeight < 0 || nHeight > chainActive.Height())
             throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block height out of range");
 
-        strHash=chainActive[nHeight]->GetBlockHash().GetHex();            
+        strHash=chainActive[nHeight]->GetBlockHash().GetHex();                    
     }
+        
+//        int nHeight = atoi(params[0].get_str().c_str());
     uint256 hash(strHash);
 /*
     bool fVerbose = true;
@@ -438,10 +497,18 @@ Value getblock(const Array& params, bool fHelp)
     
     if (mapBlockIndex.count(hash) == 0)
         throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block not found");
-
+    
     CBlock block;
     CBlockIndex* pblockindex = mapBlockIndex[hash];
 
+    if(pMultiChainFilterEngine->m_TxID != 0)
+    {
+        if (!chainActive.Contains(pblockindex))
+        {
+            throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block not found in active chain");
+        }    
+    }
+    
     if(!ReadBlockFromDisk(block, pblockindex))
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
 
@@ -478,6 +545,32 @@ Value gettxoutsetinfo(const Array& params, bool fHelp)
     return ret;
 }
 
+Value getfiltertxinput(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)                       
+        mc_ThrowHelpMessage("getfiltertxinput");        
+//        throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");                    
+    
+    int64_t vin = params[0].get_int64();                                          
+    
+    if(pMultiChainFilterEngine->m_Vout >= 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "This callback cannot be used in stream filters");                            
+    }
+    
+    if( (vin < 0) || (vin >= (unsigned int)pMultiChainFilterEngine->m_Tx.vin.size()) )
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "vin out of range");                    
+    }
+    
+    
+    Array getxoutparams;
+    getxoutparams.push_back(pMultiChainFilterEngine->m_Tx.vin[vin].prevout.hash.ToString());
+    getxoutparams.push_back((int64_t)pMultiChainFilterEngine->m_Tx.vin[vin].prevout.n);
+        
+    return gettxout(getxoutparams,false);
+}
+
 Value gettxout(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 3)                        // MCHN
@@ -498,7 +591,10 @@ Value gettxout(const Array& params, bool fHelp)
         CCoinsViewMemPool view(pcoinsTip, mempool);
         if (!view.GetCoins(hash, coins))
             return Value::null;
-        mempool.pruneSpent(hash, coins); // TODO: this should be done by the CCoinsViewMemPool
+        if(pMultiChainFilterEngine->m_TxID == 0)                                // In filter we already checked this input exists, but mempool is dirty
+        {
+            mempool.pruneSpent(hash, coins); // TODO: this should be done by the CCoinsViewMemPool
+        }
     } else {
         if (!pcoinsTip->GetCoins(hash, coins))
             return Value::null;

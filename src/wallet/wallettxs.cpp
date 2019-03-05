@@ -1,6 +1,6 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "wallet/wallettxs.h"
@@ -295,6 +295,19 @@ int mc_WalletTxs::Initialize(
     m_ChunkBuffer=(unsigned char*)mc_New(MAX_CHUNK_SIZE);
     return err;
 }
+
+int mc_WalletTxs::UpdateMode(uint32_t mode)
+{
+    m_Mode |= mode;
+    if(m_Database)
+    {
+        return m_Database->UpdateMode(mode);
+    }
+    
+    return MC_ERR_INTERNAL_ERROR;
+}
+    
+
 
 int mc_WalletTxs::SetMode(uint32_t mode, uint32_t mask)
 {
@@ -2025,11 +2038,19 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     
     fFound=false;
     txdef.Zero();
+    
+    m_Database->SetTxCache((unsigned char*)&hash);
+    if(m_Database->m_TxCachedFlags == MC_TCF_FOUND)
+    {
+        fFound=true;
+        memcpy(&txdef,&(m_Database->m_TxCachedDef),sizeof(mc_TxDefRow));
+    }
+/*    
     if(m_Database->GetTx(&txdef,(unsigned char*)&hash) == MC_ERR_NOERROR)
     {
         fFound=true;        
     }
-    
+*/    
     if(!fFound)
     {
         for(i=0;i<(int)tx.vout.size();i++)                                      // Checking that tx has long OP_RETURN
@@ -2347,6 +2368,9 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                     entity.Zero();
                     memcpy(entity.m_EntityID,short_txid,MC_AST_SHORT_TXID_SIZE);
                     entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
+                    
+                    bool passed_filters=true;
+
                     if(imp->FindEntity(&entity) >= 0)    
                     {
                         if(chunk_hashes)
@@ -2390,7 +2414,45 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                 chunk_hashes+=MC_CDB_CHUNK_HASH_SIZE;
                             }
                         }
+/*                        
+                        else
+                        {
+                            mc_MultiChainFilter* lpFilter;
+                            int applied=0;
+                            string filter_error;
+                            int filter_block=-1;
+                            int filter_offset=0;
+                            if(block >= 0)
+                            {
+                                filter_block=block;
+                                filter_offset=block_pos->nTxOffset;
+                            }
+                            else
+                            {
+                                if( imp->m_ImportID > 0 )
+                                {
+                                    filter_offset=-1;                                    
+                                }
+                            }
+                            if(pMultiChainFilterEngine->RunStreamFilters(tx,i,entity.m_EntityID,filter_block, filter_offset, 
+                                    filter_error,&lpFilter,&applied) != MC_ERR_NOERROR)
+                            {
+                                if(fDebug)LogPrint("mchn","mchn: Stream items rejected (%s): %s\n","Error while running filters",EncodeHexTx(tx));
+                                passed_filters=false;
+                            }
+                            else
+                            {
+                                if(filter_error.size())
+                                {
+                                    if(fDebug)LogPrint("mchn","mchn: Rejecting filter: %s\n",lpFilter->m_FilterCaption.c_str());
+                                    if(fDebug)LogPrint("mchn","mchn: Stream items rejected (%s): %s\n",filter_error.c_str(),EncodeHexTx(tx));                                
+                                    passed_filters=false;
+                                }
+                            }                    
+                        }
+*/                            
 //                        if(imp->m_TmpEntities->Seek(&entity) < 0)
+                        if(passed_filters)
                         {
                             extension.Zero();
                             extension.m_Output=i;

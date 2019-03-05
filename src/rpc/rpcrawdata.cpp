@@ -1,10 +1,12 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "rpc/rpcutils.h"
+#include "filters/multichainfilter.h"
+#include "filters/filter.h"
 
 #include "utils/util.h"
 #include "json/json_spirit_ubjson.h"
@@ -14,11 +16,14 @@
 using namespace std;
 using namespace json_spirit;
 
+void ParseFilterRestrictionsForField(Value param,mc_Script *lpDetailsScript,uint32_t filter_type);
+
 uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_EntityDetails *entity,uint32_t *data_format,int *errorCode,string *strError)
 {
     uint32_t param_type=MC_DATA_API_PARAM_TYPE_NONE;   
     uint32_t this_param_type;  
     bool missing_data=true;
+    bool txfilter=false;
     *data_format=MC_SCR_DATA_FORMAT_UNKNOWN;
     entity->Zero();
     
@@ -47,6 +52,21 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     {
                         this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_UPGRADE;
                     }
+                    if(d.value_.get_str() == "txfilter")
+                    {
+                        if( (param_type == MC_DATA_API_PARAM_TYPE_PUBLISH) ||
+                            (param_type == MC_DATA_API_PARAM_TYPE_APPROVAL) ) 
+                        {
+                            *strError=string("'create' field should preceed 'for'");       
+                            goto exitlbl;
+                        }
+                        this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_FILTER;
+                        txfilter=true;
+                    }
+                    if(d.value_.get_str() == "streamfilter")
+                    {
+                        this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_FILTER;
+                    }
                 }
                 if(this_param_type == MC_DATA_API_PARAM_TYPE_NONE)
                 {
@@ -62,29 +82,39 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                 }
                 if(entity->GetEntityType() != MC_ENT_TYPE_ASSET)
                 {
-                    *strError=string("Asset with this identifier not found");                                                                        
+                    *strError=string("Asset with this identifier not found");                                                           
+                    *errorCode=RPC_ENTITY_NOT_FOUND;
                     goto exitlbl;                        
                 }                
                 this_param_type=MC_DATA_API_PARAM_TYPE_FOLLOWON;                
             }
             if(d.name_ == "for")
             {
-                if(d.value_.type() != null_type && !d.value_.get_str().empty())
+                if(txfilter)
                 {
-                    ParseEntityIdentifier(d.value_,entity, MC_ENT_TYPE_ANY);       
-                }                
-                if(entity->GetEntityType() == MC_ENT_TYPE_STREAM)
-                {
-                    this_param_type=MC_DATA_API_PARAM_TYPE_PUBLISH;                
+                    param_type=MC_DATA_API_PARAM_TYPE_NONE;           
+                    this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_FILTER;
                 }
-                if(entity->GetEntityType() == MC_ENT_TYPE_UPGRADE)
+                else
                 {
-                    this_param_type=MC_DATA_API_PARAM_TYPE_APPROVAL;                
-                }
-                if(this_param_type == MC_DATA_API_PARAM_TYPE_NONE)
-                {
-                    *strError=string("Entity with this identifier not found");                            
-                    goto exitlbl;                        
+                    if(d.value_.type() != null_type && !d.value_.get_str().empty())
+                    {
+                        ParseEntityIdentifier(d.value_,entity, MC_ENT_TYPE_ANY);       
+                        if(entity->GetEntityType() == MC_ENT_TYPE_STREAM)
+                        {
+                            this_param_type=MC_DATA_API_PARAM_TYPE_PUBLISH;                
+                        }
+                        if(entity->GetEntityType() == MC_ENT_TYPE_UPGRADE)
+                        {
+                            this_param_type=MC_DATA_API_PARAM_TYPE_APPROVAL;                
+                        }
+                    }                
+                    if(this_param_type == MC_DATA_API_PARAM_TYPE_NONE)
+                    {
+                        *strError=string("Entity with this identifier not found");                            
+                        *errorCode=RPC_ENTITY_NOT_FOUND;
+                        goto exitlbl;                        
+                    }
                 }
             }
             if( (d.name_ == "text") || (d.name_ == "json")  || (d.name_ == "cache") )
@@ -384,7 +414,8 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
                             {
                                 if(*data_format == MC_SCR_DATA_FORMAT_UNKNOWN)
                                 {
-                                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Unsupported item data type: " + d.name_);                                    
+                                    *errorCode=RPC_NOT_SUPPORTED;
+                                    *strError="Unsupported item data type: " + d.name_;
                                 }                    
                             }
                         }
@@ -711,7 +742,7 @@ CScript RawDataScriptFollowOn(Value *param,mc_EntityDetails *entity,mc_Script *l
     return scriptOpReturn;
 }
 
-bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,string *strError)
+bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,int *errorCode,string *strError)
 {
     *restrict=0;
     *permissions=0;
@@ -747,6 +778,7 @@ bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_
                 if(match == 0)
                 {
                     *strError="Unsupported restriction";
+                    *errorCode=RPC_NOT_SUPPORTED;
                     return false;
                 }
                 start=ptr+1;
@@ -843,7 +875,7 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
                 {
                     *strError=string("open/restrict field can appear only once in the object");                                                                                                        
                 }
-                if(RawDataParseRestrictParameter(d.value_,&restrict,&permissions,strError))
+                if(RawDataParseRestrictParameter(d.value_,&restrict,&permissions,errorCode,strError))
                 {
                     if(restrict & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN)
                     {
@@ -1049,7 +1081,7 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
         {
             if(!missing_startblock)
             {
-                *strError=string("open field can appear only once in the object");                                                                                                        
+                *strError=string("startblock field can appear only once in the object");                                                                                                        
             }
             if(d.value_.type() == int_type)
             {
@@ -1170,6 +1202,170 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
     return scriptOpReturn;
 }
 
+CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError)
+{
+    CScript scriptOpReturn=CScript();
+    bool field_parsed;
+    size_t bytes;
+    const unsigned char *script;
+    string entity_name,filter_code,filter_main_name;
+    uint32_t filter_type=MC_FLT_TYPE_TX;
+
+    bool missing_name=true;
+    bool missing_code=true;
+    bool missing_for=true;
+    
+    lpDetails->Clear();
+    lpDetails->AddElement();                   
+
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();                   
+        
+    BOOST_FOREACH(const Pair& d, param->get_obj()) 
+    {
+        field_parsed=false;
+        if(d.name_ == "name")
+        {
+            if(!missing_name)
+            {
+                *strError=string("open field can appear only once in the object");                                                                                                        
+            }
+            if(d.value_.type() != null_type && !d.value_.get_str().empty())
+            {
+                entity_name=d.value_.get_str();
+                if(entity_name.size())
+                {
+                    if(entity_name.size() > MC_ENT_MAX_NAME_SIZE)
+                    {
+                        *strError=string("Invalid filter name - too long"); 
+                    }
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());
+                }
+            }
+            else
+            {
+                *strError=string("Invalid name");                            
+            }
+            missing_name=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "for")
+        {
+            if(!missing_for)
+            {
+                *strError=string("for field can appear only once in the object");                                                                                                        
+            }
+             
+            ParseFilterRestrictionsForField(d.value_,lpDetailsScript,MC_FLT_TYPE_TX);
+                        
+            script = lpDetailsScript->GetData(0,&bytes);
+
+            if(bytes)
+            {
+                lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_RESTRICTIONS,script,bytes);
+            }
+            
+            missing_for=false;
+            field_parsed=true;
+        }
+        
+        if(d.name_ == "code")
+        {
+            if(!missing_code)
+            {
+                *strError=string("code field can appear only once in the object");                                                                                                        
+            }
+            if(d.value_.type() == str_type)
+            {
+                lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)d.value_.get_str().c_str(),d.value_.get_str().size());                                                        
+            }
+            else
+            {
+                *strError=string("Invalid code field type");                            
+            }
+            filter_code=d.value_.get_str();
+            missing_code=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "create")
+        {
+            if (strcmp(d.value_.get_str().c_str(),"streamfilter") == 0)
+            {
+                filter_type=MC_FLT_TYPE_STREAM;
+            }
+            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_TYPE,(unsigned char*)&filter_type,4);
+            
+            
+            field_parsed=true;
+        }
+        if(!field_parsed)
+        {
+            *strError=strprintf("Invalid field: %s",d.name_.c_str());
+        }
+    }    
+    
+    filter_main_name=MC_FLT_MAIN_NAME_TX;
+    
+    if(strError->size() == 0)
+    {
+        if(filter_type != MC_FLT_TYPE_TX)
+        {
+            filter_main_name=MC_FLT_MAIN_NAME_STREAM;
+            if(!missing_for)
+            {
+                *strError=string("for field is allowed only for tx filters");                                                                                                        
+                *errorCode=RPC_NOT_ALLOWED;                
+            }
+        }
+    }
+    
+    if(strError->size() == 0)
+    {
+
+        if(missing_code)
+        {                    
+            *strError=string("Missing code");                                                                                            
+        }        
+        else
+        {
+            mc_Filter *worker=new mc_Filter;
+            string strFilterError;
+            int err=pFilterEngine->CreateFilter(filter_code.c_str(),filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strFilterError);
+            delete worker;
+            if(err)
+            {
+                *strError=string("Couldn't create filter");                                                                                                        
+                *errorCode=RPC_INTERNAL_ERROR;                
+            }
+            else
+            {      
+                if(strFilterError.size())
+                {
+                    *strError=strprintf("Couldn't compile filter code: %s",strFilterError.c_str());                                                                                                      
+                }
+            }            
+        }
+    }
+    
+    if(strError->size() == 0)
+    {
+        int err;
+        script=lpDetails->GetData(0,&bytes);
+        lpDetailsScript->Clear();
+        err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_FILTER,0,script,bytes);
+        if(err)
+        {
+            *strError=string("Invalid code, too long");                                                            
+        }
+        else
+        {
+            script = lpDetailsScript->GetData(0,&bytes);
+            scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+        }        
+    }
+    
+    return scriptOpReturn;
+}
 
 CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *data_format,mc_Script *lpDetailsScript,vector<uint256>* vChunkHashes,int *errorCode,string *strError)
 {
@@ -1348,6 +1544,7 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
             if(out_options & MC_RFD_OPTION_OFFCHAIN)
             {
                 *strError=string("chunks data type is not allowed with missing options field");                                            
+                *errorCode=RPC_NOT_ALLOWED;
                 goto exitlbl;                
             }
             if(*data_format != MC_SCR_DATA_FORMAT_UNKNOWN)
@@ -1579,6 +1776,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
         if(param_type != MC_DATA_API_PARAM_TYPE_EMPTY_RAW)
         {
             strError=string("Keyword not allowed in this API");       
+            errorCode=RPC_NOT_ALLOWED;
         }
         goto exitlbl;        
     }
@@ -1611,6 +1809,9 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             break;
         case MC_DATA_API_PARAM_TYPE_CREATE_UPGRADE:
             scriptOpReturn=RawDataScriptCreateUpgrade(&param,lpDetails,lpDetailsScript,&errorCode,&strError);
+            break;
+        case MC_DATA_API_PARAM_TYPE_CREATE_FILTER:
+            scriptOpReturn=RawDataScriptCreateFilter(&param,lpDetails,lpDetailsScript,&errorCode,&strError);
             break;
         case MC_DATA_API_PARAM_TYPE_APPROVAL:
             scriptOpReturn=RawDataScriptApprove(&param,&entity,lpDetailsScript,&errorCode,&strError);

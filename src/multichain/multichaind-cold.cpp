@@ -1,6 +1,6 @@
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "version/clientversion.h"
@@ -19,6 +19,7 @@
 #include "multichain/multichain.h"
 #include "chainparams/globals.h"
 static bool fDaemon;
+mc_EnterpriseFeatures* pEF = NULL;
 
 void DebugPrintClose();
 std::string HelpMessage_Cold();
@@ -46,6 +47,19 @@ bool mc_DoesParentDataDirExist()
     if (mapArgs.count("-datadir"))
     {
         boost::filesystem::path path=boost::filesystem::system_complete(mapArgs["-datadir"]);
+        if (!boost::filesystem::is_directory(path)) 
+        {
+            return false;
+        }    
+    }
+    return true;
+}
+
+bool mc_DoesParentLogDirExist()
+{
+    if (mapArgs.count("-logdir"))
+    {
+        boost::filesystem::path path=boost::filesystem::system_complete(mapArgs["-logdir"]);
         if (!boost::filesystem::is_directory(path)) 
         {
             return false;
@@ -99,6 +113,12 @@ bool AppInit(int argc, char* argv[])
     if(!mc_DoesParentDataDirExist())
     {
         fprintf(stderr,"\nError: Data directory %s needs to exist before calling multichaind-cold. Exiting...\n\n",mapArgs["-datadir"].c_str());
+        return false;        
+    }
+        
+    if(!mc_DoesParentLogDirExist())
+    {
+        fprintf(stderr,"\nError: Log directory %s needs to exist before calling multichaind-cold. Exiting...\n\n",mapArgs["-logdir"].c_str());
         return false;        
     }
         
@@ -234,7 +254,7 @@ bool AppInit(int argc, char* argv[])
     {
         char fileName[MC_DCT_DB_MAX_PATH];
         mc_GetFullFileName(mc_gState->m_Params->NetworkName(),"params", ".dat",MC_FOM_RELATIVE_TO_DATADIR,fileName);
-        fprintf(stderr,"ERROR: Parameter set for blockchain %s is not valid.\n\nThe file %s must be copied manually from an existing node.\n\n",
+        fprintf(stderr,"ERROR: Parameter set for blockchain %s is not valid.\n\nThe file %s must be copied manually from an existing node into empty blockchain directory.\n\n",
                 mc_gState->m_Params->NetworkName(),fileName);                        
         delete mc_gState;                
         return false;        

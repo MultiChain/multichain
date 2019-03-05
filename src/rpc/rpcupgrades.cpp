@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 
@@ -70,6 +70,7 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
     vector<CTxDestination> addresses;    
     
     vector<CTxDestination> fromaddresses;        
+    EnsureWalletIsUnlocked();
     
     if(params[0].get_str() != "*")
     {
@@ -167,12 +168,14 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
                     ( -mc_gState->VersionInfo(protocol_version) != mc_gState->GetNumericVersion() ) )
                 {
                     strError=strprintf("Invalid value for protocol version. Valid range: %s\n",mc_SupportedProtocols().c_str());
+                    errorCode=RPC_NOT_ALLOWED;
                     goto exitlbl;
                 }
                 
                 if( protocol_version < mc_gState->MinProtocolDowngradeVersion() )
                 {
                     strError="Invalid protocol version, cannot downgrade to this version";
+                    errorCode=RPC_NOT_ALLOWED;
                     goto exitlbl;
                 }
                 if( mc_gState->m_NetworkParams->ProtocolVersion() >= mc_gState->MinProtocolForbiddenDowngradeVersion() )
@@ -210,6 +213,7 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
                     else
                     {
                         strError="Some upgrade parameters are not supported by the current protocol, please upgrade protocol separately first.";
+                        errorCode=RPC_NOT_SUPPORTED;
                         goto exitlbl;
                     }
 //                    lpDetails->SetParamValue(s.name_.c_str(),s.name_.size(),(unsigned char*)s.value_.get_str().c_str(),s.value_.get_str().size());                                        
@@ -264,7 +268,6 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
     scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;        
     
     
-    EnsureWalletIsUnlocked();
     {
         LOCK (pwalletMain->cs_wallet_send);
 
@@ -280,6 +283,75 @@ exitlbl:
     return wtx.GetHash().GetHex();    
 }
 
+bool ParseStreamFilterApproval(Value param,mc_EntityDetails *stream_entity)
+{
+    bool field_parsed,for_found,approve_found;
+    bool approval=false;
+    
+    if(param.type() == obj_type)
+    {
+        Object objParams = param.get_obj();
+        for_found=false;
+        approve_found=false;
+        BOOST_FOREACH(const Pair& s, objParams) 
+        {
+            field_parsed=false;
+            if(s.name_ == "for")
+            {
+                if(for_found)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"for field can appear only once in the object");                               
+                }
+                if(s.value_.type() == str_type)
+                {
+                    ParseEntityIdentifier(s.value_.get_str(),stream_entity, MC_ENT_TYPE_STREAM);           
+                }
+                else
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"stream identifier should be string");                               
+                }
+                field_parsed=true;
+                for_found=true;
+            }            
+            if(s.name_ == "approve")
+            {
+                if(approve_found)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"for field can appear only once in the object");                               
+                }
+                if(s.value_.type() == bool_type)
+                {
+                    approval=s.value_.get_bool();
+                }
+                else
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"approve should be boolean");                               
+                }       
+                field_parsed=true;
+                approve_found=true;
+            }
+            if(!field_parsed)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid field: %s",s.name_.c_str()));                           
+            }
+        }
+        if(!for_found)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER,"missing stream identifier");                                           
+        }
+        if(!approve_found)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER,"missing approve filed");                                           
+        }
+    }
+    else
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid stream approval, should be object");                                        
+    }        
+    
+    return approval;
+}
+
 Value approvefrom(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 3)
@@ -293,39 +365,97 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
     string entity_identifier;
     entity_identifier=params[1].get_str();
     
-    approval=1;
-    if (params.size() > 2)    
-    {
-        if(!paramtobool(params[2]))
-        {
-            approval=0;
-        }
-    }
-    
     timestamp=mc_TimeNowAsUInt();
 
     mc_EntityDetails entity;
     entity.Zero();
-    ParseEntityIdentifier(entity_identifier,&entity, MC_ENT_TYPE_UPGRADE);           
-
-    if( mc_gState->m_NetworkParams->ProtocolVersion() >= mc_gState->MinProtocolForbiddenDowngradeVersion() )
+    ParseEntityIdentifier(entity_identifier,&entity, MC_ENT_TYPE_ANY);           
+    
+    string entity_nameU; 
+    string entity_nameL; 
+    bool fIsUpgrade=true;
+    bool fIsStreamFilter=false;
+    
+    switch(entity.GetEntityType())
     {
-        if(entity.UpgradeProtocolVersion())
-        {
-            if(entity.UpgradeProtocolVersion() < mc_gState->m_NetworkParams->ProtocolVersion())
+        case MC_ENT_TYPE_UPGRADE:
+            entity_nameU="Upgrade";
+            entity_nameL="upgrade";
+            break;
+        case MC_ENT_TYPE_FILTER:
+            if(mc_gState->m_Features->Filters() == 0)
             {
-                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid protocol version, cannot downgrade from current version");
-            }                    
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
+            }   
+            if(entity.GetFilterType() != MC_FLT_TYPE_TX)
+            {
+                if(mc_gState->m_Features->StreamFilters() == 0)
+                {
+                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Only Tx filters can be approved/disapproved in this protocol version.");        
+                }        
+                if(entity.GetFilterType() == MC_FLT_TYPE_STREAM)
+                {
+                    fIsStreamFilter=true;
+                }
+            }
+            entity_nameU="Filter";
+            entity_nameL="filter";
+            fIsUpgrade=false;
+            break;
+        default:
+            throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Invalid identifier, should be upgrade or filter");                                
+            break;
+    }
+
+    mc_EntityDetails stream_entity;
+    stream_entity.Zero();
+    
+    if(fIsStreamFilter)
+    {
+        if (params.size() <= 2)    
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMS, "Missing stream identifier");                    
+        }        
+        approval=ParseStreamFilterApproval(params[2],&stream_entity);
+    }
+    else
+    {
+        approval=1;
+        if (params.size() > 2)    
+        {
+            if(!paramtobool(params[2]))
+            {
+                approval=0;
+            }
         }
     }
     
-    if(mc_gState->m_Permissions->IsApproved(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,0))
-    {
-        throw JSONRPCError(RPC_NOT_ALLOWED, "Upgrade already approved");                                
-    }
 
+    if(fIsUpgrade)
+    {
+        if( mc_gState->m_NetworkParams->ProtocolVersion() >= mc_gState->MinProtocolForbiddenDowngradeVersion() )
+        {
+            if(entity.UpgradeProtocolVersion())
+            {
+                if(entity.UpgradeProtocolVersion() < mc_gState->m_NetworkParams->ProtocolVersion())
+                {
+                    throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid protocol version, cannot downgrade from current version");
+                }                    
+            }
+        }
+    }
+    
+    if(fIsUpgrade)
+    {
+        if(mc_gState->m_Permissions->IsApproved(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,0))
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Upgrade already approved");                                
+        }
+    }
+    
     vector<CTxDestination> fromaddresses;       
     fromaddresses=ParseAddresses(params[0].get_str(),false,false);
+    EnsureWalletIsUnlocked();
 
     if(fromaddresses.size() != 1)
     {
@@ -335,43 +465,75 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
     {
         throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
     }
-        
+            
     CKeyID *lpKeyID=boost::get<CKeyID> (&fromaddresses[0]);
-    if(lpKeyID != NULL)
+    if(fIsStreamFilter)
     {
-        if(mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)(lpKeyID)) == 0)
+        if(lpKeyID != NULL)
         {
-            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have admin permission");                                                                        
-        }                                                                     
+            if(mc_gState->m_Permissions->CanAdmin(stream_entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
+            {
+                throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have admin permission for specified stream");                                                                        
+            }                                                                     
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Please use raw transactions to approve filters from P2SH addresses");                                                
+        }
     }
     else
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Please use raw transactions to approve upgrades from P2SH addresses");                                                
+        if(lpKeyID != NULL)
+        {
+            if(mc_gState->m_Permissions->CanAdmin(NULL,(unsigned char*)(lpKeyID)) == 0)
+            {
+                throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have admin permission");                                                                        
+            }                                                                     
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Please use raw transactions to approve upgrades from P2SH addresses");                                                
+        }
     }
     
     mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
     lpScript->Clear();
     
-    lpScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);        
-    lpScript->SetApproval(approval, timestamp);
-    
-    size_t elem_size;
-    const unsigned char *elem;
     CScript scriptOpReturn=CScript();
     
-    for(int e=0;e<lpScript->GetNumElements();e++)
+    if(fIsUpgrade)
     {
-        elem = lpScript->GetData(e,&elem_size);
-        scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
-    }    
-    scriptOpReturn << OP_RETURN;
+        lpScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);        
+        lpScript->SetApproval(approval, timestamp);
+        size_t elem_size;
+        const unsigned char *elem;
+
+        for(int e=0;e<lpScript->GetNumElements();e++)
+        {
+            elem = lpScript->GetData(e,&elem_size);
+            scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
+        }    
+        scriptOpReturn << OP_RETURN;
+    }
+    else
+    {
+        if(fIsStreamFilter)
+        {
+            lpScript->SetEntity(stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);                    
+        }
+        lpScript->SetPermission(MC_PTP_FILTER,0,approval ? 4294967295U : 0,timestamp);
+        uint160 filter_address;
+        filter_address=0;
+        memcpy(&filter_address,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+        addresses.push_back(CKeyID(filter_address));
+    }
     
-    LogPrintf("mchn: %s upgrade %s (%s) from address %s\n",(approval != 0) ? "Approving" : "Disapproving",
+    
+    LogPrintf("mchn: %s %s %s (%s) from address %s\n",(approval != 0) ? "Approving" : "Disapproving",entity_nameL.c_str(),
             ((uint256*)entity.GetTxID())->ToString().c_str(),entity.GetName(),CBitcoinAddress(fromaddresses[0]).ToString().c_str());
         
     
     CWalletTx wtx;
-    EnsureWalletIsUnlocked();
     LOCK (pwalletMain->cs_wallet_send);    
 
     SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn, fromaddresses);

@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 
@@ -22,6 +22,7 @@ Value createrawsendfrom(const Array& params, bool fHelp)
     set<CTxDestination> thisFromAddresses;
     
     fromaddresses=ParseAddresses(params[0].get_str(),false,true);
+    EnsureWalletIsUnlocked();
 
     if(fromaddresses.size() != 1)
     {
@@ -110,7 +111,6 @@ Value createrawsendfrom(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Either addresses object or data array should not be empty");                                                        
     }
     
-    EnsureWalletIsUnlocked();
     {
         LOCK (pwalletMain->cs_wallet_send);
         int eErrorCode;
@@ -229,6 +229,7 @@ Value sendfromaddress(const Array& params, bool fHelp)
     }
     
 
+    EnsureWalletIsUnlocked();
     vector<CTxDestination> fromaddresses;        
     
     if(params[0].get_str() != "*")
@@ -269,8 +270,6 @@ Value sendfromaddress(const Array& params, bool fHelp)
     }
 
     
-    EnsureWalletIsUnlocked();
-    LOCK (pwalletMain->cs_wallet_send);
     
     SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(), fromaddresses);
     
@@ -333,6 +332,7 @@ Value sendwithmetadatafrom(const Array& params, bool fHelp)
     
     vector<CTxDestination> fromaddresses;        
     set<CTxDestination> thisFromAddresses;
+    EnsureWalletIsUnlocked();
 
     if(params[0].get_str() != "*")
     {
@@ -390,7 +390,6 @@ Value sendwithmetadatafrom(const Array& params, bool fHelp)
     
 
 
-    EnsureWalletIsUnlocked();
     LOCK (pwalletMain->cs_wallet_send);
     
     SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, scriptOpReturn, fromaddresses);
@@ -585,6 +584,7 @@ Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp)
     
     vector<CTxDestination> fromaddresses;        
     fromaddresses=ParseAddresses(params[0].get_str(),false,false);
+    EnsureWalletIsUnlocked();
     
     if(fromaddresses.size() != 1)
     {
@@ -643,15 +643,6 @@ Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp)
 
     CWalletTx wtx;
     
-
-    
-    EnsureWalletIsUnlocked();
-    LOCK (pwalletMain->cs_wallet_send);
-    
-    SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(), fromaddresses);
-    
-    int vout=-1;
-    
     CScript scriptPubKey = GetScriptForDestination(addresses[0]);
     
     for(int element=0;element < lpScript->GetNumElements();element++)
@@ -666,6 +657,14 @@ Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp)
         else
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
     }
+    
+
+    
+    LOCK (pwalletMain->cs_wallet_send);
+    
+    SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(), fromaddresses);
+    
+    int vout=-1;
     
     CScript::const_iterator pc0 = scriptPubKey.begin();
     
@@ -731,6 +730,7 @@ Value preparelockunspent(const json_spirit::Array& params, bool fHelp)
     uint256 offer_hash;
     bool lock_it=true;
     
+    EnsureWalletIsUnlocked();
     
     if (params[0].type() != obj_type)
     {
@@ -755,18 +755,6 @@ Value preparelockunspent(const json_spirit::Array& params, bool fHelp)
         }        
     }
 
-    CWalletTx wtx;
-    
-
-    vector<CTxDestination> fromaddresses;    
-    
-    EnsureWalletIsUnlocked();
-    LOCK (pwalletMain->cs_wallet_send);
-       
-    SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(), fromaddresses);
-    
-    int vout=-1;
-    
     CScript scriptPubKey = GetScriptForDestination(addresses[0]);
     
     for(int element=0;element < lpScript->GetNumElements();element++)
@@ -782,8 +770,19 @@ Value preparelockunspent(const json_spirit::Array& params, bool fHelp)
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid script");
     }
     
-    CScript::const_iterator pc0 = scriptPubKey.begin();
+    CWalletTx wtx;
     
+
+    vector<CTxDestination> fromaddresses;    
+    
+    LOCK (pwalletMain->cs_wallet_send);
+       
+    SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(), fromaddresses);
+    
+    int vout=-1;
+    
+    
+    CScript::const_iterator pc0 = scriptPubKey.begin();
     for (unsigned int j = 0; j < wtx.vout.size(); j++)
     {
         CTxOut txout=wtx.vout[j];
@@ -887,6 +886,7 @@ Value sendassetfrom(const Array& params, bool fHelp)
     
     lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);
     
+    EnsureWalletIsUnlocked();
     vector<CTxDestination> addresses;    
     addresses.push_back(address.Get());
     
@@ -929,7 +929,6 @@ Value sendassetfrom(const Array& params, bool fHelp)
         }        
     }
 
-    EnsureWalletIsUnlocked();
     LOCK (pwalletMain->cs_wallet_send);
     
     SendMoneyToSeveralAddresses(addresses, nAmount, wtx, lpScript, CScript(),fromaddresses);

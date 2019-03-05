@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "interpreter.h"
@@ -1109,9 +1109,10 @@ bool TransactionSignatureChecker::CheckSig(const vector<unsigned char>& vchSigIn
     {
         if(mc_gState->m_NetworkParams->IsProtocolMultichain())
         {
-            const unsigned char *pubkey_hash=(unsigned char *)Hash160(vchPubKey.begin(),vchPubKey.end()).begin();
-
-            if(mc_gState->m_Permissions->CanSend(NULL,pubkey_hash))
+//            const unsigned char *pubkey_hash=(unsigned char *)Hash160(vchPubKey.begin(),vchPubKey.end()).begin();
+//            if(mc_gState->m_Permissions->CanSend(NULL,pubkey_hash))
+            uint160 hash=Hash160(vchPubKey.begin(),vchPubKey.end());
+            if(mc_gState->m_Permissions->CanSend(NULL,&hash))
             {
                 CheckSendPermission=false;                    
             }                                    

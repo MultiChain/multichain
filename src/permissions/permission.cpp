@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "multichain/multichain.h"
@@ -292,6 +292,7 @@ int mc_Permissions::Zero()
     m_MempoolPermissions=NULL;
     m_MempoolPermissionsToReplay=NULL;
     m_CheckForMempoolFlag=0;
+    m_RollBackPos.Zero();
     
     return MC_ERR_NOERROR;
 }
@@ -327,7 +328,7 @@ int mc_Permissions::Initialize(const char *name,int mode)
      
     m_Ledger->SetName(name);
     m_Database->SetName(name);
-    mc_GetFullFileName(name,"permissions",".log",MC_FOM_RELATIVE_TO_DATADIR,m_LogFileName);
+    mc_GetFullFileName(name,"permissions",".log",MC_FOM_RELATIVE_TO_LOGDIR | MC_FOM_CREATE_DIR,m_LogFileName);
     
     err=m_Database->Open();
     
@@ -720,11 +721,23 @@ uint32_t mc_Permissions::GetPossiblePermissionTypes(const void* entity_details)
     {
         if(entity->GetEntityType())
         {
-            return entity->Permissions();
+            full_type = entity->Permissions();
+            if(entity->GetEntityType() == MC_ENT_TYPE_ASSET)
+            {
+                if(mc_gState->m_Features->FixedIn20005())               
+                {
+                    full_type |= MC_PTP_SEND | MC_PTP_RECEIVE;
+                }
+            }
+            full_type |= GetCustomLowPermissionTypes();
+            full_type |= GetCustomHighPermissionTypes();
+            return full_type;
         }
     }
     
     full_type = MC_PTP_GLOBAL_ALL;
+    full_type |= GetCustomLowPermissionTypes();
+    full_type |= GetCustomHighPermissionTypes();
     
     return full_type;
 }
@@ -755,6 +768,24 @@ uint32_t mc_Permissions::GetPossiblePermissionTypes(uint32_t entity_type)
     return full_type;
 }
 
+uint32_t mc_Permissions::GetCustomLowPermissionTypes()
+{
+    if(mc_gState->m_Features->CustomPermissions())
+    {
+        return MC_PTP_CUSTOM1 | MC_PTP_CUSTOM2 | MC_PTP_CUSTOM3;        
+    }
+    return MC_PTP_NONE;
+}
+
+uint32_t mc_Permissions::GetCustomHighPermissionTypes()
+{
+    if(mc_gState->m_Features->CustomPermissions())
+    {
+        return MC_PTP_CUSTOM4 | MC_PTP_CUSTOM5 | MC_PTP_CUSTOM6;        
+    }
+    return MC_PTP_NONE;    
+}
+
 
 /** Return ORed MC_PTP_ constants by textual value */
 
@@ -770,9 +801,7 @@ uint32_t mc_Permissions::GetPermissionType(const char *str,uint32_t full_type)
     char* start;
     char* ptrEnd;
     char c;
-    
-//    full_type=GetPossiblePermissionTypes(entity_details);
-    
+        
     ptr=(char*)str;
     ptrEnd=ptr+strlen(ptr);
     start=ptr;
@@ -798,8 +827,14 @@ uint32_t mc_Permissions::GetPermissionType(const char *str,uint32_t full_type)
                 if(mc_MemcmpCheckSize(start,"mine",     ptr-start) == 0)perm_type = MC_PTP_MINE;
                 if(mc_MemcmpCheckSize(start,"admin",    ptr-start) == 0)perm_type = MC_PTP_ADMIN;
                 if(mc_MemcmpCheckSize(start,"activate", ptr-start) == 0)perm_type = MC_PTP_ACTIVATE;
-                if(mc_MemcmpCheckSize(start,"create", ptr-start) == 0)perm_type = MC_PTP_CREATE;
-                if(mc_MemcmpCheckSize(start,"write", ptr-start) == 0)perm_type = MC_PTP_WRITE;
+                if(mc_MemcmpCheckSize(start,"create",   ptr-start) == 0)perm_type = MC_PTP_CREATE;
+                if(mc_MemcmpCheckSize(start,"write",    ptr-start) == 0)perm_type = MC_PTP_WRITE;
+                if(mc_MemcmpCheckSize(start,MC_PTN_CUSTOM1,  ptr-start) == 0)perm_type = MC_PTP_CUSTOM1;
+                if(mc_MemcmpCheckSize(start,MC_PTN_CUSTOM2,  ptr-start) == 0)perm_type = MC_PTP_CUSTOM2;
+                if(mc_MemcmpCheckSize(start,MC_PTN_CUSTOM3,  ptr-start) == 0)perm_type = MC_PTP_CUSTOM3;
+                if(mc_MemcmpCheckSize(start,MC_PTN_CUSTOM4,  ptr-start) == 0)perm_type = MC_PTP_CUSTOM4;
+                if(mc_MemcmpCheckSize(start,MC_PTN_CUSTOM5,  ptr-start) == 0)perm_type = MC_PTP_CUSTOM5;
+                if(mc_MemcmpCheckSize(start,MC_PTN_CUSTOM6,  ptr-start) == 0)perm_type = MC_PTP_CUSTOM6;
                 
                 if(perm_type == 0)
                 {
@@ -818,6 +853,84 @@ uint32_t mc_Permissions::GetPermissionType(const char *str,uint32_t full_type)
     }
     
     return  result;
+}
+
+void mc_RollBackPos::Zero()
+{
+    m_Block=-1;
+    m_Offset=0;
+    m_InMempool=0;
+}
+
+
+int mc_RollBackPos::IsOut(int block,int offset)
+{
+    if(block == m_Block)
+    {
+        return (offset > m_Offset) ? 1 : 0;
+    }
+    
+    return (block > m_Block) ? 1 : 0;
+}
+
+int mc_RollBackPos::InBlock()
+{
+    return (m_Block >= 0) ? 1 : 0;
+}
+
+int mc_RollBackPos::InMempool()
+{
+    return ( (m_Block < 0) && (m_InMempool != 0) ) ? 1 : 0;
+}
+
+int mc_RollBackPos::NotApplied()
+{
+    return ( (m_Block < 0) && (m_InMempool == 0) ) ? 1 : 0;
+}
+
+int mc_Permissions::SetRollBackPos(int block,int offset,int inmempool)
+{
+    m_RollBackPos.m_Block=block;
+    m_RollBackPos.m_Offset=offset;
+    m_RollBackPos.m_InMempool=inmempool;
+    
+    return MC_ERR_NOERROR;
+}
+
+void mc_Permissions::ResetRollBackPos()
+{
+    m_RollBackPos.Zero();
+}
+
+/** Rewinds permission sequence to specific position, returns true if mempool should be checked */
+
+int mc_Permissions::RewindToRollBackPos(mc_PermissionLedgerRow *row)
+{
+    if(m_RollBackPos.InBlock() == 0)
+    {
+        return MC_ERR_NOERROR;
+    }
+    
+    if(m_Ledger->Open() <= 0)
+    {
+        LogString("GetPermission: couldn't open ledger");
+        return MC_ERR_DBOPEN_ERROR;
+    }
+    
+    m_Ledger->GetRow(row->m_ThisRow,row);
+    while( (row->m_PrevRow > 0 ) && m_RollBackPos.IsOut(row->m_BlockReceived,row->m_Offset) )
+    {
+        m_Ledger->GetRow(row->m_PrevRow,row);
+    }
+
+    if(m_RollBackPos.IsOut(row->m_BlockReceived,row->m_Offset))
+    {
+        row->Zero();        
+    }
+    
+    m_Ledger->Close();
+    
+    return MC_ERR_NOERROR;
 }
 
 /** Returns permission value and details for key (entity,address,type) */
@@ -902,7 +1015,19 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
             
             m_Ledger->Close();
         }        
-               
+    
+        if(ptr)
+        {
+            if(RewindToRollBackPos(&pldRow))
+            {
+                return 0;                
+            }            
+            if(pldRow.m_Type == MC_PTP_NONE)
+            {
+                ptr=NULL;
+            }
+        }
+        
         if(ptr)
         {
             row->m_BlockFrom=pldRow.m_BlockFrom;
@@ -923,18 +1048,21 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
         row->m_FoundInDB=found_in_db;        
  */ 
     }
-    
-    if(checkmempool)
+    if(checkmempool != 0)
     { 
-        mprow=0;
-        while(mprow>=0)
+        if( ( m_RollBackPos.NotApplied() != 0) ||
+            ( (m_RollBackPos.InMempool() != 0) && (type != MC_PTP_FILTER) ) )
         {
-            mprow=m_MemPool->Seek((unsigned char*)&pldRow+m_Ledger->m_KeyOffset);
-            if(mprow>=0)
+            mprow=0;
+            while(mprow>=0)
             {
-                memcpy((unsigned char*)row+m_Ledger->m_KeyOffset,m_MemPool->GetRow(mprow),m_Ledger->m_TotalSize);
-//                row->m_FoundInDB=found_in_db;
-                pldRow.m_PrevRow=row->m_ThisRow;
+                mprow=m_MemPool->Seek((unsigned char*)&pldRow+m_Ledger->m_KeyOffset);
+                if(mprow>=0)
+                {
+                    memcpy((unsigned char*)row+m_Ledger->m_KeyOffset,m_MemPool->GetRow(mprow),m_Ledger->m_TotalSize);
+    //                row->m_FoundInDB=found_in_db;
+                    pldRow.m_PrevRow=row->m_ThisRow;
+                }
             }
         }
     }
@@ -1036,7 +1164,7 @@ int mc_Permissions::IsApprovedInternal(const void* lpUpgrade, int check_current_
 
 /** Returns non-zero value if (entity,address) can connect */
 
-int mc_Permissions::CanConnect(const void* lpEntity,const void* lpAddress)
+int mc_Permissions::CanConnectInternal(const void* lpEntity,const void* lpAddress,int with_implicit)
 {
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
     {
@@ -1057,9 +1185,43 @@ int mc_Permissions::CanConnect(const void* lpEntity,const void* lpAddress)
             
     result=GetPermission(lpEntity,lpAddress,MC_PTP_CONNECT);
     
+    
+    if(with_implicit)
+    {
+        if(result == 0)
+        {
+            result |=  GetPermission(lpEntity,lpAddress,MC_PTP_ADMIN);    
+        }
+
+        if(result == 0)
+        {
+            result |=  GetPermission(lpEntity,lpAddress,MC_PTP_ACTIVATE);    
+        }
+
+        if(result == 0)
+        {
+            result |=  GetPermission(lpEntity,lpAddress,MC_PTP_MINE);    
+        }
+    }
+    
+    if(result)
+    {
+        result = MC_PTP_CONNECT; 
+    }
+    
     UnLock();
     
     return result;
+}
+
+int mc_Permissions::CanConnect(const void* lpEntity,const void* lpAddress)
+{
+    return CanConnectInternal(lpEntity,lpAddress,1);
+}
+
+int mc_Permissions::CanConnectForVerify(const void* lpEntity,const void* lpAddress)
+{
+    return CanConnectInternal(lpEntity,lpAddress,mc_gState->m_Features->ImplicitConnectPermission());
 }
 
 /** Returns non-zero value if (entity,address) can send */
@@ -1219,6 +1381,31 @@ int mc_Permissions::CanWrite(const void* lpEntity,const void* lpAddress)
     return result;
 }
 
+/** Returns non-zero value if filter is approved */
+
+int mc_Permissions::FilterApproved(const void* lpEntity,const void* lpAddress)
+{
+    int result;
+
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    
+    Lock(0);
+    
+    result = GetPermission(lpEntity,lpAddress,MC_PTP_FILTER);    
+    
+    if(result)
+    {
+        result = MC_PTP_FILTER; 
+    }
+    
+    UnLock();
+    
+    return result;
+}
+
 /** Returns non-zero value if (entity,address) can write */
 
 int mc_Permissions::CanCreate(const void* lpEntity,const void* lpAddress)
@@ -1280,6 +1467,20 @@ int mc_Permissions::CanIssue(const void* lpEntity,const void* lpAddress)
     
     return result;    
 }
+
+int mc_Permissions::CanCustom(const void* lpEntity,const void* lpAddress,uint32_t permission)
+{
+    int result;
+    
+    Lock(0);
+            
+    result=GetPermission(lpEntity,lpAddress,permission);
+    
+    UnLock();
+    
+    return result;        
+}
+
 
 /** Returns 1 if we are still in setup period (NULL entity only) */
 
@@ -2178,6 +2379,7 @@ int mc_Permissions::AdminConsensus(const void* lpEntity,uint32_t type)
             case MC_PTP_ACTIVATE:
             case MC_PTP_ISSUE:
             case MC_PTP_CREATE:
+            case MC_PTP_FILTER:
                 if(IsSetupPeriod())            
                 {
                     return 1;
@@ -2203,6 +2405,10 @@ int mc_Permissions::AdminConsensus(const void* lpEntity,uint32_t type)
                 if(type == MC_PTP_CREATE)
                 {
                     consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensuscreate");
+                }
+                if(type == MC_PTP_FILTER)
+                {
+                    consensus=mc_gState->m_NetworkParams->GetInt64Param("adminconsensustxfilter");
                 }
 
                 if(consensus==0)
@@ -2945,10 +3151,14 @@ void mc_Permissions::FreePermissionList(mc_Buffer *permissions)
 
 int mc_Permissions::IsActivateEnough(uint32_t type)
 {
-    if(type & ( MC_PTP_ADMIN | MC_PTP_ISSUE | MC_PTP_MINE | MC_PTP_ACTIVATE | MC_PTP_CREATE))
+    if(type & ( MC_PTP_ADMIN | MC_PTP_ISSUE | MC_PTP_MINE | MC_PTP_ACTIVATE | MC_PTP_CREATE | MC_PTP_FILTER))
     {
         return 0;
     }    
+    if(type & GetCustomHighPermissionTypes())
+    {
+        return 0;        
+    }
     return 1;
 }
 
@@ -3040,6 +3250,13 @@ int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAdd
     types[num_types]=MC_PTP_ACTIVATE;num_types++;        
     types[num_types]=MC_PTP_ADMIN;num_types++;        
     types[num_types]=MC_PTP_UPGRADE;num_types++;                        
+    types[num_types]=MC_PTP_FILTER;num_types++;                        
+    types[num_types]=MC_PTP_CUSTOM1;num_types++;                        
+    types[num_types]=MC_PTP_CUSTOM2;num_types++;                        
+    types[num_types]=MC_PTP_CUSTOM3;num_types++;                        
+    types[num_types]=MC_PTP_CUSTOM4;num_types++;                        
+    types[num_types]=MC_PTP_CUSTOM5;num_types++;                        
+    types[num_types]=MC_PTP_CUSTOM6;num_types++;                        
     
     err=MC_ERR_NOERROR;
 

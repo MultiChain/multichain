@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "core/main.h"
@@ -191,10 +191,56 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
                                                 if (it != map_last_upgrade.end())
                                                 {
                                                     take_it=false;
-                                                    if( ( (param.m_Param->m_Type & MC_PRM_TIME) == 0 ) ||
-                                                           ((*vParams)[it->second].m_Block + MIN_BLOCKS_BETWEEN_UPGRADES <= upgrade.m_AppliedBlock) )
+                                                    if(( param.m_Param->m_Type & MC_PRM_DATA_TYPE_MASK) == MC_PRM_BOOLEAN )
                                                     {
-                                                        int64_t old_value=(*vParams)[it->second].m_Value;
+                                                        take_it=true;                                                        
+                                                    }
+                                                    else                                                        
+                                                    {                                                    
+                                                        if( ( (param.m_Param->m_Type & MC_PRM_TIME) == 0 ) ||
+                                                               ((*vParams)[it->second].m_Block + MIN_BLOCKS_BETWEEN_UPGRADES <= upgrade.m_AppliedBlock) )
+                                                        {
+                                                            int64_t old_value=(*vParams)[it->second].m_Value;
+                                                            if(param.m_Value >= old_value)
+                                                            {
+                                                                if(param_value <= 2*old_value)
+                                                                {
+                                                                    take_it=true;
+                                                                }
+                                                            }
+                                                            else
+                                                            {
+                                                                if(old_value <= 2*param_value)
+                                                                {
+                                                                    take_it=true;
+                                                                }                                                            
+                                                            }
+                                                            if(!take_it)
+                                                            {
+                                                                param.m_Skipped =MC_PSK_DOUBLE_RANGE;
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            param.m_Skipped = MC_PSK_FRESH_UPGRADE;
+                                                        }
+                                                    }
+                                                    if(take_it)
+                                                    {
+                                                        it->second=(int)vParams->size();
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    take_it=false;
+                                                    if(( param.m_Param->m_Type & MC_PRM_DATA_TYPE_MASK) == MC_PRM_BOOLEAN )
+                                                    {
+                                                        take_it=true;                                                        
+                                                    }
+                                                    else                                                        
+                                                    {
+                                                        int64_t old_value=mc_gState->m_NetworkParams->GetInt64Param(param.m_Param->m_Name);
+
                                                         if(param.m_Value >= old_value)
                                                         {
                                                             if(param_value <= 2*old_value)
@@ -209,38 +255,6 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
                                                                 take_it=true;
                                                             }                                                            
                                                         }
-                                                        if(!take_it)
-                                                        {
-                                                            param.m_Skipped =MC_PSK_DOUBLE_RANGE;
-                                                        }
-                                                    }
-                                                    else
-                                                    {
-                                                        param.m_Skipped = MC_PSK_FRESH_UPGRADE;
-                                                    }
-                                                    if(take_it)
-                                                    {
-                                                        it->second=(int)vParams->size();
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    take_it=false;
-                                                    int64_t old_value=mc_gState->m_NetworkParams->GetInt64Param(param.m_Param->m_Name);
-                                                    
-                                                    if(param.m_Value >= old_value)
-                                                    {
-                                                        if(param_value <= 2*old_value)
-                                                        {
-                                                            take_it=true;
-                                                        }
-                                                    }
-                                                    else
-                                                    {
-                                                        if(old_value <= 2*param_value)
-                                                        {
-                                                            take_it=true;
-                                                        }                                                            
                                                     }
                                                     if(!take_it)
                                                     {
@@ -450,7 +464,7 @@ void FindSigner(CBlock *block,unsigned char *sig,int *sig_size,uint32_t *hash_ty
     }
 }
     
-bool VerifyBlockSignature(CBlock *block,bool force)
+bool VerifyBlockSignature(CBlock *block,bool force,bool in_sync)
 {
     unsigned char sig[255];
     int sig_size;//,key_size;
@@ -480,6 +494,28 @@ bool VerifyBlockSignature(CBlock *block,bool force)
     FindSigner(block, sig, &sig_size, &hash_type);
     if(block->vSigner[0])
     {
+        if(in_sync)
+        {
+            if(Params().DisallowUnsignedBlockNonce())
+            {
+                if(hash_type == BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE)
+                {
+                    LogPrintf("mchn: Nonce not covered by block signature\n");
+                    block->nSigHashType=BLOCKSIGHASH_INVALID;
+                    return false;                
+                }
+            }
+            else
+            {
+                if(hash_type == BLOCKSIGHASH_NO_SIGNATURE)
+                {
+                    LogPrintf("mchn: Nonce covered by block signature\n");
+                    block->nSigHashType=BLOCKSIGHASH_INVALID;
+                    return false;                
+                }                
+            }
+        }
+        
         switch(hash_type)
         {
             case BLOCKSIGHASH_HEADER:
@@ -488,6 +524,7 @@ bool VerifyBlockSignature(CBlock *block,bool force)
                 hash_to_verify=block->GetHash();
                 break;
             case BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE:
+            case BLOCKSIGHASH_NO_SIGNATURE:
                 
                 original_merkle_root=block->hashMerkleRoot;
                 original_nonce=block->nNonce;
@@ -495,7 +532,10 @@ bool VerifyBlockSignature(CBlock *block,bool force)
                 block->nMerkleTreeType=MERKLETREE_NO_COINBASE_OP_RETURN;
                 savedMerkleTree=block->vMerkleTree;
                 block->hashMerkleRoot=block->BuildMerkleTree();
-                block->nNonce=0;
+                if(hash_type == BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE)
+                {
+                    block->nNonce=0;                    
+                }
                 hash_to_verify=block->GetHash();
                 
                 block->hashMerkleRoot=original_merkle_root;

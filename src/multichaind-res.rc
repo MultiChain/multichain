@@ -18,13 +18,13 @@ BEGIN
         BEGIN
             VALUE "CompanyName",        "Coin Sciences Ltd"
             VALUE "FileDescription",    "multichaind (OSS daemon/client for MultiChain)"
-            VALUE "FileVersion",        VER_FILEVERSION_STR
+            VALUE "FileVersion",        WIN_VERSION_STR
             VALUE "InternalName",       "multichaind"
             VALUE "LegalCopyright",     COPYRIGHT_STR
             VALUE "LegalTrademarks1",   "The software product under this license is provided free of charge. Full terms are shown at: http://www.multichain.com/terms-of-service/."
             VALUE "OriginalFilename",   "multichaind.exe"
             VALUE "ProductName",        "multichaind"
-            VALUE "ProductVersion",     VER_PRODUCTVERSION_STR
+            VALUE "ProductVersion",     WIN_VERSION_STR
         END
     END
 

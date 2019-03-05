@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef MULTICHAINPARAMS_H
@@ -68,6 +68,7 @@ extern int64_t MCP_FIRST_BLOCK_REWARD;
 extern int MCP_TARGET_BLOCK_TIME;
 extern int MAX_CHUNK_SIZE; 
 extern int MAX_CHUNK_COUNT; 
+extern int MAX_NBITS_FOR_SIGNED_NONCE; 
 extern int MCP_ANYONE_CAN_ADMIN;
 extern int MCP_ANYONE_CAN_MINE;
 extern int MCP_ANYONE_CAN_CONNECT;

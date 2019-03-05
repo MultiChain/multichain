@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "multichain/multichain.h"
@@ -245,11 +245,25 @@ void __US_FlushFileWithMode(int FileHan,uint32_t use_data_sync)
     }
 }
 
+int __US_LockFile(int FileHan)
+{
+    return flock(FileHan,LOCK_EX);
+}
+
+int __US_UnLockFile(int FileHan)
+{
+    return flock(FileHan,LOCK_UN);
+}
+
 int __US_DeleteFile(const char *file_name)
 {
     return unlink(file_name);
 }
 
+int __US_GetPID()
+{
+    return getpid();
+}
 #else
 
 #include "windows.h"
@@ -331,10 +345,39 @@ void __US_FlushFileWithMode(int FileHan,uint32_t use_data_sync)
     FlushFileBuffers(hFile);
 }
 
+int __US_LockFile(int FileHan)
+{
+    HANDLE hFile = (HANDLE)_get_osfhandle(FileHan);
+    OVERLAPPED overlapvar = { 0 };
+
+    if(LockFileEx(hFile, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
+                                0, MAXDWORD, MAXDWORD, &overlapvar))
+    {
+        return 0;
+    }        
+    return -1;
+}
+
+int __US_UnLockFile(int FileHan)
+{
+    HANDLE hFile = (HANDLE)_get_osfhandle(FileHan);
+    OVERLAPPED overlapvar = { 0 };
+
+    if(UnlockFileEx(hFile, 0, MAXDWORD, MAXDWORD, &overlapvar))
+    {
+        return 0;
+    }        
+    return -1;
+}
+
 int __US_DeleteFile(const char *file_name)
 {
     return (int)DeleteFile(file_name);
 }
 
+int __US_GetPID()
+{
+    return (int)GetCurrentProcessId();
+}
 
 #endif

@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "chainparams/chainparams.h"
@@ -207,6 +207,7 @@ public:
         fMineBlocksOnDemand = false;
         fSkipProofOfWorkCheck = false;
         fTestnetToBeDeprecatedFieldRPC = false;
+        fDisallowUnsignedBlockNonce = false;
     }
 
     const Checkpoints::CCheckpointData& Checkpoints() const 
@@ -551,6 +552,17 @@ public:
         if(mc_gState->m_Features->FixedIn1000920001())
         {
             fAllowMinDifficultyBlocks = (mc_gState->m_NetworkParams->GetInt64Param("allowmindifficultyblocks") != 0);            
+        }
+        fDisallowUnsignedBlockNonce=false;
+        if(mc_gState->m_Features->NonceInMinerSignature())
+        {
+            if(nTargetTimespan <= 0)
+            {
+                if(mc_gState->m_NetworkParams->GetInt64Param("powminimumbits") <= MAX_NBITS_FOR_SIGNED_NONCE)
+                {
+                    fDisallowUnsignedBlockNonce=true;
+                }
+            }
         }
     }
     

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef MULTICHAIN_PERMISSION_H
@@ -15,16 +15,31 @@
 #define MC_PTP_ISSUE            0x00000010
 #define MC_PTP_CREATE           0x00000020
 #define MC_PTP_MINE             0x00000100
+#define MC_PTP_CUSTOM1          0x00000200
+#define MC_PTP_CUSTOM2          0x00000400
+#define MC_PTP_CUSTOM3          0x00000800
 #define MC_PTP_ADMIN            0x00001000
 #define MC_PTP_ACTIVATE         0x00002000
 #define MC_PTP_UPGRADE          0x00010000
+#define MC_PTP_CUSTOM4          0x00020000
+#define MC_PTP_CUSTOM5          0x00040000
+#define MC_PTP_CUSTOM6          0x00080000
 #define MC_PTP_BLOCK_MINER      0x01000000
 #define MC_PTP_BLOCK_INDEX      0x02000000
+#define MC_PTP_FILTER           0x04000000
 #define MC_PTP_SPECIFIED        0x80000000
 #define MC_PTP_ALL              0x00FFFFFF
 #define MC_PTP_GLOBAL_ALL       0x00003137
+#define MC_PTP_CUSTOM_ALL       0x000E0E00
 
 #define MC_PTP_CACHED_SCRIPT_REQUIRED      0x02000000                           // Special temporary value for coin selection
+
+#define MC_PTN_CUSTOM1          "low1"
+#define MC_PTN_CUSTOM2          "low2"
+#define MC_PTN_CUSTOM3          "low3"
+#define MC_PTN_CUSTOM4          "high1"
+#define MC_PTN_CUSTOM5          "high2"
+#define MC_PTN_CUSTOM6          "high3"
 
 
 #define MC_PFL_NONE             0x00000000
@@ -222,6 +237,18 @@ typedef struct mc_PermissionDetails
 } mc_PermissionDetails;
 
 
+typedef struct mc_RollBackPos
+{
+    int m_Block;
+    int m_Offset;
+    int m_InMempool;
+    
+    void Zero();
+    int IsOut(int block,int offset);
+    int InBlock();
+    int InMempool();
+    int NotApplied();
+} mc_RollBackPos;
 
 
 typedef struct mc_Permissions
@@ -259,7 +286,7 @@ typedef struct mc_Permissions
     int m_CheckForMempoolFlag;
     mc_Buffer               *m_MempoolPermissions;
     mc_Buffer               *m_MempoolPermissionsToReplay;    
-    
+    mc_RollBackPos m_RollBackPos;
     
     void *m_Semaphore;
     uint64_t m_LockedBy;
@@ -291,12 +318,17 @@ typedef struct mc_Permissions
     int SetCheckPoint();
     int RollBackToCheckPoint();
     
+    int SetRollBackPos(int block,int offset,int inmempool);
+    void ResetRollBackPos();
+    int RewindToRollBackPos(mc_PermissionLedgerRow *row);
+    
     uint32_t GetAllPermissions(const void* lpEntity,const void* lpAddress,uint32_t type);
     uint32_t GetPermissionType(const char *str,uint32_t full_type);
-//    uint32_t GetPermissionType(const char *str,int entity_type);
     uint32_t GetPermissionType(const char *str,const void *entity_details);
     uint32_t GetPossiblePermissionTypes(uint32_t entity_type);
     uint32_t GetPossiblePermissionTypes(const void *entity_details);
+    uint32_t GetCustomLowPermissionTypes();
+    uint32_t GetCustomHighPermissionTypes();
     
     int GetAdminCount();
     int GetMinerCount();
@@ -308,6 +340,7 @@ typedef struct mc_Permissions
     int IsApproved(const void* lpUpgrade, int check_current_block);
     
     int CanConnect(const void* lpEntity,const void* lpAddress);
+    int CanConnectForVerify(const void* lpEntity,const void* lpAddress);
     int CanSend(const void* lpEntity,const void* lpAddress);
     int CanReceive(const void* lpEntity,const void* lpAddress);
     int CanWrite(const void* lpEntity,const void* lpAddress);
@@ -316,6 +349,8 @@ typedef struct mc_Permissions
     int CanMine(const void* lpEntity,const void* lpAddress);
     int CanAdmin(const void* lpEntity,const void* lpAddress);    
     int CanActivate(const void* lpEntity,const void* lpAddress);    
+    int CanCustom(const void* lpEntity,const void* lpAddress,uint32_t permission);    
+    int FilterApproved(const void* lpEntity,const void* lpAddress);
     
     int CanMineBlock(const void* lpAddress,uint32_t block);
     
@@ -351,6 +386,7 @@ typedef struct mc_Permissions
     
     int SetPermissionInternal(const void* lpEntity,const void* lpAddress,uint32_t type,const void* lpAdmin,uint32_t from,uint32_t to,uint32_t timestamp,
                                                                                                            uint32_t flags,int update_mempool,int offset);
+    int CanConnectInternal(const void* lpEntity,const void* lpAddress,int with_implicit);
     int CommitInternal(const void* lpMiner,const void* lpHash);
     int StoreBlockInfoInternal(const void* lpMiner,const void* lpHash,int update_counts);    
     int RollBackInternal(int block);

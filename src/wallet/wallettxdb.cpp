@@ -1,10 +1,17 @@
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "multichain/multichain.h"
 #include "wallet/wallettxdb.h"
+#include "community/community.h"
 
 #define MC_TDB_MAX_TXS_FILE_SIZE             0x8000000                          // Maximal data file size, 128MB
+
+int IsCSkipped(int type)
+{
+    return 0;
+}
+
 
 void mc_TxEntityRowExtension::Zero()
 {
@@ -290,6 +297,7 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
     int import_count;
     int last_import;
     char msg[256];
+    char dir_name[MC_DCT_DB_MAX_PATH];
     
     mc_TxEntityStat stat;
     mc_TxImportRow edbImport;
@@ -306,7 +314,9 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
     m_Database=new mc_TxEntityDB;
     
     mc_GetFullFileName(name,"wallet/txs","",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,m_LobFileNamePrefix);
-    mc_GetFullFileName(name,"wallet/txs",".log",MC_FOM_RELATIVE_TO_DATADIR,m_LogFileName);
+    mc_GetFullFileName(name,"wallet","",MC_FOM_RELATIVE_TO_LOGDIR | MC_FOM_CREATE_DIR,dir_name);
+    mc_CreateDir(dir_name);
+    mc_GetFullFileName(name,"wallet/txs",".log",MC_FOM_RELATIVE_TO_LOGDIR | MC_FOM_CREATE_DIR,m_LogFileName);
     
     m_Database->SetName(name);
     
@@ -424,7 +434,18 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
         if(m_Mode == MC_WMD_AUTO)
         {
             m_Mode=MC_WMD_TXS | MC_WMD_ADDRESS_TXS;
+            if(MC_TDB_WALLET_VERSION >= 3)
+            {
+                m_Mode |= MC_WMD_FLAT_DAT_FILE;
+            }
         }
+        
+        m_DBStat.m_WalletVersion = 2;
+        if(m_Mode & MC_WMD_FLAT_DAT_FILE)
+        {
+            m_DBStat.m_WalletVersion=3;
+        }
+        
         m_DBStat.m_InitMode=m_Mode & MC_WMD_MODE_MASK;
         err=m_Database->m_DB->Write((char*)&m_DBStat+m_Database->m_KeyOffset,m_Database->m_KeySize,(char*)&m_DBStat+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
         if(err)
@@ -484,6 +505,30 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
    
     
     return err;
+}
+
+int mc_TxDB::UpdateMode(uint32_t mode)
+{
+    m_Mode |= mode;
+    m_DBStat.m_InitMode=m_Mode & MC_WMD_MODE_MASK;
+    m_DBStat.m_WalletVersion = 2;
+    if(m_Mode & MC_WMD_FLAT_DAT_FILE)
+    {
+        m_DBStat.m_WalletVersion=3;
+    }
+    int err=m_Database->m_DB->Write((char*)&m_DBStat+m_Database->m_KeyOffset,m_Database->m_KeySize,(char*)&m_DBStat+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+    if(err)
+    {
+        return err;
+    }                            
+    
+    err=m_Database->m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
+    if(err)
+    {
+        return err;
+    }
+
+    return MC_ERR_NOERROR;
 }
 
 int mc_TxDB::Destroy()
@@ -993,7 +1038,7 @@ int mc_TxDB::IncrementSubKey(
         memcpy(&erow.m_Entity,entity,sizeof(mc_TxEntity));
         erow.m_Generation=stat->m_Generation;
 
-        
+
         last_pos=0;
         mprow=mempool->Seek(&erow);
         if(mprow >= 0)                                                     
@@ -1023,43 +1068,52 @@ int mc_TxDB::IncrementSubKey(
                 memcpy((char*)&erow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
                 last_pos=erow.m_LastSubKeyPos;
             }
+            if( (IsCSkipped(entity->m_EntityType) == 0) && (pEF->STR_IsIndexSkipped(import,parent_entity,entity) == 0) )
+            {
+                erow.Zero();                                                            
+                memcpy(&erow.m_Entity,entity,sizeof(mc_TxEntity));
+                erow.m_Generation=stat->m_Generation;
+                erow.m_LastSubKeyPos=last_pos+1;        
+                mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);        
+            }
+        }
+
+        if( (IsCSkipped(entity->m_EntityType) == 0) && (pEF->STR_IsIndexSkipped(import,parent_entity,entity) == 0) )
+        {
             erow.Zero();                                                            
             memcpy(&erow.m_Entity,entity,sizeof(mc_TxEntity));
             erow.m_Generation=stat->m_Generation;
+            memcpy(erow.m_TxId,tx_hash,MC_TDB_TXID_SIZE);
             erow.m_LastSubKeyPos=last_pos+1;        
+            erow.m_TempPos=last_pos+1;        
+            erow.m_Block=block;
+            erow.m_Flags=flags;
+            if(extension)
+            {
+                if(extension->m_Count)
+                {
+                    memcpy(erow.m_TxId+MC_TEE_OFFSET_IN_TXID,extension,MC_TEE_SIZE_IN_EXTENSION);                
+                    erow.m_Flags |= MC_TFL_IS_EXTENSION;
+                }
+            }
+        
             mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);        
         }
-
-        erow.Zero();                                                            
-        memcpy(&erow.m_Entity,entity,sizeof(mc_TxEntity));
-        erow.m_Generation=stat->m_Generation;
-        memcpy(erow.m_TxId,tx_hash,MC_TDB_TXID_SIZE);
-        erow.m_LastSubKeyPos=last_pos+1;        
-        erow.m_TempPos=last_pos+1;        
-        erow.m_Block=block;
-        erow.m_Flags=flags;
-        if(extension)
-        {
-            if(extension->m_Count)
-            {
-                memcpy(erow.m_TxId+MC_TEE_OFFSET_IN_TXID,extension,MC_TEE_SIZE_IN_EXTENSION);                
-                erow.m_Flags |= MC_TFL_IS_EXTENSION;
-            }
-        }
-        
-        mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);        
         
         if(last_pos == 0)
         {
-            erow.Zero();
-            memcpy(&erow.m_Entity,&stat->m_Entity,sizeof(mc_TxEntity));
-            erow.m_Generation=stat->m_Generation;
-            memcpy(erow.m_TxId,subkey_hash,MC_TDB_ENTITY_ID_SIZE);
-            erow.m_Block=block;
-            erow.m_Flags=flags;
-            stat->m_LastPos+=1;
-            erow.m_TempPos=stat->m_LastPos;                                     // Will be copied to m_LastPos on commit. m_LastPos=0 to allow Seek() above
-            mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);            
+            if( (IsCSkipped(stat->m_Entity.m_EntityType) == 0) && (pEF->STR_IsIndexSkipped(import,NULL,parent_entity) == 0) )
+            {
+                erow.Zero();
+                memcpy(&erow.m_Entity,&stat->m_Entity,sizeof(mc_TxEntity));
+                erow.m_Generation=stat->m_Generation;
+                memcpy(erow.m_TxId,subkey_hash,MC_TDB_ENTITY_ID_SIZE);
+                erow.m_Block=block;
+                erow.m_Flags=flags;
+                stat->m_LastPos+=1;
+                erow.m_TempPos=stat->m_LastPos;                                     // Will be copied to m_LastPos on commit. m_LastPos=0 to allow Seek() above
+                mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);            
+            }
         }
     }
 
@@ -1068,6 +1122,29 @@ exitlbl:
 
     return err;
 }
+
+int mc_TxDB::SetTxCache(                                                             // Returns tx definition if found, error if not found
+              const unsigned char *hash)
+{
+    m_TxCachedDef.Zero();
+    m_TxCachedFlags=MC_TCF_ERROR;
+    
+    int err=GetTx(&m_TxCachedDef,hash,IsCSkipped(MC_TET_GETDB_ADD_TX));    
+    if(err == MC_ERR_NOERROR)
+    {
+        m_TxCachedFlags=MC_TCF_FOUND;   
+    }
+    else
+    {
+        if (err == MC_ERR_NOT_FOUND)
+        {
+            m_TxCachedFlags=MC_TCF_NOT_FOUND;
+        }
+    }
+    
+    return MC_ERR_NOERROR;
+}
+
 
 /*
  * Adds tx to specific import
@@ -1145,7 +1222,20 @@ int mc_TxDB::AddTx(mc_TxImport *import,
 
     newtx=0;
     ondisk=0;
-    err=GetTx(&txdef,hash);
+//    err=GetTx(&txdef,hash,IsCSkipped(MC_TET_GETDB_ADD_TX));
+    if(m_TxCachedFlags & MC_TCF_FOUND)
+    {
+        memcpy(&txdef,&(m_TxCachedDef),sizeof(mc_TxDefRow));
+    }
+    if(m_TxCachedFlags & MC_TCF_NOT_FOUND)
+    {
+        err=MC_ERR_NOT_FOUND;
+    }
+    if(m_TxCachedFlags & MC_TCF_ERROR)
+    {
+        err=MC_ERR_INTERNAL_ERROR;
+    }
+    
     if(err == MC_ERR_NOT_FOUND)                                                 // Tx is not found, neither on disk, nor in the mempool    
     {
         err=MC_ERR_NOERROR;
@@ -1245,6 +1335,16 @@ int mc_TxDB::AddTx(mc_TxImport *import,
                 isrelevant=1;
             }
         }
+        
+        if(IsCSkipped(((mc_TxEntity*)entities->GetRow(i))->m_EntityType))
+        {
+            isrelevant=0;
+        }
+        if(pEF->STR_IsIndexSkipped(import,NULL,(mc_TxEntity*)entities->GetRow(i)))
+        {
+            isrelevant=0;
+        }
+    
         
         if(isrelevant)
         {
@@ -1443,9 +1543,15 @@ int mc_TxDB::SaveTxFlag(const unsigned char *hash,uint32_t flag,int set_flag)
     return MC_ERR_NOERROR;
 }
 
-
 int mc_TxDB::GetTx(mc_TxDefRow *txdef,
               const unsigned char *hash)
+{
+    return GetTx(txdef,hash,0);
+}
+
+int mc_TxDB::GetTx(mc_TxDefRow *txdef,
+              const unsigned char *hash,
+              int skip_db)
 {
     int err,value_len,mprow; 
     unsigned char *ptr;
@@ -1474,6 +1580,11 @@ int mc_TxDB::GetTx(mc_TxDefRow *txdef,
             txdef->m_Block=-1;
         }
         return MC_ERR_NOERROR;
+    }
+    
+    if(skip_db)
+    {
+        return MC_ERR_NOT_FOUND;
     }
     
     memcpy(txdef->m_TxId,hash, MC_TDB_TXID_SIZE);
@@ -1716,7 +1827,10 @@ int mc_TxDB::Commit(mc_TxImport *import)
         }                            
     }
     
-    m_UnsubscribeMemPoolSize=0;
+    if(imp->m_ImportID == 0)
+    {
+        m_UnsubscribeMemPoolSize=0;
+    }
     FlushDataFile(m_DBStat.m_LastFileID);
 
     err=m_Database->m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
@@ -2020,6 +2134,16 @@ int mc_TxDB::GetList(
     
     txs->Clear();
     
+    if(IsCSkipped(entity->m_EntityType))
+    {
+        return MC_ERR_NOT_SUPPORTED;
+    }
+    
+    if(pEF->STR_IsIndexSkipped(import,NULL,entity))
+    {
+        return MC_ERR_NOT_ALLOWED;
+    }
+    
     int row;
     mc_TxEntityStat *stat;
     
@@ -2140,6 +2264,16 @@ int mc_TxDB::GetList(
     char msg[256];
     
     txs->Clear();
+    
+    if(IsCSkipped(entity->m_EntityType))
+    {
+        return MC_ERR_NOT_SUPPORTED;
+    }
+    
+    if(pEF->STR_IsIndexSkipped(import,NULL,entity))
+    {
+        return MC_ERR_NOT_ALLOWED;
+    }   
     
     mempool=m_MemPools[import-m_Imports];
     
@@ -2371,6 +2505,49 @@ int mc_TxDB::GetListSize(mc_TxEntity *entity,int *confirmed)
     return (int)(stat->m_LastPos);    
 }
 
+int mc_TxDB::TransferSubKey(mc_TxEntityStat *lpChainEntStat,const mc_TxEntityRow& erow,int slot)
+{
+    unsigned char* subkey_ptr;
+    mc_TxEntityRow subkey_erow;
+    unsigned char stream_subkey_hash160[20];
+    int subkey_list_size,transferred_subkeys;
+    int err=MC_ERR_NOERROR;
+    int i,value_len; 
+    
+    transferred_subkeys=0;
+    
+    switch(lpChainEntStat->m_Entity.m_EntityType & MC_TET_TYPE_MASK)
+    {
+        case MC_TET_STREAM_KEY:
+        case MC_TET_STREAM_PUBLISHER:
+            mc_GetCompoundHash160(&stream_subkey_hash160,&(erow.m_Entity.m_EntityID),erow.m_TxId);
+            subkey_erow.Zero();
+            memcpy(subkey_erow.m_Entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+            subkey_erow.m_Entity.m_EntityType=lpChainEntStat->m_Entity.m_EntityType | MC_TET_SUBKEY;
+            subkey_erow.m_Generation=lpChainEntStat->m_Generation;
+            GetListSize(&(subkey_erow.m_Entity),subkey_erow.m_Generation,&subkey_list_size);
+            for(i=0;i<subkey_list_size;i++)                                                                           
+            {
+                subkey_erow.m_Pos=i+1;
+                subkey_erow.m_Generation=lpChainEntStat->m_Generation;
+                subkey_erow.SwapPosBytes();
+                subkey_ptr=(unsigned char*)m_Database->m_DB->Read((char*)&subkey_erow+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err);
+                subkey_erow.m_Generation=(m_Imports+slot)->m_ImportID;         // Change generation when writing to DB
+                err=m_Database->m_DB->Write((char*)&subkey_erow+m_Database->m_KeyOffset,m_Database->m_KeySize,(char*)subkey_ptr,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);                        
+                subkey_erow.SwapPosBytes();
+                transferred_subkeys++;
+                if(transferred_subkeys >= 1000)
+                {
+                    m_Database->m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);                    
+                    transferred_subkeys=0;
+                }
+            }
+            break;
+    }
+    
+    return MC_ERR_NOERROR; 
+}
+
 mc_TxImport *mc_TxDB::StartImport(mc_Buffer *lpEntities,int block,int *err)
 {
     char msg[256];
@@ -2384,8 +2561,6 @@ mc_TxImport *mc_TxDB::StartImport(mc_Buffer *lpEntities,int block,int *err)
     mc_TxEntityRow erow;
     mc_TxEntityRow *lperow;
     unsigned char* ptr;
-    
-    
     Dump("Before StartImport");
     generation=m_DBStat.m_LastGeneration+1;
     slot=0;
@@ -2450,11 +2625,20 @@ mc_TxImport *mc_TxDB::StartImport(mc_Buffer *lpEntities,int block,int *err)
                         erow.m_Generation=(m_Imports+slot)->m_ImportID;         // Change generation when writing to DB
                         *err=m_Database->m_DB->Write((char*)&erow+m_Database->m_KeyOffset,m_Database->m_KeySize,(char*)ptr,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);                        
                         erow.SwapPosBytes();
+                        
+                                
                         count++;
                         if(*err)
                         {
                             goto exitlbl;
                         }                            
+                        
+                        *err=TransferSubKey(lpChainEntStat,erow,slot);
+                        if(*err)
+                        {
+                            goto exitlbl;
+                        }                            
+                        
                         if(((pos+1) % 1000) == 0)
                         {
                             m_Database->m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);                    
@@ -2475,6 +2659,7 @@ mc_TxImport *mc_TxDB::StartImport(mc_Buffer *lpEntities,int block,int *err)
                                 *err=m_Database->m_DB->Write((char*)&erow+m_Database->m_KeyOffset,m_Database->m_KeySize,(char*)&erow+m_Database->m_ValueOffset,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
                                 erow.SwapPosBytes();
                                 count++;
+                                *err=TransferSubKey(lpChainEntStat,erow,slot);
                             }
                         }
                     }      
@@ -2607,6 +2792,8 @@ int mc_TxDB::Unsubscribe(mc_Buffer* lpEntities)
     {
         return MC_ERR_NOERROR;
     }
+    
+    Dump("Before Unsubscribe");
     
     deleted_items=0;
     unsubscribed_entities=0;
@@ -2741,6 +2928,7 @@ int mc_TxDB::Unsubscribe(mc_Buffer* lpEntities)
     
 exitlbl:
     
+    Dump("After Unsubscribe");
     return err;
 }
 
@@ -2841,7 +3029,8 @@ int mc_TxDB::CompleteImport(mc_TxImport *import,uint32_t flags)
         edbImport.m_Generation=lpdel->m_Generation;
         edbImport.m_Block=import->m_Block;
         edbImport.m_Pos=lpdel->m_PosInImport;
-        edbImport.m_LastPos=lpdel->m_LastPos;
+        edbImport.m_LastPos=lpdel->m_LastClearedPos;
+//        edbImport.m_LastPos=lpdel->m_LastPos;
         edbImport.m_LastImportedBlock=lpent->m_LastImportedBlock;//import->m_Block;
         edbImport.m_TimeAdded=lpdel->m_TimeAdded;
         edbImport.m_Flags=lpdel->m_Flags;
@@ -2866,6 +3055,8 @@ int mc_TxDB::CompleteImport(mc_TxImport *import,uint32_t flags)
         {
             goto exitlbl;
         }                    
+        
+        pEF->STR_SetSyncFlag(&(lpent->m_Entity),false);
     }
 
     edbImport.Zero();                                                           // Import block update
@@ -2908,6 +3099,11 @@ int mc_TxDB::CompleteImport(mc_TxImport *import,uint32_t flags)
     m_Imports->m_Block=import->m_Block;
     
                                                                                 // Cleanup below this point, cannot fail
+    for(j=0;j<import->m_Entities->GetCount();j++)
+    {
+        lpent=(mc_TxEntityStat*)import->m_Entities->GetRow(j);
+        pEF->STR_SetSyncFlag(&(lpent->m_Entity),true);        
+    }
     j=0;
     for(i=0;i<m_MemPools[0]->GetCount();i++)
     {
@@ -3098,14 +3294,19 @@ int mc_TxDB::DropImport(mc_TxImport *import)
 {
     char msg[256];
     int err;
-    int j,commit_required;
+    int j,commit_required,value_len,i;
     uint32_t pos;
     mc_TxImportRow edbImport;
     mc_TxEntityStat *lpent;
     mc_TxEntityRow erow;
+    mc_TxEntityRow subkey_erow;
+    unsigned char stream_subkey_hash160[20];
+    unsigned char *ptr;
+    int subkey_list_size,deleted_items;
     
     Dump("Before DropImport");
     
+    deleted_items=0;
     err=MC_ERR_NOERROR;
 
     for(j=0;j<import->m_Entities->GetCount();j++)
@@ -3154,6 +3355,40 @@ int mc_TxDB::DropImport(mc_TxImport *import)
             erow.m_Generation=lpent->m_Generation;
             erow.m_Pos=pos;
             erow.SwapPosBytes();
+            switch(lpent->m_Entity.m_EntityType & MC_TET_TYPE_MASK)
+            {
+                case MC_TET_STREAM_KEY:
+                case MC_TET_STREAM_PUBLISHER:
+                    ptr=(unsigned char*)m_Database->m_DB->Read((char*)&erow+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err);
+                    if(err == MC_ERR_NOERROR)
+                    {
+                        if(ptr)
+                        {
+                            memcpy((char*)&erow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
+                        }
+                        mc_GetCompoundHash160(&stream_subkey_hash160,&(erow.m_Entity.m_EntityID),erow.m_TxId);
+                        subkey_erow.Zero();
+                        memcpy(subkey_erow.m_Entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+                        subkey_erow.m_Entity.m_EntityType=lpent->m_Entity.m_EntityType | MC_TET_SUBKEY;
+                        subkey_erow.m_Generation=erow.m_Generation;
+                        GetListSize(&(subkey_erow.m_Entity),subkey_erow.m_Generation,&subkey_list_size);
+                        for(i=0;i<subkey_list_size;i++)                     // If there are subkey rows in mempool, they will be stored on commit,
+                                                                            // but there should be only few irrelevant rows from  old generation
+                        {
+                            subkey_erow.m_Pos=i+1;
+                            subkey_erow.SwapPosBytes();
+                            m_Database->m_DB->Delete((char*)&subkey_erow+m_Database->m_KeyOffset,m_Database->m_KeySize,MC_OPT_DB_DATABASE_TRANSACTIONAL);        
+                            subkey_erow.SwapPosBytes();
+                            deleted_items++;
+                            if(deleted_items >= 1000)
+                            {
+                                m_Database->m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);                    
+                                deleted_items=0;
+                            }
+                        }
+                    }
+                    break;
+            }
             m_Database->m_DB->Delete((char*)&erow+m_Database->m_KeyOffset,m_Database->m_KeySize,MC_OPT_DB_DATABASE_TRANSACTIONAL);        
             erow.SwapPosBytes();
             commit_required=1;

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #ifndef MULTICHAINPARAMLIST_H
@@ -118,8 +118,12 @@ static const mc_OneMultichainParam MultichainParamArray[] =
                    "Miners must wait <mining-diversity>*<active miners> between blocks."},
     { "adminconsensusupgrade"               , "admin-consensus-upgrade"               , 
                    MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE | MC_PRM_DECIMAL , -1,    500000,          0,   1000000, 0.0, 10008, 0, "-mc-adminconsensusupgrade",
-                   "adminconsensusadmin","",
+                   "adminconsensustxfilter","",
                    "<admin-consensus-upgrade>*<active admins> needed to upgrade the chain."},
+    { "adminconsensustxfilter"               , "admin-consensus-txfilter"               , 
+                   MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE | MC_PRM_DECIMAL , -1,    500000,          0,   1000000, 0.0, 20004, 0, "-mc-adminconsensustxfilter",
+                   "adminconsensusadmin","",
+                   "<admin-consensus-txfilter>*<active admins> needed to approve filter in the chain."},
     { "adminconsensusadmin"               , "admin-consensus-admin"               , 
                    MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE | MC_PRM_DECIMAL , -1,    500000,          0,   1000000, 0.0, 10001, 0, "-mc-adminconsensusadmin",
                    "adminconsensusactivate","",

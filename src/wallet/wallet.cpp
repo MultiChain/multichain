@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "wallet/wallet.h"
@@ -19,6 +19,7 @@ extern mc_WalletTxs* pwalletTxsMain;
 #include "utils/timedata.h"
 #include "utils/util.h"
 #include "utils/utilmoneystr.h"
+#include "community/community.h"
 
 #include <assert.h>
 
@@ -30,6 +31,10 @@ using namespace std;
 /**
  * Settings
  */
+
+//! -maxtxfee default
+static const CAmount DEFAULT_TRANSACTION_MAXFEE = 0.1 * COIN;
+
 CFeeRate payTxFee(DEFAULT_TRANSACTION_FEE);
 CAmount maxTxFee = DEFAULT_TRANSACTION_MAXFEE;
 unsigned int nTxConfirmTarget = 1;
@@ -597,7 +602,7 @@ bool CWallet::EncryptWallet(const SecureString& strWalletPassphrase)
 
         // Need to completely rewrite the wallet file; if we don't, bdb might keep
         // bits of the unencrypted private key in slack space in the database file.
-        CDB::Rewrite(strWalletFile);
+        RewriteWalletDB(strWalletFile);
 
     }
     NotifyStatusChanged(this);
@@ -1356,9 +1361,10 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, bool fOnlySubscri
             lpent=(mc_TxEntityStat*)m_ChainEntities->GetRow(i);
             if(lpent->m_Entity.IsSubscription())
             {
-                if(lpent->m_Entity.m_EntityType & MC_TET_CHAINPOS)
+//                if(lpent->m_Entity.m_EntityType & MC_TET_CHAINPOS)
                 {
-                    if(lpent->m_Flags & MC_EFL_NOT_IN_SYNC)
+                    if( ((lpent->m_Flags & MC_EFL_NOT_IN_SYNC) != 0 ) ||
+                        (pEF->STR_IsOutOfSync(&(lpent->m_Entity)) != 0) )    
                     {
                         vStreamsToImport.push_back(lpent->m_Entity);
                     }
@@ -1442,8 +1448,10 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, bool fOnlySubscri
                     memcpy(entity.m_EntityID,vStreamsToImport[i].m_EntityID,MC_TDB_ENTITY_ID_SIZE);
                     entity.m_EntityType=vStreamsToImport[i].m_EntityType;
                     lpEntities->Add(&entity,NULL);
+/*                    
                     entity.m_EntityType=(vStreamsToImport[i].m_EntityType - MC_TET_CHAINPOS) | MC_TET_TIMERECEIVED;
                     lpEntities->Add(&entity,NULL);
+ */ 
                 }
             }            
         }
@@ -2645,6 +2653,7 @@ bool CWallet::CreateTransaction(CScript scriptPubKey, const CAmount& nValue, CSc
 {
     vector< pair<CScript, CAmount> > vecSend;
     CAmount nAmount=nValue;
+    int eErrorCode1=0; 
     if(nAmount < 0)
     {
         minRelayTxFee = CFeeRate(MIN_RELAY_TX_FEE);    
@@ -2656,7 +2665,8 @@ bool CWallet::CreateTransaction(CScript scriptPubKey, const CAmount& nValue, CSc
     {
         vecSend.push_back(make_pair(scriptOpReturn, 0));
     }
-    return CreateMultiChainTransaction(vecSend, wtxNew, reservekey, nFeeRet, strFailReason, coinControl, addresses, min_conf, min_inputs, max_inputs, lpCoinsToUse, eErrorCode);
+    return CreateMultiChainTransaction(vecSend, wtxNew, reservekey, nFeeRet, strFailReason, coinControl, addresses, min_conf, min_inputs, max_inputs, lpCoinsToUse, 
+    (eErrorCode != 0) ? eErrorCode : & eErrorCode1);
 }
 
 bool CWallet::CreateTransaction(std::vector<CScript> scriptPubKeys, const CAmount& nValue, CScript scriptOpReturn,
@@ -3143,7 +3153,11 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
         if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
         {
 //            pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-chunkflushmode",MC_CDB_FLUSH_MODE_COMMIT));
-            pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-flushsourcechunks",true) ? (MC_CDB_FLUSH_MODE_FILE | MC_CDB_FLUSH_MODE_DATASYNC) : MC_CDB_FLUSH_MODE_NONE);
+            if(pwalletTxsMain->m_ChunkDB->FlushSourceChunks(GetArg("-flushsourcechunks",true) ? (MC_CDB_FLUSH_MODE_FILE | MC_CDB_FLUSH_MODE_DATASYNC) : MC_CDB_FLUSH_MODE_NONE))
+            {
+                reject_reason="Couldn't store offchain items, probably chunk database is corrupted";                                        
+                return false;
+            }
         }
         
         if (!wtxNew.AcceptToMemoryPoolReturnReason(false,true,reject_reason))   // MCHN
@@ -3152,6 +3166,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
             LogPrintf("CommitTransaction() : Error: Transaction not valid: %s\n",reject_reason.c_str());  // MCHN
             return false;
         }
+/*        
         else
         {
             pwalletTxsMain->AddTx(NULL,wtxNew,-1,NULL,-1,0);   
@@ -3160,7 +3175,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
                 SyncWithWallets(wtxNew, NULL);            
             }
         }
-    
+*/    
         for (unsigned int i = 0; i < wtxNew.vin.size(); i++) 
         {
             COutPoint outp=wtxNew.vin[i].prevout;
@@ -3210,7 +3225,7 @@ DBErrors CWallet::LoadWallet(bool& fFirstRunRet)
     DBErrors nLoadWalletRet = CWalletDB(strWalletFile,"cr+").LoadWallet(this);
     if (nLoadWalletRet == DB_NEED_REWRITE)
     {
-        if (CDB::Rewrite(strWalletFile, "\x04pool"))
+        if (RewriteWalletDB(strWalletFile, "\x04pool"))
         {
             LOCK(cs_wallet);
             setKeyPool.clear();
@@ -3237,7 +3252,7 @@ DBErrors CWallet::ZapWalletTx(std::vector<CWalletTx>& vWtx)
     DBErrors nZapWalletTxRet = CWalletDB(strWalletFile,"cr+").ZapWalletTx(this, vWtx);
     if (nZapWalletTxRet == DB_NEED_REWRITE)
     {
-        if (CDB::Rewrite(strWalletFile, "\x04pool"))
+        if (RewriteWalletDB(strWalletFile, "\x04pool"))
         {
             LOCK(cs_wallet);
             setKeyPool.clear();
@@ -3343,7 +3358,6 @@ bool CWallet::TopUpKeyPool(unsigned int kpSize)
 {
     {
         LOCK(cs_wallet);
-
         if (IsLocked())
             return false;
 
@@ -4155,10 +4169,21 @@ bool CMerkleTx::AcceptToMemoryPool(bool fLimitFree, bool fRejectInsaneFee)
 }
 
 /* MCHN START */
-bool CMerkleTx::AcceptToMemoryPoolReturnReason(bool fLimitFree, bool fRejectInsaneFee,string& reject_reason)
+bool CWalletTx::AcceptToMemoryPoolReturnReason(bool fLimitFree, bool fRejectInsaneFee,string& reject_reason)
 {
     CValidationState state;
-    bool result=::AcceptToMemoryPool(mempool, state, *this, fLimitFree, NULL, fRejectInsaneFee,false);
+    
+    if(pMultiChainFilterEngine)
+    {
+        pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetSendTimeout());
+    }
+
+    bool result=::AcceptToMemoryPool(mempool, state, *this, fLimitFree, NULL, fRejectInsaneFee,this);
+
+    if(pMultiChainFilterEngine)
+    {
+        pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetAcceptTimeout());
+    }
 
     if(!result)
     {

@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2014-2016 The Bitcoin Core developers
 // Original code was distributed under the MIT software license.
-// Copyright (c) 2014-2017 Coin Sciences Ltd
+// Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "structs/base58.h"
@@ -233,6 +233,9 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     obj.push_back(Pair("lockadminminerounds",Params().LockAdminMineRounds()));                    
     obj.push_back(Pair("gen",GetBoolArg("-gen", true)));                    
     obj.push_back(Pair("genproclimit",GetArg("-genproclimit", 1)));                    
+    obj.push_back(Pair("lockinlinemetadata",GetBoolArg("-lockinlinemetadata", true)));                    
+    obj.push_back(Pair("acceptfiltertimeout",GetArg("-acceptfiltertimeout", DEFAULT_ACCEPT_FILTER_TIMEOUT)));                    
+    obj.push_back(Pair("sendfiltertimeout",GetArg("-sendfiltertimeout", DEFAULT_SEND_FILTER_TIMEOUT)));                    
 /*
     obj.push_back(Pair("shortoutput",GetBoolArg("-shortoutput",false)));                    
     obj.push_back(Pair("walletdbversion", mc_gState->GetWalletDBVersion()));                
@@ -310,6 +313,11 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
         fFound=true;
     }
+    if(param_name == "lockinlinemetadata")
+    {
+        mapArgs ["-" + param_name]=paramtobool(params[1],false) ? "1" : "0";
+        fFound=true;
+    }
     if(param_name == "mineemptyrounds")
     {
         if( (params[1].type() == real_type) || (params[1].type() == str_type) )
@@ -362,6 +370,8 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
     if( (param_name == "lockadminminerounds") ||
         (param_name == "maxshowndata") ||
         (param_name == "maxqueryscanitems") ||
+        (param_name == "acceptfiltertimeout") ||
+        (param_name == "sendfiltertimeout") ||
         (param_name == "dropmessagestest") )
     {
         if( (params[1].type() == int_type) || (params[1].type() == str_type) )
@@ -378,6 +388,13 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
             if( nValue >= 0 )
             {
                 mapArgs ["-" + param_name]=strprintf("%d", nValue);                                
+                if(param_name == "acceptfiltertimeout")
+                {
+                    if(pMultiChainFilterEngine)
+                    {
+                        pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetAcceptTimeout());
+                    }
+                }
             }
             else
             {
@@ -639,11 +656,13 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                             int n=(int)mc_GetLE(ptr,4);
                             if(n >= 0)
                             {
-                                param_value=((double)n+mc_gState->m_NetworkParams->ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
+//                                param_value=((double)n+mc_gState->m_NetworkParams->ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
+                                param_value=((double)n)/MC_PRM_DECIMAL_GRANULARITY;
                             }
                             else
                             {
-                                param_value=-((double)(-n)+mc_gState->m_NetworkParams->ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;                                        
+//                                param_value=-((double)(-n)+mc_gState->m_NetworkParams->ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;                                        
+                                param_value=-((double)(-n))/MC_PRM_DECIMAL_GRANULARITY;                                        
                             }
                         }
                         else
@@ -654,7 +673,8 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                     case MC_PRM_UINT32:
                         if((mc_gState->m_NetworkParams->m_lpParams+i)->m_Type & MC_PRM_DECIMAL)
                         {
-                            param_value=((double)mc_GetLE(ptr,4)+mc_gState->m_NetworkParams->ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
+//                            param_value=((double)mc_GetLE(ptr,4)+mc_gState->m_NetworkParams->ParamAccuracy())/MC_PRM_DECIMAL_GRANULARITY;
+                            param_value=((double)mc_GetLE(ptr,4))/MC_PRM_DECIMAL_GRANULARITY;
                         }
                         else
                         {
@@ -722,8 +742,36 @@ Value getblockchainparams(const json_spirit::Array& params, bool fHelp)
                 {
                     param_value=(int)MAX_CHUNK_COUNT;
                 }
+                if(strcmp("anyonecanconnect",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(MCP_ANYONE_CAN_CONNECT != 0);
+                }
+                if(strcmp("anyonecansend",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(MCP_ANYONE_CAN_SEND != 0);
+                }
+                if(strcmp("anyonecanreceive",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(MCP_ANYONE_CAN_RECEIVE != 0);
+                }
+                if(strcmp("anyonecanreceiveempty",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(MCP_ANYONE_CAN_RECEIVE_EMPTY != 0);
+                }
+                if(strcmp("anyonecancreate",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(MCP_ANYONE_CAN_CREATE != 0);
+                }
+                if(strcmp("anyonecanissue",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(MCP_ANYONE_CAN_ISSUE != 0);
+                }
+                if(strcmp("anyonecanactivate",(mc_gState->m_NetworkParams->m_lpParams+i)->m_Name) == 0)
+                {
+                    param_value=(MCP_ANYONE_CAN_ACTIVATE != 0);
+                }
             }
-
+    
             if(!hidden)
             {
                 obj.push_back(Pair(param_name,param_value));        
@@ -1104,7 +1152,7 @@ Value createmultisig(const Array& params, bool fHelp)
 Value verifymessage(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 3)                                            // MCHN
-        throw runtime_error("Help message not found\n");
+        mc_ThrowHelpMessage("verifymessage");
 
     string strAddress  = params[0].get_str();
     string strSign     = params[1].get_str();
