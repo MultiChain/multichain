@@ -2635,7 +2635,7 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
     return dirty_count;
 }
 
-void FillContitionsList(vector<mc_QueryCondition>& conditions, Value param)
+void FillConditionsList(vector<mc_QueryCondition>& conditions, Value param)
 {
     bool key_found=false;
     bool publisher_found=false;
@@ -2777,7 +2777,7 @@ Value liststreamqueryitems(const Array& params, bool fHelp)
         verbose=paramtobool(params[2]);
     }
     
-    FillContitionsList(conditions,params[1]);    
+    FillConditionsList(conditions,params[1]);    
 
     if(conditions.size() == 0)
     {
@@ -2846,4 +2846,24 @@ Value liststreamqueryitems(const Array& params, bool fHelp)
     }
     
     return retArray;
+}
+
+Value retrievestreamitems(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 2)
+        throw runtime_error("Help message not found\n");
+    
+    pEF->ENT_RPCVerifyEdition();
+    
+    return pEF->STR_RPCRetrieveStreamItems(params);
+}
+
+Value purgestreamitems(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 2)
+        throw runtime_error("Help message not found\n");
+    
+    pEF->ENT_RPCVerifyEdition();
+    
+    return pEF->STR_RPCPurgeStreamItems(params);
 }

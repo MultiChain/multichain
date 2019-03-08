@@ -61,6 +61,17 @@ int mc_EnterpriseFeatures::STR_PutSubscriptions(mc_Buffer *subscriptions)
     return MC_ERR_NOERROR;        
 }
 
+Value mc_EnterpriseFeatures::STR_RPCRetrieveStreamItems(const Array& params)
+{
+    return Value::null;
+}
+
+Value mc_EnterpriseFeatures::STR_RPCPurgeStreamItems(const Array& params)
+{
+    return Value::null;
+}
+
+
 int mc_EnterpriseFeatures::WLT_CreateSubscription(mc_TxEntity *entity,uint32_t retrieve,uint32_t indexes,uint32_t *rescan_mode)
 {
     *rescan_mode=0;
