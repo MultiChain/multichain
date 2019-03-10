@@ -5,6 +5,7 @@
 
 #include "wallet/wallettxs.h"
 #include "utils/core_io.h"
+#include "community/community.h"
 
 #include "json/json_spirit_utils.h"
 #include "json/json_spirit_value.h"
@@ -2373,7 +2374,8 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
 
                     if(imp->FindEntity(&entity) >= 0)    
                     {
-                        if(chunk_hashes)
+                        if( (chunk_hashes != NULL) && 
+                            (pEF->STR_NoRetrieve(&entity) == 0) )
                         {
                             mc_ChunkDBRow chunk_def;
                             mc_TxEntity chunk_entity;
