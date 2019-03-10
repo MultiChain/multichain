@@ -510,7 +510,11 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
                 mode |= MC_WMD_AUTOSUBSCRIBE_STREAMS;
                 mode |= MC_WMD_AUTOSUBSCRIBE_ASSETS;
                 found=true;
-            }                
+            }              
+            if( autosubscribe=="" )
+            {
+                found=true;
+            }
             if(!found)
             {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value");                                                                        
