@@ -388,7 +388,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "                         " + _("(more details and % substitutions online)") + "\n";
 /* MCHN START */    
     strUsage += "  -walletdbversion=1|2   " + _("Specify wallet version, 1 - not scalable, 2 (default) - scalable") + "\n";
-    strUsage += "  -autosubscribe=streams|assets|\"streams,assets\"|\"assets,streams\" " + _("Automatically subscribe to new streams and/or assets") + "\n";
+    strUsage += "  -autosubscribe=streams|assets|\"streams,assets\"|\"assets,streams\"|\"\" " + _("Automatically subscribe to new streams and/or assets") + "\n";
     strUsage += "  -maxshowndata=<n>      " + strprintf(_("The maximum number of bytes to show in the data field of API responses. (default: %u)"), MAX_OP_RETURN_SHOWN) + "\n";
     strUsage += "                         " + _("Pieces of data larger than this will be returned as an object with txid, vout and size fields, for use with the gettxoutdata command.") + "\n";
 /* MCHN END */    
