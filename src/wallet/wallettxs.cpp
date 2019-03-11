@@ -1340,7 +1340,7 @@ int mc_WalletTxs::Unsubscribe(mc_Buffer* lpEntities,bool purge)
                 {
                     for(j=0;j<lpEntities->GetCount();j++)                                       
                     {
-                        m_ChunkDB->RemoveEntity((mc_TxEntity*)lpEntities->GetRow(j));
+                        m_ChunkDB->RemoveEntity((mc_TxEntity*)lpEntities->GetRow(j),NULL,NULL);
                     }
                 }
             }

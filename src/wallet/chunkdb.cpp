@@ -534,7 +534,7 @@ int mc_ChunkDB::SourceChunksRecovery()
     return err;
 }
 
-int mc_ChunkDB::RemoveEntityInternal(mc_TxEntity *entity)                          
+int mc_ChunkDB::RemoveEntityInternal(mc_TxEntity *entity,uint32_t *removed_chunks,uint64_t *removed_size)                          
 {
     int err;
     mc_SubscriptionDBRow subscription;
@@ -551,6 +551,15 @@ int mc_ChunkDB::RemoveEntityInternal(mc_TxEntity *entity)
     
     err=MC_ERR_NOERROR;
     sprintf_hex(enthex,entity->m_EntityID,MC_TDB_ENTITY_ID_SIZE);
+    
+    if(removed_chunks)
+    {
+        *removed_chunks=0;
+    }
+    if(removed_size)
+    {
+        *removed_size=0;
+    }
     
     subscription.Zero();
     subscription.m_RecordType=MC_CDB_TYPE_SUBSCRIPTION;
@@ -693,7 +702,17 @@ int mc_ChunkDB::RemoveEntityInternal(mc_TxEntity *entity)
                                             {
                                                 chunk_found=1;
                                                 memcpy(chunk_def.m_Hash,buf+param_value_start,bytes);
+                                                if(removed_chunks)
+                                                {
+                                                    *removed_chunks+=1;
+                                                }
                                             }
+                                        }
+                                        break;
+                                    case MC_ENT_SPRM_CHUNK_SIZE:
+                                        if(removed_size)
+                                        {
+                                            *removed_size+=(uint32_t)mc_GetLE(buf+param_value_start,bytes);                                            
                                         }
                                         break;
                                     case MC_ENT_SPRM_ITEM_COUNT:
@@ -789,12 +808,12 @@ exitlbl:
     return err;
 }
 
-int mc_ChunkDB::RemoveEntity(mc_TxEntity *entity)                          
+int mc_ChunkDB::RemoveEntity(mc_TxEntity *entity,uint32_t *removed_chunks,uint64_t *removed_size)                          
 {
     int err;
     
     Lock();
-    err=RemoveEntityInternal(entity);    
+    err=RemoveEntityInternal(entity,removed_chunks,removed_size);    
     UnLock();    
     
     return err;
