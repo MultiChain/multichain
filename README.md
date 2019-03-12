@@ -142,3 +142,7 @@ Notes
 
 * This will build `multichaind`, `multichain-cli` and `multichain-util` in the `src` directory.
 
+
+FreeBSD Build Notes
+===================
+See the file `README-FreeBSD` for an unsupported FreeBSD 11 compile script.
