@@ -2413,6 +2413,11 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                         // Feeding async chunk retriever here
                                     }
                                 }
+                                else
+                                {
+                                    pEF->STR_RestoreChunkIfNeeded(&chunk_def);
+                                }
+                                
                                 chunk_hashes+=MC_CDB_CHUNK_HASH_SIZE;
                             }
                         }

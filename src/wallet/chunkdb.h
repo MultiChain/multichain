@@ -28,6 +28,7 @@
 #define MC_CDB_FLUSH_MODE_DATASYNC    0x00000100
 
 #define MC_CFL_STORAGE_FLUSHED        0x01000000 
+#define MC_CFL_STORAGE_PURGED         0x02000000 
 
 
 /** File DB Row*/

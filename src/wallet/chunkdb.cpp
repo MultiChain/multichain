@@ -3,6 +3,7 @@
 
 #include "multichain/multichain.h"
 #include "wallet/chunkdb.h"
+#include "community/community.h"
 
 #define MC_CDB_TMP_FLAG_SHOULD_COMMIT           0x00000001
 #define MC_CDB_FILE_PAGE_SIZE                   0x00100000
@@ -756,6 +757,7 @@ int mc_ChunkDB::RemoveEntityInternal(mc_TxEntity *entity,uint32_t *removed_chunk
                     file_offset=file_size;
                 }
             }
+//            pEF->STR_RemoveDataFromFile(FileHan,0,file_size,0);
         }
         
         
@@ -1284,10 +1286,12 @@ int mc_ChunkDB::GetChunkDefInternal(
                             memcpy((char*)chunk_def+m_ValueOffset,ptr,m_ValueSize);        
 //                            ptr=GetChunkInternal(chunk_def,-1,-1,&bytes);
                         }
+/*                        
                         else
                         {
                             chunk_def->m_Pos=on_disk_items;
                         }
+ */ 
                     }
                 }
                 err=MC_ERR_NOT_FOUND;            
