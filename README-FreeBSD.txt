@@ -1,0 +1,63 @@
+# Below are instructions for compiling MultiChain 1.0.7 for FreeBSD 11
+# These are provided by Axel Reinhold (thank you!) and have not been tested by us
+
+#!/bin/sh
+
+# install multichain on FreeBSD-11-amd64
+# all is install under /opt - can be a symlink to /usr/local
+# all is build in /usr/src - build working directory
+
+cd /usr/src
+# install Oracle BDB
+Name=bdb
+Version=18.1.32
+URL="http://www.oracle.com/technology/products/berkeley-db/db/db-$Version.tar.gz"
+srcdir=db-$Version
+tar xzf db-$Version.tar.gz
+cd $srcdir
+cd build_unix
+../dist/configure --prefix=/opt/$Name --docdir=/opt/$Name/info --with-cryptography=no --enable-cxx
+make
+make install
+
+cd /usr/src
+# install boost 1.57 (the only one that works!)
+Name=boost
+Version=1.57.0
+URL="http://www.boost.org/boost_1_57_0.tar.bz2"
+srcdir=${Name}_1_57_0
+tar xjf boost_1_57_0.tar.bz2
+cd $srcdir
+LDFLAGS="-Wl,-rpath,/opt/boost/lib" \
+./bootstrap.sh --prefix=/opt/$Name --with-toolset=clang
+./b2 install
+
+cd /usr/src
+# install multichain 1.0.7
+Name=multichain
+Version=1.0.7
+URL="https://www.multichain.com/version-1
+/multichain-$Version.tar.gz"
+srcdir=$Name-$Version
+tar xzf multichain-$Version.tar.gz
+cd $srcdir
+sed -i .bak 's/DbEnv(0).remove(strPath.c_str(), 0);/DbEnv((u_int32_t)0).remove(strPath.c_str(), 0);/' src/wallet/db.cpp
+for F in define.h utility.cpp; do
+  sed -i .bak 's/MAC_OSX/MAC_OSX2/' src/utils/$F
+done
+ln -s /usr/bin/cc /usr/local/bin/gcc
+export LD_LIBRARY_PATH=/opt/boost/lib
+CFLAGS=-I/opt/bdb/include \
+CXXFLAGS="-DMAC_OSX2 -DHAVE_CXX_STDHEADERS -I/opt/bdb/include -I/opt/boost/include" \
+LDFLAGS="-Wl,-rpath,/opt/bdb/lib -Wl,-rpath,/opt/boost/lib -L/opt/bdb/lib -L/opt/boost/lib" \
+SSL_CFLAGS="-I/usr/include" \
+SSL_LIBS="-L/usr/lib -lssl" \
+CRYPTO_CFLAGS="-I/usr/include" \
+CRYPTO_LIBS="-L/usr/lib -lcrypto" \
+./configure --prefix=/opt/$Name --datarootdir=/opt/$Name --mandir=/opt/$Name/man --disable-nls \
+        --enable-wallet --with-incompatible-bdb --with-boost=/opt/boost
+make
+make install
+rm /usr/local/bin/gcc
+
+
