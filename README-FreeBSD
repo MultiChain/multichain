@@ -1,5 +1,6 @@
-# Below are instructions for compiling MultiChain 1.0.7 for FreeBSD 11
-# These are provided by Axel Reinhold (thank you!) and have not been tested by us
+# This is a shell script for compiling MultiChain 1.0.7 for FreeBSD 11
+# You need to download bdb from Oracle (after registering) and boost 1.57.0 before
+# Code provided by Axel Reinhold (thank you!) and has not been tested by us
 
 #!/bin/sh
 
