@@ -2415,7 +2415,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                 }
                                 else
                                 {
-                                    pEF->STR_RestoreChunkIfNeeded(&chunk_def);
+                                    m_ChunkDB->RestoreChunkIfNeeded(&chunk_def);
                                 }
                                 
                                 chunk_hashes+=MC_CDB_CHUNK_HASH_SIZE;

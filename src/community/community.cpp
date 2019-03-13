@@ -71,11 +71,6 @@ Value mc_EnterpriseFeatures::STR_RPCPurgeStreamItems(const Array& params)
     return Value::null;
 }
 
-int mc_EnterpriseFeatures::STR_RestoreChunkIfNeeded(mc_ChunkDBRow *chunk_def)
-{
-    return MC_ERR_NOERROR;
-}
-
 int mc_EnterpriseFeatures::STR_RemoveDataFromFile(int fHan, uint32_t from, uint32_t size, uint32_t mode)
 {
     return MC_ERR_NOERROR;

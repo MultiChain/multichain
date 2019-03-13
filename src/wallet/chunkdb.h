@@ -223,6 +223,7 @@ typedef struct mc_ChunkDB
                                   uint32_t fileid,
                                   uint32_t flush_mode);
     
+    int RestoreChunkIfNeeded(mc_ChunkDBRow *chunk_def);
     
     int AddToFile(const void *chunk,                  
                           uint32_t size,

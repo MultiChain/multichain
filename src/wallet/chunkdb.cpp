@@ -2148,3 +2148,21 @@ int mc_ChunkDB::Commit(int block,uint32_t flush_mode)
     return err;
 }
 
+int mc_ChunkDB::RestoreChunkIfNeeded(mc_ChunkDBRow *chunk_def)
+{
+    if( (chunk_def->m_StorageFlags & MC_CFL_STORAGE_PURGED) == 0 )
+    {
+        return MC_ERR_NOERROR;
+    }
+    
+    int err=MC_ERR_NOERROR;
+    chunk_def->m_StorageFlags-=MC_CFL_STORAGE_PURGED;
+    
+    chunk_def->SwapPosBytes();
+    err=m_DB->Write((char*)chunk_def+m_KeyOffset,m_KeySize,
+            (char*)chunk_def+m_ValueOffset,m_ValueSize,MC_OPT_DB_DATABASE_DEFAULT);
+    chunk_def->SwapPosBytes();                                        
+
+    return err;
+}
+
