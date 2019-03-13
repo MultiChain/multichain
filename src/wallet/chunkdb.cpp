@@ -703,14 +703,14 @@ int mc_ChunkDB::RemoveEntityInternal(mc_TxEntity *entity,uint32_t *removed_chunk
                                             {
                                                 chunk_found=1;
                                                 memcpy(chunk_def.m_Hash,buf+param_value_start,bytes);
-                                                if(removed_chunks)
-                                                {
-                                                    *removed_chunks+=1;
-                                                }
                                             }
                                         }
                                         break;
                                     case MC_ENT_SPRM_CHUNK_SIZE:
+                                        if(removed_chunks)
+                                        {
+                                            *removed_chunks+=1;
+                                        }
                                         if(removed_size)
                                         {
                                             *removed_size+=(uint32_t)mc_GetLE(buf+param_value_start,bytes);                                            
