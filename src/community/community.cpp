@@ -71,6 +71,12 @@ Value mc_EnterpriseFeatures::STR_RPCPurgeStreamItems(const Array& params)
     return Value::null;
 }
 
+Value mc_EnterpriseFeatures::STR_RPCPurgePublishedItems(const Array& params)
+{
+    return Value::null;
+}
+
+
 int mc_EnterpriseFeatures::STR_RemoveDataFromFile(int fHan, uint32_t from, uint32_t size, uint32_t mode)
 {
     return MC_ERR_NOERROR;

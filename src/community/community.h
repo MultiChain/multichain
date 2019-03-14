@@ -46,6 +46,7 @@ typedef struct mc_EnterpriseFeatures
     int STR_PutSubscriptions(mc_Buffer *subscriptions);
     Value STR_RPCRetrieveStreamItems(const Array& params);
     Value STR_RPCPurgeStreamItems(const Array& params);    
+    Value STR_RPCPurgePublishedItems(const Array& params);
     int STR_RemoveDataFromFile(int fHan, uint32_t from, uint32_t size, uint32_t mode);
     
     int WLT_CreateSubscription(mc_TxEntity *entity,uint32_t retrieve,uint32_t indexes,uint32_t *rescan_mode);

@@ -271,6 +271,7 @@ extern json_spirit::Value unsubscribe(const json_spirit::Array& params, bool fHe
 extern json_spirit::Value trimsubscribe(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value retrievestreamitems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value purgestreamitems(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value purgepublisheditems(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listassettransactions(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getassettransaction(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getstreamitem(const json_spirit::Array& params, bool fHelp);

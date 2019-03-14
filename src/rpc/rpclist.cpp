@@ -259,6 +259,7 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "trimsubscribe",          &trimsubscribe,          false,     false,      true },
     { "wallet",             "retrievestreamitems",    &retrievestreamitems,          false,     false,      true },
     { "wallet",             "purgestreamitems",       &purgestreamitems,          false,     false,      true },
+    { "wallet",             "purgepublisheditems",    &purgepublisheditems,          false,     false,      true },
     { "wallet",             "listassettransactions",  &listassettransactions,         false,     false,      true },
     { "wallet",             "getassettransaction",    &getassettransaction,         false,     false,      true },
     { "wallet",             "getstreamitem",          &getstreamitem,         false,     false,      true },

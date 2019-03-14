@@ -2867,3 +2867,13 @@ Value purgestreamitems(const Array& params, bool fHelp)
     
     return pEF->STR_RPCPurgeStreamItems(params);
 }
+
+Value purgepublisheditems(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error("Help message not found\n");
+    
+    pEF->ENT_RPCVerifyEdition();
+    
+    return pEF->STR_RPCPurgePublishedItems(params);
+}
