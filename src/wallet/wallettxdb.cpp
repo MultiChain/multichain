@@ -2611,7 +2611,9 @@ mc_TxImport *mc_TxDB::StartImport(mc_Buffer *lpEntities,int block,int *err)
             lpChainEntStat=m_Imports->GetEntity(row);
             if( (lpChainEntStat->m_Flags & MC_EFL_NOT_IN_SYNC) == 0 )           // in-sync rows ordered by timereceived should be copied
             {
-                if( (lpChainEntStat->m_Entity.m_EntityType & MC_TET_ORDERMASK) == MC_TET_TIMERECEIVED)
+                if( ((lpChainEntStat->m_Entity.m_EntityType & MC_TET_ORDERMASK) == MC_TET_TIMERECEIVED) && 
+                    (pEF->STR_IsIndexSkipped(NULL,NULL,&(lpChainEntStat->m_Entity)) == 0) && 
+                    (pEF->STR_IsIndexSkipped(m_Imports+slot,NULL,&(lpChainEntStat->m_Entity)) == 0) )
                 {
                     lpEntStat->m_Flags -= MC_EFL_NOT_IN_SYNC;
                     erow.Zero();
@@ -3018,7 +3020,10 @@ int mc_TxDB::CompleteImport(mc_TxImport *import,uint32_t flags)
         {
             if( (lpdel->m_Entity.IsSubscription() != 0) || ( (flags & MC_EFL_NOT_IN_SYNC_AFTER_IMPORT) == 0) )
             {
-                lpdel->m_Flags-=MC_EFL_NOT_IN_SYNC;                
+                if(pEF->STR_IsIndexSkipped(import,NULL,&(lpdel->m_Entity)) == 0)
+                {
+                    lpdel->m_Flags-=MC_EFL_NOT_IN_SYNC;                
+                }
             }
         }
         
