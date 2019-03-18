@@ -88,7 +88,7 @@ DLLEXPORT bool V8Filter_IsRunning(V8Filter_t* filter_);
  */
 DLLEXPORT int V8Filter_Initialize(V8Filter_t* filter_, V8Engine_t* engine_, const char* script_,
                                   const char* functionName_, const char** callbackNames_, size_t nCallbackNames_,
-                                  bool isFilterLimitedMathSet_, bool isFixedJSDateFunctions_, char* strResult_);
+                                  int jsInjectionParams, char* strResult_);
 
 /**
  * Run the filter function in the JS script.
@@ -138,7 +138,7 @@ DLLEXPORT int V8Engine_Initialize(V8Engine_t* engine_, IFilterCallback_t* filter
  */
 DLLEXPORT int V8Engine_CreateFilter(V8Engine_t* engine_, const char* script_, const char* mainName_,
                                     const char** callbackNames_, size_t nCallbackNames_, V8Filter_t* filter_,
-                                    uint32_t jsInjectionParams, char* strResult_);
+                                    int jsInjectionParams, char* strResult_);
 
 /**
  * Run the filter function in the JS script.

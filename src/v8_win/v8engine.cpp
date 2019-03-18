@@ -49,7 +49,7 @@ int V8Engine::Initialize(IFilterCallback *filterCallback, std::string dataDir_, 
 }
 
 int V8Engine::CreateFilter(std::string script, std::string mainName, const std::vector<std::string> &callbackNames,
-                           V8Filter *filter, jsInjectionParams, std::string &strResult)
+                           V8Filter *filter, int jsInjectionParams, std::string &strResult)
 {
     logger->debug("V8Engine::CreateFilter - enter");
     strResult.clear();

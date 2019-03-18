@@ -147,7 +147,7 @@ V8Filter::~V8Filter()
 }
 
 int V8Filter::Initialize(V8Engine *engine, std::string script, std::string functionName,
-                         const std::vector<std::string> &callbackNames, jsInjectionParams,
+                         const std::vector<std::string> &callbackNames, int jsInjectionParams,
                          std::string &strResult)
 {
     logger->debug("V8Filter::Initialize - enter");

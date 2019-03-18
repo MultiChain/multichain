@@ -41,7 +41,7 @@ public:
      * MC_ERR_NOERROR otherwise.
      */
     int Initialize(V8Engine *engine, std::string script, std::string functionName,
-                   const std::vector<std::string> &callbackNames, uint32_t jsInjectionParams, std::string &strResult);
+                   const std::vector<std::string> &callbackNames, int jsInjectionParams, std::string &strResult);
 
     /**
      * Run the filter function in the JS script.

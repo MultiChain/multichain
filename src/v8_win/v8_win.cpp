@@ -79,7 +79,7 @@ bool V8Filter_IsRunning(V8Filter_t *filter_)
 }
 
 int V8Filter_Initialize(V8Filter_t *filter_, V8Engine_t *engine_, const char *script_, const char *functionName_,
-                        const char **callbackNames_, size_t nCallbackNames_, uint32_t jsInjectionParams,
+                        const char **callbackNames_, size_t nCallbackNames_, int jsInjectionParams,
                         char *strResult_)
 {
     auto filter = reinterpret_cast<V8Filter *>(filter_);
@@ -127,7 +127,7 @@ int V8Engine_Initialize(V8Engine_t *engine_, IFilterCallback_t *filterCallback_,
 }
 
 int V8Engine_CreateFilter(V8Engine_t *engine_, const char *script_, const char *mainName_, const char **callbackNames_,
-                          size_t nCallbackNames_, V8Filter_t *filter_, uint32_t jsInjectionParams, char *strResult_)
+                          size_t nCallbackNames_, V8Filter_t *filter_, int jsInjectionParams, char *strResult_)
 {
     auto engine = reinterpret_cast<V8Engine *>(engine_);
     auto filter = reinterpret_cast<V8Filter *>(filter_);
