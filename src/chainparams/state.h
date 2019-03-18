@@ -155,6 +155,7 @@ typedef struct mc_Features
     int ImplicitConnectPermission();
     int LicenseTokens();
     int FixedJSDateFunctions();
+    int DisabledJSDateParse();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo
