@@ -1347,16 +1347,19 @@ void ThreadOpenConnections()
         //
         CAddress addrConnect;
 
+        
         // Only connect out to one peer per network group (/16 for IPv4).
         // Do this here so we don't have to critsect vNodes inside mapAddresses critsect.
         int nOutbound = 0;
+        int nNodes = 0;
         set<vector<unsigned char> > setConnected;
         set<string> setConnectedVerifiedAddresses;
         set<string> setConnectedFromAddresses;
         set<string> setConnectedToAddresses;
         {
             LOCK(cs_vNodes);
-            BOOST_FOREACH(CNode* pnode, vNodes) {
+            nNodes=(int)vNodes.size();
+            BOOST_FOREACH(CNode* pnode, vNodes) {                
                 if (!pnode->fInbound) {
                     setConnected.insert(pnode->addr.GetGroup());
                     nOutbound++;
@@ -1380,11 +1383,13 @@ void ThreadOpenConnections()
 
         int64_t nANow = GetAdjustedTime();
 
+        addrman.SCRecalculate(nANow);
+        
         int nTries = 0;
         while (true)
         {
             // use an nUnkBias between 10 (no outgoing connections) and 90 (8 outgoing connections)
-            CAddress addr = addrman.Select(10 + min(nOutbound,8)*10);
+            CAddress addr = addrman.Select(10 + min(nOutbound,8)*10,nNodes);
 
             // if we selected an invalid address, restart
 /* MCHN START */            
@@ -1392,15 +1397,20 @@ void ThreadOpenConnections()
             {
                 if (!addr.IsValid() || (IsLocal(addr) && (addr.GetPort() == GetListenPort())))
                 {
+                    addrman.SetSC(true,nANow);
                     break;                
                 }
+
                 MilliSleep(100);
             }
             else
             {
 /* MCHN END */            
                 if (!addr.IsValid() || setConnected.count(addr.GetGroup()) || IsLocal(addr))
+                {
+                    addrman.SetSC(true,nANow);
                     break;
+                }
 /* MCHN START */            
             }
 /* MCHN END */            
@@ -1421,7 +1431,9 @@ void ThreadOpenConnections()
             }
             
             if (IsLimited(addr))
+            {
                 continue;
+            }
 
             // only consider very recently tried nodes after 30 failed attempts
 /* MCHN START */            
@@ -1429,7 +1441,9 @@ void ThreadOpenConnections()
             {
 /* MCHN END */            
             if (nANow - addr.nLastTry < 600 && nTries < 30)
+            {
                 continue;
+            }
 /* MCHN START */            
             }
 /* MCHN END */            
@@ -1453,16 +1467,19 @@ void ThreadOpenConnections()
                 
                 if(setConnectedVerifiedAddresses.count(addr.ToStringIPPort()))
                 {
+                    addrman.SetSC(false,nANow);
                     continue;
                 }
                 if(setConnectedToAddresses.count(addr.ToStringIPPort()))
                 {
+                    addrman.SetSC(false,nANow);
                     continue;
                 }
                 if (nANow - addr.nLastTry < 600)
                 {
                     if(setConnectedFromAddresses.count(addr.ToStringIPPort()))
                     {
+                        addrman.SetSC(false,nANow);
                         continue;
                     }
                 }
@@ -1478,6 +1495,7 @@ void ThreadOpenConnections()
         if (addrConnect.IsValid())
         {
             OpenNetworkConnection(addrConnect, &grant);
+            addrman.SetSC(false,nANow);
         }
 /* MCHN END */        
     }
