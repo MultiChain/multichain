@@ -195,7 +195,8 @@ typedef struct mc_ChunkDB
                     const void *entity,
                     const unsigned char *txid,
                     const int vout,
-                    int *mempool_entity_row);
+                    int *mempool_entity_row,
+                    int check_limit);
             
     
     int GetChunkDef(
@@ -204,6 +205,14 @@ typedef struct mc_ChunkDB
                     const void *entity,
                     const unsigned char *txid,
                     const int vout);
+    
+    int GetChunkDefWithLimit(
+                    mc_ChunkDBRow *chunk_def,
+                    const unsigned char *hash,                                  // Chunk hash (before chopping)    
+                    const void *entity,
+                    const unsigned char *txid,
+                    const int vout,
+                    int check_limit);
     
     unsigned char *GetChunkInternal(mc_ChunkDBRow *chunk_def,
                                     int32_t offset,

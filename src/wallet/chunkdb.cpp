@@ -1126,7 +1126,8 @@ int mc_ChunkDB::GetChunkDefInternal(
                         const void *entity,
                         const unsigned char *txid,
                         const int vout,
-                        int *mempool_row)
+                        int *mempool_row,
+                        int check_limit)
 {
     mc_SubscriptionDBRow *subscription;
     int err,value_len,mprow; 
@@ -1259,39 +1260,42 @@ int mc_ChunkDB::GetChunkDefInternal(
             {
 //                ptr=GetChunkInternal(chunk_def,-1,-1,&bytes);
                 total_items=chunk_def->m_ItemCount;
-                while(chunk_def->m_Pos < on_disk_items)
+                if( (check_limit == -1) || ((int)on_disk_items <= check_limit) )
                 {
-                    if( (chunk_def->m_TxIDStart == 0) || (chunk_def->m_TxIDStart == (uint32_t)mc_GetLE((void*)txid,4)))
+                    while(chunk_def->m_Pos < on_disk_items)
                     {
-                        ptr=GetChunkInternal(chunk_def,-1,-1,&bytes);
-                        if(mc_ScriptMatchesTxIDAndVOut(ptr,bytes,txid,vout) == MC_ERR_NOERROR)
+                        if( (chunk_def->m_TxIDStart == 0) || (chunk_def->m_TxIDStart == (uint32_t)mc_GetLE((void*)txid,4)))
                         {
-                            return MC_ERR_NOERROR;
+                            ptr=GetChunkInternal(chunk_def,-1,-1,&bytes);
+                            if(mc_ScriptMatchesTxIDAndVOut(ptr,bytes,txid,vout) == MC_ERR_NOERROR)
+                            {
+                                return MC_ERR_NOERROR;
+                            }
                         }
-                    }
-                    chunk_def->m_Pos+=1;
-                    
-                    if(chunk_def->m_Pos < total_items)
-                    {
-                        chunk_def->SwapPosBytes();
-                        ptr=(unsigned char*)m_DB->Read((char*)chunk_def+m_KeyOffset,m_KeySize,&value_len,0,&err);
-                        chunk_def->SwapPosBytes();
-                        if(err)
+                        chunk_def->m_Pos+=1;
+
+                        if(chunk_def->m_Pos < total_items)
                         {
-                            return err;
+                            chunk_def->SwapPosBytes();
+                            ptr=(unsigned char*)m_DB->Read((char*)chunk_def+m_KeyOffset,m_KeySize,&value_len,0,&err);
+                            chunk_def->SwapPosBytes();
+                            if(err)
+                            {
+                                return err;
+                            }
+
+                            if(ptr)
+                            {
+                                memcpy((char*)chunk_def+m_ValueOffset,ptr,m_ValueSize);        
+    //                            ptr=GetChunkInternal(chunk_def,-1,-1,&bytes);
+                            }
+    /*                        
+                            else
+                            {
+                                chunk_def->m_Pos=on_disk_items;
+                            }
+     */ 
                         }
-                    
-                        if(ptr)
-                        {
-                            memcpy((char*)chunk_def+m_ValueOffset,ptr,m_ValueSize);        
-//                            ptr=GetChunkInternal(chunk_def,-1,-1,&bytes);
-                        }
-/*                        
-                        else
-                        {
-                            chunk_def->m_Pos=on_disk_items;
-                        }
- */ 
                     }
                 }
                 err=MC_ERR_NOT_FOUND;            
@@ -1348,11 +1352,29 @@ int mc_ChunkDB::GetChunkDef(
     int err;
     
     Lock();
-    err=GetChunkDefInternal(chunk_def,hash,entity,txid,vout,NULL);
+    err=GetChunkDefInternal(chunk_def,hash,entity,txid,vout,NULL,-1);
     UnLock();
     
     return err;
 }
+
+int mc_ChunkDB::GetChunkDefWithLimit(
+                        mc_ChunkDBRow *chunk_def,
+                        const unsigned char *hash,  
+                        const void *entity,
+                        const unsigned char *txid,
+                        const int vout,
+                        int check_limit)
+{
+    int err;
+    
+    Lock();
+    err=GetChunkDefInternal(chunk_def,hash,entity,txid,vout,NULL,check_limit);
+    UnLock();
+    
+    return err;
+}
+
 
 int mc_ChunkDB::AddChunkInternal(                                                           
                  const unsigned char *hash,                                     
@@ -1385,7 +1407,7 @@ int mc_ChunkDB::AddChunkInternal(
     
     chunk_def.Zero();
     
-    err=GetChunkDefInternal(&chunk_def,hash,entity,txid,vout,NULL);
+    err=GetChunkDefInternal(&chunk_def,hash,entity,txid,vout,NULL,-1);
     if(err == MC_ERR_NOERROR)
     {
         return MC_ERR_FOUND;
@@ -1421,7 +1443,7 @@ int mc_ChunkDB::AddChunkInternal(
     
     if(txid)
     {
-        err=GetChunkDefInternal(&entity_chunk_def,hash,entity,NULL,-1,&mempool_entity_row);
+        err=GetChunkDefInternal(&entity_chunk_def,hash,entity,NULL,-1,&mempool_entity_row,-1);
         if(err == MC_ERR_NOERROR)
         {
             total_items=entity_chunk_def.m_ItemCount;
@@ -1448,7 +1470,7 @@ int mc_ChunkDB::AddChunkInternal(
 
     if(add_entity_row)
     {
-        err=GetChunkDefInternal(&null_chunk_def,hash,NULL,NULL,-1,&mempool_last_null_row);
+        err=GetChunkDefInternal(&null_chunk_def,hash,NULL,NULL,-1,&mempool_last_null_row,-1);
         if(err == MC_ERR_NOT_FOUND)
         {
             add_null_row=1;
@@ -1655,7 +1677,7 @@ unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
         }
         subscription=(mc_SubscriptionDBRow *)m_Subscriptions->GetRow(subscription_id);
         
-        if(GetChunkDefInternal(&chunk_def_zero,chunk_def->m_Hash,&(subscription->m_Entity),NULL,0,NULL) == MC_ERR_NOERROR)
+        if(GetChunkDefInternal(&chunk_def_zero,chunk_def->m_Hash,&(subscription->m_Entity),NULL,0,NULL,-1) == MC_ERR_NOERROR)
         {
             return GetChunkInternal(&chunk_def_zero,offset,len,bytes);
         }

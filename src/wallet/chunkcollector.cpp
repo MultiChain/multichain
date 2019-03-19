@@ -295,13 +295,14 @@ int mc_ChunkCollector::ReadFromDB(mc_Buffer *mempool,int rows)
             {
                 GetDBRow(&collect_row);
                 collect_row.m_State.m_Status |= MC_CCF_INSERTED;                
-                if(m_ChunkDB->GetChunkDef(&chunk_def,collect_row.m_ChunkDef.m_Hash,&(collect_row.m_ChunkDef.m_Entity),collect_row.m_TxID,collect_row.m_Vout) == MC_ERR_NOERROR)
-                {
-                    collect_row.m_State.m_Status |= MC_CCF_DELETED;
-                }
                 mprow=mempool->Seek(&collect_row);
                 if(mprow < 0)
                 {
+                    if(m_ChunkDB->GetChunkDefWithLimit(&chunk_def,collect_row.m_ChunkDef.m_Hash,&(collect_row.m_ChunkDef.m_Entity),collect_row.m_TxID,collect_row.m_Vout,
+                            MC_CCW_MAX_ITEMS_PER_CHUNKFOR_CHECK) == MC_ERR_NOERROR)
+                    {
+                        collect_row.m_State.m_Status |= MC_CCF_DELETED;
+                    }
                     mempool->Add(&collect_row);
                     row++;
                 }
