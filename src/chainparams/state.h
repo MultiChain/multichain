@@ -156,6 +156,7 @@ typedef struct mc_Features
     int LicenseTokens();
     int FixedJSDateFunctions();
     int DisabledJSDateParse();
+    int FixedLegacyPermissionRestrictionFlag();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo
