@@ -114,8 +114,22 @@ int mc_FilterEngine::CreateFilter(std::string script, std::string main_name, std
     const char **callbackNames = vec2cstrs(callback_names, n_callbackNames);
     auto v8filter = static_cast<V8Filter_t *>(filter->m_Impl);
     char result[RESULT_SIZE];
+    uint32_t jsInjectionParams=0;
+    if(mc_gState->m_Features->FilterLimitedMathSet())
+    {
+        jsInjectionParams |= MC_V8W_JS_INJECTION_LIMITED_MATH_SET;
+    }
+    if(mc_gState->m_Features->FixedJSDateFunctions())
+    {
+        jsInjectionParams |= MC_V8W_JS_INJECTION_FIXED_DATE_FUNCTIONS;
+    }
+    if(mc_gState->m_Features->DisabledJSDateParse())
+    {
+        jsInjectionParams |= MC_V8W_JS_INJECTION_DISABLED_DATE_PARSE;
+    }
+    
     retval = V8Engine_CreateFilter(v8engine, script.c_str(), main_name.c_str(), callbackNames, n_callbackNames,
-                                   v8filter, mc_gState->m_Features->FilterLimitedMathSet(), mc_gState->m_Features->FixedJSDateFunctions(), result);
+                                   v8filter, jsInjectionParams, result);
     delete [] callbackNames;
     if (fDebug)
         LogPrint("v8filter", "v8filter:   retval=%d result=%s\n", retval, result);

@@ -6,6 +6,11 @@
 
 #include "declspec.h"
 
+#define MC_V8W_JS_INJECTION_LIMITED_MATH_SET             0x00000001
+#define MC_V8W_JS_INJECTION_FIXED_DATE_FUNCTIONS         0x00000002
+#define MC_V8W_JS_INJECTION_DISABLED_DATE_PARSE          0x00000004
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -83,7 +88,7 @@ DLLEXPORT bool V8Filter_IsRunning(V8Filter_t* filter_);
  */
 DLLEXPORT int V8Filter_Initialize(V8Filter_t* filter_, V8Engine_t* engine_, const char* script_,
                                   const char* functionName_, const char** callbackNames_, size_t nCallbackNames_,
-                                  bool isFilterLimitedMathSet_, bool isFixedJSDateFunctions_, char* strResult_);
+                                  int jsInjectionParams, char* strResult_);
 
 /**
  * Run the filter function in the JS script.
@@ -127,14 +132,13 @@ DLLEXPORT int V8Engine_Initialize(V8Engine_t* engine_, IFilterCallback_t* filter
  *                                  If empty, register no callback functions.
  * @param nCallbackNames_           The number of callback names in @p callback_names_
  * @param filter_                   The filter object to initialize.
- * @param isFilterLimitedMathSet_   @c true if JS Math functions have to be suppressed.
- * @param isFixedJSDateFunctions_   @c true if limited set of JS Date functions is allowed.
+ * @param jsInjectionParams         @c JC injection params. MC_V8W_JS_INJECTION constants
  * @param strResult_                Reason for failure if unsuccessful.
  * @return                          MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
  */
 DLLEXPORT int V8Engine_CreateFilter(V8Engine_t* engine_, const char* script_, const char* mainName_,
                                     const char** callbackNames_, size_t nCallbackNames_, V8Filter_t* filter_,
-                                    bool isFilterLimitedMathSet_, bool FixedJSDateFunctions_, char* strResult_);
+                                    int jsInjectionParams, char* strResult_);
 
 /**
  * Run the filter function in the JS script.

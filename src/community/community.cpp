@@ -26,7 +26,17 @@ int mc_EnterpriseFeatures::STR_CreateSubscription(mc_TxEntity *entity,const std:
     return MC_ERR_FOUND;        
 }
 
+int mc_EnterpriseFeatures::STR_TrimSubscription(mc_TxEntity *entity,const std::string parameters)
+{
+    return MC_ERR_NOERROR;        
+}
+
 int mc_EnterpriseFeatures::STR_IsIndexSkipped(mc_TxImport *import,mc_TxEntity *parent_entity,mc_TxEntity *entity)
+{
+    return 0;
+}
+
+int mc_EnterpriseFeatures::STR_NoRetrieve(mc_TxEntity *entity)
 {
     return 0;
 }
@@ -50,6 +60,28 @@ int mc_EnterpriseFeatures::STR_PutSubscriptions(mc_Buffer *subscriptions)
 {
     return MC_ERR_NOERROR;        
 }
+
+Value mc_EnterpriseFeatures::STR_RPCRetrieveStreamItems(const Array& params)
+{
+    return Value::null;
+}
+
+Value mc_EnterpriseFeatures::STR_RPCPurgeStreamItems(const Array& params)
+{
+    return Value::null;
+}
+
+Value mc_EnterpriseFeatures::STR_RPCPurgePublishedItems(const Array& params)
+{
+    return Value::null;
+}
+
+
+int mc_EnterpriseFeatures::STR_RemoveDataFromFile(int fHan, uint32_t from, uint32_t size, uint32_t mode)
+{
+    return MC_ERR_NOERROR;
+}
+
 
 int mc_EnterpriseFeatures::WLT_CreateSubscription(mc_TxEntity *entity,uint32_t retrieve,uint32_t indexes,uint32_t *rescan_mode)
 {
@@ -106,6 +138,12 @@ std::string mc_EnterpriseFeatures::ENT_TextConstant(const char* name)
 {
     return "";
 }
+
+void mc_EnterpriseFeatures::ENT_InitRPCHelpMap()
+{
+    
+}
+
 
 void mc_EnterpriseFeatures::LIC_RPCVerifyFeature(uint64_t feature)
 {

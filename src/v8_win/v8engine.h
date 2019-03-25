@@ -49,7 +49,7 @@ public:
      * @return               MC_ERR_INTERNAL_ERROR if the engine failed, MC_ERR_NOERROR otherwise.
      */
     int CreateFilter(std::string script, std::string mainName, const std::vector<std::string> &callbackNames,
-                     V8Filter *filter, bool isFilterLimitedMathSet, bool isFixedJSDateFunctions_, std::string &strResult);
+                     V8Filter *filter, int jsInjectionParams, std::string &strResult);
 
     /**
      * Run the filter function in the JS script.

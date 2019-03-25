@@ -37,11 +37,17 @@ typedef struct mc_EnterpriseFeatures
             uint32_t mode);                                                     // Unused    
     
     int STR_CreateSubscription(mc_TxEntity *entity,const std::string parameters);
+    int STR_TrimSubscription(mc_TxEntity *entity,const std::string parameters);
     int STR_IsIndexSkipped(mc_TxImport *import,mc_TxEntity *parent_entity,mc_TxEntity *entity);
+    int STR_NoRetrieve(mc_TxEntity *entity);
     int STR_IsOutOfSync(mc_TxEntity *entity);
     int STR_SetSyncFlag(mc_TxEntity *entity,bool confirm);
     int STR_GetSubscriptions(mc_Buffer *subscriptions);
     int STR_PutSubscriptions(mc_Buffer *subscriptions);
+    Value STR_RPCRetrieveStreamItems(const Array& params);
+    Value STR_RPCPurgeStreamItems(const Array& params);    
+    Value STR_RPCPurgePublishedItems(const Array& params);
+    int STR_RemoveDataFromFile(int fHan, uint32_t from, uint32_t size, uint32_t mode);
     
     int WLT_CreateSubscription(mc_TxEntity *entity,uint32_t retrieve,uint32_t indexes,uint32_t *rescan_mode);
     int WLT_DeleteSubscription(mc_TxEntity *entity,uint32_t rescan_mode);
@@ -55,6 +61,7 @@ typedef struct mc_EnterpriseFeatures
     int ENT_MinWalletDatVersion();
     void ENT_RPCVerifyEdition();
     std::string ENT_TextConstant(const char* name);
+    void ENT_InitRPCHelpMap();
     
     void LIC_RPCVerifyFeature(uint64_t feature);
     bool LIC_VerifyFeature(uint64_t feature,std::string& reason);

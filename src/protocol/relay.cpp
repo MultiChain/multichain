@@ -163,19 +163,22 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
                 strError="Chunk data hash mismatch";
                 goto exitlbl;                                        
             }
-            chunk_err=pwalletTxsMain->m_ChunkDB->AddChunk(chunk->m_Hash,&(chunk->m_Entity),(unsigned char*)collect_row->m_TxID,collect_row->m_Vout,ptrOut,NULL,sizeOut,0,0);
-            if(chunk_err)
+            if( (collect_row->m_State.m_Status & MC_CCF_DELETED ) == 0 )
             {
-                if(chunk_err != MC_ERR_FOUND)
+                chunk_err=pwalletTxsMain->m_ChunkDB->AddChunk(chunk->m_Hash,&(chunk->m_Entity),(unsigned char*)collect_row->m_TxID,collect_row->m_Vout,ptrOut,NULL,sizeOut,0,0);
+                if(chunk_err)
                 {
-                    strError=strprintf("Internal chunk DB error: %d",chunk_err);
-                    goto exitlbl;                    
+                    if(chunk_err != MC_ERR_FOUND)
+                    {
+                        strError=strprintf("Internal chunk DB error: %d",chunk_err);
+                        goto exitlbl;                    
+                    }
                 }
-            }
-            else
-            {
-                for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Delivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                
-                LogPrint("chunks","Retrieved chunk %s\n",(*(uint256*)(chunk->m_Hash)).ToString().c_str());                
+                else
+                {
+                    for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Delivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                
+                    LogPrint("chunks","Retrieved chunk %s\n",(*(uint256*)(chunk->m_Hash)).ToString().c_str());                
+                }
             }
             collect_row->m_State.m_Status |= MC_CCF_DELETED;
         }        
