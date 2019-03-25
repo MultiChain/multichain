@@ -4,6 +4,8 @@
 #include "multichain/multichain.h"
 #include "wallet/chunkcollector.h"
 
+#define MC_IMPOSSIBLE_NEXT_ATTEMPT 0xFFFFFFFF
+
 void mc_ChunkEntityKey::Zero()
 {
     memset(this,0, sizeof(mc_ChunkEntityKey));    
@@ -169,23 +171,57 @@ void mc_ChunkCollector::GetDBRow(mc_ChunkCollectorRow* collect_row)
 
 int mc_ChunkCollector::DeleteDBRow(mc_ChunkCollectorRow *collect_row)
 {       
+    uint32_t next_attempt;
     SetDBRow(collect_row);
+
+    next_attempt=m_DBRow.m_QueryNextAttempt;
+    if(next_attempt)
+    {
+        m_DBRow.m_QueryNextAttempt=MC_IMPOSSIBLE_NEXT_ATTEMPT;
+        m_DB->Delete((char*)&m_DBRow+m_KeyDBOffset,m_KeyDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);    
+        m_DBRow.m_QueryNextAttempt=next_attempt;
+    }
     return m_DB->Delete((char*)&m_DBRow+m_KeyDBOffset,m_KeyDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);    
 }
 
 int mc_ChunkCollector::InsertDBRow(mc_ChunkCollectorRow *collect_row)
 {
+    uint32_t next_attempt;
+    uint32_t query_attempts;
     collect_row->m_State.m_Status &= MC_CCF_ERROR_MASK;
     SetDBRow(collect_row);
     collect_row->m_State.m_Status |= MC_CCF_INSERTED;    
+
+    next_attempt=m_DBRow.m_QueryNextAttempt;
+    if(next_attempt)
+    {
+        query_attempts=m_DBRow.m_QueryAttempts;
+        m_DBRow.m_QueryNextAttempt=MC_IMPOSSIBLE_NEXT_ATTEMPT;
+        m_DBRow.m_QueryAttempts=next_attempt;
+        m_DB->Write((char*)&m_DBRow+m_KeyDBOffset,m_KeyDBSize,(char*)&m_DBRow+m_ValueDBOffset,m_ValueDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+        m_DBRow.m_QueryNextAttempt=next_attempt;
+        m_DBRow.m_QueryAttempts=query_attempts;
+    }
+
     return m_DB->Write((char*)&m_DBRow+m_KeyDBOffset,m_KeyDBSize,(char*)&m_DBRow+m_ValueDBOffset,m_ValueDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
 }
 
 int mc_ChunkCollector::UpdateDBRow(mc_ChunkCollectorRow *collect_row)
 {
+    uint32_t next_attempt;
+    uint32_t query_attempts;
     int err;    
     collect_row->m_State.m_Status &= MC_CCF_ERROR_MASK;
     SetDBRow(collect_row);
+
+    next_attempt=m_DBRow.m_QueryNextAttempt;
+    if(next_attempt)
+    {
+        m_DBRow.m_QueryNextAttempt=MC_IMPOSSIBLE_NEXT_ATTEMPT;
+        m_DB->Delete((char*)&m_DBRow+m_KeyDBOffset,m_KeyDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);    
+        m_DBRow.m_QueryNextAttempt=next_attempt;
+    }
+
     err=m_DB->Delete((char*)&m_DBRow+m_KeyDBOffset,m_KeyDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);    
     if(err)
     {
@@ -194,6 +230,18 @@ int mc_ChunkCollector::UpdateDBRow(mc_ChunkCollectorRow *collect_row)
     collect_row->m_DBNextAttempt=collect_row->m_State.m_QueryNextAttempt;
     m_DBRow.m_QueryNextAttempt=mc_SwapBytes32(collect_row->m_DBNextAttempt);
     collect_row->m_State.m_Status |= MC_CCF_INSERTED;    
+
+    next_attempt=m_DBRow.m_QueryNextAttempt;
+    if(next_attempt)
+    {
+        query_attempts=m_DBRow.m_QueryAttempts;
+        m_DBRow.m_QueryNextAttempt=MC_IMPOSSIBLE_NEXT_ATTEMPT;
+        m_DBRow.m_QueryAttempts=next_attempt;
+        m_DB->Write((char*)&m_DBRow+m_KeyDBOffset,m_KeyDBSize,(char*)&m_DBRow+m_ValueDBOffset,m_ValueDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+        m_DBRow.m_QueryNextAttempt=next_attempt;
+        m_DBRow.m_QueryAttempts=query_attempts;
+    }
+
     return m_DB->Write((char*)&m_DBRow+m_KeyDBOffset,m_KeyDBSize,(char*)&m_DBRow+m_ValueDBOffset,m_ValueDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
 }
 
@@ -243,17 +291,21 @@ int mc_ChunkCollector::ReadFromDB(mc_Buffer *mempool,int rows)
         if(ptr)
         {
             memcpy((char*)&m_DBRow,ptr,m_TotalDBSize);   
-            GetDBRow(&collect_row);
-            collect_row.m_State.m_Status |= MC_CCF_INSERTED;                
-            if(m_ChunkDB->GetChunkDef(&chunk_def,collect_row.m_ChunkDef.m_Hash,&(collect_row.m_ChunkDef.m_Entity),collect_row.m_TxID,collect_row.m_Vout) == MC_ERR_NOERROR)
+            if(m_DBRow.m_QueryNextAttempt != MC_IMPOSSIBLE_NEXT_ATTEMPT)
             {
-                collect_row.m_State.m_Status |= MC_CCF_DELETED;
-            }
-            mprow=mempool->Seek(&collect_row);
-            if(mprow < 0)
-            {
-                mempool->Add(&collect_row);
-                row++;
+                GetDBRow(&collect_row);
+                collect_row.m_State.m_Status |= MC_CCF_INSERTED;                
+                mprow=mempool->Seek(&collect_row);
+                if(mprow < 0)
+                {
+                    if(m_ChunkDB->GetChunkDefWithLimit(&chunk_def,collect_row.m_ChunkDef.m_Hash,&(collect_row.m_ChunkDef.m_Entity),collect_row.m_TxID,collect_row.m_Vout,
+                            MC_CCW_MAX_ITEMS_PER_CHUNKFOR_CHECK) == MC_ERR_NOERROR)
+                    {
+                        collect_row.m_State.m_Status |= MC_CCF_DELETED;
+                    }
+                    mempool->Add(&collect_row);
+                    row++;
+                }
             }
         }
         else

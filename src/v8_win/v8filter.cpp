@@ -129,6 +129,11 @@ for (var fn of Object.getOwnPropertyNames(Math)) {
 }
 delete Date.now;
 )";
+
+static std::string jsDeleteDateParse = R"(
+delete Date.parse;
+)";
+
 // clang-format on
 
 V8Filter::~V8Filter()
@@ -142,7 +147,7 @@ V8Filter::~V8Filter()
 }
 
 int V8Filter::Initialize(V8Engine *engine, std::string script, std::string functionName,
-                         const std::vector<std::string> &callbackNames, bool isFilterLimitedMathSet, bool isFixedJSDateFunctions,
+                         const std::vector<std::string> &callbackNames, int jsInjectionParams,
                          std::string &strResult)
 {
     logger->debug("V8Filter::Initialize - enter");
@@ -174,13 +179,17 @@ int V8Filter::Initialize(V8Engine *engine, std::string script, std::string funct
     m_context.Reset(isolate, context);
 
     std::string jsPreamble = jsFixture;
-    if (isFixedJSDateFunctions)
+    if(jsInjectionParams & MC_V8W_JS_INJECTION_FIXED_DATE_FUNCTIONS)
     {
         jsPreamble=jsFixtureDateFunctions;
     }
-    if (isFilterLimitedMathSet)
+    if(jsInjectionParams & MC_V8W_JS_INJECTION_LIMITED_MATH_SET)
     {
         jsPreamble += jsLimitMathSet;
+    }
+    if(jsInjectionParams & MC_V8W_JS_INJECTION_DISABLED_DATE_PARSE)
+    {
+        jsPreamble += jsDeleteDateParse;
     }
 
     logger->debug("  Processing preamble");

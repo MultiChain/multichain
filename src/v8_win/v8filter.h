@@ -7,6 +7,11 @@
 #include "json/json_spirit.h"
 #include <v8.h>
 
+#define MC_V8W_JS_INJECTION_LIMITED_MATH_SET             0x00000001
+#define MC_V8W_JS_INJECTION_FIXED_DATE_FUNCTIONS         0x00000002
+#define MC_V8W_JS_INJECTION_DISABLED_DATE_PARSE          0x00000004
+
+
 namespace mc_v8
 {
 class V8Engine;
@@ -36,7 +41,7 @@ public:
      * MC_ERR_NOERROR otherwise.
      */
     int Initialize(V8Engine *engine, std::string script, std::string functionName,
-                   const std::vector<std::string> &callbackNames, bool isFilterLimitedMathSet, bool isFixedJSDateFunctions, std::string &strResult);
+                   const std::vector<std::string> &callbackNames, int jsInjectionParams, std::string &strResult);
 
     /**
      * Run the filter function in the JS script.

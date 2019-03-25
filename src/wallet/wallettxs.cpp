@@ -5,6 +5,7 @@
 
 #include "wallet/wallettxs.h"
 #include "utils/core_io.h"
+#include "community/community.h"
 
 #include "json/json_spirit_utils.h"
 #include "json/json_spirit_value.h"
@@ -1339,7 +1340,7 @@ int mc_WalletTxs::Unsubscribe(mc_Buffer* lpEntities,bool purge)
                 {
                     for(j=0;j<lpEntities->GetCount();j++)                                       
                     {
-                        m_ChunkDB->RemoveEntity((mc_TxEntity*)lpEntities->GetRow(j));
+                        m_ChunkDB->RemoveEntity((mc_TxEntity*)lpEntities->GetRow(j),NULL,NULL);
                     }
                 }
             }
@@ -2373,7 +2374,8 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
 
                     if(imp->FindEntity(&entity) >= 0)    
                     {
-                        if(chunk_hashes)
+                        if( (chunk_hashes != NULL) && 
+                            (pEF->STR_NoRetrieve(&entity) == 0) )
                         {
                             mc_ChunkDBRow chunk_def;
                             mc_TxEntity chunk_entity;
@@ -2411,6 +2413,11 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                         // Feeding async chunk retriever here
                                     }
                                 }
+                                else
+                                {
+                                    m_ChunkDB->RestoreChunkIfNeeded(&chunk_def);
+                                }
+                                
                                 chunk_hashes+=MC_CDB_CHUNK_HASH_SIZE;
                             }
                         }

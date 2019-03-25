@@ -171,6 +171,10 @@ for (var fn of Object.getOwnPropertyNames(Math)) {
 delete Date.now;
 )";
 
+static std::string jsDeleteDateParse = R"(
+delete Date.parse;
+)";
+
 V8Filter::~V8Filter()
 {
     if (m_isRunning)
@@ -215,6 +219,10 @@ int V8Filter::Initialize(V8Engine *engine, std::string script, std::string funct
     if (mc_gState->m_Features->FilterLimitedMathSet())
     {
         jsPreamble += jsLimitMathSet;
+    }
+    if (mc_gState->m_Features->DisabledJSDateParse())
+    {
+        jsPreamble += jsDeleteDateParse;
     }
 
     int status = this->CompileAndLoadScript(jsPreamble, "", "preamble", strResult);

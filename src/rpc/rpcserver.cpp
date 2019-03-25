@@ -251,7 +251,10 @@ string CRPCTable::help(string strCommand) const
             }
             catch (std::exception& e)
             {
-                strHelp = string(e.what());
+                if(strCommand != "")
+                {
+                    strHelp = string(e.what());
+                }
             }
         }
         else

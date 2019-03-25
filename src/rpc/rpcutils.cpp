@@ -13,6 +13,7 @@
 #include "utils/utilmoneystr.h"
 #include "wallet/wallettxs.h"
 #include "json/json_spirit_ubjson.h"
+#include "community/community.h"
 
 #include <boost/assign/list_of.hpp>
 
@@ -797,6 +798,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
 // 0x0010 stats
 // 0x0020 creators    
 // 0x0040 filters
+// 0x0080 subscription
 // 0x0800 skip name and ref
     
     Object entry;
@@ -984,14 +986,56 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
             {
                 if(output_level & 0x0008)
                 {                
+                    vector<pair<string,uint32_t>> index_types;
+                    index_types.push_back(pair<string,uint32_t>("items",MC_TET_STREAM | MC_TET_CHAINPOS));                                                                            
+                    index_types.push_back(pair<string,uint32_t>("keys",MC_TET_STREAM_KEY | MC_TET_CHAINPOS));                                                                            
+                    index_types.push_back(pair<string,uint32_t>("publishers",MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS));                                                                            
+                    index_types.push_back(pair<string,uint32_t>("items-local",MC_TET_STREAM | MC_TET_TIMERECEIVED));                                                                            
+                    index_types.push_back(pair<string,uint32_t>("keys-local",MC_TET_STREAM_KEY | MC_TET_TIMERECEIVED));                                                                            
+                    index_types.push_back(pair<string,uint32_t>("publishers-local",MC_TET_STREAM_PUBLISHER | MC_TET_TIMERECEIVED));                                                                            
                     entry.push_back(Pair("subscribed",true));                                            
-                    if(entStat.m_Flags & MC_EFL_NOT_IN_SYNC)
-                    {
+                    if( ((entStat.m_Flags & MC_EFL_NOT_IN_SYNC) != 0) ||
+                        (pEF->STR_IsOutOfSync(&(entStat.m_Entity)) != 0) )
+                    {                        
                         entry.push_back(Pair("synchronized",false));                                                            
                     }
                     else
                     {
-                        entry.push_back(Pair("synchronized",true));                                                                            
+                        bool fSynchronized=true;
+                        if(pEF->ENT_EditionNumeric() == 0)
+                        {
+                            for(unsigned int ind=1;ind<index_types.size();ind++)
+                            {      
+                                if(fSynchronized)
+                                {
+                                    entStat.m_Entity.m_EntityType=index_types[ind].second;
+                                    if(pwalletTxsMain->FindEntity(&entStat))
+                                    {
+                                        if( (entStat.m_Flags & MC_EFL_NOT_IN_SYNC) != 0)
+                                        {
+                                            fSynchronized=false;
+                                        }
+                                    }                            
+                                }
+                            }
+                        }
+                        entry.push_back(Pair("synchronized",fSynchronized));                                                                            
+                    }
+                    if(output_level & 0x0080)
+                    {                
+                        entStat.m_Entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
+                        entry.push_back(Pair("retrieve",(pEF->STR_NoRetrieve(&(entStat.m_Entity))==0)));                                                                            
+
+                        mc_TxImport dummy_import;
+                        dummy_import.m_ImportID=1;
+
+                        Object indexes;
+                        for(unsigned int ind=0;ind<index_types.size();ind++)
+                        {        
+                            entStat.m_Entity.m_EntityType=index_types[ind].second;
+                            indexes.push_back(Pair(index_types[ind].first,(pEF->STR_IsIndexSkipped(&dummy_import,NULL,&(entStat.m_Entity)) == 0))); 
+                        }
+                        entry.push_back(Pair("indexes",indexes));                                                                            
                     }
                 }
                 if(output_level & 0x0010)

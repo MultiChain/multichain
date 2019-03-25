@@ -661,26 +661,26 @@ void mc_EntityDetails::Set(mc_EntityLedgerRow* row)
         value_offset=mc_FindSpecialParamInDetailsScript(m_LedgerRow.m_Script,m_LedgerRow.m_ScriptSize,MC_ENT_SPRM_PERMISSIONS,&value_size);
         if(value_offset <= m_LedgerRow.m_ScriptSize)
         {
-/*            
-            if(m_Permissions & MC_PTP_WRITE)
+            if( (value_offset != m_LedgerRow.m_ScriptSize) || (mc_gState->m_Features->FixedLegacyPermissionRestrictionFlag() == 0)) 
             {
-                m_Permissions -= MC_PTP_WRITE;
-            }
- */ 
-            m_Permissions |= MC_PTP_SPECIFIED;
-            if((value_size>0) && (value_size<=4))
-            {
-                m_ScriptPermissions=(uint32_t)mc_GetLE(m_LedgerRow.m_Script+value_offset,value_size);
-                m_Permissions |= m_ScriptPermissions;
+                m_Permissions |= MC_PTP_SPECIFIED;
+                if((value_size>0) && (value_size<=4))
+                {
+                    m_ScriptPermissions=(uint32_t)mc_GetLE(m_LedgerRow.m_Script+value_offset,value_size);
+                    m_Permissions |= m_ScriptPermissions;
+                }
             }
         }
         
         value_offset=mc_FindSpecialParamInDetailsScript(m_LedgerRow.m_Script,m_LedgerRow.m_ScriptSize,MC_ENT_SPRM_RESTRICTIONS,&value_size);
         if(value_offset <= m_LedgerRow.m_ScriptSize)
         {
-            if((value_size>0) && (value_size<=4))
+            if( (value_offset != m_LedgerRow.m_ScriptSize) || (mc_gState->m_Features->FixedLegacyPermissionRestrictionFlag() == 0))
             {
-                m_Restrictions |= (uint32_t)mc_GetLE(m_LedgerRow.m_Script+value_offset,value_size);
+                if((value_size>0) && (value_size<=4))
+                {
+                    m_Restrictions |= (uint32_t)mc_GetLE(m_LedgerRow.m_Script+value_offset,value_size);
+                }
             }
         }
         
