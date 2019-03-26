@@ -4225,7 +4225,14 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
     else
     {
         vector<string> inputStrings;
-        inputStrings=ParseStringList(blockset_identifier);
+        if(blockset_identifier.type() == int_type)
+        {
+            inputStrings.push_back(strprintf("%d",blockset_identifier.get_int()));
+        }
+        else
+        {
+            inputStrings=ParseStringList(blockset_identifier);
+        }
 
         for(unsigned int i=0;i<inputStrings.size();i++)
         {
