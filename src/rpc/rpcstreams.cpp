@@ -1108,7 +1108,7 @@ Value subscribe(const Array& params, bool fHelp)
     }   
        
     // Whether to perform rescan after import
-    bool fRescan = true;
+    bool fRescan = true;    
     string indexes="all";
     
     if (params.size() > 1)
@@ -1175,6 +1175,13 @@ Value subscribe(const Array& params, bool fHelp)
             {
                 fNewFound=true;                
             }
+        }
+        else
+        {
+            if (params.size() > 2)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Subscription parameters can be specified only for streams");                        
+            }            
         }
 
         if(lpEntity->GetEntityType() == MC_ENT_TYPE_ASSET)
