@@ -175,7 +175,7 @@ void CheckWalletError(int err)
                 throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is not supported in this build");                                        
                 break;
             case MC_ERR_NOT_ALLOWED:
-                throw JSONRPCError(RPC_NOT_SUPPORTED, "The index required for this API is not built for this subscription.");                                        
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "The index required is not available for this subscription.");                                        
                 break;
             case MC_ERR_INTERNAL_ERROR:
                 throw JSONRPCError(RPC_INTERNAL_ERROR, "Internal wallet error");                                        

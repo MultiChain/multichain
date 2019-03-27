@@ -1620,11 +1620,11 @@ Value liststreamblockitems(const Array& params, bool fHelp)
 }
 
 
-void getSubKeyEntityFromKey(string str,mc_TxEntityStat entStat,mc_TxEntity *entity)
+bool getSubKeyEntityFromKey(string str,mc_TxEntityStat entStat,mc_TxEntity *entity,bool ignore_unsubscribed)
 {
     if(str == "*")
     {
-        return;
+        return false;
     }
     uint160 key_string_hash;
     uint160 stream_subkey_hash;
@@ -1634,15 +1634,21 @@ void getSubKeyEntityFromKey(string str,mc_TxEntityStat entStat,mc_TxEntity *enti
     entity->m_EntityType=entStat.m_Entity.m_EntityType | MC_TET_SUBKEY;    
     if(pEF->STR_IsIndexSkipped(NULL,&(entStat.m_Entity),entity))
     {
+        if(ignore_unsubscribed)
+        {
+            return false;
+        }
         CheckWalletError(MC_ERR_NOT_ALLOWED);
     }
+    
+    return true;
 }
 
-void getSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity *entity)
+bool getSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity *entity,bool ignore_unsubscribed)
 {
     if(str == "*")
     {
-        return;
+        return false;
     }
     uint160 stream_subkey_hash;
     CBitcoinAddress address(str);
@@ -1671,10 +1677,17 @@ void getSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity
 
     memcpy(entity->m_EntityID,&stream_subkey_hash,MC_TDB_ENTITY_ID_SIZE);
     entity->m_EntityType=entStat.m_Entity.m_EntityType | MC_TET_SUBKEY;    
+    
     if(pEF->STR_IsIndexSkipped(NULL,&(entStat.m_Entity),entity))
     {
+        if(ignore_unsubscribed)
+        {
+            return false;
+        }
         CheckWalletError(MC_ERR_NOT_ALLOWED);
     }
+    
+    return true;
 }
 
 Value getstreamsummary(const Array& params, bool fPublisher)
@@ -1710,12 +1723,12 @@ Value getstreamsummary(const Array& params, bool fPublisher)
 
     if(fPublisher)
     {
-        getSubKeyEntityFromPublisher(params[1].get_str(),entStat,&entity);    
+        getSubKeyEntityFromPublisher(params[1].get_str(),entStat,&entity,false);    
         conditions.push_back(mc_QueryCondition(MC_QCT_PUBLISHER,params[1].get_str()));
     }
     else
     {
-        getSubKeyEntityFromKey(params[1].get_str(),entStat,&entity);
+        getSubKeyEntityFromKey(params[1].get_str(),entStat,&entity,false);
         conditions.push_back(mc_QueryCondition(MC_QCT_KEY,params[1].get_str()));
     }
     
@@ -2070,7 +2083,7 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
     }
 
     string key_string=params[1].get_str();
-    getSubKeyEntityFromKey(params[1].get_str(),entStat,&entity);
+    getSubKeyEntityFromKey(params[1].get_str(),entStat,&entity,false);
     
     vector <mc_QueryCondition> conditions;
 
@@ -2175,7 +2188,7 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
     }
 
     string key_string=params[1].get_str();
-    getSubKeyEntityFromPublisher(params[1].get_str(),entStat,&entity);
+    getSubKeyEntityFromPublisher(params[1].get_str(),entStat,&entity,false);
     
     vector <mc_QueryCondition> conditions;
 
@@ -2419,11 +2432,11 @@ Value liststreamkeys_or_publishers(const Array& params,bool is_publishers)
 
                 if(is_publishers)
                 {
-                    getSubKeyEntityFromPublisher(str,entStat,&entity);
+                    getSubKeyEntityFromPublisher(str,entStat,&entity,false);
                 }
                 else
                 {
-                    getSubKeyEntityFromKey(str,entStat,&entity);        
+                    getSubKeyEntityFromKey(str,entStat,&entity,false);        
                 }
                 inputEntities.push_back(entity);
             }
@@ -2498,17 +2511,18 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
         vConditionMerged[i]=0;
         
         entStat.m_Entity.m_EntityType &= MC_TET_ORDERMASK;
+        bool index_found=true;
         if(i<conditions_count)
         {
             switch(conditions[i].m_Type)
             {
                 case MC_QCT_KEY:
                     entStat.m_Entity.m_EntityType |= MC_TET_STREAM_KEY;
-                    getSubKeyEntityFromKey(conditions[i].m_Value,entStat,&vConditionEntities[i]);                
+                    index_found=getSubKeyEntityFromKey(conditions[i].m_Value,entStat,&vConditionEntities[i],true);                
                     break;
                 case MC_QCT_PUBLISHER:
                     entStat.m_Entity.m_EntityType |= MC_TET_STREAM_PUBLISHER;
-                    getSubKeyEntityFromPublisher(conditions[i].m_Value,entStat,&vConditionEntities[i]);                
+                    index_found=getSubKeyEntityFromPublisher(conditions[i].m_Value,entStat,&vConditionEntities[i],true);                
                     break;
             }
         }
@@ -2517,12 +2531,15 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
             entStat.m_Entity.m_EntityType |= MC_TET_STREAM;
             memcpy(&vConditionEntities[i],&entStat.m_Entity,sizeof(mc_TxEntity));
         }
-        if(vConditionEntities[i].m_EntityType)
+        if(index_found)
         {
-            vConditionListSizes[i]=pwalletTxsMain->GetListSize(&vConditionEntities[i],entStat.m_Generation,NULL);     
-            if(vConditionListSizes[i]>max_size)
+            if(vConditionEntities[i].m_EntityType)
             {
-                max_size=vConditionListSizes[i];
+                vConditionListSizes[i]=pwalletTxsMain->GetListSize(&vConditionEntities[i],entStat.m_Generation,NULL);     
+                if(vConditionListSizes[i]>max_size)
+                {
+                    max_size=vConditionListSizes[i];
+                }
             }
         }
     }
@@ -2538,10 +2555,13 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
         {
             if(vConditionMerged[i] == 0)
             {
-                if(vConditionListSizes[i]<=min_size)
+                if(vConditionListSizes[i] > 0)
                 {
-                    min_size=vConditionListSizes[i];
-                    min_condition=i;
+                    if(vConditionListSizes[i]<=min_size)
+                    {
+                        min_size=vConditionListSizes[i];
+                        min_condition=i;
+                    }
                 }
             }
         }
