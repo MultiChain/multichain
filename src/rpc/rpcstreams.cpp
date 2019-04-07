@@ -197,7 +197,7 @@ Value liststreams(const Array& params, bool fHelp)
     if(streams == NULL)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot open entity database");
 
-    output_level=0x1E;
+    output_level=0x9E;
     
     if (params.size() > 1)    
     {
