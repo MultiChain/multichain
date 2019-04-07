@@ -1004,14 +1004,17 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
                         bool fSynchronized=true;
                         if(pEF->ENT_EditionNumeric() == 0)
                         {
+                            mc_TxEntityStat entStatTmp;
+                            entStatTmp.Zero();
+                            memcpy(&entStatTmp,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
                             for(unsigned int ind=1;ind<index_types.size();ind++)
                             {      
                                 if(fSynchronized)
                                 {
-                                    entStat.m_Entity.m_EntityType=index_types[ind].second;
-                                    if(pwalletTxsMain->FindEntity(&entStat))
+                                    entStatTmp.m_Entity.m_EntityType=index_types[ind].second;
+                                    if(pwalletTxsMain->FindEntity(&entStatTmp))
                                     {
-                                        if( (entStat.m_Flags & MC_EFL_NOT_IN_SYNC) != 0)
+                                        if( (entStatTmp.m_Flags & MC_EFL_NOT_IN_SYNC) != 0)
                                         {
                                             fSynchronized=false;
                                         }
