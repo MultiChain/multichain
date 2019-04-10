@@ -877,7 +877,10 @@ bool BackupWallet(const CWallet& wallet, const string& strDest)
                 // Flush log data to the dat file
                 bitdbwrap.CloseDb(wallet.strWalletFile);
                 bitdbwrap.CheckpointLSN(wallet.strWalletFile);
-                bitdbwrap.m_lpMapFileUseCount->erase(wallet.strWalletFile);
+                if(bitdbwrap.m_lpMapFileUseCount)
+                {
+                    bitdbwrap.m_lpMapFileUseCount->erase(wallet.strWalletFile);
+                }
 
                 // Copy wallet.dat
                 filesystem::path pathSrc = GetDataDir() / wallet.strWalletFile;
