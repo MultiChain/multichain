@@ -175,7 +175,7 @@ void CheckWalletError(int err)
                 throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is not supported in this build");                                        
                 break;
             case MC_ERR_NOT_ALLOWED:
-                throw JSONRPCError(RPC_NOT_SUPPORTED, "The index required for this API is not built for this subscription.");                                        
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "The index required is not available for this subscription.");                                        
                 break;
             case MC_ERR_INTERNAL_ERROR:
                 throw JSONRPCError(RPC_INTERNAL_ERROR, "Internal wallet error");                                        
@@ -1004,14 +1004,17 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
                         bool fSynchronized=true;
                         if(pEF->ENT_EditionNumeric() == 0)
                         {
+                            mc_TxEntityStat entStatTmp;
+                            entStatTmp.Zero();
+                            memcpy(&entStatTmp,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
                             for(unsigned int ind=1;ind<index_types.size();ind++)
                             {      
                                 if(fSynchronized)
                                 {
-                                    entStat.m_Entity.m_EntityType=index_types[ind].second;
-                                    if(pwalletTxsMain->FindEntity(&entStat))
+                                    entStatTmp.m_Entity.m_EntityType=index_types[ind].second;
+                                    if(pwalletTxsMain->FindEntity(&entStatTmp))
                                     {
-                                        if( (entStat.m_Flags & MC_EFL_NOT_IN_SYNC) != 0)
+                                        if( (entStatTmp.m_Flags & MC_EFL_NOT_IN_SYNC) != 0)
                                         {
                                             fSynchronized=false;
                                         }
@@ -4225,7 +4228,14 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
     else
     {
         vector<string> inputStrings;
-        inputStrings=ParseStringList(blockset_identifier);
+        if(blockset_identifier.type() == int_type)
+        {
+            inputStrings.push_back(strprintf("%d",blockset_identifier.get_int()));
+        }
+        else
+        {
+            inputStrings=ParseStringList(blockset_identifier);
+        }
 
         for(unsigned int i=0;i<inputStrings.size();i++)
         {
