@@ -2354,7 +2354,7 @@ int mc_Script::SetDataFormat(const uint32_t format)
     return MC_ERR_NOERROR;    
 }
 
-int mc_Script::GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_count,int64_t *total_size,int check_sizes)
+int mc_Script::GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_count,int64_t *total_size,unsigned char** salt,uint32_t *salt_size,int check_sizes)
 {
     unsigned char *ptr;
     unsigned char *ptrEnd;
@@ -2415,12 +2415,29 @@ int mc_Script::GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_co
 
     s=(uint32_t)(*ptr);
  
-    if(s != 0)
+    if(ptr+s+1>ptrEnd)
     {
-        return MC_ERR_ERROR_IN_SCRIPT;                                          // Salt length should be 0
+        return MC_ERR_ERROR_IN_SCRIPT;                    
     }
     
-    ptr++;
+    if(salt)
+    {
+        *salt=ptr+1;                
+    }
+    if(salt_size)
+    {
+        *salt_size=s;                
+    }
+    
+    if(s != 0)
+    {
+        if(mc_gState->m_Features->SaltedChunks() == 0)
+        {
+            return MC_ERR_ERROR_IN_SCRIPT;                                          // Salt length should be 0
+        }
+    }
+    
+    ptr+=s+1;
     
     count=(int)mc_GetVarInt(ptr,ptrEnd-ptr,-1,&shift);
     
@@ -2491,13 +2508,13 @@ int mc_Script::GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_co
 
 int mc_Script::GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_count,int64_t *total_size)
 {
-    return GetChunkDef(format,hashes,chunk_count,total_size,0);
+    return GetChunkDef(format,hashes,chunk_count,total_size,NULL,NULL,0);
 }
 
-int mc_Script::SetChunkDefHeader(const uint32_t format,int chunk_count)
+int mc_Script::SetChunkDefHeader(const uint32_t format,int chunk_count,unsigned char* salt,uint32_t salt_size)
 {
     int err,shift;
-    unsigned char buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+14];
+    unsigned char buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+14+MAX_CHUNK_SALT_SIZE];
     
     err=AddElement();
     if(err)
@@ -2509,10 +2526,18 @@ int mc_Script::SetChunkDefHeader(const uint32_t format,int chunk_count)
     buf[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_DATA_FORMAT_PREFIX;        
     buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+1]=MC_DCT_SCRIPT_EXTENDED_TYPE_CHUNK_DEF;
     buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+2]=(unsigned char)format;
-    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+3]=0;                                      // Salt length    
-    shift=mc_PutVarInt(buf+MC_DCT_SCRIPT_IDENTIFIER_LEN+4,11,chunk_count);
+    if(salt_size > MAX_CHUNK_SALT_SIZE)
+    {
+        return MC_ERR_NOT_ALLOWED;
+    }    
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+3]=(unsigned char)salt_size;                                      // Salt length   
+    if(salt_size)
+    {
+        memcpy(buf+MC_DCT_SCRIPT_IDENTIFIER_LEN+4,salt,salt_size);        
+    }
+    shift=mc_PutVarInt(buf+MC_DCT_SCRIPT_IDENTIFIER_LEN+4+salt_size,11,chunk_count);
     
-    err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+4+shift);
+    err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+4+salt_size+shift);
     if(err)
     {
         return err;
@@ -2548,7 +2573,7 @@ int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format)
     return ExtractAndDeleteDataFormat(format,NULL,NULL,NULL);
 }
 
-int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashes,int *chunk_count,int64_t *total_size,int check_sizes)
+int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashes,int *chunk_count,int64_t *total_size,unsigned char** salt,uint32_t *salt_size,int check_sizes)
 {
     int elem,err;
 
@@ -2612,7 +2637,7 @@ int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashe
     elem=m_NumElements-2;
     
     SetElement(elem);
-    while( (elem >= 0 ) && ((err=GetChunkDef(format,hashes,chunk_count,total_size,check_sizes)) == MC_ERR_NOERROR) )
+    while( (elem >= 0 ) && ((err=GetChunkDef(format,hashes,chunk_count,total_size,salt,salt_size,check_sizes)) == MC_ERR_NOERROR) )
     {
         m_Restrictions |= MC_ENT_ENTITY_RESTRICTION_OFFCHAIN;
         DeleteElement(elem);
@@ -2645,7 +2670,7 @@ int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashe
 
 int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashes,int *chunk_count,int64_t *total_size)
 {
-    return ExtractAndDeleteDataFormat(format,hashes,chunk_count,total_size,0);
+    return ExtractAndDeleteDataFormat(format,hashes,chunk_count,total_size,NULL,NULL,0);
 }
 
 int mc_Script::DeleteDuplicatesInRange(int from,int to)

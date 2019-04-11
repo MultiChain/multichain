@@ -606,9 +606,9 @@ void MultiChainTransaction_FillAdminPermissionsBeforeTx(const CTransaction& tx,
     }
 }
 
-bool MultiChainTransaction_VerifyAndDeleteDataFormatElements(string& reason,int64_t *total_size)
-{
-    if(mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL,NULL,NULL,total_size,1))
+bool MultiChainTransaction_VerifyAndDeleteDataFormatElements(string& reason,int64_t *total_size,uint32_t *salt_size)
+{    
+    if(mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL,NULL,NULL,total_size,NULL,salt_size,1))
     {
         reason="Error in data format script";
         return false;                    
@@ -630,7 +630,7 @@ bool MultiChainTransaction_CheckOpReturnScript(const CTransaction& tx,
     int64_t total_offchain_size;
     
     total_offchain_size=0;
-    if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason,&total_offchain_size))
+    if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason,&total_offchain_size,NULL))
     {
         return false;
     }
@@ -896,8 +896,9 @@ bool MultiChainTransaction_CheckEntityItem(const CTransaction& tx,
 {
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     mc_EntityDetails entity;
+    uint32_t salt_size;
     
-    if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason,NULL))
+    if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason,NULL,&salt_size))
     {
         return false;
     }
@@ -938,6 +939,20 @@ bool MultiChainTransaction_CheckEntityItem(const CTransaction& tx,
         {
             if(entity.GetEntityType() <= MC_ENT_TYPE_STREAM_MAX)
             {
+                if(mc_gState->m_TmpScript->m_Restrictions & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN)
+                {
+                    if(mc_gState->m_Features->SaltedChunks())
+                    {
+                        if(entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_NEED_SALTED)
+                        {
+                            if(salt_size == 0)
+                            {
+                                reason="Metadata script rejected - unsalted offchain items in restricted stream";                                            
+                                return false;
+                            }
+                        }
+                    }
+                }
                 if(!MultiChainTransaction_CheckStreamItem(&entity,vout,details,reason))
                 {
                     return false;            
@@ -946,6 +961,10 @@ bool MultiChainTransaction_CheckEntityItem(const CTransaction& tx,
             else
             {
                 reason="Metadata script rejected - too many elements for this entity type";                
+                if(mc_gState->m_Features->FixedIn20010())
+                {
+                    return false;
+                }
             }
         }
     }
@@ -1517,6 +1536,10 @@ bool MultiChainTransaction_CheckOutputs(const CTransaction& tx,                 
             
             permission_type=MC_PTP_CONNECT | MC_PTP_SEND | MC_PTP_RECEIVE | MC_PTP_WRITE;
             permission_type |= mc_gState->m_Permissions->GetCustomLowPermissionTypes();
+            if(mc_gState->m_Features->ReadPermissions())
+            {
+                permission_type |= MC_PTP_READ;                
+            }
             if(!MultiChainTransaction_ProcessPermissions(tx,offset,vout,permission_type,true,details,reason))
             {
                 return false;
@@ -2394,7 +2417,7 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
                 if(details->new_entity_type <= MC_ENT_TYPE_STREAM_MAX)
                 {
                                                                                 // Granting default per-entity permissions to openers
-                    err=mc_gState->m_Permissions->SetPermission(&txid,opener_buf,MC_PTP_ADMIN | MC_PTP_ACTIVATE | MC_PTP_WRITE,
+                    err=mc_gState->m_Permissions->SetPermission(&txid,opener_buf,MC_PTP_ADMIN | MC_PTP_ACTIVATE | MC_PTP_WRITE | MC_PTP_READ,
                             (unsigned char*)openers[i].begin(),0,(uint32_t)(-1),timestamp,opener_flags[i] | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
                 }
                 stored_openers.insert(openers[i]);

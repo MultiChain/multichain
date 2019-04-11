@@ -1529,6 +1529,11 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
             }
         }
 
+        if(entity->Restrictions() & MC_ENT_ENTITY_RESTRICTION_NEED_SALTED)
+        {
+            out_options |= MC_RFD_OPTION_SALTED;
+        }
+        
         if(in_options & MC_RFD_OPTION_OFFCHAIN)
         {
             AppendOffChainFormatData(*data_format,out_options,lpDetailsScript,vValue,vChunkHashes,errorCode,strError);

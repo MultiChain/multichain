@@ -680,6 +680,12 @@ void mc_EntityDetails::Set(mc_EntityLedgerRow* row)
             }
         }
         
+        if(m_ScriptPermissions & MC_PTP_READ)
+        {
+            m_Restrictions=MC_ENT_ENTITY_RESTRICTION_NEED_SALTED;
+        }
+            
+        
         value_offset=mc_FindSpecialParamInDetailsScript(m_LedgerRow.m_Script,m_LedgerRow.m_ScriptSize,MC_ENT_SPRM_RESTRICTIONS,&value_size);
         if(value_offset <= m_LedgerRow.m_ScriptSize)
         {
@@ -687,6 +693,11 @@ void mc_EntityDetails::Set(mc_EntityLedgerRow* row)
             {
                 if((value_size>0) && (value_size<=4))
                 {
+                    if(m_Restrictions & MC_ENT_ENTITY_RESTRICTION_NEED_SALTED)
+                    {
+                        m_Restrictions-=MC_ENT_ENTITY_RESTRICTION_NEED_SALTED;                        
+                    }
+                        
                     m_Restrictions |= (uint32_t)mc_GetLE(m_LedgerRow.m_Script+value_offset,value_size);
                 }
             }

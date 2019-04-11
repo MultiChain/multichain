@@ -1009,6 +1009,11 @@ Value publishfrom(const Array& params, bool fHelp)
         }                
     }    
     
+    if(stream_entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_NEED_SALTED)
+    {
+        out_options |= MC_RFD_OPTION_SALTED;
+    }
+    
     lpDetailsScript->Clear();
     if(in_options & MC_RFD_OPTION_OFFCHAIN)        
     {
@@ -1642,7 +1647,7 @@ bool getSubKeyEntityFromKey(string str,mc_TxEntityStat entStat,mc_TxEntity *enti
     key_string_hash=Hash160(str.begin(),str.end());
     mc_GetCompoundHash160(&stream_subkey_hash,entStat.m_Entity.m_EntityID,&key_string_hash);
     memcpy(entity->m_EntityID,&stream_subkey_hash,MC_TDB_ENTITY_ID_SIZE);
-    entity->m_EntityType=entStat.m_Entity.m_EntityType | MC_TET_SUBKEY;    
+    entity->m_EntityType=entStat.m_Entity.m_EntityType | MC_TET_SUBKEY;   
     if(pEF->STR_IsIndexSkipped(NULL,&(entStat.m_Entity),entity))
     {
         if(ignore_unsubscribed)

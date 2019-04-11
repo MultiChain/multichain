@@ -7,6 +7,7 @@
 #include "utils/declare.h"
 #include "protocol/relay.h"
 #include "wallet/chunkdb.h"
+#include "wallet/chunkdb.h"
 #include "wallet/wallettxdb.h"
 
 #define MC_CCF_NONE                       0x00000000 
@@ -38,6 +39,8 @@ typedef struct mc_ChunkEntityKey
     mc_TxEntity m_Entity;
     uint32_t m_Size;
     uint32_t m_Flags;
+    uint32_t m_SaltSize;
+    unsigned char m_Salt[MC_TDB_TXID_SIZE];                               
     
     void Zero();
 } mc_ChunkEntityKey;
@@ -71,7 +74,12 @@ typedef struct mc_ChunkCollectorDBRow
     uint32_t m_QueryAttempts;
     uint32_t m_Status;
     int64_t m_TotalChunkSize;
-    int64_t m_TotalChunkCount;                                                       
+    int64_t m_TotalChunkCount;      
+    
+    unsigned char m_Salt[MC_TDB_TXID_SIZE];                               
+    uint32_t m_SaltSize;
+    uint32_t m_Reserved1;
+    int64_t m_Reserved2;
     
     void Zero();
 } mc_ChunkCollectorDBRow;
@@ -163,6 +171,7 @@ typedef struct mc_ChunkCollector
     int InsertDBRow(mc_ChunkCollectorRow *collect_row);
     int SeekDB(void *dbrow);
     int ReadFromDB(mc_Buffer *mempool,int rows);
+    int UpgradeDB();
     
     int Initialize(                                                             // Initialization
               mc_ChunkDB *chunk_db,
@@ -174,14 +183,18 @@ typedef struct mc_ChunkCollector
                  const mc_TxEntity *entity,                                     // Parent entity
                  const unsigned char *txid,
                  const int vout,
-                 const uint32_t chunk_size);  
+                 const uint32_t chunk_size,
+                 const unsigned char *salt,
+                 const uint32_t salt_size);  
     
     int InsertChunkInternal(                  
                  const unsigned char *hash,   
                  const mc_TxEntity *entity,   
                  const unsigned char *txid,
                  const int vout,
-                 const uint32_t chunk_size);  
+                 const uint32_t chunk_size,
+                 const unsigned char *salt,
+                 const uint32_t salt_size);  
 
     int MarkAndClear(uint32_t flag, int unmark);    
     int CopyFlags();    

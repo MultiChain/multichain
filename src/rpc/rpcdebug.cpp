@@ -600,7 +600,7 @@ Value debug(const Array& params, bool fHelp)
                                 {
                                     throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing stream");                                    
                                 }
-                                collector.InsertChunk((unsigned char*)&chunk_hash,&entity,(unsigned char*)&txid,vout,chunk_size);
+                                collector.InsertChunk((unsigned char*)&chunk_hash,&entity,(unsigned char*)&txid,vout,chunk_size,NULL,0);
                             }
                         }
                     }            

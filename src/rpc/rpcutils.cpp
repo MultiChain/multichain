@@ -885,6 +885,10 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
             }
             Object pObject;
             pObject.push_back(Pair("write",entity.AnyoneCanWrite() ? false : true));
+            if(mc_gState->m_Features->ReadPermissions())
+            {
+                pObject.push_back(Pair("read",entity.AnyoneCanRead() ? false : true));                
+            }
             if(mc_gState->m_Features->OffChainData())
             {
                 pObject.push_back(Pair("onchain",(entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_ONCHAIN) ? true : false));
