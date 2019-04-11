@@ -1302,6 +1302,17 @@ Value unsubscribe(const Array& params, bool fHelp)
         {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't unsubscribe from stream");                                    
         }
+        for(int is=0;is<(int)inputStrings.size();is++)
+        {
+            mc_EntityDetails* lpEntity;
+            lpEntity=&inputEntities[is];
+
+            mc_TxEntity entity;
+            entity.Zero();
+            memcpy(entity.m_EntityID,lpEntity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+            entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
+            pEF->STR_TrimSubscription(&entity,"unsubscribe");        
+        }
     }
 
     return Value::null;
@@ -2483,6 +2494,7 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
     vector<int> vConditionMerged;
     mc_TxEntityStat entStat;
     bool merge_lists=true;
+    bool one_index_found=false;
     
     vConditionEntities.resize(conditions_count+1);
     vConditionListSizes.resize(conditions_count+1);
@@ -2514,6 +2526,7 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
         bool index_found=true;
         if(i<conditions_count)
         {
+            index_found=false;
             switch(conditions[i].m_Type)
             {
                 case MC_QCT_KEY:
@@ -2524,6 +2537,10 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
                     entStat.m_Entity.m_EntityType |= MC_TET_STREAM_PUBLISHER;
                     index_found=getSubKeyEntityFromPublisher(conditions[i].m_Value,entStat,&vConditionEntities[i],true);                
                     break;
+            }
+            if(index_found)
+            {
+                one_index_found=true;                
             }
         }
         else
@@ -2542,6 +2559,11 @@ int GetAndQueryDirtyList(vector<mc_QueryCondition>& conditions, mc_EntityDetails
                 }
             }
         }
+    }
+    
+    if(!one_index_found)
+    {
+        CheckWalletError(MC_ERR_NOT_ALLOWED);        
     }
     
     clean_count=0;
