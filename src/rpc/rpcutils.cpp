@@ -568,7 +568,11 @@ Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong)
                 if(full_type & MC_PTP_CONNECT)entry.push_back(Pair("connect", (type & MC_PTP_CONNECT) ? true : false));
                 if(full_type & MC_PTP_SEND)entry.push_back(Pair("send", (type & MC_PTP_SEND) ? true : false));
                 if(full_type & MC_PTP_RECEIVE)entry.push_back(Pair("receive", (type & MC_PTP_RECEIVE) ? true : false));
-                if(full_type & MC_PTP_WRITE)entry.push_back(Pair("write", (type & MC_PTP_WRITE) ? true : false));                
+                if(full_type & MC_PTP_WRITE)entry.push_back(Pair("write", (type & MC_PTP_WRITE) ? true : false));      
+                if(mc_gState->m_Features->ReadPermissions())
+                {
+                    if(full_type & MC_PTP_READ)entry.push_back(Pair("read", (type & MC_PTP_READ) ? true : false));                          
+                }
                 if(full_type & MC_PTP_CREATE)entry.push_back(Pair("create", (type & MC_PTP_CREATE) ? true : false));                
                 if(full_type & MC_PTP_ISSUE)entry.push_back(Pair("issue", (type & MC_PTP_ISSUE) ? true : false));
                 if(full_type & MC_PTP_MINE)entry.push_back(Pair("mine", (type & MC_PTP_MINE) ? true : false));
