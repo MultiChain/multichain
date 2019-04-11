@@ -14,7 +14,7 @@ int mc_State::VersionInfo(int version)
     }
     
     int this_build=20001901;
-    int this_protocol=20009;   
+    int this_protocol=20010;   
     
     if(version < 0)
     {

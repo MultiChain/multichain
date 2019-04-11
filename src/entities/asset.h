@@ -195,6 +195,7 @@ typedef struct mc_EntityDetails
     uint32_t Permissions(); 
     uint32_t Restrictions(); 
     int AnyoneCanWrite(); 
+    int AnyoneCanRead(); 
     int UpgradeProtocolVersion(); 
     uint32_t UpgradeStartBlock(); 
     uint64_t GetQuantity();

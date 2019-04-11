@@ -613,11 +613,19 @@ void mc_EntityDetails::Set(mc_EntityLedgerRow* row)
             break;
         case MC_ENT_TYPE_STREAM:
             m_Permissions |= MC_PTP_ADMIN | MC_PTP_ACTIVATE | MC_PTP_WRITE;
+            if(mc_gState->m_Features->ReadPermissions())
+            {
+                m_Permissions |= MC_PTP_READ;                
+            }
             break;
         default:
             if(m_LedgerRow.m_EntityType <= MC_ENT_TYPE_STREAM_MAX)
             {
                 m_Permissions = MC_PTP_WRITE | MC_PTP_ACTIVATE;
+                if(mc_gState->m_Features->ReadPermissions())
+                {
+                    m_Permissions |= MC_PTP_READ;                
+                }
             }
             break;            
     }
@@ -1926,6 +1934,25 @@ int mc_EntityDetails::AnyoneCanWrite()
         }
     }
     return 0;
+}
+
+int mc_EntityDetails::AnyoneCanRead()
+{
+    unsigned char *ptr;
+    size_t bytes;
+
+    if(mc_gState->m_Features->ReadPermissions())
+    {
+        if(m_Permissions & MC_PTP_SPECIFIED)
+        {
+            if(m_ScriptPermissions & MC_PTP_READ)
+            {
+                return 0;
+            }
+        }
+    }
+    
+    return 1;
 }
 
 uint32_t mc_EntityDetails::UpgradeStartBlock()
