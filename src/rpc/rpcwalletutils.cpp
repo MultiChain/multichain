@@ -1202,7 +1202,8 @@ void AppendOffChainFormatData(uint32_t data_format,
                     ptr=(unsigned char*)&vValue[i*MAX_CHUNK_SIZE];
                 }
                 
-                mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(ptr,size,&hash);
+//                mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(ptr,size,&hash);
+                mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(salt,salt_size,ptr,size,&hash);
                 
                 err=pwalletTxsMain->m_ChunkDB->AddChunk((unsigned char*)&hash,&entity,NULL,-1,ptr,NULL,size,0,0);   
                 if(err)

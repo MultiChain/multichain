@@ -800,12 +800,14 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
     const unsigned char *script;
     string entity_name;
     int is_open=0;
-    uint32_t restrict;
+    int is_salted=0;
+    uint32_t restrict=0;
     uint32_t permissions=MC_PTP_WRITE;
     
     bool missing_name=true;
     bool missing_open=true;
     bool missing_details=true;
+    bool missing_salted=true;
     
     lpDetails->Clear();
     lpDetails->AddElement();                   
@@ -863,6 +865,31 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
             missing_open=false;
             field_parsed=true;
         }
+        if(d.name_ == "salted")
+        {
+            if(mc_gState->m_Features->SaltedChunks() == 0)
+            {
+                *strError=string("Salted chunks not supported for this protocol version");               
+                *errorCode=RPC_NOT_SUPPORTED;
+            }
+            else
+            {                
+                if(!missing_salted)
+                {
+                    *strError=string("salted field can appear only once in the object");                                                                                                        
+                }
+                if(d.value_.type() == bool_type)
+                {
+                    is_salted=d.value_.get_bool();
+                }    
+                else
+                {
+                    *strError=string("Invalid salted");                                            
+                }
+                missing_salted=false;
+                field_parsed=true;
+            }
+        }
         if(d.name_ == "restrict")
         {
             if(mc_gState->m_Features->OffChainData() == 0)
@@ -886,10 +913,6 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
                             *errorCode=RPC_NOT_SUPPORTED;                            
                         }                        
                     }
-                    if(restrict)
-                    {
-                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_RESTRICTIONS,(unsigned char*)&restrict,1);                         
-                    }
                 }
                 missing_open=false;
                 field_parsed=true;
@@ -912,9 +935,25 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
         }
     }    
     
+    if(missing_salted)
+    {
+        if(permissions & MC_PTP_READ)
+        {
+            is_salted=true;
+        }
+    }
+    
     if(mc_gState->m_Features->OffChainData())
     {
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_PERMISSIONS,(unsigned char*)&permissions,1);                                
+    }
+    if(is_salted)
+    {
+        restrict |= MC_ENT_ENTITY_RESTRICTION_NEED_SALTED;
+    }
+    if( restrict != 0 )
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_RESTRICTIONS,(unsigned char*)&restrict,1);                         
     }
     
     if(strError->size() == 0)

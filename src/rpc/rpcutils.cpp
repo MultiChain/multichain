@@ -883,6 +883,10 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
                     entry.push_back(Pair("open",false));                                            
                 }
             }
+            if(mc_gState->m_Features->SaltedChunks())
+            {
+                entry.push_back(Pair("salted",(entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_NEED_SALTED) ? true : false));                
+            }
             Object pObject;
             pObject.push_back(Pair("write",entity.AnyoneCanWrite() ? false : true));
             if(mc_gState->m_Features->ReadPermissions())
@@ -1626,6 +1630,8 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     uint32_t retrieve_status;
     Value format_item_value;
     string format_text_str;
+    unsigned char* salt;
+    uint32_t salt_size;
     
     mc_EntityDetails entity;
     uint256 hash;
@@ -1648,7 +1654,7 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     }
     
 //    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
-    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
+    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size,&salt,&salt_size,0);
     
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     mc_gState->m_TmpScript->SetElement(0);
@@ -1798,6 +1804,14 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     {
         if((retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN)
         {
+            if(salt_size)
+            {
+                entry.push_back(Pair("salt", HexStr(salt,salt+salt_size)));            
+            }
+            else
+            {
+                entry.push_back(Pair("salt", ""));                            
+            }
             entry.push_back(Pair("chunks", chunks));            
         }
     }

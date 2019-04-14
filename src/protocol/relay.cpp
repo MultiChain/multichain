@@ -156,7 +156,8 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
         {
             collect_row=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(itreq->second);
             uint256 hash;
-            mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(ptrOut,sizeOut,&hash);
+//            mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(ptrOut,sizeOut,&hash);
+            mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(collect_row->m_ChunkDef.m_Salt,collect_row->m_ChunkDef.m_SaltSize,ptrOut,sizeOut,&hash);
             if(memcmp(&hash,chunk->m_Hash,sizeof(uint256)))
             {
                 for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Baddelivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                
@@ -1840,6 +1841,17 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
     msg_type_response=MC_RMT_NONE;
     msg_type_relay=MC_RMT_NONE;
     pto_stored=NULL;
+    
+    
+    flags_response=0x00;
+    flags_relay=0x00;
+    
+    string strPayload;
+    strPayload.resize(2*(int)vRecv.size()+1,'Z');
+    mc_BinToHex(&strPayload[0],&vRecv.str()[0],(int)vRecv.size());
+    
+    if(fDebug)LogPrint("offchain","Offchain mesg: %s\n",strPayload.c_str());
+    
     
     verify_flags=verify_flags_in;
     vRecv >> msg_format;

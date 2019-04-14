@@ -141,6 +141,7 @@ typedef struct mc_SHA256
     void GetHash(unsigned char *hash);
     
     void DoubleHash(const void *lpData,int size,void *hash);
+    void DoubleHash(const void *lpSalt,int salt_size,const void *lpData,int size,void *hash);
     
     mc_SHA256()
     {

@@ -307,6 +307,7 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
     lpDetails->Clear();
     
     int ret,type;
+    bool missing_salted=true;
     string stream_name="";
 
     if (params[2].type() != str_type)
@@ -381,7 +382,32 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
                     }
                     else
                     {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid field, should be restrict");               
+                        if(mc_gState->m_Features->SaltedChunks())
+                        {                            
+                            if(d.name_ == "salted")
+                            {
+                                if(d.value_.type() == bool_type)
+                                {
+                                    if(d.value_.get_bool())
+                                    {
+                                        restrict |= MC_ENT_ENTITY_RESTRICTION_NEED_SALTED;
+                                    }
+                                    missing_salted=false;
+                                }    
+                                else
+                                {
+                                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid salted, should be boolean");                                                    
+                                }
+                            }
+                            else
+                            {
+                                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid field, should be restrict or salted");               
+                            }                        
+                        }
+                        else
+                        {
+                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid field, should be restrict");                                           
+                        }
                     }
                 }
             }
@@ -395,7 +421,14 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
             permissions = params[3].get_bool() ? MC_PTP_NONE : MC_PTP_WRITE;
         }
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_PERMISSIONS,(unsigned char*)&permissions,1);                                
-        if(restrict)
+        if(missing_salted)
+        {
+            if(permissions & MC_PTP_READ)
+            {
+                restrict |= MC_ENT_ENTITY_RESTRICTION_NEED_SALTED;
+            }
+        }
+        if( restrict != 0 )
         {
             lpDetails->SetSpecialParamValue(MC_ENT_SPRM_RESTRICTIONS,(unsigned char*)&restrict,1);                         
         }
