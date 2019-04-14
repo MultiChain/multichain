@@ -2530,6 +2530,13 @@ int mc_Script::SetChunkDefHeader(const uint32_t format,int chunk_count,unsigned 
     {
         return MC_ERR_NOT_ALLOWED;
     }    
+    if(salt_size)
+    {
+        if(salt_size < MIN_CHUNK_SALT_SIZE)
+        {
+            return MC_ERR_NOT_ALLOWED;
+        }            
+    }
     buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+3]=(unsigned char)salt_size;                                      // Salt length   
     if(salt_size)
     {

@@ -903,6 +903,20 @@ bool MultiChainTransaction_CheckEntityItem(const CTransaction& tx,
         return false;
     }
     
+    if(salt_size)
+    {
+        if(salt_size > MAX_CHUNK_SALT_SIZE)
+        {
+            reason="Metadata script rejected - salt size too large";
+            return false;            
+        }
+        if(salt_size < MIN_CHUNK_SALT_SIZE)
+        {
+            reason="Metadata script rejected - salt size too small";
+            return false;            
+        }
+    }
+    
     mc_gState->m_TmpScript->SetElement(0);
                                                                                 // Should be spke
     if(mc_gState->m_TmpScript->GetEntity(short_txid))                           // Entity element
