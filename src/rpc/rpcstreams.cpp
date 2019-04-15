@@ -203,7 +203,7 @@ Value liststreams(const Array& params, bool fHelp)
     {
         if(paramtobool(params[1]))
         {
-            output_level=0xBE;           
+            output_level=0x01BE;           
             if(mc_gState->m_Features->StreamFilters())
             {
                 output_level |= 0x40;    

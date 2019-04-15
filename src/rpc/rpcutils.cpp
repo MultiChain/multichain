@@ -803,7 +803,9 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
 // 0x0020 creators    
 // 0x0040 filters
 // 0x0080 subscription
+// 0x0100 salted
 // 0x0800 skip name and ref
+    
     
     Object entry;
     mc_EntityDetails entity;
@@ -883,10 +885,6 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
                     entry.push_back(Pair("open",false));                                            
                 }
             }
-            if(mc_gState->m_Features->SaltedChunks())
-            {
-                entry.push_back(Pair("salted",(entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_NEED_SALTED) ? true : false));                
-            }
             Object pObject;
             pObject.push_back(Pair("write",entity.AnyoneCanWrite() ? false : true));
             if(mc_gState->m_Features->ReadPermissions())
@@ -899,6 +897,13 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
                 pObject.push_back(Pair("offchain",(entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN) ? true : false));
             }
             entry.push_back(Pair("restrict",pObject));                                            
+            if(output_level & 0x0100)
+            {
+                if(mc_gState->m_Features->SaltedChunks())
+                {
+                    entry.push_back(Pair("salted",(entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_NEED_SALTED) ? true : false));                
+                }
+            }
         }
        
         
