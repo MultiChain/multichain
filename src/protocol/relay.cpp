@@ -157,7 +157,7 @@ int MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map <
             collect_row=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(itreq->second);
             uint256 hash;
 //            mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(ptrOut,sizeOut,&hash);
-            mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(collect_row->m_ChunkDef.m_Salt,collect_row->m_ChunkDef.m_SaltSize,ptrOut,sizeOut,&hash);
+            mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(collect_row->m_Salt,collect_row->m_SaltSize,ptrOut,sizeOut,&hash);
             if(memcmp(&hash,chunk->m_Hash,sizeof(uint256)))
             {
                 for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Baddelivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                

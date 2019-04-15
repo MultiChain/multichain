@@ -39,8 +39,6 @@ typedef struct mc_ChunkEntityKey
     mc_TxEntity m_Entity;
     uint32_t m_Size;
     uint32_t m_Flags;
-    uint32_t m_SaltSize;
-    unsigned char m_Salt[MC_TDB_TXID_SIZE];                               
     
     void Zero();
 } mc_ChunkEntityKey;
@@ -76,7 +74,7 @@ typedef struct mc_ChunkCollectorDBRow
     int64_t m_TotalChunkSize;
     int64_t m_TotalChunkCount;      
     
-    unsigned char m_Salt[MC_TDB_TXID_SIZE];                               
+    unsigned char m_Salt[MC_CDB_CHUNK_HASH_SIZE];                               // Salt size should not be large than hash size
     uint32_t m_SaltSize;
     uint32_t m_Reserved1;
     int64_t m_Reserved2;
@@ -90,8 +88,10 @@ typedef struct mc_ChunkCollectorRow
     uint32_t m_DBNextAttempt;
     int m_Vout;
     unsigned char m_TxID[MC_TDB_TXID_SIZE];                               
+    unsigned char m_Salt[MC_CDB_CHUNK_HASH_SIZE];                               
+    uint32_t m_SaltSize;
     uint32_t m_Reserved1;
-    uint32_t m_Reserved2;        
+    
     mc_ChunkEntityValue m_State;
     
     void Zero();
