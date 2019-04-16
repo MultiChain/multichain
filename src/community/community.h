@@ -13,6 +13,7 @@
 #define MC_EFT_STREAM_CONDITIONAL_INDEXING     0x0000000000000100
 #define MC_EFT_STREAM_MANUAL_RETRIEVAL         0x0000000000000200
 #define MC_EFT_STREAM_READ_PERMISSIONS         0x0000000000001000
+#define MC_EFT_OFFCHAIN_AUTHENTICATION         0x0000000000010000
 #define MC_EFT_ALL                             0xFFFFFFFFFFFFFFFF
 
 
@@ -49,6 +50,18 @@ typedef struct mc_EnterpriseFeatures
     Value STR_RPCPurgePublishedItems(const Array& params);
     int STR_RemoveDataFromFile(int fHan, uint32_t from, uint32_t size, uint32_t mode);
     
+    bool OFF_ProcessChunkRequest(unsigned char *ptrStart,unsigned char *ptrEnd,vector<unsigned char>* payload_response,vector<unsigned char>* payload_relay,
+        map<uint160,int>& mapReadPermissionedStreams,string& strError);
+    bool OFF_ProcessChunkResponse(const mc_RelayRequest *request,const mc_RelayResponse *response,map <int,int>* request_pairs,mc_ChunkCollector* collector);
+    bool OFF_GetScriptsToVerify(map<uint160,int>& mapReadPermissionedStreams,vector<CScript>& vSigScriptsIn,vector<CScript>& vSigScriptsToVerify,string& strError);
+    bool OFF_GetAddressesForSigning(map<uint160,int>& mapReadPermissionedStreams,set<CPubKey>& vAddresses,string& strError);
+    bool OFF_VerifySignatureScripts(uint32_t  msg_type_in,mc_OffchainMessageID& msg_id_received,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags_in,
+            vector<unsigned char>& vPayloadIn,vector<CScript>& vSigScriptsToVerify,string& strError);
+    bool OFF_CreateSignatureScripts(uint32_t  msg_type_in,mc_OffchainMessageID& msg_id_received,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags_in,
+            vector<unsigned char>& vPayloadIn,set<CPubKey>& vAddresses,vector<CScript>& vSigScripts,string& strError);
+    bool OFF_GetPayloadForReadPermissioned(vector<unsigned char>* payload,string& strError);
+    
+    CPubKey WLT_FindReadPermissionedAddress(unsigned char* short_txid);
     int WLT_CreateSubscription(mc_TxEntity *entity,uint32_t retrieve,uint32_t indexes,uint32_t *rescan_mode);
     int WLT_DeleteSubscription(mc_TxEntity *entity,uint32_t rescan_mode);
     int WLT_StartImport();

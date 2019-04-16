@@ -7,6 +7,7 @@
 #include "rpc/rpcutils.h"
 #include "filters/multichainfilter.h"
 #include "filters/filter.h"
+#include "community/community.h"
 
 #include "utils/util.h"
 #include "json/json_spirit_ubjson.h"
@@ -1568,13 +1569,18 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
             }
         }
 
+        if(entity->AnyoneCanRead() == 0)
+        {
+            pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS);
+        }
+        
         if(entity->Restrictions() & MC_ENT_ENTITY_RESTRICTION_NEED_SALTED)
         {
             out_options |= MC_RFD_OPTION_SALTED;
         }
         
         if(in_options & MC_RFD_OPTION_OFFCHAIN)
-        {
+        {            
             AppendOffChainFormatData(*data_format,out_options,lpDetailsScript,vValue,vChunkHashes,errorCode,strError);
             if(strError->size())
             {

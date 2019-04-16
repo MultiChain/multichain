@@ -2411,7 +2411,27 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                     }
                                     else
                                     {
-                                        m_ChunkCollector->InsertChunk(chunk_hashes,&chunk_entity,(unsigned char*)&hash,i,chunk_size,salt,salt_size);
+                                        bool insert_it=false;
+                                        mc_EntityDetails entity_details;
+
+                                        if(mc_gState->m_Assets->FindEntityByShortTxID(&entity_details,short_txid))
+                                        {
+                                            if(entity_details.AnyoneCanRead())
+                                            {
+                                                insert_it=true;                                                
+                                            }
+                                            else
+                                            {
+                                                if(pEF->WLT_FindReadPermissionedAddress(short_txid).IsValid())
+                                                {
+                                                    insert_it=true;                                                                                                    
+                                                }
+                                            }
+                                        }
+                                        if(insert_it)
+                                        {
+                                            m_ChunkCollector->InsertChunk(chunk_hashes,&chunk_entity,(unsigned char*)&hash,i,chunk_size,salt,salt_size);
+                                        }
                                         // Feeding async chunk retriever here
                                     }
                                 }

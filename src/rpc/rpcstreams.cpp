@@ -1042,6 +1042,11 @@ Value publishfrom(const Array& params, bool fHelp)
         }                
     }    
     
+    if(stream_entity.AnyoneCanRead() == 0)
+    {
+        pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS);
+    }
+    
     if(stream_entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_NEED_SALTED)
     {
         out_options |= MC_RFD_OPTION_SALTED;
@@ -1191,6 +1196,10 @@ Value subscribe(const Array& params, bool fHelp)
         mc_TxEntity entity;
         if(lpEntity->GetEntityType() == MC_ENT_TYPE_STREAM)
         {
+            if(lpEntity->AnyoneCanRead() == 0)
+            {
+                pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS);
+            }
             entity.Zero();
             memcpy(entity.m_EntityID,lpEntity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
             entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;

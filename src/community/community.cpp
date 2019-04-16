@@ -82,6 +82,54 @@ int mc_EnterpriseFeatures::STR_RemoveDataFromFile(int fHan, uint32_t from, uint3
     return MC_ERR_NOERROR;
 }
 
+bool mc_EnterpriseFeatures::OFF_ProcessChunkRequest(unsigned char *ptrStart,unsigned char *ptrEnd,vector<unsigned char>* payload_response,vector<unsigned char>* payload_relay,
+        map<uint160,int>& mapReadPermissionedStreams,string& strError)
+{
+    return false;    
+}
+
+bool mc_EnterpriseFeatures::OFF_GetScriptsToVerify(map<uint160,int>& mapReadPermissionedStreams,vector<CScript>& vSigScriptsIn,vector<CScript>& vSigScriptsToVerify,string& strError)
+{
+    return true;
+}
+
+bool mc_EnterpriseFeatures::OFF_VerifySignatureScripts(uint32_t  msg_type_in,mc_OffchainMessageID& msg_id_received,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags_in,
+            vector<unsigned char>& vPayloadIn,vector<CScript>& vSigScriptsToVerify,string& strError)
+{
+    return true;        
+}
+
+bool mc_EnterpriseFeatures::OFF_GetAddressesForSigning(map<uint160,int>& mapReadPermissionedStreams,set<CPubKey>& vAddresses,string& strError)
+{
+    return true;
+}
+
+bool mc_EnterpriseFeatures::OFF_CreateSignatureScripts(uint32_t  msg_type_in,mc_OffchainMessageID& msg_id_received,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags_in,
+            vector<unsigned char>& vPayloadIn,set<CPubKey>& vAddresses,vector<CScript>& vSigScripts,string& strError)
+{    
+    return true;
+}
+
+bool mc_EnterpriseFeatures::OFF_GetPayloadForReadPermissioned(vector<unsigned char>* payload,string& strError)
+{
+    return true;
+}
+
+bool mc_EnterpriseFeatures::OFF_ProcessChunkResponse(const mc_RelayRequest *request,const mc_RelayResponse *response,map <int,int>* request_pairs,mc_ChunkCollector* collector)
+{
+    return true;
+}
+
+
+
+CPubKey mc_EnterpriseFeatures::WLT_FindReadPermissionedAddress(unsigned char* short_txid)
+{
+    CPubKey result;
+    
+    return result;
+}
+
+
 
 int mc_EnterpriseFeatures::WLT_CreateSubscription(mc_TxEntity *entity,uint32_t retrieve,uint32_t indexes,uint32_t *rescan_mode)
 {
@@ -152,7 +200,7 @@ void mc_EnterpriseFeatures::LIC_RPCVerifyFeature(uint64_t feature)
 
 bool mc_EnterpriseFeatures::LIC_VerifyFeature(uint64_t feature,std::string& reason)
 {
-    reason="Not available in Community efition";
+    reason="Not available in Community edition";
     return false;
 }
 
