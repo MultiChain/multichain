@@ -952,6 +952,10 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
     {
         restrict |= MC_ENT_ENTITY_RESTRICTION_NEED_SALTED;
     }
+    if(permissions & MC_PTP_READ)
+    {
+        restrict |= MC_ENT_ENTITY_RESTRICTION_ONCHAIN;
+    }
     if( restrict != 0 )
     {
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_RESTRICTIONS,(unsigned char*)&restrict,1);                         

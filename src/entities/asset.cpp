@@ -1938,6 +1938,10 @@ int mc_EntityDetails::AnyoneCanWrite()
 
 int mc_EntityDetails::AnyoneCanRead()
 {
+    if(m_LedgerRow.m_EntityType != MC_ENT_TYPE_STREAM)
+    {
+        return 1;
+    }
     if(mc_gState->m_Features->ReadPermissions())
     {
         if(m_Permissions & MC_PTP_SPECIFIED)

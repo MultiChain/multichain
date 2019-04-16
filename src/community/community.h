@@ -61,7 +61,7 @@ typedef struct mc_EnterpriseFeatures
             vector<unsigned char>& vPayloadIn,set<CPubKey>& vAddresses,vector<CScript>& vSigScripts,string& strError);
     bool OFF_GetPayloadForReadPermissioned(vector<unsigned char>* payload,string& strError);
     
-    CPubKey WLT_FindReadPermissionedAddress(unsigned char* short_txid);
+    CPubKey WLT_FindReadPermissionedAddress(const unsigned char* short_txid);
     int WLT_CreateSubscription(mc_TxEntity *entity,uint32_t retrieve,uint32_t indexes,uint32_t *rescan_mode);
     int WLT_DeleteSubscription(mc_TxEntity *entity,uint32_t rescan_mode);
     int WLT_StartImport();

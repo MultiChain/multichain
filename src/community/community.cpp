@@ -122,7 +122,7 @@ bool mc_EnterpriseFeatures::OFF_ProcessChunkResponse(const mc_RelayRequest *requ
 
 
 
-CPubKey mc_EnterpriseFeatures::WLT_FindReadPermissionedAddress(unsigned char* short_txid)
+CPubKey mc_EnterpriseFeatures::WLT_FindReadPermissionedAddress(const unsigned char* short_txid)
 {
     CPubKey result;
     

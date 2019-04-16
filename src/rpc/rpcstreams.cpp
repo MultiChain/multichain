@@ -428,6 +428,10 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
                 restrict |= MC_ENT_ENTITY_RESTRICTION_NEED_SALTED;
             }
         }
+        if(permissions & MC_PTP_READ)
+        {
+            restrict |= MC_ENT_ENTITY_RESTRICTION_ONCHAIN;
+        }        
         if( restrict != 0 )
         {
             lpDetails->SetSpecialParamValue(MC_ENT_SPRM_RESTRICTIONS,(unsigned char*)&restrict,1);                         
@@ -1184,6 +1188,14 @@ Value subscribe(const Array& params, bool fHelp)
         mc_EntityDetails entity_to_subscribe;
         Value param=inputStrings[is];
         ParseEntityIdentifier(param,&entity_to_subscribe, MC_ENT_TYPE_ANY);           
+        if(entity_to_subscribe.AnyoneCanRead() == 0)
+        {
+            pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS);
+            if(!pEF->WLT_FindReadPermissionedAddress(entity_to_subscribe.GetTxID()+MC_AST_SHORT_TXID_OFFSET).IsValid())
+            {
+                throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with read permission for stream "+inputStrings[is]);                
+            }
+        }
         inputEntities.push_back(entity_to_subscribe);
     }
     
@@ -1196,10 +1208,6 @@ Value subscribe(const Array& params, bool fHelp)
         mc_TxEntity entity;
         if(lpEntity->GetEntityType() == MC_ENT_TYPE_STREAM)
         {
-            if(lpEntity->AnyoneCanRead() == 0)
-            {
-                pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS);
-            }
             entity.Zero();
             memcpy(entity.m_EntityID,lpEntity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
             entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
