@@ -772,6 +772,11 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                                     query_count++;
                                 }
                             }
+                            else
+                            {
+                                LogPrint("chunks","Dropped chunk (lost permission) %s\n",(*(uint256*)(collect_row->m_ChunkDef.m_Hash)).ToString().c_str());                
+                                collect_row->m_State.m_Status |= MC_CCF_DELETED;
+                            }
                         }
                     }
                 }

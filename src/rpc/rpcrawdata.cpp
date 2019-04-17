@@ -952,6 +952,18 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
     {
         restrict |= MC_ENT_ENTITY_RESTRICTION_NEED_SALTED;
     }
+    if(strError->size() == 0)
+    {
+        if(permissions & MC_PTP_READ)
+        {
+            if( (restrict |= MC_ENT_ENTITY_RESTRICTION_ONCHAIN ) == 0 )
+            {
+                *strError="onchain restriction should be set for read-permissioned streams";
+                *errorCode=RPC_NOT_ALLOWED;
+            }
+        }        
+    }
+    
     if(permissions & MC_PTP_READ)
     {
         restrict |= MC_ENT_ENTITY_RESTRICTION_ONCHAIN;

@@ -430,7 +430,10 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
         }
         if(permissions & MC_PTP_READ)
         {
-            restrict |= MC_ENT_ENTITY_RESTRICTION_ONCHAIN;
+            if( (restrict |= MC_ENT_ENTITY_RESTRICTION_ONCHAIN ) == 0 )
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "onchain restriction should be set for read-permissioned streams");                               
+            }
         }        
         if( restrict != 0 )
         {
