@@ -99,11 +99,6 @@ bool mc_EnterpriseFeatures::OFF_VerifySignatureScripts(uint32_t  msg_type_in,mc_
     return true;        
 }
 
-bool mc_EnterpriseFeatures::OFF_GetAddressesForSigning(map<uint160,int>& mapReadPermissionedStreams,set<CPubKey>& vAddresses,string& strError)
-{
-    return true;
-}
-
 bool mc_EnterpriseFeatures::OFF_CreateSignatureScripts(uint32_t  msg_type_in,mc_OffchainMessageID& msg_id_received,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags_in,
             vector<unsigned char>& vPayloadIn,set<CPubKey>& vAddresses,vector<CScript>& vSigScripts,string& strError)
 {    
@@ -122,7 +117,7 @@ bool mc_EnterpriseFeatures::OFF_ProcessChunkResponse(const mc_RelayRequest *requ
 
 
 
-CPubKey mc_EnterpriseFeatures::WLT_FindReadPermissionedAddress(const unsigned char* short_txid)
+CPubKey mc_EnterpriseFeatures::WLT_FindReadPermissionedAddress(mc_EntityDetails* entity)
 {
     CPubKey result;
     

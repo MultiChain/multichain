@@ -54,14 +54,13 @@ typedef struct mc_EnterpriseFeatures
         map<uint160,int>& mapReadPermissionedStreams,string& strError);
     bool OFF_ProcessChunkResponse(const mc_RelayRequest *request,const mc_RelayResponse *response,map <int,int>* request_pairs,mc_ChunkCollector* collector);
     bool OFF_GetScriptsToVerify(map<uint160,int>& mapReadPermissionedStreams,vector<CScript>& vSigScriptsIn,vector<CScript>& vSigScriptsToVerify,string& strError);
-    bool OFF_GetAddressesForSigning(map<uint160,int>& mapReadPermissionedStreams,set<CPubKey>& vAddresses,string& strError);
     bool OFF_VerifySignatureScripts(uint32_t  msg_type_in,mc_OffchainMessageID& msg_id_received,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags_in,
             vector<unsigned char>& vPayloadIn,vector<CScript>& vSigScriptsToVerify,string& strError);
     bool OFF_CreateSignatureScripts(uint32_t  msg_type_in,mc_OffchainMessageID& msg_id_received,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags_in,
             vector<unsigned char>& vPayloadIn,set<CPubKey>& vAddresses,vector<CScript>& vSigScripts,string& strError);
     bool OFF_GetPayloadForReadPermissioned(vector<unsigned char>* payload,string& strError);
     
-    CPubKey WLT_FindReadPermissionedAddress(const unsigned char* short_txid);
+    CPubKey WLT_FindReadPermissionedAddress(mc_EntityDetails* entity);
     int WLT_CreateSubscription(mc_TxEntity *entity,uint32_t retrieve,uint32_t indexes,uint32_t *rescan_mode);
     int WLT_DeleteSubscription(mc_TxEntity *entity,uint32_t rescan_mode);
     int WLT_StartImport();

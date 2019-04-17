@@ -1191,7 +1191,7 @@ Value subscribe(const Array& params, bool fHelp)
         if(entity_to_subscribe.AnyoneCanRead() == 0)
         {
             pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS);
-            if(!pEF->WLT_FindReadPermissionedAddress(entity_to_subscribe.GetTxID()+MC_AST_SHORT_TXID_OFFSET).IsValid())
+            if(!pEF->WLT_FindReadPermissionedAddress(&entity_to_subscribe).IsValid())
             {
                 throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with read permission for stream "+inputStrings[is]);                
             }

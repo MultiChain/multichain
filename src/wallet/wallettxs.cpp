@@ -2422,7 +2422,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                             }
                                             else
                                             {
-                                                if(pEF->WLT_FindReadPermissionedAddress(short_txid).IsValid())
+                                                if(pEF->WLT_FindReadPermissionedAddress(&entity_details).IsValid())
                                                 {
                                                     insert_it=true;                                                                                                    
                                                 }
