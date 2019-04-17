@@ -633,8 +633,8 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         }
         else
         {
-            if(fDebug)LogPrint("chunks","Cannot send chunk request: %s, response: %s, chunks: %d, lost permission\n",
-                    request_id.ToString().c_str(),response->m_MsgID.ToString().c_str(),item.second.m_Pairs.size());                        
+            if(fDebug)LogPrint("chunks","Cannot send chunk request: %s, chunks: %d, lost permission\n",
+                    request_id.ToString().c_str(),item.second.m_Pairs.size());                        
         }
     }
 
@@ -774,7 +774,8 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                             }
                             else
                             {
-                                LogPrint("chunks","Dropped chunk (lost permission) %s\n",(*(uint256*)(collect_row->m_ChunkDef.m_Hash)).ToString().c_str());                
+                                unsigned char* ptrhash=collect_row->m_ChunkDef.m_Hash;
+                                LogPrint("chunks","Dropped chunk (lost permission) %s\n",(*(uint256*)ptrhash).ToString().c_str());                
                                 collect_row->m_State.m_Status |= MC_CCF_DELETED;
                             }
                         }
@@ -980,7 +981,8 @@ bool mc_RelayProcess_Chunk_Query(unsigned char *ptrStart,unsigned char *ptrEnd,v
                 for(int c=0;c<count;c++)
                 {
                     chunk=*(mc_ChunkEntityKey*)ptr;
-                    if(mc_IsReadPermissionedStream(&chunk,mapReadPermissionCache,NULL) == 0)
+                    if( (mc_IsReadPermissionedStream(&chunk,mapReadPermissionCache,NULL) == 0) ||
+                        (pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS,strError) != 0) )
                     {
                         if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,chunk.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
                         {

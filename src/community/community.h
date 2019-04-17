@@ -52,7 +52,7 @@ typedef struct mc_EnterpriseFeatures
     
     bool OFF_ProcessChunkRequest(unsigned char *ptrStart,unsigned char *ptrEnd,vector<unsigned char>* payload_response,vector<unsigned char>* payload_relay,
         map<uint160,int>& mapReadPermissionedStreams,string& strError);
-    bool OFF_ProcessChunkResponse(const mc_RelayRequest *request,const mc_RelayResponse *response,map <int,int>* request_pairs,mc_ChunkCollector* collector);
+    bool OFF_ProcessChunkResponse(mc_RelayRequest *request,mc_RelayResponse *response,map <int,int>* request_pairs,mc_ChunkCollector* collector);
     bool OFF_GetScriptsToVerify(map<uint160,int>& mapReadPermissionedStreams,vector<CScript>& vSigScriptsIn,vector<CScript>& vSigScriptsToVerify,string& strError);
     bool OFF_VerifySignatureScripts(uint32_t  msg_type_in,mc_OffchainMessageID& msg_id_received,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags_in,
             vector<unsigned char>& vPayloadIn,vector<CScript>& vSigScriptsToVerify,string& strError);

@@ -110,7 +110,7 @@ bool mc_EnterpriseFeatures::OFF_GetPayloadForReadPermissioned(vector<unsigned ch
     return true;
 }
 
-bool mc_EnterpriseFeatures::OFF_ProcessChunkResponse(const mc_RelayRequest *request,const mc_RelayResponse *response,map <int,int>* request_pairs,mc_ChunkCollector* collector)
+bool mc_EnterpriseFeatures::OFF_ProcessChunkResponse(mc_RelayRequest *request,mc_RelayResponse *response,map <int,int>* request_pairs,mc_ChunkCollector* collector)
 {
     return true;
 }
