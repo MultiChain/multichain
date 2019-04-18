@@ -305,6 +305,18 @@ int MultichainResponseScore(mc_RelayResponse *response,mc_ChunkCollectorRow *col
     
     ptr=ptrStart;
     ptrEnd=ptr+response->m_Payload.size();
+    if(*ptr == MC_RDT_ENCRYPTION_OPTIONS)
+    {
+        if(mc_gState->m_Features->ReadPermissions())
+        {
+            ptr++;
+            ptr+=sizeof(uint32_t);
+        }
+        else
+        {
+            return MC_CCW_WORST_RESPONSE_SCORE;                    
+        }
+    }
     ptr++;
     count=(int)mc_GetVarInt(ptr,ptrEnd-ptr,-1,&shift);
     ptr+=shift;
@@ -358,6 +370,8 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     vector<int> vRows;
     CRelayRequestPairs request_pairs;
     int best_score,best_response,this_score,not_processed;
+    map<uint160,int> mapReadPermissionCache;
+    set<CPubKey> sAddressesToSign;
     
     pRelayManager->CheckTime();
     pRelayManager->InvalidateResponsesFromDisconnected();
@@ -558,11 +572,10 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     {
         string strError;
         bool lost_permission=false;
-        map<uint160,int> mapReadPermissionCache;
-        set<CPubKey> sAddressesToSign;
-        vector<unsigned char> vRPPayload;
         mapReadPermissionCache.clear();
         sAddressesToSign.clear();
+        
+        vector<unsigned char> vRPPayload;
         BOOST_FOREACH(PAIRTYPE(const int, int)& chunk_row, item.second.m_Pairs)    
         {                            
             collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(chunk_row.first);
@@ -574,6 +587,14 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         if(!lost_permission)
         {
             vRPPayload.clear();
+            request=pRelayManager->FindRequest(item.first.request_id);
+            if(request == NULL)
+            {
+                return false;
+            }
+
+            response=&(request->m_Responses[item.first.response_id]);
+            
             if(sAddressesToSign.size())
             {
                 pEF->OFF_GetPayloadForReadPermissioned(&vRPPayload,strError);
@@ -582,13 +603,6 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
             payload.clear();
             shift=mc_PutVarInt(buf,16,item.second.m_Pairs.size());
             payload.resize(5+1+shift+vRPPayload.size()+sizeof(mc_ChunkEntityKey)*item.second.m_Pairs.size());
-            request=pRelayManager->FindRequest(item.first.request_id);
-            if(request == NULL)
-            {
-                return false;
-            }
-
-            response=&(request->m_Responses[item.first.response_id]);
 
             expiration=time_now+collector->m_TimeoutRequest;
             dest_expiration=expiration+response->m_MsgID.m_TimeStamp-request->m_MsgID.m_TimeStamp;// response->m_TimeDiff;
@@ -643,10 +657,11 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     last_count=0;
     total_size=0;
     
+    mapReadPermissionCache.clear();
+    sAddressesToSign.clear();
+    
     while(row<=collector->m_MemPool->GetCount())
     {
-        map<uint160,int> mapReadPermissionCache;
-        set<CPubKey> sAddressesToSign;
         string strError;
         collect_row=NULL;
         if(row<collector->m_MemPool->GetCount())
@@ -661,10 +676,24 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         {
             if(last_count)
             {
+                int extra_size=0;
+                if(sAddressesToSign.size())
+                {
+                    extra_size+=1+sizeof(uint32_t);
+                }
                 payload.clear();
                 shift=mc_PutVarInt(buf,16,last_count);
-                payload.resize(1+shift+sizeof(mc_ChunkEntityKey)*last_count);
+                payload.resize(1+extra_size+shift+sizeof(mc_ChunkEntityKey)*last_count);
                 ptrOut=&(payload[0]);
+                
+                if(sAddressesToSign.size())
+                {
+                    uint32_t subscriber_encryption=pEF->OFF_SupportedEncryptionOptions(MC_EOP_ALL);
+                    *ptrOut=MC_RDT_ENCRYPTION_OPTIONS;
+                    ptrOut++;
+                    mc_PutLE(ptrOut,&subscriber_encryption,sizeof(subscriber_encryption));
+                    ptrOut+=sizeof(subscriber_encryption);                    
+                }
                 
                 *ptrOut=MC_RDT_CHUNK_IDS;
                 ptrOut++;
@@ -707,6 +736,8 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                 last_row=row;
                 last_count=0;     
                 total_size=0;
+                mapReadPermissionCache.clear();
+                sAddressesToSign.clear();
             }
         }
         
@@ -925,20 +956,34 @@ int MultichainCollectChunksQueueStats(mc_ChunkCollector* collector)
     return delay;
 }
 
-void mc_RelayPayload_ChunkIDs(vector<unsigned char>* payload,vector <mc_ChunkEntityKey>& vChunkDefs,int size)
+void mc_RelayPayload_ChunkIDs(vector<unsigned char>* payload,vector <mc_ChunkEntityKey>& vChunkDefs,int size,uint32_t encryption_options)
 {
     unsigned char buf[16];
-    int shift;
+    int shift,extra_size;
     unsigned char *ptrOut;
     
     if(payload)
     {
         if(vChunkDefs.size())
         {
+            extra_size=0;
+            if(encryption_options)
+            {
+                extra_size+=1+sizeof(encryption_options);
+            }
+            
             shift=mc_PutVarInt(buf,16,vChunkDefs.size());
-            payload->resize(1+shift+size*vChunkDefs.size());
+            payload->resize(1+extra_size+shift+size*vChunkDefs.size());
             ptrOut=&(*payload)[0];
 
+            if(encryption_options)
+            {
+                *ptrOut=MC_RDT_ENCRYPTION_OPTIONS;
+                ptrOut++;
+                mc_PutLE(ptrOut,&encryption_options,sizeof(encryption_options));
+                ptrOut+=sizeof(encryption_options);                                    
+            }
+            
             *ptrOut=MC_RDT_CHUNK_IDS;
             ptrOut++;
             memcpy(ptrOut,buf,shift);
@@ -962,6 +1007,9 @@ bool mc_RelayProcess_Chunk_Query(unsigned char *ptrStart,unsigned char *ptrEnd,v
     map<uint160,int> mapReadPermissionCache;
     mc_ChunkEntityKey chunk;
     mc_ChunkDBRow chunk_def;
+    uint32_t subscriber_encryption=0;
+    uint32_t publisher_encryption=0;
+    
     
     size=sizeof(mc_ChunkEntityKey);
     ptr=ptrStart;
@@ -969,6 +1017,20 @@ bool mc_RelayProcess_Chunk_Query(unsigned char *ptrStart,unsigned char *ptrEnd,v
     {
         switch(*ptr)
         {
+            case MC_RDT_ENCRYPTION_OPTIONS:
+                if(mc_gState->m_Features->ReadPermissions())
+                {
+                    ptr++;
+                    subscriber_encryption=(uint32_t)mc_GetLE(ptr,sizeof(subscriber_encryption));
+                    ptr+=sizeof(subscriber_encryption);
+                    publisher_encryption=pEF->OFF_SupportedEncryptionOptions(subscriber_encryption);
+                }
+                else
+                {
+                    strError=strprintf("Request format (%d, %d) not supported in this protocol version",MC_RMT_CHUNK_QUERY,*ptr);
+                    return false;                    
+                }
+                break;
             case MC_RDT_CHUNK_IDS:
                 ptr++;
                 count=(int)mc_GetVarInt(ptr,ptrEnd-ptr,-1,&shift);
@@ -980,9 +1042,10 @@ bool mc_RelayProcess_Chunk_Query(unsigned char *ptrStart,unsigned char *ptrEnd,v
                 }                
                 for(int c=0;c<count;c++)
                 {
+                    string strErrorToIgnore;
                     chunk=*(mc_ChunkEntityKey*)ptr;
                     if( (mc_IsReadPermissionedStream(&chunk,mapReadPermissionCache,NULL) == 0) ||
-                        (pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS,strError) != 0) )
+                        ((pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS,strErrorToIgnore) != 0) && (publisher_encryption != 0) ))
                     {
                         if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,chunk.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
                         {
@@ -1005,8 +1068,8 @@ bool mc_RelayProcess_Chunk_Query(unsigned char *ptrStart,unsigned char *ptrEnd,v
                     ptr+=size;
                 }
 
-                mc_RelayPayload_ChunkIDs(payload_response,vToRespond,size);
-                mc_RelayPayload_ChunkIDs(payload_relay,vToRelay,size);
+                mc_RelayPayload_ChunkIDs(payload_response,vToRespond,size,publisher_encryption);
+                mc_RelayPayload_ChunkIDs(payload_relay,vToRelay,size,subscriber_encryption);
                 break;
             default:
                 strError=strprintf("Unsupported request format (%d, %d)",MC_RMT_CHUNK_QUERY,*ptr);

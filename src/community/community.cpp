@@ -115,6 +115,11 @@ bool mc_EnterpriseFeatures::OFF_ProcessChunkResponse(mc_RelayRequest *request,mc
     return true;
 }
 
+uint32_t mc_EnterpriseFeatures::OFF_SupportedEncryptionOptions(uint32_t min_options)
+{
+    return 0;
+}
+
 
 
 CPubKey mc_EnterpriseFeatures::WLT_FindReadPermissionedAddress(mc_EntityDetails* entity)

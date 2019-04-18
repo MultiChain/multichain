@@ -60,9 +60,12 @@
 #define MC_RDT_EXPIRATION                          0x03
 #define MC_RDT_CHUNK_IDS                           0x11
 #define MC_RDT_CHUNKS                              0x12
+#define MC_RDT_ENCRYPTION_OPTIONS                  0x21
 
 #define MC_LIM_MAX_SECONDS                60
 #define MC_LIM_MAX_MEASURES                4
+
+
 
 #define MC_RST_NONE                          0x00000000
 #define MC_RST_DELETED                       0x00000001
@@ -70,6 +73,8 @@
 #define MC_RST_PERMANENT_FAILURE             0x00000004
 #define MC_RST_TEMPORARY_FAILURE             0x00000008
 #define MC_RST_DISCONNECTED                  0x00000010
+
+#define MC_EOP_ALL                           0xFFFFFFFF
 
 using namespace std;
 
