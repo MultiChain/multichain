@@ -2399,11 +2399,16 @@ bool mc_RelayManager::ProcessRelay( CNode* pfrom,
                                        msg_type_response_ptr,&flags_response,vPayloadResponse,vSigScriptsRespond,
                                        msg_type_relay_ptr,&flags_relay,vPayloadRelay,vSigScriptsRelay,strError))
             {
-                if(!pEF->OFF_VerifySignatureScripts(msg_type_in,msg_id_received,msg_id_to_respond,flags_in,vPayloadIn,vSigScriptsToVerify,strError))
+                int dos_score=0;
+                if(!pEF->OFF_VerifySignatureScripts(msg_type_in,msg_id_received,msg_id_to_respond,flags_in,vPayloadIn,vSigScriptsToVerify,strError,dos_score))
                 {
                     LogPrintf("ProcessOffchain() : Error processing %s (request %s) from peer %d: %s\n",mc_MsgTypeStr(msg_type_in).c_str(),
                             msg_id_received.ToString().c_str(),pfrom->GetId(),strError.c_str());     
-                    return false;                                    
+                    if(dos_score)
+                    {
+                        return state.DoS(dos_score, error("ProcessOffchain() : Invalid sigScript"),REJECT_INVALID, "bad-sigscript");       
+                    }
+                    return false;
                 }
                 if(msg_type_response_ptr && *msg_type_response_ptr)
                 {

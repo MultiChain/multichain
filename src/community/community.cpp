@@ -93,14 +93,14 @@ bool mc_EnterpriseFeatures::OFF_GetScriptsToVerify(map<uint160,int>& mapReadPerm
     return true;
 }
 
-bool mc_EnterpriseFeatures::OFF_VerifySignatureScripts(uint32_t  msg_type_in,mc_OffchainMessageID& msg_id_received,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags_in,
-            vector<unsigned char>& vPayloadIn,vector<CScript>& vSigScriptsToVerify,string& strError)
+bool mc_EnterpriseFeatures::OFF_VerifySignatureScripts(uint32_t  msg_type,mc_OffchainMessageID& msg_id,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags,
+            vector<unsigned char>& vPayload,vector<CScript>& vSigScriptsToVerify,string& strError,int& dos_score)
 {
     return true;        
 }
 
-bool mc_EnterpriseFeatures::OFF_CreateSignatureScripts(uint32_t  msg_type_in,mc_OffchainMessageID& msg_id_received,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags_in,
-            vector<unsigned char>& vPayloadIn,set<CPubKey>& vAddresses,vector<CScript>& vSigScripts,string& strError)
+bool mc_EnterpriseFeatures::OFF_CreateSignatureScripts(uint32_t  msg_type,mc_OffchainMessageID& msg_id,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags,
+            vector<unsigned char>& vPayload,set<CPubKey>& vAddresses,vector<CScript>& vSigScripts,string& strError)
 {    
     return true;
 }
