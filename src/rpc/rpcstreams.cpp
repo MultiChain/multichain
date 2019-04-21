@@ -1051,7 +1051,7 @@ Value publishfrom(const Array& params, bool fHelp)
     
     if(stream_entity.AnyoneCanRead() == 0)
     {
-        pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS);
+        pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS,"Publishing to read-restricted stream");
     }
     
     if(stream_entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_NEED_SALTED)
@@ -1108,7 +1108,7 @@ Value trimsubscribe(const Array& params, bool fHelp)
     if (fHelp || params.size() != 2)
         throw runtime_error("Help message not found\n");
     
-    pEF->ENT_RPCVerifyEdition();
+    pEF->ENT_RPCVerifyEdition("trimsubscribe API");
     
     string indexes=params[1].get_str();
     
@@ -1171,7 +1171,7 @@ Value subscribe(const Array& params, bool fHelp)
 
     if (params.size() > 2)
     {
-        pEF->ENT_RPCVerifyEdition();
+        pEF->ENT_RPCVerifyEdition("Controlled subscriptions");
         indexes=params[2].get_str();
     }
     
@@ -1193,7 +1193,7 @@ Value subscribe(const Array& params, bool fHelp)
         ParseEntityIdentifier(param,&entity_to_subscribe, MC_ENT_TYPE_ANY);           
         if(entity_to_subscribe.AnyoneCanRead() == 0)
         {
-            pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS);
+            pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS,"Subscribing to read-restricted stream");
             if(!pEF->WLT_FindReadPermissionedAddress(&entity_to_subscribe).IsValid())
             {
                 throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with read permission for stream "+inputStrings[is]);                
@@ -2960,7 +2960,7 @@ Value retrievestreamitems(const Array& params, bool fHelp)
     if (fHelp || params.size() != 2)
         throw runtime_error("Help message not found\n");
     
-    pEF->ENT_RPCVerifyEdition();
+    pEF->ENT_RPCVerifyEdition("retrievestreamitems API");
     
     return pEF->STR_RPCRetrieveStreamItems(params);
 }
@@ -2970,7 +2970,7 @@ Value purgestreamitems(const Array& params, bool fHelp)
     if (fHelp || params.size() != 2)
         throw runtime_error("Help message not found\n");
     
-    pEF->ENT_RPCVerifyEdition();
+    pEF->ENT_RPCVerifyEdition("purgestreamitems API");
     
     return pEF->STR_RPCPurgeStreamItems(params);
 }
@@ -2980,7 +2980,7 @@ Value purgepublisheditems(const Array& params, bool fHelp)
     if (fHelp || params.size() != 1)
         throw runtime_error("Help message not found\n");
     
-    pEF->ENT_RPCVerifyEdition();
+    pEF->ENT_RPCVerifyEdition("purgepublisheditems API");
     
     return pEF->STR_RPCPurgePublishedItems(params);
 }

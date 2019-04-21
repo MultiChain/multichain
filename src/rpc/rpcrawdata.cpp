@@ -1587,7 +1587,7 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
 
         if(entity->AnyoneCanRead() == 0)
         {
-            pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS);
+            pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS,"Publishing to read-restricted stream");
         }
         
         if(entity->Restrictions() & MC_ENT_ENTITY_RESTRICTION_NEED_SALTED)

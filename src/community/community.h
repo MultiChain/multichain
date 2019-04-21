@@ -72,11 +72,11 @@ typedef struct mc_EnterpriseFeatures
     std::string ENT_Edition();
     int ENT_EditionNumeric();
     int ENT_MinWalletDatVersion();
-    void ENT_RPCVerifyEdition();
+    void ENT_RPCVerifyEdition(std::string message);
     std::string ENT_TextConstant(const char* name);
     void ENT_InitRPCHelpMap();
     
-    void LIC_RPCVerifyFeature(uint64_t feature);
+    void LIC_RPCVerifyFeature(uint64_t feature,std::string message);
     bool LIC_VerifyFeature(uint64_t feature,std::string& reason);
 //    bool LIC_VerifyConfirmation(uint160 address,void *confirmation, size_t size,std::string& reason);
 //    string LIC_LicenseName(void *confirmation, size_t size);

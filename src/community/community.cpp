@@ -177,9 +177,9 @@ int mc_EnterpriseFeatures::ENT_MinWalletDatVersion()
     return 2;
 }
 
-void mc_EnterpriseFeatures::ENT_RPCVerifyEdition() 
+void mc_EnterpriseFeatures::ENT_RPCVerifyEdition(string message) 
 {
-    throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is available only in Enterprise edition of MultiChain, please call \"help enterprise\" for details");        
+    throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is only available in MultiChain Enterprise" + message.size() ? (": " + message) : "");        
 }
 
 std::string mc_EnterpriseFeatures::ENT_TextConstant(const char* name)
@@ -193,9 +193,9 @@ void mc_EnterpriseFeatures::ENT_InitRPCHelpMap()
 }
 
 
-void mc_EnterpriseFeatures::LIC_RPCVerifyFeature(uint64_t feature)
+void mc_EnterpriseFeatures::LIC_RPCVerifyFeature(uint64_t feature,string message)
 {
-    throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is available only in Enterprise edition of MultiChain, please call \"help enterprise\" for details");            
+    throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is only available in MultiChain Enterprise" + message.size() ? (": " + message) : "");            
 }
 
 bool mc_EnterpriseFeatures::LIC_VerifyFeature(uint64_t feature,std::string& reason)
