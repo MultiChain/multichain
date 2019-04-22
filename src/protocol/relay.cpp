@@ -305,12 +305,14 @@ int MultichainResponseScore(mc_RelayResponse *response,mc_ChunkCollectorRow *col
     
     ptr=ptrStart;
     ptrEnd=ptr+response->m_Payload.size();
-    if(*ptr == MC_RDT_ENCRYPTION_OPTIONS)
+    if(*ptr == MC_RDT_ENTERPRISE_FEATURES)
     {
         if(mc_gState->m_Features->ReadPermissions())
         {
             ptr++;
-            ptr+=sizeof(uint32_t);
+            int length=mc_GetVarInt(ptr,ptrEnd-ptr,-1,&shift);
+            ptr+=shift;
+            ptr+=length;
         }
         else
         {
@@ -677,24 +679,30 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
             if(last_count)
             {
                 int extra_size=0;
+                int ef_size;
+                const unsigned char* ef=pEF->OFF_SupportedEnterpriseFeatures(NULL,0,&ef_size);
                 if(sAddressesToSign.size())
                 {
-                    extra_size+=1+sizeof(uint32_t);
+                    shift=mc_PutVarInt(buf,16,ef_size);
+                    extra_size+=1+shift+ef_size;
                 }
                 payload.clear();
                 shift=mc_PutVarInt(buf,16,last_count);
-                payload.resize(1+extra_size+shift+sizeof(mc_ChunkEntityKey)*last_count);
+                payload.resize(extra_size+1+shift+sizeof(mc_ChunkEntityKey)*last_count);
                 ptrOut=&(payload[0]);
                 
                 if(sAddressesToSign.size())
                 {
-                    uint32_t subscriber_encryption=pEF->OFF_SupportedEncryptionOptions(MC_EOP_ALL);
-                    *ptrOut=MC_RDT_ENCRYPTION_OPTIONS;
+                    shift=mc_PutVarInt(buf,16,ef_size);
+                    *ptrOut=MC_RDT_ENTERPRISE_FEATURES;
                     ptrOut++;
-                    mc_PutLE(ptrOut,&subscriber_encryption,sizeof(subscriber_encryption));
-                    ptrOut+=sizeof(subscriber_encryption);                    
+                    memcpy(ptrOut,buf,shift);
+                    ptrOut+=shift;
+                    memcpy(ptrOut,ef,ef_size);
+                    ptrOut+=ef_size;
                 }
                 
+                shift=mc_PutVarInt(buf,16,last_count);
                 *ptrOut=MC_RDT_CHUNK_IDS;
                 ptrOut++;
                 memcpy(ptrOut,buf,shift);
@@ -956,7 +964,7 @@ int MultichainCollectChunksQueueStats(mc_ChunkCollector* collector)
     return delay;
 }
 
-void mc_RelayPayload_ChunkIDs(vector<unsigned char>* payload,vector <mc_ChunkEntityKey>& vChunkDefs,int size,uint32_t encryption_options)
+void mc_RelayPayload_ChunkIDs(vector<unsigned char>* payload,vector <mc_ChunkEntityKey>& vChunkDefs,int size,const unsigned char* ef,int ef_size)
 {
     unsigned char buf[16];
     int shift,extra_size;
@@ -967,23 +975,28 @@ void mc_RelayPayload_ChunkIDs(vector<unsigned char>* payload,vector <mc_ChunkEnt
         if(vChunkDefs.size())
         {
             extra_size=0;
-            if(encryption_options)
+            if(ef)
             {
-                extra_size+=1+sizeof(encryption_options);
+                shift=mc_PutVarInt(buf,16,ef_size);
+                extra_size+=1+shift+ef_size;
             }
             
             shift=mc_PutVarInt(buf,16,vChunkDefs.size());
-            payload->resize(1+extra_size+shift+size*vChunkDefs.size());
+            payload->resize(extra_size+1+shift+size*vChunkDefs.size());
             ptrOut=&(*payload)[0];
 
-            if(encryption_options)
+            if(ef)
             {
-                *ptrOut=MC_RDT_ENCRYPTION_OPTIONS;
+                shift=mc_PutVarInt(buf,16,ef_size);
+                *ptrOut=MC_RDT_ENTERPRISE_FEATURES;
                 ptrOut++;
-                mc_PutLE(ptrOut,&encryption_options,sizeof(encryption_options));
-                ptrOut+=sizeof(encryption_options);                                    
+                memcpy(ptrOut,buf,shift);
+                ptrOut+=shift;
+                memcpy(ptrOut,ef,ef_size);
+                ptrOut+=ef_size;
             }
             
+            shift=mc_PutVarInt(buf,16,vChunkDefs.size());
             *ptrOut=MC_RDT_CHUNK_IDS;
             ptrOut++;
             memcpy(ptrOut,buf,shift);
@@ -1001,29 +1014,38 @@ void mc_RelayPayload_ChunkIDs(vector<unsigned char>* payload,vector <mc_ChunkEnt
 bool mc_RelayProcess_Chunk_Query(unsigned char *ptrStart,unsigned char *ptrEnd,vector<unsigned char>* payload_response,vector<unsigned char>* payload_relay,string& strError)
 {
     unsigned char *ptr;
-    int shift,count,size;
+    int shift,count,size,subscriber_ef_length,publisher_ef_length;
     vector <mc_ChunkEntityKey> vToRelay;
     vector <mc_ChunkEntityKey> vToRespond;
     map<uint160,int> mapReadPermissionCache;
     mc_ChunkEntityKey chunk;
     mc_ChunkDBRow chunk_def;
-    uint32_t subscriber_encryption=0;
-    uint32_t publisher_encryption=0;
     
-    
+    unsigned char *subscriber_ef=NULL;
+    unsigned char *publisher_ef=NULL;
+    subscriber_ef_length=0;
+    publisher_ef_length=0;
+        
     size=sizeof(mc_ChunkEntityKey);
     ptr=ptrStart;
     while(ptr<ptrEnd)
     {
         switch(*ptr)
         {
-            case MC_RDT_ENCRYPTION_OPTIONS:
+            case MC_RDT_ENTERPRISE_FEATURES:
                 if(mc_gState->m_Features->ReadPermissions())
                 {
                     ptr++;
-                    subscriber_encryption=(uint32_t)mc_GetLE(ptr,sizeof(subscriber_encryption));
-                    ptr+=sizeof(subscriber_encryption);
-                    publisher_encryption=pEF->OFF_SupportedEncryptionOptions(subscriber_encryption);
+                    subscriber_ef_length=(int)mc_GetVarInt(ptr,ptrEnd-ptr,-1,&shift);
+                    ptr+=shift;
+                    if(subscriber_ef_length > MC_CCW_MAX_EF_SIZE)
+                    {
+                        strError="Bad enterprise features object";
+                        return false;                                            
+                    }
+                    subscriber_ef=ptr;
+                    publisher_ef=pEF->OFF_SupportedEnterpriseFeatures(subscriber_ef,subscriber_ef_length,&publisher_ef_length);                    
+                    ptr+=subscriber_ef_length;
                 }
                 else
                 {
@@ -1045,7 +1067,7 @@ bool mc_RelayProcess_Chunk_Query(unsigned char *ptrStart,unsigned char *ptrEnd,v
                     string strErrorToIgnore;
                     chunk=*(mc_ChunkEntityKey*)ptr;
                     if( (mc_IsReadPermissionedStream(&chunk,mapReadPermissionCache,NULL) == 0) ||
-                        ((pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_GIVE,strErrorToIgnore) != 0) && (publisher_encryption != 0) ))
+                        ((pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_GIVE,strErrorToIgnore) != 0) && (publisher_ef != NULL) ))
                     {
                         if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,chunk.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
                         {
@@ -1068,8 +1090,8 @@ bool mc_RelayProcess_Chunk_Query(unsigned char *ptrStart,unsigned char *ptrEnd,v
                     ptr+=size;
                 }
 
-                mc_RelayPayload_ChunkIDs(payload_response,vToRespond,size,publisher_encryption);
-                mc_RelayPayload_ChunkIDs(payload_relay,vToRelay,size,subscriber_encryption);
+                mc_RelayPayload_ChunkIDs(payload_response,vToRespond,size,publisher_ef,publisher_ef_length);
+                mc_RelayPayload_ChunkIDs(payload_relay,vToRelay,size,subscriber_ef,subscriber_ef_length);
                 break;
             default:
                 strError=strprintf("Unsupported request format (%d, %d)",MC_RMT_CHUNK_QUERY,*ptr);

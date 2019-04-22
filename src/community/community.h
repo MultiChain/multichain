@@ -63,7 +63,7 @@ typedef struct mc_EnterpriseFeatures
     bool OFF_CreateSignatureScripts(uint32_t  msg_type,mc_OffchainMessageID& msg_id,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags,
             vector<unsigned char>& vPayload,set<CPubKey>& vAddresses,vector<CScript>& vSigScripts,string& strError);
     bool OFF_GetPayloadForReadPermissioned(vector<unsigned char>* payload,string& strError);
-    uint32_t OFF_SupportedEncryptionOptions(uint32_t min_options);
+    unsigned char* OFF_SupportedEnterpriseFeatures(unsigned char* min_ef,int min_ef_size,int *ef_size);
     
     CPubKey WLT_FindReadPermissionedAddress(mc_EntityDetails* entity);
     int WLT_CreateSubscription(mc_TxEntity *entity,uint32_t retrieve,uint32_t indexes,uint32_t *rescan_mode);

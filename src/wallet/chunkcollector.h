@@ -32,6 +32,7 @@
 #define MC_CCW_MAX_DELAY_BETWEEN_COLLECTS       1000
 #define MC_CCW_QUERY_SPLIT                         4
 #define MC_CCW_MAX_ITEMS_PER_CHUNKFOR_CHECK       16
+#define MC_CCW_MAX_EF_SIZE                     65536
 
 
 typedef struct mc_ChunkEntityKey
