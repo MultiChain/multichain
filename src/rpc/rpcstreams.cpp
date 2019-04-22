@@ -1051,7 +1051,7 @@ Value publishfrom(const Array& params, bool fHelp)
     
     if(stream_entity.AnyoneCanRead() == 0)
     {
-        pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS,"Publishing to read-restricted stream");
+        pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_WRITE,"Publishing to read-restricted stream");
     }
     
     if(stream_entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_NEED_SALTED)
@@ -1193,7 +1193,7 @@ Value subscribe(const Array& params, bool fHelp)
         ParseEntityIdentifier(param,&entity_to_subscribe, MC_ENT_TYPE_ANY);           
         if(entity_to_subscribe.AnyoneCanRead() == 0)
         {
-            pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_PERMISSIONS,"Subscribing to read-restricted stream");
+            pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_READ,"Subscribing to read-restricted stream");
             if(!pEF->WLT_FindReadPermissionedAddress(&entity_to_subscribe).IsValid())
             {
                 throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet doesn't have keys with read permission for stream "+inputStrings[is]);                
