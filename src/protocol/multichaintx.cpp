@@ -1600,6 +1600,7 @@ bool MultiChainTransaction_CheckTransfers(const CTransaction& tx,               
     return true;
 }
 
+// this is not relevant, since we will use MIN_OFFCHAIN_FEE = 0
 int64_t MultiChainTransaction_OffchainFee(int64_t total_offchain_size)            // Total size of offchain items
 {
     return (MIN_OFFCHAIN_FEE*total_offchain_size + 999)/ 1000;

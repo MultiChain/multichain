@@ -8,8 +8,21 @@
 
 #include "utils/tinyformat.h"
 
+/* We want to fix a single transaction fee for every transaction in our blockchain 
+ * Because of that, we will consider here every transaction as being of the same size
+ */
+
+// Unique-fee start
+constexpr int canonical_transaction_size = 1;
+// Unique-fee end
+
+
 CFeeRate::CFeeRate(const CAmount& nFeePaid, size_t nSize)
 {
+    // Unique-fee start
+    nSize = canonical_transaction_size;    
+    // Unique-fee end
+
     if (nSize > 0)
         nSatoshisPerK = nFeePaid*1000/nSize;
     else
@@ -18,6 +31,10 @@ CFeeRate::CFeeRate(const CAmount& nFeePaid, size_t nSize)
 
 CAmount CFeeRate::GetFee(size_t nSize) const
 {
+    // Unique-fee start
+    nSize = canonical_transaction_size;
+    // Unique-fee end 
+    
     CAmount nFee = nSatoshisPerK*nSize / 1000;
 
     if (nFee == 0 && nSatoshisPerK > 0)
