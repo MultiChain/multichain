@@ -2340,6 +2340,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         }
     }
     
+    pEF->ENT_MaybeStop();
 
     // As LoadBlockIndex can take several minutes, it's possible the user
     // requested to kill the GUI during the last operation. If so, exit.

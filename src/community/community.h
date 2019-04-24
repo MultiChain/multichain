@@ -80,6 +80,7 @@ typedef struct mc_EnterpriseFeatures
     void ENT_RPCVerifyEdition(std::string message);
     std::string ENT_TextConstant(const char* name);
     void ENT_InitRPCHelpMap();
+    void ENT_MaybeStop();
     
     void LIC_RPCVerifyFeature(uint64_t feature,std::string message);
     bool LIC_VerifyFeature(uint64_t feature,std::string& reason);

@@ -202,6 +202,11 @@ std::string mc_EnterpriseFeatures::ENT_TextConstant(const char* name)
     return "";
 }
 
+void mc_EnterpriseFeatures::ENT_MaybeStop()
+{
+    
+}
+
 void mc_EnterpriseFeatures::ENT_InitRPCHelpMap()
 {
     

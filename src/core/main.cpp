@@ -28,6 +28,7 @@
 #include "keys/key.h"
 #include "wallet/wallet.h"
 #include "multichain/multichain.h"
+#include "community/community.h"
 #include "wallet/wallettxs.h"
 #include "script/script.h"
 #include "protocol/relay.h"
@@ -4810,6 +4811,9 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
     {
         ShrinkDebugFile();
     }
+    
+    pEF->ENT_MaybeStop();
+    
 /* MCHN END */    
     
     return true;
