@@ -158,7 +158,7 @@ bool MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map 
                 {
                     if(mc_IsReadPermissionedStream((mc_ChunkEntityKey*)ptr,mapReadPermissionCache,NULL))
                     {
-                        result=pEF->OFF_ProcessChunkResponse(request,response,request_pairs,collector);
+                        result=pEF->OFF_ProcessChunkResponse(request,response,request_pairs,collector,strError);
                         goto exitlbl;
                     }
                     total_size+=((mc_ChunkEntityKey*)ptr)->m_Size+size;
@@ -166,7 +166,7 @@ bool MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map 
                 }
                 break;
             default:
-                result=pEF->OFF_ProcessChunkResponse(request,response,request_pairs,collector);
+                result=pEF->OFF_ProcessChunkResponse(request,response,request_pairs,collector,strError);
                 goto exitlbl;
         }
     }
@@ -575,6 +575,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         string strError;
         bool lost_permission=false;
         mapReadPermissionCache.clear();
+        int ef_cache_id;
         sAddressesToSign.clear();
         
         vector<unsigned char> vRPPayload;
@@ -597,9 +598,15 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
 
             response=&(request->m_Responses[item.first.response_id]);
             
+            ef_cache_id=-1;
             if(sAddressesToSign.size())
             {
-                pEF->OFF_GetPayloadForReadPermissioned(&vRPPayload,strError);
+                if(!pEF->OFF_GetPayloadForReadPermissioned(&vRPPayload,&ef_cache_id,strError))
+                {
+                    if(fDebug)LogPrint("chunks","Error creating read-permissioned EF payload: %s\n",
+                            strError.c_str());                                            
+                }
+                
             }
 
             payload.clear();
@@ -633,7 +640,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                 count++;
             }
     //        mc_DumpSize("req",&(payload[0]),1+shift+sizeof(mc_ChunkEntityKey)*item.second.m_Pairs.size(),64);
-            request_id=pRelayManager->SendNextRequest(response,MC_RMT_CHUNK_REQUEST,0,payload,sAddressesToSign);
+            request_id=pRelayManager->SendNextRequest(response,MC_RMT_CHUNK_REQUEST,0,payload,sAddressesToSign,ef_cache_id);
             if(!request_id.IsZero())
             {
                 if(fDebug)LogPrint("chunks","New chunk request: %s, response: %s, chunks: %d\n",request_id.ToString().c_str(),response->m_MsgID.ToString().c_str(),item.second.m_Pairs.size());
@@ -1439,7 +1446,10 @@ bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
                 bool read_permissioned;
                 if(!mc_RelayProcess_Chunk_Request(ptr,ptrEnd,payload_response_ptr,payload_relay_ptr,mapReadPermissionCache,&read_permissioned,strError))
                 {
-                    goto exitlbl;                            
+                    if(!read_permissioned)
+                    {
+                        goto exitlbl;                            
+                    }
                 }
                 vSigScriptsToVerify.clear();
                 if(read_permissioned)
@@ -2517,11 +2527,12 @@ void mc_RelayRequest::Zero()
     m_TryCount=0;
     m_Status=MC_RST_NONE;
     m_DestinationID=0;
+    m_EFCacheID=-1;
     m_Payload.clear();   
     m_Responses.clear();
 }
 
-int mc_RelayManager::AddRequest(CNode *pto,int64_t destination,mc_OffchainMessageID msg_id,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status)
+int mc_RelayManager::AddRequest(CNode *pto,int64_t destination,mc_OffchainMessageID msg_id,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status,int ef_cache_id)
 {    
     int err=MC_ERR_NOERROR;
  
@@ -2539,6 +2550,7 @@ int mc_RelayManager::AddRequest(CNode *pto,int64_t destination,mc_OffchainMessag
         request.m_Status=status;
         request.m_DestinationID=destination;
         request.m_Payload=payload;   
+        request.m_EFCacheID=ef_cache_id;
         request.m_Responses.clear();
 
         if(fDebug)LogPrint("offchain","Offchain rqst: %s, to: %d, msg: %s, size: %d\n",msg_id.ToString().c_str(),pto ? pto->GetId() : 0,mc_MsgTypeStr(msg_type).c_str(),(int)payload.size());
@@ -2610,6 +2622,7 @@ int mc_RelayManager::DeleteRequest(mc_OffchainMessageID request)
     map<mc_OffchainMessageID, mc_RelayRequest>::iterator itreq = m_Requests.find(request);
     if(itreq != m_Requests.end())
     {
+        pEF->OFF_FreeEFCache(itreq->second.m_EFCacheID);
         m_Requests.erase(itreq);       
         if(fDebug)LogPrint("offchain","Offchain delete: %s, msg: %s, size: %d. Open requests: %d\n",itreq->second.m_MsgID.ToString().c_str(),
             mc_MsgTypeStr(itreq->second.m_MsgType).c_str(),(int)itreq->second.m_Payload.size(),(int)m_Requests.size());
@@ -2658,7 +2671,7 @@ mc_OffchainMessageID mc_RelayManager::SendRequest(CNode* pto,uint32_t msg_type,u
         }
     }
 
-    if(AddRequest(pto,0,msg_id,msg_type,flags,payload,MC_RST_NONE) != MC_ERR_NOERROR)
+    if(AddRequest(pto,0,msg_id,msg_type,flags,payload,MC_RST_NONE,-1) != MC_ERR_NOERROR)
     {
         UnLock();
         return mc_OffchainMessageID();
@@ -2667,7 +2680,7 @@ mc_OffchainMessageID mc_RelayManager::SendRequest(CNode* pto,uint32_t msg_type,u
     return msg_id;
 }
 
-mc_OffchainMessageID mc_RelayManager::SendNextRequest(mc_RelayResponse* response,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,set<CPubKey>& sAddresses)
+mc_OffchainMessageID mc_RelayManager::SendNextRequest(mc_RelayResponse* response,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,set<CPubKey>& sAddresses,int ef_cache_id)
 {
     mc_OffchainMessageID msg_id;
     vector <int32_t> vEmptyHops;
@@ -2689,7 +2702,7 @@ mc_OffchainMessageID mc_RelayManager::SendNextRequest(mc_RelayResponse* response
                 {
                     msg_id=PushRelay(pnode,0,vEmptyHops,vEmptySendPaths,msg_type,msg_id,response->m_MsgID,
                                          flags,payload,vSigScripts,NULL,MC_PRA_NONE);                    
-                    if(AddRequest(pnode,response->SourceID(),msg_id,msg_type,flags,payload,MC_RST_NONE) != MC_ERR_NOERROR)
+                    if(AddRequest(pnode,response->SourceID(),msg_id,msg_type,flags,payload,MC_RST_NONE,ef_cache_id) != MC_ERR_NOERROR)
                     {                    
                         UnLock();
                         return mc_OffchainMessageID();

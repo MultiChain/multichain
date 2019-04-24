@@ -105,12 +105,18 @@ bool mc_EnterpriseFeatures::OFF_CreateSignatureScripts(uint32_t  msg_type,mc_Off
     return true;
 }
 
-bool mc_EnterpriseFeatures::OFF_GetPayloadForReadPermissioned(vector<unsigned char>* payload,string& strError)
+bool mc_EnterpriseFeatures::OFF_GetPayloadForReadPermissioned(vector<unsigned char>* payload,int *ef_cache_id,string& strError)
 {
+    *ef_cache_id=-1;
     return true;
 }
 
-bool mc_EnterpriseFeatures::OFF_ProcessChunkResponse(mc_RelayRequest *request,mc_RelayResponse *response,map <int,int>* request_pairs,mc_ChunkCollector* collector)
+void mc_EnterpriseFeatures::OFF_FreeEFCache(int ef_cache_id)
+{
+    
+}
+
+bool mc_EnterpriseFeatures::OFF_ProcessChunkResponse(mc_RelayRequest *request,mc_RelayResponse *response,map <int,int>* request_pairs,mc_ChunkCollector* collector,string& strError)
 {
     return true;
 }
