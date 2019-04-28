@@ -2996,7 +2996,10 @@ int mc_TxDB::CompleteImport(mc_TxImport *import,uint32_t flags)
             lpdel->m_LastPos=lpent->m_LastPos; 
             if(lpent->m_Flags & MC_EFL_NOT_IN_SYNC)
             {
-                lpdel->m_LastPos+=pos-clearedpos;                               // New position including mempool
+                if(lpdel->m_Flags & MC_EFL_NOT_IN_SYNC)
+                {
+                    lpdel->m_LastPos+=pos-clearedpos;                           // New position including mempool
+                }
             }
             lpdel->m_LastClearedPos=lpent->m_LastClearedPos;                    // New position excluding mempool
             lpent->m_LastClearedPos=clearedpos;                                 // Old position, excluding mempool
@@ -3117,9 +3120,13 @@ int mc_TxDB::CompleteImport(mc_TxImport *import,uint32_t flags)
         row=import->FindEntity(&(lperow->m_Entity));
         if(row >= 0)                                                            // Shifting mempool transactions, in-sync transactions are removed
         {
+//            row=import->FindEntity(&(lperow->m_Entity));
             lpent=import->GetEntity(row);
             lperow->m_TempPos+=lpent->m_LastPos-lpent->m_LastClearedPos;
             lperow->m_Generation=import->m_ImportID;
+            lpdel=NULL;
+            row=m_Imports->FindEntity(&(lperow->m_Entity));
+            lpdel=m_Imports->GetEntity(row);            
             if( (lpent->m_Flags & MC_EFL_NOT_IN_SYNC) == 0 )
             {
                 mprow=rawmempool->Seek(lperow->m_TxId);
@@ -3129,6 +3136,16 @@ int mc_TxDB::CompleteImport(mc_TxImport *import,uint32_t flags)
                     lptxdef->m_Flags |= 0x80000000;                             // MC_TFL_IMPOSSIBLE
                 }
                 take_it=0;
+            }
+            else
+            {
+                if(lpdel)
+                {
+                    if( (lpdel->m_Flags & MC_EFL_NOT_IN_SYNC) == 0 )
+                    {
+                        take_it=0;
+                    }            
+                }                
             }
         }
         if(take_it)
