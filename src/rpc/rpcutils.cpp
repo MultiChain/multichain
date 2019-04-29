@@ -165,8 +165,10 @@ Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total)
     return value;
 }
 
-void CheckWalletError(int err)
+void CheckWalletError(int err,uint32_t entity_type,string message)
 {
+    string index;
+    string msg;
     if(err)
     {
         switch(err)
@@ -175,7 +177,37 @@ void CheckWalletError(int err)
                 throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is not supported in this build");                                        
                 break;
             case MC_ERR_NOT_ALLOWED:
-                throw JSONRPCError(RPC_NOT_SUPPORTED, "The index required is not available for this subscription.");                                        
+                if(message.size())
+                {
+                    msg=message;
+                }
+                else
+                {
+                    index="";
+                    switch(entity_type & MC_TET_TYPE_MASK)
+                    {
+                        case MC_TET_STREAM:
+                            if( (entity_type & MC_TET_ORDERMASK) == MC_TET_TIMERECEIVED )index="items-local";
+                            break;
+                        case MC_TET_STREAM_KEY:
+                            if( (entity_type & MC_TET_ORDERMASK) == MC_TET_TIMERECEIVED )index="keys-local";
+                            if( (entity_type & MC_TET_ORDERMASK) == MC_TET_CHAINPOS )index="keys";
+                            break;
+                        case MC_TET_STREAM_PUBLISHER:
+                            if( (entity_type & MC_TET_ORDERMASK) == MC_TET_TIMERECEIVED )index="publishers-local";
+                            if( (entity_type & MC_TET_ORDERMASK) == MC_TET_CHAINPOS )index="publishers";
+                            break;
+                    }
+                    if(index.size())
+                    {
+                        msg="The required " + index + " index is not active for this subscription.";
+                    }
+                }
+                if(msg.size() == 0)
+                {
+                    "The index required is not available for this subscription.";
+                }
+                throw JSONRPCError(RPC_NOT_SUBSCRIBED, msg);                                        
                 break;
             case MC_ERR_INTERNAL_ERROR:
                 throw JSONRPCError(RPC_INTERNAL_ERROR, "Internal wallet error");                                        

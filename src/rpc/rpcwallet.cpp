@@ -1839,7 +1839,7 @@ Value listsinceblock(const Array& params, bool fHelp)
             while(up_tx-down_tx>chunk_size)
             {
                 err=pwalletTxsMain->GetList(&wallet_entity,this_tx,1,lpEntRowBuffer);
-                CheckWalletError(err);
+                CheckWalletError(err,wallet_entity.m_EntityType,"");
                 if( (err == MC_ERR_NOERROR) && (lpEntRowBuffer->GetCount() > 0) )
                 {
                     entrow=(mc_TxEntityRow *)(lpEntRowBuffer->GetRow(0));
@@ -1863,7 +1863,7 @@ Value listsinceblock(const Array& params, bool fHelp)
             while(this_tx<=tx_count)
             {
                 err=pwalletTxsMain->GetList(&wallet_entity,this_tx,chunk_size,lpEntRowBuffer);
-                CheckWalletError(err);
+                CheckWalletError(err,wallet_entity.m_EntityType,"");
                 if( (err == MC_ERR_NOERROR) && (lpEntRowBuffer->GetCount() > 0) )
                 {
                     for(int i=0;i<lpEntRowBuffer->GetCount();i++)
