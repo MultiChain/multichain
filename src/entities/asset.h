@@ -94,6 +94,7 @@
 #define MC_ENT_SPRM_CHUNK_DETAILS             0x86
 #define MC_ENT_SPRM_CHUNK_DATA                0x87
 #define MC_ENT_SPRM_ITEM_COUNT                0x88
+#define MC_ENT_SPRM_SALT                      0x89
 
 #define MC_ENT_SPRM_FILE_END                  0xFF
 

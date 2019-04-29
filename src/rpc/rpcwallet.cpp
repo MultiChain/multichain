@@ -568,7 +568,7 @@ Value storechunk(const Array& params, bool fHelp)
     entity.Zero();
     entity.m_EntityType=MC_TET_AUTHOR;
     
-    err=pwalletTxsMain->m_ChunkDB->AddChunk((unsigned char*)&hash,&entity,NULL,-1,(unsigned char*)&vValue[0],NULL,(int)vValue.size(),0,0);
+    err=pwalletTxsMain->m_ChunkDB->AddChunk((unsigned char*)&hash,&entity,NULL,-1,(unsigned char*)&vValue[0],NULL,NULL,(int)vValue.size(),0,0,0);
     
     if(err)
     {

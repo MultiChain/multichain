@@ -125,6 +125,7 @@ bool MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map 
     mc_ChunkEntityKey *chunk;
     mc_ChunkEntityKey *chunkOut;
     unsigned char *ptrOut;
+    unsigned char *ptrOutEnd;
     bool result=false;
     string strError="";
     mc_ChunkCollectorRow *collect_row;
@@ -172,13 +173,14 @@ bool MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map 
     }
     
 
-    if(response->m_Payload.size() != 1+shift+total_size)
+    if(response->m_Payload.size() < 1+shift+total_size)
     {
         strError="Total size mismatch";
         goto exitlbl;        
     }
 
     ptrOut=&(response->m_Payload[0]);
+    ptrOutEnd=ptrOut+response->m_Payload.size();
     if(*ptrOut != MC_RDT_CHUNKS)
     {
         strError="Unsupported payload format";
@@ -200,6 +202,11 @@ bool MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map 
         sizeOut=((mc_ChunkEntityKey*)ptr)->m_Size;
         chunk=(mc_ChunkEntityKey*)ptr;
         chunkOut=(mc_ChunkEntityKey*)ptrOut;
+        if(ptrOutEnd - ptrOut < size)
+        {
+            strError="Total size mismatch";
+            goto exitlbl;                                                    
+        }
         ptrOut+=size;
         if(chunk->m_Size != chunkOut->m_Size)
         {
@@ -224,6 +231,16 @@ bool MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map 
         if (itreq != request_pairs->end())
         {
             collect_row=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(itreq->second);
+            if(ptrOutEnd - ptrOut < collect_row->m_SaltSize+sizeOut)
+            {
+                strError="Total size mismatch";
+                goto exitlbl;                                                    
+            }
+            if(collect_row->m_SaltSize)
+            {
+                memcpy(collect_row->m_Salt,ptrOut,collect_row->m_SaltSize);
+                ptrOut+=collect_row->m_SaltSize;
+            }
             uint256 hash;
 //            mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(ptrOut,sizeOut,&hash);
             mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(collect_row->m_Salt,collect_row->m_SaltSize,ptrOut,sizeOut,&hash);
@@ -235,7 +252,8 @@ bool MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map 
             }
             if( (collect_row->m_State.m_Status & MC_CCF_DELETED ) == 0 )
             {
-                chunk_err=pwalletTxsMain->m_ChunkDB->AddChunk(chunk->m_Hash,&(chunk->m_Entity),(unsigned char*)collect_row->m_TxID,collect_row->m_Vout,ptrOut,NULL,sizeOut,0,0);
+                chunk_err=pwalletTxsMain->m_ChunkDB->AddChunk(chunk->m_Hash,&(chunk->m_Entity),(unsigned char*)collect_row->m_TxID,collect_row->m_Vout,
+                        ptrOut,NULL,collect_row->m_Salt,sizeOut,0,collect_row->m_SaltSize,0);
                 if(chunk_err)
                 {
                     if(chunk_err != MC_ERR_FOUND)
@@ -1202,8 +1220,13 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
                                 strError="Total size of requested chunks is too big for response expiration";
                                 return false;                                                
                             }
-                            chunk_found=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&chunk_bytes);
+                            
+                            unsigned char salt[MC_CDB_CHUNK_SALT_SIZE];
+                            uint32_t salt_size;
+                            
+                            chunk_found=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&chunk_bytes,salt,&salt_size);
                             mc_gState->m_TmpBuffers->m_RelayTmpBuffer->SetData((unsigned char*)&chunk,size);
+                            mc_gState->m_TmpBuffers->m_RelayTmpBuffer->SetData(salt,salt_size);
                             mc_gState->m_TmpBuffers->m_RelayTmpBuffer->SetData(chunk_found,chunk_bytes);
                         }                    
                         else
@@ -1215,7 +1238,7 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
                     ptr+=size;
                 }
                 
-                if(read_permissioned == NULL)
+                if(!read_permissioned)
                 {
                     chunk_found=mc_gState->m_TmpBuffers->m_RelayTmpBuffer->GetData(0,&chunk_bytes);
                     shift=mc_PutVarInt(buf,16,count);

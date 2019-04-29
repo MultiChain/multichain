@@ -2415,7 +2415,7 @@ int mc_Script::GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_co
 
     s=(uint32_t)(*ptr);
  
-    if(ptr+s+1>ptrEnd)
+    if(ptr+1>ptrEnd)                                                            // +s with exp salt
     {
         return MC_ERR_ERROR_IN_SCRIPT;                    
     }
@@ -2433,11 +2433,11 @@ int mc_Script::GetChunkDef(uint32_t *format,unsigned char** hashes,int *chunk_co
     {
         if(mc_gState->m_Features->SaltedChunks() == 0)
         {
-            return MC_ERR_ERROR_IN_SCRIPT;                                          // Salt length should be 0
+            return MC_ERR_ERROR_IN_SCRIPT;                                      // Salt length should be 0
         }
     }
     
-    ptr+=s+1;
+    ptr+=1;                                                                     // +s with exp salt
     
     count=(int)mc_GetVarInt(ptr,ptrEnd-ptr,-1,&shift);
     
@@ -2538,13 +2538,16 @@ int mc_Script::SetChunkDefHeader(const uint32_t format,int chunk_count,unsigned 
         }            
     }
     buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+3]=(unsigned char)salt_size;                                      // Salt length   
+    
+/*    
     if(salt_size)
     {
         memcpy(buf+MC_DCT_SCRIPT_IDENTIFIER_LEN+4,salt,salt_size);        
     }
-    shift=mc_PutVarInt(buf+MC_DCT_SCRIPT_IDENTIFIER_LEN+4+salt_size,11,chunk_count);
+ */ 
+    shift=mc_PutVarInt(buf+MC_DCT_SCRIPT_IDENTIFIER_LEN+4,11,chunk_count);      // +s with exp salt
     
-    err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+4+salt_size+shift);
+    err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+4+shift);                      // +s with exp salt
     if(err)
     {
         return err;

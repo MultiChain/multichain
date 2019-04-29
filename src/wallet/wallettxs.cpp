@@ -2392,11 +2392,13 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                 {
                                     if(m_ChunkDB->GetChunkDef(&chunk_def,chunk_hashes,NULL,NULL,-1) == MC_ERR_NOERROR)
                                     {
-                                        chunk_found=m_ChunkDB->GetChunk(&chunk_def,0,-1,&chunk_bytes);
+                                        unsigned char salt[MC_CDB_CHUNK_SALT_SIZE];
+                                        uint32_t salt_size;
+                                        chunk_found=m_ChunkDB->GetChunk(&chunk_def,0,-1,&chunk_bytes,salt,&salt_size);
                                         if(chunk_found)
                                         {
                                             memcpy(m_ChunkBuffer,chunk_found,chunk_size);
-                                            chunk_err=m_ChunkDB->AddChunk(chunk_hashes,&chunk_entity,(unsigned char*)&hash,i,m_ChunkBuffer,NULL,chunk_size,0,0);
+                                            chunk_err=m_ChunkDB->AddChunk(chunk_hashes,&chunk_entity,(unsigned char*)&hash,i,m_ChunkBuffer,NULL,salt,chunk_size,0,salt_size,0);
                                             if(chunk_err)
                                             {
                                                 err=chunk_err;

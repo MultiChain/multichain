@@ -1300,7 +1300,7 @@ const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes
                     read_size=start+count-total_size;
                 }
                 read_size-=read_from;
-                elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&elem_size);
+                elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&elem_size,NULL,NULL);
                 if(elem)
                 {
                     if(fHan)
@@ -1404,7 +1404,7 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
             }
             if(!skip_read)
             {
-                *elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&elem_size);
+                *elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&elem_size,NULL,NULL);
                 if(*elem)
                 {
                     if(use_tmp_buf)
@@ -1809,14 +1809,6 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     {
         if((retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN)
         {
-            if(salt_size)
-            {
-                entry.push_back(Pair("salt", HexStr(salt,salt+salt_size)));            
-            }
-            else
-            {
-                entry.push_back(Pair("salt", ""));                            
-            }
             entry.push_back(Pair("chunks", chunks));            
         }
     }
