@@ -514,6 +514,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
 
     strUsage += "\n" + _("MultiChain runtime parameters") + "\n";    
     strUsage += "  -offline                                 " + _("Start multichaind in offline mode, no connections to other nodes.") + "\n";
+    strUsage += "  -storeruntimeparams                      " + _("Permanently save modifications to runtime parameters made by setruntimeparam APIs.") + "\n";
     strUsage += "  -initprivkey=<privkey>                   " + _("Manually set the wallet default address and private key when running multichaind for the first time.") + "\n";
     strUsage += "  -handshakelocal=<address>                " + _("Manually override the wallet address which is used for handshaking with other peers in a MultiChain blockchain.") + "\n";
     strUsage += "  -lockadminminerounds=<n>                 " + _("If set overrides lock-admin-mine-rounds blockchain setting.") + "\n";
