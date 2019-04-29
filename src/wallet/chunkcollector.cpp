@@ -546,13 +546,12 @@ int mc_ChunkCollector::InsertChunk(                                             
                  const unsigned char *txid,
                  const int vout,
                  const uint32_t chunk_size,
-                 const unsigned char *salt,
                  const uint32_t salt_size)
 {
     int err;
     
     Lock();
-    err=InsertChunkInternal(hash,entity,txid,vout,chunk_size,salt,salt_size);
+    err=InsertChunkInternal(hash,entity,txid,vout,chunk_size,salt_size);
     UnLock();
     
     return err;    
@@ -691,7 +690,6 @@ int mc_ChunkCollector::InsertChunkInternal(
                  const unsigned char *txid,
                  const int vout,
                  const uint32_t chunk_size,
-                 const unsigned char *salt,
                  const uint32_t salt_size)
 {
     mc_ChunkCollectorRow collect_row;
@@ -706,10 +704,6 @@ int mc_ChunkCollector::InsertChunkInternal(
     collect_row.m_State.m_Status=MC_CCF_NEW;
     collect_row.m_SaltSize=salt_size;
     memset(collect_row.m_Salt,0,MAX_CHUNK_SALT_SIZE);
-    if(salt_size)
-    {
-        memcpy(collect_row.m_Salt,salt,salt_size);
-    }
     
     mprow=m_MemPool->Seek(&collect_row);
     if(mprow<0)

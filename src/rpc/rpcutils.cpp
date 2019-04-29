@@ -1635,7 +1635,6 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     uint32_t retrieve_status;
     Value format_item_value;
     string format_text_str;
-    unsigned char* salt;
     uint32_t salt_size;
     
     mc_EntityDetails entity;
@@ -1659,7 +1658,7 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     }
     
 //    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
-    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size,&salt,&salt_size,0);
+    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size,&salt_size,0);
     
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     mc_gState->m_TmpScript->SetElement(0);

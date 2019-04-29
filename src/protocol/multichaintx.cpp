@@ -608,7 +608,7 @@ void MultiChainTransaction_FillAdminPermissionsBeforeTx(const CTransaction& tx,
 
 bool MultiChainTransaction_VerifyAndDeleteDataFormatElements(string& reason,int64_t *total_size,uint32_t *salt_size)
 {    
-    if(mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL,NULL,NULL,total_size,NULL,salt_size,1))
+    if(mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL,NULL,NULL,total_size,salt_size,1))
     {
         reason="Error in data format script";
         return false;                    

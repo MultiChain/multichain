@@ -186,7 +186,6 @@ typedef struct mc_ChunkCollector
                  const unsigned char *txid,
                  const int vout,
                  const uint32_t chunk_size,
-                 const unsigned char *salt,
                  const uint32_t salt_size);  
     
     int InsertChunkInternal(                  
@@ -195,7 +194,6 @@ typedef struct mc_ChunkCollector
                  const unsigned char *txid,
                  const int vout,
                  const uint32_t chunk_size,
-                 const unsigned char *salt,
                  const uint32_t salt_size);  
 
     int MarkAndClear(uint32_t flag, int unmark);    
