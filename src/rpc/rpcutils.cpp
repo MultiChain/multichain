@@ -205,7 +205,7 @@ void CheckWalletError(int err,uint32_t entity_type,string message)
                 }
                 if(msg.size() == 0)
                 {
-                    "The index required is not available for this subscription.";
+                    msg="The index required is not available for this subscription.";
                 }
                 throw JSONRPCError(RPC_NOT_SUBSCRIBED, msg);                                        
                 break;
