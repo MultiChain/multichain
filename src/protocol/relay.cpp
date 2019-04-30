@@ -59,14 +59,20 @@ int mc_IsReadPermissionedStream(mc_ChunkEntityKey* chunk,map<uint160,int>& cache
     }
 
     mc_EntityDetails entity;
-    int result;
+    int result=0;
     
-    if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,chunk->m_Entity.m_EntityID) == 0)
     {
-        result=-2;
-        cache.insert(make_pair(enthash,result));
-        return result;
-    }               
+        LOCK(cs_main);                                                          // possible caching improvement here
+        if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,chunk->m_Entity.m_EntityID) == 0)
+        {
+            result=-2;
+        }               
+    }
+    
+    if(result)
+    {
+        return result;        
+    }
     
     result=0;
     
@@ -500,7 +506,8 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                 else
                 {
                     itdld->second+=collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey);
-                }                                    
+                }  
+                pRelayManager->UnLock();
             }
         }
         else
@@ -575,8 +582,8 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                             itdld->second+=collect_row->m_ChunkDef.m_Size + sizeof(mc_ChunkEntityKey);
                         }                                    
                     }
+                    pRelayManager->UnLock();
                 }
-                pRelayManager->UnLock();
             }
             if(!collect_row->m_State.m_Query.IsZero())
             {
@@ -798,6 +805,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                             {
                                 expired=1;
                             }
+                            pRelayManager->UnLock();
                         }                        
                     }                    
                 }
@@ -1816,7 +1824,6 @@ int mc_RelayManager::Lock(int write_mode,int allow_secondary)
     {
         return allow_secondary;
     }
-    
     __US_SemWait(m_Semaphore); 
     m_LockedBy=this_thread;
     
@@ -2700,6 +2707,7 @@ mc_OffchainMessageID mc_RelayManager::SendRequest(CNode* pto,uint32_t msg_type,u
         return mc_OffchainMessageID();
     }
     
+    UnLock();
     return msg_id;
 }
 
@@ -2714,7 +2722,7 @@ mc_OffchainMessageID mc_RelayManager::SendNextRequest(mc_RelayResponse* response
     msg_id=GenerateMsgID();
 
     
-    Lock();
+    Lock();                                                                     // Secondary lock, to make sure it is locked by this thread
     {
         LOCK(cs_vNodes);
         BOOST_FOREACH(CNode* pnode, vNodes)
