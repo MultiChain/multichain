@@ -514,6 +514,11 @@ int mc_ChunkCollector::Initialize(mc_ChunkDB *chunk_db,const char *name,uint32_t
         {
             m_TotalChunkCount=m_DBRow.m_TotalChunkCount;
             m_TotalChunkSize=m_DBRow.m_TotalChunkSize;
+            if(m_TotalChunkCount < 0)
+            {
+                m_TotalChunkCount=0;
+                m_TotalChunkSize=0;
+            }
             err=ReadFromDB(m_MemPool,m_MaxMemPoolSize);
             if(err)
             {
