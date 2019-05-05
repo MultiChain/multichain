@@ -5,6 +5,7 @@
 #include "version/version.h"
 #include "custom/custom.h"
 
+
 int mc_State::VersionInfo(int version)
 {
     int custom_version=custom_version_info(version);
@@ -15,6 +16,11 @@ int mc_State::VersionInfo(int version)
     
     int this_build=20001901;
     int this_protocol=20010;   
+    
+    if(mc_gState->m_EnterpriseBuild)
+    {
+        this_build=mc_gState->m_EnterpriseBuild;
+    }
     
     if(version < 0)
     {

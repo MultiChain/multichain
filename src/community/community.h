@@ -76,6 +76,7 @@ typedef struct mc_EnterpriseFeatures
     
     std::string ENT_Edition();
     int ENT_EditionNumeric();
+    int ENT_BuildVersion();
     int ENT_MinWalletDatVersion();
     void ENT_RPCVerifyEdition(std::string message);
     std::string ENT_TextConstant(const char* name);
