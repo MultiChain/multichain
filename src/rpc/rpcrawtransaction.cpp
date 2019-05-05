@@ -523,7 +523,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
             entity.Set(&entity_row);
             lpEntity=&entity;
         }
-        entry.push_back(Pair("create", StreamEntry((unsigned char*)&txid,0x05,lpEntity)));
+        entry.push_back(Pair("create", StreamEntry((unsigned char*)&txid,0x105,lpEntity)));
     }
     
     if(mc_gState->m_Compatibility & MC_VCM_1_0)

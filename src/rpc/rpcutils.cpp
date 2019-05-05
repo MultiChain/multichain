@@ -1035,6 +1035,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
             {
                 if(output_level & 0x0008)
                 {                
+                    bool fSynchronized=true;
                     vector<pair<string,uint32_t>> index_types;
                     index_types.push_back(pair<string,uint32_t>("items",MC_TET_STREAM | MC_TET_CHAINPOS));                                                                            
                     index_types.push_back(pair<string,uint32_t>("keys",MC_TET_STREAM_KEY | MC_TET_CHAINPOS));                                                                            
@@ -1045,12 +1046,12 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
                     entry.push_back(Pair("subscribed",true));                                            
                     if( ((entStat.m_Flags & MC_EFL_NOT_IN_SYNC) != 0) ||
                         (pEF->STR_IsOutOfSync(&(entStat.m_Entity)) != 0) )
-                    {                        
-                        entry.push_back(Pair("synchronized",false));                                                            
+                    {               
+                        fSynchronized=false;
+//                        entry.push_back(Pair("synchronized",false));                                                            
                     }
                     else
                     {
-                        bool fSynchronized=true;
                         if(pEF->ENT_EditionNumeric() == 0)
                         {
                             mc_TxEntityStat entStatTmp;
@@ -1071,7 +1072,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
                                 }
                             }
                         }
-                        entry.push_back(Pair("synchronized",fSynchronized));                                                                            
+//                        entry.push_back(Pair("synchronized",fSynchronized));                                                                            
                     }
                     if(output_level & 0x0080)
                     {                
@@ -1089,6 +1090,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
                         }
                         entry.push_back(Pair("indexes",indexes));                                                                            
                     }
+                    entry.push_back(Pair("synchronized",fSynchronized));                                                                            
                 }
                 if(output_level & 0x0010)
                 {
@@ -1840,6 +1842,10 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     {
         if((retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN)
         {
+            if(mc_gState->m_Features->SaltedChunks())
+            {
+                entry.push_back(Pair("saltsize", (int)salt_size));                
+            }
             entry.push_back(Pair("chunks", chunks));            
         }
     }

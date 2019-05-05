@@ -118,7 +118,7 @@ Value getstreaminfo(const Array& params, bool fHelp)
     {
         if(paramtobool(params[1]))
         {
-            output_level=0x26;            
+            output_level=0x126;            
         }
     }
     
@@ -430,10 +430,13 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
         }
         if(permissions & MC_PTP_READ)
         {
-            if( (restrict |= MC_ENT_ENTITY_RESTRICTION_ONCHAIN ) == 0 )
+            restrict |= MC_ENT_ENTITY_RESTRICTION_ONCHAIN;
+/*            
+            if( (restrict & MC_ENT_ENTITY_RESTRICTION_ONCHAIN ) == 0 )
             {
                 throw JSONRPCError(RPC_NOT_ALLOWED, "onchain restriction should be set for read-permissioned streams");                               
             }
+ */ 
         }        
         if( restrict != 0 )
         {
@@ -1149,7 +1152,7 @@ Value trimsubscribe(const Array& params, bool fHelp)
 
 Value subscribe(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > ((pEF->ENT_EditionNumeric() == 0) ? 2 : 3))
+    if (fHelp || params.size() < 1 || params.size() > 3 )
         throw runtime_error("Help message not found\n");
 
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
