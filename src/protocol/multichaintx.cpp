@@ -896,7 +896,7 @@ bool MultiChainTransaction_CheckEntityItem(const CTransaction& tx,
 {
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     mc_EntityDetails entity;
-    uint32_t salt_size;
+    uint32_t salt_size=0;
     
     if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason,NULL,&salt_size))
     {
