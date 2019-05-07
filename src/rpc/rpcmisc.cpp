@@ -1023,7 +1023,8 @@ Value getaddresses(const Array& params, bool fHelp)
         {
             lpEntity=pwalletTxsMain->GetEntity(i);        
             CBitcoinAddress address;
-            if( (lpEntity->m_Entity.m_EntityType & MC_TET_ORDERMASK) == MC_TET_CHAINPOS)
+            if( ((lpEntity->m_Entity.m_EntityType & MC_TET_ORDERMASK) == MC_TET_CHAINPOS) &&
+                ((lpEntity->m_Flags & MC_EFL_NOT_IN_LISTS) == 0 ) )   
             {
                 if(CBitcoinAddressFromTxEntity(address,&(lpEntity->m_Entity)))
                 {

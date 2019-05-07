@@ -869,6 +869,11 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
                     CTxDestination addressRet=address.Get();        
                     const CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
                     const CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
+                    uint32_t flags=0;
+                    if(item.second.purpose == "license")
+                    {
+                        flags |= MC_EFL_NOT_IN_LISTS;
+                    }
 
                     entstat.Zero();
                     if(lpKeyID)

@@ -4834,7 +4834,11 @@ void mc_InitRPCHelpMap20()
             + HelpExampleRpc("purgepublisheditems", "\"mytxid\"")
          ));
     
-     mapHelpStrings.insert(std::make_pair("AAAAAAA",
+    mapHelpStrings.insert(std::make_pair("getlicenserequest",
+            "getlicenserequest \n"
+        ));
+   
+    mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
     

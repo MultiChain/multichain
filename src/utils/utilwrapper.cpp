@@ -1183,4 +1183,121 @@ int mc_FindIPv4ServerAddress(uint32_t *all_ips,int max_ips)
      return c;
 }
 
+int mc_FindMacServerAddress(unsigned char **lppAddr,unsigned char *lpAddrToValidate)
+{
+    int nSD; // Socket descriptor
+    struct ifreq sIfReq; // Interface request
+    struct if_nameindex *pIfList; // Ptr to interface name index
+    struct if_nameindex *pListSave; // Ptr to interface name index
+
+    unsigned char *lpThisAddr;
+    int AllocSize;
+    
+    int j,k,n,r,i,s;
+    lpThisAddr=NULL;
+
+    int AdapterCount;
+
+    //
+    // Initialize this function
+    //
+    pIfList = (struct if_nameindex *)NULL;
+    pListSave = (struct if_nameindex *)NULL;
+    #ifndef SIOCGIFADDR
+    // The kernel does not support the required ioctls
+    return MC_ERR_NOT_SUPPORTED;
+    #endif
+    //
+    // Create a socket that we can use for all of our ioctls
+    //
+    nSD = socket( PF_INET, SOCK_STREAM, 0 );
+    if ( nSD < 0 )
+    {
+    // Socket creation failed, this is a fatal error
+        return MC_ERR_INTERNAL_ERROR;
+    }
+    //
+    // Obtain a list of dynamically allocated structures
+    //
+    pIfList = pListSave = if_nameindex();
+    //
+    // Walk thru the array returned and query for each interface's
+    // address
+    //
+
+    AdapterCount=0;
+    for ( pIfList; *(char *)pIfList != 0; pIfList++ )
+        AdapterCount++;
+    
+    if(AdapterCount>0)
+    {
+        AllocSize=6*AdapterCount+3;
+        AllocSize=(((AllocSize-1)/16+1)*16)+16;
+        
+        lpThisAddr=new unsigned char[AllocSize];
+        memset(lpThisAddr,1,AllocSize);
+        
+        *(lpThisAddr+0)=AdapterCount/256;
+        *(lpThisAddr+1)=AdapterCount%256;
+        
+        if(lppAddr)
+        {
+            *lppAddr=lpThisAddr;
+        }
+        
+        AdapterCount=0;
+        pIfList = pListSave;
+        for ( pIfList; *(char *)pIfList != 0; pIfList++ )
+        {
+            strncpy( sIfReq.ifr_name, pIfList->if_name, IF_NAMESIZE );
+            if ( ioctl(nSD, SIOCGIFHWADDR, &sIfReq) != 0 )
+            {
+                // We failed to get the MAC address for the interface
+                return MC_ERR_INTERNAL_ERROR;
+         }
+         memcpy(lpThisAddr+2+AdapterCount*6,(void *)&sIfReq.ifr_ifru.ifru_hwaddr.sa_data[0],6);
+         lpThisAddr[2+AdapterCount*6+6]=0;
+         AdapterCount++;
+        }
+    }
+    //
+    // Clean up things and return
+    //
+    if_freenameindex( pListSave );
+    close( nSD );
+    
+    r=MC_ERR_NOERROR;
+    if(lpAddrToValidate)
+    {
+        r=MC_ERR_NOT_FOUND;
+        n=lpAddrToValidate[0]*256+lpAddrToValidate[1];
+        for(k=0;k<AdapterCount;k++)
+        if(r == MC_ERR_NOT_FOUND)
+        {
+            for(j=0;j<n;j++)
+            {
+                s=0;
+                for(i=0;i<6;i++)
+                {
+                    s+=lpThisAddr[2+k*6+i];
+                }
+                if(s>0)
+                {
+                    if(memcmp(lpThisAddr+2+k*6,lpAddrToValidate+2+j*6,6)==0)
+                    {
+                         r=MC_ERR_NOERROR;     
+                    }
+                }
+            }
+        }
+    }
+    
+    if(lppAddr==NULL)
+    {
+        delete [] lpThisAddr;
+    }
+    
+    return r;
+}
+        
         

@@ -1289,11 +1289,11 @@ Value getassetbalances(const Array& params, bool fHelp)
             {
                 const CBitcoinAddress& address = item.first;
                 const string& strName = item.second.name;
-                if (strName == params[0].get_str())
-                {
-                   setAddress.insert(address);                    
+                    if (strName == params[0].get_str())
+                    {
+                       setAddress.insert(address);                    
+                    }
                 }
-            }            
             check_account=true;
         }
     }

@@ -370,12 +370,16 @@ uint32_t mc_GetParamFromDetailsScript(const unsigned char *ptr,uint32_t total,ui
     return new_offset;
 }
 
-uint32_t mc_FindSpecialParamInDetailsScript(const unsigned char *ptr,uint32_t total,uint32_t param,size_t *bytes)
+uint32_t mc_FindSpecialParamInDetailsScriptFull(const unsigned char *ptr,uint32_t total,uint32_t param,size_t *bytes,uint32_t *param_offset)
 {
     uint32_t offset,new_offset;
     uint32_t value_offset;
     size_t value_size;
         
+    if(param_offset)
+    {
+        *param_offset=total;
+    }
     offset=0;
     while(offset<total)
     {
@@ -386,6 +390,10 @@ uint32_t mc_FindSpecialParamInDetailsScript(const unsigned char *ptr,uint32_t to
             {
                 if(ptr[offset+1] == (unsigned char)param)
                 {
+                    if(param_offset)
+                    {
+                        *param_offset=offset;
+                    }
                     *bytes=value_size;
                     return value_offset;
                 }
@@ -395,6 +403,11 @@ uint32_t mc_FindSpecialParamInDetailsScript(const unsigned char *ptr,uint32_t to
     }
     
     return total;
+}
+
+uint32_t mc_FindSpecialParamInDetailsScript(const unsigned char *ptr,uint32_t total,uint32_t param,size_t *bytes)
+{
+    return mc_FindSpecialParamInDetailsScriptFull(ptr,total,param,bytes,NULL);
 }
 
 uint32_t mc_FindNamedParamInDetailsScript(const unsigned char *ptr,uint32_t total,const char *param,size_t *bytes)

@@ -267,8 +267,11 @@ Value getaddressesbyaccount(const Array& params, bool fHelp)
     {
         const CBitcoinAddress& address = item.first;
         const string& strName = item.second.name;
-        if (strName == strAccount)
-            ret.push_back(address.ToString());
+        if(item.second.purpose != "license")
+        {
+            if (strName == strAccount)
+                ret.push_back(address.ToString());
+        }
     }
     return ret;
 }
@@ -436,8 +439,9 @@ Value listaddresses(const Array& params, bool fHelp)
     for(int i=0;i<entity_count;i++)
     {
         lpEntity=pwalletTxsMain->GetEntity(i);
-        if((lpEntity->m_Entity.m_EntityType == (MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS)) || 
-           (lpEntity->m_Entity.m_EntityType == (MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS)))
+        if( ((lpEntity->m_Entity.m_EntityType == (MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS)) || 
+            (lpEntity->m_Entity.m_EntityType == (MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS))) &&
+            ((lpEntity->m_Flags & MC_EFL_NOT_IN_LISTS) == 0 ) )               
         {
             if(setAddresses.size())
             {

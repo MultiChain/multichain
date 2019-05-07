@@ -3315,6 +3315,33 @@ bool CWallet::DelAddressBook(const CTxDestination& address)
     return CWalletDB(strWalletFile).EraseName(CBitcoinAddress(address).ToString());
 }
 
+bool CWallet::SetEKey(const uint256& hashEKey, const CEncryptionKey& ekey)
+{
+    {
+        LOCK(cs_wallet); // mapAddressBook
+        std::map<uint256, CEncryptionKey>::iterator mi = mapEKeys.find(hashEKey);
+        if(mi != mapEKeys.end())
+        {
+            return false;
+        }
+        
+        mapEKeys.insert(make_pair(hashEKey,ekey));
+    }
+    LogPrint("mchn","Stored ekey %s in the wallet book, type: %2X, purpose: %2x.\n",hashEKey.ToString().c_str(),ekey.m_Type,ekey.m_Purpose);
+    return CWalletDB(strWalletFile).WriteEKey(hashEKey, ekey);    
+}
+    
+bool CWallet::DelEKey(const uint256& hashEKey)
+{
+    {
+        LOCK(cs_wallet); 
+
+        mapEKeys.erase(hashEKey);
+    }
+    return CWalletDB(strWalletFile).EraseEKey(hashEKey);    
+}
+
+
 bool CWallet::SetDefaultKey(const CPubKey &vchPubKey)
 {
     if (fFileBacked)
@@ -3766,8 +3793,11 @@ set<CTxDestination> CWallet::GetAccountAddresses(string strAccount) const
     {
         const CTxDestination& address = item.first;
         const string& strName = item.second.name;
-        if (strName == strAccount)
-            result.insert(address);
+        if(item.second.purpose != "license")
+        {        
+            if (strName == strAccount)
+                result.insert(address);
+        }
     }
     return result;
 }

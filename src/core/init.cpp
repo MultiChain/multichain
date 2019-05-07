@@ -1748,7 +1748,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     CTxDestination addressRet=address.Get();        
                     const CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
                     const CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
-
+                    uint32_t flags=0;
+                    if(item.second.purpose == "license")
+                    {
+                        flags |= MC_EFL_NOT_IN_LISTS;
+                    }
                     entstat.Zero();
                     if(lpKeyID)
                     {
@@ -1756,9 +1760,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                         entstat.m_Entity.m_EntityType=MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS;
                         if(!pwalletTxsMain->FindEntity(&entstat))
                         {
-                            pwalletTxsMain->AddEntity(&(entstat.m_Entity),0);
+                            pwalletTxsMain->AddEntity(&(entstat.m_Entity),flags);
                             entstat.m_Entity.m_EntityType=MC_TET_PUBKEY_ADDRESS | MC_TET_TIMERECEIVED;
-                            pwalletTxsMain->AddEntity(&(entstat.m_Entity),0);
+                            pwalletTxsMain->AddEntity(&(entstat.m_Entity),flags);
                         }
                     }
                         
@@ -1768,9 +1772,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                         entstat.m_Entity.m_EntityType=MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS;
                         if(!pwalletTxsMain->FindEntity(&entstat))
                         {
-                            pwalletTxsMain->AddEntity(&(entstat.m_Entity),0);
+                            pwalletTxsMain->AddEntity(&(entstat.m_Entity),flags);
                             entstat.m_Entity.m_EntityType=MC_TET_SCRIPT_ADDRESS | MC_TET_TIMERECEIVED;
-                            pwalletTxsMain->AddEntity(&(entstat.m_Entity),0);
+                            pwalletTxsMain->AddEntity(&(entstat.m_Entity),flags);
                         }
                     }
                 }
@@ -2340,7 +2344,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             }
         }
     }
-    
+
     pEF->ENT_MaybeStop();
 
     // As LoadBlockIndex can take several minutes, it's possible the user

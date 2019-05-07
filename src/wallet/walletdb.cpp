@@ -66,6 +66,19 @@ bool CWalletDB::EraseTx(uint256 hash)
     return Erase(std::make_pair(std::string("tx"), hash));
 }
 
+bool CWalletDB::WriteEKey(uint256 hash, const CEncryptionKey& ekey)
+{
+    nWalletDBUpdated++;
+    return Write(std::make_pair(std::string("ekey"), hash), ekey);
+}
+
+bool CWalletDB::EraseEKey(uint256 hash)
+{
+    nWalletDBUpdated++;
+    return Erase(std::make_pair(std::string("ekey"), hash));
+}
+
+
 bool CWalletDB::WriteKey(const CPubKey& vchPubKey, const CPrivKey& vchPrivKey, const CKeyMetadata& keyMeta)
 {
     nWalletDBUpdated++;
@@ -370,6 +383,12 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             string strAddress;
             ssKey >> strAddress;
             ssValue >> pwallet->mapAddressBook[CBitcoinAddress(strAddress).Get()].purpose;
+        }
+        else if (strType == "ekey")
+        {
+            uint256 hash;
+            ssKey >> hash;
+            ssValue >> pwallet->mapEKeys[hash];
         }
         else if (strType == "tx")
         {

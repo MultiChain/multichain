@@ -11,6 +11,7 @@
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "wallet/crypter.h"
+#include "keys/enckey.h"
 #include "keys/key.h"
 #include "wallet/keystore.h"
 #include "core/main.h"
@@ -364,6 +365,8 @@ public:
     int64_t nOrderPosNext;
     std::map<uint256, int> mapRequestCount;
 
+    std::map<uint256, CEncryptionKey> mapEKeys;
+    
     std::map<CTxDestination, CAddressBookData> mapAddressBook;
 
     CPubKey vchDefaultKey;
@@ -609,6 +612,10 @@ public:
 
     bool DelAddressBook(const CTxDestination& address);
 
+    bool SetEKey(const uint256& hashEKey, const CEncryptionKey& ekey);
+    
+    bool DelEKey(const uint256& hashEKey);
+    
     void UpdatedTransaction(const uint256 &hashTx);
 
     void Inventory(const uint256 &hash)
