@@ -29,6 +29,7 @@ class CWalletTx;
 class uint160;
 class uint256;
 class CEncryptionKey;
+class CLicenseRequest;
 
 bool WalletDBRecover(CDBWrapEnv& dbenv, std::string filename, bool fOnlyKeys);
 bool WalletDBRecover(CDBWrapEnv& dbenv, std::string filename);
@@ -97,6 +98,9 @@ public:
 
     bool WriteEKey(uint256 hash, const CEncryptionKey& ekey);
     bool EraseEKey(uint256 hash);
+
+    bool WriteLicenseRequest(uint256 hash, const CLicenseRequest& license_request);
+    bool EraseLicenseRequest(uint256 hash);
 
     bool WriteKey(const CPubKey& vchPubKey, const CPrivKey& vchPrivKey, const CKeyMetadata &keyMeta);
     bool WriteCryptedKey(const CPubKey& vchPubKey, const std::vector<unsigned char>& vchCryptedSecret, const CKeyMetadata &keyMeta);

@@ -13,6 +13,7 @@
 #include "wallet/crypter.h"
 #include "keys/enckey.h"
 #include "keys/key.h"
+#include "community/license.h"
 #include "wallet/keystore.h"
 #include "core/main.h"
 #include "ui/ui_interface.h"
@@ -365,6 +366,8 @@ public:
     int64_t nOrderPosNext;
     std::map<uint256, int> mapRequestCount;
 
+    std::map<uint256, CLicenseRequest> mapLicenseRequests;
+    
     std::map<uint256, CEncryptionKey> mapEKeys;
     
     std::map<CTxDestination, CAddressBookData> mapAddressBook;
@@ -615,6 +618,12 @@ public:
     bool SetEKey(const uint256& hashEKey, const CEncryptionKey& ekey);
     
     bool DelEKey(const uint256& hashEKey);
+    
+    bool SetLicenseRequest(const uint256& hash, const CLicenseRequest& license_request);
+    
+    bool SetLicenseRequestRefCount(const uint256& hash, uint32_t count);
+    
+    bool DelLicenseRequest(const uint256& hash);
     
     void UpdatedTransaction(const uint256 &hashTx);
 

@@ -3318,7 +3318,7 @@ bool CWallet::DelAddressBook(const CTxDestination& address)
 bool CWallet::SetEKey(const uint256& hashEKey, const CEncryptionKey& ekey)
 {
     {
-        LOCK(cs_wallet); // mapAddressBook
+        LOCK(cs_wallet); // mapEKeys
         std::map<uint256, CEncryptionKey>::iterator mi = mapEKeys.find(hashEKey);
         if(mi != mapEKeys.end())
         {
@@ -3327,7 +3327,7 @@ bool CWallet::SetEKey(const uint256& hashEKey, const CEncryptionKey& ekey)
         
         mapEKeys.insert(make_pair(hashEKey,ekey));
     }
-    LogPrint("mchn","Stored ekey %s in the wallet book, type: %2X, purpose: %2x.\n",hashEKey.ToString().c_str(),ekey.m_Type,ekey.m_Purpose);
+    LogPrint("mchn","Stored ekey %s in the wallet, type: %2X, purpose: %2x.\n",hashEKey.ToString().c_str(),ekey.m_Type,ekey.m_Purpose);
     return CWalletDB(strWalletFile).WriteEKey(hashEKey, ekey);    
 }
     
@@ -3341,6 +3341,63 @@ bool CWallet::DelEKey(const uint256& hashEKey)
     return CWalletDB(strWalletFile).EraseEKey(hashEKey);    
 }
 
+bool CWallet::SetLicenseRequest(const uint256& hash, const CLicenseRequest& license_request)
+{
+    {
+        LOCK(cs_wallet); // mapLicenseRequests
+        std::map<uint256, CLicenseRequest>::iterator mi = mapLicenseRequests.find(hash);
+        if(mi != mapLicenseRequests.end())
+        {
+            return false;
+        }
+        
+        mapLicenseRequests.insert(make_pair(hash,license_request));
+    }
+    LogPrint("mchn","Stored license request %s in the wallet.\n",hash.ToString().c_str());
+    return CWalletDB(strWalletFile).WriteLicenseRequest(hash, license_request);        
+}
+    
+bool CWallet::SetLicenseRequestRefCount(const uint256& hash, uint32_t count)
+{
+    {
+        LOCK(cs_wallet); // mapLicenseRequests
+        std::map<uint256, CLicenseRequest>::iterator mi = mapLicenseRequests.find(hash);
+        if(mi == mapLicenseRequests.end())
+        {
+            return false;
+        }        
+
+        if( (mi->second.m_ReferenceCount == 0) || (count == 0) )
+        {
+            mi->second.m_ReferenceCount=count;
+        }
+        else
+        {
+            if(mi->second.m_ReferenceCount != count)
+            {
+                return false;
+            }
+            mi->second.m_ReferenceCount-=1;
+        }
+        if(mi->second.m_ReferenceCount)
+        {
+            LogPrint("mchn","License request %s in the wallet modified, ref count: %d.\n",hash.ToString().c_str(),mi->second.m_ReferenceCount);
+            return CWalletDB(strWalletFile).WriteLicenseRequest(hash, mi->second);        
+        }
+    }    
+    return DelLicenseRequest(hash);
+}
+    
+bool CWallet::DelLicenseRequest(const uint256& hash)
+{
+    {
+        LOCK(cs_wallet); 
+
+        mapLicenseRequests.erase(hash);
+    }
+    LogPrint("mchn","License request %s deleted from wallet.\n",hash.ToString().c_str());
+    return CWalletDB(strWalletFile).EraseLicenseRequest(hash);        
+}
 
 bool CWallet::SetDefaultKey(const CPubKey &vchPubKey)
 {

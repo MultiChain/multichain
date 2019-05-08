@@ -78,6 +78,18 @@ bool CWalletDB::EraseEKey(uint256 hash)
     return Erase(std::make_pair(std::string("ekey"), hash));
 }
 
+bool CWalletDB::WriteLicenseRequest(uint256 hash, const CLicenseRequest& license_request)
+{
+    nWalletDBUpdated++;
+    return Write(std::make_pair(std::string("license"), hash), license_request);
+}
+
+bool CWalletDB::EraseLicenseRequest(uint256 hash)
+{
+    nWalletDBUpdated++;
+    return Erase(std::make_pair(std::string("license"), hash));
+}
+
 
 bool CWalletDB::WriteKey(const CPubKey& vchPubKey, const CPrivKey& vchPrivKey, const CKeyMetadata& keyMeta)
 {
@@ -389,6 +401,12 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             uint256 hash;
             ssKey >> hash;
             ssValue >> pwallet->mapEKeys[hash];
+        }
+        else if (strType == "license")
+        {
+            uint256 hash;
+            ssKey >> hash;
+            ssValue >> pwallet->mapLicenseRequests[hash];
         }
         else if (strType == "tx")
         {
