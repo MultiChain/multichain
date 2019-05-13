@@ -61,6 +61,7 @@ public:
 
 uint64_t nLastBlockTx = 0;
 uint64_t nLastBlockSize = 0;
+uint256 cachedMerkleRoot=0;
 
 // We want to sort transactions by priority and fee rate, so:
 typedef boost::tuple<double, CFeeRate, const CTransaction*> TxPriority;
@@ -207,10 +208,22 @@ bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet)
         case BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE:
         case BLOCKSIGHASH_NO_SIGNATURE:
             block->nMerkleTreeType=MERKLETREE_NO_COINBASE_OP_RETURN;
-            block->hashMerkleRoot=block->BuildMerkleTree();
             if(hash_type == BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE)
             {
+                block->hashMerkleRoot=block->BuildMerkleTree();
                 block->nNonce=0;
+            }
+            else
+            {
+                if(cachedMerkleRoot != 0)
+                {
+                    block->hashMerkleRoot=cachedMerkleRoot;
+                }
+                else
+                {
+                    block->hashMerkleRoot=block->BuildMerkleTree();
+                    cachedMerkleRoot=block->hashMerkleRoot;
+                }
             }
             hash_to_verify=block->GetHash();
             block->nMerkleTreeType=MERKLETREE_FULL;                
@@ -756,6 +769,7 @@ bool static ScanHash(CBlock *pblock, uint32_t& nNonce, uint256 *phash,uint16_t s
 //    ss << *pblock;
     assert(ss.size() == 80);
     hasher.Write((unsigned char*)&ss[0], 76);
+    cachedMerkleRoot=0;    
     while (true) {
         nNonce++;
 
