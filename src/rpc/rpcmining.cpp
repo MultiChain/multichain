@@ -195,12 +195,14 @@ Value setgenerate(const Array& params, bool fHelp)
                 
             int64_t nStart = GetTimeMillis();
             int64_t nCount=1;
+            uint256 cachedMerkleRoot=0;    
+            
             CBlock *pblock = &pblocktemplate->block;
             {
                 LOCK(cs_main);
 /* MCHN START */                
                 IncrementExtraNonce(pblock, pindexPrev, nExtraNonce,pwalletMain);
-                CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE,pwalletMain);
+                CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE,pwalletMain,&cachedMerkleRoot);
 //                IncrementExtraNonce(pblock, chainActive.Tip(), nExtraNonce);
 /* MCHN START */                
             }
@@ -208,8 +210,12 @@ Value setgenerate(const Array& params, bool fHelp)
                 // Yes, there is a chance every nonce could fail to satisfy the -regtest
                 // target -- 1 in 2^(2^32). That ain't gonna happen.
                 ++pblock->nNonce;
-                CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE,pwalletMain);     
+                CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE,pwalletMain,&cachedMerkleRoot);     
                 nCount++;
+            }
+            if(Params().DisallowUnsignedBlockNonce())
+            {
+                pblock->hashMerkleRoot=pblock->BuildMerkleTree();                   
             }
             int64_t nEnd = GetTimeMillis();
             LogPrintf("RPC Miner      : %ld hashes were tried in %ldms (%8.3fh/ms)\n",nCount,nEnd-nStart,

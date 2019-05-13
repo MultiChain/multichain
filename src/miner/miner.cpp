@@ -61,7 +61,6 @@ public:
 
 uint64_t nLastBlockTx = 0;
 uint64_t nLastBlockSize = 0;
-uint256 cachedMerkleRoot=0;
 
 // We want to sort transactions by priority and fee rate, so:
 typedef boost::tuple<double, CFeeRate, const CTransaction*> TxPriority;
@@ -111,7 +110,7 @@ bool UpdateTime(CBlockHeader* pblock, const CBlockIndex* pindexPrev)
 
 /* MCHN START */
 
-bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet)
+bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet,uint256 *cachedMerkleRoot)
 {
     if(Params().DisallowUnsignedBlockNonce())
     {
@@ -130,7 +129,10 @@ bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet)
     
     int coinbase_tx,op_return_output;
     uint256 hash_to_verify;
-    uint256 original_merkle_root;
+    vector<uint256> cachedMerkleBranch;
+    
+    cachedMerkleBranch.clear();
+    
     std::vector<unsigned char> vchSigOut;
     std::vector<unsigned char> vchPubKey;
     
@@ -215,14 +217,14 @@ bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet)
             }
             else
             {
-                if(cachedMerkleRoot != 0)
+                if(*cachedMerkleRoot != 0)
                 {
-                    block->hashMerkleRoot=cachedMerkleRoot;
+                    block->hashMerkleRoot=*cachedMerkleRoot;
                 }
                 else
                 {
                     block->hashMerkleRoot=block->BuildMerkleTree();
-                    cachedMerkleRoot=block->hashMerkleRoot;
+                    *cachedMerkleRoot=block->hashMerkleRoot;
                 }
             }
             hash_to_verify=block->GetHash();
@@ -282,8 +284,10 @@ bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet)
     switch(hash_type)
     {
         case BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE:
-        case BLOCKSIGHASH_NO_SIGNATURE:
             block->hashMerkleRoot=block->BuildMerkleTree();
+            break;
+        case BLOCKSIGHASH_NO_SIGNATURE:
+            block->hashMerkleRoot=block->CheckMerkleBranch(tx.GetHash(),block->GetMerkleBranch(0),0);
             break;
     }
 
@@ -741,7 +745,7 @@ void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& 
     pblock->vtx[0] = txCoinbase;
     
 /* MCHN START */    
-    CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE,pwallet);
+    CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE,pwallet,NULL);
     pblock->hashMerkleRoot = pblock->BuildMerkleTree();
 /* MCHN END */    
 }
@@ -769,14 +773,15 @@ bool static ScanHash(CBlock *pblock, uint32_t& nNonce, uint256 *phash,uint16_t s
 //    ss << *pblock;
     assert(ss.size() == 80);
     hasher.Write((unsigned char*)&ss[0], 76);
-    cachedMerkleRoot=0;    
+    uint256 cachedMerkleRoot=0;    
+    
     while (true) {
         nNonce++;
 
         if(Params().DisallowUnsignedBlockNonce())
         {
             pblock->nNonce=nNonce;
-            CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE,pwallet);
+            CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE,pwallet,&cachedMerkleRoot);
             *phash=pblock->GetHash();
         }
         else
@@ -794,13 +799,23 @@ bool static ScanHash(CBlock *pblock, uint32_t& nNonce, uint256 *phash,uint16_t s
 */
         if( (((uint16_t*)phash)[15] & success_and_mask) == 0)
         {
+            if(Params().DisallowUnsignedBlockNonce())
+            {
+                pblock->hashMerkleRoot=pblock->BuildMerkleTree();                   
+            }
             return true;            
         }
         
         // If nothing found after trying for a while, return -1
         if ((nNonce & 0xffff) == 0)
+        {
 //        if ((nNonce & 0xff) == 0)
+            if(Params().DisallowUnsignedBlockNonce())
+            {
+                pblock->hashMerkleRoot=pblock->BuildMerkleTree();                   
+            }
             return false;
+        }
         if ((nNonce & 0xfff) == 0)
             boost::this_thread::interruption_point();
     }
@@ -1648,7 +1663,7 @@ void static BitcoinMiner(CWallet *pwallet)
                 if(UpdateTime(pblock, pindexPrev))
                 {
 /* MCHN START */                    
-                    CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE,pwallet);
+                    CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE,pwallet,NULL);
 /* MCHN END */                    
                 }
                 if (Params().AllowMinDifficultyBlocks())
