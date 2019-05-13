@@ -959,13 +959,14 @@ int GetMaxActiveMinersCount()
     }
 }
 
-double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set <CTxDestination> *lpsMinerPool,double *lpdMiningStartTime,double *lpdActiveMiners,uint256 *lphLastBlockHash,int *lpnMemPoolSize)
+double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set <CTxDestination> *lpsMinerPool,double *lpdMiningStartTime,double *lpdActiveMiners,uint256 *lphLastBlockHash,int *lpnMemPoolSize,double wAvBlockTime)
 {
     int nMinerPoolSizeMin=4;
     int nMinerPoolSizeMax=16;
     double dRelativeSpread=1.;
     double dRelativeMinerPoolSize=0.25;
     double dAverageCreateBlockTime=2;
+    double dAverageCreateBlockTimeShift=0;
     double dMinerDriftMin=mc_gState->m_NetworkParams->ParamAccuracy();
     double dEmergencyMinersConvergenceRate=2.;    
     int nPastBlocks=12;
@@ -1050,6 +1051,13 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
     }
     dExpectedTimeMin=dExpectedTimeByLast - 0.5 * dSpread;
     dExpectedTimeMax=dExpectedTimeByLast + 0.5 * dSpread;
+    if(dAverageCreateBlockTime < wAvBlockTime)
+    {
+        LogPrint("mcminer","mchn-miner: increased average block creation time: %8.3fs, adjusting\n",wAvBlockTime);
+        dAverageCreateBlockTimeShift=wAvBlockTime-dAverageCreateBlockTime;
+        dAverageCreateBlockTime=wAvBlockTime;
+        dExpectedTimeMin-=dAverageCreateBlockTimeShift;
+    }
     
     dAverageGap=0;
     nWindowSize=0;
@@ -1101,7 +1109,7 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
         
         *lpdMiningStartTime=dExpectedTime;
     }
-    
+       
     fInMinerPool=false;
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
@@ -1170,7 +1178,8 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
         if(fInMinerPool)
         {
             *lpdMiningStartTime += mc_RandomDouble() * dSpread;
-            *lpdMiningStartTime -= dSpread / (nMinerPoolSize + 1);                    
+            *lpdMiningStartTime -= dSpread / (nMinerPoolSize + 1);   
+            *lpdMiningStartTime -= dAverageCreateBlockTimeShift;
         }
         else
         {
@@ -1258,8 +1267,11 @@ void static BitcoinMiner(CWallet *pwallet)
     int EmptyBlockToMine;
     uint64_t wCount[10];
     double wTime[10];
+    double wBlockTime[10];
     memset(wCount,0,wSize*sizeof(uint64_t));
     memset(wTime,0,wSize*sizeof(uint64_t));
+    memset(wBlockTime,0,wSize*sizeof(uint64_t));
+    int wBlockTimePos=0;
     
     uint16_t success_and_mask=0xffff;
     int min_bits;
@@ -1412,8 +1424,15 @@ void static BitcoinMiner(CWallet *pwallet)
                 nMemPoolSize=1;
             }
             
+            double wAvTimePerBlock=0;
+            for(int w=0;w<wSize;w++)
+            {
+                wAvTimePerBlock+=wBlockTime[w];
+            }
+            wAvTimePerBlock/=wSize;
+            
             canMine=MC_PTP_MINE;
-            if(mc_TimeNowAsDouble() < GetMinerAndExpectedMiningStartTime(pwallet, &kMiner,&sMinerPool, &dMiningStartTime,&dActiveMiners,&hLastBlockHash,&nMemPoolSize))
+            if(mc_TimeNowAsDouble() < GetMinerAndExpectedMiningStartTime(pwallet, &kMiner,&sMinerPool, &dMiningStartTime,&dActiveMiners,&hLastBlockHash,&nMemPoolSize,wAvTimePerBlock))
             {
                 canMine=0;
             }
@@ -1518,6 +1537,12 @@ void static BitcoinMiner(CWallet *pwallet)
 
                         SetThreadPriority(THREAD_PRIORITY_NORMAL);
 
+                        double wBlockTimeNow=mc_TimeNowAsDouble();
+                        if(wBlockTimeNow>wStartTime+0.01)
+                        {
+                            wBlockTime[wPos]=wBlockTimeNow-wStartTime;
+                            wBlockTimePos=(wBlockTimePos+1)%wSize;
+                        }
                         LogPrintf("MultiChainMiner: Block Found - %s, prev: %s, height: %d, txs: %d\n",
                                 hash.GetHex(),pblock->hashPrevBlock.ToString().c_str(),mc_gState->m_Permissions->m_Block+1,(int)pblock->vtx.size());
 /*                        
@@ -1536,6 +1561,10 @@ void static BitcoinMiner(CWallet *pwallet)
                             {
                                 __US_Sleep(1000);
                                 boost::this_thread::interruption_point();                                                                    
+                            }
+                            else
+                            {
+                                LogPrint("mcminer","mchn-miner: Block successfully processed\n");
                             }
                         }
 /* MCHN END */                        
