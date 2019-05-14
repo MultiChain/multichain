@@ -3353,7 +3353,7 @@ bool CWallet::SetLicenseRequest(const uint256& hash, const CLicenseRequest& lice
         
         mapLicenseRequests.insert(make_pair(hash,license_request));
     }
-    LogPrint("mchn","Stored license request %s in the wallet.\n",hash.ToString().c_str());
+    LogPrintf("Stored license request %s in the wallet.\n",hash.ToString().c_str());
     return CWalletDB(strWalletFile).WriteLicenseRequest(hash, license_request);        
 }
     
@@ -3371,17 +3371,14 @@ bool CWallet::SetLicenseRequestRefCount(const uint256& hash, uint32_t count)
         {
             mi->second.m_ReferenceCount=count;
         }
-        else
+        
+        if(mi->second.m_ReferenceCount)
         {
-            if(mi->second.m_ReferenceCount != count)
-            {
-                return false;
-            }
             mi->second.m_ReferenceCount-=1;
         }
         if(mi->second.m_ReferenceCount)
         {
-            LogPrint("mchn","License request %s in the wallet modified, ref count: %d.\n",hash.ToString().c_str(),mi->second.m_ReferenceCount);
+            LogPrintf("License request %s in the wallet modified, ref count: %d.\n",hash.ToString().c_str(),mi->second.m_ReferenceCount);
             return CWalletDB(strWalletFile).WriteLicenseRequest(hash, mi->second);        
         }
     }    
@@ -3395,7 +3392,7 @@ bool CWallet::DelLicenseRequest(const uint256& hash)
 
         mapLicenseRequests.erase(hash);
     }
-    LogPrint("mchn","License request %s deleted from wallet.\n",hash.ToString().c_str());
+    LogPrintf("License request %s deleted from wallet.\n",hash.ToString().c_str());
     return CWalletDB(strWalletFile).EraseLicenseRequest(hash);        
 }
 

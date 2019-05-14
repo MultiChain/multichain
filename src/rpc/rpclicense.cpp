@@ -338,7 +338,10 @@ Value getlicenserequest(const Array& params, bool fHelp)
     license_request.SetPrivateKey(full_key.m_PrivateKey);
     license_request.m_ReferenceCount=0;
     
-    pwalletMain->SetLicenseRequest(license_request.GetHash(),license_request);
+    if(!pwalletMain->SetLicenseRequest(license_request.GetHash(),license_request))
+    {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot save license request");                        
+    }
     
     printf("New license request with hash: %s, size: %d\n",license_request.GetHash().ToString().c_str(),(int)license_request.m_Data.size());
     return HexStr(license_request.m_Data);    

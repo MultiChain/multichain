@@ -13,7 +13,7 @@ MC_ENT_SPRM_LICENSE_UNLOCKED_FEATURES,
 MC_ENT_SPRM_LICENSE_FLAGS,
 MC_ENT_SPRM_LICENSE_PARAMS,
 MC_ENT_SPRM_LICENSE_PREV_LICENSE,    
-MC_ENT_SPRM_LICENSE_NAME,
+//MC_ENT_SPRM_LICENSE_NAME,
 MC_ENT_SPRM_LICENSE_DETAILS
 };
 
@@ -66,6 +66,31 @@ const unsigned char *CLicenseRequest::GetParam(uint32_t param,size_t *bytes)
     }
     
     return ptr+offset;
+}
+
+const unsigned char *CLicenseRequest::GetParamToEnd(uint32_t param,size_t *bytes)
+{
+    uint32_t param_offset;
+    size_t src_bytes;
+    const unsigned char *ptr;
+
+    src_bytes=m_Data.size();
+    *bytes=0;
+    if(src_bytes == 0)
+    {
+        return NULL;
+    }
+    
+    ptr=&m_Data[0];
+    
+    mc_FindSpecialParamInDetailsScriptFull(ptr,src_bytes,param,bytes,&param_offset);
+    if(param_offset == src_bytes)
+    {
+        return NULL;
+    }
+    
+    *bytes=src_bytes-param_offset;
+    return ptr+param_offset;
 }
 
 bool CLicenseRequest::Verify()

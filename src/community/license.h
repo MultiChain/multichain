@@ -35,9 +35,9 @@
 #define MC_ENT_SPRM_LICENSE_PREV_LICENSE      0x26
 #define MC_ENT_SPRM_LICENSE_NAME              0x2C
 #define MC_ENT_SPRM_LICENSE_DETAILS           0x2E
+#define MC_ENT_SPRM_LICENSE_COUNT             0x2F
 #define MC_ENT_SPRM_LICENSE_ENCRYPTED_REQUEST 0x30
 #define MC_ENT_SPRM_LICENSE_ORIGINAL_HASH     0x31
-#define MC_ENT_SPRM_LICENSE_COUNT             0x32
 
 
 #define MC_ECF_LICENSE_PURCHASE_NO_ENCRYPTION             0x00000000
@@ -71,6 +71,7 @@ class CLicenseRequest
         void SetPrivateKey(const std::vector<unsigned char>& private_key);
         bool Verify();
         const unsigned char *GetParam(uint32_t param,size_t *bytes);
+        const unsigned char *GetParamToEnd(uint32_t param,size_t *bytes);
         uint256 GetHash();
         
     ADD_SERIALIZE_METHODS;
