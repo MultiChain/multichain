@@ -22,6 +22,11 @@ void CLicenseRequest::Zero()
     m_Data.clear();
 }
 
+bool CLicenseRequest::IsZero()
+{
+    return (m_Data.size() == 0);
+}
+
 void CLicenseRequest::SetData(mc_Script *script)
 {
     const unsigned char* ptr;

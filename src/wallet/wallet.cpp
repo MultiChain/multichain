@@ -2031,6 +2031,7 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
 //                    LogPrintf("DEBUG: %s %d %d %d\n",coin.m_OutPoint.ToString().c_str(),coin.GetDepthInMainChain(),coin.IsFinal(),coin.BlocksToMaturity());
 //                    LogPrintf("DEBUG: %s\n",coin.ToString().c_str());
                     if ( (coin.IsFinal()) && 
+                         ((coin.m_Flags & MC_TFL_IS_LICENSE_TOKEN) == 0) &&   
                          (coin.BlocksToMaturity() <= 0) &&
                          (mine != ISMINE_NO) &&
                          (!fOnlyUnlocked || !IsLockedCoin(txid, vout)) && 

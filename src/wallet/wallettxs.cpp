@@ -20,6 +20,8 @@ using namespace json_spirit;
 int64_t GetAdjustedTime();
 void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
 bool CBitcoinAddressFromTxEntity(CBitcoinAddress &address,mc_TxEntity *lpEntity);
+bool IsLicenseTokenIssuance(mc_Script *lpScript,uint256 hash);
+bool IsLicenseTokenTransfer(mc_Script *lpScript,mc_Buffer *amounts);
 
 using namespace std;
 
@@ -1066,6 +1068,10 @@ int mc_WalletTxs::RollBack(mc_TxImport *import,int block)
                                                             {
                                                                 txout.m_Flags |= MC_TFL_IS_SPENDABLE;
                                                             }
+                                                            if(prevtxdef.m_Flags & MC_TFL_IS_LICENSE_TOKEN) // License token transfer
+                                                            {
+                                                                txout.m_Flags |= MC_TFL_IS_LICENSE_TOKEN;
+                                                            }
                                                         }
                                                         mc_TxEntity input_entity;
                                                         GetSingleInputEntity(prevwtx,&input_entity); // Check if the entity coinsides with single input entity of prev tx - change
@@ -2003,6 +2009,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     bool fOutputIsSpendable;
     bool fNewStream;
     bool fNewAsset;
+    bool fLicenseTokenTransfer;
     std::vector<mc_Coin> txoutsIn;
     std::vector<mc_Coin> txoutsOut;
     uint256 hash;
@@ -2100,6 +2107,8 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     fSingleInputEntity=true;
     fNewStream=false;
     fNewAsset=false;
+    fLicenseTokenTransfer=false;
+    
     input_entity.Zero();
     BOOST_FOREACH(const CTxIn& txin, tx.vin)                                    //Checking inputs    
     {
@@ -2274,6 +2283,20 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                     fNewAsset=true;                    
                 }
             }            
+            
+            if(fNewAsset)
+            {
+                if(IsLicenseTokenIssuance(mc_gState->m_TmpScript,hash))
+                {
+                    utxo.m_Flags |= MC_TFL_IS_LICENSE_TOKEN;
+                    fNewAsset=false;
+                }
+            }
+            if(IsLicenseTokenTransfer(mc_gState->m_TmpScript,mc_gState->m_TmpAssetsOut))
+            {
+                fLicenseTokenTransfer=true;
+                utxo.m_Flags |= MC_TFL_IS_LICENSE_TOKEN;
+            }
             
             BOOST_FOREACH(const CTxDestination& dest, addressRets)
             {
@@ -2806,7 +2829,10 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     {
         flags |= MC_TFL_ALL_INPUTS_FROM_ME;
     }
-    
+    if(fLicenseTokenTransfer)                                                   
+    {
+        flags |= MC_TFL_IS_LICENSE_TOKEN;                                       // Needed for rollback, license issuance is not pure license tx
+    }
     timestamp=mc_TimeNowAsUInt();
     if(block >= 0)
     {

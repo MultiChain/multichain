@@ -1826,6 +1826,11 @@ const unsigned char* mc_EntityDetails::GetScript()
     return m_LedgerRow.m_Script;
 }
 
+uint32_t mc_EntityDetails::GetScriptSize()
+{
+    return m_LedgerRow.m_ScriptSize;
+}
+
 int mc_EntityDetails::GetAssetMultiple()
 {
     int multiple;

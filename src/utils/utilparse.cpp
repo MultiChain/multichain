@@ -145,7 +145,63 @@ bool HasPerOutputDataEntries(const CTxOut& txout,mc_Script *lpScript)
     return false;
 }
 
+bool IsLicenseTokenIssuance(mc_Script *lpScript,uint256 hash)
+{
+    int64_t quantity;
+    mc_EntityDetails entity;
+    
+    if(mc_gState->m_TmpScript->GetNumElements() == 0)
+    {
+        return false;
+    }
+    
+    mc_gState->m_TmpScript->SetElement(0);
+    if(mc_gState->m_TmpScript->GetAssetGenesis(&quantity) == 0)
+    {
+        if(quantity == 1)
+        {
+            if(mc_gState->m_Assets->FindEntityByTxID(&entity,(unsigned char*)&hash))
+            {
+                if(entity.GetEntityType() == MC_ENT_TYPE_LICENSE_TOKEN)
+                {
+                    return true;
+                }
+            }            
+        }
+    }
+    
+    return false;
+}
 
+bool IsLicenseTokenTransfer(mc_Script *lpScript,mc_Buffer *amounts)
+{
+    mc_EntityDetails entity;
+    
+    if(mc_gState->m_TmpScript->GetNumElements() != 3)
+    {
+        return false;
+    }
+    
+    if(amounts->GetCount() != 1)
+    {
+        return false;
+    }
+    
+    if(mc_GetABQuantity(amounts->GetRow(0)) != 1)            
+    {
+        return false;        
+    }
+    
+    if(mc_gState->m_Assets->FindEntityByFullRef(&entity,amounts->GetRow(0)))
+    {
+        if(entity.GetEntityType() == MC_ENT_TYPE_LICENSE_TOKEN)
+        {
+            return true;
+        }        
+    }
+    
+    return false;
+}
 /* 
  * Parses txout script into asset-quantity buffer
  * Use it only with unspent or not yet created outputs

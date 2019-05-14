@@ -188,6 +188,7 @@ typedef struct mc_EntityDetails
     const unsigned char* GetScript();    
     const unsigned char* GetParamUpgrades(int *size);    
     
+    uint32_t GetScriptSize();
     int IsUnconfirmedGenesis();    
     int GetAssetMultiple();
     uint32_t GetFilterType();

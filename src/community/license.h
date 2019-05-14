@@ -70,6 +70,7 @@ class CLicenseRequest
         void SetData(const unsigned char* ptr,size_t bytes);
         void SetPrivateKey(const std::vector<unsigned char>& private_key);
         bool Verify();
+        bool IsZero();
         const unsigned char *GetParam(uint32_t param,size_t *bytes);
         const unsigned char *GetParamToEnd(uint32_t param,size_t *bytes);
         uint256 GetHash();
