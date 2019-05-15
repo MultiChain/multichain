@@ -150,13 +150,13 @@ bool IsLicenseTokenIssuance(mc_Script *lpScript,uint256 hash)
     int64_t quantity;
     mc_EntityDetails entity;
     
-    if(mc_gState->m_TmpScript->GetNumElements() == 0)
+    if(lpScript->GetNumElements() == 0)
     {
         return false;
     }
     
-    mc_gState->m_TmpScript->SetElement(0);
-    if(mc_gState->m_TmpScript->GetAssetGenesis(&quantity) == 0)
+    lpScript->SetElement(0);
+    if(lpScript->GetAssetGenesis(&quantity) == 0)
     {
         if(quantity == 1)
         {
@@ -177,7 +177,7 @@ bool IsLicenseTokenTransfer(mc_Script *lpScript,mc_Buffer *amounts)
 {
     mc_EntityDetails entity;
     
-    if(mc_gState->m_TmpScript->GetNumElements() != 3)
+    if(lpScript->GetNumElements() != 3)
     {
         return false;
     }
@@ -309,9 +309,17 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                 }
             }        
         }
-                
-        if(issue_found)                                                         
+         
+        if(issue_found)
         {
+            if(IsLicenseTokenIssuance(lpScript,hash))
+            {
+                issue_found=false;
+            }
+        }
+        
+        if(issue_found)                                                         
+        {                
             if(hash != 0)
             {
                 mc_EntityDetails entity;
@@ -810,7 +818,7 @@ bool CreateAssetBalanceList(const CTxOut& txout,mc_Buffer *amounts,mc_Script *lp
                     return false;                                    
                 }
             }        
-            
+                                
             if(required)
             {
                 if(lpScript->GetPermission(&type,&from,&to,&timestamp) == 0)    

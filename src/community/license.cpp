@@ -3,20 +3,6 @@
 
 #include "community/license.h"
 
-const uint32_t mc_LicenseParamsForHash[]={    
-MC_ENT_SPRM_LICENSE_CHAIN_PARAMS_HASH,
-MC_ENT_SPRM_LICENSE_ADDRESS,
-MC_ENT_SPRM_LICENSE_NONCE,
-MC_ENT_SPRM_LICENSE_START_TIME,
-MC_ENT_SPRM_LICENSE_END_TIME,  
-MC_ENT_SPRM_LICENSE_UNLOCKED_FEATURES,
-MC_ENT_SPRM_LICENSE_FLAGS,
-MC_ENT_SPRM_LICENSE_PARAMS,
-MC_ENT_SPRM_LICENSE_PREV_LICENSE,    
-//MC_ENT_SPRM_LICENSE_NAME,
-MC_ENT_SPRM_LICENSE_DETAILS
-};
-
 void CLicenseRequest::Zero()
 {
     m_Data.clear();
@@ -170,7 +156,10 @@ uint256 CLicenseRequest::GetHash()
         offset=mc_FindSpecialParamInDetailsScriptFull(ptr,src_bytes,mc_LicenseParamsForHash[i],&bytes,&param_offset);
         if(param_offset < src_bytes)
         {
-            lpScript->SetData(ptr+param_offset,bytes+offset-param_offset);
+            if(bytes)
+            {
+                lpScript->SetData(ptr+param_offset,bytes+offset-param_offset);
+            }
         }        
     }
     
