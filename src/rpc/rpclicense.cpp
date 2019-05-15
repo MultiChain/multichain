@@ -343,7 +343,6 @@ Value getlicenserequest(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot save license request");                        
     }
     
-    printf("New license request with hash: %s, size: %d\n",license_request.GetHash().ToString().c_str(),(int)license_request.m_Data.size());
     return HexStr(license_request.m_Data);    
     
 //    return license_address.ToString().c_str();
