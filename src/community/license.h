@@ -74,7 +74,10 @@ class CLicenseRequest
         bool IsZero();
         const unsigned char *GetParam(uint32_t param,size_t *bytes);
         const unsigned char *GetParamToEnd(uint32_t param,size_t *bytes);
+        uint256 GetHash(const uint32_t *params,int param_count);
         uint256 GetHash();
+        uint256 GetConfirmationHash();
+        std::string GetLicenseNameByConfirmation();
         
     ADD_SERIALIZE_METHODS;
     
@@ -86,19 +89,6 @@ class CLicenseRequest
     }
 };
 
-const uint32_t mc_LicenseParamsForHash[]={    
-MC_ENT_SPRM_LICENSE_CHAIN_PARAMS_HASH,
-MC_ENT_SPRM_LICENSE_ADDRESS,
-MC_ENT_SPRM_LICENSE_NONCE,
-MC_ENT_SPRM_LICENSE_START_TIME,
-MC_ENT_SPRM_LICENSE_END_TIME,  
-MC_ENT_SPRM_LICENSE_UNLOCKED_FEATURES,
-MC_ENT_SPRM_LICENSE_FLAGS,
-MC_ENT_SPRM_LICENSE_PARAMS,
-MC_ENT_SPRM_LICENSE_PREV_LICENSE,    
-//MC_ENT_SPRM_LICENSE_NAME,
-MC_ENT_SPRM_LICENSE_DETAILS
-};
 
 
 #endif /* LICENSE_H */

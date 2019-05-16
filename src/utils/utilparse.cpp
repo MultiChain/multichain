@@ -177,7 +177,7 @@ bool IsLicenseTokenTransfer(mc_Script *lpScript,mc_Buffer *amounts)
 {
     mc_EntityDetails entity;
     
-    if(lpScript->GetNumElements() != 3)
+    if(lpScript->GetNumElements() < 2)
     {
         return false;
     }

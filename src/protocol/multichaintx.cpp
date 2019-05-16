@@ -7,6 +7,7 @@
 #include "core/main.h"
 #include "utils/util.h"
 #include "utils/utilparse.h"
+#include "community/license.h"
 #include "multichain/multichain.h"
 #include "structs/base58.h"
 #include "custom/custom.h"
@@ -1390,10 +1391,21 @@ bool MultiChainTransaction_CheckLicenseTokenTransfer(const CTransaction& tx,
         return false;                                                            
     }        
     
-    if(mc_gState->m_TmpScript->GetNumElements() != 3)
+    if(mc_gState->m_Features->License20010())
     {
-        reason="License token transfer script rejected - wrong number of elements";
-        return false;                                                                                                                                                                                
+        if(mc_gState->m_TmpScript->GetNumElements() < 2)
+        {
+            reason="License token transfer script rejected - wrong number of elements";
+            return false;                                                                                                                                                                                
+        }        
+    }
+    else
+    {
+        if(mc_gState->m_TmpScript->GetNumElements() != 3)
+        {
+            reason="License token transfer script rejected - wrong number of elements";
+            return false;                                                                                                                                                                                
+        }
     }
     
     if(details->vInputHashTypes[0] != SIGHASH_ALL)
@@ -1777,6 +1789,19 @@ bool MultiChainTransaction_CheckLicenseTokenDetails(CMultiChainTxDetails *detail
         return false;                                                                                                                                                
     }    
     
+    if(mc_gState->m_Features->License20010())
+    {
+        CLicenseRequest confirmation;
+        confirmation.SetData(details->details_script,details->details_script_size);
+        string license_name=confirmation.GetLicenseNameByConfirmation();
+        if( (value_sizes[MC_ENT_SPRM_NAME] != license_name.size()) ||
+            (memcmp(details->details_script+value_starts[MC_ENT_SPRM_NAME],license_name.c_str(),value_sizes[MC_ENT_SPRM_NAME]) != 0))    
+        {
+            reason="License token issue script rejected - name mismatch";
+            return false;                                                                                                                                                            
+        }
+    }
+    
     return true;
 }
 
@@ -2106,12 +2131,23 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                     }
                     
                     MultiChainTransaction_SetTmpOutputScript(tx.vout[issue_vout].scriptPubKey);
-                    if(mc_gState->m_TmpScript->GetNumElements() != 3)
+                    if(mc_gState->m_Features->License20010())
                     {
-                        reason="License token issue script rejected - wrong number of elements";
-                        return false;                                                                                                                                                                                
+                        if(mc_gState->m_TmpScript->GetNumElements() < 2)
+                        {
+                            reason="License token issue script rejected - wrong number of elements";
+                            return false;                                                                                                                                                                                
+                        }
                     }
-                                    
+                    else
+                    {
+                        if(mc_gState->m_TmpScript->GetNumElements() != 3)
+                        {
+                            reason="License token issue script rejected - wrong number of elements";
+                            return false;                                                                                                                                                                                
+                        }
+                    }
+                    
                     if(!MultiChainTransaction_CheckLicenseTokenDetails(details,token_address,reason))
                     {
                         return false;                                                                                                                                                        

@@ -3,6 +3,32 @@
 
 #include "community/license.h"
 
+const uint32_t mc_LicenseParamsForHash[]={    
+MC_ENT_SPRM_LICENSE_CHAIN_PARAMS_HASH,
+MC_ENT_SPRM_LICENSE_ADDRESS,
+MC_ENT_SPRM_LICENSE_NONCE,
+MC_ENT_SPRM_LICENSE_START_TIME,
+MC_ENT_SPRM_LICENSE_END_TIME,  
+MC_ENT_SPRM_LICENSE_UNLOCKED_FEATURES,
+MC_ENT_SPRM_LICENSE_FLAGS,
+MC_ENT_SPRM_LICENSE_PARAMS,
+MC_ENT_SPRM_LICENSE_PREV_LICENSE,    
+//MC_ENT_SPRM_LICENSE_NAME,
+MC_ENT_SPRM_LICENSE_DETAILS
+};
+
+const uint32_t mc_LicenseParamsForConfirmation[]={    
+MC_ENT_SPRM_LICENSE_REQUEST_HASH,
+MC_ENT_SPRM_LICENSE_REQUEST_ADDRESS,
+MC_ENT_SPRM_LICENSE_CONFIRMATION_TIME,
+MC_ENT_SPRM_LICENSE_CONFIRMATION_REF,
+MC_ENT_SPRM_LICENSE_PUBKEY,  
+MC_ENT_SPRM_LICENSE_MIN_VERSION,
+MC_ENT_SPRM_LICENSE_MIN_PROTOCOL,
+MC_ENT_SPRM_LICENSE_CONFIRMATION_DETAILS,
+MC_ENT_SPRM_LICENSE_SIGNATURE,    
+};
+
 void CLicenseRequest::Zero()
 {
     m_Data.clear();
@@ -128,14 +154,12 @@ bool CLicenseRequest::Verify()
     return true;
 }
 
-uint256 CLicenseRequest::GetHash()
+uint256 CLicenseRequest::GetHash(const uint32_t *params,int param_count)
 {
     uint256 hash=0;
     uint32_t offset,param_offset;
     size_t src_bytes,bytes;
     const unsigned char *ptr;
-    
-    int param_count=sizeof(mc_LicenseParamsForHash)/sizeof(uint32_t);
     
     mc_Script *lpScript=mc_gState->m_TmpBuffers->m_LicenseTmpBuffer;
     
@@ -153,7 +177,7 @@ uint256 CLicenseRequest::GetHash()
     
     for(int i=0;i<param_count;i++)
     {
-        offset=mc_FindSpecialParamInDetailsScriptFull(ptr,src_bytes,mc_LicenseParamsForHash[i],&bytes,&param_offset);
+        offset=mc_FindSpecialParamInDetailsScriptFull(ptr,src_bytes,params[i],&bytes,&param_offset);
         if(param_offset < src_bytes)
         {
             if(bytes)
@@ -170,3 +194,20 @@ uint256 CLicenseRequest::GetHash()
     return hash;
 }
 
+uint256 CLicenseRequest::GetHash()
+{
+    return GetHash(mc_LicenseParamsForHash,sizeof(mc_LicenseParamsForHash)/sizeof(uint32_t));
+}
+
+uint256 CLicenseRequest::GetConfirmationHash()
+{
+    return GetHash(mc_LicenseParamsForConfirmation,sizeof(mc_LicenseParamsForConfirmation)/sizeof(uint32_t));    
+}
+
+std::string CLicenseRequest::GetLicenseNameByConfirmation()
+{
+    uint256 hash=GetConfirmationHash();
+    unsigned char *ptr=(unsigned char *)&hash;
+    
+    return strprintf("license-%02x%02x-%02x%02x-%02x%02x-%02x%02x",ptr[31],ptr[30],ptr[29],ptr[28],ptr[27],ptr[26],ptr[25],ptr[24]);
+}
