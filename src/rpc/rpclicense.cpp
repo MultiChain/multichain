@@ -11,8 +11,6 @@
 #include "community/community.h"
 #include "rpc/rpcwallet.h"
 
-int mc_FindMacServerAddress(unsigned char **lppAddr,unsigned char *lpAddrToValidate);
-
 bool mc_GetLicenseAddress(CBitcoinAddress &license_address,bool create_new)
 {
     if(!create_new)
@@ -250,7 +248,7 @@ Value getlicenserequest(const Array& params, bool fHelp)
     
     unsigned char *lpMACList;
  
-    if(mc_FindMacServerAddress(&lpMACList,NULL) == MC_ERR_NOERROR)
+    if(__US_FindMacServerAddress(&lpMACList,NULL) == MC_ERR_NOERROR)
     {
         int k,n,l,c;
         stored_param=NULL;
