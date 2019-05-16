@@ -174,7 +174,10 @@ int mc_ChunkDB::AddSubscription(mc_SubscriptionDBRow *subscription)
     if(subscription->m_Entity.m_EntityType != MC_TET_NONE)
     {
         mc_GetFullFileName(m_Name,dir_name,"",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,subscription->m_DirName);
-        mc_CreateDir(subscription->m_DirName);
+        if(subscription->m_Entity.m_EntityType == MC_TET_AUTHOR)
+        {
+            mc_CreateDir(subscription->m_DirName);
+        }
     }
     else
     {
@@ -612,6 +615,7 @@ int mc_ChunkDB::RemoveEntityInternal(mc_TxEntity *entity,uint32_t *removed_chunk
     {
         err=MC_ERR_NOERROR;
         
+        mc_CreateDir(old_subscription->m_DirName);
         SetFileName(FileName,old_subscription,file_id);
         FileHan=open(FileName,_O_BINARY | O_RDONLY, S_IRUSR | S_IWUSR);
         if(FileHan<=0)
@@ -1839,6 +1843,7 @@ int mc_ChunkDB::AddToFile(const void* chunk,
     tail[1]=MC_ENT_SPRM_FILE_END;
     tail[2]=0x00;
     
+    mc_CreateDir(subscription->m_DirName);
     SetFileName(FileName,subscription,fileid);
     err=MC_ERR_NOERROR;
     FileHan=open(FileName,_O_BINARY | O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
@@ -1918,6 +1923,8 @@ int mc_ChunkDB::FlushDataFile(mc_SubscriptionDBRow *subscription,uint32_t fileid
 {
     char FileName[MC_DCT_DB_MAX_PATH];         
     int FileHan;
+    
+    mc_CreateDir(subscription->m_DirName);
     SetFileName(FileName,subscription,fileid);
     
     FileHan=open(FileName,_O_BINARY | O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
