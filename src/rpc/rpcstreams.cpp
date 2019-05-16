@@ -365,17 +365,7 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
                 {
                     if(d.name_ == "restrict")
                     {
-                        if(RawDataParseRestrictParameter(d.value_,&restrict,&permissions,&errorCode,&strError))
-                        {
-                            if(restrict & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN)
-                            {
-                                if(restrict & MC_ENT_ENTITY_RESTRICTION_ONCHAIN)
-                                {
-                                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Stream cannot be restricted from both onchain and offchain items");               
-                                }                        
-                            }                            
-                        }
-                        else
+                        if(!RawDataParseRestrictParameter(d.value_,&restrict,&permissions,&errorCode,&strError))
                         {
                             throw JSONRPCError(errorCode, strError);                                                                           
                         }
@@ -438,6 +428,15 @@ Value createstreamfromcmd(const Array& params, bool fHelp)
             }
  */ 
         }        
+        
+        if(restrict & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN)
+        {
+            if(restrict & MC_ENT_ENTITY_RESTRICTION_ONCHAIN)
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "Stream cannot be restricted from both onchain and offchain items");               
+            }                        
+        }                            
+        
         if( restrict != 0 )
         {
             lpDetails->SetSpecialParamValue(MC_ENT_SPRM_RESTRICTIONS,(unsigned char*)&restrict,1);                         
