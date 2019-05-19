@@ -267,6 +267,10 @@ int __US_GetPID()
 
 int __US_FindMacServerAddress(unsigned char **lppAddr,unsigned char *lpAddrToValidate)
 {
+#ifdef MAC_OSX
+    return MC_ERR_NOT_SUPPORTED;
+#else
+
     int nSD; // Socket descriptor
     struct ifreq sIfReq; // Interface request
     struct if_nameindex *pIfList; // Ptr to interface name index
@@ -380,6 +384,8 @@ int __US_FindMacServerAddress(unsigned char **lppAddr,unsigned char *lpAddrToVal
     }
     
     return r;
+#endif        
+ 
 }
 
 
