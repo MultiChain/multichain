@@ -2080,7 +2080,7 @@ void mc_InitRPCHelpMap09()
             "{\n"
             "  \"walletversion\": xxxxx,           (numeric) the wallet version\n"
             "  \"balance\": xxxxxxx,               (numeric) the total native currency balance of the wallet\n"
-            "  \"txcount\": xxxxxxx,               (numeric) the total number of transactions in the wallet\n"
+            "  \"txcount\": xxxxxxx,               (numeric) the total number of transactions and stream keys in the wallet\n"
             "  \"walletdbversion\": xxxxx,         (numeric) the wallet database version\n"
             "  \"keypoololdest\": xxxxxx,          (numeric) the timestamp (seconds since GMT epoch) of the oldest pre-generated key in the key pool\n"
             "  \"keypoolsize\": xxxx,              (numeric) how many new keys are pre-generated\n"
