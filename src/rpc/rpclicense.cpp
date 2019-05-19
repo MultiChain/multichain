@@ -187,11 +187,9 @@ Value getlicenserequest(const Array& params, bool fHelp)
     CLicenseRequest license_request;
     CBitcoinAddress license_address;
     uint32_t encryption_type;
-    vector<unsigned char> vEncryptionPublicKey;
     unsigned char* stored_param;
     int param_size;
     uint32_t value32;
-    uint64_t value64;
     unsigned char nonce[MC_LIC_NONCE_SIZE];
     
     if(!mc_GetLicenseAddress(license_address,false))
@@ -248,38 +246,38 @@ Value getlicenserequest(const Array& params, bool fHelp)
     
     unsigned char *lpMACList;
  
-    if(__US_FindMacServerAddress(&lpMACList,NULL) == MC_ERR_NOERROR)
-    {
-        int k,n,l,c;
-        stored_param=NULL;
-        param_size=6;
-        n=lpMACList[0];
-        n=n*256+lpMACList[1];
- 
-
-        for(k=0;k<n;k++)
-        {
-            if(stored_param == NULL)
-            {
-                c=0;
-                for(l=1;l<6;l++)
-                {
-                    if(lpMACList[2+k*6+l] == lpMACList[2+k*6+l-1])c++;
-                }
-                if(c != 5)
-                {
-                    stored_param=lpMACList+2+k*6;
-                }
-            }
-        }
-        if(stored_param)
-        {
-            lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_MAC_ADDRESS,stored_param,param_size);    
-            
-        }
-    }
     if(lpMACList)
     {
+        if(__US_FindMacServerAddress(&lpMACList,NULL) == MC_ERR_NOERROR)
+        {
+            int k,n,l,c;
+            stored_param=NULL;
+            param_size=6;
+            n=lpMACList[0];
+            n=n*256+lpMACList[1];
+
+
+            for(k=0;k<n;k++)
+            {
+                if(stored_param == NULL)
+                {
+                    c=0;
+                    for(l=1;l<6;l++)
+                    {
+                        if(lpMACList[2+k*6+l] == lpMACList[2+k*6+l-1])c++;
+                    }
+                    if(c != 5)
+                    {
+                        stored_param=lpMACList+2+k*6;
+                    }
+                }
+            }
+            if(stored_param)
+            {
+                lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_MAC_ADDRESS,stored_param,param_size);    
+
+            }
+        }
         delete [] lpMACList;        
     }
     
@@ -311,7 +309,9 @@ Value getlicenserequest(const Array& params, bool fHelp)
     stored_param=(unsigned char*)&value32;
     param_size=sizeof(uint32_t);
     lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_TRANSFER_METHOD,stored_param,param_size);    
-        
+
+    /*
+    uint64_t value64;
     value32=mc_TimeNowAsUInt();
     stored_param=(unsigned char*)&value32;
     param_size=sizeof(uint32_t);
@@ -331,6 +331,7 @@ Value getlicenserequest(const Array& params, bool fHelp)
     stored_param=(unsigned char*)&value32;
     param_size=sizeof(uint32_t);
     lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_FLAGS,stored_param,param_size);    
+    */
     
     license_request.SetData(lpScript);   
     license_request.SetPrivateKey(full_key.m_PrivateKey);
