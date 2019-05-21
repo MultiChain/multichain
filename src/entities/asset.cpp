@@ -613,11 +613,19 @@ void mc_EntityDetails::Set(mc_EntityLedgerRow* row)
             break;
         case MC_ENT_TYPE_STREAM:
             m_Permissions |= MC_PTP_ADMIN | MC_PTP_ACTIVATE | MC_PTP_WRITE;
+            if(mc_gState->m_Features->ReadPermissions())
+            {
+                m_Permissions |= MC_PTP_READ;                
+            }
             break;
         default:
             if(m_LedgerRow.m_EntityType <= MC_ENT_TYPE_STREAM_MAX)
             {
                 m_Permissions = MC_PTP_WRITE | MC_PTP_ACTIVATE;
+                if(mc_gState->m_Features->ReadPermissions())
+                {
+                    m_Permissions |= MC_PTP_READ;                
+                }
             }
             break;            
     }
@@ -671,7 +679,7 @@ void mc_EntityDetails::Set(mc_EntityLedgerRow* row)
                 }
             }
         }
-        
+                            
         value_offset=mc_FindSpecialParamInDetailsScript(m_LedgerRow.m_Script,m_LedgerRow.m_ScriptSize,MC_ENT_SPRM_RESTRICTIONS,&value_size);
         if(value_offset <= m_LedgerRow.m_ScriptSize)
         {
@@ -1818,6 +1826,11 @@ const unsigned char* mc_EntityDetails::GetScript()
     return m_LedgerRow.m_Script;
 }
 
+uint32_t mc_EntityDetails::GetScriptSize()
+{
+    return m_LedgerRow.m_ScriptSize;
+}
+
 int mc_EntityDetails::GetAssetMultiple()
 {
     int multiple;
@@ -1926,6 +1939,26 @@ int mc_EntityDetails::AnyoneCanWrite()
         }
     }
     return 0;
+}
+
+int mc_EntityDetails::AnyoneCanRead()
+{
+    if(m_LedgerRow.m_EntityType != MC_ENT_TYPE_STREAM)
+    {
+        return 1;
+    }
+    if(mc_gState->m_Features->ReadPermissions())
+    {
+        if(m_Permissions & MC_PTP_SPECIFIED)
+        {
+            if(m_ScriptPermissions & MC_PTP_READ)
+            {
+                return 0;
+            }
+        }
+    }
+    
+    return 1;
 }
 
 uint32_t mc_EntityDetails::UpgradeStartBlock()

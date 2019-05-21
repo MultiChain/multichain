@@ -527,7 +527,7 @@ Value listwallettransactions(const Array& params, bool fHelp)
         {
             wallet_by_time.m_EntityType |= MC_TET_WALLET_SPENDABLE;            
         }
-        CheckWalletError(pwalletTxsMain->GetList(&wallet_by_time,-nFrom,nCount,entity_rows));
+        CheckWalletError(pwalletTxsMain->GetList(&wallet_by_time,-nFrom,nCount,entity_rows),wallet_by_time.m_EntityType,"");
         for(int i=0;i<entity_rows->GetCount();i++)
         {
             lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
@@ -658,7 +658,7 @@ Value listaddresstransactions(const Array& params, bool fHelp)
             memcpy(address_by_time.m_EntityID,lpScriptID,MC_TDB_ENTITY_ID_SIZE);
             address_by_time.m_EntityType=MC_TET_SCRIPT_ADDRESS | MC_TET_TIMERECEIVED;
         }
-        CheckWalletError(pwalletTxsMain->GetList(&address_by_time,-nFrom,nCount,entity_rows));
+        CheckWalletError(pwalletTxsMain->GetList(&address_by_time,-nFrom,nCount,entity_rows),address_by_time.m_EntityType,"");
         for(int i=0;i<entity_rows->GetCount();i++)
         {
             lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);

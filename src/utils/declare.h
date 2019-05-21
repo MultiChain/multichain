@@ -141,6 +141,7 @@ typedef struct mc_SHA256
     void GetHash(unsigned char *hash);
     
     void DoubleHash(const void *lpData,int size,void *hash);
+    void DoubleHash(const void *lpSalt,int salt_size,const void *lpData,int size,void *hash);
     
     mc_SHA256()
     {
@@ -263,6 +264,7 @@ int mc_StringCompareCaseInsensitive(const char *str1,const char *str2,int len);
 uint32_t mc_GetParamFromDetailsScript(const unsigned char *ptr,uint32_t total,uint32_t offset,uint32_t* param_value_start,size_t *bytes);
 uint32_t mc_GetParamFromDetailsScriptErr(const unsigned char *ptr,uint32_t total,uint32_t offset,uint32_t* param_value_start,size_t *bytes, int *err);
 uint32_t mc_FindSpecialParamInDetailsScript(const unsigned char *ptr,uint32_t total,uint32_t param,size_t *bytes);
+uint32_t mc_FindSpecialParamInDetailsScriptFull(const unsigned char *ptr,uint32_t total,uint32_t param,size_t *bytes,uint32_t *param_offset);
 uint32_t mc_FindNamedParamInDetailsScript(const unsigned char *ptr,uint32_t total,const char *param,size_t *bytes);
 
 const unsigned char *mc_ParseOpDropOpReturnScript(const unsigned char *src,int size,int *op_drop_offset,int *op_drop_size,int op_drop_count,int *op_return_offset,int *op_return_size);
@@ -289,6 +291,7 @@ int __US_LockFile(int FileHan);
 int __US_UnLockFile(int FileHan);
 int __US_DeleteFile(const char *file_name);
 int __US_GetPID();
+int __US_FindMacServerAddress(unsigned char **lppAddr,unsigned char *lpAddrToValidate);
 void sprintf_hex(char *hex,const unsigned char *bin,int size);
 
 

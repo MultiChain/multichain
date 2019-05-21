@@ -545,6 +545,13 @@ Value verifypermission(const Array& params, bool fHelp)
         case MC_PTP_CUSTOM6:
             result = mc_gState->m_Permissions->CanCustom(lpEntity,lpAddress,type);
             break;
+        case MC_PTP_READ:    
+            if(mc_gState->m_Features->ReadPermissions() == 0)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
+            }
+            result = mc_gState->m_Permissions->CanRead      (lpEntity,lpAddress); 
+            break;
         default:
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid permission");
     }    
@@ -721,6 +728,7 @@ Value listpermissions(const Array& params, bool fHelp)
             case MC_PTP_SEND   :entry.push_back(Pair("type", "send"));break;
             case MC_PTP_RECEIVE:entry.push_back(Pair("type", "receive"));break;
             case MC_PTP_WRITE  :entry.push_back(Pair("type", "write"));break;
+            case MC_PTP_READ   :if(mc_gState->m_Features->ReadPermissions())entry.push_back(Pair("type", "read"));break;
             case MC_PTP_CREATE :entry.push_back(Pair("type", "create"));break;
             case MC_PTP_ISSUE  :entry.push_back(Pair("type", "issue"));break;
             case MC_PTP_MINE   :entry.push_back(Pair("type", "mine"));break;

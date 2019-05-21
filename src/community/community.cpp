@@ -82,6 +82,63 @@ int mc_EnterpriseFeatures::STR_RemoveDataFromFile(int fHan, uint32_t from, uint3
     return MC_ERR_NOERROR;
 }
 
+bool mc_EnterpriseFeatures::OFF_ProcessChunkRequest(unsigned char *ptrStart,unsigned char *ptrEnd,vector<unsigned char>* payload_response,vector<unsigned char>* payload_relay,
+        map<uint160,int>& mapReadPermissionedStreams,string& strError)
+{
+    return false;    
+}
+
+bool mc_EnterpriseFeatures::OFF_GetScriptsToVerify(map<uint160,int>& mapReadPermissionedStreams,vector<CScript>& vSigScriptsIn,vector<CScript>& vSigScriptsToVerify,string& strError)
+{
+    return true;
+}
+
+bool mc_EnterpriseFeatures::OFF_VerifySignatureScripts(uint32_t  msg_type,mc_OffchainMessageID& msg_id,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags,
+            vector<unsigned char>& vPayload,vector<CScript>& vSigScriptsToVerify,string& strError,int& dos_score)
+{
+    return true;        
+}
+
+bool mc_EnterpriseFeatures::OFF_CreateSignatureScripts(uint32_t  msg_type,mc_OffchainMessageID& msg_id,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags,
+            vector<unsigned char>& vPayload,set<CPubKey>& vAddresses,vector<CScript>& vSigScripts,string& strError)
+{    
+    return true;
+}
+
+bool mc_EnterpriseFeatures::OFF_GetPayloadForReadPermissioned(vector<unsigned char>* payload,int *ef_cache_id,string& strError)
+{
+    *ef_cache_id=-1;
+    return true;
+}
+
+void mc_EnterpriseFeatures::OFF_FreeEFCache(int ef_cache_id)
+{
+    
+}
+
+bool mc_EnterpriseFeatures::OFF_ProcessChunkResponse(mc_RelayRequest *request,mc_RelayResponse *response,map <int,int>* request_pairs,mc_ChunkCollector* collector,string& strError)
+{
+    return true;
+}
+
+unsigned char* mc_EnterpriseFeatures::OFF_SupportedEnterpriseFeatures(unsigned char* min_ef,int min_ef_size,int *ef_size)
+{
+    if(ef_size)
+    {
+        *ef_size=0;
+    }
+    return NULL;
+}
+
+
+CPubKey mc_EnterpriseFeatures::WLT_FindReadPermissionedAddress(mc_EntityDetails* entity)
+{
+    CPubKey result;
+    
+    return result;
+}
+
+
 
 int mc_EnterpriseFeatures::WLT_CreateSubscription(mc_TxEntity *entity,uint32_t retrieve,uint32_t indexes,uint32_t *rescan_mode)
 {
@@ -119,6 +176,11 @@ string mc_EnterpriseFeatures::ENT_Edition()
     return "Community";
 }
 
+int mc_EnterpriseFeatures::ENT_BuildVersion()
+{
+    return 0;
+}
+
 int mc_EnterpriseFeatures::ENT_EditionNumeric() 
 {
     return 0;
@@ -129,14 +191,25 @@ int mc_EnterpriseFeatures::ENT_MinWalletDatVersion()
     return 2;
 }
 
-void mc_EnterpriseFeatures::ENT_RPCVerifyEdition() 
+void mc_EnterpriseFeatures::ENT_RPCVerifyEdition(string message) 
 {
-    throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is available only in Enterprise edition of MultiChain, please call \"help enterprise\" for details");        
+	string error="This feature is only available in MultiChain Enterprise";
+    if(message.size())
+    {
+        error += ": ";
+        error += message;
+    }
+    throw JSONRPCError(RPC_NOT_SUPPORTED, error);        
 }
 
 std::string mc_EnterpriseFeatures::ENT_TextConstant(const char* name)
 {
     return "";
+}
+
+void mc_EnterpriseFeatures::ENT_MaybeStop()
+{
+    
 }
 
 void mc_EnterpriseFeatures::ENT_InitRPCHelpMap()
@@ -145,14 +218,20 @@ void mc_EnterpriseFeatures::ENT_InitRPCHelpMap()
 }
 
 
-void mc_EnterpriseFeatures::LIC_RPCVerifyFeature(uint64_t feature)
+void mc_EnterpriseFeatures::LIC_RPCVerifyFeature(uint64_t feature,string message)
 {
-    throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is available only in Enterprise edition of MultiChain, please call \"help enterprise\" for details");            
+	string error="This feature is only available in MultiChain Enterprise";
+    if(message.size())
+    {
+        error += ": ";
+        error += message;
+    }
+    throw JSONRPCError(RPC_NOT_SUPPORTED, error);        
 }
 
 bool mc_EnterpriseFeatures::LIC_VerifyFeature(uint64_t feature,std::string& reason)
 {
-    reason="Not available in Community efition";
+    reason="Not available in Community edition";
     return false;
 }
 

@@ -2075,6 +2075,34 @@ bool CheckOutputPermissions(const vector<pair<CScript, CAmount> >& vecSend,mc_Bu
     return true;
 }
 
+bool IsLicenseTokenIssuanceDetails(const CTxOut& txout,mc_Script *lpScript)
+{
+    uint32_t type;
+    int update;
+    unsigned char script[MC_ENT_MAX_SCRIPT_SIZE];;
+    int script_size;    
+    const CScript& script1 = txout.scriptPubKey;        
+    CScript::const_iterator pc1 = script1.begin();
+    lpScript->Clear();
+    lpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+    if(lpScript->GetNumElements() == 0)
+    {
+        return false;
+    }
+        
+    lpScript->SetElement(0);
+    if(lpScript->GetNewEntityType(&type,&update,script,&script_size) == 0)
+    {
+        if(type == MC_ENT_TYPE_LICENSE_TOKEN)
+        {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+
 bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript, CAmount> >& vecSend,
                                 CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, std::string& strFailReason, const CCoinControl* coinControl,
                                 const set<CTxDestination>* addresses,int min_conf,int min_inputs,int max_inputs,const vector<COutPoint>* lpCoinsToUse,uint32_t flags,int *eErrorCode)
@@ -2204,6 +2232,35 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                 required |= this_required;
             }
         }
+        if(required & MC_PTP_ISSUE)
+        {
+            BOOST_FOREACH (const PAIRTYPE(CScript, CAmount)& s, vecSend)   
+            {                
+                CTxOut txout(s.second, s.first);
+                if(IsLicenseTokenIssuanceDetails(txout,lpScript))
+                {
+                    if(required & MC_PTP_ISSUE)
+                    {
+                        required-=MC_PTP_ISSUE;
+                    }
+                }
+            }            
+            if( (required & MC_PTP_ISSUE) == 0)
+            {
+                for(int i=0;i<out_amounts->GetCount();i++)
+                {
+                    if(mc_GetABRefType(out_amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_SPECIAL)
+                    {
+                        switch(mc_GetLE(out_amounts->GetRow(i)+4,4))
+                        {
+                            case MC_PTP_ISSUE | MC_PTP_SEND:
+                                mc_SetABQuantity(out_amounts->GetRow(i),0);                                
+                                break;
+                        }                    
+                    }
+                }                
+            }
+        }        
     }
     else
     {

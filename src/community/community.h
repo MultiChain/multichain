@@ -10,9 +10,14 @@
 
 #define MC_EFT_NONE                            0x0000000000000000
 #define MC_EFT_LICENSE_TRANSFER                0x0000000000000002
-#define MC_EFT_STREAM_CONDITIONAL_INDEXING     0x0000000000000100
+#define MC_EFT_STREAM_SUBSCRIPTION_CONTROL     0x0000000000000100
 #define MC_EFT_STREAM_MANUAL_RETRIEVAL         0x0000000000000200
-#define MC_EFT_STREAM_READ_PERMISSIONS         0x0000000000001000
+#define MC_EFT_STREAM_MANUAL_PURGING           0x0000000000000400
+#define MC_EFT_STREAM_READ_RESTRICTED_READ     0x0000000000001000
+#define MC_EFT_STREAM_READ_RESTRICTED_WRITE    0x0000000000002000
+#define MC_EFT_STREAM_READ_RESTRICTED_GIVE     0x0000000000004000
+#define MC_EFT_OFFCHAIN_AUTHENTICATION_VERIFY  0x0000000000010000
+#define MC_EFT_OFFCHAIN_AUTHENTICATION_SIGN    0x0000000000020000
 #define MC_EFT_ALL                             0xFFFFFFFFFFFFFFFF
 
 
@@ -49,6 +54,19 @@ typedef struct mc_EnterpriseFeatures
     Value STR_RPCPurgePublishedItems(const Array& params);
     int STR_RemoveDataFromFile(int fHan, uint32_t from, uint32_t size, uint32_t mode);
     
+    bool OFF_ProcessChunkRequest(unsigned char *ptrStart,unsigned char *ptrEnd,vector<unsigned char>* payload_response,vector<unsigned char>* payload_relay,
+        map<uint160,int>& mapReadPermissionedStreams,string& strError);
+    bool OFF_ProcessChunkResponse(mc_RelayRequest *request,mc_RelayResponse *response,map <int,int>* request_pairs,mc_ChunkCollector* collector,string& strError);
+    bool OFF_GetScriptsToVerify(map<uint160,int>& mapReadPermissionedStreams,vector<CScript>& vSigScriptsIn,vector<CScript>& vSigScriptsToVerify,string& strError);
+    bool OFF_VerifySignatureScripts(uint32_t  msg_type,mc_OffchainMessageID& msg_id,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags,
+            vector<unsigned char>& vPayload,vector<CScript>& vSigScriptsToVerify,string& strError,int& dos_score);
+    bool OFF_CreateSignatureScripts(uint32_t  msg_type,mc_OffchainMessageID& msg_id,mc_OffchainMessageID& msg_id_to_respond,uint32_t  flags,
+            vector<unsigned char>& vPayload,set<CPubKey>& vAddresses,vector<CScript>& vSigScripts,string& strError);
+    bool OFF_GetPayloadForReadPermissioned(vector<unsigned char>* payload,int *ef_cache_id,string& strError);
+    void OFF_FreeEFCache(int ef_cache_id);
+    unsigned char* OFF_SupportedEnterpriseFeatures(unsigned char* min_ef,int min_ef_size,int *ef_size);
+    
+    CPubKey WLT_FindReadPermissionedAddress(mc_EntityDetails* entity);
     int WLT_CreateSubscription(mc_TxEntity *entity,uint32_t retrieve,uint32_t indexes,uint32_t *rescan_mode);
     int WLT_DeleteSubscription(mc_TxEntity *entity,uint32_t rescan_mode);
     int WLT_StartImport();
@@ -58,12 +76,14 @@ typedef struct mc_EnterpriseFeatures
     
     std::string ENT_Edition();
     int ENT_EditionNumeric();
+    int ENT_BuildVersion();
     int ENT_MinWalletDatVersion();
-    void ENT_RPCVerifyEdition();
+    void ENT_RPCVerifyEdition(std::string message);
     std::string ENT_TextConstant(const char* name);
     void ENT_InitRPCHelpMap();
+    void ENT_MaybeStop();
     
-    void LIC_RPCVerifyFeature(uint64_t feature);
+    void LIC_RPCVerifyFeature(uint64_t feature,std::string message);
     bool LIC_VerifyFeature(uint64_t feature,std::string& reason);
 //    bool LIC_VerifyConfirmation(uint160 address,void *confirmation, size_t size,std::string& reason);
 //    string LIC_LicenseName(void *confirmation, size_t size);

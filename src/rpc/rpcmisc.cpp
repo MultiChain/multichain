@@ -26,6 +26,8 @@
 std::string BurnAddress(const std::vector<unsigned char>& vchVersion);
 std::string SetBannedTxs(std::string txlist);
 std::string SetLockedBlock(std::string hash);
+int mc_StoreSetRuntimeParam(std::string param_name);
+
 /* MCHN END */
 
 #include <boost/assign/list_of.hpp>
@@ -281,6 +283,7 @@ bool paramtobool(Value param)
     return paramtobool(param,true);
 }
 
+
 Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 2)                                            
@@ -292,6 +295,14 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
     }
     
     string param_name=params[0].get_str();
+    string old_value="";
+    bool old_value_found=false;
+    if (mapArgs.count("-" + param_name))
+    {
+        old_value_found=true;
+        old_value=mapArgs["-" + param_name];
+    }
+    
     bool fFound=false;
     if(param_name == "miningrequirespeers")
     {
@@ -538,7 +549,21 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Unsupported runtime parameter: " + param_name);                                                    
     }
 
+    if(mc_StoreSetRuntimeParam(param_name))
+    {
+        if(old_value_found)
+        {
+            mapArgs["-" + param_name]=old_value;
+        }
+        else
+        {
+            mapArgs.erase("-" + param_name);
+        }
+        throw JSONRPCError(RPC_GENERAL_FILE_ERROR, "Cannot store new parameter value permanently");                                                            
+    }
+    
     SetMultiChainRuntimeParams();    
+    
     
     return Value::null;
 }    
@@ -998,7 +1023,8 @@ Value getaddresses(const Array& params, bool fHelp)
         {
             lpEntity=pwalletTxsMain->GetEntity(i);        
             CBitcoinAddress address;
-            if( (lpEntity->m_Entity.m_EntityType & MC_TET_ORDERMASK) == MC_TET_CHAINPOS)
+            if( ((lpEntity->m_Entity.m_EntityType & MC_TET_ORDERMASK) == MC_TET_CHAINPOS) &&
+                ((lpEntity->m_Flags & MC_EFL_NOT_IN_LISTS) == 0 ) )   
             {
                 if(CBitcoinAddressFromTxEntity(address,&(lpEntity->m_Entity)))
                 {

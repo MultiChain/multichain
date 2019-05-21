@@ -7,6 +7,7 @@
 #include "core/main.h"
 #include "utils/util.h"
 #include "utils/utilparse.h"
+#include "community/license.h"
 #include "multichain/multichain.h"
 #include "structs/base58.h"
 #include "custom/custom.h"
@@ -606,9 +607,9 @@ void MultiChainTransaction_FillAdminPermissionsBeforeTx(const CTransaction& tx,
     }
 }
 
-bool MultiChainTransaction_VerifyAndDeleteDataFormatElements(string& reason,int64_t *total_size)
-{
-    if(mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL,NULL,NULL,total_size,1))
+bool MultiChainTransaction_VerifyAndDeleteDataFormatElements(string& reason,int64_t *total_size,uint32_t *salt_size)
+{    
+    if(mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL,NULL,NULL,total_size,salt_size,1))
     {
         reason="Error in data format script";
         return false;                    
@@ -630,7 +631,7 @@ bool MultiChainTransaction_CheckOpReturnScript(const CTransaction& tx,
     int64_t total_offchain_size;
     
     total_offchain_size=0;
-    if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason,&total_offchain_size))
+    if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason,&total_offchain_size,NULL))
     {
         return false;
     }
@@ -896,10 +897,25 @@ bool MultiChainTransaction_CheckEntityItem(const CTransaction& tx,
 {
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     mc_EntityDetails entity;
+    uint32_t salt_size=0;
     
-    if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason,NULL))
+    if(!MultiChainTransaction_VerifyAndDeleteDataFormatElements(reason,NULL,&salt_size))
     {
         return false;
+    }
+    
+    if(salt_size)
+    {
+        if(salt_size > MAX_CHUNK_SALT_SIZE)
+        {
+            reason="Metadata script rejected - salt size too large";
+            return false;            
+        }
+        if(salt_size < MIN_CHUNK_SALT_SIZE)
+        {
+            reason="Metadata script rejected - salt size too small";
+            return false;            
+        }
     }
     
     mc_gState->m_TmpScript->SetElement(0);
@@ -938,6 +954,20 @@ bool MultiChainTransaction_CheckEntityItem(const CTransaction& tx,
         {
             if(entity.GetEntityType() <= MC_ENT_TYPE_STREAM_MAX)
             {
+                if(mc_gState->m_TmpScript->m_Restrictions & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN)
+                {
+                    if(mc_gState->m_Features->SaltedChunks())
+                    {
+                        if(entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_NEED_SALTED)
+                        {
+                            if(salt_size == 0)
+                            {
+                                reason="Metadata script rejected - unsalted offchain items in restricted stream";                                            
+                                return false;
+                            }
+                        }
+                    }
+                }
                 if(!MultiChainTransaction_CheckStreamItem(&entity,vout,details,reason))
                 {
                     return false;            
@@ -946,6 +976,10 @@ bool MultiChainTransaction_CheckEntityItem(const CTransaction& tx,
             else
             {
                 reason="Metadata script rejected - too many elements for this entity type";                
+                if(mc_gState->m_Features->FixedIn20010())
+                {
+                    return false;
+                }
             }
         }
     }
@@ -1357,10 +1391,21 @@ bool MultiChainTransaction_CheckLicenseTokenTransfer(const CTransaction& tx,
         return false;                                                            
     }        
     
-    if(mc_gState->m_TmpScript->GetNumElements() != 3)
+    if(mc_gState->m_Features->License20010())
     {
-        reason="License token transfer script rejected - wrong number of elements";
-        return false;                                                                                                                                                                                
+        if(mc_gState->m_TmpScript->GetNumElements() < 2)
+        {
+            reason="License token transfer script rejected - wrong number of elements";
+            return false;                                                                                                                                                                                
+        }        
+    }
+    else
+    {
+        if(mc_gState->m_TmpScript->GetNumElements() != 3)
+        {
+            reason="License token transfer script rejected - wrong number of elements";
+            return false;                                                                                                                                                                                
+        }
     }
     
     if(details->vInputHashTypes[0] != SIGHASH_ALL)
@@ -1517,6 +1562,10 @@ bool MultiChainTransaction_CheckOutputs(const CTransaction& tx,                 
             
             permission_type=MC_PTP_CONNECT | MC_PTP_SEND | MC_PTP_RECEIVE | MC_PTP_WRITE;
             permission_type |= mc_gState->m_Permissions->GetCustomLowPermissionTypes();
+            if(mc_gState->m_Features->ReadPermissions())
+            {
+                permission_type |= MC_PTP_READ;                
+            }
             if(!MultiChainTransaction_ProcessPermissions(tx,offset,vout,permission_type,true,details,reason))
             {
                 return false;
@@ -1739,6 +1788,19 @@ bool MultiChainTransaction_CheckLicenseTokenDetails(CMultiChainTxDetails *detail
         reason="License token issue script rejected - timestamp is too far in the future";
         return false;                                                                                                                                                
     }    
+    
+    if(mc_gState->m_Features->License20010())
+    {
+        CLicenseRequest confirmation;
+        confirmation.SetData(details->details_script,details->details_script_size);
+        string license_name=confirmation.GetLicenseNameByConfirmation();
+        if( (value_sizes[MC_ENT_SPRM_NAME] != license_name.size()) ||
+            (memcmp(details->details_script+value_starts[MC_ENT_SPRM_NAME],license_name.c_str(),value_sizes[MC_ENT_SPRM_NAME]) != 0))    
+        {
+            reason="License token issue script rejected - name mismatch";
+            return false;                                                                                                                                                            
+        }
+    }
     
     return true;
 }
@@ -2069,12 +2131,23 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                     }
                     
                     MultiChainTransaction_SetTmpOutputScript(tx.vout[issue_vout].scriptPubKey);
-                    if(mc_gState->m_TmpScript->GetNumElements() != 3)
+                    if(mc_gState->m_Features->License20010())
                     {
-                        reason="License token issue script rejected - wrong number of elements";
-                        return false;                                                                                                                                                                                
+                        if(mc_gState->m_TmpScript->GetNumElements() < 2)
+                        {
+                            reason="License token issue script rejected - wrong number of elements";
+                            return false;                                                                                                                                                                                
+                        }
                     }
-                                    
+                    else
+                    {
+                        if(mc_gState->m_TmpScript->GetNumElements() != 3)
+                        {
+                            reason="License token issue script rejected - wrong number of elements";
+                            return false;                                                                                                                                                                                
+                        }
+                    }
+                    
                     if(!MultiChainTransaction_CheckLicenseTokenDetails(details,token_address,reason))
                     {
                         return false;                                                                                                                                                        
@@ -2394,7 +2467,7 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
                 if(details->new_entity_type <= MC_ENT_TYPE_STREAM_MAX)
                 {
                                                                                 // Granting default per-entity permissions to openers
-                    err=mc_gState->m_Permissions->SetPermission(&txid,opener_buf,MC_PTP_ADMIN | MC_PTP_ACTIVATE | MC_PTP_WRITE,
+                    err=mc_gState->m_Permissions->SetPermission(&txid,opener_buf,MC_PTP_ADMIN | MC_PTP_ACTIVATE | MC_PTP_WRITE | MC_PTP_READ,
                             (unsigned char*)openers[i].begin(),0,(uint32_t)(-1),timestamp,opener_flags[i] | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
                 }
                 stored_openers.insert(openers[i]);

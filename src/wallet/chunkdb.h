@@ -8,6 +8,7 @@
 #include "wallet/wallettxdb.h"
 
 #define MC_CDB_CHUNK_HASH_SIZE       32
+#define MC_CDB_CHUNK_SALT_SIZE       32
 #define MC_CDB_ROW_SIZE              80
 #define MC_CDB_HEADER_SIZE           40
 
@@ -174,8 +175,10 @@ typedef struct mc_ChunkDB
                  const int vout,
                  const unsigned char *chunk,                                    // Chunk data
                  const unsigned char *details,                                  // Chunk metadata
+                 const unsigned char *salt,                                     // Chunk salt
                  const uint32_t chunk_size,                                     // Chunk size
                  const uint32_t details_size,                                   // Chunk metadata size
+                 const uint32_t salt_size,                                      // Chunk salt size
                  const uint32_t flags);                                         // Flags
 
     int AddChunkInternal(                                                               // Adds chunk to mempool
@@ -185,8 +188,10 @@ typedef struct mc_ChunkDB
                  const int vout,
                  const unsigned char *chunk,                                    // Chunk data
                  const unsigned char *details,                                  // Chunk metadata
+                 const unsigned char *salt,                                     // Chunk salt
                  const uint32_t chunk_size,                                     // Chunk size
                  const uint32_t details_size,                                   // Chunk metadata size
+                 const uint32_t salt_size,                                      // Chunk salt size
                  const uint32_t flags);                                         // Flags
 
     int GetChunkDefInternal(
@@ -217,12 +222,16 @@ typedef struct mc_ChunkDB
     unsigned char *GetChunkInternal(mc_ChunkDBRow *chunk_def,
                                     int32_t offset,
                                     int32_t len,
-                                    size_t *bytes);
+                                    size_t *bytes,
+                                    unsigned char *salt,
+                                    uint32_t *salt_size);
 
     unsigned char *GetChunk(mc_ChunkDBRow *chunk_def,
                                     int32_t offset,
                                     int32_t len,
-                                    size_t *bytes);
+                                    size_t *bytes,
+                                    unsigned char *salt,
+                                    uint32_t *salt_size);
     
     void SetFileName(char *FileName,
                      mc_SubscriptionDBRow *subscription,

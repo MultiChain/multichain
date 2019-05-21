@@ -7,6 +7,7 @@
 #include "utils/declare.h"
 #include "protocol/relay.h"
 #include "wallet/chunkdb.h"
+#include "wallet/chunkdb.h"
 #include "wallet/wallettxdb.h"
 
 #define MC_CCF_NONE                       0x00000000 
@@ -23,6 +24,7 @@
 #define MC_CCW_TIMEOUT_REQUEST                    10
 #define MC_CCW_TIMEOUT_REQUEST_SHIFT               2
 #define MC_CCW_MAX_CHUNKS_PER_QUERY             1000
+#define MC_CCW_MAX_SIGNATURES_PER_REQEST           4
 #define MC_CCW_DEFAULT_AUTOCOMMIT_DELAY          200
 #define MC_CCW_WORST_RESPONSE_SCORE       1048576000
 #define MC_CCW_DEFAULT_MEMPOOL_SIZE            60000
@@ -30,6 +32,7 @@
 #define MC_CCW_MAX_DELAY_BETWEEN_COLLECTS       1000
 #define MC_CCW_QUERY_SPLIT                         4
 #define MC_CCW_MAX_ITEMS_PER_CHUNKFOR_CHECK       16
+#define MC_CCW_MAX_EF_SIZE                     65536
 
 
 typedef struct mc_ChunkEntityKey
@@ -71,7 +74,12 @@ typedef struct mc_ChunkCollectorDBRow
     uint32_t m_QueryAttempts;
     uint32_t m_Status;
     int64_t m_TotalChunkSize;
-    int64_t m_TotalChunkCount;                                                       
+    int64_t m_TotalChunkCount;      
+    
+    unsigned char m_Salt[MC_CDB_CHUNK_HASH_SIZE];                               // Salt size should not be large than hash size
+    uint32_t m_SaltSize;
+    uint32_t m_Reserved1;
+    int64_t m_Reserved2;
     
     void Zero();
 } mc_ChunkCollectorDBRow;
@@ -82,8 +90,10 @@ typedef struct mc_ChunkCollectorRow
     uint32_t m_DBNextAttempt;
     int m_Vout;
     unsigned char m_TxID[MC_TDB_TXID_SIZE];                               
+    unsigned char m_Salt[MC_CDB_CHUNK_HASH_SIZE];                               
+    uint32_t m_SaltSize;
     uint32_t m_Reserved1;
-    uint32_t m_Reserved2;        
+    
     mc_ChunkEntityValue m_State;
     
     void Zero();
@@ -163,6 +173,7 @@ typedef struct mc_ChunkCollector
     int InsertDBRow(mc_ChunkCollectorRow *collect_row);
     int SeekDB(void *dbrow);
     int ReadFromDB(mc_Buffer *mempool,int rows);
+    int UpgradeDB();
     
     int Initialize(                                                             // Initialization
               mc_ChunkDB *chunk_db,
@@ -174,14 +185,16 @@ typedef struct mc_ChunkCollector
                  const mc_TxEntity *entity,                                     // Parent entity
                  const unsigned char *txid,
                  const int vout,
-                 const uint32_t chunk_size);  
+                 const uint32_t chunk_size,
+                 const uint32_t salt_size);  
     
     int InsertChunkInternal(                  
                  const unsigned char *hash,   
                  const mc_TxEntity *entity,   
                  const unsigned char *txid,
                  const int vout,
-                 const uint32_t chunk_size);  
+                 const uint32_t chunk_size,
+                 const uint32_t salt_size);  
 
     int MarkAndClear(uint32_t flag, int unmark);    
     int CopyFlags();    

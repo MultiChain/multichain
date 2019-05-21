@@ -64,6 +64,7 @@ using namespace json_spirit;
 #define MC_RFD_OPTION_INLINE                   0x00000001
 #define MC_RFD_OPTION_OFFCHAIN                 0x00000002
 #define MC_RFD_OPTION_CACHE                    0x00000004
+#define MC_RFD_OPTION_SALTED                   0x00000008
 
 #define MC_OST_UNDEFINED                       0x00000000
 #define MC_OST_UNKNOWN                         0x00000001
@@ -150,7 +151,7 @@ void mc_RemoveBinaryCacheFile(string id);
 bool AvailableFromStatus(uint32_t status);
 string OffChainError(uint32_t status,int *errorCode); 
 bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,int *errorCode,string *strError);
-void CheckWalletError(int err);
+void CheckWalletError(int err,uint32_t entity_type,string message);
 
 
 #endif	/* RPCMULTICHAINUTILS_H */

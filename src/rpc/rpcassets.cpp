@@ -1289,11 +1289,11 @@ Value getassetbalances(const Array& params, bool fHelp)
             {
                 const CBitcoinAddress& address = item.first;
                 const string& strName = item.second.name;
-                if (strName == params[0].get_str())
-                {
-                   setAddress.insert(address);                    
+                    if (strName == params[0].get_str())
+                    {
+                       setAddress.insert(address);                    
+                    }
                 }
-            }            
             check_account=true;
         }
     }
@@ -2227,7 +2227,7 @@ Value listassettransactions(const Array& params, bool fHelp)
     mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
     lpScript->Clear();    
 
-    CheckWalletError(pwalletTxsMain->GetList(&entStat.m_Entity,1,1,entity_rows));
+    CheckWalletError(pwalletTxsMain->GetList(&entStat.m_Entity,1,1,entity_rows),entStat.m_Entity.m_EntityType,"");
     shift=1;
     if(entity_rows->GetCount())
     {
@@ -2255,7 +2255,7 @@ Value listassettransactions(const Array& params, bool fHelp)
         }
     }
     
-    CheckWalletError(pwalletTxsMain->GetList(&entStat.m_Entity,start+1,count,entity_rows));
+    CheckWalletError(pwalletTxsMain->GetList(&entStat.m_Entity,start+1,count,entity_rows),entStat.m_Entity.m_EntityType,"");
     
     
     for(int i=0;i<entity_rows->GetCount()+shift;i++)

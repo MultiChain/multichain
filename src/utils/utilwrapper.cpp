@@ -750,6 +750,7 @@ int mc_ReadConfigFile(
 
 int mc_Params::ReadConfig(const char *network_name)
 {
+    mc_ReadConfigFile(mc_GetConfigFile(network_name,"setruntimeparam",".conf"),&mapArgs, &mapMultiArgs,"-");    
     mc_ReadConfigFile(mc_GetConfigFile(network_name,"multichain",".conf"),&mapArgs, &mapMultiArgs,"-");    
     return mc_ReadConfigFile(mc_GetConfigFile(NULL,NULL,".conf"),&mapArgs, &mapMultiArgs,"-");    
 }
@@ -757,6 +758,49 @@ int mc_Params::ReadConfig(const char *network_name)
 int mc_ReadGeneralConfigFile(mc_MapStringString *mapConfig,const char *network_name,const char *file_name,const char *extension)
 {
     return mc_ReadConfigFile(mc_GetConfigFile(network_name,file_name,extension),(std::map<string, string>*)mapConfig->mapObject, NULL,"");
+}
+
+int mc_StoreSetRuntimeParam(string param_name)
+{
+    if(!GetBoolArg("-storeruntimeparams",false))
+    {
+        return MC_ERR_NOERROR;
+    }
+        
+    map<string,string> mapStored;
+    
+    int err=mc_ReadConfigFile(mc_GetConfigFile(mc_gState->m_Params->NetworkName(),"setruntimeparam",".conf"),&mapStored, NULL,"");
+    if(err)
+    {
+        return err;
+    }
+    
+    map<string,string>::iterator it = mapStored.find(param_name);
+    if(it != mapStored.end())
+    {
+        it->second=mapArgs["-" + param_name];        
+    }
+    else
+    {
+        mapStored.insert(make_pair(param_name,mapArgs["-" + param_name]));        
+    }
+    
+    FILE *fileHan;
+    
+    fileHan=mc_OpenFile(mc_gState->m_Params->NetworkName(),"setruntimeparam",".conf","w",MC_FOM_RELATIVE_TO_DATADIR);
+    if(fileHan == NULL)
+    {
+        return MC_ERR_FILE_WRITE_ERROR;
+    }
+    
+    for (it = mapStored.begin(); it !=  mapStored.end(); ++it)
+    {
+        fprintf(fileHan,"%s=%s\n",it->first.c_str(),it->second.c_str());
+    }     
+    
+    mc_CloseFile(fileHan);   
+    
+    return MC_ERR_NOERROR;
 }
 
 int mc_BuildDescription(int build, char *desc)
@@ -949,6 +993,21 @@ void mc_SHA256::DoubleHash(const void *lpData,int size,void *hash)
     Write((unsigned char *)hash,32);
     GetHash((unsigned char *)hash);    
 }
+
+void mc_SHA256::DoubleHash(const void *lpSalt,int salt_size,const void *lpData,int size,void *hash)
+{
+    Reset();
+    if(salt_size)
+    {
+        Write(lpSalt,salt_size);        
+    }
+    Write(lpData,size);
+    GetHash((unsigned char *)hash);
+    Reset();
+    Write((unsigned char *)hash,32);
+    GetHash((unsigned char *)hash);        
+}
+
 
 int mc_MultichainParams::Import(const char *name,const char *source_address)
 {

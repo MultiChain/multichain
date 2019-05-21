@@ -66,6 +66,31 @@ bool CWalletDB::EraseTx(uint256 hash)
     return Erase(std::make_pair(std::string("tx"), hash));
 }
 
+bool CWalletDB::WriteEKey(uint256 hash, const CEncryptionKey& ekey)
+{
+    nWalletDBUpdated++;
+    return Write(std::make_pair(std::string("ekey"), hash), ekey);
+}
+
+bool CWalletDB::EraseEKey(uint256 hash)
+{
+    nWalletDBUpdated++;
+    return Erase(std::make_pair(std::string("ekey"), hash));
+}
+
+bool CWalletDB::WriteLicenseRequest(uint256 hash, const CLicenseRequest& license_request)
+{
+    nWalletDBUpdated++;
+    return Write(std::make_pair(std::string("license"), hash), license_request);
+}
+
+bool CWalletDB::EraseLicenseRequest(uint256 hash)
+{
+    nWalletDBUpdated++;
+    return Erase(std::make_pair(std::string("license"), hash));
+}
+
+
 bool CWalletDB::WriteKey(const CPubKey& vchPubKey, const CPrivKey& vchPrivKey, const CKeyMetadata& keyMeta)
 {
     nWalletDBUpdated++;
@@ -370,6 +395,18 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             string strAddress;
             ssKey >> strAddress;
             ssValue >> pwallet->mapAddressBook[CBitcoinAddress(strAddress).Get()].purpose;
+        }
+        else if (strType == "ekey")
+        {
+            uint256 hash;
+            ssKey >> hash;
+            ssValue >> pwallet->mapEKeys[hash];
+        }
+        else if (strType == "license")
+        {
+            uint256 hash;
+            ssKey >> hash;
+            ssValue >> pwallet->mapLicenseRequests[hash];
         }
         else if (strType == "tx")
         {
@@ -877,7 +914,10 @@ bool BackupWallet(const CWallet& wallet, const string& strDest)
                 // Flush log data to the dat file
                 bitdbwrap.CloseDb(wallet.strWalletFile);
                 bitdbwrap.CheckpointLSN(wallet.strWalletFile);
-                bitdbwrap.m_lpMapFileUseCount->erase(wallet.strWalletFile);
+                if(bitdbwrap.m_lpMapFileUseCount)
+                {
+                    bitdbwrap.m_lpMapFileUseCount->erase(wallet.strWalletFile);
+                }
 
                 // Copy wallet.dat
                 filesystem::path pathSrc = GetDataDir() / wallet.strWalletFile;

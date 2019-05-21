@@ -7,6 +7,7 @@
 #include "rpc/rpcutils.h"
 #include "filters/multichainfilter.h"
 #include "filters/filter.h"
+#include "community/community.h"
 
 #include "utils/util.h"
 #include "json/json_spirit_ubjson.h"
@@ -772,6 +773,7 @@ bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_
             {
                 match=0;
                 if(( (ptr-start) ==  5) && (memcmp(start,"write",    ptr-start) == 0) ){match = 1; *permissions |= MC_PTP_WRITE ;}
+                if(( (ptr-start) ==  4) && (memcmp(start,"read",     ptr-start) == 0) )if(mc_gState->m_Features->ReadPermissions()){match = 1; *permissions |= MC_PTP_READ ;}
                 if(( (ptr-start) ==  7) && (memcmp(start,"onchain",  ptr-start) == 0) ){match = 1; *restrict |= MC_ENT_ENTITY_RESTRICTION_ONCHAIN;}
                 if(( (ptr-start) ==  8) && (memcmp(start,"offchain", ptr-start) == 0) ){match = 1; *restrict |= MC_ENT_ENTITY_RESTRICTION_OFFCHAIN;}
                 
@@ -799,12 +801,14 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
     const unsigned char *script;
     string entity_name;
     int is_open=0;
-    uint32_t restrict;
+    int is_salted=0;
+    uint32_t restrict=0;
     uint32_t permissions=MC_PTP_WRITE;
     
     bool missing_name=true;
     bool missing_open=true;
     bool missing_details=true;
+    bool missing_salted=true;
     
     lpDetails->Clear();
     lpDetails->AddElement();                   
@@ -862,6 +866,31 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
             missing_open=false;
             field_parsed=true;
         }
+        if(d.name_ == "salted")
+        {
+            if(mc_gState->m_Features->SaltedChunks() == 0)
+            {
+                *strError=string("Salted chunks not supported for this protocol version");               
+                *errorCode=RPC_NOT_SUPPORTED;
+            }
+            else
+            {                
+                if(!missing_salted)
+                {
+                    *strError=string("salted field can appear only once in the object");                                                                                                        
+                }
+                if(d.value_.type() == bool_type)
+                {
+                    is_salted=d.value_.get_bool();
+                }    
+                else
+                {
+                    *strError=string("Invalid salted");                                            
+                }
+                missing_salted=false;
+                field_parsed=true;
+            }
+        }
         if(d.name_ == "restrict")
         {
             if(mc_gState->m_Features->OffChainData() == 0)
@@ -875,6 +904,8 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
                 {
                     *strError=string("open/restrict field can appear only once in the object");                                                                                                        
                 }
+                RawDataParseRestrictParameter(d.value_,&restrict,&permissions,errorCode,strError);
+/*                
                 if(RawDataParseRestrictParameter(d.value_,&restrict,&permissions,errorCode,strError))
                 {
                     if(restrict & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN)
@@ -885,11 +916,8 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
                             *errorCode=RPC_NOT_SUPPORTED;                            
                         }                        
                     }
-                    if(restrict)
-                    {
-                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_RESTRICTIONS,(unsigned char*)&restrict,1);                         
-                    }
                 }
+ */ 
                 missing_open=false;
                 field_parsed=true;
             }
@@ -911,9 +939,49 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
         }
     }    
     
+    if(missing_salted)
+    {
+        if(permissions & MC_PTP_READ)
+        {
+            is_salted=true;
+        }
+    }
+    
     if(mc_gState->m_Features->OffChainData())
     {
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_PERMISSIONS,(unsigned char*)&permissions,1);                                
+    }
+    if(is_salted)
+    {
+        restrict |= MC_ENT_ENTITY_RESTRICTION_NEED_SALTED;
+    }
+    if(strError->size() == 0)
+    {
+        if(permissions & MC_PTP_READ)
+        {
+            restrict |= MC_ENT_ENTITY_RESTRICTION_ONCHAIN;
+/*            
+            if( (restrict & MC_ENT_ENTITY_RESTRICTION_ONCHAIN ) == 0 )
+            {
+                *strError="onchain restriction should be set for read-permissioned streams";
+                *errorCode=RPC_NOT_ALLOWED;
+            }
+ */ 
+        }        
+    }
+    
+    if(restrict & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN)
+    {
+        if(restrict & MC_ENT_ENTITY_RESTRICTION_ONCHAIN)
+        {
+            *strError=string("Stream cannot be restricted from both onchain and offchain items");               
+            *errorCode=RPC_NOT_SUPPORTED;                            
+        }                        
+    }
+    
+    if( restrict != 0 )
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_RESTRICTIONS,(unsigned char*)&restrict,1);                         
     }
     
     if(strError->size() == 0)
@@ -1528,8 +1596,18 @@ CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *dat
             }
         }
 
-        if(in_options & MC_RFD_OPTION_OFFCHAIN)
+        if(entity->AnyoneCanRead() == 0)
         {
+            pEF->LIC_RPCVerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_WRITE,"Publishing to read-restricted stream");
+        }
+        
+        if(entity->Restrictions() & MC_ENT_ENTITY_RESTRICTION_NEED_SALTED)
+        {
+            out_options |= MC_RFD_OPTION_SALTED;
+        }
+        
+        if(in_options & MC_RFD_OPTION_OFFCHAIN)
+        {            
             AppendOffChainFormatData(*data_format,out_options,lpDetailsScript,vValue,vChunkHashes,errorCode,strError);
             if(strError->size())
             {

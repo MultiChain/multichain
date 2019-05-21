@@ -28,6 +28,7 @@
 #define MC_ENT_ENTITY_RESTRICTION_NONE           0x00000000
 #define MC_ENT_ENTITY_RESTRICTION_ONCHAIN        0x00000001
 #define MC_ENT_ENTITY_RESTRICTION_OFFCHAIN       0x00000002
+#define MC_ENT_ENTITY_RESTRICTION_NEED_SALTED    0x00000004
 
 
 
@@ -81,7 +82,7 @@
 #define MC_ENT_SPRM_LICENSE_PUBKEY            0x69
 #define MC_ENT_SPRM_LICENSE_MIN_VERSION       0x6A
 #define MC_ENT_SPRM_LICENSE_MIN_PROTOCOL      0x6B
-#define MC_ENT_SPRM_LICENSE_DETAILS           0x6E
+#define MC_ENT_SPRM_LICENSE_CONFIRMATION_DETAILS  0x6E
 #define MC_ENT_SPRM_LICENSE_SIGNATURE         0x6F
 
 
@@ -93,6 +94,7 @@
 #define MC_ENT_SPRM_CHUNK_DETAILS             0x86
 #define MC_ENT_SPRM_CHUNK_DATA                0x87
 #define MC_ENT_SPRM_ITEM_COUNT                0x88
+#define MC_ENT_SPRM_SALT                      0x89
 
 #define MC_ENT_SPRM_FILE_END                  0xFF
 
@@ -186,6 +188,7 @@ typedef struct mc_EntityDetails
     const unsigned char* GetScript();    
     const unsigned char* GetParamUpgrades(int *size);    
     
+    uint32_t GetScriptSize();
     int IsUnconfirmedGenesis();    
     int GetAssetMultiple();
     uint32_t GetFilterType();
@@ -195,6 +198,7 @@ typedef struct mc_EntityDetails
     uint32_t Permissions(); 
     uint32_t Restrictions(); 
     int AnyoneCanWrite(); 
+    int AnyoneCanRead(); 
     int UpgradeProtocolVersion(); 
     uint32_t UpgradeStartBlock(); 
     uint64_t GetQuantity();

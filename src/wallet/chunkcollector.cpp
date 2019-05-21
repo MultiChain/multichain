@@ -38,12 +38,12 @@ void mc_ChunkCollector::Zero()
     m_ChunkDB=NULL;
     m_KeyOffset=0;
     m_KeyDBOffset=0;
-    m_KeySize=MC_TDB_TXID_SIZE+sizeof(int)+sizeof(mc_ChunkEntityKey)+3*sizeof(uint32_t);
+    m_KeySize=MC_TDB_TXID_SIZE+sizeof(int)+sizeof(mc_ChunkEntityKey)+3*sizeof(uint32_t)+MAX_CHUNK_SALT_SIZE;
     m_KeyDBSize=MC_TDB_TXID_SIZE+sizeof(int)+sizeof(uint32_t)+MC_CDB_CHUNK_HASH_SIZE+sizeof(mc_TxEntity);   // 96
     m_ValueOffset=m_KeySize;
     m_ValueDBOffset=m_KeyDBSize;
     m_ValueSize=sizeof(mc_ChunkEntityValue);
-    m_ValueDBSize=4*sizeof(uint32_t)+2*sizeof(int64_t);
+    m_ValueDBSize=6*sizeof(uint32_t)+3*sizeof(int64_t)+MAX_CHUNK_SALT_SIZE;     // 80
     m_TotalSize=m_KeySize+m_ValueSize;
     m_TotalDBSize=m_KeyDBSize+m_ValueDBSize;
     m_Name[0]=0;
@@ -151,6 +151,8 @@ void mc_ChunkCollector::SetDBRow(mc_ChunkCollectorRow* collect_row)
     m_DBRow.m_Flags=collect_row->m_ChunkDef.m_Flags;
     m_DBRow.m_QueryAttempts=collect_row->m_State.m_QueryAttempts;
     m_DBRow.m_Status=collect_row->m_State.m_Status;
+    memcpy(m_DBRow.m_Salt,collect_row->m_Salt,MAX_CHUNK_SALT_SIZE);
+    m_DBRow.m_SaltSize=collect_row->m_SaltSize;
 }
 
 void mc_ChunkCollector::GetDBRow(mc_ChunkCollectorRow* collect_row)
@@ -167,6 +169,8 @@ void mc_ChunkCollector::GetDBRow(mc_ChunkCollectorRow* collect_row)
     collect_row->m_State.m_QueryAttempts=m_DBRow.m_QueryAttempts;
     collect_row->m_State.m_Status=m_DBRow.m_Status;
     collect_row->m_State.m_Status |= MC_CCF_INSERTED;                
+    memcpy(collect_row->m_Salt,m_DBRow.m_Salt,MAX_CHUNK_SALT_SIZE);
+    collect_row->m_SaltSize=m_DBRow.m_SaltSize;
 }
 
 int mc_ChunkCollector::DeleteDBRow(mc_ChunkCollectorRow *collect_row)
@@ -257,9 +261,69 @@ int mc_ChunkCollector::SeekDB(void *dbrow)
         return MC_ERR_NOT_FOUND;
     }
     
+    if(value_len != (int)m_ValueDBSize)
+    {
+        return MC_ERR_NOT_SUPPORTED;
+    }
+    
     memcpy((unsigned char*)&m_DBRow+m_KeyDBOffset,(unsigned char*)dbrow,m_KeyDBSize);
     memcpy((unsigned char*)&m_DBRow+m_ValueDBOffset,ptr,m_ValueDBSize);
     memcpy(&m_LastDBRow,&m_DBRow,m_TotalDBSize);
+    
+    return err;
+}
+
+int mc_ChunkCollector::UpgradeDB()
+{
+    int err,value_len;   
+    unsigned char *ptr;
+    int diff,count;
+
+    err=MC_ERR_NOERROR;
+    ptr=(unsigned char*)m_DB->Read((char*)&m_DBRow+m_KeyDBOffset,m_KeyDBSize,&value_len,MC_OPT_DB_DATABASE_SEEK_ON_READ,&err);
+    
+    diff=m_ValueDBSize-value_len;
+    if(diff <= 0)
+    {
+        return MC_ERR_CORRUPTED;
+    }
+    
+    count=0;
+    m_DBRow.Zero();
+    while(ptr)
+    {
+        ptr=(unsigned char*)m_DB->MoveNext(&err);
+        if(ptr)
+        {
+            memcpy((char*)&m_DBRow+m_KeyDBOffset,ptr,m_TotalDBSize-diff);            
+            
+            m_DB->Write((char*)&m_DBRow+m_KeyDBOffset,m_KeyDBSize,(char*)&m_DBRow+m_ValueDBOffset,m_ValueDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+            count++;
+            
+            if(count >= 1000)
+            {
+                err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
+                if(err)
+                {
+                    return err;
+                }                                        
+            }
+        }
+    }
+    
+    m_DBRow.Zero();
+    ptr=(unsigned char*)m_DB->Read((char*)&m_DBRow+m_KeyDBOffset,m_KeyDBSize,&value_len,0,&err);
+    memcpy((unsigned char*)&m_DBRow+m_ValueDBOffset,ptr,value_len);
+    m_DB->Write((char*)&m_DBRow+m_KeyDBOffset,m_KeyDBSize,(char*)&m_DBRow+m_ValueDBOffset,m_ValueDBSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);
+    err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
+    if(err)
+    {
+        return err;
+    }                                        
+    
+    
+    m_DBRow.Zero();    
+    err=SeekDB(&m_DBRow);
     
     return err;
 }
@@ -434,6 +498,11 @@ int mc_ChunkCollector::Initialize(mc_ChunkDB *chunk_db,const char *name,uint32_t
     if(m_DB)
     {
         err=SeekDB(&m_DBRow);
+        if(err == MC_ERR_NOT_SUPPORTED)
+        {
+            err=UpgradeDB();
+        }
+        
         if(err)
         {
             if(err != MC_ERR_NOT_FOUND)
@@ -445,6 +514,11 @@ int mc_ChunkCollector::Initialize(mc_ChunkDB *chunk_db,const char *name,uint32_t
         {
             m_TotalChunkCount=m_DBRow.m_TotalChunkCount;
             m_TotalChunkSize=m_DBRow.m_TotalChunkSize;
+            if(m_TotalChunkCount < 0)
+            {
+                m_TotalChunkCount=0;
+                m_TotalChunkSize=0;
+            }
             err=ReadFromDB(m_MemPool,m_MaxMemPoolSize);
             if(err)
             {
@@ -476,12 +550,13 @@ int mc_ChunkCollector::InsertChunk(                                             
                  const mc_TxEntity *entity,                                     // Parent entity
                  const unsigned char *txid,
                  const int vout,
-                 const uint32_t chunk_size)
+                 const uint32_t chunk_size,
+                 const uint32_t salt_size)
 {
     int err;
     
     Lock();
-    err=InsertChunkInternal(hash,entity,txid,vout,chunk_size);
+    err=InsertChunkInternal(hash,entity,txid,vout,chunk_size,salt_size);
     UnLock();
     
     return err;    
@@ -497,6 +572,8 @@ int mc_ChunkCollector::Unsubscribe(mc_Buffer* lpEntities)
     mc_ChunkCollectorRow collect_row;
     int try_again,commit_required;
     mc_TxEntity entity;
+    
+    err=MC_ERR_NOERROR;
     
     commit_required=0;
     for(i=0;i<m_MemPool->GetCount();i++)
@@ -536,12 +613,17 @@ int mc_ChunkCollector::Unsubscribe(mc_Buffer* lpEntities)
             try_again=0;
             err=SeekDB(&m_DBRow);
 
+            if(err)
+            {
+                goto exitlbl;
+            }
+            
             ptr=(unsigned char*)m_DB->MoveNext(&err);
             while(ptr)
             {
                 if(err)
                 {
-                    return MC_ERR_CORRUPTED;            
+                    goto exitlbl;         
                 }
                 memcpy((char*)&m_DBRow,ptr,m_TotalDBSize);   
                 ptr=(unsigned char*)m_DB->MoveNext(&err);
@@ -585,7 +667,7 @@ int mc_ChunkCollector::Unsubscribe(mc_Buffer* lpEntities)
                         err=m_DB->Commit(MC_OPT_DB_DATABASE_TRANSACTIONAL);
                         if(err)
                         {
-                            return err;
+                            goto exitlbl;
                         }                                        
                     }
                 }                
@@ -600,9 +682,11 @@ int mc_ChunkCollector::Unsubscribe(mc_Buffer* lpEntities)
         CommitInternal(1);    
     }
     
+exitlbl:
+
     UnLock();    
     
-    return MC_ERR_NOERROR;
+    return err;
 }
 
 int mc_ChunkCollector::InsertChunkInternal(                  
@@ -610,7 +694,8 @@ int mc_ChunkCollector::InsertChunkInternal(
                  const mc_TxEntity *entity,   
                  const unsigned char *txid,
                  const int vout,
-                 const uint32_t chunk_size)
+                 const uint32_t chunk_size,
+                 const uint32_t salt_size)
 {
     mc_ChunkCollectorRow collect_row;
     int mprow;
@@ -622,6 +707,8 @@ int mc_ChunkCollector::InsertChunkInternal(
     collect_row.m_Vout=vout;
     collect_row.m_ChunkDef.m_Size=chunk_size;
     collect_row.m_State.m_Status=MC_CCF_NEW;
+    collect_row.m_SaltSize=salt_size;
+    memset(collect_row.m_Salt,0,MAX_CHUNK_SALT_SIZE);
     
     mprow=m_MemPool->Seek(&collect_row);
     if(mprow<0)

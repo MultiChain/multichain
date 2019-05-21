@@ -60,9 +60,12 @@
 #define MC_RDT_EXPIRATION                          0x03
 #define MC_RDT_CHUNK_IDS                           0x11
 #define MC_RDT_CHUNKS                              0x12
+#define MC_RDT_ENTERPRISE_FEATURES                 0x21
 
 #define MC_LIM_MAX_SECONDS                60
 #define MC_LIM_MAX_MEASURES                4
+
+
 
 #define MC_RST_NONE                          0x00000000
 #define MC_RST_DELETED                       0x00000001
@@ -246,6 +249,7 @@ typedef struct mc_RelayRequest
     int m_TryCount;
     uint32_t m_Status;
     int64_t m_DestinationID;
+    int m_EFCacheID;
     vector <unsigned char> m_Payload;   
     vector <mc_RelayResponse> m_Responses;
     
@@ -321,7 +325,7 @@ typedef struct mc_RelayManager
                                 CValidationState &state, 
                                 uint32_t verify_flags_in);
 
-    int AddRequest(CNode *pto,int64_t destination,mc_OffchainMessageID msg_id,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status);
+    int AddRequest(CNode *pto,int64_t destination,mc_OffchainMessageID msg_id,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status,int ef_cache_id);
 //    int AddRequest(int64_t parent_nonce,int parent_response_id,CNode *pto,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status);
     int AddResponse(mc_OffchainMessageID request,CNode *pfrom,int32_t source,int hop_count,mc_OffchainMessageID msg_id,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status);
     //int AddResponse(int64_t request,CNode *pfrom,int32_t source,int hop_count,int64_t nonce,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,uint32_t status);
@@ -332,7 +336,7 @@ typedef struct mc_RelayManager
     
     mc_OffchainMessageID SendRequest(CNode* pto,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload);
 //    int64_t SendRequest(CNode* pto,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload);
-    mc_OffchainMessageID SendNextRequest(mc_RelayResponse* response,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload);
+    mc_OffchainMessageID SendNextRequest(mc_RelayResponse* response,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload,set<CPubKey>& vSigScripts,int ef_cache_id);
 //    int64_t SendNextRequest(mc_RelayResponse* response,uint32_t msg_type,uint32_t flags,vector <unsigned char>& payload);
 }   mc_RelayManager;
 
