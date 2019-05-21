@@ -2031,6 +2031,7 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
 //                    LogPrintf("DEBUG: %s %d %d %d\n",coin.m_OutPoint.ToString().c_str(),coin.GetDepthInMainChain(),coin.IsFinal(),coin.BlocksToMaturity());
 //                    LogPrintf("DEBUG: %s\n",coin.ToString().c_str());
                     if ( (coin.IsFinal()) && 
+                         ((coin.m_Flags & MC_TFL_IS_LICENSE_TOKEN) == 0) &&   
                          (coin.BlocksToMaturity() <= 0) &&
                          (mine != ISMINE_NO) &&
                          (!fOnlyUnlocked || !IsLockedCoin(txid, vout)) && 
@@ -3315,6 +3316,87 @@ bool CWallet::DelAddressBook(const CTxDestination& address)
     return CWalletDB(strWalletFile).EraseName(CBitcoinAddress(address).ToString());
 }
 
+bool CWallet::SetEKey(const uint256& hashEKey, const CEncryptionKey& ekey)
+{
+    {
+        LOCK(cs_wallet); // mapEKeys
+        std::map<uint256, CEncryptionKey>::iterator mi = mapEKeys.find(hashEKey);
+        if(mi != mapEKeys.end())
+        {
+            return false;
+        }
+        
+        mapEKeys.insert(make_pair(hashEKey,ekey));
+    }
+    LogPrint("mchn","Stored ekey %s in the wallet, type: %2X, purpose: %2x.\n",hashEKey.ToString().c_str(),ekey.m_Type,ekey.m_Purpose);
+    return CWalletDB(strWalletFile).WriteEKey(hashEKey, ekey);    
+}
+    
+bool CWallet::DelEKey(const uint256& hashEKey)
+{
+    {
+        LOCK(cs_wallet); 
+
+        mapEKeys.erase(hashEKey);
+    }
+    return CWalletDB(strWalletFile).EraseEKey(hashEKey);    
+}
+
+bool CWallet::SetLicenseRequest(const uint256& hash, const CLicenseRequest& license_request)
+{
+    {
+        LOCK(cs_wallet); // mapLicenseRequests
+        std::map<uint256, CLicenseRequest>::iterator mi = mapLicenseRequests.find(hash);
+        if(mi != mapLicenseRequests.end())
+        {
+            return false;
+        }
+        
+        mapLicenseRequests.insert(make_pair(hash,license_request));
+    }
+    LogPrintf("Stored license request %s in the wallet.\n",hash.ToString().c_str());
+    return CWalletDB(strWalletFile).WriteLicenseRequest(hash, license_request);        
+}
+    
+bool CWallet::SetLicenseRequestRefCount(const uint256& hash, uint32_t count)
+{
+    {
+        LOCK(cs_wallet); // mapLicenseRequests
+        std::map<uint256, CLicenseRequest>::iterator mi = mapLicenseRequests.find(hash);
+        if(mi == mapLicenseRequests.end())
+        {
+            return false;
+        }        
+
+        if( (mi->second.m_ReferenceCount == 0) || (count == 0) )
+        {
+            mi->second.m_ReferenceCount=count;
+        }
+        
+        if(mi->second.m_ReferenceCount)
+        {
+            mi->second.m_ReferenceCount-=1;
+        }
+        if(mi->second.m_ReferenceCount)
+        {
+            LogPrintf("License request %s in the wallet modified, ref count: %d.\n",hash.ToString().c_str(),mi->second.m_ReferenceCount);
+            return CWalletDB(strWalletFile).WriteLicenseRequest(hash, mi->second);        
+        }
+    }    
+    return DelLicenseRequest(hash);
+}
+    
+bool CWallet::DelLicenseRequest(const uint256& hash)
+{
+    {
+        LOCK(cs_wallet); 
+
+        mapLicenseRequests.erase(hash);
+    }
+    LogPrintf("License request %s deleted from wallet.\n",hash.ToString().c_str());
+    return CWalletDB(strWalletFile).EraseLicenseRequest(hash);        
+}
+
 bool CWallet::SetDefaultKey(const CPubKey &vchPubKey)
 {
     if (fFileBacked)
@@ -3766,8 +3848,11 @@ set<CTxDestination> CWallet::GetAccountAddresses(string strAccount) const
     {
         const CTxDestination& address = item.first;
         const string& strName = item.second.name;
-        if (strName == strAccount)
-            result.insert(address);
+        if(item.second.purpose != "license")
+        {        
+            if (strName == strAccount)
+                result.insert(address);
+        }
     }
     return result;
 }

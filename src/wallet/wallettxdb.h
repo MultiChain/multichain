@@ -47,6 +47,7 @@
 #define MC_EFL_RESERVEDMASK                     0x00FF0000
 #define MC_EFL_NOT_IN_SYNC                      0x01000000
 #define MC_EFL_NOT_IN_SYNC_AFTER_IMPORT         0x02000000
+#define MC_EFL_NOT_IN_LISTS                     0x04000000
 #define MC_EFL_UNSUBSCRIBED                     0x10000000
 
 #define MC_SFL_NONE             0x00000000

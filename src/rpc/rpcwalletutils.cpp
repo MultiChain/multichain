@@ -1089,11 +1089,29 @@ void AppendOffChainFormatData(uint32_t data_format,
     unsigned char *ptr;
     uint256 hash;
     mc_TxEntity entity;
+    unsigned char salt[MC_CDB_CHUNK_SALT_SIZE];
+    uint32_t salt_size;
+        
+    salt_size=0;
+    if(mc_gState->m_Features->SaltedChunks())
+    {
+        if(out_options & MC_RFD_OPTION_SALTED)
+        {
+            salt_size=16;
+        }
+    }
+    
     entity.Zero();
     entity.m_EntityType=MC_TET_AUTHOR;    
 
     if(out_options & MC_RFD_OPTION_OFFCHAIN)
     {
+        if(salt_size)
+        {
+            *errorCode=RPC_NOT_ALLOWED;
+            *strError="chunks option is not allowed for salted items";
+            return;             
+        }
         chunk_count=(int)vValue.size()/MC_CDB_CHUNK_HASH_SIZE;
         if(chunk_count > MAX_CHUNK_COUNT)
         {
@@ -1101,7 +1119,7 @@ void AppendOffChainFormatData(uint32_t data_format,
             return; 
         }
 
-        lpDetailsScript->SetChunkDefHeader(data_format,chunk_count);
+        lpDetailsScript->SetChunkDefHeader(data_format,chunk_count,0);
         for(int i=0;i<chunk_count;i++)
         {
             err=pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,(unsigned char*)&vValue[i*MC_CDB_CHUNK_HASH_SIZE],&entity,NULL,-1);
@@ -1160,7 +1178,7 @@ void AppendOffChainFormatData(uint32_t data_format,
             mc_gState->m_TmpBuffers->m_RpcChunkScript1->Resize(max_chunk_size,1);
             ptr=mc_gState->m_TmpBuffers->m_RpcChunkScript1->m_lpData;
             
-            lpDetailsScript->SetChunkDefHeader(data_format,chunk_count);
+            lpDetailsScript->SetChunkDefHeader(data_format,chunk_count,salt_size);
             for(int i=0;i<chunk_count;i++)
             {
                 size=MAX_CHUNK_SIZE;
@@ -1183,9 +1201,15 @@ void AppendOffChainFormatData(uint32_t data_format,
                     ptr=(unsigned char*)&vValue[i*MAX_CHUNK_SIZE];
                 }
                 
-                mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(ptr,size,&hash);
+//                mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(ptr,size,&hash);
+                if(salt_size)
+                {
+                    GetRandBytes(salt, salt_size);
+                }
                 
-                err=pwalletTxsMain->m_ChunkDB->AddChunk((unsigned char*)&hash,&entity,NULL,-1,ptr,NULL,size,0,0);   
+                mc_gState->m_TmpBuffers->m_RpcHasher1->DoubleHash(salt,salt_size,ptr,size,&hash);
+                
+                err=pwalletTxsMain->m_ChunkDB->AddChunk((unsigned char*)&hash,&entity,NULL,-1,ptr,NULL,salt,size,0,salt_size,0);   
                 if(err)
                 {
                     switch(err)
@@ -1211,7 +1235,7 @@ void AppendOffChainFormatData(uint32_t data_format,
         }
         else
         {
-            lpDetailsScript->SetChunkDefHeader(data_format,0);            
+            lpDetailsScript->SetChunkDefHeader(data_format,0,salt_size);            
         }
         if(fHan > 0)
         {

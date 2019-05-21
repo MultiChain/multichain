@@ -165,8 +165,10 @@ Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total)
     return value;
 }
 
-void CheckWalletError(int err)
+void CheckWalletError(int err,uint32_t entity_type,string message)
 {
+    string index;
+    string msg;
     if(err)
     {
         switch(err)
@@ -175,7 +177,37 @@ void CheckWalletError(int err)
                 throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is not supported in this build");                                        
                 break;
             case MC_ERR_NOT_ALLOWED:
-                throw JSONRPCError(RPC_NOT_SUPPORTED, "The index required is not available for this subscription.");                                        
+                if(message.size())
+                {
+                    msg=message;
+                }
+                else
+                {
+                    index="";
+                    switch(entity_type & MC_TET_TYPE_MASK)
+                    {
+                        case MC_TET_STREAM:
+                            if( (entity_type & MC_TET_ORDERMASK) == MC_TET_TIMERECEIVED )index="items-local";
+                            break;
+                        case MC_TET_STREAM_KEY:
+                            if( (entity_type & MC_TET_ORDERMASK) == MC_TET_TIMERECEIVED )index="keys-local";
+                            if( (entity_type & MC_TET_ORDERMASK) == MC_TET_CHAINPOS )index="keys";
+                            break;
+                        case MC_TET_STREAM_PUBLISHER:
+                            if( (entity_type & MC_TET_ORDERMASK) == MC_TET_TIMERECEIVED )index="publishers-local";
+                            if( (entity_type & MC_TET_ORDERMASK) == MC_TET_CHAINPOS )index="publishers";
+                            break;
+                    }
+                    if(index.size())
+                    {
+                        msg="The required " + index + " index is not active for this subscription.";
+                    }
+                }
+                if(msg.size() == 0)
+                {
+                    msg="The index required is not available for this subscription.";
+                }
+                throw JSONRPCError(RPC_NOT_SUBSCRIBED, msg);                                        
                 break;
             case MC_ERR_INTERNAL_ERROR:
                 throw JSONRPCError(RPC_INTERNAL_ERROR, "Internal wallet error");                                        
@@ -568,7 +600,11 @@ Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong)
                 if(full_type & MC_PTP_CONNECT)entry.push_back(Pair("connect", (type & MC_PTP_CONNECT) ? true : false));
                 if(full_type & MC_PTP_SEND)entry.push_back(Pair("send", (type & MC_PTP_SEND) ? true : false));
                 if(full_type & MC_PTP_RECEIVE)entry.push_back(Pair("receive", (type & MC_PTP_RECEIVE) ? true : false));
-                if(full_type & MC_PTP_WRITE)entry.push_back(Pair("write", (type & MC_PTP_WRITE) ? true : false));                
+                if(full_type & MC_PTP_WRITE)entry.push_back(Pair("write", (type & MC_PTP_WRITE) ? true : false));      
+                if(mc_gState->m_Features->ReadPermissions())
+                {
+                    if(full_type & MC_PTP_READ)entry.push_back(Pair("read", (type & MC_PTP_READ) ? true : false));                          
+                }
                 if(full_type & MC_PTP_CREATE)entry.push_back(Pair("create", (type & MC_PTP_CREATE) ? true : false));                
                 if(full_type & MC_PTP_ISSUE)entry.push_back(Pair("issue", (type & MC_PTP_ISSUE) ? true : false));
                 if(full_type & MC_PTP_MINE)entry.push_back(Pair("mine", (type & MC_PTP_MINE) ? true : false));
@@ -799,7 +835,9 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
 // 0x0020 creators    
 // 0x0040 filters
 // 0x0080 subscription
+// 0x0100 salted
 // 0x0800 skip name and ref
+    
     
     Object entry;
     mc_EntityDetails entity;
@@ -881,12 +919,23 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
             }
             Object pObject;
             pObject.push_back(Pair("write",entity.AnyoneCanWrite() ? false : true));
+            if(mc_gState->m_Features->ReadPermissions())
+            {
+                pObject.push_back(Pair("read",entity.AnyoneCanRead() ? false : true));                
+            }
             if(mc_gState->m_Features->OffChainData())
             {
                 pObject.push_back(Pair("onchain",(entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_ONCHAIN) ? true : false));
                 pObject.push_back(Pair("offchain",(entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_OFFCHAIN) ? true : false));
             }
             entry.push_back(Pair("restrict",pObject));                                            
+            if(output_level & 0x0100)
+            {
+                if(mc_gState->m_Features->SaltedChunks())
+                {
+                    entry.push_back(Pair("salted",(entity.Restrictions() & MC_ENT_ENTITY_RESTRICTION_NEED_SALTED) ? true : false));                
+                }
+            }
         }
        
         
@@ -986,6 +1035,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
             {
                 if(output_level & 0x0008)
                 {                
+                    bool fSynchronized=true;
                     vector<pair<string,uint32_t>> index_types;
                     index_types.push_back(pair<string,uint32_t>("items",MC_TET_STREAM | MC_TET_CHAINPOS));                                                                            
                     index_types.push_back(pair<string,uint32_t>("keys",MC_TET_STREAM_KEY | MC_TET_CHAINPOS));                                                                            
@@ -996,12 +1046,12 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
                     entry.push_back(Pair("subscribed",true));                                            
                     if( ((entStat.m_Flags & MC_EFL_NOT_IN_SYNC) != 0) ||
                         (pEF->STR_IsOutOfSync(&(entStat.m_Entity)) != 0) )
-                    {                        
-                        entry.push_back(Pair("synchronized",false));                                                            
+                    {               
+                        fSynchronized=false;
+//                        entry.push_back(Pair("synchronized",false));                                                            
                     }
                     else
                     {
-                        bool fSynchronized=true;
                         if(pEF->ENT_EditionNumeric() == 0)
                         {
                             mc_TxEntityStat entStatTmp;
@@ -1022,7 +1072,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
                                 }
                             }
                         }
-                        entry.push_back(Pair("synchronized",fSynchronized));                                                                            
+//                        entry.push_back(Pair("synchronized",fSynchronized));                                                                            
                     }
                     if(output_level & 0x0080)
                     {                
@@ -1040,6 +1090,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
                         }
                         entry.push_back(Pair("indexes",indexes));                                                                            
                     }
+                    entry.push_back(Pair("synchronized",fSynchronized));                                                                            
                 }
                 if(output_level & 0x0010)
                 {
@@ -1283,7 +1334,7 @@ const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes
                     read_size=start+count-total_size;
                 }
                 read_size-=read_from;
-                elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&elem_size);
+                elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&elem_size,NULL,NULL);
                 if(elem)
                 {
                     if(fHan)
@@ -1387,7 +1438,7 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
             }
             if(!skip_read)
             {
-                *elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&elem_size);
+                *elem=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&elem_size,NULL,NULL);
                 if(*elem)
                 {
                     if(use_tmp_buf)
@@ -1618,6 +1669,7 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     uint32_t retrieve_status;
     Value format_item_value;
     string format_text_str;
+    uint32_t salt_size;
     
     mc_EntityDetails entity;
     uint256 hash;
@@ -1640,7 +1692,7 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     }
     
 //    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
-    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
+    mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size,&salt_size,0);
     
     unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
     mc_gState->m_TmpScript->SetElement(0);
@@ -1790,6 +1842,10 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
     {
         if((retrieve_status & MC_OST_STORAGE_MASK) == MC_OST_OFF_CHAIN)
         {
+            if(mc_gState->m_Features->SaltedChunks())
+            {
+                entry.push_back(Pair("saltsize", (int)salt_size));                
+            }
             entry.push_back(Pair("chunks", chunks));            
         }
     }

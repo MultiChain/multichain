@@ -110,7 +110,7 @@ bool UpdateTime(CBlockHeader* pblock, const CBlockIndex* pindexPrev)
 
 /* MCHN START */
 
-bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet)
+bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet,uint256 *cachedMerkleRoot)
 {
     if(Params().DisallowUnsignedBlockNonce())
     {
@@ -129,7 +129,10 @@ bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet)
     
     int coinbase_tx,op_return_output;
     uint256 hash_to_verify;
-    uint256 original_merkle_root;
+    vector<uint256> cachedMerkleBranch;
+    
+    cachedMerkleBranch.clear();
+    
     std::vector<unsigned char> vchSigOut;
     std::vector<unsigned char> vchPubKey;
     
@@ -207,10 +210,22 @@ bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet)
         case BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE:
         case BLOCKSIGHASH_NO_SIGNATURE:
             block->nMerkleTreeType=MERKLETREE_NO_COINBASE_OP_RETURN;
-            block->hashMerkleRoot=block->BuildMerkleTree();
             if(hash_type == BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE)
             {
+                block->hashMerkleRoot=block->BuildMerkleTree();
                 block->nNonce=0;
+            }
+            else
+            {
+                if(*cachedMerkleRoot != 0)
+                {
+                    block->hashMerkleRoot=*cachedMerkleRoot;
+                }
+                else
+                {
+                    block->hashMerkleRoot=block->BuildMerkleTree();
+                    *cachedMerkleRoot=block->hashMerkleRoot;
+                }
             }
             hash_to_verify=block->GetHash();
             block->nMerkleTreeType=MERKLETREE_FULL;                
@@ -269,8 +284,10 @@ bool CreateBlockSignature(CBlock *block,uint32_t hash_type,CWallet *pwallet)
     switch(hash_type)
     {
         case BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE:
-        case BLOCKSIGHASH_NO_SIGNATURE:
             block->hashMerkleRoot=block->BuildMerkleTree();
+            break;
+        case BLOCKSIGHASH_NO_SIGNATURE:
+            block->hashMerkleRoot=block->CheckMerkleBranch(tx.GetHash(),block->GetMerkleBranch(0),0);
             break;
     }
 
@@ -728,7 +745,7 @@ void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& 
     pblock->vtx[0] = txCoinbase;
     
 /* MCHN START */    
-    CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE,pwallet);
+    CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE,pwallet,NULL);
     pblock->hashMerkleRoot = pblock->BuildMerkleTree();
 /* MCHN END */    
 }
@@ -756,13 +773,15 @@ bool static ScanHash(CBlock *pblock, uint32_t& nNonce, uint256 *phash,uint16_t s
 //    ss << *pblock;
     assert(ss.size() == 80);
     hasher.Write((unsigned char*)&ss[0], 76);
+    uint256 cachedMerkleRoot=0;    
+    
     while (true) {
         nNonce++;
 
         if(Params().DisallowUnsignedBlockNonce())
         {
             pblock->nNonce=nNonce;
-            CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE,pwallet);
+            CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE,pwallet,&cachedMerkleRoot);
             *phash=pblock->GetHash();
         }
         else
@@ -780,13 +799,23 @@ bool static ScanHash(CBlock *pblock, uint32_t& nNonce, uint256 *phash,uint16_t s
 */
         if( (((uint16_t*)phash)[15] & success_and_mask) == 0)
         {
+            if(Params().DisallowUnsignedBlockNonce())
+            {
+                pblock->hashMerkleRoot=pblock->BuildMerkleTree();                   
+            }
             return true;            
         }
         
         // If nothing found after trying for a while, return -1
         if ((nNonce & 0xffff) == 0)
+        {
 //        if ((nNonce & 0xff) == 0)
+            if(Params().DisallowUnsignedBlockNonce())
+            {
+                pblock->hashMerkleRoot=pblock->BuildMerkleTree();                   
+            }
             return false;
+        }
         if ((nNonce & 0xfff) == 0)
             boost::this_thread::interruption_point();
     }
@@ -959,13 +988,14 @@ int GetMaxActiveMinersCount()
     }
 }
 
-double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set <CTxDestination> *lpsMinerPool,double *lpdMiningStartTime,double *lpdActiveMiners,uint256 *lphLastBlockHash,int *lpnMemPoolSize)
+double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set <CTxDestination> *lpsMinerPool,double *lpdMiningStartTime,double *lpdActiveMiners,uint256 *lphLastBlockHash,int *lpnMemPoolSize,double wAvBlockTime)
 {
     int nMinerPoolSizeMin=4;
     int nMinerPoolSizeMax=16;
     double dRelativeSpread=1.;
     double dRelativeMinerPoolSize=0.25;
     double dAverageCreateBlockTime=2;
+    double dAverageCreateBlockTimeShift=0;
     double dMinerDriftMin=mc_gState->m_NetworkParams->ParamAccuracy();
     double dEmergencyMinersConvergenceRate=2.;    
     int nPastBlocks=12;
@@ -1050,6 +1080,13 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
     }
     dExpectedTimeMin=dExpectedTimeByLast - 0.5 * dSpread;
     dExpectedTimeMax=dExpectedTimeByLast + 0.5 * dSpread;
+    if(dAverageCreateBlockTime < wAvBlockTime)
+    {
+        LogPrint("mcminer","mchn-miner: increased average block creation time: %8.3fs, adjusting\n",wAvBlockTime);
+        dAverageCreateBlockTimeShift=wAvBlockTime-dAverageCreateBlockTime;
+        dAverageCreateBlockTime=wAvBlockTime;
+        dExpectedTimeMin-=dAverageCreateBlockTimeShift;
+    }
     
     dAverageGap=0;
     nWindowSize=0;
@@ -1101,7 +1138,7 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
         
         *lpdMiningStartTime=dExpectedTime;
     }
-    
+       
     fInMinerPool=false;
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
@@ -1170,7 +1207,8 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
         if(fInMinerPool)
         {
             *lpdMiningStartTime += mc_RandomDouble() * dSpread;
-            *lpdMiningStartTime -= dSpread / (nMinerPoolSize + 1);                    
+            *lpdMiningStartTime -= dSpread / (nMinerPoolSize + 1);   
+            *lpdMiningStartTime -= dAverageCreateBlockTimeShift;
         }
         else
         {
@@ -1258,8 +1296,11 @@ void static BitcoinMiner(CWallet *pwallet)
     int EmptyBlockToMine;
     uint64_t wCount[10];
     double wTime[10];
+    double wBlockTime[10];
     memset(wCount,0,wSize*sizeof(uint64_t));
     memset(wTime,0,wSize*sizeof(uint64_t));
+    memset(wBlockTime,0,wSize*sizeof(uint64_t));
+    int wBlockTimePos=0;
     
     uint16_t success_and_mask=0xffff;
     int min_bits;
@@ -1412,8 +1453,15 @@ void static BitcoinMiner(CWallet *pwallet)
                 nMemPoolSize=1;
             }
             
+            double wAvTimePerBlock=0;
+            for(int w=0;w<wSize;w++)
+            {
+                wAvTimePerBlock+=wBlockTime[w];
+            }
+            wAvTimePerBlock/=wSize;
+            
             canMine=MC_PTP_MINE;
-            if(mc_TimeNowAsDouble() < GetMinerAndExpectedMiningStartTime(pwallet, &kMiner,&sMinerPool, &dMiningStartTime,&dActiveMiners,&hLastBlockHash,&nMemPoolSize))
+            if(mc_TimeNowAsDouble() < GetMinerAndExpectedMiningStartTime(pwallet, &kMiner,&sMinerPool, &dMiningStartTime,&dActiveMiners,&hLastBlockHash,&nMemPoolSize,wAvTimePerBlock))
             {
                 canMine=0;
             }
@@ -1518,6 +1566,12 @@ void static BitcoinMiner(CWallet *pwallet)
 
                         SetThreadPriority(THREAD_PRIORITY_NORMAL);
 
+                        double wBlockTimeNow=mc_TimeNowAsDouble();
+                        if(wBlockTimeNow>wStartTime+0.01)
+                        {
+                            wBlockTime[wPos]=wBlockTimeNow-wStartTime;
+                            wBlockTimePos=(wBlockTimePos+1)%wSize;
+                        }
                         LogPrintf("MultiChainMiner: Block Found - %s, prev: %s, height: %d, txs: %d\n",
                                 hash.GetHex(),pblock->hashPrevBlock.ToString().c_str(),mc_gState->m_Permissions->m_Block+1,(int)pblock->vtx.size());
 /*                        
@@ -1536,6 +1590,10 @@ void static BitcoinMiner(CWallet *pwallet)
                             {
                                 __US_Sleep(1000);
                                 boost::this_thread::interruption_point();                                                                    
+                            }
+                            else
+                            {
+                                LogPrint("mcminer","mchn-miner: Block successfully processed\n");
                             }
                         }
 /* MCHN END */                        
@@ -1605,7 +1663,7 @@ void static BitcoinMiner(CWallet *pwallet)
                 if(UpdateTime(pblock, pindexPrev))
                 {
 /* MCHN START */                    
-                    CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE,pwallet);
+                    CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE,pwallet,NULL);
 /* MCHN END */                    
                 }
                 if (Params().AllowMinDifficultyBlocks())

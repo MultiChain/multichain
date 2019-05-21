@@ -600,7 +600,7 @@ Value debug(const Array& params, bool fHelp)
                                 {
                                     throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing stream");                                    
                                 }
-                                collector.InsertChunk((unsigned char*)&chunk_hash,&entity,(unsigned char*)&txid,vout,chunk_size);
+                                collector.InsertChunk((unsigned char*)&chunk_hash,&entity,(unsigned char*)&txid,vout,chunk_size,0);
                             }
                         }
                     }            
@@ -673,7 +673,7 @@ Value debug(const Array& params, bool fHelp)
                                 if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,(unsigned char *)&chunk_hash,
                                         (entity.m_EntityType == MC_TET_NONE) ? NULL: &entity,(txid == 0) ? NULL : (unsigned char*)&txid,vout) == MC_ERR_NOERROR)
                                 {
-                                    chunk_found=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&chunk_bytes);
+                                    chunk_found=pwalletTxsMain->m_ChunkDB->GetChunk(&chunk_def,0,-1,&chunk_bytes,NULL,NULL);
                                     if(chunk_found)
                                     {
                                         chunk_obj.push_back(Pair("size",(int)chunk_bytes));

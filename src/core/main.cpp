@@ -28,6 +28,7 @@
 #include "keys/key.h"
 #include "wallet/wallet.h"
 #include "multichain/multichain.h"
+#include "community/community.h"
 #include "wallet/wallettxs.h"
 #include "script/script.h"
 #include "protocol/relay.h"
@@ -2144,9 +2145,9 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                         // arguments; if so, don't trigger DoS protection to
                         // avoid splitting the network between upgraded and
                         // non-upgraded nodes.
-                        CScriptCheck check(*coins, tx, i,
+                        CScriptCheck check2(*coins, tx, i,
                                 flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheStore);
-                        if (check())
+                        if (check2())
                             return state.Invalid(false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
                     }
                     // Failures of other flags indicate a transaction that is
@@ -4810,6 +4811,9 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
     {
         ShrinkDebugFile();
     }
+    
+    pEF->ENT_MaybeStop();
+    
 /* MCHN END */    
     
     return true;

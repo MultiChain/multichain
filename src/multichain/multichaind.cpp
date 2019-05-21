@@ -138,6 +138,7 @@ bool AppInit(int argc, char* argv[])
         edition=edition+" Edition, ";
     }
     
+    mc_gState->m_EnterpriseBuild=pEF->ENT_BuildVersion();
     
     mc_gState->m_Params->HasOption("-?");
             

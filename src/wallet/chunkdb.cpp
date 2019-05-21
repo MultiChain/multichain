@@ -174,7 +174,10 @@ int mc_ChunkDB::AddSubscription(mc_SubscriptionDBRow *subscription)
     if(subscription->m_Entity.m_EntityType != MC_TET_NONE)
     {
         mc_GetFullFileName(m_Name,dir_name,"",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,subscription->m_DirName);
-        mc_CreateDir(subscription->m_DirName);
+        if(subscription->m_Entity.m_EntityType == MC_TET_AUTHOR)
+        {
+            mc_CreateDir(subscription->m_DirName);
+        }
     }
     else
     {
@@ -612,6 +615,7 @@ int mc_ChunkDB::RemoveEntityInternal(mc_TxEntity *entity,uint32_t *removed_chunk
     {
         err=MC_ERR_NOERROR;
         
+        mc_CreateDir(old_subscription->m_DirName);
         SetFileName(FileName,old_subscription,file_id);
         FileHan=open(FileName,_O_BINARY | O_RDONLY, S_IRUSR | S_IWUSR);
         if(FileHan<=0)
@@ -1173,7 +1177,7 @@ int mc_ChunkDB::GetChunkDefInternal(
 //                ptr=(unsigned char *)m_ChunkData->GetData(chunk_def->m_InternalFileOffset,&bytes);
                 if( (chunk_def->m_TxIDStart == 0) || (chunk_def->m_TxIDStart == (uint32_t)mc_GetLE((void*)txid,4)))
                 {
-                    ptr=GetChunkInternal(chunk_def,-1,-1,&bytes);
+                    ptr=GetChunkInternal(chunk_def,-1,-1,&bytes,NULL,NULL);
                     if(mc_ScriptMatchesTxIDAndVOut(ptr,bytes,txid,vout) == MC_ERR_NOERROR)
                     {
                         return MC_ERR_NOERROR;
@@ -1266,7 +1270,7 @@ int mc_ChunkDB::GetChunkDefInternal(
                     {
                         if( (chunk_def->m_TxIDStart == 0) || (chunk_def->m_TxIDStart == (uint32_t)mc_GetLE((void*)txid,4)))
                         {
-                            ptr=GetChunkInternal(chunk_def,-1,-1,&bytes);
+                            ptr=GetChunkInternal(chunk_def,-1,-1,&bytes,NULL,NULL);
                             if(mc_ScriptMatchesTxIDAndVOut(ptr,bytes,txid,vout) == MC_ERR_NOERROR)
                             {
                                 return MC_ERR_NOERROR;
@@ -1383,8 +1387,10 @@ int mc_ChunkDB::AddChunkInternal(
                  const int vout,
                  const unsigned char *chunk,                                    
                  const unsigned char *details,                                  
+                 const unsigned char *salt,                                     
                  const uint32_t chunk_size,                                     
                  const uint32_t details_size,                                   
+                 const uint32_t salt_size,                                   
                  const uint32_t flags)
 {
     int err;
@@ -1417,7 +1423,7 @@ int mc_ChunkDB::AddChunkInternal(
         return err; 
     }
     
-    if( (m_ChunkData->m_Size + chunk_size + details_size + MC_CDB_MAX_CHUNK_EXTRA_SIZE > MC_CDB_MAX_CHUNK_DATA_POOL_SIZE) || 
+    if( (m_ChunkData->m_Size + chunk_size + details_size + salt_size +MC_CDB_MAX_CHUNK_EXTRA_SIZE > MC_CDB_MAX_CHUNK_DATA_POOL_SIZE) || 
         (m_MemPool->GetCount() + 2 > MC_CDB_MAX_MEMPOOL_SIZE ) )
     {
         CommitInternal(-1,0);
@@ -1515,6 +1521,10 @@ int mc_ChunkDB::AddChunkInternal(
     if(details_size)
     {
         m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_CHUNK_DETAILS,details,details_size);        
+    }
+    if(salt_size)
+    {
+        m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_SALT,salt,salt_size);        
     }
     if(total_items == 0)
     {
@@ -1630,14 +1640,16 @@ int mc_ChunkDB::AddChunk(
                  const int vout,
                  const unsigned char *chunk,                                    
                  const unsigned char *details,                                  
+                 const unsigned char *salt,                                     
                  const uint32_t chunk_size,                                     
                  const uint32_t details_size,                                   
+                 const uint32_t salt_size,                                      
                  const uint32_t flags)
 {
     int err;
     
     Lock();
-    err=AddChunkInternal(hash,entity,txid,vout,chunk,details,chunk_size,details_size,flags);
+    err=AddChunkInternal(hash,entity,txid,vout,chunk,details,salt,chunk_size,details_size,salt_size,flags);
     UnLock();
     
     return err;
@@ -1651,12 +1663,31 @@ void mc_ChunkDB::SetFileName(char *FileName,
 }
 
 
-
+void mc_GetChunkSalt(unsigned char* ptr,uint32_t max_size,unsigned char *salt,uint32_t *salt_size)
+{
+    if(salt)
+    {
+        *salt_size=0;
+        uint32_t salt_offset;
+        size_t salt_bytes=0;
+        salt_offset=mc_FindSpecialParamInDetailsScript(ptr,max_size,MC_ENT_SPRM_SALT,&salt_bytes);
+        if(salt_offset != max_size)
+        {
+            if(salt_bytes <= MAX_CHUNK_SALT_SIZE)
+            {
+                *salt_size=salt_bytes;
+                memcpy(salt,ptr+salt_offset,*salt_size);
+            }
+        }            
+    }    
+}
 
 unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
                                     int32_t offset,
                                     int32_t len,
-                                    size_t *bytes)
+                                    size_t *bytes,
+                                    unsigned char *salt,
+                                    uint32_t *salt_size)        
 {
     unsigned char *ptr;
     size_t bytes_to_read;
@@ -1679,7 +1710,7 @@ unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
         
         if(GetChunkDefInternal(&chunk_def_zero,chunk_def->m_Hash,&(subscription->m_Entity),NULL,0,NULL,-1) == MC_ERR_NOERROR)
         {
-            return GetChunkInternal(&chunk_def_zero,offset,len,bytes);
+            return GetChunkInternal(&chunk_def_zero,offset,len,bytes,salt,salt_size);
         }
         return NULL;
     }
@@ -1691,6 +1722,7 @@ unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
         read_from=0;
         if(offset >= 0)
         {
+            mc_GetChunkSalt(ptr,chunk_def->m_HeaderSize,salt,salt_size);
             read_from+=chunk_def->m_HeaderSize+offset;
             if(offset >= (int)chunk_def->m_Size)
             {
@@ -1723,7 +1755,20 @@ unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
         read_from=chunk_def->m_InternalFileOffset;
         bytes_to_read=chunk_def->m_HeaderSize;
         if(offset >= 0)
-        {
+        {            
+            if(salt)
+            {
+                if(lseek64(FileHan,read_from,SEEK_SET) != (int)read_from)
+                {
+                    goto exitlbl;
+                }
+                if(read(FileHan,m_TmpScript->m_lpData,bytes_to_read) != (int)bytes_to_read)
+                {
+                    goto exitlbl;
+                }
+                mc_GetChunkSalt(m_TmpScript->m_lpData,chunk_def->m_HeaderSize,salt,salt_size);                
+            }
+
             read_from+=chunk_def->m_HeaderSize+offset;
             bytes_to_read=chunk_def->m_Size;
             if(len>0)
@@ -1768,12 +1813,14 @@ exitlbl:
 unsigned char *mc_ChunkDB::GetChunk(mc_ChunkDBRow *chunk_def,
                                     int32_t offset,
                                     int32_t len,
-                                    size_t *bytes)
+                                    size_t *bytes,
+                                    unsigned char *salt,
+                                    uint32_t *salt_size)
 {
     unsigned char *ptr;
     
     Lock();
-    ptr=GetChunkInternal(chunk_def,offset,len,bytes);
+    ptr=GetChunkInternal(chunk_def,offset,len,bytes,salt,salt_size);
     UnLock();
     
     return ptr;
@@ -1796,6 +1843,7 @@ int mc_ChunkDB::AddToFile(const void* chunk,
     tail[1]=MC_ENT_SPRM_FILE_END;
     tail[2]=0x00;
     
+    mc_CreateDir(subscription->m_DirName);
     SetFileName(FileName,subscription,fileid);
     err=MC_ERR_NOERROR;
     FileHan=open(FileName,_O_BINARY | O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
@@ -1875,6 +1923,8 @@ int mc_ChunkDB::FlushDataFile(mc_SubscriptionDBRow *subscription,uint32_t fileid
 {
     char FileName[MC_DCT_DB_MAX_PATH];         
     int FileHan;
+    
+    mc_CreateDir(subscription->m_DirName);
     SetFileName(FileName,subscription,fileid);
     
     FileHan=open(FileName,_O_BINARY | O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
@@ -1954,7 +2004,7 @@ int mc_ChunkDB::FlushSourceChunks(uint32_t flush_mode)
                 full_commit_required=1;
             }            
 
-            err=AddToFile(GetChunkInternal(chunk_def,-1,-1,NULL),size,
+            err=AddToFile(GetChunkInternal(chunk_def,-1,-1,NULL,NULL,NULL),size,
                           subscription,subscription->m_LastFileID,subscription->m_LastFileSize,(row==last_row) ? flush_mode : 0);
             if(err)
             {
@@ -2034,7 +2084,7 @@ int mc_ChunkDB::CommitInternal(int block,uint32_t flush_mode)
                     subscription->m_LastFileSize=0;
                 }            
 
-                err=AddToFile(GetChunkInternal(chunk_def,-1,-1,NULL),size,
+                err=AddToFile(GetChunkInternal(chunk_def,-1,-1,NULL,NULL,NULL),size,
                               subscription,subscription->m_LastFileID,subscription->m_LastFileSize,0);
                 if(err)
                 {

@@ -267,8 +267,11 @@ Value getaddressesbyaccount(const Array& params, bool fHelp)
     {
         const CBitcoinAddress& address = item.first;
         const string& strName = item.second.name;
-        if (strName == strAccount)
-            ret.push_back(address.ToString());
+        if(item.second.purpose != "license")
+        {
+            if (strName == strAccount)
+                ret.push_back(address.ToString());
+        }
     }
     return ret;
 }
@@ -436,8 +439,9 @@ Value listaddresses(const Array& params, bool fHelp)
     for(int i=0;i<entity_count;i++)
     {
         lpEntity=pwalletTxsMain->GetEntity(i);
-        if((lpEntity->m_Entity.m_EntityType == (MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS)) || 
-           (lpEntity->m_Entity.m_EntityType == (MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS)))
+        if( ((lpEntity->m_Entity.m_EntityType == (MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS)) || 
+            (lpEntity->m_Entity.m_EntityType == (MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS))) &&
+            ((lpEntity->m_Flags & MC_EFL_NOT_IN_LISTS) == 0 ) )               
         {
             if(setAddresses.size())
             {
@@ -568,7 +572,7 @@ Value storechunk(const Array& params, bool fHelp)
     entity.Zero();
     entity.m_EntityType=MC_TET_AUTHOR;
     
-    err=pwalletTxsMain->m_ChunkDB->AddChunk((unsigned char*)&hash,&entity,NULL,-1,(unsigned char*)&vValue[0],NULL,(int)vValue.size(),0,0);
+    err=pwalletTxsMain->m_ChunkDB->AddChunk((unsigned char*)&hash,&entity,NULL,-1,(unsigned char*)&vValue[0],NULL,NULL,(int)vValue.size(),0,0,0);
     
     if(err)
     {
@@ -1839,7 +1843,7 @@ Value listsinceblock(const Array& params, bool fHelp)
             while(up_tx-down_tx>chunk_size)
             {
                 err=pwalletTxsMain->GetList(&wallet_entity,this_tx,1,lpEntRowBuffer);
-                CheckWalletError(err);
+                CheckWalletError(err,wallet_entity.m_EntityType,"");
                 if( (err == MC_ERR_NOERROR) && (lpEntRowBuffer->GetCount() > 0) )
                 {
                     entrow=(mc_TxEntityRow *)(lpEntRowBuffer->GetRow(0));
@@ -1863,7 +1867,7 @@ Value listsinceblock(const Array& params, bool fHelp)
             while(this_tx<=tx_count)
             {
                 err=pwalletTxsMain->GetList(&wallet_entity,this_tx,chunk_size,lpEntRowBuffer);
-                CheckWalletError(err);
+                CheckWalletError(err,wallet_entity.m_EntityType,"");
                 if( (err == MC_ERR_NOERROR) && (lpEntRowBuffer->GetCount() > 0) )
                 {
                     for(int i=0;i<lpEntRowBuffer->GetCount();i++)

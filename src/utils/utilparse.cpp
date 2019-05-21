@@ -145,7 +145,63 @@ bool HasPerOutputDataEntries(const CTxOut& txout,mc_Script *lpScript)
     return false;
 }
 
+bool IsLicenseTokenIssuance(mc_Script *lpScript,uint256 hash)
+{
+    int64_t quantity;
+    mc_EntityDetails entity;
+    
+    if(lpScript->GetNumElements() == 0)
+    {
+        return false;
+    }
+    
+    lpScript->SetElement(0);
+    if(lpScript->GetAssetGenesis(&quantity) == 0)
+    {
+        if(quantity == 1)
+        {
+            if(mc_gState->m_Assets->FindEntityByTxID(&entity,(unsigned char*)&hash))
+            {
+                if(entity.GetEntityType() == MC_ENT_TYPE_LICENSE_TOKEN)
+                {
+                    return true;
+                }
+            }            
+        }
+    }
+    
+    return false;
+}
 
+bool IsLicenseTokenTransfer(mc_Script *lpScript,mc_Buffer *amounts)
+{
+    mc_EntityDetails entity;
+    
+    if(lpScript->GetNumElements() < 2)
+    {
+        return false;
+    }
+    
+    if(amounts->GetCount() != 1)
+    {
+        return false;
+    }
+    
+    if(mc_GetABQuantity(amounts->GetRow(0)) != 1)            
+    {
+        return false;        
+    }
+    
+    if(mc_gState->m_Assets->FindEntityByFullRef(&entity,amounts->GetRow(0)))
+    {
+        if(entity.GetEntityType() == MC_ENT_TYPE_LICENSE_TOKEN)
+        {
+            return true;
+        }        
+    }
+    
+    return false;
+}
 /* 
  * Parses txout script into asset-quantity buffer
  * Use it only with unspent or not yet created outputs
@@ -253,9 +309,17 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                 }
             }        
         }
-                
-        if(issue_found)                                                         
+         
+        if(issue_found)
         {
+            if(IsLicenseTokenIssuance(lpScript,hash))
+            {
+                issue_found=false;
+            }
+        }
+        
+        if(issue_found)                                                         
+        {                
             if(hash != 0)
             {
                 mc_EntityDetails entity;
@@ -754,7 +818,7 @@ bool CreateAssetBalanceList(const CTxOut& txout,mc_Buffer *amounts,mc_Script *lp
                     return false;                                    
                 }
             }        
-            
+                                
             if(required)
             {
                 if(lpScript->GetPermission(&type,&from,&to,&timestamp) == 0)    

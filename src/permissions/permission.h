@@ -14,6 +14,7 @@
 #define MC_PTP_WRITE            0x00000008
 #define MC_PTP_ISSUE            0x00000010
 #define MC_PTP_CREATE           0x00000020
+#define MC_PTP_READ             0x00000080
 #define MC_PTP_MINE             0x00000100
 #define MC_PTP_CUSTOM1          0x00000200
 #define MC_PTP_CUSTOM2          0x00000400
@@ -344,6 +345,7 @@ typedef struct mc_Permissions
     int CanSend(const void* lpEntity,const void* lpAddress);
     int CanReceive(const void* lpEntity,const void* lpAddress);
     int CanWrite(const void* lpEntity,const void* lpAddress);
+    int CanRead(const void* lpEntity,const void* lpAddress);
     int CanCreate(const void* lpEntity,const void* lpAddress);
     int CanIssue(const void* lpEntity,const void* lpAddress);
     int CanMine(const void* lpEntity,const void* lpAddress);

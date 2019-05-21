@@ -514,6 +514,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
 
     strUsage += "\n" + _("MultiChain runtime parameters") + "\n";    
     strUsage += "  -offline                                 " + _("Start multichaind in offline mode, no connections to other nodes.") + "\n";
+    strUsage += "  -storeruntimeparams                      " + _("Permanently save modifications to runtime parameters made by setruntimeparam APIs.") + "\n";
     strUsage += "  -initprivkey=<privkey>                   " + _("Manually set the wallet default address and private key when running multichaind for the first time.") + "\n";
     strUsage += "  -handshakelocal=<address>                " + _("Manually override the wallet address which is used for handshaking with other peers in a MultiChain blockchain.") + "\n";
     strUsage += "  -lockadminminerounds=<n>                 " + _("If set overrides lock-admin-mine-rounds blockchain setting.") + "\n";
@@ -1747,7 +1748,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     CTxDestination addressRet=address.Get();        
                     const CKeyID *lpKeyID=boost::get<CKeyID> (&addressRet);
                     const CScriptID *lpScriptID=boost::get<CScriptID> (&addressRet);
-
+                    uint32_t flags=0;
+                    if(item.second.purpose == "license")
+                    {
+                        flags |= MC_EFL_NOT_IN_LISTS;
+                    }
                     entstat.Zero();
                     if(lpKeyID)
                     {
@@ -1755,9 +1760,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                         entstat.m_Entity.m_EntityType=MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS;
                         if(!pwalletTxsMain->FindEntity(&entstat))
                         {
-                            pwalletTxsMain->AddEntity(&(entstat.m_Entity),0);
+                            pwalletTxsMain->AddEntity(&(entstat.m_Entity),flags);
                             entstat.m_Entity.m_EntityType=MC_TET_PUBKEY_ADDRESS | MC_TET_TIMERECEIVED;
-                            pwalletTxsMain->AddEntity(&(entstat.m_Entity),0);
+                            pwalletTxsMain->AddEntity(&(entstat.m_Entity),flags);
                         }
                     }
                         
@@ -1767,9 +1772,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                         entstat.m_Entity.m_EntityType=MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS;
                         if(!pwalletTxsMain->FindEntity(&entstat))
                         {
-                            pwalletTxsMain->AddEntity(&(entstat.m_Entity),0);
+                            pwalletTxsMain->AddEntity(&(entstat.m_Entity),flags);
                             entstat.m_Entity.m_EntityType=MC_TET_SCRIPT_ADDRESS | MC_TET_TIMERECEIVED;
-                            pwalletTxsMain->AddEntity(&(entstat.m_Entity),0);
+                            pwalletTxsMain->AddEntity(&(entstat.m_Entity),flags);
                         }
                     }
                 }
@@ -2339,7 +2344,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             }
         }
     }
-    
+
+    pEF->ENT_MaybeStop();
 
     // As LoadBlockIndex can take several minutes, it's possible the user
     // requested to kill the GUI during the last operation. If so, exit.

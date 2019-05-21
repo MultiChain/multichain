@@ -754,6 +754,10 @@ uint32_t mc_Permissions::GetPossiblePermissionTypes(uint32_t entity_type)
             break;
         case MC_ENT_TYPE_STREAM:
             full_type = MC_PTP_WRITE | MC_PTP_ACTIVATE | MC_PTP_ADMIN;
+            if(mc_gState->m_Features->ReadPermissions())
+            {
+                full_type |= MC_PTP_READ;
+            }
             break;
         case MC_ENT_TYPE_NONE:
             full_type = MC_PTP_GLOBAL_ALL;
@@ -762,6 +766,10 @@ uint32_t mc_Permissions::GetPossiblePermissionTypes(uint32_t entity_type)
             if(entity_type <= MC_ENT_TYPE_STREAM_MAX)
             {
                 full_type = MC_PTP_WRITE | MC_PTP_ACTIVATE | MC_PTP_ADMIN;
+                if(mc_gState->m_Features->ReadPermissions())
+                {
+                    full_type |= MC_PTP_READ;
+                }
             }
             break;
     }
@@ -829,6 +837,7 @@ uint32_t mc_Permissions::GetPermissionType(const char *str,uint32_t full_type)
                 if(mc_MemcmpCheckSize(start,"activate", ptr-start) == 0)perm_type = MC_PTP_ACTIVATE;
                 if(mc_MemcmpCheckSize(start,"create",   ptr-start) == 0)perm_type = MC_PTP_CREATE;
                 if(mc_MemcmpCheckSize(start,"write",    ptr-start) == 0)perm_type = MC_PTP_WRITE;
+                if(mc_MemcmpCheckSize(start,"read",     ptr-start) == 0)perm_type = MC_PTP_READ;
                 if(mc_MemcmpCheckSize(start,MC_PTN_CUSTOM1,  ptr-start) == 0)perm_type = MC_PTP_CUSTOM1;
                 if(mc_MemcmpCheckSize(start,MC_PTN_CUSTOM2,  ptr-start) == 0)perm_type = MC_PTP_CUSTOM2;
                 if(mc_MemcmpCheckSize(start,MC_PTN_CUSTOM3,  ptr-start) == 0)perm_type = MC_PTP_CUSTOM3;
@@ -1114,7 +1123,8 @@ uint32_t mc_Permissions::GetAllPermissions(const void* lpEntity,const void* lpAd
     if(type & MC_PTP_SEND)       result |= CanSend(lpEntity,lpAddress);
     if(type & MC_PTP_RECEIVE)    result |= CanReceive(lpEntity,lpAddress);
     if(type & MC_PTP_WRITE)      result |= CanWrite(lpEntity,lpAddress);
-    if(type & MC_PTP_CREATE)       result |= CanCreate(lpEntity,lpAddress);
+    if(type & MC_PTP_READ)       result |= CanRead(lpEntity,lpAddress);
+    if(type & MC_PTP_CREATE)     result |= CanCreate(lpEntity,lpAddress);
     if(type & MC_PTP_ISSUE)      result |= CanIssue(lpEntity,lpAddress);
     if(type & MC_PTP_ADMIN)      result |= CanAdmin(lpEntity,lpAddress);
     if(type & MC_PTP_MINE)       result |= CanMine(lpEntity,lpAddress);
@@ -1376,6 +1386,31 @@ int mc_Permissions::CanWrite(const void* lpEntity,const void* lpAddress)
         }
     }
     
+    UnLock();
+    
+    return result;
+}
+
+/** Returns non-zero value if (entity,address) can write */
+
+int mc_Permissions::CanRead(const void* lpEntity,const void* lpAddress)
+{
+    int result;
+
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    
+    Lock(0);
+    
+    result = GetPermission(lpEntity,lpAddress,MC_PTP_READ);    
+    
+    if(result)
+    {
+        result = MC_PTP_READ; 
+    }
+        
     UnLock();
     
     return result;
@@ -2833,6 +2868,7 @@ int mc_Permissions::RequiredForConsensus(const void* lpEntity,const void* lpAddr
         case MC_PTP_CREATE:
         case MC_PTP_ACTIVATE:
         case MC_PTP_WRITE:
+        case MC_PTP_READ:
             if(pldLast.m_ThisRow)
             {
                 if(pldLast.m_BlockFrom == from)
@@ -3244,6 +3280,7 @@ int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAdd
     types[num_types]=MC_PTP_SEND;num_types++;
     types[num_types]=MC_PTP_RECEIVE;num_types++;
     types[num_types]=MC_PTP_WRITE;num_types++;        
+    types[num_types]=MC_PTP_READ;num_types++;        
     types[num_types]=MC_PTP_CREATE;num_types++;        
     types[num_types]=MC_PTP_ISSUE;num_types++;
     types[num_types]=MC_PTP_MINE;num_types++;
