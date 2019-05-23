@@ -504,6 +504,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "prioritisetransaction", 1 },
     { "prioritisetransaction", 2 },
     { "getlicenseconfirmation", 1 },
+    { "listlicenses", 0 },
 };
 
 class CRPCConvertTable

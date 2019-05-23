@@ -1198,6 +1198,7 @@ int mc_WalletTxs::RollBack(mc_TxImport *import,int block)
                         if (itold == m_UTXOs[import_pos].end())
                         {
                             m_UTXOs[import_pos].insert(make_pair(txouts[i].m_OutPoint, txouts[i]));
+                            pEF->LIC_VerifyUpdateCoin(block,&(txouts[i]),true);
                         }                    
                     }
                 }
@@ -2879,6 +2880,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
         for(i=0;i<(int)txoutsIn.size();i++)
         {
             m_UTXOs[import_pos].erase(txoutsIn[i].m_OutPoint);
+            pEF->LIC_VerifyUpdateCoin(block,&(txoutsIn[i]),false);
         }
         for(i=0;i<(int)txoutsOut.size();i++)
         {
@@ -2900,6 +2902,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                     }
                 }
                 m_UTXOs[import_pos].insert(make_pair(txoutsOut[i].m_OutPoint, txoutsOut[i]));
+                pEF->LIC_VerifyUpdateCoin(block,&(txoutsOut[i]),true);
             }                    
         }
     }    

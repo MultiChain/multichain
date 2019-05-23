@@ -235,9 +235,14 @@ bool mc_EnterpriseFeatures::LIC_VerifyFeature(uint64_t feature,std::string& reas
     return false;
 }
 
-int mc_EnterpriseFeatures::LIC_VerifyLicenses()
+int mc_EnterpriseFeatures::LIC_VerifyLicenses(int block)
 {
     return MC_ERR_NOERROR;
+}
+
+int mc_EnterpriseFeatures::LIC_VerifyUpdateCoin(int block,mc_Coin *coin,bool is_new)
+{
+    return MC_ERR_NOERROR;    
 }
 
 Value mc_EnterpriseFeatures::LIC_RPCDecodeLicenseRequest(const Array& params)

@@ -87,7 +87,8 @@ typedef struct mc_EnterpriseFeatures
     bool LIC_VerifyFeature(uint64_t feature,std::string& reason);
 //    bool LIC_VerifyConfirmation(uint160 address,void *confirmation, size_t size,std::string& reason);
 //    string LIC_LicenseName(void *confirmation, size_t size);
-    int LIC_VerifyLicenses();
+    int LIC_VerifyLicenses(int block);
+    int LIC_VerifyUpdateCoin(int block,mc_Coin *coin,bool is_new);
     Value LIC_RPCDecodeLicenseRequest(const Array& params);
     Value LIC_RPCActivateLicense(const Array& params);
     Value LIC_RPCTransferLicense(const Array& params);

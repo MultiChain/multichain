@@ -173,18 +173,13 @@ bool mc_GetLicenseEncryptionKey(vector<unsigned char> &vEncryptionPublicKey,uint
     return true;
 }
 
-
-Value getlicenserequest(const Array& params, bool fHelp)
+CLicenseRequest mc_GetLicenseRequest(int *errorCode,string *strError)
 {
-    if (fHelp || params.size() > 0)
-        mc_ThrowHelpMessage("getlicenserequest");        
-    
-    if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
-    }   
+    *errorCode=0;
+    *strError="";
     
     CLicenseRequest license_request;
+    
     CBitcoinAddress license_address;
     uint32_t encryption_type;
     unsigned char* stored_param;
@@ -194,7 +189,9 @@ Value getlicenserequest(const Array& params, bool fHelp)
     
     if(!mc_GetLicenseAddress(license_address,false))
     {
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot create license address");                
+        *errorCode=RPC_INTERNAL_ERROR;
+        *strError="Cannot create license address";
+        return license_request;
     }
     
     CEncryptionKey full_key;
@@ -203,8 +200,9 @@ Value getlicenserequest(const Array& params, bool fHelp)
     encryption_type=MC_ECF_ASYMMETRIC_ENCRYPTION_RSA_2048_DER;
     if(!full_key.Generate(encryption_type))
     {
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot create encryption key");                
-//        return false;
+        *errorCode=RPC_INTERNAL_ERROR;
+        *strError="Cannot create encryption key";
+        return license_request;
     }
 /*    
     if(!mc_GetLicenseEncryptionKey(vEncryptionPublicKey,&encryption_type,false))
@@ -310,6 +308,9 @@ Value getlicenserequest(const Array& params, bool fHelp)
     param_size=sizeof(uint32_t);
     lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_TRANSFER_METHOD,stored_param,param_size);    
 
+    GetRandBytes(nonce,MC_LIC_NONCE_SIZE);
+    lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_REQUEST_NONCE,nonce,MC_LIC_NONCE_SIZE);    
+    
     /*
     uint64_t value64;
     value32=mc_TimeNowAsUInt();
@@ -336,6 +337,29 @@ Value getlicenserequest(const Array& params, bool fHelp)
     license_request.SetData(lpScript);   
     license_request.SetPrivateKey(full_key.m_PrivateKey);
     license_request.m_ReferenceCount=0;
+    
+    return license_request;
+}
+
+Value getlicenserequest(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 0)
+        mc_ThrowHelpMessage("getlicenserequest");        
+    
+    if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. To get this functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
+    }   
+    
+    int errCode;
+    string strError;
+    
+    CLicenseRequest license_request=mc_GetLicenseRequest(&errCode,&strError);
+    
+    if(strError.size())
+    {
+        throw JSONRPCError(errCode,strError);                        
+    }
     
     if(!pwalletMain->SetLicenseRequest(license_request.GetHash(),license_request))
     {

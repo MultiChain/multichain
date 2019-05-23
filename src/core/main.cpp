@@ -4780,9 +4780,10 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
     
     if(activate)
     {
-        
+        pEF->LIC_VerifyLicenses(-1);
         if (!ActivateBestChain(state, pblock))
-            return error("%s : ActivateBestChain failed", __func__);
+            return error("%s : ActivateBestChain failed", __func__);    
+        pEF->LIC_VerifyLicenses(chainActive.Height());
     }
 /* MCHN START */    
 /*
@@ -6314,6 +6315,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                     }
                 }
             }
+            
+        
+            pEF->LIC_VerifyLicenses(-1);            
 /* MCHN END */            
             
             

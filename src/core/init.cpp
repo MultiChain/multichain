@@ -2666,6 +2666,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     }
 #endif
 
+    pEF->LIC_VerifyLicenses(chainActive.Height());
+    
     SetRPCWarmupFinished();                                                     // Should be here, otherwise wallet can double spend
     uiInterface.InitMessage(_("Done loading"));
 
