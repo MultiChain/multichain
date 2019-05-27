@@ -505,6 +505,10 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         {
             string autosubscribe=params[1].get_str();
             uint32_t mode=MC_WMD_NONE;
+            
+            mode |= mc_AutosubscribeWalletMode(params[1].get_str(),false);
+
+/*
             bool found=false;
             if(autosubscribe=="streams")
             {
@@ -529,6 +533,14 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
             if(!found)
             {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value");                                                                        
+            }
+*/
+            if(mode == MC_WMD_NONE)
+            {
+                if(params[1].get_str().size() != 0)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value");                                                                                            
+                }
             }
             
             if(pwalletTxsMain)

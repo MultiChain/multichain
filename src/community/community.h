@@ -42,6 +42,8 @@ typedef struct mc_EnterpriseFeatures
             uint32_t mode);                                                     // Unused    
     
     int STR_CreateSubscription(mc_TxEntity *entity,const std::string parameters);
+    uint32_t STR_CheckAutoSubscription(const std::string parameters,bool check_license);
+    int STR_CreateAutoSubscription(mc_TxEntity *entity);
     int STR_TrimSubscription(mc_TxEntity *entity,const std::string parameters);
     int STR_IsIndexSkipped(mc_TxImport *import,mc_TxEntity *parent_entity,mc_TxEntity *entity);
     int STR_NoRetrieve(mc_TxEntity *entity);

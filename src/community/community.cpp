@@ -26,6 +26,16 @@ int mc_EnterpriseFeatures::STR_CreateSubscription(mc_TxEntity *entity,const std:
     return MC_ERR_FOUND;        
 }
 
+uint32_t mc_EnterpriseFeatures::STR_CheckAutoSubscription(const std::string parameters,bool check_license)
+{
+    return 0;
+}
+
+int mc_EnterpriseFeatures::STR_CreateAutoSubscription(mc_TxEntity *entity)
+{
+    return MC_ERR_NOERROR;        
+}
+
 int mc_EnterpriseFeatures::STR_TrimSubscription(mc_TxEntity *entity,const std::string parameters)
 {
     return MC_ERR_NOERROR;        

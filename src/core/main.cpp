@@ -4127,9 +4127,11 @@ bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool f
 //    if (block.GetBlockTime() > GetAdjustedTime() + 2 * 60 * 60)
     if (block.GetBlockTime() > GetAdjustedTime() + 2 * 6 * Params().TargetSpacing())
 /* MCHN END */    
+    {
+        LogPrintf("ERROR: Block time: %u. Node time: %u, Offset: %u\n",block.GetBlockTime(), GetAdjustedTime(), GetTimeOffset());
         return state.Invalid(error("CheckBlockHeader() : block timestamp too far in the future"),
                              REJECT_INVALID, "time-too-new");
-
+    }
     return true;
 }
 
