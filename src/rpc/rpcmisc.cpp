@@ -17,6 +17,7 @@
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #endif
+#include "community/community.h"
 
 #include <stdint.h>
 
@@ -72,6 +73,7 @@ Value getinfo(const Array& params, bool fHelp)
     
     obj.push_back(Pair("version", mc_BuildDescription(mc_gState->GetNumericVersion())));
     obj.push_back(Pair("nodeversion", mc_gState->GetNumericVersion()));
+    obj.push_back(Pair("nodeedition", pEF->ENT_Edition()));
     obj.push_back(Pair("protocolversion", mc_gState->m_NetworkParams->ProtocolVersion()));
     obj.push_back(Pair("chainname", string(mc_gState->m_NetworkParams->Name())));
     obj.push_back(Pair("description", string((char*)mc_gState->m_NetworkParams->GetParam("chaindescription",NULL))));
