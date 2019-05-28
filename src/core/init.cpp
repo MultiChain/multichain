@@ -424,9 +424,9 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "                         " + _("(more details and % substitutions online)") + "\n";
 /* MCHN START */    
     strUsage += "  -walletdbversion=2|3   " + _("Specify wallet version, 2 - Berkeley DB, 3 (default) - proprietary") + "\n";
-    strUsage += "  -autosubscribe=<params> " + _("Automatically subscribe to new streams and/or assets. Comma delimited list of the entities to subscribe (assets, streams)") + "\n";
-    strUsage += "                         " + _("and/or conditional indexing/retrieval parameters (only in Enterprise Edition):") + "\n";
-    strUsage += "                         " + _("streams-items,streams-items-local,streams-keys,streams-keys-local,streams-publishers,streams-publishers-local,streams-retrieve") + "\n";
+    strUsage += "  -autosubscribe=<params> " + _("Automatically subscribe to new streams and/or assets, as a comma delimited list of subscriptions.") + "\n";
+    strUsage += "                         " + _("All editions: assets, streams. Enterprise Edition only: streams-items,streams-items-local,") + "\n";
+    strUsage += "                         " + _("streams-keys,streams-keys-local,streams-publishers,streams-publishers-local,streams-retrieve") + "\n";
 /* MCHN END */    
     strUsage += "  -zapwallettxes=<mode>  " + _("Delete all wallet transactions and only recover those parts of the blockchain through -rescan on startup") + "\n";
     strUsage += "                         " + _("(1 = keep tx meta data e.g. account owner and payment request information, 2 = drop tx meta data)") + "\n";
