@@ -3342,19 +3342,28 @@ bool CWallet::DelEKey(const uint256& hashEKey)
     return CWalletDB(strWalletFile).EraseEKey(hashEKey);    
 }
 
-bool CWallet::SetLicenseRequest(const uint256& hash, const CLicenseRequest& license_request)
+bool CWallet::SetLicenseRequest(const uint256& hash, const CLicenseRequest& license_request,const uint256& full_hash)
 {
     {
         LOCK(cs_wallet); // mapLicenseRequests
         std::map<uint256, CLicenseRequest>::iterator mi = mapLicenseRequests.find(hash);
         if(mi != mapLicenseRequests.end())
         {
-            return false;
+            mi->second=license_request;
         }
-        
-        mapLicenseRequests.insert(make_pair(hash,license_request));
+        else
+        {
+            mapLicenseRequests.insert(make_pair(hash,license_request));
+        }
     }
-    LogPrintf("Stored license request %s in the wallet.\n",hash.ToString().c_str());
+    if(full_hash == 0)
+    {
+        LogPrintf("Stored license request %s in the wallet.\n",hash.ToString().c_str());
+    }
+    else
+    {
+        LogPrintf("Stored license request %s-%s in the wallet.\n",hash.ToString().c_str(),full_hash.ToString().c_str());        
+    }
     return CWalletDB(strWalletFile).WriteLicenseRequest(hash, license_request);        
 }
     

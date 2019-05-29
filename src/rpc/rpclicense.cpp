@@ -361,7 +361,7 @@ Value getlicenserequest(const Array& params, bool fHelp)
         throw JSONRPCError(errCode,strError);                        
     }
     
-    if(!pwalletMain->SetLicenseRequest(license_request.GetHash(),license_request))
+    if(!pwalletMain->SetLicenseRequest(license_request.GetHash(),license_request,0))
     {
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot save license request");                        
     }
