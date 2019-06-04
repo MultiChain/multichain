@@ -199,6 +199,7 @@ typedef struct mc_TmpBuffers
     mc_Script               *m_RpcChunkScript1;
     mc_Script               *m_RelayTmpBuffer;
     mc_Script               *m_LicenseTmpBuffer;
+    mc_Script               *m_LicenseTmpBufferForHash;
     
     void  Init()
     {
@@ -225,6 +226,7 @@ typedef struct mc_TmpBuffers
         m_RpcChunkScript1=new mc_Script();
         m_RelayTmpBuffer=new mc_Script();
         m_LicenseTmpBuffer=new mc_Script();
+        m_LicenseTmpBufferForHash=new mc_Script();
     }    
 
     void  Destroy()
@@ -245,6 +247,7 @@ typedef struct mc_TmpBuffers
         delete m_RpcChunkScript1;
         delete m_RelayTmpBuffer;
         delete m_LicenseTmpBuffer;
+        delete m_LicenseTmpBufferForHash;
     }
     
 } mc_TmpBuffers;

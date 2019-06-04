@@ -1713,17 +1713,17 @@ bool MultiChainTransaction_CheckLicenseTokenDetails(CMultiChainTxDetails *detail
         reason="License token issue script rejected - no name";
         return false;                                                                                                                                        
     }
-    if( value_sizes[MC_ENT_SPRM_LICENSE_REQUEST_HASH] == 0 )
+    if( value_sizes[MC_ENT_SPRM_LICENSE_LICENSE_HASH] == 0 )
     {
         reason="License token issue script rejected - invalid request hash";
         return false;                                                                                                                                        
     }
-    if( value_sizes[MC_ENT_SPRM_LICENSE_REQUEST_ADDRESS] != sizeof(uint160) )
+    if( value_sizes[MC_ENT_SPRM_LICENSE_ISSUE_ADDRESS] != sizeof(uint160) )
     {
         reason="License token issue script rejected - invalid request address";
         return false;                                                                                                                                        
     }
-    if(memcmp(token_address,details->details_script+value_starts[MC_ENT_SPRM_LICENSE_REQUEST_ADDRESS],value_sizes[MC_ENT_SPRM_LICENSE_REQUEST_ADDRESS]))
+    if(memcmp(token_address,details->details_script+value_starts[MC_ENT_SPRM_LICENSE_ISSUE_ADDRESS],value_sizes[MC_ENT_SPRM_LICENSE_ISSUE_ADDRESS]))
     {
         reason="License token issue script rejected - request address mismatch";
         return false;                                                                                                                                                
@@ -1743,13 +1743,13 @@ bool MultiChainTransaction_CheckLicenseTokenDetails(CMultiChainTxDetails *detail
         reason="License token issue script rejected - invalid pubkey";
         return false;                                                                                                                                        
     }
-    if( (value_sizes[MC_ENT_SPRM_LICENSE_MIN_VERSION] < 4 ) || 
-        (value_sizes[MC_ENT_SPRM_LICENSE_MIN_VERSION] > 8 ))
+    if( (value_sizes[MC_ENT_SPRM_LICENSE_MIN_NODE] < 4 ) || 
+        (value_sizes[MC_ENT_SPRM_LICENSE_MIN_NODE] > 8 ))
     {
         reason="License token issue script rejected - invalid version";
         return false;                                                                                                                                        
     }
-    if( mc_gState->GetNumericVersion() < mc_GetLE(details->details_script+value_starts[MC_ENT_SPRM_LICENSE_MIN_VERSION],value_sizes[MC_ENT_SPRM_LICENSE_MIN_VERSION]) )
+    if( mc_gState->GetNumericVersion() < mc_GetLE(details->details_script+value_starts[MC_ENT_SPRM_LICENSE_MIN_NODE],value_sizes[MC_ENT_SPRM_LICENSE_MIN_NODE]) )
     {
         reason="License token issue script rejected - Not supported in this version of MultiChain";
         return false;                                                                                                                                        
@@ -1793,7 +1793,7 @@ bool MultiChainTransaction_CheckLicenseTokenDetails(CMultiChainTxDetails *detail
     {
         CLicenseRequest confirmation;
         confirmation.SetData(details->details_script,details->details_script_size);
-        string license_name=confirmation.GetLicenseNameByConfirmation();
+        string license_name=confirmation.GetLicenseName();
         if( (value_sizes[MC_ENT_SPRM_NAME] != license_name.size()) ||
             (memcmp(details->details_script+value_starts[MC_ENT_SPRM_NAME],license_name.c_str(),value_sizes[MC_ENT_SPRM_NAME]) != 0))    
         {

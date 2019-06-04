@@ -16,29 +16,34 @@
 #define MC_ENT_SPRM_LICENSE_PK_HASH_VERSION   0x08
 #define MC_ENT_SPRM_LICENSE_SC_HASH_VERSION   0x09
 #define MC_ENT_SPRM_LICENSE_CHECKSUM          0x0a
+#define MC_ENT_SPRM_LICENSE_REQUEST_MIN       0x10
 #define MC_ENT_SPRM_LICENSE_ADDRESS           0x10
 #define MC_ENT_SPRM_LICENSE_ADDRESS_TYPE      0x11
 #define MC_ENT_SPRM_LICENSE_MAC_ADDRESS       0x12
 #define MC_ENT_SPRM_LICENSE_IP_ADDRESS        0x13
 #define MC_ENT_SPRM_LICENSE_NODE_VERSION      0x14
 #define MC_ENT_SPRM_LICENSE_PROTOCOL_VERSION  0x15
-#define MC_ENT_SPRM_LICENSE_EKEY              0x16
-#define MC_ENT_SPRM_LICENSE_EKEY_TYPE         0x17
-#define MC_ENT_SPRM_LICENSE_TRANSFER_METHOD   0x18
 #define MC_ENT_SPRM_LICENSE_REQUEST_NONCE     0x1D
 #define MC_ENT_SPRM_LICENSE_REQUEST_DETAILS   0x1E
+#define MC_ENT_SPRM_LICENSE_REQUEST_MAX       0x1F
+#define MC_ENT_SPRM_LICENSE_LICENSE_MIN       0x20
 #define MC_ENT_SPRM_LICENSE_NONCE             0x20
 #define MC_ENT_SPRM_LICENSE_START_TIME        0x21
 #define MC_ENT_SPRM_LICENSE_END_TIME          0x22
 #define MC_ENT_SPRM_LICENSE_UNLOCKED_FEATURES 0x23
 #define MC_ENT_SPRM_LICENSE_FLAGS             0x24
 #define MC_ENT_SPRM_LICENSE_PARAMS            0x25
-#define MC_ENT_SPRM_LICENSE_NAME              0x2C
 #define MC_ENT_SPRM_LICENSE_DETAILS           0x2E
+#define MC_ENT_SPRM_LICENSE_LICENSE_MAX       0x2F
 #define MC_ENT_SPRM_LICENSE_ENCRYPTED_REQUEST 0x30
 #define MC_ENT_SPRM_LICENSE_ORIGINAL_HASH     0x31
-#define MC_ENT_SPRM_LICENSE_MERGED_HASH       0x32
-#define MC_ENT_SPRM_LICENSE_COUNT             0x3D
+#define MC_ENT_SPRM_LICENSE_REQUEST_HASH      0x32
+#define MC_ENT_SPRM_LICENSE_EKEY              0x56
+#define MC_ENT_SPRM_LICENSE_EKEY_TYPE         0x57
+#define MC_ENT_SPRM_LICENSE_TRANSFER_METHOD   0x58
+#define MC_ENT_SPRM_LICENSE_COUNT             0x5D
+#define MC_ENT_SPRM_LICENSE_CONFIRMATION_MIN  0x60
+#define MC_ENT_SPRM_LICENSE_CONFIRMATION_MAX  0x6F
 
 
 #define MC_ECF_LICENSE_PURCHASE_NO_ENCRYPTION             0x00000000
@@ -74,10 +79,10 @@ class CLicenseRequest
         bool IsZero();
         const unsigned char *GetParam(uint32_t param,size_t *bytes);
         const unsigned char *GetParamToEnd(uint32_t param,size_t *bytes);
-        uint256 GetHash(const uint32_t *params,int param_count);
-        uint256 GetHash();
-        uint256 GetConfirmationHash();
-        std::string GetLicenseNameByConfirmation();
+        uint256 GetHash(uint32_t from, uint32_t to,bool add_chain);
+        uint256 GetLicenseHash();
+        uint256 GetConfirmationNameHash();
+        std::string GetLicenseName();
         
     ADD_SERIALIZE_METHODS;
     
