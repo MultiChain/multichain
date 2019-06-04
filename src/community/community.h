@@ -92,6 +92,7 @@ typedef struct mc_EnterpriseFeatures
     int LIC_VerifyLicenses(int block);
     int LIC_VerifyUpdateCoin(int block,mc_Coin *coin,bool is_new);
     Value LIC_RPCDecodeLicenseRequest(const Array& params);
+    Value LIC_RPCDecodeLicenseConfirmation(const Array& params);
     Value LIC_RPCActivateLicense(const Array& params);
     Value LIC_RPCTransferLicense(const Array& params);
     Value LIC_RPCListLicenseRequests(const Array& params);

@@ -260,6 +260,11 @@ Value mc_EnterpriseFeatures::LIC_RPCDecodeLicenseRequest(const Array& params)
     return Value::null;
 }
 
+Value mc_EnterpriseFeatures::LIC_RPCDecodeLicenseConfirmation(const Array& params)
+{
+    return Value::null;
+}
+
 Value mc_EnterpriseFeatures::LIC_RPCActivateLicense(const Array& params)
 {
     return Value::null;

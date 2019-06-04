@@ -381,6 +381,16 @@ Value decodelicenserequest(const json_spirit::Array& params, bool fHelp)
     return pEF->LIC_RPCDecodeLicenseRequest(params);    
 }
 
+Value decodelicenseconfirmation(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error("Help message not found\n");
+    
+    pEF->ENT_RPCVerifyEdition("decodelicenseconfirmation API");
+    
+    return pEF->LIC_RPCDecodeLicenseConfirmation(params);    
+}
+
 Value activatelicense(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)

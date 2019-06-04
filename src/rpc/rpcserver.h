@@ -291,6 +291,7 @@ extern json_spirit::Value getstreampublishersummary(const json_spirit::Array& pa
 extern json_spirit::Value storechunk(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getlicenserequest(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value decodelicenserequest(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value decodelicenseconfirmation(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value activatelicense(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value activatelicensefrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value transferlicense(const json_spirit::Array& params, bool fHelp);
