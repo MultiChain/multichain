@@ -1100,7 +1100,7 @@ bool mc_RelayProcess_Chunk_Query(unsigned char *ptrStart,unsigned char *ptrEnd,v
                     string strErrorToIgnore;
                     chunk=*(mc_ChunkEntityKey*)ptr;
                     if( (mc_IsReadPermissionedStream(&chunk,mapReadPermissionCache,NULL) == 0) ||
-                        ((pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_GIVE,strErrorToIgnore) != 0) && (publisher_ef != NULL) ))
+                        ((pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_DELIVER,strErrorToIgnore) != 0) && (publisher_ef != NULL) ))
                     {
                         if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,chunk.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
                         {
@@ -1199,7 +1199,7 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
                         if(mc_IsReadPermissionedStream(&chunk,mapReadPermissionCache,NULL) != 0)
                         {
                             *read_permissioned=true;
-                            if(!pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_GIVE,strError))
+                            if(!pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_DELIVER,strError))
                             {
                                 strError="Request for chunk in read-permissioned stream";
                                 return false;                    
@@ -1266,7 +1266,7 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
                 if(read_permissioned)
                 {
                     *read_permissioned=true;
-                    if(!pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_GIVE,strError))
+                    if(!pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_DELIVER,strError))
                     {
                         strError=strprintf("Unsupported request format (%d, %d)",MC_RMT_CHUNK_REQUEST,*ptr);
                     }
