@@ -491,7 +491,19 @@ Value dumpwallet(const Array& params, bool fHelp)
     // sort time/key pairs
     std::vector<std::pair<int64_t, CKeyID> > vKeyBirth;
     for (std::map<CKeyID, int64_t>::const_iterator it = mapKeyBirth.begin(); it != mapKeyBirth.end(); it++) {
-        vKeyBirth.push_back(std::make_pair(it->second, it->first));
+        bool take_it=true;
+        std::map<CTxDestination, CAddressBookData>::iterator mi = pwalletMain->mapAddressBook.find(it->first);
+        if(mi != pwalletMain->mapAddressBook.end())
+        {
+            if(mi->second.purpose == "license")
+            {
+                take_it=false;
+            }
+        }
+        if(take_it)
+        {
+            vKeyBirth.push_back(std::make_pair(it->second, it->first));
+        }
     }
     mapKeyBirth.clear();
     std::sort(vKeyBirth.begin(), vKeyBirth.end());

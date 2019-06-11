@@ -311,29 +311,6 @@ CLicenseRequest mc_GetLicenseRequest(int *errorCode,string *strError)
     GetRandBytes(nonce,MC_LIC_NONCE_SIZE);
     lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_REQUEST_NONCE,nonce,MC_LIC_NONCE_SIZE);    
     
-    /*
-    uint64_t value64;
-    value32=mc_TimeNowAsUInt();
-    stored_param=(unsigned char*)&value32;
-    param_size=sizeof(uint32_t);
-    lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_START_TIME,stored_param,param_size);    
-    
-    value32+=31622400; //366 days
-    stored_param=(unsigned char*)&value32;
-    param_size=sizeof(uint32_t);
-    lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_END_TIME,stored_param,param_size);    
-    
-    value64=MC_LIC_DEFAULT_UNLOCKED_FEATURES;
-    stored_param=(unsigned char*)&value64;
-    param_size=sizeof(uint64_t);
-    lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_UNLOCKED_FEATURES,stored_param,param_size);  
-    
-    value32=0;
-    stored_param=(unsigned char*)&value32;
-    param_size=sizeof(uint32_t);
-    lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_FLAGS,stored_param,param_size);    
-    */
-    
     license_request.SetData(lpScript);   
     license_request.SetPrivateKey(full_key.m_PrivateKey);
     license_request.m_ReferenceCount=0;
