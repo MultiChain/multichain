@@ -1749,11 +1749,6 @@ bool MultiChainTransaction_CheckLicenseTokenDetails(CMultiChainTxDetails *detail
         reason="License token issue script rejected - invalid version";
         return false;                                                                                                                                        
     }
-    if( mc_gState->GetNumericVersion() < mc_GetLE(details->details_script+value_starts[MC_ENT_SPRM_LICENSE_MIN_NODE],value_sizes[MC_ENT_SPRM_LICENSE_MIN_NODE]) )
-    {
-        reason="License token issue script rejected - Not supported in this version of MultiChain";
-        return false;                                                                                                                                        
-    }
     if( (value_sizes[MC_ENT_SPRM_LICENSE_MIN_PROTOCOL] < 4 ) || 
         (value_sizes[MC_ENT_SPRM_LICENSE_MIN_PROTOCOL] > 8 ))
     {
