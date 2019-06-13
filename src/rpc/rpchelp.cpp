@@ -4836,8 +4836,121 @@ void mc_InitRPCHelpMap20()
     
     mapHelpStrings.insert(std::make_pair("getlicenserequest",
             "getlicenserequest \n"
-        ));
+            "\nReturns license request.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getlicenserequest", "") 
+            + HelpExampleRpc("getlicenserequest", "")    
+       ));
    
+    mapHelpStrings.insert(std::make_pair("decodelicenserequest",
+            "decodelicenserequest \"license-request-hex\"\n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nReturns a JSON object representing the serialized, hex-encoded license request.\n"
+
+            "\nArguments:\n"
+            "1. \"license-request-hex\"                          (string, required) The license request hex string (output of getlicenserequest)\n"
+
+            "\nExamples:\n"
+            + HelpExampleCli("decoderawtransaction", "\"hexstring\"")
+            + HelpExampleRpc("decoderawtransaction", "\"hexstring\"")
+      ));
+   
+    mapHelpStrings.insert(std::make_pair("decodelicenseconfirmation",
+            "decodelicenseconfirmation \"license-confirmation-hex\"\n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nReturns a JSON object representing the serialized, hex-encoded license request.\n"
+
+            "\nArguments:\n"
+            "1. \"license-confirmation-hex\"                     (string, required) The license confirmation hex string (input of activatelicense)\n"
+
+            "\nExamples:\n"
+            + HelpExampleCli("decodelicenseconfirmation", "\"hexstring\"")
+            + HelpExampleRpc("decodelicenseconfirmation", "\"hexstring\"")
+      ));
+   
+}
+
+void mc_InitRPCHelpMap21()
+{
+    mapHelpStrings.insert(std::make_pair("listlicenses",
+            "listlicenses ( verbose ) \n"
+            "\nReturns list of licenses owned by this node\n"
+            "\nArguments:\n"
+            "1. verbose                          (boolean, optional, default=false) If true, returns extended license information \n"
+            "\nResult:\n"
+            "An array containing list of licenses\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("listlicenses", "")
+            + HelpExampleRpc("listlicenses", "")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("getlicenseconfirmation",
+            "getlicenseconfirmation \"license-request-hex\" ( confirmation-settings )\n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nReturns license confirmation.\n"
+
+            "\nArguments:\n"
+            "1. \"license-request-hex\"                          (string, required) The license request hex string (output of getlicenserequest)\n"
+            "2. confirmation-settings                          (integer, optional) Number of confirmations with default settings to return\n"
+            "  or\n"
+            "2. confirmation-settings                          (object, optional) Confirmation settings. Possible fields:\n"
+            "                                                       count, integer, number of confirmations with these settings to return\n"
+            "                                                       starttime, integer\n"
+            "                                                       endtime,  integer\n"
+            "                                                       interval, integer (in case of conflict with endtime, the last field counts)\n"
+            "                                                       features, integer or hexadecimal string\n"
+            "                                                       single feature, as it appears in the output of listlicenses, boolean\n"
+            "                                                                         (in case of conflict with features, the last field counts)\n"
+            "                                                       flags,  integer\n"
+            "                                                       params,  a json object with custom parameters\n"
+            "                                                       details,  a json object with custom details\n"
+            "  or\n"
+            "2. confirmation-settings                          (array, optional) Array of objects as described above, \"count\" field is ignored\n"
+
+            "\nReturns array of license confirmations.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getlicenseconfirmation", "\"hexstring\"")
+            + HelpExampleRpc("getlicenseconfirmation", "\"hexstring\"")
+      ));
+   
+    mapHelpStrings.insert(std::make_pair("activatelicense",
+            "activatelicense ( \"license-confirmation-hex\" )\n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nActivates Enterprise license.\n"
+
+            "\nArguments:\n"
+            "1. \"license-confirmation-hex\"                     (string, optional) The license confirmation hex string\n"
+            "                                                       If omitted, empty, self-signed license is activated.\n"
+
+            "\nResult:\n"
+            "\"transactionid\"                     (string) The transaction id.\n"
+    
+            "\nExamples:\n"
+            + HelpExampleCli("activatelicense", "\"hexstring\"")
+            + HelpExampleRpc("activatelicense", "\"hexstring\"")
+      ));
+   
+    mapHelpStrings.insert(std::make_pair("transferlicense",
+            "transferlicense \"license-identifier\" \"license-request-hex\" \n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nTransfers Enterprise license.\n"
+
+            "\nArguments:\n"
+            "1. \"license-identifier\"                  (string, required) License identifier - one of the following (see output of listlicenses):\n"
+            "                                                                           (license) name\n"
+            "                                                                           confirmation->licensehash\n"
+            "                                                                           transactions->issuetxid\n"
+            "                                                                           transactions->assetref\n"
+            "2. \"license-request-hex\"                 (string, required) The license confirmation hex string\n"
+            "\nResult:\n"
+            "\"transactionid\"                          (string) The transaction id.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("transferlicense", "\"license-7952-5b4c-fe80-1667\" \"hexstring\"")
+            + HelpExampleRpc("transferlicense", "\"license-7952-5b4c-fe80-1667\",\"hexstring\"")
+      ));
+   
+   
+    
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
@@ -4938,6 +5051,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap18();
     mc_InitRPCHelpMap19();
     mc_InitRPCHelpMap20();
+    mc_InitRPCHelpMap21();
     
     pEF->ENT_InitRPCHelpMap();
     
