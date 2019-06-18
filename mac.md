@@ -10,7 +10,7 @@
 
         xcode-select --install
         
--   Select XCode locatioh:
+-   Select XCode location:
 
         sudo xcode-select -s <path/to/Xcode.app>
 
