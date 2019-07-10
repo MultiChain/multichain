@@ -4978,6 +4978,20 @@ void mc_InitRPCHelpMap21()
             + HelpExampleRpc("takelicense", "\"license-7952-5b4c-fe80-1667\"")
       ));
    
+    mapHelpStrings.insert(std::make_pair("importlicenserequest",
+            "importlicenserequest \"license-request-hex\" \n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nImports license request.\n"
+
+            "\nArguments:\n"
+            "1. \"license-request-hex\"                          (string, required) The license request hex string (output of getlicenserequest)\n"
+
+            "\nReturns array of license confirmations.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("importlicenserequest", "\"hexstring\"")
+            + HelpExampleRpc("importlicenserequest", "\"hexstring\"")
+      ));
+   
    
     
     mapHelpStrings.insert(std::make_pair("AAAAAAA",

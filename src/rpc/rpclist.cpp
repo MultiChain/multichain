@@ -176,6 +176,7 @@ static const CRPCCommand vRPCCommands[] =
     { "hidden",             "takelicense",            &takelicense,             true,      false,      true },
     { "hidden",             "listlicenses",           &listlicenses,            true,      false,      true },
     { "hidden",             "getlicenseconfirmation", &getlicenseconfirmation,  true,      false,      true },
+    { "hidden",             "importlicenserequest",   &importlicenserequest,       true,      false,      true },
     
     
     /* Wallet */

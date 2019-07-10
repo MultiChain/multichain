@@ -296,4 +296,8 @@ Value mc_EnterpriseFeatures::LIC_RPCTakeLicense(const Array& params)
     return Value::null;
 }
 
+Value mc_EnterpriseFeatures::LIC_RPCImportLicenseRequest(const Array& params)
+{
+    return Value::null;    
+}
 

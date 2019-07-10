@@ -98,6 +98,7 @@ typedef struct mc_EnterpriseFeatures
     Value LIC_RPCListLicenseRequests(const Array& params);
     Value LIC_RPCGetLicenseConfirmation(const Array& params);
     Value LIC_RPCTakeLicense(const Array& params);
+    Value LIC_RPCImportLicenseRequest(const Array& params);
 
     
 } mc_EnterpriseFeatures;

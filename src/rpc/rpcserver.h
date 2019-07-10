@@ -298,6 +298,7 @@ extern json_spirit::Value transferlicense(const json_spirit::Array& params, bool
 extern json_spirit::Value takelicense(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listlicenses(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getlicenseconfirmation(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value importlicenserequest(const json_spirit::Array& params, bool fHelp);
 
 extern json_spirit::Value purehelpitem(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value purehelpitem_nomethod(const json_spirit::Array& params, bool fHelp);
