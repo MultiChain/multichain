@@ -4959,6 +4959,25 @@ void mc_InitRPCHelpMap21()
             + HelpExampleRpc("transferlicense", "\"license-7952-5b4c-fe80-1667\",\"hexstring\"")
       ));
    
+    mapHelpStrings.insert(std::make_pair("takelicense",
+            "takelicense \"license-identifier\"  \n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nTake Enterprise license to this node and stop any other from using it.\n"
+
+            "\nArguments:\n"
+            "1. \"license-identifier\"                  (string, required) License identifier - one of the following (see output of listlicenses):\n"
+            "                                                                           (license) name\n"
+            "                                                                           confirmation->licensehash\n"
+            "                                                                           transactions->issuetxid\n"
+            "                                                                           transactions->assetref\n"
+            "                                                                           transactions->lasttxid\n"
+            "\nResult:\n"
+            "\"transactionid\"                          (string) The transaction id.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("takelicense", "\"license-7952-5b4c-fe80-1667\"")
+            + HelpExampleRpc("takelicense", "\"license-7952-5b4c-fe80-1667\"")
+      ));
+   
    
     
     mapHelpStrings.insert(std::make_pair("AAAAAAA",

@@ -2673,6 +2673,21 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
     pEF->LIC_VerifyLicenses(0);
     
+    vector<string> conflicting_licenses=pEF->LIC_LicensesWithStatus("conflicting");
+    
+    for(unsigned int l=0;l<conflicting_licenses.size();l++)
+    {
+        if(!GetBoolArg("-shortoutput", false))
+        {    
+            sprintf(bufOutput,"The license %s is available to this node but will not be used automatically, because it appears it was not previously in use.\n",
+                    conflicting_licenses[l].c_str());
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+            sprintf(bufOutput,"To use this license for this node and stop any other from using it, use the 'takelicense %s' command.\n\n",
+                    conflicting_licenses[l].c_str());                    
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+        }        
+    }
+    
     SetRPCWarmupFinished();                                                     // Should be here, otherwise wallet can double spend
     uiInterface.InitMessage(_("Done loading"));
 

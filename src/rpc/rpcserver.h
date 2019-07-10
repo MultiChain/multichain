@@ -295,6 +295,7 @@ extern json_spirit::Value decodelicenseconfirmation(const json_spirit::Array& pa
 extern json_spirit::Value activatelicense(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value activatelicensefrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value transferlicense(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value takelicense(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listlicenses(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getlicenseconfirmation(const json_spirit::Array& params, bool fHelp);
 

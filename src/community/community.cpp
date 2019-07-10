@@ -245,6 +245,12 @@ bool mc_EnterpriseFeatures::LIC_VerifyFeature(uint64_t feature,std::string& reas
     return false;
 }
 
+std::vector<std::string> mc_EnterpriseFeatures::LIC_LicensesWithStatus(std::string status)
+{
+    std::vector<std::string> result;
+    return result;
+}
+
 int mc_EnterpriseFeatures::LIC_VerifyLicenses(int block)
 {
     return MC_ERR_NOERROR;
@@ -284,3 +290,10 @@ Value mc_EnterpriseFeatures::LIC_RPCGetLicenseConfirmation(const Array& params)
 {
     return Value::null;
 }
+
+Value mc_EnterpriseFeatures::LIC_RPCTakeLicense(const Array& params)
+{
+    return Value::null;
+}
+
+
