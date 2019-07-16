@@ -172,6 +172,8 @@ bool AppInit(int argc, char* argv[])
     if(!GetBoolArg("-shortoutput", false))
     {
         fprintf(stdout,"\nMultiChain %s Daemon (%slatest protocol %d)\n\n",mc_BuildDescription(mc_gState->GetNumericVersion()).c_str(),edition.c_str(),mc_gState->GetProtocolVersion());
+        fprintf(stdout,"%s",pEF->ENT_TextConstant("demo-startup-message").c_str());
+        fprintf(stdout,"Starting up node...\n\n");
     }
     
     pipes[1]=STDOUT_FILENO;
