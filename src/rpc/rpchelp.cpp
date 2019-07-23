@@ -5075,6 +5075,11 @@ void mc_InitRPCAllowedWhenOffline()
     setAllowedWhenOffline.insert("walletlock");    
     setAllowedWhenOffline.insert("walletpassphrase");    
     setAllowedWhenOffline.insert("walletpassphrasechange");    
+    
+    setAllowedWhenOffline.insert("decodelicenserequest");    
+    setAllowedWhenOffline.insert("decodelicenseconfirmation");    
+    setAllowedWhenOffline.insert("getlicenseconfirmation");    
+    
 }
 
 void mc_InitRPCHelpMap()
