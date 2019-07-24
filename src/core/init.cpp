@@ -2021,6 +2021,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     fDiscover = GetBoolArg("-discover", true);
     fNameLookup = GetBoolArg("-dns", true);
 
+    if(GetBoolArg("-offline",false))
+    {
+        fListen=false;
+    }
+    
     bool fBound = false;
     bool fThisBound;
     mc_gState->m_IPv4Address=0;    
