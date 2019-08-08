@@ -75,6 +75,15 @@ typedef struct mc_EnterpriseFeatures
     int WLT_NoIndex(mc_TxEntity *entity);
     int WLT_NoRetrieve(mc_TxEntity *entity);
     
+    bool NET_ProcessHandshakeData(CNode* pfrom, std::string sENTData,bool fIsVerackack);
+    std::vector<unsigned char> NET_PushHandshakeData(CNode* pfrom,bool fIsVerackack);
+    bool NET_FinalizeHandshake(CNode* pfrom);
+    void NET_FreeNodeData(void *pNodeData);
+    bool NET_IsEncrypted(CNode* pfrom);
+    int NET_ReadHeader(void *pNodeData,CNetMessage& msg,const char *pch,unsigned int nBytes); 
+    void NET_ProcessMsgData(void *pNodeData,CNetMessage& msg);
+    CDataStream NET_PushMsg(void *pNodeData,CDataStream& ssSend);
+    
     std::string ENT_Edition();
     int ENT_EditionNumeric();
     int ENT_BuildVersion();

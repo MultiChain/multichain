@@ -181,6 +181,54 @@ int mc_EnterpriseFeatures::WLT_NoRetrieve(mc_TxEntity *entity)
     return 0;
 }
 
+bool mc_EnterpriseFeatures::NET_ProcessHandshakeData(CNode* pfrom, std::string sENTData,bool fIsVerackack)
+{
+    return !fIsVerackack;
+}
+
+std::vector<unsigned char> mc_EnterpriseFeatures::NET_PushHandshakeData(CNode* pfrom, bool fIsVerackack)
+{
+    vector<unsigned char> result;
+    return result;
+}
+
+bool mc_EnterpriseFeatures::NET_FinalizeHandshake(CNode* pfrom)
+{
+    return true;
+}
+
+
+void mc_EnterpriseFeatures::NET_FreeNodeData(void *pNodeData)
+{
+    
+}
+
+bool mc_EnterpriseFeatures::NET_IsEncrypted(CNode* pfrom)
+{
+    return false;
+}
+
+
+int mc_EnterpriseFeatures::NET_ReadHeader(void *pNodeData,CNetMessage& msg,const char *pch,unsigned int nBytes)
+{
+    return -1;
+}
+
+void mc_EnterpriseFeatures::NET_ProcessMsgData(void *pNodeData,CNetMessage& msg)
+{
+    
+}
+
+CDataStream mc_EnterpriseFeatures::NET_PushMsg(void *pNodeData,CDataStream& ssSend)
+{
+    return ssSend;
+}
+
+
+
+
+
+
 string mc_EnterpriseFeatures::ENT_Edition() 
 {
     return "Community";

@@ -22,6 +22,7 @@
 #include "wallet/wallet.h"
 extern CWallet* pwalletMain;
 #include "multichain/multichain.h"
+#include "community/community.h"
 
 #ifdef WIN32
 #include <string.h>
@@ -512,7 +513,7 @@ void CNode::PushVersion()
     {
         subver=FormatSubVersion("MultiChain", mc_gState->GetProtocolVersion(), std::vector<string>());
     }
-    PushMessage("version", PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
+    PushMessage("version", PROTOCOL_VERSION, nLocalServices | NODE_EXT_HANDSHAKE, nTime, addrYou, addrMe,
                 nLocalHostNonce, subver, nBestHeight, true);
 /* MCHN END */
 }
@@ -613,6 +614,7 @@ void CNode::copyStats(CNodeStats &stats)
     stats.kAddrLocal=kAddrLocal;
     stats.kAddrRemote=kAddrRemote;
     stats.fSuccessfullyConnected=fSuccessfullyConnected;
+    stats.fEncrypted=pEF->NET_IsEncrypted(this);
 /* MCHN END */    
     
 }
@@ -633,7 +635,16 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
         // absorb network data
         int handled;
         if (!msg.in_data)
-            handled = msg.readHeader(pch, nBytes);
+        {
+            if(pEntData)
+            {
+                handled = pEF->NET_ReadHeader(pEntData,msg,pch,nBytes);
+            }
+            else
+            {
+                handled = msg.readHeader(pch, nBytes);
+            }
+        }
         else
             handled = msg.readData(pch, nBytes);
 
@@ -645,6 +656,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 
         if (msg.complete())
         {
+            pEF->NET_ProcessMsgData(pEntData,msg);
             msg.nTime = GetTimeMicros();
             if(fDebug)LogPrint("mcnet","mcnet: complete message: %s, peer=%d\n", msg.hdr.GetCommand(),id);
         }
@@ -2258,6 +2270,9 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     fCanConnectLocal=false;
     fCanConnectRemote=false;
     fLastIgnoreIncoming=false;
+    
+    pEntData=NULL;
+    
 /* MCHN END */    
     
     {
@@ -2287,6 +2302,12 @@ CNode::~CNode()
 
     if (pfilter)
         delete pfilter;
+    
+    if(pEntData)
+    {
+        pEF->NET_FreeNodeData(pEntData);
+        pEntData=NULL;
+    }
 
     GetNodeSignals().FinalizeNode(GetId());
 }
@@ -2378,7 +2399,11 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
     memcpy((char*)&ssSend[CMessageHeader::CHECKSUM_OFFSET], &nChecksum, sizeof(nChecksum));
 
     if(fDebug)LogPrint("net", "(%d bytes) peer=%d\n", nSize, id);
-
+    if(pEntData)
+    {
+        ssSend=pEF->NET_PushMsg(pEntData,ssSend);
+    }
+    
     std::deque<CSerializeData>::iterator it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
     ssSend.GetAndClear(*it);
     nSendSize += (*it).size();

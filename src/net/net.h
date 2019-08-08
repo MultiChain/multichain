@@ -177,6 +177,7 @@ public:
     CKeyID kAddrRemote;
     CKeyID kAddrLocal;    
     bool fSuccessfullyConnected;
+    bool fEncrypted;
 /* MCHN END */    
 };
 
@@ -293,6 +294,8 @@ public:
     CKeyID kAddrLocal;
 
     CAddress addrFromVersion;
+    
+    void *pEntData;
     
 /* MCHN END*/    
     

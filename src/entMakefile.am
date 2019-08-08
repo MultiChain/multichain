@@ -1,1 +1,2 @@
+include enterprise/Makefile.am
 

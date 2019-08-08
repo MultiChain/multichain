@@ -67,6 +67,7 @@ public:
 /** nServices flags */
 enum {
     NODE_NETWORK = (1 << 0),
+    NODE_EXT_HANDSHAKE = (1 << 16), // 1,2,3 and 10 already used by Bitcoin
 
     // Bits 24-31 are reserved for temporary experiments. Just pick a bit that
     // isn't getting used, or one not being used much, and notify the
