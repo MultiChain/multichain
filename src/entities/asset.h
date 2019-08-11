@@ -37,10 +37,10 @@
 #define MC_ENT_MAX_NAME_SIZE                           32
 #define MC_ENT_MAX_ITEM_KEY_SIZE                      256
 #define MC_ENT_MAX_SCRIPT_SIZE_BEFORE_FILTERS        4096
-#define MC_ENT_MAX_SCRIPT_SIZE                      65536
+#define MC_ENT_MAX_SCRIPT_SIZE                    1048576
 #define MC_ENT_MAX_FIXED_FIELDS_SIZE                  128 
 #define MC_ENT_MAX_STORED_ISSUERS                     128 
-#define MC_ENT_SCRIPT_ALLOC_SIZE                    66000 // > MC_ENT_MAX_SCRIPT_SIZE + MC_ENT_MAX_FIXED_FIELDS_SIZE + 27*MC_ENT_MAX_STORED_ISSUERS
+#define MC_ENT_SCRIPT_ALLOC_SIZE                  1052160 // > MC_ENT_MAX_SCRIPT_SIZE + MC_ENT_MAX_FIXED_FIELDS_SIZE + 27*MC_ENT_MAX_STORED_ISSUERS
 
 #define MC_ENT_KEY_SIZE              32
 #define MC_ENT_KEYTYPE_TXID           0x00000001
