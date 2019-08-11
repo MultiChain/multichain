@@ -513,8 +513,8 @@ void CNode::PushVersion()
     {
         subver=FormatSubVersion("MultiChain", mc_gState->GetProtocolVersion(), std::vector<string>());
     }
-    PushMessage("version", PROTOCOL_VERSION, nLocalServices | NODE_EXT_HANDSHAKE, nTime, addrYou, addrMe,
-                nLocalHostNonce, subver, nBestHeight, true);
+    PushMessage("version", PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
+                nLocalHostNonce, subver, nBestHeight, true, MC_SRV_ENCRYPTED_CONNECTIONS);
 /* MCHN END */
 }
 

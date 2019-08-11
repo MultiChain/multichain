@@ -278,6 +278,7 @@ public:
     
 /* MCHN START*/    
     
+    uint64_t nMultiChainServices;
     uint64_t nVersionNonceReceived;
     uint64_t nVersionNonceSent;
     uint64_t nVerackNonceReceived;

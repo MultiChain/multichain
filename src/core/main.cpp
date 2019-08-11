@@ -5724,6 +5724,12 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         else
             pfrom->fRelayTxes = true;
 
+        pfrom->nMultiChainServices=0;
+        if (!vRecv.empty())
+        {
+            vRecv >> pfrom->nMultiChainServices;
+        }
+        
         // Disconnect if we connected to ourself
         if (nNonce == nLocalHostNonce && nNonce > 1)
         {            
