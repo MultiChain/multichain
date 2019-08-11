@@ -7031,6 +7031,10 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         if (pto->nVersion == 0)
             return true;
 
+        if(!pEF->NET_IsFinalized(pto))
+        {
+            return true;            
+        }
         //
         // Message: ping
         //

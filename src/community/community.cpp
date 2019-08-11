@@ -208,6 +208,11 @@ bool mc_EnterpriseFeatures::NET_IsEncrypted(CNode* pfrom)
     return false;
 }
 
+bool mc_EnterpriseFeatures::NET_IsFinalized(CNode* pfrom)
+{
+    return true;    
+}
+
 
 int mc_EnterpriseFeatures::NET_ReadHeader(void *pNodeData,CNetMessage& msg,const char *pch,unsigned int nBytes)
 {

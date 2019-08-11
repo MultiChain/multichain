@@ -80,6 +80,7 @@ typedef struct mc_EnterpriseFeatures
     bool NET_FinalizeHandshake(CNode* pfrom);
     void NET_FreeNodeData(void *pNodeData);
     bool NET_IsEncrypted(CNode* pfrom);
+    bool NET_IsFinalized(CNode* pfrom);
     int NET_ReadHeader(void *pNodeData,CNetMessage& msg,const char *pch,unsigned int nBytes); 
     void NET_ProcessMsgData(void *pNodeData,CNetMessage& msg);
     CDataStream NET_PushMsg(void *pNodeData,CDataStream& ssSend);
