@@ -83,7 +83,9 @@ typedef struct mc_EnterpriseFeatures
     bool NET_IsFinalized(CNode* pfrom);
     int NET_ReadHeader(void *pNodeData,CNetMessage& msg,const char *pch,unsigned int nBytes); 
     void NET_ProcessMsgData(void *pNodeData,CNetMessage& msg);
-    CDataStream NET_PushMsg(void *pNodeData,CDataStream& ssSend);
+    int NET_StoreInCache(void *pNodeData,CNetMessage& msg,const char *pch,unsigned int nBytes); 
+    bool NET_RestoreFromCache(CNode* pfrom); 
+    bool NET_PushMsg(void *pNodeData,CDataStream& ssSend);
     
     std::string ENT_Edition();
     int ENT_EditionNumeric();

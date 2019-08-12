@@ -224,11 +224,20 @@ void mc_EnterpriseFeatures::NET_ProcessMsgData(void *pNodeData,CNetMessage& msg)
     
 }
 
-CDataStream mc_EnterpriseFeatures::NET_PushMsg(void *pNodeData,CDataStream& ssSend)
+bool mc_EnterpriseFeatures::NET_PushMsg(void *pNodeData,CDataStream& ssSend)
 {
-    return ssSend;
+    return true;
 }
 
+int mc_EnterpriseFeatures::NET_StoreInCache(void *pNodeData,CNetMessage& msg,const char *pch,unsigned int nBytes)
+{
+    return 0;
+}
+
+bool mc_EnterpriseFeatures::NET_RestoreFromCache(CNode* pfrom)
+{
+    return true;
+}
 
 
 

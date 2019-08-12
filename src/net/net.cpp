@@ -78,6 +78,7 @@ namespace {
 bool fDiscover = true;
 bool fListen = true;
 uint64_t nLocalServices = NODE_NETWORK;
+uint64_t nLocalMultiChainServices = MC_SRV_ENCRYPTED_CONNECTIONS;
 CCriticalSection cs_mapLocalHost;
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
 CCriticalSection cs_setLocalAddr;
@@ -514,7 +515,7 @@ void CNode::PushVersion()
         subver=FormatSubVersion("MultiChain", mc_gState->GetProtocolVersion(), std::vector<string>());
     }
     PushMessage("version", PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
-                nLocalHostNonce, subver, nBestHeight, true, MC_SRV_ENCRYPTED_CONNECTIONS);
+                nLocalHostNonce, subver, nBestHeight, true, nLocalMultiChainServices);
 /* MCHN END */
 }
 
@@ -623,6 +624,20 @@ void CNode::copyStats(CNodeStats &stats)
 // requires LOCK(cs_vRecvMsg)
 bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 {
+    if(!pEF->NET_RestoreFromCache(this))
+    {
+        return false;
+    }
+    
+    if(!vRecvMsg.empty() && vRecvMsg.back().complete())
+    {
+        int handled;
+        CNetMessage& msg = vRecvMsg.back();
+        handled=pEF->NET_StoreInCache(pEntData,msg,pch,nBytes);
+        pch += handled;
+        nBytes -= handled;
+    }
+    
     while (nBytes > 0) {
 
         // get current incomplete message, or create a new one
@@ -648,9 +663,12 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
         else
             handled = msg.readData(pch, nBytes);
 
-        if (handled < 0)
-                return false;
-
+        if (handled < 0)        
+        {
+            LogPrintf("Error reading header, size: %u, peer=%d\n",msg.hdr.nMessageSize,this->id);            
+            return false;
+        }
+        
         pch += handled;
         nBytes -= handled;
 
@@ -659,6 +677,10 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
             pEF->NET_ProcessMsgData(pEntData,msg);
             msg.nTime = GetTimeMicros();
             if(fDebug)LogPrint("mcnet","mcnet: complete message: %s, peer=%d\n", msg.hdr.GetCommand(),id);
+            
+            handled=pEF->NET_StoreInCache(pEntData,msg,pch,nBytes);
+            pch += handled;
+            nBytes -= handled;
         }
     }
 
@@ -2262,6 +2284,7 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     fPingQueued = false;
 
 /* MCHN START */    
+    nMultiChainServices=0;
     fDefaultMessageStart=false;
     fVerackackReceived=false;
     fVerackackSent=false;
@@ -2401,9 +2424,8 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
     if(fDebug)LogPrint("net", "(%d bytes) peer=%d\n", nSize, id);
     if(pEntData)
     {
-        ssSend=pEF->NET_PushMsg(pEntData,ssSend);
+        pEF->NET_PushMsg(pEntData,ssSend);
     }
-    
     std::deque<CSerializeData>::iterator it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
     ssSend.GetAndClear(*it);
     nSendSize += (*it).size();

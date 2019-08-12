@@ -587,10 +587,7 @@ bool PushMultiChainVerack(CNode* pfrom, bool fIsVerackack)
         {
             pfrom->PushMessage("verackack", vParameterSetHash, vSigScript);                
         }
-        if(!pfrom->fInbound)
-        {
-            pEF->NET_FinalizeHandshake(pfrom);
-        }
+        pEF->NET_FinalizeHandshake(pfrom);
     }
     
     
