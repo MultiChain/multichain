@@ -297,6 +297,7 @@ public:
     CAddress addrFromVersion;
     
     void *pEntData;
+    int64_t nNextSendTime;
     
 /* MCHN END*/    
     
@@ -659,6 +660,8 @@ public:
     void Subscribe(unsigned int nChannel, unsigned int nHops=0);
     void CancelSubscribe(unsigned int nChannel);
     void CloseSocketDisconnect();
+    
+    bool DelayedSend();
 
     // Denial-of-service detection/prevention
     // The idea is to detect peers that are behaving

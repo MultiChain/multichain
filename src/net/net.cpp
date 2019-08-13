@@ -621,6 +621,20 @@ void CNode::copyStats(CNodeStats &stats)
 }
 #undef X
 
+bool CNode::DelayedSend()
+{
+    if(nNextSendTime)
+    {
+        if(GetTime() < nNextSendTime)
+        {
+            return true;
+        }
+    }
+    
+    nNextSendTime=0;
+    return false;
+}
+
 // requires LOCK(cs_vRecvMsg)
 bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 {
@@ -753,6 +767,11 @@ int CNetMessage::readData(const char *pch, unsigned int nBytes)
 // requires LOCK(cs_vSend)
 void SocketSendData(CNode *pnode)
 {
+    if(pnode->DelayedSend())
+    {
+        return;
+    }
+    
     std::deque<CSerializeData>::iterator it = pnode->vSendMsg.begin();
 
     while (it != pnode->vSendMsg.end()) {
@@ -813,7 +832,7 @@ void ThreadSocketHandler()
             vector<CNode*> vNodesCopy = vNodes;
             BOOST_FOREACH(CNode* pnode, vNodesCopy)
             {
-                if (pnode->fDisconnect ||
+                if ( (pnode->fDisconnect && !pnode->DelayedSend()) ||
                     (pnode->GetRefCount() <= 0 && pnode->vRecvMsg.empty() && pnode->nSendSize == 0 && pnode->ssSend.empty()))
                 {
                     // remove from vNodes
@@ -2295,6 +2314,7 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     fLastIgnoreIncoming=false;
     
     pEntData=NULL;
+    nNextSendTime=0;    
     
 /* MCHN END */    
     

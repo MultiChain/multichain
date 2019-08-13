@@ -239,6 +239,10 @@ bool mc_EnterpriseFeatures::NET_RestoreFromCache(CNode* pfrom)
     return true;
 }
 
+void mc_EnterpriseFeatures::NET_CheckConnections()
+{
+    
+}
 
 
 

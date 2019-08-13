@@ -86,6 +86,7 @@ typedef struct mc_EnterpriseFeatures
     int NET_StoreInCache(void *pNodeData,CNetMessage& msg,const char *pch,unsigned int nBytes); 
     bool NET_RestoreFromCache(CNode* pfrom); 
     bool NET_PushMsg(void *pNodeData,CDataStream& ssSend);
+    void NET_CheckConnections();
     
     std::string ENT_Edition();
     int ENT_EditionNumeric();
