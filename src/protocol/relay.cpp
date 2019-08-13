@@ -272,7 +272,7 @@ bool MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map 
                 {
                     for(int k=0;k<2;k++)collector->m_StatTotal[k].m_Delivered+=k ? collect_row->m_ChunkDef.m_Size : 1;                
                     unsigned char* ptrhash=chunk->m_Hash;
-                    LogPrint("chunks","Retrieved chunk %s\n",(*(uint256*)ptrhash).ToString().c_str());                
+                    if(fDebug)LogPrint("chunks","Retrieved chunk %s\n",(*(uint256*)ptrhash).ToString().c_str());                
                 }
             }
             collect_row->m_State.m_Status |= MC_CCF_DELETED;
@@ -847,7 +847,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                             else
                             {
                                 unsigned char* ptrhash=collect_row->m_ChunkDef.m_Hash;
-                                LogPrint("chunks","Dropped chunk (lost permission) %s\n",(*(uint256*)ptrhash).ToString().c_str());                
+                                if(fDebug)LogPrint("chunks","Dropped chunk (lost permission) %s\n",(*(uint256*)ptrhash).ToString().c_str());                
                                 collect_row->m_State.m_Status |= MC_CCF_DELETED;
                             }
                         }
@@ -1209,7 +1209,7 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
                     else
                     {
                         unsigned char* ptrhash=chunk.m_Hash;
-                        LogPrint("chunks","Request for chunk: %s\n",(*(uint256*)ptrhash).ToString().c_str());
+                        if(fDebug)LogPrint("chunks","Request for chunk: %s\n",(*(uint256*)ptrhash).ToString().c_str());
                         if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,chunk.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
                         {
                             if(chunk_def.m_Size != chunk.m_Size)
@@ -1874,7 +1874,7 @@ void mc_RelayManager::CheckTime()
         {
 /*            
             mc_OffchainMessageID msg_id=it->first.m_ID;
-            LogPrint("offchain","Offchain rrdl:  %s, from: %d, to: %d, msg: %s, now: %d, exp: %d\n",
+            if(fDebug)LogPrint("offchain","Offchain rrdl:  %s, from: %d, to: %d, msg: %s, now: %d, exp: %d\n",
             msg_id.ToString().c_str(),it->second.m_NodeFrom,it->first.m_NodeTo,mc_MsgTypeStr(it->second.m_MsgType).c_str(),m_LastTime,it->second.m_Timestamp);
 */
             m_RelayRecords.erase(it++);
@@ -1928,7 +1928,7 @@ void mc_RelayManager::SetRelayRecord(CNode *pto,CNode *pfrom,uint32_t msg_type,m
         it->second=value;
     }
 /*   
-    LogPrint("offchain","Offchain rrst:  %s, from: %d, to: %d, msg: %s, now: %d, exp: %d\n",
+    if(fDebug)LogPrint("offchain","Offchain rrst:  %s, from: %d, to: %d, msg: %s, now: %d, exp: %d\n",
     msg_id.ToString().c_str(),pfrom ? pfrom->GetId() : 0,pto ? pto->GetId() : 0,mc_MsgTypeStr(msg_type).c_str(),m_LastTime,value.m_Timestamp);
 */    
 
