@@ -403,6 +403,9 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -whitebind=<addr>      " + _("Bind to given address and whitelist peers connecting to it. Use [host]:port notation for IPv6") + "\n";
     strUsage += "  -whitelist=<netmask>   " + _("Whitelist peers connecting from the given netmask or IP address. Can be specified multiple times.") + "\n";
     strUsage += "                         " + _("Whitelisted peers cannot be DoS banned and their transactions are always relayed, even if they are already in the mempool, useful e.g. for a gateway") + "\n";
+    strUsage += "  -onlyencrypted         " + _("Allow only encrypted connection, default: 0. Enterprise Edition only.") + "\n";
+    strUsage += "  -allowunencrypted=<netmask>   " + _("Allowed unecnrypted connections with peers connecting from the given netmask or IP address. Can be specified multiple times.") + "\n";
+    strUsage += "                         " + _("Enterprise Edition only.") + "\n";
 
 #ifdef ENABLE_WALLET
     strUsage += "\n" + _("Wallet options:") + "\n";
