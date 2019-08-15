@@ -15,6 +15,11 @@ void mc_EnterpriseFeatures::Destroy()
     Zero();
 }
 
+int mc_EnterpriseFeatures::Prepare()
+{
+
+}
+
 int mc_EnterpriseFeatures::Initialize(const char *name,uint32_t mode)
 {
     

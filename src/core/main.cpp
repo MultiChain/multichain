@@ -4791,6 +4791,7 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
         {
             LOCK(cs_main);
             pEF->LIC_VerifyLicenses(chainActive.Height());
+            pEF->NET_CheckConnections();
         }
     }
 /* MCHN START */    

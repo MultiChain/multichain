@@ -17,6 +17,8 @@
 #define MC_EFT_STREAM_READ_RESTRICTED_DELIVER       0x0000000000004000
 #define MC_EFT_NETWORK_SIGNED_RECEIVE               0x0000000000010000
 #define MC_EFT_NETWORK_SIGNED_SEND                  0x0000000000020000
+#define MC_EFT_NETWORK_ENCRYPTED_CONNECTIONS        0x0000000000040000
+
 #define MC_EFT_ALL                                  0xFFFFFFFFFFFFFFFF
 
 
@@ -36,6 +38,7 @@ typedef struct mc_EnterpriseFeatures
     
     void Zero();
     void Destroy();
+    int  Prepare();              
     int  Initialize(              
             const char *name,                                                   // Chain name
             uint32_t mode);                                                     // Unused    

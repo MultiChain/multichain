@@ -1239,6 +1239,13 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     bool new_wallet_txs=false;
     seed_node=mc_gState->GetSeedNode();
     mc_Buffer *rescan_subscriptions=NULL;
+
+    if(pEF->Prepare())
+    {
+        fprintf(stderr,"\nError: Cannot prepare Enterprise features. Exiting...\n\n");
+        return false;        
+    }
+
     
     int seed_attempt=1;
     if(init_privkey.size())
