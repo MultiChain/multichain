@@ -58,6 +58,9 @@ typedef struct mc_Script
     size_t GetParamValue(const unsigned char *ptr,size_t total,size_t offset,size_t* param_value_start,size_t *bytes);
     int SetData(const unsigned char* src,const size_t bytes);
     const unsigned char* GetData(int element,size_t *bytes);
+
+    int GetSize();
+    int ShrinkCurrentElementSizeBy(int size);
     
     int GetElement();
     int SetElement(int element);

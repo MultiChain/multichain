@@ -182,6 +182,19 @@ int mc_Script::DeleteElement(int element)
     return MC_ERR_NOERROR;
 }
 
+int mc_Script::GetSize()
+{
+    return m_Size;
+}
+
+int mc_Script::ShrinkCurrentElementSizeBy(int size)
+{    
+    m_lpCoord[2*m_CurrentElement + 1]-=size;
+    m_Size-=size;    
+    return MC_ERR_NOERROR;    
+}
+
+
 int mc_Script::GetElement()
 {
     return m_CurrentElement;
