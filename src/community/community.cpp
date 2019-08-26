@@ -17,7 +17,7 @@ void mc_EnterpriseFeatures::Destroy()
 
 int mc_EnterpriseFeatures::Prepare()
 {
-
+    return MC_ERR_NOERROR;
 }
 
 int mc_EnterpriseFeatures::Initialize(const char *name,uint32_t mode)
@@ -91,11 +91,57 @@ Value mc_EnterpriseFeatures::STR_RPCPurgePublishedItems(const Array& params)
     return Value::null;
 }
 
-
 int mc_EnterpriseFeatures::STR_RemoveDataFromFile(int fHan, uint32_t from, uint32_t size, uint32_t mode)
 {
     return MC_ERR_NOERROR;
 }
+
+Value mc_EnterpriseFeatures::FED_RPCCreateFeed(const Array& params)
+{
+    return Value::null;
+}
+
+Value mc_EnterpriseFeatures::FED_RPCSuspendFeed(const Array& params)
+{
+    return Value::null;
+}
+
+Value mc_EnterpriseFeatures::FED_RPCDeleteFeed(const Array& params)
+{
+    return Value::null;
+}
+
+Value mc_EnterpriseFeatures::FED_RPCRescanFeed(const Array& params)
+{
+    return Value::null;
+}
+
+Value mc_EnterpriseFeatures::FED_RPCAddFeedStreams(const Array& params)
+{
+    return Value::null;
+}
+
+Value mc_EnterpriseFeatures::FED_RPCRemoveFeedStreams(const Array& params)
+{
+    return Value::null;
+}
+
+Value mc_EnterpriseFeatures::FED_RPCAddFeedBlocks(const Array& params)
+{
+    return Value::null;
+}
+
+Value mc_EnterpriseFeatures::FED_RPCRemoveFeedBlocks(const Array& params)
+{
+    return Value::null;
+}
+
+Value mc_EnterpriseFeatures::FED_RPCPurgeFeedFile(const Array& params)
+{
+    return Value::null;
+}
+
+
 
 bool mc_EnterpriseFeatures::OFF_ProcessChunkRequest(unsigned char *ptrStart,unsigned char *ptrEnd,vector<unsigned char>* payload_response,vector<unsigned char>* payload_relay,
         map<uint160,int>& mapReadPermissionedStreams,string& strError)

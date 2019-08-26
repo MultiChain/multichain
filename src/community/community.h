@@ -18,6 +18,7 @@
 #define MC_EFT_NETWORK_SIGNED_RECEIVE               0x0000000000010000
 #define MC_EFT_NETWORK_SIGNED_SEND                  0x0000000000020000
 #define MC_EFT_NETWORK_ENCRYPTED_CONNECTIONS        0x0000000000040000
+#define MC_EFT_FEEDS                                0x0000000000100000
 
 #define MC_EFT_ALL                                  0xFFFFFFFFFFFFFFFF
 
@@ -57,6 +58,17 @@ typedef struct mc_EnterpriseFeatures
     Value STR_RPCPurgeStreamItems(const Array& params);    
     Value STR_RPCPurgePublishedItems(const Array& params);
     int STR_RemoveDataFromFile(int fHan, uint32_t from, uint32_t size, uint32_t mode);
+    
+    Value FED_RPCCreateFeed(const Array& params);
+    Value FED_RPCSuspendFeed(const Array& params);
+    Value FED_RPCDeleteFeed(const Array& params);
+    Value FED_RPCRescanFeed(const Array& params);
+    Value FED_RPCAddFeedStreams(const Array& params);
+    Value FED_RPCRemoveFeedStreams(const Array& params);
+    Value FED_RPCAddFeedBlocks(const Array& params);
+    Value FED_RPCRemoveFeedBlocks(const Array& params);
+    Value FED_RPCPurgeFeedFile(const Array& params);
+    
     
     bool OFF_ProcessChunkRequest(unsigned char *ptrStart,unsigned char *ptrEnd,vector<unsigned char>* payload_response,vector<unsigned char>* payload_relay,
         map<uint160,int>& mapReadPermissionedStreams,string& strError);

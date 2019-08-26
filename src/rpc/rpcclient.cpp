@@ -221,7 +221,30 @@ static const std::string vAPINames[] =
 "verifypermission",
 "walletlock",
 "walletpassphrase",
-"walletpassphrasechange"    
+"walletpassphrasechange",
+"txouttobinarycache",    
+"trimsubscribe",
+"retrievestreamitems",
+"purgestreamitems",
+"purgepublisheditems",
+"getlicenserequest",
+"decodelicenserequest",
+"decodelicenseconfirmation",
+"listlicenses",
+"getlicenseconfirmation",
+"activatelicense",
+"transferlicense",
+"takelicense",
+"importlicenserequest",
+"createfeed",
+"suspendfeed",
+"deletefeed",
+"rescanfeed",
+"addfeedstreams",
+"removefeedstreams",
+"addfeedblocks",
+"removefeedblocks",
+"purgefeedfile"       
 };
 
 static const CRPCConvertParam vRPCConvertParams[] =
@@ -506,6 +529,13 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "getlicenseconfirmation", 1 },
     { "listlicenses", 0 },
     { "listlicenses", 1 },
+    { "createfeed", 1 },
+    { "suspendfeed", 2 },
+    { "addfeedstreams", 1 },
+    { "addfeedstreams", 2 },
+    { "removefeedstreams", 1 },
+    { "purgefeedfile", 1 },
+    { "purgefeedfile", 2 },
 };
 
 class CRPCConvertTable
@@ -613,6 +643,8 @@ static const CRPCConvertParamMayBeString vRPCConvertParamsMayBeString[] =
     { "createfrom", 4 },                                                            
     { "create", 3 },                                                            
     { "listlicenses", 0 },
+    { "addfeedstreams", 1 },
+    { "removefeedstreams", 1 },
 };
 
 class CRPCConvertTableMayBeString
