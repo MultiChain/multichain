@@ -244,7 +244,8 @@ static const std::string vAPINames[] =
 "removefeedstreams",
 "addfeedblocks",
 "removefeedblocks",
-"purgefeedfile"       
+"purgefeedfile",       
+"listfeeds"
 };
 
 static const CRPCConvertParam vRPCConvertParams[] =
@@ -536,6 +537,8 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "removefeedstreams", 1 },
     { "purgefeedfile", 1 },
     { "purgefeedfile", 2 },
+    { "listfeeds", 0 },
+    { "listfeeds", 1 },                                                            
 };
 
 class CRPCConvertTable
@@ -645,6 +648,7 @@ static const CRPCConvertParamMayBeString vRPCConvertParamsMayBeString[] =
     { "listlicenses", 0 },
     { "addfeedstreams", 1 },
     { "removefeedstreams", 1 },
+    { "listfeeds", 0 },
 };
 
 class CRPCConvertTableMayBeString

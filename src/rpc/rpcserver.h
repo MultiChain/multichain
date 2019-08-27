@@ -313,6 +313,7 @@ extern json_spirit::Value removefeedstreams(const json_spirit::Array& params, bo
 extern json_spirit::Value addfeedblocks(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value removefeedblocks(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value purgefeedfile(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listfeeds(const json_spirit::Array& params, bool fHelp);
 
 /* MCHN END */    
 extern json_spirit::Value signmessage(const json_spirit::Array& params, bool fHelp);

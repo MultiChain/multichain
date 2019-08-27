@@ -68,6 +68,7 @@ typedef struct mc_EnterpriseFeatures
     Value FED_RPCAddFeedBlocks(const Array& params);
     Value FED_RPCRemoveFeedBlocks(const Array& params);
     Value FED_RPCPurgeFeedFile(const Array& params);
+    Value FED_RPCListFeeds(const Array& params);
     
     
     bool OFF_ProcessChunkRequest(unsigned char *ptrStart,unsigned char *ptrEnd,vector<unsigned char>* payload_response,vector<unsigned char>* payload_relay,

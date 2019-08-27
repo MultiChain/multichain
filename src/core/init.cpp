@@ -1538,7 +1538,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 mc_EnterpriseFeatures* pRescanEF = new mc_EnterpriseFeatures;
                 if(pRescanEF->Initialize(mc_gState->m_Params->NetworkName(),0))
                 {
-                    fprintf(stderr,"\nError: Cannot intitialize Enterprise features. Exiting...\n\n");
+                    fprintf(stderr,"\nError: Couldn't initialize Enterprise features, please see debug.log for details. Exiting...\n\n");
                     return false;        
                 }
                 pRescanEF->STR_GetSubscriptions(rescan_subscriptions);
@@ -2425,7 +2425,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         
     if(pEF->Initialize(mc_gState->m_Params->NetworkName(),0))
     {
-        fprintf(stderr,"\nError: Cannot intitialize Enterprise features. Exiting...\n\n");
+        fprintf(stderr,"\nError: Couldn't initialize Enterprise features, please see debug.log for details. Exiting...\n\n");
         return false;        
     }
     if(rescan_subscriptions)

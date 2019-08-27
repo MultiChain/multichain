@@ -178,7 +178,17 @@ static const CRPCCommand vRPCCommands[] =
     { "hidden",             "getlicenseconfirmation", &getlicenseconfirmation,  true,      false,      true },
     { "hidden",             "importlicenserequest",   &importlicenserequest,       true,      false,      true },
     
-    
+    { "hidden",             "createfeed",             &createfeed,              true,      false,      false },
+    { "hidden",             "suspendfeed",            &suspendfeed,             true,      false,      false },
+    { "hidden",             "deletefeed",             &deletefeed,              true,      false,      false },
+    { "hidden",             "rescanfeed",             &rescanfeed,              true,      false,      false },
+    { "hidden",             "addfeedstreams",         &addfeedstreams,          true,      false,      false },
+    { "hidden",             "removefeedstreams",      &removefeedstreams,       true,      false,      false },
+    { "hidden",             "addfeedblocks",          &addfeedblocks,           true,      false,      false },
+    { "hidden",             "removefeedblocks",       &removefeedblocks,        true,      false,      false },
+    { "hidden",             "purgefeedfile",          &purgefeedfile,           true,      false,      false },
+    { "hidden",             "listfeeds",              &listfeeds,               true,      false,      false },
+
     /* Wallet */
     { "wallet",             "addmultisigaddress",     &addmultisigaddress,     true,      false,      true },
     { "wallet",             "backupwallet",           &backupwallet,           true,      false,      true },

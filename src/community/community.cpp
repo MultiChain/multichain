@@ -141,6 +141,11 @@ Value mc_EnterpriseFeatures::FED_RPCPurgeFeedFile(const Array& params)
     return Value::null;
 }
 
+Value mc_EnterpriseFeatures::FED_RPCListFeeds(const Array& params)
+{
+    return Value::null;
+}
+
 
 
 bool mc_EnterpriseFeatures::OFF_ProcessChunkRequest(unsigned char *ptrStart,unsigned char *ptrEnd,vector<unsigned char>* payload_response,vector<unsigned char>* payload_relay,
