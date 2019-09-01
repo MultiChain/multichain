@@ -103,6 +103,7 @@ typedef struct mc_EnterpriseFeatures
     bool NET_RestoreFromCache(CNode* pfrom); 
     bool NET_PushMsg(void *pNodeData,CDataStream& ssSend);
     void NET_CheckConnections();
+    uint64_t NET_Services();
     
     std::string ENT_Edition();
     int ENT_EditionNumeric();

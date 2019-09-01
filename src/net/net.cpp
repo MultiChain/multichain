@@ -78,7 +78,7 @@ namespace {
 bool fDiscover = true;
 bool fListen = true;
 uint64_t nLocalServices = NODE_NETWORK;
-uint64_t nLocalMultiChainServices = MC_SRV_ENCRYPTED_CONNECTIONS;
+uint64_t nLocalMultiChainServices = 0;
 CCriticalSection cs_mapLocalHost;
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
 CCriticalSection cs_setLocalAddr;
@@ -510,6 +510,7 @@ void CNode::PushVersion()
     
 /* MCHN START */
     std::string subver=FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, std::vector<string>());
+    nLocalMultiChainServices |= pEF->NET_Services();
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
         subver=FormatSubVersion("MultiChain", mc_gState->GetProtocolVersion(), std::vector<string>());

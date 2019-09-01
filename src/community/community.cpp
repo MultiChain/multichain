@@ -304,6 +304,10 @@ void mc_EnterpriseFeatures::NET_CheckConnections()
     
 }
 
+uint64_t mc_EnterpriseFeatures::NET_Services()
+{
+    return 0;
+}
 
 
 
