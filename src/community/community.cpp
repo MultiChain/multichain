@@ -243,7 +243,7 @@ int mc_EnterpriseFeatures::WLT_NoRetrieve(mc_TxEntity *entity)
 
 bool mc_EnterpriseFeatures::NET_ProcessHandshakeData(CNode* pfrom, std::string sENTData,bool fIsVerackack)
 {
-    return !fIsVerackack;
+    return true;
 }
 
 std::vector<unsigned char> mc_EnterpriseFeatures::NET_PushHandshakeData(CNode* pfrom, bool fIsVerackack)
