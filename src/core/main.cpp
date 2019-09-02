@@ -2925,18 +2925,21 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Removing block txs from mempool\n");
 
     int err=MC_ERR_NOERROR;
-    CDiskTxPos pos1(pindexNew->GetBlockPos(), 80+GetSizeOfCompactSize(pblock->vtx.size()));
-    for (unsigned int i = 0; i < pblock->vtx.size(); i++)
+    if(pindexNew->nHeight)
     {
-        const CTransaction &tx = pblock->vtx[i];
-        err=pEF->FED_EventTx(tx,pindexNew->nHeight,&pos1,i,pindexNew->GetBlockHash(),pblock->nTime);
-        if(err)
+        CDiskTxPos pos1(pindexNew->GetBlockPos(), 80+GetSizeOfCompactSize(pblock->vtx.size()));
+        for (unsigned int i = 0; i < pblock->vtx.size(); i++)
         {
-            LogPrintf("ERROR: Cannot write tx %s to feeds in block, error %d\n",tx.GetHash().ToString().c_str(),err);
+            const CTransaction &tx = pblock->vtx[i];
+            err=pEF->FED_EventTx(tx,pindexNew->nHeight,&pos1,i,pindexNew->GetBlockHash(),pblock->nTime);
+            if(err)
+            {
+                LogPrintf("ERROR: Cannot write tx %s to feeds in block, error %d\n",tx.GetHash().ToString().c_str(),err);
+            }
+            pos1.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
         }
-        pos1.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
     }
-    
+
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Removing block txs from mempool\n");
     mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted);
     mempool.check(pcoinsTip);
