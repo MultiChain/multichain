@@ -76,7 +76,7 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("port", GetListenPort()));    
     obj.push_back(Pair("setupblocks", mc_gState->m_NetworkParams->GetInt64Param("setupfirstblocks")));    
     
-    obj.push_back(Pair("nodeaddress", MultichainServerAddress() + strprintf(":%d",GetListenPort())));       
+    obj.push_back(Pair("nodeaddress", MultichainServerAddress(true) + strprintf(":%d",GetListenPort())));       
 
     obj.push_back(Pair("burnaddress", BurnAddress(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS))));                
     obj.push_back(Pair("incomingpaused", (mc_gState->m_NodePausedState & MC_NPS_INCOMING) ? true : false));                

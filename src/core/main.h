@@ -146,7 +146,7 @@ static const uint64_t nMinDiskSpace = 52428800;
 
 
 /* MCHN START */
-std::string MultichainServerAddress();
+std::string MultichainServerAddress(bool check_external_ip);
 void ClearMemPools();
 std::string SetLastBlock(uint256 hash);
 std::string SetLastBlock(uint256 hash,bool *fNotFound);
