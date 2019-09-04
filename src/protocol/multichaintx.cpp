@@ -2290,11 +2290,11 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     if(new_issue)                                                               // Updating entity database
     {        
         err=mc_gState->m_Assets->InsertAsset(&txid,offset,details->fLicenseTokenIssuance ? MC_ENT_TYPE_LICENSE_TOKEN : MC_ENT_TYPE_ASSET,
-                total,asset_name,multiple,details->details_script,details->details_script_size,special_script,special_script_size,update_mempool);                      
+                total,asset_name,multiple,details->details_script,details->details_script_size,special_script,special_script_size,details->extended_script_row,update_mempool);                      
     }
     else
     {
-        err=mc_gState->m_Assets->InsertAssetFollowOn(&txid,offset,total,details->details_script,details->details_script_size,special_script,special_script_size,entity.GetTxID(),update_mempool);
+        err=mc_gState->m_Assets->InsertAssetFollowOn(&txid,offset,total,details->details_script,details->details_script_size,special_script,special_script_size,details->extended_script_row,entity.GetTxID(),update_mempool);
     }
             
     if(err)           

@@ -961,7 +961,7 @@ int mc_AssetDB::InsertEntity(const void* txid, int offset, int entity_type, cons
 }
 
 
-int mc_AssetDB::InsertAsset(const void* txid, int offset, int asset_type, uint64_t quantity, const char *name, int multiple, const void* script, size_t script_size, const void* special_script, size_t special_script_size,int update_mempool)
+int mc_AssetDB::InsertAsset(const void* txid, int offset, int asset_type, uint64_t quantity, const char *name, int multiple, const void* script, size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row,int update_mempool)
 {
     mc_EntityLedgerRow aldRow;
     mc_EntityDetails details;
@@ -986,6 +986,7 @@ int mc_AssetDB::InsertAsset(const void* txid, int offset, int asset_type, uint64
     aldRow.m_LastPos=0;
     aldRow.m_ChainPos=-1;
     aldRow.m_PrevPos=-1;
+    aldRow.m_ExtendedScript=-extended_script_row;
     
     mc_Script *lpDetails;
     lpDetails=new mc_Script;
@@ -1127,7 +1128,7 @@ int mc_AssetDB::InsertAsset(const void* txid, int offset, int asset_type, uint64
     return MC_ERR_NOERROR;
 }
 
-int mc_AssetDB::InsertAssetFollowOn(const void* txid, int offset, uint64_t quantity, const void* script, size_t script_size, const void* special_script, size_t special_script_size, const void* original_txid, int update_mempool)
+int mc_AssetDB::InsertAssetFollowOn(const void* txid, int offset, uint64_t quantity, const void* script, size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row, const void* original_txid, int update_mempool)
 {
     mc_EntityLedgerRow aldRow;
     
@@ -1205,6 +1206,7 @@ int mc_AssetDB::InsertAssetFollowOn(const void* txid, int offset, uint64_t quant
     aldRow.m_LastPos=last_pos;
     aldRow.m_ChainPos=-1;
     aldRow.m_PrevPos=-1;
+    aldRow.m_ExtendedScript=-extended_script_row;
 
     mc_Script *lpDetails;
     lpDetails=new mc_Script;
