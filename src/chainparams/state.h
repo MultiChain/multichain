@@ -128,6 +128,7 @@ typedef struct mc_Features
     int FixedIn1000920001();
     int FixedIn1001020003();
     int FixedIn1001120003();
+    int FixedSpendingBigScripts();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo
