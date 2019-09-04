@@ -253,7 +253,13 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
     vector<valtype> altstack;
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
     if (script.size() > 10000)
-        return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
+    {
+        if(mc_gState->m_Features->FixedSpendingBigScripts() == 0)
+        {
+            return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
+        }
+    }
+        
     int nOpCount = 0;
     bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
 
