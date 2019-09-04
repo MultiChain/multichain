@@ -161,6 +161,8 @@ typedef struct mc_Features
     int SaltedChunks();
     int FixedIn20010();
     int License20010();
+    int ExtendedEntityDetails();
+    int FixedSpendingBigScripts();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo

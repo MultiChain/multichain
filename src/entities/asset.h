@@ -162,7 +162,7 @@ typedef struct mc_EntityLedgerRow
     uint32_t m_ScriptSize;                                                      // Script Size
     int64_t m_Quantity;                                                         // Total quantity of the entity (including follow-ons)
     uint32_t m_EntityType;                                                      // Entity type - MC_ENT_TYPE_ constants
-    uint32_t m_Reserved1;                                                       // Reserved to align to 96 bytes
+    int32_t m_ExtendedScript;                                                  // Size of extended script when in file, row+1 in temp buffer if in mempool
     int64_t m_PrevPos;                                                          // Position of the previous entity in the ledger
     int64_t m_FirstPos;                                                         // Position in the ledger corresponding to first object in the chain
     int64_t m_LastPos;                                                          // Position in the ledger corresponding to last object in the chain before this object
@@ -211,6 +211,7 @@ typedef struct mc_EntityDetails
     uint64_t GetQuantity();
     uint32_t GetEntityType();    
     const void* GetSpecialParam(uint32_t param,size_t* bytes);
+    const void* GetSpecialParam(uint32_t param,size_t* bytes,int check_extended_script);
     const void* GetParam(const char *param,size_t* bytes);
     int32_t NextParam(uint32_t offset,uint32_t* param_value_start,size_t *bytes);
 }mc_EntityDetails;
@@ -226,6 +227,7 @@ typedef struct mc_EntityLedger
     uint32_t m_ValueOffset;                                                     // Offset of the value in mc_EntityLedgerRow structure, 36 
     uint32_t m_ValueSize;                                                       // Size of the ledger value 28 if protocol<=10003, 60 otherwise
     uint32_t m_TotalSize;                                                       // Totals size of the ledger row
+    unsigned char m_ZeroBuffer[96];
    
     mc_EntityLedger()
     {
@@ -258,6 +260,8 @@ typedef struct mc_AssetDB
     mc_Buffer   *m_MemPool;
     mc_Buffer   *m_TmpRelevantEntities;
     mc_Buffer   *m_ShortTxIDCache;
+    mc_Script   *m_ExtendedScripts;
+    mc_Script   *m_RowExtendedScript;
     
     char m_Name[MC_PRM_NETWORK_NAME_MAX_SIZE+1]; 
     int m_Block;
@@ -283,7 +287,7 @@ typedef struct mc_AssetDB
 
     int Initialize(const char *name,int mode);
         
-    int InsertEntity(const void* txid, int offset, int entity_type, const void *script,size_t script_size, const void* special_script, size_t special_script_size,int update_mempool);
+    int InsertEntity(const void* txid, int offset, int entity_type, const void *script,size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row,int update_mempool);
     int InsertAsset(const void* txid, int offset, int asset_type, uint64_t quantity,const char *name,int multiple,const void *script,size_t script_size, const void* special_script, size_t special_script_size,int update_mempool);
     int InsertAssetFollowOn(const void* txid, int offset, uint64_t quantity, const void *script,size_t script_size, const void* special_script, size_t special_script_size,const void* original_txid,int update_mempool);
     int Commit();

@@ -713,7 +713,7 @@ Object FilterEntry(const unsigned char *txid,uint32_t output_level,uint32_t filt
             entry.push_back(Pair("language", "javascript"));
             
             Array entities;
-            ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size);
+            ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
 
             if(ptr)
             {   

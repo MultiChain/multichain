@@ -95,6 +95,9 @@ typedef struct mc_Script
     int GetGeneralDetails(unsigned char* script,int *script_size);
     int SetGeneralDetails(const unsigned char* script,int script_size);
     
+    int GetExtendedDetails(unsigned char **script,size_t *script_size);
+    int SetExtendedDetails(const unsigned char* script,size_t script_size);
+    
     int GetAssetQuantities(mc_Buffer *amounts,uint32_t script_type);
     int SetAssetQuantities(mc_Buffer *amounts,uint32_t script_type);
 
