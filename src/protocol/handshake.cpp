@@ -551,6 +551,19 @@ bool PushMultiChainVerack(CNode* pfrom, bool fIsVerackack)
         pkey=key.GetPubKey();
     }
     
+    
+    {
+        LOCK(cs_NodeStatus);
+
+        if(pNodeStatus)
+        {
+            if(mc_gState->m_NetworkParams->m_Status != MC_PRM_STATUS_EMPTY)
+            {
+                pNodeStatus->sAddress=CBitcoinAddress(pkey.GetID()).ToString();
+            }
+        }
+    }
+    
     CScript scriptSig;
     vector<unsigned char> vchSig;
     if (!key.Sign(signed_hash, vchSig))

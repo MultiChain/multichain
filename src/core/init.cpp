@@ -70,6 +70,9 @@ mc_WalletTxs* pwalletTxsMain = NULL;
 mc_RelayManager* pRelayManager = NULL;
 mc_FilterEngine* pFilterEngine = NULL;
 mc_MultiChainFilterEngine* pMultiChainFilterEngine = NULL;
+CInitNodeStatus *pNodeStatus = NULL;
+CCriticalSection cs_NodeStatus;
+
 
 bool fFeeEstimatesInitialized = false;
 extern int JSON_DOUBLE_DECIMAL_DIGITS;                             
@@ -98,6 +101,17 @@ CClientUIInterface uiInterface;
 static const CAmount nHighTransactionFeeWarning = 0.01 * COIN;
 //! -maxtxfee will warn if called with a higher fee than this amount (in satoshis)
 static const CAmount nHighTransactionMaxFeeWarning = 100 * nHighTransactionFeeWarning;
+
+
+CInitNodeStatus::CInitNodeStatus()
+{
+    fInitialized=false;
+    sSeedIP="";
+    nSeedPort=0;
+    sAddress="";
+    sLastError="";    
+    tStartConnectTime=0;
+}
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -225,7 +239,14 @@ void Shutdown()
     delete pwalletMain;
     pwalletMain = NULL;
 /* MCHN START */  
-    
+    {
+        LOCK(cs_NodeStatus);
+        if(pNodeStatus)
+        {
+            delete pNodeStatus;
+            pNodeStatus=NULL;        
+        }
+    }
     if(pwalletTxsMain)
     {
         delete pwalletTxsMain;
@@ -391,6 +412,8 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -proxy=<ip:port>       " + _("Connect through SOCKS5 proxy") + "\n";
     strUsage += "  -seednode=<ip>         " + _("Connect to a node to retrieve peer addresses, and disconnect") + "\n";
     strUsage += "  -timeout=<n>           " + strprintf(_("Specify connection timeout in milliseconds (minimum: 1, default: %d)"), DEFAULT_CONNECT_TIMEOUT) + "\n";
+    strUsage += "  -retryconnecttime=<n>  " + _("Number of seconds during which an initial connection is retried before the node quits (default: 0)") + "\n";
+    
 /*    
 #ifdef USE_UPNP
 #if USE_UPNP
@@ -1159,6 +1182,27 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     } // (!fDisableWallet)
 
 /* MCHN START*/    
+    string rpc_threads_error="";
+    
+    if (fServer)
+    {
+        JSON_DOUBLE_DECIMAL_DIGITS=GetArg("-apidecimaldigits",-1);        
+        uiInterface.InitMessage.connect(SetRPCWarmupStatus);
+        StartRPCThreads(rpc_threads_error);
+    }
+    
+    uint32_t SeedStartTime=mc_TimeNowAsUInt();
+    int64_t SeedStopTime64=(int64_t)SeedStartTime+GetArg("-retryconnecttime",-1);
+    if(SeedStopTime64 > 0xFFFFFFFF)
+    {
+        SeedStopTime64=0xFFFFFFFF;
+    }
+    if(SeedStopTime64 < 0)
+    {
+        SeedStopTime64=SeedStartTime-1;
+    }
+    uint32_t SeedStopTime=(uint32_t)SeedStopTime64;
+    
     uiInterface.InitMessage(_("Initializing multichain..."));
     RegisterNodeSignals(GetNodeSignals());
 
@@ -1258,7 +1302,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             seed_attempt=2;            
         }
     }
-    
+
+    bool first_attempt=true;
     while(seed_attempt)
     {        
         
@@ -1292,8 +1337,12 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 {
                     if(!GetBoolArg("-shortoutput", false))
                     {    
-                        sprintf(bufOutput,"Retrieving blockchain parameters from the seed node %s ...\n",seed_node);
-                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                        if(first_attempt)
+                        {
+                            sprintf(bufOutput,"Retrieving blockchain parameters from the seed node %s ...\n",seed_node);
+                            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                            first_attempt=false;
+                        }
                     }
                 }
             }
@@ -1327,11 +1376,25 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             }            
 */
             
+            if(pNodeStatus == NULL)
+            {
+                LOCK(cs_NodeStatus);
+                pNodeStatus=new CInitNodeStatus;
+                pNodeStatus->fInitialized=false;
+                pNodeStatus->sLastError="First connection attempt";
+                pNodeStatus->tStartConnectTime=SeedStartTime;
+                pNodeStatus->sSeedIP=seed_ip;
+                pNodeStatus->nSeedPort=seed_port;
+            }
+            
+            
             if(mc_QuerySeed(seedThreadGroup,seed_node))
             {
+                LOCK(cs_NodeStatus);
                 if((mc_gState->m_NetworkState == MC_NTS_SEED_READY) || (mc_gState->m_NetworkState == MC_NTS_SEED_NO_PARAMS) )
                 {
                     seed_error="Couldn't disconnect from the seed node, please restart multichaind";
+                    pNodeStatus->sLastError="Disconnect error";
                 }
                 else
                 {
@@ -1339,13 +1402,39 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     if(seed_port == 0)
                     {
                         seed_error=strprintf("Couldn't connect to the seed node %s - please specify port number explicitly.",seed_node);                
+                        pNodeStatus->sLastError="Couldn't connect to the seed node, missing port";
                     }
                     else
                     {
                         seed_error=strprintf("Couldn't connect to the seed node %s on port %d - please check multichaind is running at that address and that your firewall settings allow incoming connections.",                
                             seed_ip.c_str(),seed_port);
+                        pNodeStatus->sLastError="Couldn't connect to the seed node, multichaind is not running or firewall issue";
                     }
                 }
+            }
+            else
+            {
+                LOCK(cs_NodeStatus);
+                if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_VALID)
+                {
+                    pNodeStatus->sLastError="";
+                    pNodeStatus->fInitialized=true;                    
+                }
+                if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY)
+                {
+                    pNodeStatus->sLastError="Couldn't retrieve blockchain parameters from the seed node";
+                }
+                if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL)
+                {
+                    if(seed_attempt == 1)
+                    {
+                        pNodeStatus->sLastError="Couldn't initialize node, no connect permission";
+                    }
+                    else
+                    {
+                        pNodeStatus->sLastError="Seconfd connection attempt, trying -initprivkey";                        
+                    }
+                }                
             }
 
             if(mc_gState->m_NetworkParams->GetParam("protocolversion",&size) != NULL)
@@ -1460,8 +1549,30 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 seed_attempt--;                
             }
         }
+        if(seed_attempt == 0)
+        {
+            if((mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY) 
+               || (mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL))
+            {
+                if(mc_TimeNowAsUInt() < SeedStopTime)
+                {
+                    if(!ShutdownRequested())
+                    {
+                        seed_attempt++;
+                        __US_Sleep(2000);
+                    }
+                }
+            }
+        }
     }
 
+    if(pNodeStatus)
+    {
+        LOCK(cs_NodeStatus);
+        delete pNodeStatus;
+        pNodeStatus=NULL;        
+    }
+    
     if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_VALID)
     {
         LogPrintf("mchn: Parameter set is valid - initializing blockchain parameters...\n");
@@ -1923,6 +2034,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     
     pwalletMain=NULL;
 
+/*    
     string rpc_threads_error="";
     if (fServer)
     {
@@ -1930,6 +2042,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
         StartRPCThreads(rpc_threads_error);
     }
+ */ 
 /* MCHN END*/        
     
         ::minRelayTxFee = CFeeRate(MIN_RELAY_TX_FEE); 
