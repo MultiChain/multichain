@@ -412,7 +412,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -proxy=<ip:port>       " + _("Connect through SOCKS5 proxy") + "\n";
     strUsage += "  -seednode=<ip>         " + _("Connect to a node to retrieve peer addresses, and disconnect") + "\n";
     strUsage += "  -timeout=<n>           " + strprintf(_("Specify connection timeout in milliseconds (minimum: 1, default: %d)"), DEFAULT_CONNECT_TIMEOUT) + "\n";
-    strUsage += "  -retryconnecttime=<n>  " + _("Number of seconds during which an initial connection is retried before the node quits (default: 0)") + "\n";
+    strUsage += "  -retryinittime=<n>     " + _("Number of seconds during which an initial connection is retried before the node quits (default: 0)") + "\n";
     
 /*    
 #ifdef USE_UPNP
@@ -699,6 +699,52 @@ bool InitSanityCheck(void)
         return false;
 
     return true;
+}
+
+bool GrantMessagePrinted(int OutputPipe,bool failed_seed)
+{
+    char bufOutput[4096];
+    size_t bytes_written;
+    if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL)
+    {
+        if(pwalletMain)
+        {
+            if(pwalletMain->vchDefaultKey.IsValid())
+            {
+                LogPrintf("mchn: Minimal blockchain parameter set is created, default address: %s\n",
+                        CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());
+                    
+                if(!GetBoolArg("-shortoutput", false))
+                {    
+                    sprintf(bufOutput,"Blockchain successfully initialized.\n\n");             
+                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                    
+                    if(failed_seed)
+                    {
+                        sprintf(bufOutput,"Could not connect to seed node, please ensure it is up and available.\n\n");
+                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                        
+                    }
+                    
+                    sprintf(bufOutput,"Please ask blockchain admin or user having activate permission to let you connect and/or transact:\n");
+                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+
+                    sprintf(bufOutput,"multichain-cli %s grant %s connect\n",mc_gState->m_NetworkParams->Name(),
+                         CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());
+                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                    sprintf(bufOutput,"multichain-cli %s grant %s connect,send,receive\n\n",mc_gState->m_NetworkParams->Name(),
+                         CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());
+                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                }
+                else
+                {
+                    sprintf(bufOutput,"%s\n",CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());                            
+                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                }
+                return true;
+            }
+        }
+    }    
+    return false;
 }
 
 /** Initialize bitcoin.
@@ -1187,12 +1233,25 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     if (fServer)
     {
         JSON_DOUBLE_DECIMAL_DIGITS=GetArg("-apidecimaldigits",-1);        
-        uiInterface.InitMessage.connect(SetRPCWarmupStatus);
+//        uiInterface.InitMessage.connect(SetRPCWarmupStatus);
         StartRPCThreads(rpc_threads_error);
+    }
+    if(rpc_threads_error.size())
+    {
+        if(!GetBoolArg("-shortoutput", false))
+        {    
+            sprintf(bufOutput,"%s\n",rpc_threads_error.c_str());                            
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+        }            
+    }
+    bool rpc_with_default_port=false;
+    if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY)
+    {
+        rpc_with_default_port=true;
     }
     
     uint32_t SeedStartTime=mc_TimeNowAsUInt();
-    int64_t SeedStopTime64=(int64_t)SeedStartTime+GetArg("-retryconnecttime",-1);
+    int64_t SeedStopTime64=(int64_t)SeedStartTime+GetArg("-retryinittime",-1);
     if(SeedStopTime64 > 0xFFFFFFFF)
     {
         SeedStopTime64=0xFFFFFFFF;
@@ -1284,6 +1343,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     const char *seed_node;
     bool zap_wallet_txs=false;
     bool new_wallet_txs=false;
+    bool grant_message_printed=false;
     seed_node=mc_gState->GetSeedNode();
     mc_Buffer *rescan_subscriptions=NULL;
 
@@ -1310,6 +1370,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         if((mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY) 
            || (mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL))
         {
+            
             if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL)
             {
                 InitializeMultiChainParams();                    
@@ -1341,7 +1402,6 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                         {
                             sprintf(bufOutput,"Retrieving blockchain parameters from the seed node %s ...\n",seed_node);
                             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                            first_attempt=false;
                         }
                     }
                 }
@@ -1387,7 +1447,6 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 pNodeStatus->nSeedPort=seed_port;
             }
             
-            
             if(mc_QuerySeed(seedThreadGroup,seed_node))
             {
                 LOCK(cs_NodeStatus);
@@ -1414,6 +1473,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             }
             else
             {
+                first_attempt=false;
                 LOCK(cs_NodeStatus);
                 if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_VALID)
                 {
@@ -1432,7 +1492,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     }
                     else
                     {
-                        pNodeStatus->sLastError="Seconfd connection attempt, trying -initprivkey";                        
+                        pNodeStatus->sLastError="Second connection attempt, trying -initprivkey";                        
                     }
                 }                
             }
@@ -1539,7 +1599,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                         bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                     }                    
                 }
-            }
+            }            
         }
         seed_attempt--;
         if(seed_attempt)
@@ -1558,12 +1618,52 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 {
                     if(!ShutdownRequested())
                     {
+                        if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL)
+                        {
+                            InitializeMultiChainParams();        
+                        }
+                        
+                        if(!grant_message_printed)
+                        {
+                            grant_message_printed=GrantMessagePrinted(OutputPipe,first_attempt);
+                            if(!GetBoolArg("-shortoutput", false))
+                            {    
+                                sprintf(bufOutput,"You can use getinitstatus API to see current initialization status\n\n");
+                                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                            }
+                        }
+                        if(rpc_with_default_port)
+                        {
+                            LogPrintf("Restarting RPC server...\n");
+                            SelectMultiChainParams(mc_gState->m_Params->NetworkName());
+                            StopRPCThreads();
+                            if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL)
+                            {
+                                if (fServer)
+                                {
+                                    JSON_DOUBLE_DECIMAL_DIGITS=GetArg("-apidecimaldigits",-1);        
+                            //        uiInterface.InitMessage.connect(SetRPCWarmupStatus);
+                                    StartRPCThreads(rpc_threads_error);
+                                }
+                                if(rpc_threads_error.size())
+                                {
+                                    if(!GetBoolArg("-shortoutput", false))
+                                    {    
+                                        sprintf(bufOutput,"%s\n",rpc_threads_error.c_str());                            
+                                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+                                    }            
+                                }
+                            }     
+                            rpc_with_default_port=false;
+                        }
+                        SetRPCWarmupStatus("Node waiting to successfully initialize, only getinitstatus command is available.");
                         seed_attempt++;
                         __US_Sleep(2000);
                     }
                 }
             }
         }
+        first_attempt=false;
     }
 
     if(pNodeStatus)
@@ -1647,10 +1747,14 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 __US_Sleep(1000);
                 rescan_subscriptions=new mc_Buffer;
                 mc_EnterpriseFeatures* pRescanEF = new mc_EnterpriseFeatures;
+                if(pRescanEF->Prepare())
+                {
+                    return InitError(_("Couldn't initialize Enterprise features")); 
+                }
+                
                 if(pRescanEF->Initialize(mc_gState->m_Params->NetworkName(),0))
                 {
-                    fprintf(stderr,"\nError: Couldn't initialize Enterprise features, please see debug.log for details. Exiting...\n\n");
-                    return false;        
+                    return InitError(_("Couldn't initialize Enterprise features")); 
                 }
                 pRescanEF->STR_GetSubscriptions(rescan_subscriptions);
                 pRescanEF->Destroy();
@@ -1663,7 +1767,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             zap_wallet_txs=true;
         }
 
-
+        
         
         pwalletTxsMain=new mc_WalletTxs;
         mc_TxEntity entity;
@@ -1991,14 +2095,21 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 }
                 if(pwalletMain->vchDefaultKey.IsValid())
                 {
+/*                    
                     LogPrintf("mchn: Minimal blockchain parameter set is created, default address: %s\n",
                             CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());
+ */ 
                     if(fFirstRunForBuild)
                     {
                         if (!pwalletMain->SetAddressBook(pwalletMain->vchDefaultKey.GetID(), "", "receive"))
                             strErrors << _("Cannot write default address") << "\n";
                     }
                     
+                    if(!grant_message_printed)
+                    {
+                        grant_message_printed=GrantMessagePrinted(OutputPipe,false);
+                    }
+/*                    
                     if(!GetBoolArg("-shortoutput", false))
                     {    
                         sprintf(bufOutput,"Blockchain successfully initialized.\n\n");             
@@ -2018,6 +2129,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                         sprintf(bufOutput,"%s\n",CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());                            
                         bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
                     }
+ */ 
                     return false;
                 }
             }
@@ -2505,6 +2617,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
         }
     }
+/*    
     if(rpc_threads_error.size())
     {
         if(!GetBoolArg("-shortoutput", false))
@@ -2513,7 +2626,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
         }            
     }
-    
+*/    
 //    int version=mc_gState->m_NetworkParams->GetInt64Param("protocolversion");
     int version=mc_gState->m_NetworkParams->ProtocolVersion();
     LogPrintf("MultiChain protocol version: %d\n",version);

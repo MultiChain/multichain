@@ -124,7 +124,7 @@ Value getinfo(const Array& params, bool fHelp)
     return obj;
 }
 
-Value getnodestatus(const Array& params, bool fHelp)
+Value getinitstatus(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)  
         throw runtime_error("Help message not found\n");

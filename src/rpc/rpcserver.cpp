@@ -1099,7 +1099,7 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
             {
                 jreq.parse(valRequest);
                 jreq_parsed=true;
-                if( (jreq.strMethod != "stop") && (jreq.strMethod != "getnodestatus") )
+                if( (jreq.strMethod != "stop") && (jreq.strMethod != "getinitstatus") )
                 {
                     throw JSONRPCError(RPC_IN_WARMUP, rpcWarmupStatus);                    
                 }

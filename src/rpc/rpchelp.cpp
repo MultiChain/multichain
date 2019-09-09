@@ -4995,12 +4995,12 @@ void mc_InitRPCHelpMap21()
             + HelpExampleRpc("importlicenserequest", "\"hexstring\"")
       ));
    
-     mapHelpStrings.insert(std::make_pair("getnodestatus",
-            "getnodestatus\n"
+     mapHelpStrings.insert(std::make_pair("getinitstatus",
+            "getinitstatus\n"
             "\nReturns information about initialization status of this node\n"
             "\nExamples:\n"
-            + HelpExampleCli("getnodestatus", "")
-            + HelpExampleRpc("getnodestatus", "")
+            + HelpExampleCli("getinitstatus", "")
+            + HelpExampleRpc("getinitstatus", "")
         ));
   
     
