@@ -744,6 +744,17 @@ bool GrantMessagePrinted(int OutputPipe,bool failed_seed)
             }
         }
     }    
+    else
+    {
+        if(!GetBoolArg("-shortoutput", false))
+        {    
+            if(failed_seed)
+            {
+                sprintf(bufOutput,"Could not connect to seed node, please ensure it is up and available.\n\n");
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                        
+            }
+        }        
+    }
     return false;
 }
 
@@ -1626,19 +1637,22 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                         if(!grant_message_printed)
                         {
                             grant_message_printed=GrantMessagePrinted(OutputPipe,first_attempt);
+                        }
+                        if(first_attempt)
+                        {
                             if(!GetBoolArg("-shortoutput", false))
                             {    
                                 sprintf(bufOutput,"You can use getinitstatus API to see current initialization status\n\n");
                                 bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                            }
+                            }                            
                         }
                         if(rpc_with_default_port)
                         {
-                            LogPrintf("Restarting RPC server...\n");
-                            SelectMultiChainParams(mc_gState->m_Params->NetworkName());
-                            StopRPCThreads();
                             if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL)
                             {
+                                LogPrintf("Restarting RPC server...\n");
+                                SelectMultiChainParams(mc_gState->m_Params->NetworkName());
+                                StopRPCThreads();
                                 if (fServer)
                                 {
                                     JSON_DOUBLE_DECIMAL_DIGITS=GetArg("-apidecimaldigits",-1);        
@@ -1653,8 +1667,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                                         bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
                                     }            
                                 }
+                                rpc_with_default_port=false;
                             }     
-                            rpc_with_default_port=false;
                         }
                         SetRPCWarmupStatus("Node waiting to successfully initialize, only getinitstatus command is available.");
                         seed_attempt++;
