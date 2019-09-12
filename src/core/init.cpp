@@ -704,7 +704,6 @@ bool InitSanityCheck(void)
 bool GrantMessagePrinted(int OutputPipe,bool failed_seed)
 {
     char bufOutput[4096];
-    size_t bytes_written;
     if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL)
     {
         if(pwalletMain)
@@ -717,28 +716,28 @@ bool GrantMessagePrinted(int OutputPipe,bool failed_seed)
                 if(!GetBoolArg("-shortoutput", false))
                 {    
                     sprintf(bufOutput,"Blockchain successfully initialized.\n\n");             
-                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                    write(OutputPipe,bufOutput,strlen(bufOutput));
                     
                     if(failed_seed)
                     {
                         sprintf(bufOutput,"Could not connect to seed node, please ensure it is up and available.\n\n");
-                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                        
+                        write(OutputPipe,bufOutput,strlen(bufOutput));                        
                     }
                     
                     sprintf(bufOutput,"Please ask blockchain admin or user having activate permission to let you connect and/or transact:\n");
-                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                    write(OutputPipe,bufOutput,strlen(bufOutput));
 
                     sprintf(bufOutput,"multichain-cli %s grant %s connect\n",mc_gState->m_NetworkParams->Name(),
                          CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());
-                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                    write(OutputPipe,bufOutput,strlen(bufOutput));
                     sprintf(bufOutput,"multichain-cli %s grant %s connect,send,receive\n\n",mc_gState->m_NetworkParams->Name(),
                          CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());
-                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                    write(OutputPipe,bufOutput,strlen(bufOutput));
                 }
                 else
                 {
                     sprintf(bufOutput,"%s\n",CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());                            
-                    bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+                    write(OutputPipe,bufOutput,strlen(bufOutput));
                 }
                 return true;
             }
@@ -751,7 +750,7 @@ bool GrantMessagePrinted(int OutputPipe,bool failed_seed)
             if(failed_seed)
             {
                 sprintf(bufOutput,"Could not connect to seed node, please ensure it is up and available.\n\n");
-                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                        
+                write(OutputPipe,bufOutput,strlen(bufOutput));                        
             }
         }        
     }
