@@ -241,6 +241,7 @@ bool AppInit(int argc, char* argv[])
             mc_CheckDataDirInConfFile();
             
             pEF=new mc_EnterpriseFeatures;
+            mc_gState->m_EnterpriseBuild=pEF->ENT_BuildVersion();
         }
 #endif
         
