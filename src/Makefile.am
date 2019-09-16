@@ -233,6 +233,7 @@ libbitcoin_server_a_SOURCES = \
   rpc/rpcmisc.cpp \
   rpc/rpcnet.cpp \
   rpc/rpcrawtransaction.cpp \
+  rpc/rpcfeeds.cpp \
   rpc/rpcserver.cpp \
   script/sigcache.cpp \
   utils/timedata.cpp \

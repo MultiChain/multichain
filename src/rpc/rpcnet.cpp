@@ -116,6 +116,7 @@ Value getpeerinfo(const Array& params, bool fHelp)
         }
 /* MCHN END */        
         obj.push_back(Pair("inbound", stats.fInbound));
+        obj.push_back(Pair("encrypted", stats.fEncrypted));
         obj.push_back(Pair("startingheight", stats.nStartingHeight));
         if (fStateStats) {
             obj.push_back(Pair("banscore", statestats.nMisbehavior));

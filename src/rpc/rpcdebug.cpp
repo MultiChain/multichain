@@ -264,14 +264,14 @@ Value mcd_DebugIssueLicenseToken(const Object& params)
     int protocol=20007;
     unsigned int timestamp=mc_TimeNowAsUInt();
     
-    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_REQUEST_HASH,hash,32);
-    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_REQUEST_ADDRESS,(unsigned char*)&KeyID,20);
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_LICENSE_HASH,hash,32);
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_ISSUE_ADDRESS,(unsigned char*)&KeyID,20);
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(name.c_str()),name.size());//+1);
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,4);    
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_CONFIRMATION_TIME,(unsigned char*)&dummy_int64,4);
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_CONFIRMATION_REF,(unsigned char*)&dummy_int64,2);
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_PUBKEY,(unsigned char*)&dummy_int64,2);
-    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_MIN_VERSION,(unsigned char*)&version,4);
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_MIN_NODE,(unsigned char*)&version,4);
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_MIN_PROTOCOL,(unsigned char*)&protocol,4);
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_SIGNATURE,(unsigned char*)&dummy_int64,1);
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_TIMESTAMP,(unsigned char*)&timestamp,4);

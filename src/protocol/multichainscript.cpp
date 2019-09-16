@@ -32,6 +32,7 @@
 #define MC_DCT_SCRIPT_MULTICHAIN_ASSET_DETAILS_PREFIX 'a'
 #define MC_DCT_SCRIPT_MULTICHAIN_ASSET_FOLLOWON_PREFIX 'o'
 #define MC_DCT_SCRIPT_MULTICHAIN_GENERAL_DETAILS_PREFIX 'c'
+#define MC_DCT_SCRIPT_MULTICHAIN_EXTENDED_DETAILS_PREFIX 'c'
 #define MC_DCT_SCRIPT_MULTICHAIN_DATA_FORMAT_PREFIX 'f'
 #define MC_DCT_SCRIPT_MULTICHAIN_RAW_DATA_PREFIX 'd'
 
@@ -181,6 +182,19 @@ int mc_Script::DeleteElement(int element)
     
     return MC_ERR_NOERROR;
 }
+
+int mc_Script::GetSize()
+{
+    return m_Size;
+}
+
+int mc_Script::ShrinkCurrentElementSizeBy(int size)
+{    
+    m_lpCoord[2*m_CurrentElement + 1]-=size;
+    m_Size-=size;    
+    return MC_ERR_NOERROR;    
+}
+
 
 int mc_Script::GetElement()
 {
@@ -1481,6 +1495,75 @@ int mc_Script::SetGeneralDetails(const unsigned char* script,int script_size)
     
     return MC_ERR_NOERROR;
 }
+
+int mc_Script::GetExtendedDetails(unsigned char **script,size_t *script_size)
+{
+    unsigned char *ptr;
+    unsigned char *ptrEnd;
+    
+    if(m_CurrentElement<0)
+    {
+        return MC_ERR_INVALID_PARAMETER_VALUE;
+    }
+    
+    if(m_lpCoord[m_CurrentElement*2+1] < MC_DCT_SCRIPT_IDENTIFIER_LEN+1)
+    {
+        return MC_ERR_WRONG_SCRIPT;
+    }
+       
+    ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
+    ptrEnd=ptr+m_lpCoord[m_CurrentElement*2+1];
+    
+    if(memcmp(ptr,MC_DCT_SCRIPT_FREE_DATA_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
+    {
+        return MC_ERR_WRONG_SCRIPT;
+    }
+    
+    if(ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN] != MC_DCT_SCRIPT_MULTICHAIN_EXTENDED_DETAILS_PREFIX)
+    {
+        return MC_ERR_WRONG_SCRIPT;
+    }
+    
+    ptr+=MC_DCT_SCRIPT_IDENTIFIER_LEN+1;
+    
+    *script_size=ptrEnd-ptr;
+    *script=ptr;
+        
+    return mc_VerifyDetailsScript(*script,*script_size);;    
+}
+    
+int mc_Script::SetExtendedDetails(const unsigned char* script,size_t script_size)
+{
+    int err;
+    unsigned char buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+1+4];
+    
+    err=AddElement();
+    if(err)
+    {
+        return err;
+    }
+    
+    memcpy(buf,MC_DCT_SCRIPT_FREE_DATA_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_EXTENDED_DETAILS_PREFIX;
+    
+    err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+1);
+    if(err)
+    {
+        return err;
+    }
+    
+    if(script_size)
+    {
+        err=SetData(script,script_size);
+        if(err)
+        {
+            return err;
+        }        
+    }
+    
+    return MC_ERR_NOERROR;
+}
+
 
 int mc_Script::GetApproval(uint32_t *approval,uint32_t *timestamp)
 {

@@ -64,6 +64,7 @@ typedef struct CMultiChainTxDetails
     unsigned char details_script[MC_ENT_MAX_SCRIPT_SIZE];                       // Entity details script
     int details_script_size;                                                    // Entity details script size
     int details_script_type;                                                    // Entity details script type - new/update
+    int extended_script_row;                                                    // Entity details script size
     uint32_t new_entity_type;                                                   // New entity type
     int new_entity_output;                                                      // Output where new entity is defined
     int64_t total_offchain_size;                                                // Total size of offchain items
@@ -117,6 +118,7 @@ void CMultiChainTxDetails::Zero()
     
     details_script_size=0;
     details_script_type=-1;
+    extended_script_row=0;
     new_entity_type=MC_ENT_TYPE_NONE;
     new_entity_output=-1;
     total_offchain_size=0;
@@ -523,6 +525,22 @@ bool MultiChainTransaction_CheckNewEntity(int vout,
         {
             reason="Metadata script rejected - unsupported new entity type";
             return false;            
+        }
+        unsigned char *ptr;
+        size_t bytes;        
+        mc_gState->m_TmpScript->SetElement(1);
+        err=mc_gState->m_TmpScript->GetExtendedDetails(&ptr,&bytes);
+        if(err == 0)
+        {
+            if(bytes)
+            {
+                if(mc_gState->m_Features->ExtendedEntityDetails())
+                {
+                    details->extended_script_row=mc_gState->m_Assets->m_ExtendedScripts->GetNumElements();
+                    mc_gState->m_Assets->m_ExtendedScripts->AddElement();
+                    mc_gState->m_Assets->m_ExtendedScripts->SetData(ptr,bytes);
+                }                
+            }
         }
     }   
     else
@@ -1713,17 +1731,17 @@ bool MultiChainTransaction_CheckLicenseTokenDetails(CMultiChainTxDetails *detail
         reason="License token issue script rejected - no name";
         return false;                                                                                                                                        
     }
-    if( value_sizes[MC_ENT_SPRM_LICENSE_REQUEST_HASH] == 0 )
+    if( value_sizes[MC_ENT_SPRM_LICENSE_LICENSE_HASH] == 0 )
     {
         reason="License token issue script rejected - invalid request hash";
         return false;                                                                                                                                        
     }
-    if( value_sizes[MC_ENT_SPRM_LICENSE_REQUEST_ADDRESS] != sizeof(uint160) )
+    if( value_sizes[MC_ENT_SPRM_LICENSE_ISSUE_ADDRESS] != sizeof(uint160) )
     {
         reason="License token issue script rejected - invalid request address";
         return false;                                                                                                                                        
     }
-    if(memcmp(token_address,details->details_script+value_starts[MC_ENT_SPRM_LICENSE_REQUEST_ADDRESS],value_sizes[MC_ENT_SPRM_LICENSE_REQUEST_ADDRESS]))
+    if(memcmp(token_address,details->details_script+value_starts[MC_ENT_SPRM_LICENSE_ISSUE_ADDRESS],value_sizes[MC_ENT_SPRM_LICENSE_ISSUE_ADDRESS]))
     {
         reason="License token issue script rejected - request address mismatch";
         return false;                                                                                                                                                
@@ -1743,15 +1761,10 @@ bool MultiChainTransaction_CheckLicenseTokenDetails(CMultiChainTxDetails *detail
         reason="License token issue script rejected - invalid pubkey";
         return false;                                                                                                                                        
     }
-    if( (value_sizes[MC_ENT_SPRM_LICENSE_MIN_VERSION] < 4 ) || 
-        (value_sizes[MC_ENT_SPRM_LICENSE_MIN_VERSION] > 8 ))
+    if( (value_sizes[MC_ENT_SPRM_LICENSE_MIN_NODE] < 4 ) || 
+        (value_sizes[MC_ENT_SPRM_LICENSE_MIN_NODE] > 8 ))
     {
         reason="License token issue script rejected - invalid version";
-        return false;                                                                                                                                        
-    }
-    if( mc_gState->GetNumericVersion() < mc_GetLE(details->details_script+value_starts[MC_ENT_SPRM_LICENSE_MIN_VERSION],value_sizes[MC_ENT_SPRM_LICENSE_MIN_VERSION]) )
-    {
-        reason="License token issue script rejected - Not supported in this version of MultiChain";
         return false;                                                                                                                                        
     }
     if( (value_sizes[MC_ENT_SPRM_LICENSE_MIN_PROTOCOL] < 4 ) || 
@@ -1793,7 +1806,7 @@ bool MultiChainTransaction_CheckLicenseTokenDetails(CMultiChainTxDetails *detail
     {
         CLicenseRequest confirmation;
         confirmation.SetData(details->details_script,details->details_script_size);
-        string license_name=confirmation.GetLicenseNameByConfirmation();
+        string license_name=confirmation.GetLicenseName();
         if( (value_sizes[MC_ENT_SPRM_NAME] != license_name.size()) ||
             (memcmp(details->details_script+value_starts[MC_ENT_SPRM_NAME],license_name.c_str(),value_sizes[MC_ENT_SPRM_NAME]) != 0))    
         {
@@ -2277,11 +2290,11 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     if(new_issue)                                                               // Updating entity database
     {        
         err=mc_gState->m_Assets->InsertAsset(&txid,offset,details->fLicenseTokenIssuance ? MC_ENT_TYPE_LICENSE_TOKEN : MC_ENT_TYPE_ASSET,
-                total,asset_name,multiple,details->details_script,details->details_script_size,special_script,special_script_size,update_mempool);                      
+                total,asset_name,multiple,details->details_script,details->details_script_size,special_script,special_script_size,details->extended_script_row,update_mempool);                      
     }
     else
     {
-        err=mc_gState->m_Assets->InsertAssetFollowOn(&txid,offset,total,details->details_script,details->details_script_size,special_script,special_script_size,entity.GetTxID(),update_mempool);
+        err=mc_gState->m_Assets->InsertAssetFollowOn(&txid,offset,total,details->details_script,details->details_script_size,special_script,special_script_size,details->extended_script_row,entity.GetTxID(),update_mempool);
     }
             
     if(err)           
@@ -2488,7 +2501,9 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
     size_t special_script_size=0;
     special_script=mc_gState->m_TmpScript->GetData(0,&special_script_size);
                                                                                 // Updating entity datanase
-    err=mc_gState->m_Assets->InsertEntity(&txid,offset,details->new_entity_type,details->details_script,details->details_script_size,special_script,special_script_size,update_mempool);
+    err=mc_gState->m_Assets->InsertEntity(&txid,offset,details->new_entity_type,details->details_script,details->details_script_size,
+            special_script,special_script_size,details->extended_script_row,update_mempool);
+
     if(err)           
     {
         reason="New entity script rejected - could not insert new entity to database";

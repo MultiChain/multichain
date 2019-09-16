@@ -1015,19 +1015,26 @@ int mc_MultichainParams::Import(const char *name,const char *source_address)
     return MC_ERR_NOERROR;
 }
 
-std::string MultichainServerAddress()
+std::string MultichainServerAddress(bool check_external_ip)
 {
     string result=string(mc_gState->m_NetworkParams->Name());
     unsigned char *ptr;
     result+="@";
-    if(mc_gState->m_IPv4Address)
+    if(check_external_ip & (mapArgs.count("-externalip") > 0) )
     {
-        ptr=(unsigned char *)(&(mc_gState->m_IPv4Address));
-        result+=strprintf("%u.%u.%u.%u",ptr[3],ptr[2],ptr[1],ptr[0]);
+        result+=mapArgs["-externalip"];
     }
     else
     {
-        result+="<server-ip-address>";
+        if(mc_gState->m_IPv4Address)
+        {
+            ptr=(unsigned char *)(&(mc_gState->m_IPv4Address));
+            result+=strprintf("%u.%u.%u.%u",ptr[3],ptr[2],ptr[1],ptr[0]);
+        }
+        else
+        {
+            result+="<server-ip-address>";
+        }
     }
     
     return result;

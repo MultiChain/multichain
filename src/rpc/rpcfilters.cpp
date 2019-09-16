@@ -11,6 +11,7 @@
 
 void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
 void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity);
+bool mc_JSInExtendedScript(size_t size);
 
 void ParseFilterRestrictionsForField(Value param,mc_Script *lpDetailsScript,uint32_t filter_type)
 {
@@ -276,6 +277,7 @@ Value createfilterfromcmd(const Array& params, bool fHelp)
         }        
     }
     
+    
 
 
     js=ParseFilterDetails(params[4]);
@@ -293,7 +295,11 @@ Value createfilterfromcmd(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER,strprintf("Couldn't compile filter code: %s",strError.c_str()));                                                                               
     }
     
-    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)js.c_str(),js.size());                                                        
+    bool js_extended=mc_JSInExtendedScript(js.size());
+    if(!js_extended)
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)js.c_str(),js.size());                                                        
+    }
     
     
     script=lpDetails->GetData(0,&bytes);
@@ -312,6 +318,21 @@ Value createfilterfromcmd(const Array& params, bool fHelp)
 
     elem = lpDetailsScript->GetData(0,&elem_size);
     scriptOpReturn << vector<unsigned char>(elem, elem + elem_size) << OP_DROP << OP_RETURN;        
+    if(js_extended)
+    {
+        lpDetails->Clear();
+        lpDetails->AddElement();
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)js.c_str(),js.size());                                                        
+
+        elem=lpDetails->GetData(0,&elem_size);
+        lpDetailsScript->Clear();
+        lpDetailsScript->SetExtendedDetails(elem,elem_size);
+        elem = lpDetailsScript->GetData(0,&elem_size);
+        scriptOpReturn << vector<unsigned char>(elem, elem + elem_size);
+        
+
+//        scriptOpReturn << vector<unsigned char>((unsigned char*)js.c_str(), (unsigned char*)js.c_str() + js.size());
+    }
     
     
     {
@@ -663,7 +684,7 @@ Value getfiltercode(const Array& params, bool fHelp)
     size_t value_size;
     char filter_code[MC_ENT_MAX_SCRIPT_SIZE+1];
     
-    ptr=(char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size);
+    ptr=(char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
 
     if(ptr == NULL)
     {
@@ -964,7 +985,7 @@ Value runtxfilter(const json_spirit::Array& params, bool fHelp)
     
     entities=mc_FillRelevantFilterEntitities(ptr, value_size);
     
-    ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size);
+    ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
     
     if(ptr)
     {
@@ -1064,7 +1085,7 @@ Value runstreamfilter(const json_spirit::Array& params, bool fHelp)
     
     entities=mc_FillRelevantFilterEntitities(ptr, value_size);
     
-    ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size);
+    ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
     
     if(ptr)
     {

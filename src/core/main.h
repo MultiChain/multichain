@@ -129,6 +129,7 @@ struct BlockHasher
 
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
+extern CCriticalSection cs_NodeStatus;
 extern CTxMemPool mempool;
 typedef boost::unordered_map<uint256, CBlockIndex*, BlockHasher> BlockMap;
 extern BlockMap mapBlockIndex;
@@ -154,7 +155,7 @@ static const uint64_t nMinDiskSpace = 52428800;
 
 
 /* MCHN START */
-std::string MultichainServerAddress();
+std::string MultichainServerAddress(bool check_external_ip);
 void ClearMemPools();
 std::string SetLastBlock(uint256 hash);
 std::string SetLastBlock(uint256 hash,bool *fNotFound);

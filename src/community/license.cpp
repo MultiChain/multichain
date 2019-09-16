@@ -3,32 +3,6 @@
 
 #include "community/license.h"
 
-const uint32_t mc_LicenseParamsForHash[]={    
-MC_ENT_SPRM_LICENSE_CHAIN_PARAMS_HASH,
-MC_ENT_SPRM_LICENSE_ADDRESS,
-MC_ENT_SPRM_LICENSE_NONCE,
-MC_ENT_SPRM_LICENSE_START_TIME,
-MC_ENT_SPRM_LICENSE_END_TIME,  
-MC_ENT_SPRM_LICENSE_UNLOCKED_FEATURES,
-MC_ENT_SPRM_LICENSE_FLAGS,
-MC_ENT_SPRM_LICENSE_PARAMS,
-MC_ENT_SPRM_LICENSE_PREV_LICENSE,    
-//MC_ENT_SPRM_LICENSE_NAME,
-MC_ENT_SPRM_LICENSE_DETAILS
-};
-
-const uint32_t mc_LicenseParamsForConfirmation[]={    
-MC_ENT_SPRM_LICENSE_REQUEST_HASH,
-MC_ENT_SPRM_LICENSE_REQUEST_ADDRESS,
-MC_ENT_SPRM_LICENSE_CONFIRMATION_TIME,
-MC_ENT_SPRM_LICENSE_CONFIRMATION_REF,
-MC_ENT_SPRM_LICENSE_PUBKEY,  
-MC_ENT_SPRM_LICENSE_MIN_VERSION,
-MC_ENT_SPRM_LICENSE_MIN_PROTOCOL,
-MC_ENT_SPRM_LICENSE_CONFIRMATION_DETAILS,
-MC_ENT_SPRM_LICENSE_SIGNATURE,    
-};
-
 void CLicenseRequest::Zero()
 {
     m_Data.clear();
@@ -154,14 +128,14 @@ bool CLicenseRequest::Verify()
     return true;
 }
 
-uint256 CLicenseRequest::GetHash(const uint32_t *params,int param_count)
+uint256 CLicenseRequest::GetHash(uint32_t from, uint32_t to,bool add_chain)
 {
     uint256 hash=0;
     uint32_t offset,param_offset;
     size_t src_bytes,bytes;
     const unsigned char *ptr;
     
-    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_LicenseTmpBuffer;
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_LicenseTmpBufferForHash;
     
     src_bytes=m_Data.size();
     if(src_bytes == 0)
@@ -174,10 +148,21 @@ uint256 CLicenseRequest::GetHash(const uint32_t *params,int param_count)
     lpScript->Clear();
     lpScript->AddElement();
     
-    
-    for(int i=0;i<param_count;i++)
+    if(add_chain)
     {
-        offset=mc_FindSpecialParamInDetailsScriptFull(ptr,src_bytes,params[i],&bytes,&param_offset);
+        offset=mc_FindSpecialParamInDetailsScriptFull(ptr,src_bytes,MC_ENT_SPRM_LICENSE_CHAIN_PARAMS_HASH,&bytes,&param_offset);
+        if(param_offset < src_bytes)
+        {
+            if(bytes)
+            {
+                lpScript->SetData(ptr+param_offset,bytes+offset-param_offset);
+            }
+        }                
+    }
+    
+    for(int i=from;i<=to;i++)
+    {
+        offset=mc_FindSpecialParamInDetailsScriptFull(ptr,src_bytes,i,&bytes,&param_offset);
         if(param_offset < src_bytes)
         {
             if(bytes)
@@ -194,19 +179,19 @@ uint256 CLicenseRequest::GetHash(const uint32_t *params,int param_count)
     return hash;
 }
 
-uint256 CLicenseRequest::GetHash()
+uint256 CLicenseRequest::GetLicenseHash()
 {
-    return GetHash(mc_LicenseParamsForHash,sizeof(mc_LicenseParamsForHash)/sizeof(uint32_t));
+    return GetHash(MC_ENT_SPRM_LICENSE_LICENSE_MIN,MC_ENT_SPRM_LICENSE_LICENSE_MAX,true);
 }
 
-uint256 CLicenseRequest::GetConfirmationHash()
+uint256 CLicenseRequest::GetConfirmationNameHash()
 {
-    return GetHash(mc_LicenseParamsForConfirmation,sizeof(mc_LicenseParamsForConfirmation)/sizeof(uint32_t));    
+    return GetHash(MC_ENT_SPRM_LICENSE_CONFIRMATION_MIN,MC_ENT_SPRM_LICENSE_CONFIRMATION_MAX,false);    
 }
 
-std::string CLicenseRequest::GetLicenseNameByConfirmation()
+std::string CLicenseRequest::GetLicenseName()
 {
-    uint256 hash=GetConfirmationHash();
+    uint256 hash=GetConfirmationNameHash();
     unsigned char *ptr=(unsigned char *)&hash;
     
     return strprintf("license-%02x%02x-%02x%02x-%02x%02x-%02x%02x",ptr[31],ptr[30],ptr[29],ptr[28],ptr[27],ptr[26],ptr[25],ptr[24]);

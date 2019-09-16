@@ -96,6 +96,7 @@ bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest);
 bool TryCreateDirectory(const boost::filesystem::path& p);
 std::string mc_SupportedProtocols();
 std::string mc_BuildDescription(int build);
+uint32_t mc_AutosubscribeWalletMode(std::string parameters,bool check_license);
 
 boost::filesystem::path GetDefaultDataDir();
 const boost::filesystem::path &GetDataDir(bool fNetSpecific = true);

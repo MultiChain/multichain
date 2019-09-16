@@ -21,6 +21,8 @@
 
 #define MESSAGE_START_SIZE 4
 
+#define MC_SRV_ENCRYPTED_CONNECTIONS 0x0000000000000002
+
 /** Message header.
  * (4) message start.
  * (12) command.

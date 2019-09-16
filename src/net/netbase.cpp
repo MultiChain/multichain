@@ -44,6 +44,8 @@ static CCriticalSection cs_proxyInfos;
 int nConnectTimeout = DEFAULT_CONNECT_TIMEOUT;
 bool fNameLookup = false;
 
+std::map <string,CNetAddr> mCachedAddresses;
+
 static const unsigned char pchIPv4[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff };
 
 // Need ample time for negotiation for very slow proxies such as Tor (milliseconds)
@@ -653,8 +655,21 @@ CNetAddr::CNetAddr(const std::string &strIp, bool fAllowLookup)
 {
     Init();
     std::vector<CNetAddr> vIP;
-    if (LookupHost(strIp.c_str(), vIP, 1, fAllowLookup))
-        *this = vIP[0];
+    
+    map<string, CNetAddr>::const_iterator it=mCachedAddresses.find(strIp);
+    if(it != mCachedAddresses.end())
+    {
+        *this = it->second;
+    }
+    else
+    {
+        if (LookupHost(strIp.c_str(), vIP, 1, fAllowLookup))
+        {
+            mCachedAddresses.insert(make_pair(strIp,vIP[0]));            
+            *this = vIP[0];
+        }
+    }
+        
 }
 
 unsigned int CNetAddr::GetByte(int n) const
