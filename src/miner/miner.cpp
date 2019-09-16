@@ -1587,7 +1587,7 @@ void static BitcoinMiner(CWallet *pwallet)
             } 
             else
             {
-                if(mc_gState->m_Permissions->m_Block > 1)
+                if( (mc_gState->m_Permissions->m_Block > 1) || !kMiner.IsValid() )
                 {
                     __US_Sleep(100);                
                 }

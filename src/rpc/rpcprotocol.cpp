@@ -45,10 +45,16 @@ const size_t POST_READ_SIZE = 256 * 1024;
 
 string HTTPPost(const string& strMsg, const map<string,string>& mapRequestHeaders)
 {
+    string host=GetArg("-rpcconnect", "127.0.0.1");
+    if(mapArgs.count("-rpcport"))
+    {
+        host+=":" + itostr(BaseParams().RPCPort());        
+    }
     ostringstream s;
     s << "POST / HTTP/1.1\r\n"
       << "User-Agent: bitcoin-json-rpc/" << FormatFullVersion() << "\r\n"
-      << "Host: 127.0.0.1\r\n"
+      << "Host: " << host.c_str() << "\r\n"
+//      << "Host: 127.0.0.1\r\n"
       << "Content-Type: application/json\r\n"
       << "Content-Length: " << strMsg.size() << "\r\n"
       << "Connection: close\r\n"
