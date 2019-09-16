@@ -177,6 +177,7 @@ public:
     CKeyID kAddrRemote;
     CKeyID kAddrLocal;    
     bool fSuccessfullyConnected;
+    bool fEncrypted;
 /* MCHN END */    
 };
 
@@ -277,6 +278,7 @@ public:
     
 /* MCHN START*/    
     
+    uint64_t nMultiChainServices;
     uint64_t nVersionNonceReceived;
     uint64_t nVersionNonceSent;
     uint64_t nVerackNonceReceived;
@@ -293,6 +295,9 @@ public:
     CKeyID kAddrLocal;
 
     CAddress addrFromVersion;
+    
+    void *pEntData;
+    int64_t nNextSendTime;
     
 /* MCHN END*/    
     
@@ -655,6 +660,8 @@ public:
     void Subscribe(unsigned int nChannel, unsigned int nHops=0);
     void CancelSubscribe(unsigned int nChannel);
     void CloseSocketDisconnect();
+    
+    bool DelayedSend();
 
     // Denial-of-service detection/prevention
     // The idea is to detect peers that are behaving

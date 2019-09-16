@@ -16,6 +16,21 @@ struct mc_FilterEngine;
 struct mc_MultiChainFilterEngine;
 struct mc_EnterpriseFeatures;
 
+
+class CInitNodeStatus
+{
+public:
+    bool fInitialized;
+    uint32_t tStartConnectTime;
+    std::string sSeedIP;
+    int nSeedPort;
+    std::string sAddress;
+    std::string sLastError;
+    
+    CInitNodeStatus();
+};
+
+
 namespace boost
 {
 class thread_group;
@@ -27,6 +42,7 @@ extern mc_RelayManager* pRelayManager;
 extern mc_FilterEngine* pFilterEngine;
 extern mc_MultiChainFilterEngine* pMultiChainFilterEngine;
 extern mc_EnterpriseFeatures* pEF;
+extern CInitNodeStatus *pNodeStatus;
 
 
 void StartShutdown();

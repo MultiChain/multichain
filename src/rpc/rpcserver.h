@@ -291,15 +291,31 @@ extern json_spirit::Value getstreampublishersummary(const json_spirit::Array& pa
 extern json_spirit::Value storechunk(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getlicenserequest(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value decodelicenserequest(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value decodelicenseconfirmation(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value activatelicense(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value activatelicensefrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value transferlicense(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value takelicense(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listlicenses(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getlicenseconfirmation(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value importlicenserequest(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getinitstatus(const json_spirit::Array& params, bool fHelp);
 
 extern json_spirit::Value purehelpitem(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value purehelpitem_nomethod(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value purehelpitem_onlyfilter(const json_spirit::Array& params, bool fHelp);
+
+extern json_spirit::Value createfeed(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value suspendfeed(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value deletefeed(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value rescanfeed(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value addfeedstreams(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value removefeedstreams(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value addfeedblocks(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value removefeedblocks(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value purgefeedfile(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listfeeds(const json_spirit::Array& params, bool fHelp);
+
 /* MCHN END */    
 extern json_spirit::Value signmessage(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value verifymessage(const json_spirit::Array& params, bool fHelp);

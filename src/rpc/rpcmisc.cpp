@@ -17,6 +17,7 @@
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #endif
+#include "community/community.h"
 
 #include <stdint.h>
 
@@ -72,6 +73,7 @@ Value getinfo(const Array& params, bool fHelp)
     
     obj.push_back(Pair("version", mc_BuildDescription(mc_gState->GetNumericVersion())));
     obj.push_back(Pair("nodeversion", mc_gState->GetNumericVersion()));
+    obj.push_back(Pair("edition", pEF->ENT_Edition()));
     obj.push_back(Pair("protocolversion", mc_gState->m_NetworkParams->ProtocolVersion()));
     obj.push_back(Pair("chainname", string(mc_gState->m_NetworkParams->Name())));
     obj.push_back(Pair("description", string((char*)mc_gState->m_NetworkParams->GetParam("chaindescription",NULL))));
@@ -79,7 +81,7 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("port", GetListenPort()));    
     obj.push_back(Pair("setupblocks", mc_gState->m_NetworkParams->GetInt64Param("setupfirstblocks")));    
     
-    obj.push_back(Pair("nodeaddress", MultichainServerAddress() + strprintf(":%d",GetListenPort())));       
+    obj.push_back(Pair("nodeaddress", MultichainServerAddress(true) + strprintf(":%d",GetListenPort())));       
 
     obj.push_back(Pair("burnaddress", BurnAddress(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS))));                
     obj.push_back(Pair("incomingpaused", (mc_gState->m_NodePausedState & MC_NPS_INCOMING) ? true : false));                
@@ -120,6 +122,36 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("relayfee",      ValueFromAmount(::minRelayTxFee.GetFeePerK())));
     obj.push_back(Pair("errors",        GetWarnings("statusbar")));
     return obj;
+}
+
+Value getinitstatus(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)  
+        throw runtime_error("Help message not found\n");
+
+    Object obj;
+    
+    obj.push_back(Pair("version", mc_BuildDescription(mc_gState->GetNumericVersion())));
+    obj.push_back(Pair("nodeversion", mc_gState->GetNumericVersion()));
+
+    LOCK(cs_NodeStatus);
+    
+    if(pNodeStatus)
+    {
+        obj.push_back(Pair("initialized", false));        
+        obj.push_back(Pair("connecttime", (int64_t)(mc_TimeNowAsUInt()-pNodeStatus->tStartConnectTime)));
+        obj.push_back(Pair("connectaddress", pNodeStatus->sSeedIP));
+        obj.push_back(Pair("connectport", pNodeStatus->nSeedPort));
+        obj.push_back(Pair("handshakelocal", pNodeStatus->sAddress));
+        obj.push_back(Pair("lasterror", pNodeStatus->sLastError));
+    }
+    else
+    {
+        obj.push_back(Pair("initialized", (mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_VALID) ));        
+    }
+    
+    return obj;
+    
 }
 
 #ifdef ENABLE_WALLET
@@ -505,6 +537,10 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
         {
             string autosubscribe=params[1].get_str();
             uint32_t mode=MC_WMD_NONE;
+            
+            mode |= mc_AutosubscribeWalletMode(params[1].get_str(),false);
+
+/*
             bool found=false;
             if(autosubscribe=="streams")
             {
@@ -529,6 +565,14 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
             if(!found)
             {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value");                                                                        
+            }
+*/
+            if(mode == MC_WMD_NONE)
+            {
+                if(params[1].get_str().size() != 0)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value");                                                                                            
+                }
             }
             
             if(pwalletTxsMain)

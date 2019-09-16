@@ -31,8 +31,8 @@ typedef struct mc_MultiChainFilter
     std::string m_CreateError;
     std::string m_MainName;
     std::string m_FilterCaption;
-    char m_FilterCode[MC_ENT_MAX_SCRIPT_SIZE+1];
     uint32_t m_FilterType;
+    int m_FilterCodeRow;
     uint160 m_FilterAddress;
     
     mc_MultiChainFilter()
@@ -79,6 +79,7 @@ typedef struct mc_MultiChainFilterEngine
     std::vector <mc_MultiChainFilter> m_Filters;
     std::vector <std::vector <std::string>> m_CallbackNames;
     mc_Buffer *m_Workers;
+    mc_Script *m_CodeLibrary;
     uint256 m_TxID;
     CTransaction m_Tx;
     int m_Vout;

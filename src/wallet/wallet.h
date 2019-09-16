@@ -620,7 +620,7 @@ public:
     
     bool DelEKey(const uint256& hashEKey);
     
-    bool SetLicenseRequest(const uint256& hash, const CLicenseRequest& license_request);
+    bool SetLicenseRequest(const uint256& hash, const CLicenseRequest& license_request,const uint256& full_hash);
     
     bool SetLicenseRequestRefCount(const uint256& hash, uint32_t count);
     

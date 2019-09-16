@@ -1081,6 +1081,7 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
 
     JSONRequest jreq;
 /* MCHN START */    
+    bool jreq_parsed=false;
     uint32_t wallet_mode=mc_gState->m_WalletMode;
     if(fDebug)LogPrint("mcapi","mcapi: API request from %s\n",conn->peer_address_to_string().c_str());
 /* MCHN END */    
@@ -1095,14 +1096,24 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
         {
             LOCK(cs_rpcWarmup);
             if (fRPCInWarmup)
-                throw JSONRPCError(RPC_IN_WARMUP, rpcWarmupStatus);
+            {
+                jreq.parse(valRequest);
+                jreq_parsed=true;
+                if( (jreq.strMethod != "stop") && (jreq.strMethod != "getinitstatus") )
+                {
+                    throw JSONRPCError(RPC_IN_WARMUP, rpcWarmupStatus);                    
+                }
+            }
         }
 
         string strReply;
 
         // singleton request
         if (valRequest.type() == obj_type) {
-            jreq.parse(valRequest);
+            if(!jreq_parsed)
+            {
+                jreq.parse(valRequest);
+            }
 
             Value result = tableRPC.execute(jreq.strMethod, jreq.params,jreq.id);
 

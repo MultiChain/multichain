@@ -13,6 +13,7 @@
 #include "keys/key.h"
 #include "structs/base58.h"
 #include "net/net.h"
+#include "community/community.h"
 
 using namespace std;
 
@@ -150,6 +151,7 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
     string sParameterSet="";
     string sParameterSetHash="";
     string sSigScript="";
+    string sEntData="";
     bool only_check_signature; 
     
     uint64_t nNonce;
@@ -176,13 +178,26 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
         pfrom->fVerackackReceived=true;
     }
     
-    vRecv >> sParameterSetHash >> sSigScript;
+    vRecv >> sParameterSetHash;
     
     if(sParameterSetHash.size() != 32)
     {
-            LogPrintf("mchn: Wrong parameter set hash size (%d) from peer=%d\n", sParameterSetHash.size(), pfrom->id);
-            return false;        
+        sEntData=sParameterSetHash;
+        sParameterSetHash="";
+        vRecv >> sParameterSetHash;
     }
+    if(!pEF->NET_ProcessHandshakeData(pfrom,sEntData,fIsVerackack))
+    {
+        LogPrintf("mchn: Wrong extended handshake data from peer=%d\n", pfrom->id);
+        return false;                
+    }
+    if(sParameterSetHash.size() != 32)
+    {
+        LogPrintf("mchn: Wrong parameter set hash size (%d) from peer=%d\n", sParameterSetHash.size(), pfrom->id);
+        return false;        
+    }
+    
+    vRecv >> sSigScript;
     
     if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_VALID)
     {
@@ -278,6 +293,10 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
         }
         
         CHashWriter ss(SER_GETHASH, 0);
+        if(sEntData.size())
+        {
+            ss << vector<unsigned char>((unsigned char*)sEntData.c_str(), (unsigned char*)sEntData.c_str()+sEntData.size());
+        }
         ss << vector<unsigned char>((unsigned char*)sParameterSetHash.c_str(), (unsigned char*)sParameterSetHash.c_str()+32);
         ss << vector<unsigned char>((unsigned char*)&nNonce, (unsigned char*)&nNonce+sizeof(nNonce));
         uint256 signed_hash=ss.GetHash();
@@ -386,7 +405,9 @@ bool PushMultiChainVerack(CNode* pfrom, bool fIsVerackack)
     vector<unsigned char>vParameterSet;
     vector<unsigned char>vParameterSetHash;
     vector<unsigned char>vSigScript;
+    vector<unsigned char>vEntData;
     uint64_t nNonce;
+    bool fAddEntData=true;
     
     if(!fIsVerackack)
     {
@@ -403,6 +424,8 @@ bool PushMultiChainVerack(CNode* pfrom, bool fIsVerackack)
         {
             vParameterSet=vector<unsigned char>(mc_gState->m_NetworkParams->m_lpData,mc_gState->m_NetworkParams->m_lpData+mc_gState->m_NetworkParams->m_Size);        
             LogPrintf("mchn: Sending full parameter set to %s\n", pfrom->addr.ToString());
+            fAddEntData=false;                                                  // Either anyone-can-connect=true - no encryption
+                                                                                // Or it is secondary verack with full paramset in initial connection
         }
         else
         {
@@ -450,8 +473,17 @@ bool PushMultiChainVerack(CNode* pfrom, bool fIsVerackack)
         
     vParameterSetHash=vector<unsigned char>((unsigned char*)&hash_to_send, (unsigned char*)&hash_to_send+32);
     
+    if(fAddEntData)
+    {
+        vEntData=pEF->NET_PushHandshakeData(pfrom,fIsVerackack);
+    }
+    
     CHashWriter ssSig(SER_GETHASH, 0);
-    ssSig << vParameterSetHash;
+    if(vEntData.size())
+    {
+        ssSig << vEntData;
+    }
+    ssSig << vParameterSetHash;        
     ssSig << vector<unsigned char>((unsigned char*)&nNonce, (unsigned char*)&nNonce+sizeof(nNonce));
     uint256 signed_hash=ssSig.GetHash();
             
@@ -519,6 +551,19 @@ bool PushMultiChainVerack(CNode* pfrom, bool fIsVerackack)
         pkey=key.GetPubKey();
     }
     
+    
+    {
+        LOCK(cs_NodeStatus);
+
+        if(pNodeStatus)
+        {
+            if(mc_gState->m_NetworkParams->m_Status != MC_PRM_STATUS_EMPTY)
+            {
+                pNodeStatus->sAddress=CBitcoinAddress(pkey.GetID()).ToString();
+            }
+        }
+    }
+    
     CScript scriptSig;
     vector<unsigned char> vchSig;
     if (!key.Sign(signed_hash, vchSig))
@@ -536,12 +581,28 @@ bool PushMultiChainVerack(CNode* pfrom, bool fIsVerackack)
     if(!fIsVerackack)
     {
         GetRandBytes((unsigned char*)&(pfrom->nVerackNonceSent), sizeof(pfrom->nVerackNonceSent));
-        pfrom->PushMessage("verack", pfrom->nVerackNonceSent, vParameterSet, vParameterSetHash, vSigScript);        
+        if(vEntData.size())
+        {
+            pfrom->PushMessage("verack", pfrom->nVerackNonceSent, vParameterSet, vEntData, vParameterSetHash, vSigScript);                    
+        }
+        else
+        {
+            pfrom->PushMessage("verack", pfrom->nVerackNonceSent, vParameterSet, vParameterSetHash, vSigScript);        
+        }
     }
     else
     {
-        pfrom->PushMessage("verackack", vParameterSetHash, vSigScript);                
+        if(vEntData.size())
+        {
+            pfrom->PushMessage("verackack", vEntData, vParameterSetHash, vSigScript);                            
+        }
+        else
+        {
+            pfrom->PushMessage("verackack", vParameterSetHash, vSigScript);                
+        }
+        pEF->NET_FinalizeHandshake(pfrom);
     }
+    
     
     return true;
     

@@ -2435,3 +2435,54 @@ int mc_Features::License20010()
 }
 
 
+int mc_Features::ExtendedEntityDetails()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 20011)
+        {
+            ret=1;
+        }
+    }
+    
+    return ret;    
+    
+}
+int mc_Features::FixedSpendingBigScripts()
+{
+    int ret=0;
+    
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 1;
+    }
+    
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol < 20000)
+        {
+            if(protocol >= 10012)
+            {
+                ret=1;
+            }
+        }
+        else
+        {
+            if(protocol >= 20011)
+            {
+                ret=1;
+            }            
+        }
+    }
+    
+    return ret;    
+}

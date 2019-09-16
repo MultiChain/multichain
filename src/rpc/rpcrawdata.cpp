@@ -1270,6 +1270,18 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
     return scriptOpReturn;
 }
 
+bool mc_JSInExtendedScript(size_t size)
+{
+    if(size > 32768)
+    {
+        if(mc_gState->m_Features->ExtendedEntityDetails())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError)
 {
     CScript scriptOpReturn=CScript();
@@ -1278,6 +1290,8 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
     const unsigned char *script;
     string entity_name,filter_code,filter_main_name;
     uint32_t filter_type=MC_FLT_TYPE_TX;
+    string js;
+    bool js_extended=false;
 
     bool missing_name=true;
     bool missing_code=true;
@@ -1345,7 +1359,15 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
             }
             if(d.value_.type() == str_type)
             {
-                lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)d.value_.get_str().c_str(),d.value_.get_str().size());                                                        
+                js_extended=mc_JSInExtendedScript(d.value_.get_str().size());
+                if(!js_extended)
+                {
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)d.value_.get_str().c_str(),d.value_.get_str().size());                                                        
+                }
+                else
+                {
+                    js=d.value_.get_str();
+                }
             }
             else
             {
@@ -1429,6 +1451,20 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
         {
             script = lpDetailsScript->GetData(0,&bytes);
             scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+            if(js_extended)
+            {
+                lpDetails->Clear();
+                lpDetails->AddElement();
+                lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)js.c_str(),js.size());                                                        
+
+                script=lpDetails->GetData(0,&bytes);
+                lpDetailsScript->Clear();
+                lpDetailsScript->SetExtendedDetails(script,bytes);
+                script = lpDetailsScript->GetData(0,&bytes);
+                scriptOpReturn << vector<unsigned char>(script, script + bytes);
+//                
+//                scriptOpReturn << vector<unsigned char>((unsigned char*)js.c_str(), (unsigned char*)js.c_str() + js.size());
+            }
         }        
     }
     
