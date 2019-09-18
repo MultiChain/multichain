@@ -1080,7 +1080,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
                         entry.push_back(Pair("retrieve",(pEF->STR_NoRetrieve(&(entStat.m_Entity))==0)));                                                                            
 
                         mc_TxImport dummy_import;
-                        dummy_import.m_ImportID=1;
+                        dummy_import.m_ImportID=-1;
 
                         Object indexes;
                         for(unsigned int ind=0;ind<index_types.size();ind++)
