@@ -1100,7 +1100,9 @@ bool mc_RelayProcess_Chunk_Query(unsigned char *ptrStart,unsigned char *ptrEnd,v
                     string strErrorToIgnore;
                     chunk=*(mc_ChunkEntityKey*)ptr;
                     if( (mc_IsReadPermissionedStream(&chunk,mapReadPermissionCache,NULL) == 0) ||
-                        ((pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_DELIVER,strErrorToIgnore) != 0) && (publisher_ef != NULL) ))
+                        ((pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_DELIVER,strErrorToIgnore) != 0) && 
+                         (pEF->LIC_VerifyFeature(MC_EFT_NETWORK_SIGNED_RECEIVE,strErrorToIgnore) != 0) &&                          
+                            (publisher_ef != NULL) ))
                     {
                         if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,chunk.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
                         {
@@ -1485,13 +1487,13 @@ bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
                 vSigScriptsToVerify.clear();
                 if(read_permissioned)
                 {
-                    if(!pEF->OFF_GetScriptsToVerify(mapReadPermissionCache,vSigScriptsIn,vSigScriptsToVerify,strError))
-                    {
-                        goto exitlbl;                            
-                    }
                     if(!pEF->OFF_ProcessChunkRequest(ptr,ptrEnd,payload_response_ptr,payload_relay_ptr,mapReadPermissionCache,strError))
                     {
                         goto exitlbl;                                                    
+                    }
+                    if(!pEF->OFF_GetScriptsToVerify(mapReadPermissionCache,vSigScriptsIn,vSigScriptsToVerify,strError))
+                    {
+                        goto exitlbl;                            
                     }
                 }
                 else
