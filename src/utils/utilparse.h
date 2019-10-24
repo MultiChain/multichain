@@ -10,6 +10,15 @@
 #include "keys/key.h"
 #include "core/main.h"
 
+#define MC_DRF_SIZE                                               40
+#define MC_DRF_TYPE_UNKNOWN                                        1                                               
+#define MC_DRF_TYPE_TXOUT_GENERAL                                  1                                               
+#define MC_DRF_TYPE_TXOUT_BLOCKS                                   2                                               
+#define MC_DRF_TYPE_RAW_BLOCKS                                     3                                               
+#define MC_DRF_TYPE_CHUNK_GENERAL                                  4 
+#define MC_DRF_TYPE_RAW_CHUNKS                                     5 
+
+
 bool ExtractDestinationScriptValid(const CScript& scriptPubKey, CTxDestination& addressRet);
 const unsigned char* GetAddressIDPtr(const CTxDestination& address);
 bool HasPerOutputDataEntries(const CTxOut& txout,mc_Script *lpScript);
@@ -24,9 +33,35 @@ int CheckRequiredPermissions(const CTxDestination& addressRet,int expected_allow
 bool mc_VerifyAssetPermissions(mc_Buffer *assets, std::vector<CTxDestination> addressRets, int required_permissions, uint32_t permission, std::string& reason);
 bool mc_ExtractOutputAssetQuantities(mc_Buffer *assets,std::string& reason,bool with_followons);
 
-
-
-
+typedef struct  mc_DataRef
+{
+    unsigned char m_Ref[MC_DRF_SIZE];
+    uint256 m_Hash;
+    uint32_t m_File;
+    uint32_t m_Offset;
+    uint32_t m_Size;
+    uint32_t m_Format;
+    uint32_t m_Type;
+    
+    mc_DataRef()
+    {
+        Zero();
+    }
+    
+    ~mc_DataRef()
+    {
+        Destroy();
+    }
+    
+    void Zero();
+    void Destroy();
+    
+    bool Set(uint256 hash,uint32_t file,uint32_t offset,uint32_t size,uint32_t format,uint32_t type);
+    bool Set(void *ref,uint32_t refsize);
+    void* Get(uint32_t* refsize);
+    bool Read();
+    
+} mc_DataRef;
 
 
 
