@@ -59,6 +59,7 @@ typedef struct  mc_DataRef
     bool Set(uint256 hash,uint32_t file,uint32_t offset,uint32_t size,uint32_t format,uint32_t type);
     bool Set(void *ref,uint32_t refsize);
     void* Get(uint32_t* refsize);
+    bool Init(CScript &script,const unsigned char **elem,uint32_t *size,uint32_t *format,std::string &strError);
     bool Read();
     
 } mc_DataRef;

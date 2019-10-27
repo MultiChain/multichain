@@ -2,7 +2,7 @@
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "utils/utilparse.h"
-#include "util.h"
+#include "version/clientversion.h"
 
 using namespace std;
 
@@ -1246,6 +1246,7 @@ bool mc_DataRef::Set(void *ref,uint32_t refsize)
                 memcpy(&m_Hash,m_Ref,32);
                 m_Offset=mc_GetLE(m_Ref+32,sizeof(uint32_t));
                 m_Size=mc_GetLE(m_Ref+36,sizeof(uint32_t)) & 0x0FFFFFFF;                                
+                m_Type=MC_DRF_TYPE_RAW_BLOCKS;
                 return true;
             }                
             break;
@@ -1253,6 +1254,122 @@ bool mc_DataRef::Set(void *ref,uint32_t refsize)
     
     Zero();                     
     
+    return false;
+}
+
+bool mc_DataRef::Init(CScript &script,const unsigned char **elem,uint32_t *size,uint32_t *format,string &strError)
+{
+    strError="";
+    script.clear();
+    if(m_Type == MC_DRF_TYPE_TXOUT_GENERAL)
+    {
+        CTransaction tx;
+        uint256 hashBlock = 0;
+        if (!GetTransaction(m_Hash, tx, hashBlock, true))
+        {
+            strError="No information available about transaction";
+            return false;
+        }
+
+        if( m_Offset >= tx.vout.size())  
+        {
+            strError="Invalid vout";
+            return false;
+        }
+        script = tx.vout[m_Offset].scriptPubKey;                 
+        return true;        
+    }
+    if(m_Type == MC_DRF_TYPE_TXOUT_BLOCKS)
+    {
+        CTxOut txout;
+        CDiskBlockPos block_pos;
+        if (mapBlockIndex.count(m_Hash) == 0)
+        {
+            strError="Block not found";
+            return false;
+        }
+
+        block_pos=mapBlockIndex[m_Hash]->GetBlockPos();
+        CAutoFile file(OpenBlockFile(block_pos, true), SER_DISK, CLIENT_VERSION);
+        if (file.IsNull())
+        {
+            strError="Cannot open block file";
+            return false;
+        }
+        try 
+        {
+            fseek(file.Get(), m_Offset, SEEK_CUR);
+            file >> txout;
+        } 
+        catch (std::exception &e) 
+        {
+            strError="Block file read error";
+            return false;
+        }
+
+        script = txout.scriptPubKey;                 
+        
+        return true;
+    }
+    if(m_Type == MC_DRF_TYPE_CHUNK_GENERAL)
+    {
+        *format=m_Format;
+        *size=0;// TODO
+        return true;
+    }
+    if(m_Type == MC_DRF_TYPE_RAW_CHUNKS)
+    {
+        *format=m_Format;
+        *size=m_Size;
+        return true;
+    }
+    if(m_Type == MC_DRF_TYPE_RAW_BLOCKS)
+    {
+        *format=m_Format;
+        *size=m_Size;
+                
+        mc_gState->m_TmpBuffers->m_RpcChunkScript1->Clear();
+        mc_gState->m_TmpBuffers->m_RpcChunkScript1->Resize(m_Size,1);
+
+        if(m_Size == 0)
+        {
+            return mc_gState->m_TmpBuffers->m_RpcChunkScript1->m_lpData;
+        }
+
+        CDiskBlockPos block_pos;
+        if (mapBlockIndex.count(m_Hash) == 0)
+        {
+            strError="Block not found";
+            return false;
+        }
+
+        block_pos=mapBlockIndex[m_Hash]->GetBlockPos();
+        CAutoFile file(OpenBlockFile(block_pos, true), SER_DISK, CLIENT_VERSION);
+        if (file.IsNull())
+        {
+            strError="Cannot open block file";
+            return false;
+        }
+        try 
+        {
+            fseek(file.Get(), m_Offset, SEEK_CUR);
+            if(fread(mc_gState->m_TmpBuffers->m_RpcChunkScript1->m_lpData,1,m_Size,file.Get()) != m_Size)
+            {
+                strError="Block file read error";
+                return false;                
+            }
+        } 
+        catch (std::exception &e) 
+        {
+            strError="Block file read error";
+            return false;
+        }
+        
+        *elem=mc_gState->m_TmpBuffers->m_RpcChunkScript1->m_lpData;        
+        return true;
+    }
+    
+    strError="Invalid data reference";
     return false;
 }
 
