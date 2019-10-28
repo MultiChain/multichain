@@ -1156,6 +1156,9 @@ void mc_DataRef::Destroy()
 
 bool mc_DataRef::Set(uint256 hash,uint32_t file,uint32_t offset,uint32_t size,uint32_t format,uint32_t type)
 {
+    uint32_t w;
+    w=(size & 0x0FFFFFFF) | ((format & 0x07) << 28);
+    
     Zero();
     m_Hash=hash;
     m_File=file;
@@ -1167,34 +1170,36 @@ bool mc_DataRef::Set(uint256 hash,uint32_t file,uint32_t offset,uint32_t size,ui
     switch(m_Type)
     {
         case MC_DRF_TYPE_TXOUT_GENERAL:
-            memcpy(m_Ref,&hash,32);
-            mc_PutLE(m_Ref+32,&offset,sizeof(uint32_t));
-            m_Ref[39]=0xF1;
+            m_Ref[3]=0xF1;
+            memcpy(m_Ref+4,&hash,32);            
+            mc_SwapBytes(m_Ref+4,32);
+            mc_PutLE(m_Ref+36,&offset,sizeof(uint32_t));            
             return true;
         case MC_DRF_TYPE_TXOUT_BLOCKS:
-            memcpy(m_Ref,&hash,32);
-            mc_PutLE(m_Ref+32,&offset,sizeof(uint32_t));
-            m_Ref[39]=0xF2;
+            m_Ref[3]=0xF2;
+            memcpy(m_Ref+4,&hash,32);
+            mc_SwapBytes(m_Ref+4,32);
+            mc_PutLE(m_Ref+36,&offset,sizeof(uint32_t));
             return true;
         case MC_DRF_TYPE_CHUNK_GENERAL:
-            memcpy(m_Ref,&hash,32);
-            mc_PutLE(m_Ref+32,&format,sizeof(uint32_t));
-            m_Ref[39]=0xF3;
+            m_Ref[3]=0xF3;
+            memcpy(m_Ref+4,&hash,32);
+            mc_SwapBytes(m_Ref+4,32);
+            mc_PutLE(m_Ref+36,&w,sizeof(uint32_t));
             return true;
         case MC_DRF_TYPE_RAW_CHUNKS:
-            memcpy(m_Ref,(unsigned char*)&hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-            mc_PutLE(m_Ref+16,&file,sizeof(uint32_t));
-            mc_PutLE(m_Ref+20,&offset,sizeof(uint32_t));
-            mc_PutLE(m_Ref+24,&size,sizeof(uint32_t));
-            mc_PutLE(m_Ref+32,&format,sizeof(uint32_t));
-            m_Ref[39]=0xF4;
+            m_Ref[3]=0xF4;
+            memcpy(m_Ref+4,(unsigned char*)&hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+            mc_SwapBytes(m_Ref+4,MC_AST_SHORT_TXID_SIZE);
+            mc_PutLE(m_Ref+20,&file,sizeof(uint32_t));
+            mc_PutLE(m_Ref+24,&offset,sizeof(uint32_t));
+            mc_PutLE(m_Ref+36,&w,sizeof(uint32_t));
             return true;
         case MC_DRF_TYPE_RAW_BLOCKS:
-            uint32_t w;
-            memcpy(m_Ref,&hash,32);
-            mc_PutLE(m_Ref+32,&offset,sizeof(uint32_t));
-            w=(size & 0x0FFFFFFF) | ((format & 0x07) << 28);
-            mc_PutLE(m_Ref+36,&w,sizeof(uint32_t));
+            mc_PutLE(m_Ref+0,&w,sizeof(uint32_t));
+            memcpy(m_Ref+4,&hash,32);
+            mc_SwapBytes(m_Ref+4,32);
+            mc_PutLE(m_Ref+36,&offset,sizeof(uint32_t));
             return true;
     }
     
@@ -1206,6 +1211,8 @@ bool mc_DataRef::Set(uint256 hash,uint32_t file,uint32_t offset,uint32_t size,ui
 
 bool mc_DataRef::Set(void *ref,uint32_t refsize)
 {
+    uint32_t w;
+    
     Zero();                     
     if(refsize != MC_DRF_SIZE)
     {
@@ -1214,38 +1221,47 @@ bool mc_DataRef::Set(void *ref,uint32_t refsize)
     
     memcpy(m_Ref,ref,MC_DRF_SIZE);
     
-    switch(m_Ref[39])
+    switch(m_Ref[3])
     {
         case 0xF1:
-            memcpy(&m_Hash,m_Ref,32);
-            m_Offset=mc_GetLE(m_Ref+32,sizeof(uint32_t));
+            memcpy(&m_Hash,m_Ref+4,32);
+            mc_SwapBytes(&m_Hash,32);
+            m_Offset=mc_GetLE(m_Ref+36,sizeof(uint32_t));
             m_Type=MC_DRF_TYPE_TXOUT_GENERAL;
             return true;
         case 0xF2:
-            memcpy(&m_Hash,m_Ref,32);
-            m_Offset=mc_GetLE(m_Ref+32,sizeof(uint32_t));
+            memcpy(&m_Hash,m_Ref+4,32);
+            mc_SwapBytes(&m_Hash,32);
+            m_Offset=mc_GetLE(m_Ref+36,sizeof(uint32_t));
             m_Type=MC_DRF_TYPE_TXOUT_BLOCKS;
             return true;
         case 0xF3:
-            memcpy(&m_Hash,m_Ref,32);
-            m_Format=mc_GetLE(m_Ref+32,sizeof(uint32_t));
+            memcpy(&m_Hash,m_Ref+4,32);
+            mc_SwapBytes(&m_Hash,32);
+            w=mc_GetLE(m_Ref+36,sizeof(uint32_t));
+            m_Format=w >> 28;
+            m_Size=w & 0x0FFFFFFF;                                
             m_Type=MC_DRF_TYPE_CHUNK_GENERAL;
             return true;
         case 0xF4:
-            memcpy((unsigned char*)&m_Hash+MC_AST_SHORT_TXID_OFFSET,m_Ref,MC_AST_SHORT_TXID_SIZE);
-            m_File=mc_GetLE(m_Ref+16,sizeof(uint32_t));
-            m_Offset=mc_GetLE(m_Ref+20,sizeof(uint32_t));
-            m_Size=mc_GetLE(m_Ref+24,sizeof(uint32_t));
-            m_Format=mc_GetLE(m_Ref+32,sizeof(uint32_t));
+            memcpy((unsigned char*)&m_Hash+MC_AST_SHORT_TXID_OFFSET,m_Ref+4,MC_AST_SHORT_TXID_SIZE);
+            mc_SwapBytes(&m_Hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+            m_File=mc_GetLE(m_Ref+20,sizeof(uint32_t));
+            m_Offset=mc_GetLE(m_Ref+24,sizeof(uint32_t));
+            w=mc_GetLE(m_Ref+36,sizeof(uint32_t));
+            m_Format=w >> 28;
+            m_Size=w & 0x0FFFFFFF;                                
             m_Type=MC_DRF_TYPE_RAW_CHUNKS;
             return true;
         default:
-            m_Format=m_Ref[39] >> 4;
+            w=mc_GetLE(m_Ref,sizeof(uint32_t));
+            m_Format=w >> 28;
+            m_Size=w & 0x0FFFFFFF;                                
             if((m_Format & 0x08) == 0)
             {
-                memcpy(&m_Hash,m_Ref,32);
-                m_Offset=mc_GetLE(m_Ref+32,sizeof(uint32_t));
-                m_Size=mc_GetLE(m_Ref+36,sizeof(uint32_t)) & 0x0FFFFFFF;                                
+                memcpy(&m_Hash,m_Ref+4,32);
+                mc_SwapBytes(&m_Hash,32);
+                m_Offset=mc_GetLE(m_Ref+36,sizeof(uint32_t));
                 m_Type=MC_DRF_TYPE_RAW_BLOCKS;
                 return true;
             }                
@@ -1314,7 +1330,7 @@ bool mc_DataRef::Init(CScript &script,const unsigned char **elem,uint32_t *size,
     if(m_Type == MC_DRF_TYPE_CHUNK_GENERAL)
     {
         *format=m_Format;
-        *size=0;// TODO
+        *size=m_Size;
         return true;
     }
     if(m_Type == MC_DRF_TYPE_RAW_CHUNKS)

@@ -236,6 +236,7 @@ int mc_GetFullFileName(const char *network_name,const char *filename, const char
 int64_t mc_GetVarInt(const unsigned char *buf,int max_size,int64_t default_value,int* shift);
 int mc_PutVarInt(unsigned char *buf,int max_size,int64_t value);
 int mc_BuildDescription(int build, char *desc);
+void mc_SwapBytes(void *vptr,uint32_t size);
 
 void mc_GetCompoundHash160(void *result,const void  *hash1,const void  *hash2);
 int mc_SetIPv4ServerAddress(const char* host);

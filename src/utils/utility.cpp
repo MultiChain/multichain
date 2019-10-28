@@ -1923,3 +1923,14 @@ void sprintf_hex(char *hex,const unsigned char *bin,int size)
     hex[size*2]=0;      
 }
 
+void mc_SwapBytes(void *vptr,uint32_t size)
+{
+    unsigned char *ptr=(unsigned char *)vptr;
+    unsigned char t;
+    for(uint32_t i=0;i<size/2;i++)
+    {
+        t=ptr[i];
+        ptr[i]=ptr[size-i-1];
+        ptr[size-i-1]=t;
+    }
+}
