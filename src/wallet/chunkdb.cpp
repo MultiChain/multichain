@@ -77,6 +77,8 @@ void mc_ChunkDB::Zero()
     m_ChunkData=NULL;
     m_TmpScript=NULL;
     
+    m_FeedPos=0;
+    
     m_Semaphore=NULL;
     m_LockedBy=0;    
 }
@@ -2190,6 +2192,7 @@ exitlbl:
             sprintf(msg,"NewBlock %d, Chunks: %d,",block,m_MemPool->GetCount());
             LogString(msg);   
         }
+        m_FeedPos=0;
         m_MemPool->Clear();
         m_ChunkData->Clear();
     }
@@ -2201,6 +2204,8 @@ exitlbl:
 int mc_ChunkDB::Commit(int block)
 {
     int err;
+    
+    pEF->FED_EventChunksAvailable();    
     
     Lock();
     err=CommitInternal(block,0);

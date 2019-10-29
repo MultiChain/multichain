@@ -153,6 +153,7 @@ void mc_ChunkCollector::SetDBRow(mc_ChunkCollectorRow* collect_row)
     m_DBRow.m_Status=collect_row->m_State.m_Status;
     memcpy(m_DBRow.m_Salt,collect_row->m_Salt,MAX_CHUNK_SALT_SIZE);
     m_DBRow.m_SaltSize=collect_row->m_SaltSize;
+    m_DBRow.m_CollectorFlags=collect_row->m_Flags;
 }
 
 void mc_ChunkCollector::GetDBRow(mc_ChunkCollectorRow* collect_row)
@@ -171,6 +172,7 @@ void mc_ChunkCollector::GetDBRow(mc_ChunkCollectorRow* collect_row)
     collect_row->m_State.m_Status |= MC_CCF_INSERTED;                
     memcpy(collect_row->m_Salt,m_DBRow.m_Salt,MAX_CHUNK_SALT_SIZE);
     collect_row->m_SaltSize=m_DBRow.m_SaltSize;
+    collect_row->m_Flags=m_DBRow.m_CollectorFlags;
 }
 
 int mc_ChunkCollector::DeleteDBRow(mc_ChunkCollectorRow *collect_row)
@@ -551,12 +553,13 @@ int mc_ChunkCollector::InsertChunk(                                             
                  const unsigned char *txid,
                  const int vout,
                  const uint32_t chunk_size,
-                 const uint32_t salt_size)
+                 const uint32_t salt_size,
+                 const uint32_t flags)
 {
     int err;
     
     Lock();
-    err=InsertChunkInternal(hash,entity,txid,vout,chunk_size,salt_size);
+    err=InsertChunkInternal(hash,entity,txid,vout,chunk_size,salt_size,flags);
     UnLock();
     
     return err;    
@@ -695,7 +698,8 @@ int mc_ChunkCollector::InsertChunkInternal(
                  const unsigned char *txid,
                  const int vout,
                  const uint32_t chunk_size,
-                 const uint32_t salt_size)
+                 const uint32_t salt_size,
+                 const uint32_t flags)
 {
     mc_ChunkCollectorRow collect_row;
     int mprow;
@@ -707,6 +711,7 @@ int mc_ChunkCollector::InsertChunkInternal(
     collect_row.m_Vout=vout;
     collect_row.m_ChunkDef.m_Size=chunk_size;
     collect_row.m_State.m_Status=MC_CCF_NEW;
+    collect_row.m_Flags=flags;
     collect_row.m_SaltSize=salt_size;
     memset(collect_row.m_Salt,0,MAX_CHUNK_SALT_SIZE);
     

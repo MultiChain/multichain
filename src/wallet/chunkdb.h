@@ -31,6 +31,8 @@
 #define MC_CFL_STORAGE_FLUSHED        0x01000000 
 #define MC_CFL_STORAGE_PURGED         0x02000000 
 
+#define MC_CFL_FORMAT_MASK            0x00000007 
+#define MC_CFL_SINGLE_CHUNK           0x00010000 
 
 /** File DB Row*/
 
@@ -140,6 +142,8 @@ typedef struct mc_ChunkDB
     mc_Buffer *m_MemPool;
     mc_Script *m_ChunkData;
     mc_Script *m_TmpScript;
+    
+    int m_FeedPos;
 
     void *m_Semaphore;                                                          // mc_TxDB object semaphore
     uint64_t m_LockedBy;                                                        // ID of the thread locking it

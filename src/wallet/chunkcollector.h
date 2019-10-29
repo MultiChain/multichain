@@ -78,7 +78,7 @@ typedef struct mc_ChunkCollectorDBRow
     
     unsigned char m_Salt[MC_CDB_CHUNK_HASH_SIZE];                               // Salt size should not be large than hash size
     uint32_t m_SaltSize;
-    uint32_t m_Reserved1;
+    uint32_t m_CollectorFlags;
     int64_t m_Reserved2;
     
     void Zero();
@@ -92,7 +92,7 @@ typedef struct mc_ChunkCollectorRow
     unsigned char m_TxID[MC_TDB_TXID_SIZE];                               
     unsigned char m_Salt[MC_CDB_CHUNK_HASH_SIZE];                               
     uint32_t m_SaltSize;
-    uint32_t m_Reserved1;
+    uint32_t m_Flags;
     
     mc_ChunkEntityValue m_State;
     
@@ -186,7 +186,8 @@ typedef struct mc_ChunkCollector
                  const unsigned char *txid,
                  const int vout,
                  const uint32_t chunk_size,
-                 const uint32_t salt_size);  
+                 const uint32_t salt_size,
+                 const uint32_t flags);  
     
     int InsertChunkInternal(                  
                  const unsigned char *hash,   
@@ -194,7 +195,8 @@ typedef struct mc_ChunkCollector
                  const unsigned char *txid,
                  const int vout,
                  const uint32_t chunk_size,
-                 const uint32_t salt_size);  
+                 const uint32_t salt_size,
+                 const uint32_t flags);  
 
     int MarkAndClear(uint32_t flag, int unmark);    
     int CopyFlags();    

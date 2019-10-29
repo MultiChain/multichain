@@ -259,7 +259,7 @@ bool MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map 
             if( (collect_row->m_State.m_Status & MC_CCF_DELETED ) == 0 )
             {
                 chunk_err=pwalletTxsMain->m_ChunkDB->AddChunk(chunk->m_Hash,&(chunk->m_Entity),(unsigned char*)collect_row->m_TxID,collect_row->m_Vout,
-                        ptrOut,NULL,collect_row->m_Salt,sizeOut,0,collect_row->m_SaltSize,0);
+                        ptrOut,NULL,collect_row->m_Salt,sizeOut,0,collect_row->m_SaltSize,collect_row->m_Flags);
                 if(chunk_err)
                 {
                     if(chunk_err != MC_ERR_FOUND)
@@ -930,6 +930,12 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
             collector->Commit();
             collector->m_NextAutoCommitTimestamp=GetTimeMillis()+collector->m_AutoCommitDelay;
         }
+    }
+    
+    int err=pEF->FED_EventChunksAvailable();
+    if(err)
+    {
+        LogPrintf("ERROR: Cannot write offchain items to feeds, error %d\n",err);
     }
     
     

@@ -1651,6 +1651,13 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                              error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
                              REJECT_INVALID, reason);            
         }
+        err=pEF->FED_EventChunksAvailable();
+        if(err)
+        {
+            LogPrintf("ERROR: Cannot write offchain items from tx %s to feeds, error %d\n",hash.ToString().c_str(),err);
+        }
+        
+        err=MC_ERR_NOERROR;
         
         permissions_to=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
         entry.SetReplayNodeParams(( (replay & MC_PPL_REPLAY) != 0) ? true : false,permissions_from,permissions_to);
@@ -2973,6 +2980,13 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
             pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
         }
     }
+    
+    err=pEF->FED_EventChunksAvailable();
+    if(err)
+    {
+        LogPrintf("ERROR: Cannot write offchain items in block, error %d\n",err);
+    }
+    
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, commit                  (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
     if(err == MC_ERR_NOERROR)
     {
