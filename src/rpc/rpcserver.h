@@ -315,6 +315,8 @@ extern json_spirit::Value addfeedblocks(const json_spirit::Array& params, bool f
 extern json_spirit::Value removefeedblocks(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value purgefeedfile(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listfeeds(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getdatarefdata(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value datareftobinarycache(const json_spirit::Array& params, bool fHelp);
 
 /* MCHN END */    
 extern json_spirit::Value signmessage(const json_spirit::Array& params, bool fHelp);

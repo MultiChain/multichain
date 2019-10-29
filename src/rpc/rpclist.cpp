@@ -189,6 +189,8 @@ static const CRPCCommand vRPCCommands[] =
     { "hidden",             "removefeedblocks",       &removefeedblocks,        true,      false,      false },
     { "hidden",             "purgefeedfile",          &purgefeedfile,           true,      false,      false },
     { "hidden",             "listfeeds",              &listfeeds,               true,      false,      false },
+    { "hidden",             "getdatarefdata",         &getdatarefdata,          true,      false,      false },
+    { "hidden",             "datareftobinarycache",   &datareftobinarycache,    true,      false,      false },
 
     /* Wallet */
     { "wallet",             "addmultisigaddress",     &addmultisigaddress,     true,      false,      true },

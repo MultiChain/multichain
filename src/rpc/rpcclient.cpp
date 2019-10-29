@@ -245,7 +245,9 @@ static const std::string vAPINames[] =
 "addfeedblocks",
 "removefeedblocks",
 "purgefeedfile",       
-"listfeeds"
+"listfeeds",
+"getdatarefdata", 
+"datareftobinarycache"
 };
 
 static const CRPCConvertParam vRPCConvertParams[] =
@@ -539,6 +541,10 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "purgefeedfile", 2 },
     { "listfeeds", 0 },
     { "listfeeds", 1 },                                                            
+    { "getdatarefdata", 1 },
+    { "getdatarefdata", 2 },
+    { "datareftobinarycache", 2 },
+    { "datareftobinarycache", 3 },
 };
 
 class CRPCConvertTable

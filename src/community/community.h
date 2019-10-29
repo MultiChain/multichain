@@ -19,6 +19,7 @@
 #define MC_EFT_NETWORK_SIGNED_SEND                  0x0000000000020000
 #define MC_EFT_NETWORK_ENCRYPTED_CONNECTIONS        0x0000000000040000
 #define MC_EFT_FEEDS                                0x0000000000100000
+#define MC_EFT_DATAREFS                             0x0000000000200000
 
 #define MC_EFT_ALL                                  0xFFFFFFFFFFFFFFFF
 
@@ -69,6 +70,12 @@ typedef struct mc_EnterpriseFeatures
     Value FED_RPCRemoveFeedBlocks(const Array& params);
     Value FED_RPCPurgeFeedFile(const Array& params);
     Value FED_RPCListFeeds(const Array& params);
+    
+    Value DRF_RPCGetDataRefData(const Array& params);
+    Value DRF_RPCDataRefToBinaryCache(const Array& params);
+    bool DRF_GetData(string dataref,CScript &script,const unsigned char **elem,int64_t *size,uint32_t *format,std::string &strError);
+    
+    
     int FED_EventTx(const CTransaction& tx,int block,CDiskTxPos* block_pos,uint32_t block_tx_index,uint256 block_hash,uint32_t block_timestamp);
     int FED_EventChunksAvailable();    
     

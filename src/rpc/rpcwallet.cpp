@@ -17,6 +17,7 @@
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #include "rpc/rpcwallet.h"
+#include "community/community.h"
 
 #include <stdint.h>
 
@@ -601,7 +602,7 @@ Value storechunk(const Array& params, bool fHelp)
 Value txoutdata_operation(const Array& params,int fHan)
 {
     CScript txout_script;
-    uint32_t format,dataref_size;
+    uint32_t format;
     unsigned char *chunk_hashes;
     int chunk_count=0;   
     int64_t total_chunk_size,out_size;
@@ -611,22 +612,21 @@ Value txoutdata_operation(const Array& params,int fHan)
     string error_str;
     int errorCode;
     
-    mc_DataRef dataref;
     out_size=0;
     format=MC_SCR_DATA_FORMAT_UNKNOWN;
     elem=NULL;
     
-    vector<unsigned char>vDataRef=ParseHex(params[0].get_str());
-    if(dataref.Set(&vDataRef[0],vDataRef.size()))
+    if(!pEF->DRF_GetData(params[0].get_str(),txout_script,&elem,&out_size,&format,error_str))
     {
-        if(!dataref.Init(txout_script,&elem,&dataref_size,&format,error_str))
+        if(error_str.size())
         {
             throw JSONRPCError(RPC_INVALID_PARAMETER, error_str);                    
         }
-        out_size=dataref_size;
-    }
-    else
-    {
+        if(params[1].type() == str_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid data reference");                                
+        }
+        
         uint256 hash;
         hash=uint256(params[0].get_str());
     //    uint256 hash(params[0].get_str());
