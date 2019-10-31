@@ -2981,10 +2981,13 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
         }
     }
     
-    err=pEF->FED_EventChunksAvailable();
-    if(err)
+    if(pindexNew->nHeight)
     {
-        LogPrintf("ERROR: Cannot write offchain items in block, error %d\n",err);
+        err=pEF->FED_EventChunksAvailable();
+        if(err)
+        {
+            LogPrintf("ERROR: Cannot write offchain items in block, error %d\n",err);
+        }
     }
     
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, commit                  (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
@@ -3294,7 +3297,6 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     const CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
 
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Best chain activation\n");
-    
     // Disconnect active blocks which are no longer in the best chain.
     while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
         if (!DisconnectTip(state))
@@ -4819,7 +4821,6 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
         }
     }
  */ 
-    
     if(activate)
     {
         {

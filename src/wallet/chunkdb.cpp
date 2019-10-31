@@ -2205,7 +2205,10 @@ int mc_ChunkDB::Commit(int block)
 {
     int err;
     
-    pEF->FED_EventChunksAvailable();    
+    if(block)
+    {
+        pEF->FED_EventChunksAvailable();    
+    }
     
     Lock();
     err=CommitInternal(block,0);
