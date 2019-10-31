@@ -1651,12 +1651,6 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                              error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
                              REJECT_INVALID, reason);            
         }
-        err=pEF->FED_EventChunksAvailable();
-        if(err)
-        {
-            LogPrintf("ERROR: Cannot write offchain items from tx %s to feeds, error %d\n",hash.ToString().c_str(),err);
-        }
-        
         err=MC_ERR_NOERROR;
         
         permissions_to=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
@@ -1665,6 +1659,11 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 /* MCHN END */    
         // Store transaction in memory
         pool.addUnchecked(hash, entry);
+        err=pEF->FED_EventChunksAvailable();
+        if(err)
+        {
+            LogPrintf("ERROR: Cannot write offchain items from tx %s to feeds, error %d\n",hash.ToString().c_str(),err);
+        }        
     }
 
     if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
