@@ -2513,16 +2513,16 @@ int mc_TxDB::TransferSubKey(mc_TxEntityStat *lpChainEntStat,const mc_TxEntityRow
     int subkey_list_size,transferred_subkeys;
     int err=MC_ERR_NOERROR;
     int i,value_len; 
-    
+        
     transferred_subkeys=0;
     
     switch(lpChainEntStat->m_Entity.m_EntityType & MC_TET_TYPE_MASK)
     {
         case MC_TET_STREAM_KEY:
         case MC_TET_STREAM_PUBLISHER:
-            mc_GetCompoundHash160(&stream_subkey_hash160,&(erow.m_Entity.m_EntityID),erow.m_TxId);
+            mc_GetCompoundHash160(stream_subkey_hash160,&(erow.m_Entity.m_EntityID),erow.m_TxId);
             subkey_erow.Zero();
-            memcpy(subkey_erow.m_Entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+            memcpy(subkey_erow.m_Entity.m_EntityID,stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
             subkey_erow.m_Entity.m_EntityType=lpChainEntStat->m_Entity.m_EntityType | MC_TET_SUBKEY;
             subkey_erow.m_Generation=lpChainEntStat->m_Generation;
             GetListSize(&(subkey_erow.m_Entity),subkey_erow.m_Generation,&subkey_list_size);
@@ -2624,6 +2624,12 @@ mc_TxImport *mc_TxDB::StartImport(mc_Buffer *lpEntities,int block,int *err)
                         erow.SwapPosBytes();
                         erow.m_Generation=lpChainEntStat->m_Generation;
                         ptr=(unsigned char*)m_Database->m_DB->Read((char*)&erow+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,err);
+
+                        if(ptr)
+                        {
+                            memcpy((char*)&erow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
+                        }
+
                         erow.m_Generation=(m_Imports+slot)->m_ImportID;         // Change generation when writing to DB
                         *err=m_Database->m_DB->Write((char*)&erow+m_Database->m_KeyOffset,m_Database->m_KeySize,(char*)ptr,m_Database->m_ValueSize,MC_OPT_DB_DATABASE_TRANSACTIONAL);                        
                         erow.SwapPosBytes();
@@ -2826,9 +2832,9 @@ int mc_TxDB::Unsubscribe(mc_Buffer* lpEntities)
                             {
                                 memcpy((char*)&erow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
                             }
-                            mc_GetCompoundHash160(&stream_subkey_hash160,&(erow.m_Entity.m_EntityID),erow.m_TxId);
+                            mc_GetCompoundHash160(stream_subkey_hash160,&(erow.m_Entity.m_EntityID),erow.m_TxId);
                             subkey_erow.Zero();
-                            memcpy(subkey_erow.m_Entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+                            memcpy(subkey_erow.m_Entity.m_EntityID,stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
                             subkey_erow.m_Entity.m_EntityType=lpent->m_Entity.m_EntityType | MC_TET_SUBKEY;
                             subkey_erow.m_Generation=erow.m_Generation;
                             GetListSize(&(subkey_erow.m_Entity),subkey_erow.m_Generation,&subkey_list_size);
@@ -2940,7 +2946,7 @@ int mc_TxDB::CompleteImport(mc_TxImport *import,uint32_t flags)
     char enthex[65];
     char txhex[65];
     int err;
-    int i,j,row,gen,chain_entities,take_it,value_len;
+    int i,j,row,gen,chain_entities,take_it,value_len,oldmempool_size;
     int subkey_list_size,deleted_items,mprow;
     uint32_t pos,clearedpos;
     mc_Buffer *mempool;
@@ -2952,6 +2958,7 @@ int mc_TxDB::CompleteImport(mc_TxImport *import,uint32_t flags)
     mc_TxEntityRow erow;
     mc_TxEntityRow subkey_erow;
     mc_TxEntityRow *lperow;
+    mc_TxEntityRow *lpchod;
     mc_TxDefRow *lptxdef;
     unsigned char stream_subkey_hash160[20];
     unsigned char *ptr;
@@ -3156,6 +3163,8 @@ int mc_TxDB::CompleteImport(mc_TxImport *import,uint32_t flags)
     }
     m_MemPools[0]->SetCount(j);    
     
+    oldmempool_size=m_MemPools[0]->GetCount();
+    
     for(i=0;i<mempool->GetCount();i++)                                          // Copying mempool transactions
     {
         lperow=(mc_TxEntityRow *)mempool->GetRow(i);               
@@ -3174,6 +3183,40 @@ int mc_TxDB::CompleteImport(mc_TxImport *import,uint32_t flags)
         sprintf(msg,"Import: %d, Transferring mempool: tx: %s, entity: (%08X, %s)",import->m_ImportID,txhex,lperow->m_Entity.m_EntityType,enthex);
         LogString(msg);
         m_MemPools[0]->Add(lperow,(unsigned char*)lperow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);        
+    }
+    
+    for(i=0;i<m_MemPools[0]->GetCount();i++)                                    // Shifting generation of locally ordered subkeys
+    {
+        lperow=(mc_TxEntityRow*)m_MemPools[0]->GetRow(i);        
+        if(lperow->m_Entity.m_EntityType & MC_TET_SUBKEY)
+        {
+            if( (lperow->m_Entity.m_EntityType & MC_TET_ORDERMASK) == MC_TET_TIMERECEIVED)
+            {
+                if(lperow->m_Generation != import->m_ImportID)          
+                {
+                    j=oldmempool_size;
+                    while(j<m_MemPools[0]->GetCount())
+                    {
+                        lpchod=(mc_TxEntityRow*)m_MemPools[0]->GetRow(j);        
+                        if(lpchod->m_Entity.m_EntityType & MC_TET_SUBKEY)
+                        {
+                            if( (lpchod->m_Entity.m_EntityType & MC_TET_ORDERMASK) == MC_TET_CHAINPOS)
+                            {
+                                if(memcmp(lperow->m_Entity.m_EntityID,lpchod->m_Entity.m_EntityID,MC_TDB_ENTITY_ID_SIZE) == 0)
+                                {
+                                    j=m_MemPools[0]->GetCount();
+                                    if(lpchod->m_Generation == import->m_ImportID)          
+                                    {
+                                        lperow->m_Generation = import->m_ImportID;
+                                    }                                    
+                                }
+                            }
+                        }
+                        j++;
+                    }
+                }
+            }
+        }        
     }
     
     for(i=0;i<rawmempool->GetCount();i++)                                       // Copying rawmempool transactions
@@ -3220,9 +3263,9 @@ int mc_TxDB::CompleteImport(mc_TxImport *import,uint32_t flags)
                             {
                                 memcpy((char*)&erow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
                             }
-                            mc_GetCompoundHash160(&stream_subkey_hash160,&(erow.m_Entity.m_EntityID),erow.m_TxId);
+                            mc_GetCompoundHash160(stream_subkey_hash160,&(erow.m_Entity.m_EntityID),erow.m_TxId);
                             subkey_erow.Zero();
-                            memcpy(subkey_erow.m_Entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+                            memcpy(subkey_erow.m_Entity.m_EntityID,stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
                             subkey_erow.m_Entity.m_EntityType=lpent->m_Entity.m_EntityType | MC_TET_SUBKEY;
                             subkey_erow.m_Generation=erow.m_Generation;
                             GetListSize(&(subkey_erow.m_Entity),subkey_erow.m_Generation,&subkey_list_size);
@@ -3388,9 +3431,9 @@ int mc_TxDB::DropImport(mc_TxImport *import)
                         {
                             memcpy((char*)&erow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
                         }
-                        mc_GetCompoundHash160(&stream_subkey_hash160,&(erow.m_Entity.m_EntityID),erow.m_TxId);
+                        mc_GetCompoundHash160(stream_subkey_hash160,&(erow.m_Entity.m_EntityID),erow.m_TxId);
                         subkey_erow.Zero();
-                        memcpy(subkey_erow.m_Entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+                        memcpy(subkey_erow.m_Entity.m_EntityID,stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
                         subkey_erow.m_Entity.m_EntityType=lpent->m_Entity.m_EntityType | MC_TET_SUBKEY;
                         subkey_erow.m_Generation=erow.m_Generation;
                         GetListSize(&(subkey_erow.m_Entity),subkey_erow.m_Generation,&subkey_list_size);
