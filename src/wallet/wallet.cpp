@@ -1563,6 +1563,15 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
             {
                 if(err == MC_ERR_NOERROR)
                 {
+                    err=pEF->FED_EventChunksAvailable();
+                    if(err)
+                    {
+                        LogPrintf("ERROR: Cannot write offchain items in block, error %d\n",err);
+                    }
+                    err=MC_ERR_NOERROR;
+                }
+                if(err == MC_ERR_NOERROR)
+                {
                     err=pwalletTxsMain->Commit(imp);
                     
                 }   
