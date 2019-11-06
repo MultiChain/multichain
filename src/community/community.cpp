@@ -171,6 +171,12 @@ int mc_EnterpriseFeatures::FED_EventChunksAvailable()
     return MC_ERR_NOERROR;    
 }
 
+int mc_EnterpriseFeatures::FED_EventBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex,bool connect,bool after,bool error)
+{
+    return MC_ERR_NOERROR;        
+}
+
+
 bool mc_EnterpriseFeatures::OFF_ProcessChunkRequest(unsigned char *ptrStart,unsigned char *ptrEnd,vector<unsigned char>* payload_response,vector<unsigned char>* payload_relay,
         map<uint160,int>& mapReadPermissionedStreams,string& strError)
 {

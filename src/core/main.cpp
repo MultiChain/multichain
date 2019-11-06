@@ -2801,8 +2801,28 @@ bool static DisconnectTip(CValidationState &state) {
     int64_t nStart = GetTimeMicros();
     {
         CCoinsViewCache view(pcoinsTip);
+        int err;
+        err=pEF->FED_EventBlock(block, state, pindexDelete,false,false,false);
+        if(err)
+        {
+            LogPrintf("ERROR: Cannot disconnect(before) block %s in feeds, error %d\n",pindexDelete->GetBlockHash().ToString().c_str(),err);
+        }        
+        
         if (!DisconnectBlock(block, state, pindexDelete, view))
+        {
+            err=pEF->FED_EventBlock(block, state, pindexDelete,false,true,true);
+            if(err)
+            {
+                LogPrintf("ERROR: Cannot disconnect(error) block %s in feeds, error %d\n",pindexDelete->GetBlockHash().ToString().c_str(),err);
+            }        
             return error("DisconnectTip() : DisconnectBlock %s failed", pindexDelete->GetBlockHash().ToString());
+        }
+        
+        err=pEF->FED_EventBlock(block, state, pindexDelete,false,true,false);
+        if(err)
+        {
+            LogPrintf("ERROR: Cannot disconnect(after) block %s in feeds, error %d\n",pindexDelete->GetBlockHash().ToString().c_str(),err);
+        }        
         assert(view.Flush());
     }
     if(fDebug)LogPrint("bench", "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * 0.001);
@@ -2907,13 +2927,29 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     {
         CCoinsViewCache view(pcoinsTip);
         CInv inv(MSG_BLOCK, pindexNew->GetBlockHash());
+        int err;
+        err=pEF->FED_EventBlock(*pblock, state, pindexNew,true,false,false);
+        if(err)
+        {
+            LogPrintf("ERROR: Cannot connect(before) block %s in feeds, error %d\n",pindexNew->GetBlockHash().ToString().c_str(),err);
+        }        
         bool rv = ConnectBlock(*pblock, state, pindexNew, view);
         g_signals.BlockChecked(*pblock, state);
         if (!rv) {            
+            err=pEF->FED_EventBlock(*pblock, state, pindexNew,true,true,true);
+            if(err)
+            {
+                LogPrintf("ERROR: Cannot connect(error) block %s in feeds, error %d\n",pindexNew->GetBlockHash().ToString().c_str(),err);
+            }        
             if (state.IsInvalid())
                 InvalidBlockFound(pindexNew, state);
             return error("ConnectTip() : ConnectBlock %s failed", pindexNew->GetBlockHash().ToString());
         }
+        err=pEF->FED_EventBlock(*pblock, state, pindexNew,true,true,false);
+        if(err)
+        {
+            LogPrintf("ERROR: Cannot connect(after) block %s in feeds, error %d\n",pindexNew->GetBlockHash().ToString().c_str(),err);
+        }        
         mapBlockSource.erase(inv.hash);
         nTime3 = GetTimeMicros(); nTimeConnectTotal += nTime3 - nTime2;
         if(fDebug)LogPrint("bench", "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
@@ -5213,8 +5249,26 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
         // check level 3: check for inconsistencies during memory-only disconnect of tip blocks
         if (nCheckLevel >= 3 && pindex == pindexState && (coins.GetCacheSize() + pcoinsTip->GetCacheSize()) <= nCoinCacheSize) {
             bool fClean = true;
+            int err;
+            err=pEF->FED_EventBlock(block, state, pindex,false,false,false);
+            if(err)
+            {
+                LogPrintf("ERROR: Cannot disconnect(before) block %s in feeds, error %d\n",pindex->GetBlockHash().ToString().c_str(),err);
+            }        
             if (!DisconnectBlock(block, state, pindex, coins, &fClean))
+            {
+                err=pEF->FED_EventBlock(block, state, pindex,false,false,true);
+                if(err)
+                {
+                    LogPrintf("ERROR: Cannot disconnect(error) block %s in feeds, error %d\n",pindex->GetBlockHash().ToString().c_str(),err);
+                }        
                 return error("VerifyDB() : *** irrecoverable inconsistency in block data at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
+            }
+            err=pEF->FED_EventBlock(block, state, pindex,false,false,false);
+            if(err)
+            {
+                LogPrintf("ERROR: Cannot disconnect(after) block %s in feeds, error %d\n",pindex->GetBlockHash().ToString().c_str(),err);
+            }        
             pindexState = pindex->pprev;
             if (!fClean) {
                 nGoodTransactions = 0;
@@ -5238,8 +5292,26 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
             CBlock block;
             if (!ReadBlockFromDisk(block, pindex))
                 return error("VerifyDB() : *** ReadBlockFromDisk failed at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
+            int err;
+            err=pEF->FED_EventBlock(block, state, pindex,true,false,false);
+            if(err)
+            {
+                LogPrintf("ERROR: Cannot connect(before) block %s in feeds, error %d\n",pindex->GetBlockHash().ToString().c_str(),err);
+            }        
             if (!ConnectBlock(block, state, pindex, coins))
+            {
+                err=pEF->FED_EventBlock(block, state, pindex,true,true,true);
+                if(err)
+                {
+                    LogPrintf("ERROR: Cannot connect(before) block %s in feeds, error %d\n",pindex->GetBlockHash().ToString().c_str(),err);
+                }        
                 return error("VerifyDB() : *** found unconnectable block at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
+            }
+            err=pEF->FED_EventBlock(block, state, pindex,true,true,false);
+            if(err)
+            {
+                LogPrintf("ERROR: Cannot connect(before) block %s in feeds, error %d\n",pindex->GetBlockHash().ToString().c_str(),err);
+            }        
         }
     }
 
