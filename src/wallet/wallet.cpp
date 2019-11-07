@@ -1610,6 +1610,15 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
                         pwalletTxsMain->AddTx(imp,tx,-1,NULL,-1,0);            
                     }
                 }
+                if(err == MC_ERR_NOERROR)
+                {
+                    err=pEF->FED_EventChunksAvailable();
+                    if(err)
+                    {
+                        LogPrintf("ERROR: Cannot write offchain items after mempool, error %d\n",err);
+                    }
+                    err=MC_ERR_NOERROR;
+                }
                 
                 err=pwalletTxsMain->CompleteImport(imp,((pindexStart->nHeight > 0) & !fOnlySubscriptions) ? MC_EFL_NOT_IN_SYNC_AFTER_IMPORT : 0);
             }

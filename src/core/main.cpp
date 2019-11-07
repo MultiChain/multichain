@@ -2945,11 +2945,6 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
                 InvalidBlockFound(pindexNew, state);
             return error("ConnectTip() : ConnectBlock %s failed", pindexNew->GetBlockHash().ToString());
         }
-        err=pEF->FED_EventBlock(*pblock, state, pindexNew,true,true,false);
-        if(err)
-        {
-            LogPrintf("ERROR: Cannot connect(after) block %s in feeds, error %d\n",pindexNew->GetBlockHash().ToString().c_str(),err);
-        }        
         mapBlockSource.erase(inv.hash);
         nTime3 = GetTimeMicros(); nTimeConnectTotal += nTime3 - nTime2;
         if(fDebug)LogPrint("bench", "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
@@ -2980,6 +2975,11 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
             }
             pos1.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
         }
+        err=pEF->FED_EventBlock(*pblock, state, pindexNew,true,true,false);
+        if(err)
+        {
+            LogPrintf("ERROR: Cannot connect(after) block %s in feeds, error %d\n",pindexNew->GetBlockHash().ToString().c_str(),err);
+        }        
     }
 
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Removing block txs from mempool\n");
