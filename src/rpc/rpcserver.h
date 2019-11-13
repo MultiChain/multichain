@@ -306,12 +306,12 @@ extern json_spirit::Value purehelpitem_nomethod(const json_spirit::Array& params
 extern json_spirit::Value purehelpitem_onlyfilter(const json_spirit::Array& params, bool fHelp);
 
 extern json_spirit::Value createfeed(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value suspendfeed(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value deletefeed(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value rescanfeed(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value addfeedstreams(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value updatefeedstreams(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value removefeedstreams(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value addfeedblocks(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value updatefeedblocks(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value removefeedblocks(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value purgefeedfile(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listfeeds(const json_spirit::Array& params, bool fHelp);

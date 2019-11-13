@@ -61,12 +61,12 @@ typedef struct mc_EnterpriseFeatures
     int STR_RemoveDataFromFile(int fHan, uint32_t from, uint32_t size, uint32_t mode);
     
     Value FED_RPCCreateFeed(const Array& params);
-    Value FED_RPCSuspendFeed(const Array& params);
     Value FED_RPCDeleteFeed(const Array& params);
-    Value FED_RPCRescanFeed(const Array& params);
     Value FED_RPCAddFeedStreams(const Array& params);
+    Value FED_RPCUpdateFeedStreams(const Array& params);
     Value FED_RPCRemoveFeedStreams(const Array& params);
     Value FED_RPCAddFeedBlocks(const Array& params);
+    Value FED_RPCUpdateFeedBlocks(const Array& params);
     Value FED_RPCRemoveFeedBlocks(const Array& params);
     Value FED_RPCPurgeFeedFile(const Array& params);
     Value FED_RPCListFeeds(const Array& params);

@@ -101,22 +101,17 @@ Value mc_EnterpriseFeatures::FED_RPCCreateFeed(const Array& params)
     return Value::null;
 }
 
-Value mc_EnterpriseFeatures::FED_RPCSuspendFeed(const Array& params)
-{
-    return Value::null;
-}
-
 Value mc_EnterpriseFeatures::FED_RPCDeleteFeed(const Array& params)
 {
     return Value::null;
 }
 
-Value mc_EnterpriseFeatures::FED_RPCRescanFeed(const Array& params)
+Value mc_EnterpriseFeatures::FED_RPCAddFeedStreams(const Array& params)
 {
     return Value::null;
 }
 
-Value mc_EnterpriseFeatures::FED_RPCAddFeedStreams(const Array& params)
+Value mc_EnterpriseFeatures::FED_RPCUpdateFeedStreams(const Array& params)
 {
     return Value::null;
 }
@@ -127,6 +122,11 @@ Value mc_EnterpriseFeatures::FED_RPCRemoveFeedStreams(const Array& params)
 }
 
 Value mc_EnterpriseFeatures::FED_RPCAddFeedBlocks(const Array& params)
+{
+    return Value::null;
+}
+
+Value mc_EnterpriseFeatures::FED_RPCUpdateFeedBlocks(const Array& params)
 {
     return Value::null;
 }
