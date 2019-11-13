@@ -5004,6 +5004,165 @@ void mc_InitRPCHelpMap21()
         ));
   
     
+    mapHelpStrings.insert(std::make_pair("createfeed",
+            "createfeed \"feed-name\" ( parameters ) \n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nCreates feed\n"
+            "\nArguments:\n"
+            "1. \"feed-name\"                      (string, required) Feed name\n"
+            "2. parameters                       (object, optional) Feed options \n"
+            "\nExamples:\n"
+            + HelpExampleCli("createfeed", "feed1")
+            + HelpExampleRpc("createfeed", "feed1")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("deletefeed",
+            "deletefeed \"feed-name\" \n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nDeletes feed\n"
+            "\nArguments:\n"
+            "1. \"feed-name\"                      (string, required) Feed name\n"
+            "\nExamples:\n"
+            + HelpExampleCli("deletefeedfeed", "feed1")
+            + HelpExampleRpc("deletefeedfeed", "feed1")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("listfeeds",
+            "listfeeds ( feed-name(s) verbose ) \n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nReturns list of feeds defined on this node\n"
+            "\nArguments:\n"
+            "1. \"feed-name\"                      (string, optional, default=*) Feed name\n"
+            " or\n"
+            "1. feed-name(s)                     (array, optional) A json array of feed names \n"                
+            "2. verbose                          (boolean, optional, default=false) If true, returns extended feed information \n"
+            "\nResult:\n"
+            "An array containing list of feeds\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("listfeeds", "")
+            + HelpExampleRpc("listfeeds", "")
+        ));
+    
+    
+}
+void mc_InitRPCHelpMap22()
+{
+     mapHelpStrings.insert(std::make_pair("addfeedstreams",
+            "addfeedstreams \"feed-name\" stream-identifier(s) ( \"action\" parameters )\n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nAdds streams to feed.\n"
+            "\nArguments:\n"
+            "1. \"feed-name\"                      (string, required) Feed name\n"
+            "2. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
+            " or\n"
+            "2. stream-identifier(s)             (array, optional) A json array of stream identifiers \n"                
+            "3. \"action\"                         (string, optional, default=rescan) Immediate action for the stream:\n"
+            "                                                         rescan - rescan stream items and start item processing, \n"
+            "                                                         suspend - suspend item processing,\n"
+            "                                                         start - start itme processing without rescanning,\n"
+            "4. parameters                       (object, optional) Item processing parameters\n"
+            "\nNote: This call can take minutes to complete if action=rescan.\n"
+            "\nResult:\n"
+            "\nExamples:\n"
+            + HelpExampleCli("addfeedstreams", "\"feed1\" \"test-stream\"") 
+            + HelpExampleCli("addfeedstreams", "\"feed1\" \"test-stream\" suspend") 
+            + HelpExampleRpc("addfeedstreams", "\"feed1\", \"test-stream\"")
+         ));
+   
+     mapHelpStrings.insert(std::make_pair("updatefeedstreams",
+            "updatefeedstreams \"feed-name\" stream-identifier(s) ( \"action\" parameters )\n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nUpdates stream item processing parameters in feed.\n"
+            "\nArguments:\n"
+            "1. \"feed-name\"                      (string, required) Feed name\n"
+            "2. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
+            " or\n"
+            "2. stream-identifier(s)             (array, optional) A json array of stream identifiers \n"                
+            " or\n"
+            "2. \"*\"                              (string, optional) All streams in feed \n"                
+            "3. \"action\"                         (string, optional, default=none) Immediate action for the stream:\n"
+            "                                                         none - don't change current action, \n"
+            "                                                         rescan - rescan stream items and start item processing, \n"
+            "                                                         suspend - suspend item processing,\n"
+            "                                                         start - start itme processing without rescanning,\n"
+            "4. parameters                       (object, optional) Item processing parameters\n"
+            "\nNote: This call can take minutes to complete if action=rescan.\n"
+            "\nResult:\n"
+            "\nExamples:\n"
+            + HelpExampleCli("updatefeedstreams", "\"feed1\" \"test-stream\"") 
+            + HelpExampleCli("updatefeedstreams", "\"feed1\" \"*\" suspend") 
+            + HelpExampleRpc("updatefeedstreams", "\"feed1\", \"test-stream\"")
+         ));
+   
+     mapHelpStrings.insert(std::make_pair("removefeedstreams",
+            "removefeedstreams \"feed-name\" stream-identifier(s) \n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nRemoves streams from feed.\n"
+            "\nArguments:\n"
+            "1. \"feed-name\"                      (string, required) Feed name\n"
+            "2. \"stream-identifier\"              (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
+            " or\n"
+            "2. stream-identifier(s)             (array, optional) A json array of stream identifiers \n"                
+            " or\n"
+            "2. \"*\"                              (string, optional) All streams in feed \n"                
+            "\nResult:\n"
+            "\nExamples:\n"
+            + HelpExampleCli("removefeedstreams", "\"feed1\" \"test-stream\"") 
+            + HelpExampleRpc("removefeedstreams", "\"feed1\", \"test-stream\"")
+         ));
+   
+     mapHelpStrings.insert(std::make_pair("addfeedblocks",
+            "addfeedblocks \"feed-name\" ( \"action\" parameters )\n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nAdds block output to feed.\n"
+            "\nArguments:\n"
+            "1. \"feed-name\"                      (string, required) Feed name\n"
+            "2. \"action\"                         (string, optional, default=rescan) Immediate action for block output:\n"
+            "                                                         rescan - rescan stream items and start item processing, \n"
+            "                                                         suspend - suspend item processing,\n"
+            "                                                         start - start itme processing without rescanning,\n"
+            "3. parameters                       (object, optional) Block processing parameters\n"
+            "\nNote: This call can take minutes to complete if action=rescan.\n"
+            "\nResult:\n"
+            "\nExamples:\n"
+            + HelpExampleCli("addfeedblocks", "\"feed1\" ") 
+            + HelpExampleCli("addfeedblocks", "\"feed1\" suspend") 
+            + HelpExampleRpc("addfeedblocks", "\"feed1\"")
+         ));
+   
+     mapHelpStrings.insert(std::make_pair("updatefeedblocks",
+            "updatefeedblocks \"feed-name\" ( \"action\" parameters )\n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nUpdates block output parameters in feed.\n"
+            "\nArguments:\n"
+            "1. \"feed-name\"                      (string, required) Feed name\n"
+            "2. \"action\"                         (string, optional, default=none) Immediate action for block output:\n"
+            "                                                         none - don't change current action, \n"
+            "                                                         rescan - rescan stream items and start item processing, \n"
+            "                                                         suspend - suspend item processing,\n"
+            "                                                         start - start itme processing without rescanning,\n"
+            "3. parameters                       (object, optional) Item processing parameters\n"
+            "\nNote: This call can take minutes to complete if action=rescan.\n"
+            "\nResult:\n"
+            "\nExamples:\n"
+            + HelpExampleCli("updatefeedblocks", "\"feed1\" ") 
+            + HelpExampleCli("updatefeedblocks", "\"feed1\" suspend") 
+            + HelpExampleRpc("updatefeedblocks", "\"feed1\", \"test-stream\"")
+         ));
+   
+     mapHelpStrings.insert(std::make_pair("removefeedblocks",
+            "removefeedblocks \"feed-name\" \n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nRemoves block output from feed.\n"
+            "\nArguments:\n"
+            "1. \"feed-name\"                      (string, required) Feed name\n"
+            "\nResult:\n"
+            "\nExamples:\n"
+            + HelpExampleCli("removefeedblocks", "\"feed1\" ") 
+            + HelpExampleRpc("removefeedblocks", "\"feed1\"")
+         ));
+   
+    
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
@@ -5110,6 +5269,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap19();
     mc_InitRPCHelpMap20();
     mc_InitRPCHelpMap21();
+    mc_InitRPCHelpMap22();
     
     pEF->ENT_InitRPCHelpMap();
     
