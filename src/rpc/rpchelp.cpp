@@ -5162,7 +5162,39 @@ void mc_InitRPCHelpMap22()
             + HelpExampleRpc("removefeedblocks", "\"feed1\"")
          ));
    
+     mapHelpStrings.insert(std::make_pair("getdatarefdata",
+            "getdatarefdata \"dataref\" ( count-bytes start-byte )\n"
+            "\nReturns metadata referenced by dataref.\n"
+            "\nArguments:\n"
+            "1. \"dataref\"                         (string, required) Dataref\n"
+            "2. count-bytes                      (numeric, optional, default=INT_MAX) Number of bytes to return\n"
+            "3. start-byte                       (numeric, optional, default=0) start from specific byte \n"
+            "\nResult:\n"
+            "\"data-hex\"                          (string) transaction output metadata in hexadecimal form.\n"
+            "\nExamples:\n"
+            "\nView the data\n"
+            + HelpExampleCli("getdatarefdata", "\"dataref\"") +
+            "\nAs a json rpc call\n"
+            + HelpExampleRpc("getdatarefdata", "\"dataref\"")
+        ));
     
+     mapHelpStrings.insert(std::make_pair("datareftobinarycache",
+            "datareftobinarycache \"identifier\" \"dataref\" ( count-bytes start-byte )\n"
+            "\nStores metadata referenced by dataref in binary cache.\n"    
+            "\nArguments:\n"
+            "1. \"identifier\"                     (string, required) Binary cache item identifier\n"
+            "2. \"dataref\"                        (string, required) Dataref\n"
+            "3. count-bytes                      (numeric, optional, default=INT_MAX) Number of bytes to return\n"
+            "4. start-byte                       (numeric, optional, default=0) start from specific byte \n"
+            "\nResult:\n"
+            "size                                (numeric) Size of the binary cache item\n"
+            "\nExamples:\n"
+            "\nView the data\n"
+            + HelpExampleCli("datareftobinarycache", "\"TjnVWwHYEg4\" \"dataref\"") +
+            "\nAs a json rpc call\n"
+            + HelpExampleRpc("datareftobinarycache", "\"TjnVWwHYEg4\", \"dataref\"")
+        ));
+     
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
