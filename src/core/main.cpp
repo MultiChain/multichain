@@ -2863,6 +2863,8 @@ bool static DisconnectTip(CValidationState &state) {
         CValidationState stateDummy;
         if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, false, NULL))
         {
+            LogPrintf("Tx not accepted in resurrection after block: %s\n",tx.GetHash().ToString().c_str());
+            pEF->FED_EventInvalidateTx(tx,stateDummy.GetRejectCode(),(stateDummy.GetRejectReason().size() > 0) ? stateDummy.GetRejectReason() : "unknown");
             mempool.remove(tx, removed, true, "resurrection");
         }
     }

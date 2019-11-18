@@ -80,6 +80,7 @@ typedef struct mc_EnterpriseFeatures
     int FED_EventChunksAvailable();    
     int FED_EventBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex,bool connect,bool after,bool error);
     int FED_EventPurgeChunk(mc_ChunkDBRow *chunk_def);    
+    int FED_EventInvalidateTx(const CTransaction& tx,int error_code,std::string error_message);
     
     bool OFF_ProcessChunkRequest(unsigned char *ptrStart,unsigned char *ptrEnd,vector<unsigned char>* payload_response,vector<unsigned char>* payload_relay,
         map<uint160,int>& mapReadPermissionedStreams,string& strError);

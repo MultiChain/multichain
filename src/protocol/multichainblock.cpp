@@ -8,6 +8,7 @@
 #include "utils/util.h"
 #include "multichain/multichain.h"
 #include "wallet/wallettxs.h"
+#include "community/community.h"
 
 #include <boost/assign/list_of.hpp>
 
@@ -346,6 +347,7 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
                     list<CTransaction> removed;
                     removed_type="banned";                                    
                     LogPrintf("mchn: Tx %s removed from the mempool (%s), reason: %s\n",tx.GetHash().ToString().c_str(),removed_type.c_str(),reason.c_str());
+                    pEF->FED_EventInvalidateTx(tx,REJECT_INVALID,"banned");
                     pool.remove(tx, removed, true, "replay");                    
                 }
             }
@@ -406,6 +408,7 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
             if(removed_type.size())
             {
                 LogPrintf("mchn: Tx %s removed from the mempool (%s), reason: %s\n",tx.GetHash().ToString().c_str(),removed_type.c_str(),reason.c_str());
+                pEF->FED_EventInvalidateTx(tx,REJECT_INVALID,reason);
                 pool.remove(tx, removed, true, "replay");                    
             }
             else
@@ -415,6 +418,7 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
                     removed_type="error";
                     reason="wallet";
                     LogPrintf("mchn: Tx %s removed from the mempool (%s), reason: %s\n",tx.GetHash().ToString().c_str(),removed_type.c_str(),reason.c_str());
+                    pEF->FED_EventInvalidateTx(tx,REJECT_INVALID,reason);
                     pool.remove(tx, removed, true, "replay");                                        
                 }
             }
