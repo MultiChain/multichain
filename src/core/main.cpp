@@ -3809,6 +3809,7 @@ string SetLockedBlock(string hash)
         else
         {
             LogPrintf("Block %s not found, chain will be switched if it will appear on alternative chain\n",hLockedBlock.ToString().c_str());     
+            LOCK(cs_vNodes);
             BOOST_FOREACH(CNode* pnode, vNodes)
             {
                 pnode->PushMessage("getheaders", chainActive.GetLocator(chainActive.Tip()), uint256(0));                
@@ -6622,6 +6623,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 LOCK(cs_main);
                 if(seed_could_connect && !mc_gState->m_Permissions->CanConnect(NULL,seed_node->kAddrRemote.begin()))
                 {
+                    LOCK(cs_vNodes);
                     if(vNodes.size() > 1)
                     {
                         LogPrintf("mchn: Seed node lost connect permission on block %d\n",mc_gState->m_Permissions->m_Block);
@@ -7470,6 +7472,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                         LogPrintf("mchn: Synced with seed node on block %d\n",mc_gState->m_Permissions->m_Block);
                         mc_RemoveFile(mc_gState->m_NetworkParams->Name(),"seed",".dat",MC_FOM_RELATIVE_TO_DATADIR);
                         mc_gState->m_pSeedNode=NULL;                    
+                        LOCK(cs_vNodes);
                         if(vNodes.size() > 1)
                         {
                             LogPrintf("mchn: Disconnecting seed node\n");

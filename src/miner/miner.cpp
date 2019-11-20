@@ -1369,6 +1369,7 @@ void static BitcoinMiner(CWallet *pwallet)
                           || (mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
                            ) && Params().MiningRequiresPeers())
                     {
+                        LOCK(cs_vNodes);
                         vector<CNode*> vNodesCopy = vNodes;
                         BOOST_FOREACH(CNode* pnode, vNodesCopy)
                         {
