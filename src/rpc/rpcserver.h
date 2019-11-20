@@ -307,6 +307,8 @@ extern json_spirit::Value purehelpitem_onlyfilter(const json_spirit::Array& para
 
 extern json_spirit::Value createfeed(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value deletefeed(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value addtofeed(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value updatefeed(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value addfeedstreams(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value updatefeedstreams(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value removefeedstreams(const json_spirit::Array& params, bool fHelp);

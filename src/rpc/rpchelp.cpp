@@ -5047,6 +5047,54 @@ void mc_InitRPCHelpMap21()
 }
 void mc_InitRPCHelpMap22()
 {
+     mapHelpStrings.insert(std::make_pair("addtofeed",
+            "addtofeed \"feed-name\" entities ( \"globals\" \"action\" parameters )\n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nAdds subscriptions to feed.\n"
+            "\nArguments:\n"
+            "1. \"feed-name\"                      (string, required) Feed name\n"
+            "2. \"entities\"                       (string, required) Stream identifier - one of: create txid, stream reference, stream name.\n"
+            " or\n"
+            "2. entities                         (array, optional) A json array of stream identifiers \n"                
+            "3. \"globals\"                        (string, optional, default \"\") One of the following: \"blocks\",\"none\",\"\".\n"
+            "4. \"action\"                         (string, optional, default=rescan) Immediate action:\n"
+            "                                                         rescan - rescan and start processing, \n"
+            "                                                         suspend - suspend processing,\n"
+            "                                                         start - start processing without rescanning,\n"
+            "5. options                          (object, optional) JSON array of subscription options\n"
+            "\nNote: This call can take minutes to complete if action=rescan.\n"
+            "\nResult:\n"
+            "\nExamples:\n"
+            + HelpExampleCli("addtofeed", "\"feed1\" \"test-stream\"") 
+            + HelpExampleCli("addtofeed", "\"feed1\" \"test-stream\" blocks suspend") 
+            + HelpExampleRpc("addtofeed", "\"feed1\", \"test-stream\"")
+         ));
+   
+     mapHelpStrings.insert(std::make_pair("updatefeed",
+            "updatefeed \"feed-name\" entities ( \"globals\" \"action\" parameters )\n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nUpdates subscriptions in feed.\n"
+            "\nArguments:\n"
+            "1. \"feed-name\"                      (string, required) Feed name\n"
+            "2. \"entities\"                       (string, required) Stream identifier - one of: create txid, stream reference, stream name. Or \"*\" or \"none\".\n"
+            " or\n"
+            "2. entities                         (array, optional) A json array of stream identifiers \n"                
+            "3. \"globals\"                        (string, optional, default \"\") One of the following: \"blocks\",\"*\",\"none\",\"\".\n"
+            "4. \"action\"                         (string, optional, default=none) Modification action:\n"
+            "                                                         none - don't change current state, \n"
+            "                                                         rescan - rescan and start processing, \n"
+            "                                                         suspend - suspend item processing,\n"
+            "                                                         start - start processing without rescanning,\n"
+            "                                                         delete - delete subscription(s)\n"
+            "5. options                          (object, optional) JSON array of options to modify\n"
+            "\nNote: This call can take minutes to complete if action=rescan.\n"
+            "\nResult:\n"
+            "\nExamples:\n"
+            + HelpExampleCli("updatefeed", "\"feed1\" \"test-stream\"") 
+            + HelpExampleCli("updatefeed", "\"feed1\" \"test-stream\" blocks suspend") 
+            + HelpExampleRpc("updatefeed", "\"feed1\", \"test-stream\"")
+         ));
+   
      mapHelpStrings.insert(std::make_pair("addfeedstreams",
             "addfeedstreams \"feed-name\" stream-identifier(s) ( \"action\" parameters )\n"
             "\nAvailable only in Enterprise Edition.\n"

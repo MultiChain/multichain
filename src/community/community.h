@@ -70,6 +70,8 @@ typedef struct mc_EnterpriseFeatures
     Value FED_RPCRemoveFeedBlocks(const Array& params);
     Value FED_RPCPurgeFeedFile(const Array& params);
     Value FED_RPCListFeeds(const Array& params);
+    Value FED_RPCAddToFeed(const Array& params);
+    Value FED_RPCUpdateFeed(const Array& params);  
     
     Value DRF_RPCGetDataRefData(const Array& params);
     Value DRF_RPCDataRefToBinaryCache(const Array& params);

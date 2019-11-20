@@ -133,5 +133,26 @@ Value datareftobinarycache(const json_spirit::Array& params, bool fHelp)
     return pEF->DRF_RPCDataRefToBinaryCache(params);
 }
 
+Value addtofeed(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 2 || params.size() > 5)
+        throw runtime_error("Help message not found\n");
+    
+    pEF->ENT_RPCVerifyEdition("addtofeed API");
+    
+    return pEF->FED_RPCAddToFeed(params);
+}
+
+Value updatefeed(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 2 || params.size() > 5)
+        throw runtime_error("Help message not found\n");
+    
+    pEF->ENT_RPCVerifyEdition("updatefeed API");
+    
+    return pEF->FED_RPCUpdateFeed(params);
+}
+
+
 
 

@@ -181,6 +181,8 @@ static const CRPCCommand vRPCCommands[] =
     
     { "feeds",              "createfeed",             &createfeed,              true,      false,      false },
     { "feeds",              "deletefeed",             &deletefeed,              true,      false,      false },
+    { "feeds",              "addtofeed",              &addtofeed,               true,      false,      false },
+    { "feeds",              "updatefeed",             &updatefeed,              true,      false,      false },
     { "feeds",              "addfeedstreams",         &addfeedstreams,          true,      false,      false },
     { "feeds",              "updatefeedstreams",      &updatefeedstreams,       true,      false,      false },
     { "feeds",              "removefeedstreams",      &removefeedstreams,       true,      false,      false },

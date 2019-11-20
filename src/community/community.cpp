@@ -146,6 +146,19 @@ Value mc_EnterpriseFeatures::FED_RPCListFeeds(const Array& params)
     return Value::null;
 }
 
+Value mc_EnterpriseFeatures::FED_RPCAddToFeed(const Array& params)
+{
+    return Value::null;   
+}
+
+Value mc_EnterpriseFeatures::FED_RPCUpdateFeed(const Array& params)
+{
+    return Value::null;    
+}
+
+
+
+    
 Value mc_EnterpriseFeatures::DRF_RPCGetDataRefData(const Array& params)
 {
     return Value::null;    
