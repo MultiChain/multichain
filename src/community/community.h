@@ -80,7 +80,7 @@ typedef struct mc_EnterpriseFeatures
     
     int FED_EventTx(const CTransaction& tx,int block,CDiskTxPos* block_pos,uint32_t block_tx_index,uint256 block_hash,uint32_t block_timestamp);
     int FED_EventChunksAvailable();    
-    int FED_EventBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex,bool connect,bool after,bool error);
+    int FED_EventBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex,std::string type,bool after,bool error);
     int FED_EventPurgeChunk(mc_ChunkDBRow *chunk_def);    
     int FED_EventInvalidateTx(const CTransaction& tx,int error_code,std::string error_message);
     

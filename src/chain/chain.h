@@ -87,6 +87,10 @@ enum BlockStatus {
     BLOCK_FAILED_VALID       =   32, //! stage after last reached validness failed
     BLOCK_FAILED_CHILD       =   64, //! descends from failed block
     BLOCK_FAILED_MASK        =   BLOCK_FAILED_VALID | BLOCK_FAILED_CHILD,
+    
+    BLOCK_HAVE_SIZE          =  128, // block has calculated size
+    BLOCK_HAVE_MINER_PUBKEY  =  256, // block has miner pubkey
+    
 };
 
 /** The block chain is a tree shaped structure starting with the
@@ -148,6 +152,7 @@ public:
     uint32_t nCanMine;
     double dTimeReceived;
     CPubKey kMiner;
+    unsigned int nSize;
     bool fPassedMinerPrecheck;
     int32_t nFirstSuccessor;
     CBlockIndex *pNextOnThisHeight;
@@ -181,6 +186,7 @@ public:
         fPassedMinerPrecheck=false;
         nFirstSuccessor=0;
         pNextOnThisHeight=NULL;
+        nSize=0;
 /* MCHN END */
     }
 
@@ -340,6 +346,11 @@ public:
             READWRITE(VARINT(nDataPos));
         if (nStatus & BLOCK_HAVE_UNDO)
             READWRITE(VARINT(nUndoPos));
+        
+        if (nStatus & BLOCK_HAVE_SIZE)
+            READWRITE(VARINT(nSize));
+        if (nStatus & BLOCK_HAVE_MINER_PUBKEY)
+            READWRITE(kMiner);
 
         // block header
         READWRITE(this->nVersion);

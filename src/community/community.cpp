@@ -189,7 +189,7 @@ int mc_EnterpriseFeatures::FED_EventPurgeChunk(mc_ChunkDBRow *chunk_def)
     return MC_ERR_NOERROR;    
 }   
 
-int mc_EnterpriseFeatures::FED_EventBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex,bool connect,bool after,bool error)
+int mc_EnterpriseFeatures::FED_EventBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex,std::string type,bool after,bool error)
 {
     return MC_ERR_NOERROR;        
 }
