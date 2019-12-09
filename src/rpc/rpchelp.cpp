@@ -4849,14 +4849,14 @@ void mc_InitRPCHelpMap20()
             "1. \"license-request-hex\"                          (string, required) The license request hex string (output of getlicenserequest)\n"
 
             "\nExamples:\n"
-            + HelpExampleCli("decoderawtransaction", "\"hexstring\"")
-            + HelpExampleRpc("decoderawtransaction", "\"hexstring\"")
+            + HelpExampleCli("decodelicenserequest", "\"hexstring\"")
+            + HelpExampleRpc("decodelicenserequest", "\"hexstring\"")
       ));
    
     mapHelpStrings.insert(std::make_pair("decodelicenseconfirmation",
             "decodelicenseconfirmation \"license-confirmation-hex\"\n"
             "\nAvailable only in Enterprise Edition.\n"
-            "\nReturns a JSON object representing the serialized, hex-encoded license request.\n"
+            "\nReturns a JSON object representing the serialized, hex-encoded license confirmation.\n"
 
             "\nArguments:\n"
             "1. \"license-confirmation-hex\"                     (string, required) The license confirmation hex string (input of activatelicense)\n"
@@ -4912,7 +4912,7 @@ void mc_InitRPCHelpMap21()
             "                                                       params,  a json object with custom parameters\n"
             "                                                       details,  a json object with custom details\n"
             "  or\n"
-            "2. confirmation-settings                          (object, required) Confirmation settings for request extension. Possible fields:\n"
+            "2. confirmation-settings                          (object, optional) Confirmation settings for request extension. Possible fields:\n"
             "                                                       extension, required, boolean, should be true\n"
             "                                                       interval, integer, optional, default - like in previous license\n"
             "                                                       delay, integer, optional, delay after last license end time, default 0  \n"
@@ -4940,6 +4940,24 @@ void mc_InitRPCHelpMap21()
             "\nExamples:\n"
             + HelpExampleCli("activatelicense", "\"hexstring\"")
             + HelpExampleRpc("activatelicense", "\"hexstring\"")
+      ));
+   
+    mapHelpStrings.insert(std::make_pair("activatelicensefrom",
+            "activatelicensefrom \"from-address\" ( \"license-confirmation-hex\" )\n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nActivates Enterprise license.\n"
+
+            "\nArguments:\n"
+            "1. \"from-address\"                     (string, required) Address used for publishing.\n"
+            "2. \"license-confirmation-hex\"                     (string, optional) The license confirmation hex string\n"
+            "                                                       If omitted, empty, self-signed license is activated.\n"
+
+            "\nResult:\n"
+            "\"transactionid\"                     (string) The transaction id.\n"
+    
+            "\nExamples:\n"
+            + HelpExampleCli("activatelicensefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"hexstring\"")
+            + HelpExampleRpc("activatelicensefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"hexstring\"")
       ));
    
     mapHelpStrings.insert(std::make_pair("transferlicense",

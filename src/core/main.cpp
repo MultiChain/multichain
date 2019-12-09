@@ -2971,7 +2971,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     int err=MC_ERR_NOERROR;
     if(pindexNew->nHeight)
     {
-        err=pEF->FED_EventBlock(*pblock, state, pindexNew,"add",true,false);
+        err=pEF->FED_EventBlock(*pblock, state, pindexNew,"add",false,false);
         if(err)
         {
             LogPrintf("ERROR: Cannot add(before) block %s in feeds, error %d\n",pindexNew->GetBlockHash().ToString().c_str(),err);
