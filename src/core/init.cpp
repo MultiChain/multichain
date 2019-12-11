@@ -381,7 +381,6 @@ std::string HelpMessage(HelpMessageMode mode)                                   
 #endif
     strUsage += "  -reindex               " + _("Rebuild the blockchain and reindex transactions on startup.") + "\n";
 #if !defined(WIN32)
-    strUsage += "  -sysperms              " + _("Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)") + "\n";
     strUsage += "  -shortoutput           " + _("Returns connection string if this node can start or default multichain address otherwise") + "\n";
 #endif
 /* MCHN START */    

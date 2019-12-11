@@ -398,6 +398,10 @@ int main(int argc, char* argv[])
         PrintExceptionContinue(NULL, "AppInitRPC()");
         return EXIT_FAILURE;
     }
+    
+#ifndef WIN32
+    umask(077);        
+#endif
 
     boost::filesystem::path path_cli_log;
     if (mapArgs.count("-datadir")) 
