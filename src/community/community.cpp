@@ -106,37 +106,17 @@ Value mc_EnterpriseFeatures::FED_RPCDeleteFeed(const Array& params)
     return Value::null;
 }
 
-Value mc_EnterpriseFeatures::FED_RPCAddFeedStreams(const Array& params)
+Value mc_EnterpriseFeatures::FED_RPCPauseFeed(const Array& params)
 {
     return Value::null;
 }
 
-Value mc_EnterpriseFeatures::FED_RPCUpdateFeedStreams(const Array& params)
+Value mc_EnterpriseFeatures::FED_RPCResumeFeed(const Array& params)
 {
     return Value::null;
 }
 
-Value mc_EnterpriseFeatures::FED_RPCRemoveFeedStreams(const Array& params)
-{
-    return Value::null;
-}
-
-Value mc_EnterpriseFeatures::FED_RPCAddFeedBlocks(const Array& params)
-{
-    return Value::null;
-}
-
-Value mc_EnterpriseFeatures::FED_RPCUpdateFeedBlocks(const Array& params)
-{
-    return Value::null;
-}
-
-Value mc_EnterpriseFeatures::FED_RPCRemoveFeedBlocks(const Array& params)
-{
-    return Value::null;
-}
-
-Value mc_EnterpriseFeatures::FED_RPCPurgeFeedFile(const Array& params)
+Value mc_EnterpriseFeatures::FED_RPCPurgeFeed(const Array& params)
 {
     return Value::null;
 }

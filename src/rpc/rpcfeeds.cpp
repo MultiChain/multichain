@@ -32,74 +32,34 @@ Value deletefeed(const json_spirit::Array& params, bool fHelp)
     return pEF->FED_RPCDeleteFeed(params);
 }
 
-Value addfeedstreams(const json_spirit::Array& params, bool fHelp)
-{
-    if (fHelp || params.size() < 2 || params.size() > 4)
-        throw runtime_error("Help message not found\n");
-    
-    pEF->ENT_RPCVerifyEdition("addfeedstreams API");
-    
-    return pEF->FED_RPCAddFeedStreams(params);
-}
-
-Value updatefeedstreams(const json_spirit::Array& params, bool fHelp)
-{
-    if (fHelp || params.size() < 2 || params.size() > 4)
-        throw runtime_error("Help message not found\n");
-    
-    pEF->ENT_RPCVerifyEdition("updatefeedstreams API");
-    
-    return pEF->FED_RPCUpdateFeedStreams(params);
-}
-
-Value removefeedstreams(const json_spirit::Array& params, bool fHelp)
-{
-    if (fHelp || params.size() != 2)
-        throw runtime_error("Help message not found\n");
-    
-    pEF->ENT_RPCVerifyEdition("removefeedstreams API");
-    
-    return pEF->FED_RPCRemoveFeedStreams(params);
-}
-
-Value addfeedblocks(const json_spirit::Array& params, bool fHelp)
-{
-    if (fHelp || params.size() < 1 || params.size() > 3)
-        throw runtime_error("Help message not found\n");
-    
-    pEF->ENT_RPCVerifyEdition("addfeedblocks API");
-    
-    return pEF->FED_RPCAddFeedBlocks(params);
-}
-
-Value updatefeedblocks(const json_spirit::Array& params, bool fHelp)
-{
-    if (fHelp || params.size() < 1 || params.size() > 3)
-        throw runtime_error("Help message not found\n");
-    
-    pEF->ENT_RPCVerifyEdition("updatefeedblocks API");
-    
-    return pEF->FED_RPCUpdateFeedBlocks(params);
-}
-
-Value removefeedblocks(const json_spirit::Array& params, bool fHelp)
+Value pausefeed(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
         throw runtime_error("Help message not found\n");
     
-    pEF->ENT_RPCVerifyEdition("removefeedblocks API");
+    pEF->ENT_RPCVerifyEdition("pausefeed API");
     
-    return pEF->FED_RPCRemoveFeedBlocks(params);
+    return pEF->FED_RPCPauseFeed(params);
 }
 
-Value purgefeedfile(const json_spirit::Array& params, bool fHelp)
+Value resumefeed(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error("Help message not found\n");
+    
+    pEF->ENT_RPCVerifyEdition("resumefeed API");
+    
+    return pEF->FED_RPCResumeFeed(params);
+}
+
+Value purgefeed(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 3)
         throw runtime_error("Help message not found\n");
     
-    pEF->ENT_RPCVerifyEdition("purgefeedfile API");
+    pEF->ENT_RPCVerifyEdition("purgefeed API");
     
-    return pEF->FED_RPCPurgeFeedFile(params);
+    return pEF->FED_RPCPurgeFeed(params);
 }
 
 Value listfeeds(const json_spirit::Array& params, bool fHelp)

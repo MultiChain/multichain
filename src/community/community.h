@@ -62,13 +62,9 @@ typedef struct mc_EnterpriseFeatures
     
     Value FED_RPCCreateFeed(const Array& params);
     Value FED_RPCDeleteFeed(const Array& params);
-    Value FED_RPCAddFeedStreams(const Array& params);
-    Value FED_RPCUpdateFeedStreams(const Array& params);
-    Value FED_RPCRemoveFeedStreams(const Array& params);
-    Value FED_RPCAddFeedBlocks(const Array& params);
-    Value FED_RPCUpdateFeedBlocks(const Array& params);
-    Value FED_RPCRemoveFeedBlocks(const Array& params);
-    Value FED_RPCPurgeFeedFile(const Array& params);
+    Value FED_RPCPauseFeed(const Array& params);
+    Value FED_RPCResumeFeed(const Array& params);
+    Value FED_RPCPurgeFeed(const Array& params);
     Value FED_RPCListFeeds(const Array& params);
     Value FED_RPCAddToFeed(const Array& params);
     Value FED_RPCUpdateFeed(const Array& params);  
