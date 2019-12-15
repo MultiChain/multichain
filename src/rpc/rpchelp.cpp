@@ -5028,7 +5028,8 @@ void mc_InitRPCHelpMap21()
             "\nCreates feed\n"
             "\nArguments:\n"
             "1. \"feed-name\"                      (string, required) Feed name\n"
-            "2. parameters                       (object, optional) Feed options \n"
+            "2. parameters                       (object, optional) Feed parameters. Supported parameters: \n"
+            "                                                         dir - feed output directory \n"
             "\nExamples:\n"
             + HelpExampleCli("createfeed", "feed1")
             + HelpExampleRpc("createfeed", "feed1")
@@ -5088,7 +5089,7 @@ void mc_InitRPCHelpMap21()
 void mc_InitRPCHelpMap22()
 {
      mapHelpStrings.insert(std::make_pair("addtofeed",
-            "addtofeed \"feed-name\" entities ( \"globals\" \"action\" parameters )\n"
+            "addtofeed \"feed-name\" entities ( \"globals\" \"action\" options )\n"
             "\nAvailable only in Enterprise Edition.\n"
             "\nAdds subscriptions to feed.\n"
             "\nArguments:\n"
@@ -5101,17 +5102,17 @@ void mc_InitRPCHelpMap22()
             "                                                         rescan - rescan and start processing, \n"
             "                                                         suspend - suspend processing,\n"
             "                                                         start - start processing without rescanning,\n"
-            "5. options                          (object, optional) JSON array of subscription options\n"
+            "5. options                          (object, optional) JSON object of subscription options\n"
             "\nNote: This call can take minutes to complete if action=rescan.\n"
             "\nResult:\n"
             "\nExamples:\n"
-            + HelpExampleCli("addtofeed", "\"feed1\" \"test-stream\"") 
+            + HelpExampleCli("addtofeed", "\"feed1\" \"test-stream\" \"\" \"{\\\"maxshowndata\\\":256}\"") 
             + HelpExampleCli("addtofeed", "\"feed1\" \"test-stream\" blocks suspend") 
             + HelpExampleRpc("addtofeed", "\"feed1\", \"test-stream\"")
          ));
    
      mapHelpStrings.insert(std::make_pair("updatefeed",
-            "updatefeed \"feed-name\" entities ( \"globals\" \"action\" parameters )\n"
+            "updatefeed \"feed-name\" entities ( \"globals\" \"action\" options )\n"
             "\nAvailable only in Enterprise Edition.\n"
             "\nUpdates subscriptions in feed.\n"
             "\nArguments:\n"
@@ -5126,11 +5127,11 @@ void mc_InitRPCHelpMap22()
             "                                                         suspend - suspend item processing,\n"
             "                                                         start - start processing without rescanning,\n"
             "                                                         delete - delete subscription(s)\n"
-            "5. options                          (object, optional) JSON array of options to modify\n"
+            "5. options                          (object, optional) JSON object of options to modify\n"
             "\nNote: This call can take minutes to complete if action=rescan.\n"
             "\nResult:\n"
             "\nExamples:\n"
-            + HelpExampleCli("updatefeed", "\"feed1\" \"test-stream\"") 
+            + HelpExampleCli("updatefeed", "\"feed1\" \"*\" \"\" \"{\\\"maxshowndata\\\":256}\"") 
             + HelpExampleCli("updatefeed", "\"feed1\" \"test-stream\" blocks suspend") 
             + HelpExampleRpc("updatefeed", "\"feed1\", \"test-stream\"")
          ));
