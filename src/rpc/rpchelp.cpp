@@ -5124,6 +5124,7 @@ void mc_InitRPCHelpMap22()
             "4. \"action\"                         (string, optional, default=none) Modification action:\n"
             "                                                         none - don't change current state, \n"
             "                                                         rescan - rescan and start processing, \n"
+            "                                                         continue - continue from the block the susbscription was suspended, \n"
             "                                                         suspend - suspend item processing,\n"
             "                                                         start - start processing without rescanning,\n"
             "                                                         delete - delete subscription(s)\n"
