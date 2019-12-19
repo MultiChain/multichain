@@ -5047,22 +5047,24 @@ void mc_InitRPCHelpMap21()
         ));
     
     mapHelpStrings.insert(std::make_pair("pausefeed",
-            "pausefeed \"feed-name\" \n"
+            "pausefeed \"feed-name\" ( buffer )\n"
             "\nAvailable only in Enterprise Edition.\n"
             "\nPauses output to feed\n"
             "\nArguments:\n"
             "1. \"feed-name\"                      (string, required) Feed name\n"
+            "2. buffer                           (optional, default=true) Store feed events in temporary buffer while paused\n"
             "\nExamples:\n"
             + HelpExampleCli("pausefeed", "feed1")
             + HelpExampleRpc("pausefeed", "feed1")
         ));
     
     mapHelpStrings.insert(std::make_pair("resumefeed",
-            "resumefeed \"feed-name\" \n"
+            "resumefeed \"feed-name\" ( buffer )\n"
             "\nAvailable only in Enterprise Edition.\n"
             "\nResumes output to feed\n"
             "\nArguments:\n"
             "1. \"feed-name\"                      (string, required) Feed name\n"
+            "2. buffer                           (optional, default=true) Try to restore events from temporary buffer\n"
             "\nExamples:\n"
             + HelpExampleCli("resumefeed", "feed1")
             + HelpExampleRpc("resumefeed", "feed1")
@@ -5124,9 +5126,8 @@ void mc_InitRPCHelpMap22()
             "4. \"action\"                         (string, optional, default=none) Modification action:\n"
             "                                                         none - don't change current state, \n"
             "                                                         rescan - rescan and start processing, \n"
-            "                                                         continue - continue from the block the susbscription was suspended, \n"
-            "                                                         suspend - suspend item processing,\n"
             "                                                         start - start processing without rescanning,\n"
+            "                                                         suspend - suspend item processing,\n"
             "                                                         delete - delete subscription(s)\n"
             "5. options                          (object, optional) JSON object of options to modify\n"
             "\nNote: This call can take minutes to complete if action=rescan.\n"
