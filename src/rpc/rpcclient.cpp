@@ -531,6 +531,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "listlicenses", 0 },
     { "listlicenses", 1 },
     { "createfeed", 1 },
+    { "deletefeed", 1 },
     { "pausefeed", 1 },
     { "resumefeed", 1 },
     { "addtofeed", 1 },

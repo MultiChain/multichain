@@ -24,7 +24,7 @@ Value createfeed(const json_spirit::Array& params, bool fHelp)
 
 Value deletefeed(const json_spirit::Array& params, bool fHelp)
 {
-    if (fHelp || params.size() != 1)
+    if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error("Help message not found\n");
     
     pEF->ENT_RPCVerifyEdition("deletefeed API");

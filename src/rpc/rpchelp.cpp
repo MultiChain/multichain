@@ -2060,7 +2060,7 @@ void mc_InitRPCHelpMap09()
             "3. count-bytes                      (numeric, optional, default=INT_MAX) Number of bytes to return\n"
             "4. start-byte                       (numeric, optional, default=0) start from specific byte \n"
             "\nResult:\n"
-            "\"data-hex\"                          (string) transaction output metadata in hexadecimal form.\n"
+            "\"data-hex\"                          (string) transaction output metadata.\n"
             "\nExamples:\n"
             "\nView the data\n"
             + HelpExampleCli("gettxoutdata", "\"txid\" 1") +
@@ -5036,11 +5036,12 @@ void mc_InitRPCHelpMap21()
         ));
     
     mapHelpStrings.insert(std::make_pair("deletefeed",
-            "deletefeed \"feed-name\" \n"
+            "deletefeed \"feed-name\" ( force )\n"
             "\nAvailable only in Enterprise Edition.\n"
             "\nDeletes feed\n"
             "\nArguments:\n"
             "1. \"feed-name\"                      (string, required) Feed name\n"
+            "2. force                            (string, optional, default false) Delete feed even with unsuspended subscriptions and not purged files.\n"
             "\nExamples:\n"
             + HelpExampleCli("deletefeedfeed", "feed1")
             + HelpExampleRpc("deletefeedfeed", "feed1")
@@ -5146,7 +5147,7 @@ void mc_InitRPCHelpMap22()
             "2. count-bytes                      (numeric, optional, default=INT_MAX) Number of bytes to return\n"
             "3. start-byte                       (numeric, optional, default=0) start from specific byte \n"
             "\nResult:\n"
-            "\"data-hex\"                          (string) transaction output metadata in hexadecimal form.\n"
+            "\"data-hex\"                          (string) transaction output metadata.\n"
             "\nExamples:\n"
             "\nView the data\n"
             + HelpExampleCli("getdatarefdata", "\"dataref\"") +
@@ -5171,6 +5172,19 @@ void mc_InitRPCHelpMap22()
             + HelpExampleRpc("datareftobinarycache", "\"TjnVWwHYEg4\", \"dataref\"")
         ));
      
+    mapHelpStrings.insert(std::make_pair("purgefeed",
+            "purgefeed \"feed-name\" first-file-to-keep ( first-timestamp-to-keep )\n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nPurges old feed files\n"
+            "\nArguments:\n"
+            "1. \"feed-name\"                      (string, required) Feed name\n"
+            "2. first-file-to-keep               (integer, required) Delete files before this file, normally, adapter read file.\n"
+            "3. first-timestamp-to-keep          (integer, optional) Delete only events before this timestamp.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("purgefeed", "feed1 1000")
+            + HelpExampleRpc("purgefeed", "feed1, 1000")
+        ));
+    
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
