@@ -837,6 +837,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
 // 0x0080 subscription
 // 0x0100 salted
 // 0x0800 skip name and ref
+// 0x1000 name and create txid only if nameless, no ref
     
     
     Object entry;
@@ -866,12 +867,25 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
             entry.push_back(Pair("type", "stream"));                        
         }
         
+        if( output_level & 0x1000 )
+        {
+            if(ptr && strlen((char*)ptr))
+            {
+                entry.push_back(Pair("name", string((char*)ptr)));            
+            }            
+            else
+            {
+                entry.push_back(Pair("name", Value::null));                            
+                entry.push_back(Pair("createtxid", hash.GetHex()));
+            }
+        }
+        
         if( (output_level & 0x0800) == 0 )
         {
             if(ptr && strlen((char*)ptr))
             {
                 entry.push_back(Pair("name", string((char*)ptr)));            
-            }
+            }            
         }
         if(output_level & 0x002)
         {
