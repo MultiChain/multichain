@@ -1366,6 +1366,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     }
 
     
+    uint32_t retry_log_time=0;
     int seed_attempt=1;
     if(init_privkey.size())
     {
@@ -1623,10 +1624,12 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         }
         if(seed_attempt == 0)
         {
+            fPauseLogPrint=false;
             if((mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY) 
                || (mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL))
             {
-                if(mc_TimeNowAsUInt() < SeedStopTime)
+                uint32_t retry_time=mc_TimeNowAsUInt();
+                if(retry_time < SeedStopTime)
                 {
                     if(!ShutdownRequested())
                     {
@@ -1674,12 +1677,25 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                         SetRPCWarmupStatus("Node waiting to successfully initialize, only getinitstatus command is available.");
                         seed_attempt++;
                         __US_Sleep(2000);
+                        if(retry_time >= retry_log_time)
+                        {
+                            retry_log_time=retry_time+60;
+                            if(retry_log_time > SeedStopTime-20)
+                            {
+                                retry_log_time=SeedStopTime-20;
+                            }
+                        }
+                        else
+                        {
+                            fPauseLogPrint=true;
+                        }
                     }
                 }
             }
         }
         first_attempt=false;
     }
+    fPauseLogPrint=false;
 
     if(pNodeStatus)
     {
