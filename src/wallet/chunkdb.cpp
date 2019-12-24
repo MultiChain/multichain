@@ -1434,6 +1434,13 @@ int mc_ChunkDB::AddChunkInternal(
     subscription=FindSubscription(entity);
     if(subscription == NULL)
     {
+        mc_TxEntity new_entity;
+        memcpy(&new_entity,entity,sizeof(mc_TxEntity));
+        AddEntityInternal(&new_entity,0);
+        subscription=FindSubscription(entity);
+    }
+    if(subscription == NULL)
+    {
         LogString("Internal error: trying to add chunk to unsubscribed entity");
         return MC_ERR_INTERNAL_ERROR;
     }
