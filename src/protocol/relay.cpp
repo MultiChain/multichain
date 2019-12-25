@@ -1803,6 +1803,7 @@ void mc_RelayManager::Zero()
 {
     m_Semaphore=NULL;
     m_LockedBy=0;         
+    m_LastTime=0;
 }
 
 void mc_RelayManager::Destroy()
@@ -2661,9 +2662,9 @@ int mc_RelayManager::DeleteRequest(mc_OffchainMessageID request)
     if(itreq != m_Requests.end())
     {
         pEF->OFF_FreeEFCache(itreq->second.m_EFCacheID);
-        m_Requests.erase(itreq);       
         if(fDebug)LogPrint("offchain","Offchain delete: %s, msg: %s, size: %d. Open requests: %d\n",itreq->second.m_MsgID.ToString().c_str(),
             mc_MsgTypeStr(itreq->second.m_MsgType).c_str(),(int)itreq->second.m_Payload.size(),(int)m_Requests.size());
+        m_Requests.erase(itreq);       
     }    
     else
     {
