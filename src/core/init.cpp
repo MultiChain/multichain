@@ -2575,6 +2575,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     break;
                 }
 
+                CBlock &genesis_block = const_cast<CBlock&>(Params().GenesisBlock());
+                chainActive.Genesis()->nSize=::GetSerializeSize(genesis_block, SER_DISK, CLIENT_VERSION);
+                
                 // Check for changed -txindex state
 /* MCHN START */    
 /* Default was false */    
