@@ -538,8 +538,6 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "addtofeed", 4 },
     { "updatefeed", 1 },
     { "updatefeed", 4 },
-    { "purgefeed", 1 },
-    { "purgefeed", 2 },
     { "listfeeds", 0 },
     { "listfeeds", 1 },                                                            
     { "getdatarefdata", 1 },

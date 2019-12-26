@@ -5029,7 +5029,7 @@ void mc_InitRPCHelpMap21()
             "\nArguments:\n"
             "1. \"feed-name\"                      (string, required) Feed name\n"
             "2. parameters                       (object, optional) Feed parameters. Supported parameters: \n"
-            "                                                         dir - feed output directory \n"
+            "                                                         directory - feed output directory, MultiChain will attempt to create it.\n"
             "\nExamples:\n"
             + HelpExampleCli("createfeed", "feed1")
             + HelpExampleRpc("createfeed", "feed1")
@@ -5038,10 +5038,11 @@ void mc_InitRPCHelpMap21()
     mapHelpStrings.insert(std::make_pair("deletefeed",
             "deletefeed \"feed-name\" ( force )\n"
             "\nAvailable only in Enterprise Edition.\n"
-            "\nDeletes feed\n"
+            "\nDeletes feed. \n"
             "\nArguments:\n"
             "1. \"feed-name\"                      (string, required) Feed name\n"
             "2. force                            (string, optional, default false) Delete feed even with unsuspended subscriptions and not purged files.\n"
+            "                                                         Feed directory is not deleted.\n"
             "\nExamples:\n"
             + HelpExampleCli("deletefeedfeed", "feed1")
             + HelpExampleRpc("deletefeedfeed", "feed1")
@@ -5176,14 +5177,17 @@ void mc_InitRPCHelpMap22()
         ));
      
     mapHelpStrings.insert(std::make_pair("purgefeed",
-            "purgefeed \"feed-name\" first-file-to-keep ( first-timestamp-to-keep )\n"
+            "purgefeed \"feed-name\" file|days|\"*\"\n"
             "\nAvailable only in Enterprise Edition.\n"
             "\nPurges old feed files\n"
             "\nArguments:\n"
             "1. \"feed-name\"                      (string, required) Feed name\n"
-            "2. first-file-to-keep               (integer, required) Delete files before this file, normally, adapter read file.\n"
-            "                                                        -1 to purge all files and reset feed pointer \n"
-            "3. first-timestamp-to-keep          (integer, optional) Delete only events before this timestamp.\n"
+            "2. file                             (integer, required) >= 0 Purge files before this file, normally, adapter read file.\n"
+            " or\n"    
+            "2. days                             (integer, required) <0 Purge only events more than this number of days ago.\n"
+            " or\n"    
+    
+            "2. \"*\"                              (string, required) Purge all files and reset feed pointer \n"
             "\nExamples:\n"
             + HelpExampleCli("purgefeed", "feed1 1000")
             + HelpExampleRpc("purgefeed", "feed1, 1000")
@@ -5196,22 +5200,25 @@ void mc_InitRPCHelpMap22()
             "      maxshowndata (integer) - maximal size of the data which can be written in the feed file\n"
             "\nThe following events can be enabled/disabled in addtofeed, updatefeed APIs, boolean, default true \n"     
             "      blockaddstart, blockaddend, blockremovestart, blockremoveend  \n"
-            "      itemreceived,  \n"
             "      itemconfirmed, itemunconfirmed, iteminvalid  \n"
             "      offchainavailable, offchainpurged \n"
             "\nThe following fields can be enabled/disabled in addtofeed, updatefeed APIs, boolean, default true, \n"
-            "      blockaddstart-blockheight,blockaddstart-blockhash,blockaddstart-blocktxcount,blockaddstart-blocktime,blockaddstart-blockminer, blockaddstart-blocksize,\n"
-            "      blockaddend-blockheight,blockaddend-blockhash,blockaddend-blocktxcount,blockaddend-blocktime,blockaddend-blockminer, blockaddend-blocksize,\n"
-            "      blockremovestart-blockheight,blockremovestart-blockhash,\n"
-            "      blockremoveend-blockheight,blockremoveend-blockhash,\n"
-            "      itemreceived-txid,itemreceived-vout,itemreceived-itemstream,itemreceived-itempublisher,itemreceived-itemkey,itemreceived-itemformat,itemreceived-itemsize, \n"
-            "      itemreceived-itemflags,itemreceived-itembinary,itemreceived-itemtext,itemreceived-itemjson,itemreceived-dataref,itemreceived-timereceived, \n"
-            "      itemconfirmed-itemstream,itemconfirmed-blockheight,itemconfirmed-blockhash,itemconfirmed-blocktime,itemconfirmed-dataref,itemconfirmed-offsetinblock, \n"
-            "      itemunconfirmed-itemstream,\n"
-            "      iteminvalid-itemstream, \n"
-            "      offchainavailable-itemstream,offchainavailable-itemformat,offchainavailable-itemsize,offchainavailable-itemflags,\n"
-            "      offchainavailable-itembinary,offchainavailable-itemtext,offchainavailable-itemjson,offchainavailable-dataref,offchainavailable-timereceived, \n"
-            "      offchainpurged-itemstream \n"
+            "      blockaddstart-height,blockaddstart-hash,blockaddstart-txcount,blockaddstart-time,blockaddstart-miner, blockaddstart-size,\n"
+            "      blockaddend-height,blockaddend-hash,blockaddend-txcount,blockaddend-time,blockaddend-miner, blockaddend-size,\n"
+            "      blockremovestart-height,blockremovestart-hash,\n"
+            "      blockremoveend-height,blockremoveend-hash,\n"
+            "      itemreceived-txid,itemreceived-vout,itemreceived-stream,itemreceived-publisher,itemreceived-key,itemreceived-format,itemreceived-size, \n"
+            "      itemreceived-flags,itemreceived-binary,itemreceived-text,itemreceived-json,itemreceived-dataref,itemreceived-timereceived, \n"
+            "      itemconfirmed-stream,itemconfirmed-blockheight,itemconfirmed-blockhash,itemconfirmed-blocktime,itemconfirmed-dataref,itemconfirmed-offsetinblock, \n"
+            "      itemunconfirmed-stream,\n"
+            "      iteminvalid-stream, \n"
+            "      offchainavailable-stream,offchainavailable-format,offchainavailable-size,offchainavailable-flags,\n"
+            "      offchainavailable-binary,offchainavailable-text,offchainavailable-json,offchainavailable-dataref,offchainavailable-timereceived, \n"
+            "      offchainpurged-stream \n"
+            "\nThe following events CAN NOT be disabled in addtofeed, updatefeed APIs, but still included in the feed\n"     
+            "      itemreceived\n"
+            "\nThe following fields CAN NOT be disabled in addtofeed, updatefeed APIs, but still included in the feed\n"     
+            "      itemreceived-id,itemconfirmed-id,itemunconfirmed-id,iteminvalid-id,offchainavailable-id,offchainpurged-id\n"
         ));
     
     mapHelpStrings.insert(std::make_pair("AAAAAAA",

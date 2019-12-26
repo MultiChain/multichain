@@ -54,7 +54,7 @@ Value resumefeed(const json_spirit::Array& params, bool fHelp)
 
 Value purgefeed(const json_spirit::Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 2 || params.size() > 3)
+    if (fHelp || params.size() != 2)
         throw runtime_error("Help message not found\n");
     
     pEF->ENT_RPCVerifyEdition("purgefeed API");
