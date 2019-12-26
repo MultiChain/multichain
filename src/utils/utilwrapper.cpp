@@ -393,6 +393,7 @@ void mc_CheckDataDirInConfFile()
             mc_ExpandDataDirParam();
         }
     }    
+    delete mapConfig;
 }
 
 

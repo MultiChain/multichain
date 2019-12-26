@@ -593,7 +593,10 @@ int mc_Buffer::SetCount(int count)
             m_Size=0;
             for(i=0;i<count;i++)
             {
-                Add(GetRow(i),GetRow(i)+m_KeySize);
+                m_Size+=m_RowSize;
+                m_lpIndex->Add((unsigned char*)GetRow(i),m_KeySize,m_Count);
+                m_Count++;
+//                Add(GetRow(i),GetRow(i)+m_KeySize);
             }
         }
         else

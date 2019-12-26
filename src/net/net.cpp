@@ -2003,6 +2003,24 @@ void StartNode(boost::thread_group& threadGroup)
     threadGroup.create_thread(boost::bind(&LoopForever<void (*)()>, "dumpaddr", &DumpAddresses, DUMP_ADDRESSES_INTERVAL * 1000));
 }
 
+void EncNetCleanup()
+{
+    {
+        LOCK(cs_vNodes);
+        if(pEF)
+        {
+            BOOST_FOREACH(CNode *pnode, vNodes)
+            {
+                if(pnode->pEntData)
+                {
+                    pEF->NET_FreeNodeData(pnode->pEntData);
+                    pnode->pEntData=NULL;
+                }
+            }                    
+        }
+    }    
+}
+
 bool StopNode()
 {
     LogPrintf("StopNode()\n");
@@ -2018,6 +2036,7 @@ bool StopNode()
     }
 
 /* MCHN START */
+    EncNetCleanup();
     LogPrintf("Node stopped\n");
 /* MCHN END */
     return true;
