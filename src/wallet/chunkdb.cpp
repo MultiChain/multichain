@@ -1771,6 +1771,12 @@ unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
                 {
                     goto exitlbl;
                 }
+                m_TmpScript->Clear();
+                if(m_TmpScript->Resize(bytes_to_read,1))
+                {
+                    goto exitlbl;                                
+                }
+    
                 if(read(FileHan,m_TmpScript->m_lpData,bytes_to_read) != (int)bytes_to_read)
                 {
                     goto exitlbl;
