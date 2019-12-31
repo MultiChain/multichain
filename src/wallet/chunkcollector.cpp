@@ -63,6 +63,22 @@ void mc_ChunkCollector::Zero()
     {
         m_TimeoutRequest=MC_CCW_TIMEOUT_REQUEST_SHIFT+1;
     }
+    int kb_per_sec=(int)GetArg("-chunkmaxkbpersecond",MC_CCW_MAX_MBS_PER_SECOND*1024);
+    
+    m_MaxMBPerSecond=1;
+    if(kb_per_sec > 1024)
+    {
+        m_MaxMBPerSecond=(kb_per_sec-1)/1024+1;
+    }
+    if(m_MaxMBPerSecond <= 1)
+    {
+        m_MaxMBPerSecond=1;
+    }
+    if(m_MaxMBPerSecond > MC_CCW_MAX_MBS_PER_SECOND)
+    {
+        m_MaxMBPerSecond=MC_CCW_MAX_MBS_PER_SECOND;
+    }
+    m_MaxKBPerDestination=(m_TimeoutRequest-MC_CCW_TIMEOUT_REQUEST_SHIFT)*kb_per_sec;
     m_TimeoutQuery=(int)GetArg("-chunkquerytimeout",MC_CCW_TIMEOUT_QUERY);
     m_TotalChunkCount=0;
     m_TotalChunkSize=0;

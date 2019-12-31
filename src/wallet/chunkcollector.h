@@ -133,6 +133,8 @@ typedef struct mc_ChunkCollector
     int m_MaxMemPoolSize;
     int m_TimeoutRequest;
     int m_TimeoutQuery;
+    int m_MaxKBPerDestination;
+    int m_MaxMBPerSecond;
     int64_t m_TotalChunkSize;
     int64_t m_TotalChunkCount;                                                       
     

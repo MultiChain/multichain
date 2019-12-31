@@ -460,7 +460,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     }
 
 
-    max_total_destination_size=(collector->m_TimeoutRequest-MC_CCW_TIMEOUT_REQUEST_SHIFT)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
+    max_total_destination_size=collector->m_MaxKBPerDestination*1024;
 //    max_total_size/=MC_CCW_QUERY_SPLIT;
 /*    
     if(max_total_destination_size > MAX_SIZE-OFFCHAIN_MSG_PADDING)
@@ -474,8 +474,12 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     }
  */ 
     max_total_query_size=MAX_CHUNK_SIZE + sizeof(mc_ChunkEntityKey);
+    if(max_total_destination_size<max_total_query_size)
+    {
+        max_total_destination_size=max_total_query_size;
+    }
     
-    max_total_in_queries=(collector->m_TimeoutRequest-MC_CCW_TIMEOUT_REQUEST_SHIFT)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
+    max_total_in_queries=collector->m_MaxKBPerDestination*1024;
     max_total_in_queries*=collector->m_TimeoutRequest;
     total_in_queries=0;
     query_count=0;
@@ -749,7 +753,8 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                     }
                 }
                 query_id=pRelayManager->SendRequest(NULL,MC_RMT_CHUNK_QUERY,0,payload);
-                if(fDebug)LogPrint("chunks","New chunk query: %s, chunks: %d, rows [%d-%d)\n",query_id.ToString().c_str(),last_count,last_row,row);
+                if(fDebug)LogPrint("chunks","New chunk query: %s, chunks: %d, rows [%d-%d), in queries %d (out of %d), per destination: %dKB, timeout: %d\n",query_id.ToString().c_str(),last_count,last_row,row,
+                        total_in_queries,max_total_in_queries,collector->m_MaxKBPerDestination,collector->m_TimeoutRequest);
                 for(int r=last_row;r<row;r++)
                 {
                     collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(r);
@@ -1188,7 +1193,7 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
                     strError="Expiration is too far in the future";
                     return false;                                                            
                 }
-                max_total_size=MC_CCW_MAX_MBS_PER_SECOND*(expiration-pRelayManager->m_LastTime)*1024*1024;
+                max_total_size=pwalletTxsMain->m_ChunkCollector->m_MaxMBPerSecond*(expiration-pRelayManager->m_LastTime)*1024*1024;
                 break;
             case MC_RDT_CHUNK_IDS:
                 ptr++;
@@ -1857,7 +1862,7 @@ void mc_RelayManager::SetDefaults()
     MsgTypeSettings(MC_RMT_NODE_DETAILS    , 0,10, 100,  1*1024*1024);
     MsgTypeSettings(MC_RMT_CHUNK_QUERY     ,pwalletTxsMain->m_ChunkCollector->m_TimeoutQuery+5,10, 100,  1*1024*1024);
     MsgTypeSettings(MC_RMT_CHUNK_QUERY_HIT ,pwalletTxsMain->m_ChunkCollector->m_TimeoutQuery+5,10, 100,  1*1024*1024);
-    MsgTypeSettings(MC_RMT_CHUNK_REQUEST   ,pwalletTxsMain->m_ChunkCollector->m_TimeoutRequest+5,10, 100, (MC_CCW_MAX_MBS_PER_SECOND+2)*1024*1024);
+    MsgTypeSettings(MC_RMT_CHUNK_REQUEST   ,pwalletTxsMain->m_ChunkCollector->m_TimeoutRequest+5,10, 100, (pwalletTxsMain->m_ChunkCollector->m_MaxMBPerSecond+2)*1024*1024);
     MsgTypeSettings(MC_RMT_CHUNK_RESPONSE  , 0,10, 100,100*1024*1024);
     MsgTypeSettings(MC_RMT_ERROR_IN_MESSAGE,30,10,1000,  1*1024*1024);
     MsgTypeSettings(MC_RMT_NEW_REQUEST     ,30,10,1000,  1*1024*1024);
