@@ -2576,7 +2576,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 }
 
                 CBlock &genesis_block = const_cast<CBlock&>(Params().GenesisBlock());
-                chainActive.Genesis()->nSize=::GetSerializeSize(genesis_block, SER_DISK, CLIENT_VERSION);
+                GenesisBlockSize=::GetSerializeSize(genesis_block, SER_DISK, CLIENT_VERSION);
                 
                 // Check for changed -txindex state
 /* MCHN START */    
@@ -2625,7 +2625,6 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     }
 
     pEF->ENT_MaybeStop();
-
     // As LoadBlockIndex can take several minutes, it's possible the user
     // requested to kill the GUI during the last operation. If so, exit.
     // As the program has not fully started yet, Shutdown() is possibly overkill.

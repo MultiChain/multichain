@@ -108,6 +108,7 @@ bool fReindex = false;
 bool fTxIndex = false;
 bool fIsBareMultisigStd = true;
 unsigned int nCoinCacheSize = 5000;
+int GenesisBlockSize=0;
 int nLastForkedHeight=0;
 vector<CBlockIndex*> vFirstOnThisHeight;
 
@@ -2927,6 +2928,10 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     {
         pMultiChainFilterEngine->Reset(pindexNew->nHeight-1,1);
     }
+    if(pindexNew->nHeight == 0)
+    {
+        pindexNew->nSize=GenesisBlockSize;
+    }
     {
         CCoinsViewCache view(pcoinsTip);
         CInv inv(MSG_BLOCK, pindexNew->GetBlockHash());
@@ -5320,6 +5325,10 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
             CBlock block;
             if (!ReadBlockFromDisk(block, pindex))
                 return error("VerifyDB() : *** ReadBlockFromDisk failed at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
+            if(pindex->nHeight == 0)
+            {
+                pindex->nSize=GenesisBlockSize;
+            }
             int err;
             err=pEF->FED_EventBlock(block, state, pindex,"check",false,false);
             if(err)
@@ -5402,7 +5411,7 @@ bool InitBlockIndex() {
             return error("LoadBlockIndex() : failed to initialize block database: %s", e.what());
         }
     }
-
+    
     return true;
 }
 
