@@ -400,9 +400,9 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
                         if(!only_once && !m_Filters[i].m_AlreadyUsed)
                         {
                             if(fDebug)LogPrint("filter","filter: stream filter %s failure on first attempt: %s, retrying\n",m_Filters[i].m_FilterCaption.c_str(),strResult.c_str());
+                            run_it=true;
+                            strResult="";
                         }
-                        run_it=true;
-                        strResult="";
                     }
                     m_Filters[i].m_AlreadyUsed=true;
                 }
@@ -474,9 +474,9 @@ int mc_MultiChainFilterEngine::RunTxFilters(const CTransaction& tx,std::set <uin
                             if(!only_once && !m_Filters[i].m_AlreadyUsed)
                             {
                                 if(fDebug)LogPrint("filter","filter: tx filter %s failure on first attempt: %s, retrying\n",m_Filters[i].m_FilterCaption.c_str(),strResult.c_str());
+                                run_it=true;
+                                strResult="";
                             }
-                            run_it=true;
-                            strResult="";
                         }
                         m_Filters[i].m_AlreadyUsed=true;
                     }
