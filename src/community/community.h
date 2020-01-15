@@ -19,6 +19,7 @@
 #define MC_EFT_NETWORK_SIGNED_SEND                  0x0000000000020000
 #define MC_EFT_NETWORK_ENCRYPTED_CONNECTIONS        0x0000000000040000
 #define MC_EFT_FEEDS                                0x0000000000100000
+#define MC_EFT_DATAREFS                             0x0000000000200000
 
 #define MC_EFT_ALL                                  0xFFFFFFFFFFFFFFFF
 
@@ -60,16 +61,24 @@ typedef struct mc_EnterpriseFeatures
     int STR_RemoveDataFromFile(int fHan, uint32_t from, uint32_t size, uint32_t mode);
     
     Value FED_RPCCreateFeed(const Array& params);
-    Value FED_RPCSuspendFeed(const Array& params);
     Value FED_RPCDeleteFeed(const Array& params);
-    Value FED_RPCRescanFeed(const Array& params);
-    Value FED_RPCAddFeedStreams(const Array& params);
-    Value FED_RPCRemoveFeedStreams(const Array& params);
-    Value FED_RPCAddFeedBlocks(const Array& params);
-    Value FED_RPCRemoveFeedBlocks(const Array& params);
-    Value FED_RPCPurgeFeedFile(const Array& params);
+    Value FED_RPCPauseFeed(const Array& params);
+    Value FED_RPCResumeFeed(const Array& params);
+    Value FED_RPCPurgeFeed(const Array& params);
     Value FED_RPCListFeeds(const Array& params);
+    Value FED_RPCAddToFeed(const Array& params);
+    Value FED_RPCUpdateFeed(const Array& params);  
+    
+    Value DRF_RPCGetDataRefData(const Array& params);
+    Value DRF_RPCDataRefToBinaryCache(const Array& params);
+    bool DRF_GetData(string dataref,CScript &script,const unsigned char **elem,int64_t *size,uint32_t *format,std::string &strError);
+    
+    
     int FED_EventTx(const CTransaction& tx,int block,CDiskTxPos* block_pos,uint32_t block_tx_index,uint256 block_hash,uint32_t block_timestamp);
+    int FED_EventChunksAvailable();    
+    int FED_EventBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex,std::string type,bool after,bool error);
+    int FED_EventPurgeChunk(mc_ChunkDBRow *chunk_def);    
+    int FED_EventInvalidateTx(const CTransaction& tx,int error_code,std::string error_message);
     
     bool OFF_ProcessChunkRequest(unsigned char *ptrStart,unsigned char *ptrEnd,vector<unsigned char>* payload_response,vector<unsigned char>* payload_relay,
         map<uint160,int>& mapReadPermissionedStreams,string& strError);

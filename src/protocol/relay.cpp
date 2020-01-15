@@ -259,7 +259,7 @@ bool MultichainProcessChunkResponse(const CRelayResponsePair *response_pair,map 
             if( (collect_row->m_State.m_Status & MC_CCF_DELETED ) == 0 )
             {
                 chunk_err=pwalletTxsMain->m_ChunkDB->AddChunk(chunk->m_Hash,&(chunk->m_Entity),(unsigned char*)collect_row->m_TxID,collect_row->m_Vout,
-                        ptrOut,NULL,collect_row->m_Salt,sizeOut,0,collect_row->m_SaltSize,0);
+                        ptrOut,NULL,collect_row->m_Salt,sizeOut,0,collect_row->m_SaltSize,collect_row->m_Flags);
                 if(chunk_err)
                 {
                     if(chunk_err != MC_ERR_FOUND)
@@ -460,7 +460,7 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     }
 
 
-    max_total_destination_size=(collector->m_TimeoutRequest-MC_CCW_TIMEOUT_REQUEST_SHIFT)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
+    max_total_destination_size=collector->m_MaxKBPerDestination*1024;
 //    max_total_size/=MC_CCW_QUERY_SPLIT;
 /*    
     if(max_total_destination_size > MAX_SIZE-OFFCHAIN_MSG_PADDING)
@@ -474,8 +474,12 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
     }
  */ 
     max_total_query_size=MAX_CHUNK_SIZE + sizeof(mc_ChunkEntityKey);
+    if(max_total_destination_size<max_total_query_size)
+    {
+        max_total_destination_size=max_total_query_size;
+    }
     
-    max_total_in_queries=(collector->m_TimeoutRequest-MC_CCW_TIMEOUT_REQUEST_SHIFT)*MC_CCW_MAX_MBS_PER_SECOND*1024*1024;
+    max_total_in_queries=collector->m_MaxKBPerDestination*1024;
     max_total_in_queries*=collector->m_TimeoutRequest;
     total_in_queries=0;
     query_count=0;
@@ -749,7 +753,8 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
                     }
                 }
                 query_id=pRelayManager->SendRequest(NULL,MC_RMT_CHUNK_QUERY,0,payload);
-                if(fDebug)LogPrint("chunks","New chunk query: %s, chunks: %d, rows [%d-%d)\n",query_id.ToString().c_str(),last_count,last_row,row);
+                if(fDebug)LogPrint("chunks","New chunk query: %s, chunks: %d, rows [%d-%d), in queries %d (out of %d), per destination: %dKB, timeout: %d\n",query_id.ToString().c_str(),last_count,last_row,row,
+                        total_in_queries,max_total_in_queries,collector->m_MaxKBPerDestination,collector->m_TimeoutRequest);
                 for(int r=last_row;r<row;r++)
                 {
                     collect_subrow=(mc_ChunkCollectorRow *)collector->m_MemPool->GetRow(r);
@@ -932,6 +937,12 @@ int MultichainCollectChunks(mc_ChunkCollector* collector)
         }
     }
     
+    int err=pEF->FED_EventChunksAvailable();
+    if(err)
+    {
+        LogPrintf("ERROR: Cannot write offchain items to feeds, error %d\n",err);
+    }
+    
     
     return not_processed;
 }
@@ -1100,7 +1111,9 @@ bool mc_RelayProcess_Chunk_Query(unsigned char *ptrStart,unsigned char *ptrEnd,v
                     string strErrorToIgnore;
                     chunk=*(mc_ChunkEntityKey*)ptr;
                     if( (mc_IsReadPermissionedStream(&chunk,mapReadPermissionCache,NULL) == 0) ||
-                        ((pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_DELIVER,strErrorToIgnore) != 0) && (publisher_ef != NULL) ))
+                        ((pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_DELIVER,strErrorToIgnore) != 0) && 
+                         (pEF->LIC_VerifyFeature(MC_EFT_NETWORK_SIGNED_RECEIVE,strErrorToIgnore) != 0) &&                          
+                            (publisher_ef != NULL) ))
                     {
                         if(pwalletTxsMain->m_ChunkDB->GetChunkDef(&chunk_def,chunk.m_Hash,NULL,NULL,-1) == MC_ERR_NOERROR)
                         {
@@ -1180,7 +1193,7 @@ bool mc_RelayProcess_Chunk_Request(unsigned char *ptrStart,unsigned char *ptrEnd
                     strError="Expiration is too far in the future";
                     return false;                                                            
                 }
-                max_total_size=MC_CCW_MAX_MBS_PER_SECOND*(expiration-pRelayManager->m_LastTime)*1024*1024;
+                max_total_size=pwalletTxsMain->m_ChunkCollector->m_MaxMBPerSecond*(expiration-pRelayManager->m_LastTime)*1024*1024;
                 break;
             case MC_RDT_CHUNK_IDS:
                 ptr++;
@@ -1485,13 +1498,13 @@ bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
                 vSigScriptsToVerify.clear();
                 if(read_permissioned)
                 {
-                    if(!pEF->OFF_GetScriptsToVerify(mapReadPermissionCache,vSigScriptsIn,vSigScriptsToVerify,strError))
-                    {
-                        goto exitlbl;                            
-                    }
                     if(!pEF->OFF_ProcessChunkRequest(ptr,ptrEnd,payload_response_ptr,payload_relay_ptr,mapReadPermissionCache,strError))
                     {
                         goto exitlbl;                                                    
+                    }
+                    if(!pEF->OFF_GetScriptsToVerify(mapReadPermissionCache,vSigScriptsIn,vSigScriptsToVerify,strError))
+                    {
+                        goto exitlbl;                            
                     }
                 }
                 else
@@ -1795,6 +1808,7 @@ void mc_RelayManager::Zero()
 {
     m_Semaphore=NULL;
     m_LockedBy=0;         
+    m_LastTime=0;
 }
 
 void mc_RelayManager::Destroy()
@@ -1848,7 +1862,7 @@ void mc_RelayManager::SetDefaults()
     MsgTypeSettings(MC_RMT_NODE_DETAILS    , 0,10, 100,  1*1024*1024);
     MsgTypeSettings(MC_RMT_CHUNK_QUERY     ,pwalletTxsMain->m_ChunkCollector->m_TimeoutQuery+5,10, 100,  1*1024*1024);
     MsgTypeSettings(MC_RMT_CHUNK_QUERY_HIT ,pwalletTxsMain->m_ChunkCollector->m_TimeoutQuery+5,10, 100,  1*1024*1024);
-    MsgTypeSettings(MC_RMT_CHUNK_REQUEST   ,pwalletTxsMain->m_ChunkCollector->m_TimeoutRequest+5,10, 100, (MC_CCW_MAX_MBS_PER_SECOND+2)*1024*1024);
+    MsgTypeSettings(MC_RMT_CHUNK_REQUEST   ,pwalletTxsMain->m_ChunkCollector->m_TimeoutRequest+5,10, 100, (pwalletTxsMain->m_ChunkCollector->m_MaxMBPerSecond+2)*1024*1024);
     MsgTypeSettings(MC_RMT_CHUNK_RESPONSE  , 0,10, 100,100*1024*1024);
     MsgTypeSettings(MC_RMT_ERROR_IN_MESSAGE,30,10,1000,  1*1024*1024);
     MsgTypeSettings(MC_RMT_NEW_REQUEST     ,30,10,1000,  1*1024*1024);
@@ -2653,9 +2667,9 @@ int mc_RelayManager::DeleteRequest(mc_OffchainMessageID request)
     if(itreq != m_Requests.end())
     {
         pEF->OFF_FreeEFCache(itreq->second.m_EFCacheID);
-        m_Requests.erase(itreq);       
         if(fDebug)LogPrint("offchain","Offchain delete: %s, msg: %s, size: %d. Open requests: %d\n",itreq->second.m_MsgID.ToString().c_str(),
             mc_MsgTypeStr(itreq->second.m_MsgType).c_str(),(int)itreq->second.m_Payload.size(),(int)m_Requests.size());
+        m_Requests.erase(itreq);       
     }    
     else
     {

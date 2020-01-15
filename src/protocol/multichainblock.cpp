@@ -8,6 +8,7 @@
 #include "utils/util.h"
 #include "multichain/multichain.h"
 #include "wallet/wallettxs.h"
+#include "community/community.h"
 
 #include <boost/assign/list_of.hpp>
 
@@ -346,6 +347,7 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
                     list<CTransaction> removed;
                     removed_type="banned";                                    
                     LogPrintf("mchn: Tx %s removed from the mempool (%s), reason: %s\n",tx.GetHash().ToString().c_str(),removed_type.c_str(),reason.c_str());
+                    pEF->FED_EventInvalidateTx(tx,REJECT_INVALID,"banned");
                     pool.remove(tx, removed, true, "replay");                    
                 }
             }
@@ -406,6 +408,7 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
             if(removed_type.size())
             {
                 LogPrintf("mchn: Tx %s removed from the mempool (%s), reason: %s\n",tx.GetHash().ToString().c_str(),removed_type.c_str(),reason.c_str());
+                pEF->FED_EventInvalidateTx(tx,REJECT_INVALID,reason);
                 pool.remove(tx, removed, true, "replay");                    
             }
             else
@@ -415,6 +418,7 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
                     removed_type="error";
                     reason="wallet";
                     LogPrintf("mchn: Tx %s removed from the mempool (%s), reason: %s\n",tx.GetHash().ToString().c_str(),removed_type.c_str(),reason.c_str());
+                    pEF->FED_EventInvalidateTx(tx,REJECT_INVALID,reason);
                     pool.remove(tx, removed, true, "replay");                                        
                 }
             }
@@ -464,7 +468,38 @@ void FindSigner(CBlock *block,unsigned char *sig,int *sig_size,uint32_t *hash_ty
     }
 }
     
-bool VerifyBlockSignature(CBlock *block,bool force,bool in_sync)
+bool VerifyBlockSignatureType(CBlock *block)
+{
+    unsigned char sig[255];
+    int sig_size;
+    uint32_t hash_type;
+    
+    FindSigner(block, sig, &sig_size, &hash_type);
+    if(block->vSigner[0])
+    {
+        if(Params().DisallowUnsignedBlockNonce())
+        {
+            if(hash_type == BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE)
+            {
+                LogPrintf("mchn: Nonce not covered by block signature\n");
+                block->nSigHashType=BLOCKSIGHASH_INVALID;
+                return false;                
+            }
+        }
+        else
+        {
+            if(hash_type == BLOCKSIGHASH_NO_SIGNATURE)
+            {
+                LogPrintf("mchn: Nonce covered by block signature\n");
+                block->nSigHashType=BLOCKSIGHASH_INVALID;
+                return false;                
+            }                
+        }
+    }
+    return true;
+}
+
+bool VerifyBlockSignature(CBlock *block,bool force)
 {
     unsigned char sig[255];
     int sig_size;//,key_size;
@@ -494,28 +529,6 @@ bool VerifyBlockSignature(CBlock *block,bool force,bool in_sync)
     FindSigner(block, sig, &sig_size, &hash_type);
     if(block->vSigner[0])
     {
-        if(in_sync)
-        {
-            if(Params().DisallowUnsignedBlockNonce())
-            {
-                if(hash_type == BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE)
-                {
-                    LogPrintf("mchn: Nonce not covered by block signature\n");
-                    block->nSigHashType=BLOCKSIGHASH_INVALID;
-                    return false;                
-                }
-            }
-            else
-            {
-                if(hash_type == BLOCKSIGHASH_NO_SIGNATURE)
-                {
-                    LogPrintf("mchn: Nonce covered by block signature\n");
-                    block->nSigHashType=BLOCKSIGHASH_INVALID;
-                    return false;                
-                }                
-            }
-        }
-        
         switch(hash_type)
         {
             case BLOCKSIGHASH_HEADER:

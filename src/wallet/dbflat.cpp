@@ -242,6 +242,7 @@ CDBConstEnv::VerifyResult CDBFlatEnv::Verify(std::string strFile,std::vector<CDB
         ret=0;       
     }
     
+    dbsrc.CloseCursor(cursor);
     dbsrc.Close();
     
     if(ret)
@@ -338,6 +339,7 @@ bool CDBFlatEnv::Salvage(std::string strFile, bool fAggressive, std::vector<CDBC
         ret=0;       
     }
     
+    dbsrc.CloseCursor(cursor);
     dbsrc.Close();
     
     if(ret)
@@ -1190,7 +1192,8 @@ bool CDBFlat::Rewrite(CDBFlatEnv *lpEnv,const string& strFile, const char* pszSk
             }        
         }
     }
-    
+        
+    dbsrc.CloseCursor(cursor);
     dbsrc.Close();
     dbdst.Close();
     

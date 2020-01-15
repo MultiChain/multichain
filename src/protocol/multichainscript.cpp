@@ -2675,6 +2675,11 @@ int mc_Script::ExtractAndDeleteDataFormat(uint32_t *format,unsigned char** hashe
 
     m_Restrictions=MC_ENT_ENTITY_RESTRICTION_NONE;
     
+    if(chunk_count)
+    {
+        *chunk_count=0;
+    }
+    
     if(salt_size)
     {
         *salt_size=0;

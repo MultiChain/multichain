@@ -453,7 +453,10 @@ int mc_Buffer::Add(const void *lpKey,const void *lpValue)
     {
         if(lpValue)
         {
-            memcpy(m_lpData+m_Size+m_KeySize,lpValue,m_RowSize-m_KeySize);
+            if( (m_lpData+m_Size+m_KeySize) != lpValue)
+            {
+                memcpy(m_lpData+m_Size+m_KeySize,lpValue,m_RowSize-m_KeySize);
+            }
         }
         else
         {
@@ -590,7 +593,10 @@ int mc_Buffer::SetCount(int count)
             m_Size=0;
             for(i=0;i<count;i++)
             {
-                Add(GetRow(i),GetRow(i)+m_KeySize);
+                m_Size+=m_RowSize;
+                m_lpIndex->Add((unsigned char*)GetRow(i),m_KeySize,m_Count);
+                m_Count++;
+//                Add(GetRow(i),GetRow(i)+m_KeySize);
             }
         }
         else
@@ -1923,3 +1929,14 @@ void sprintf_hex(char *hex,const unsigned char *bin,int size)
     hex[size*2]=0;      
 }
 
+void mc_SwapBytes(void *vptr,uint32_t size)
+{
+    unsigned char *ptr=(unsigned char *)vptr;
+    unsigned char t;
+    for(uint32_t i=0;i<size/2;i++)
+    {
+        t=ptr[i];
+        ptr[i]=ptr[size-i-1];
+        ptr[size-i-1]=t;
+    }
+}

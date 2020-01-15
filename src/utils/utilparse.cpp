@@ -2,7 +2,7 @@
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "utils/utilparse.h"
-#include "util.h"
+#include "version/clientversion.h"
 
 using namespace std;
 
@@ -1137,3 +1137,4 @@ int CheckRequiredPermissions(const CTxDestination& addressRet,int expected_allow
     
     return allowed;
 }
+

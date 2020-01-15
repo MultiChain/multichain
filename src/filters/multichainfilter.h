@@ -34,6 +34,7 @@ typedef struct mc_MultiChainFilter
     uint32_t m_FilterType;
     int m_FilterCodeRow;
     uint160 m_FilterAddress;
+    bool m_AlreadyUsed;
     
     mc_MultiChainFilter()
     {
@@ -102,7 +103,7 @@ typedef struct mc_MultiChainFilterEngine
     int SetTimeout(int timeout);    
     int Add(const unsigned char* short_txid,int for_block);
     int Reset(int block,int for_block);
-    int RunTxFilters(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied);            
+    int RunTxFilters(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied,bool only_once);            
     int RunStreamFilters(const CTransaction& tx,int vout, unsigned char *stream_short_txid,int block,int offset,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied);            
     int RunFilter(const CTransaction& tx,mc_Filter *filter,std::string &strResult);            
     int RunFilterWithCallbackLog(const CTransaction& tx,int vout,mc_Filter *filter,std::string &strResult, json_spirit::Array& callbacks);

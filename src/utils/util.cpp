@@ -101,6 +101,7 @@ map<string, vector<string> > mapMultiArgs;
 bool fDebug = false;
 bool fPrintToConsole = false;
 bool fPrintToDebugLog = true;
+bool fPauseLogPrint = false;
 bool fDaemon = false;
 bool fServer = false;
 string strMiscWarning;
@@ -228,6 +229,12 @@ bool LogAcceptCategory(const char* category)
 int LogPrintStr(const std::string &str)
 {
     int ret = 0; // Returns total number of characters written
+    
+    if(fPauseLogPrint)
+    {
+        return ret;
+    }
+    
     if (fPrintToConsole)
     {
         // print to console
