@@ -101,42 +101,22 @@ Value mc_EnterpriseFeatures::FED_RPCCreateFeed(const Array& params)
     return Value::null;
 }
 
-Value mc_EnterpriseFeatures::FED_RPCSuspendFeed(const Array& params)
-{
-    return Value::null;
-}
-
 Value mc_EnterpriseFeatures::FED_RPCDeleteFeed(const Array& params)
 {
     return Value::null;
 }
 
-Value mc_EnterpriseFeatures::FED_RPCRescanFeed(const Array& params)
+Value mc_EnterpriseFeatures::FED_RPCPauseFeed(const Array& params)
 {
     return Value::null;
 }
 
-Value mc_EnterpriseFeatures::FED_RPCAddFeedStreams(const Array& params)
+Value mc_EnterpriseFeatures::FED_RPCResumeFeed(const Array& params)
 {
     return Value::null;
 }
 
-Value mc_EnterpriseFeatures::FED_RPCRemoveFeedStreams(const Array& params)
-{
-    return Value::null;
-}
-
-Value mc_EnterpriseFeatures::FED_RPCAddFeedBlocks(const Array& params)
-{
-    return Value::null;
-}
-
-Value mc_EnterpriseFeatures::FED_RPCRemoveFeedBlocks(const Array& params)
-{
-    return Value::null;
-}
-
-Value mc_EnterpriseFeatures::FED_RPCPurgeFeedFile(const Array& params)
+Value mc_EnterpriseFeatures::FED_RPCPurgeFeed(const Array& params)
 {
     return Value::null;
 }
@@ -146,11 +126,58 @@ Value mc_EnterpriseFeatures::FED_RPCListFeeds(const Array& params)
     return Value::null;
 }
 
+Value mc_EnterpriseFeatures::FED_RPCAddToFeed(const Array& params)
+{
+    return Value::null;   
+}
+
+Value mc_EnterpriseFeatures::FED_RPCUpdateFeed(const Array& params)
+{
+    return Value::null;    
+}
+
+
+
+    
+Value mc_EnterpriseFeatures::DRF_RPCGetDataRefData(const Array& params)
+{
+    return Value::null;    
+}
+
+Value mc_EnterpriseFeatures::DRF_RPCDataRefToBinaryCache(const Array& params)
+{
+    return Value::null;
+}
+
+bool mc_EnterpriseFeatures::DRF_GetData(string dataref,CScript &script,const unsigned char **elem,int64_t *size,uint32_t *format,std::string &strError)
+{
+    return false;
+}
+
 int mc_EnterpriseFeatures::FED_EventTx(const CTransaction& tx,int block,CDiskTxPos* block_pos,uint32_t block_tx_index,uint256 block_hash,uint32_t block_timestamp)
 {
     return MC_ERR_NOERROR;
 }
 
+int mc_EnterpriseFeatures::FED_EventChunksAvailable()
+{
+    return MC_ERR_NOERROR;    
+}
+
+int mc_EnterpriseFeatures::FED_EventPurgeChunk(mc_ChunkDBRow *chunk_def)
+{
+    return MC_ERR_NOERROR;    
+}   
+
+int mc_EnterpriseFeatures::FED_EventBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex,std::string type,bool after,bool error)
+{
+    return MC_ERR_NOERROR;        
+}
+
+int mc_EnterpriseFeatures::FED_EventInvalidateTx(const CTransaction& tx,int error_code,std::string error_message)
+{
+    return MC_ERR_NOERROR;            
+}
 
 bool mc_EnterpriseFeatures::OFF_ProcessChunkRequest(unsigned char *ptrStart,unsigned char *ptrEnd,vector<unsigned char>* payload_response,vector<unsigned char>* payload_relay,
         map<uint160,int>& mapReadPermissionedStreams,string& strError)

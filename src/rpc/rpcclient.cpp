@@ -237,15 +237,15 @@ static const std::string vAPINames[] =
 "takelicense",
 "importlicenserequest",
 "createfeed",
-"suspendfeed",
 "deletefeed",
-"rescanfeed",
-"addfeedstreams",
-"removefeedstreams",
-"addfeedblocks",
-"removefeedblocks",
-"purgefeedfile",       
-"listfeeds"
+"pausefeed",
+"resumefeed",
+"addtofeed",
+"updatefeed",
+"purgefeed",       
+"listfeeds",
+"getdatarefdata", 
+"datareftobinarycache"
 };
 
 static const CRPCConvertParam vRPCConvertParams[] =
@@ -531,14 +531,19 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "listlicenses", 0 },
     { "listlicenses", 1 },
     { "createfeed", 1 },
-    { "suspendfeed", 2 },
-    { "addfeedstreams", 1 },
-    { "addfeedstreams", 2 },
-    { "removefeedstreams", 1 },
-    { "purgefeedfile", 1 },
-    { "purgefeedfile", 2 },
+    { "deletefeed", 1 },
+    { "pausefeed", 1 },
+    { "resumefeed", 1 },
+    { "addtofeed", 1 },
+    { "addtofeed", 4 },
+    { "updatefeed", 1 },
+    { "updatefeed", 4 },
     { "listfeeds", 0 },
     { "listfeeds", 1 },                                                            
+    { "getdatarefdata", 1 },
+    { "getdatarefdata", 2 },
+    { "datareftobinarycache", 2 },
+    { "datareftobinarycache", 3 },
 };
 
 class CRPCConvertTable
@@ -646,8 +651,8 @@ static const CRPCConvertParamMayBeString vRPCConvertParamsMayBeString[] =
     { "createfrom", 4 },                                                            
     { "create", 3 },                                                            
     { "listlicenses", 0 },
-    { "addfeedstreams", 1 },
-    { "removefeedstreams", 1 },
+    { "addtofeed", 1 },
+    { "updatefeed", 1 },
     { "listfeeds", 0 },
 };
 

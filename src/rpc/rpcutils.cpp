@@ -837,6 +837,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
 // 0x0080 subscription
 // 0x0100 salted
 // 0x0800 skip name and ref
+// 0x1000 name and create txid only if nameless, no ref
     
     
     Object entry;
@@ -866,12 +867,25 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
             entry.push_back(Pair("type", "stream"));                        
         }
         
+        if( output_level & 0x1000 )
+        {
+            if(ptr && strlen((char*)ptr))
+            {
+                entry.push_back(Pair("name", string((char*)ptr)));            
+            }            
+            else
+            {
+                entry.push_back(Pair("name", Value::null));                            
+                entry.push_back(Pair("createtxid", hash.GetHex()));
+            }
+        }
+        
         if( (output_level & 0x0800) == 0 )
         {
             if(ptr && strlen((char*)ptr))
             {
                 entry.push_back(Pair("name", string((char*)ptr)));            
-            }
+            }            
         }
         if(output_level & 0x002)
         {
@@ -1080,7 +1094,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
                         entry.push_back(Pair("retrieve",(pEF->STR_NoRetrieve(&(entStat.m_Entity))==0)));                                                                            
 
                         mc_TxImport dummy_import;
-                        dummy_import.m_ImportID=1;
+                        dummy_import.m_ImportID=-1;
 
                         Object indexes;
                         for(unsigned int ind=0;ind<index_types.size();ind++)
@@ -1367,7 +1381,7 @@ const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes
     return mc_gState->m_TmpBuffers->m_RpcChunkScript1->GetData(0,&elem_size);
 }
 
-uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t total_size)
+uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t total_size,int max_shown)
 {
     uint32_t status;  
     mc_ChunkDBRow chunk_def;
@@ -1379,7 +1393,12 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
         
     if(chunk_count > 1) 
     {
-        if(total_size <= mc_MaxOpReturnShown())
+        int max_size=mc_MaxOpReturnShown();
+        if(max_shown >= 0)
+        {
+            max_size=max_shown;
+        }
+        if(total_size <= max_size)
         {
             use_tmp_buf=true;
         }

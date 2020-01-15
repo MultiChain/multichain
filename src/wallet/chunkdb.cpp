@@ -77,6 +77,8 @@ void mc_ChunkDB::Zero()
     m_ChunkData=NULL;
     m_TmpScript=NULL;
     
+    m_FeedPos=0;
+    
     m_Semaphore=NULL;
     m_LockedBy=0;    
 }
@@ -1432,6 +1434,13 @@ int mc_ChunkDB::AddChunkInternal(
     subscription=FindSubscription(entity);
     if(subscription == NULL)
     {
+        mc_TxEntity new_entity;
+        memcpy(&new_entity,entity,sizeof(mc_TxEntity));
+        AddEntityInternal(&new_entity,0);
+        subscription=FindSubscription(entity);
+    }
+    if(subscription == NULL)
+    {
         LogString("Internal error: trying to add chunk to unsubscribed entity");
         return MC_ERR_INTERNAL_ERROR;
     }
@@ -1762,6 +1771,12 @@ unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
                 {
                     goto exitlbl;
                 }
+                m_TmpScript->Clear();
+                if(m_TmpScript->Resize(bytes_to_read,1))
+                {
+                    goto exitlbl;                                
+                }
+    
                 if(read(FileHan,m_TmpScript->m_lpData,bytes_to_read) != (int)bytes_to_read)
                 {
                     goto exitlbl;
@@ -2190,6 +2205,7 @@ exitlbl:
             sprintf(msg,"NewBlock %d, Chunks: %d,",block,m_MemPool->GetCount());
             LogString(msg);   
         }
+        m_FeedPos=0;
         m_MemPool->Clear();
         m_ChunkData->Clear();
     }
@@ -2201,6 +2217,11 @@ exitlbl:
 int mc_ChunkDB::Commit(int block)
 {
     int err;
+    
+    if(block)
+    {
+        pEF->FED_EventChunksAvailable();    
+    }
     
     Lock();
     err=CommitInternal(block,0);

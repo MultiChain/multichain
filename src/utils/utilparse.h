@@ -25,10 +25,5 @@ bool mc_VerifyAssetPermissions(mc_Buffer *assets, std::vector<CTxDestination> ad
 bool mc_ExtractOutputAssetQuantities(mc_Buffer *assets,std::string& reason,bool with_followons);
 
 
-
-
-
-
-
 #endif	/* MULTICHAINUTILS_H */
 

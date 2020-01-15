@@ -554,6 +554,7 @@ bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex);
 
 /** The currently-connected chain of blocks. */
 extern CChain chainActive;
+extern int GenesisBlockSize;
 
 /** Global variable that points to the active CCoinsView (protected by cs_main) */
 extern CCoinsViewCache *pcoinsTip;

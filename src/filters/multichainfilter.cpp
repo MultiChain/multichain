@@ -57,6 +57,7 @@ int mc_MultiChainFilter::Zero()
     m_FilterCaption="Unknown";
     m_FilterAddress=0;
     m_FilterCodeRow=0;
+    m_AlreadyUsed=false;
     
     return MC_ERR_NOERROR;
 }
@@ -354,6 +355,7 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
         return MC_ERR_NOERROR;
     }
     
+    bool only_once=false;
     int err=MC_ERR_NOERROR;
     strResult="";
     m_Tx=tx;
@@ -383,11 +385,26 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
             if(mc_gState->m_Permissions->FilterApproved(stream_entity_txid,&(m_Filters[i].m_FilterAddress)))
             {
                 mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
-                err=pFilterEngine->RunFilter(worker,strResult);
-                if(err)
+                bool run_it=true;
+                while(run_it)
                 {
-                    LogPrintf("Error while running filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
-                    goto exitlbl;
+                    err=pFilterEngine->RunFilter(worker,strResult);
+                    if(err)
+                    {
+                        LogPrintf("Error while running filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
+                        goto exitlbl;
+                    }
+                    run_it=false;
+                    if(strResult.size())
+                    {
+                        if(!only_once && !m_Filters[i].m_AlreadyUsed)
+                        {
+                            if(fDebug)LogPrint("filter","filter: stream filter %s failure on first attempt: %s, retrying\n",m_Filters[i].m_FilterCaption.c_str(),strResult.c_str());
+                            run_it=true;
+                            strResult="";
+                        }
+                    }
+                    m_Filters[i].m_AlreadyUsed=true;
                 }
                 if(strResult.size())
                 {
@@ -418,7 +435,7 @@ exitlbl:
     return err;    
 }
 
-int mc_MultiChainFilterEngine::RunTxFilters(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied)
+int mc_MultiChainFilterEngine::RunTxFilters(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied,bool only_once)
 {
     int err=MC_ERR_NOERROR;
     strResult="";
@@ -442,11 +459,26 @@ int mc_MultiChainFilterEngine::RunTxFilters(const CTransaction& tx,std::set <uin
                 if(m_Filters[i].HasRelevantEntity(sRelevantEntities))
                 {
                     mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
-                    err=pFilterEngine->RunFilter(worker,strResult);
-                    if(err)
+                    bool run_it=true;
+                    while(run_it)
                     {
-                        LogPrintf("Error while running filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
-                        goto exitlbl;
+                        err=pFilterEngine->RunFilter(worker,strResult);
+                        if(err)
+                        {
+                            LogPrintf("Error while running filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
+                            goto exitlbl;
+                        }
+                        run_it=false;
+                        if(strResult.size())
+                        {
+                            if(!only_once && !m_Filters[i].m_AlreadyUsed)
+                            {
+                                if(fDebug)LogPrint("filter","filter: tx filter %s failure on first attempt: %s, retrying\n",m_Filters[i].m_FilterCaption.c_str(),strResult.c_str());
+                                run_it=true;
+                                strResult="";
+                            }
+                        }
+                        m_Filters[i].m_AlreadyUsed=true;
                     }
                     if(strResult.size())
                     {

@@ -91,7 +91,10 @@ bool AppInit(int argc, char* argv[])
     //
     // If Qt is used, parameters/bitcoin.conf are parsed in qt/bitcoin.cpp's main()
 
-        
+#ifndef WIN32
+    umask(077);        
+#endif
+       
     mc_gState=new mc_State;
     
     mc_gState->m_Params->Parse(argc, argv, MC_ETP_DAEMON);

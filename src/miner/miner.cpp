@@ -943,6 +943,7 @@ set <CTxDestination> LastActiveMiners(CBlockIndex* pindexTip, CPubKey *kLastMine
                         if(block.vSigner[0])
                         {
                             pindex->kMiner.Set(block.vSigner+1, block.vSigner+1+block.vSigner[0]);
+                            pindex->nStatus |= BLOCK_HAVE_MINER_PUBKEY;
                         }
                     }
                 }
@@ -1369,6 +1370,7 @@ void static BitcoinMiner(CWallet *pwallet)
                           || (mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
                            ) && Params().MiningRequiresPeers())
                     {
+                        LOCK(cs_vNodes);
                         vector<CNode*> vNodesCopy = vNodes;
                         BOOST_FOREACH(CNode* pnode, vNodesCopy)
                         {

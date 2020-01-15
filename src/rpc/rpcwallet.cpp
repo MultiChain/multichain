@@ -17,6 +17,7 @@
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #include "rpc/rpcwallet.h"
+#include "community/community.h"
 
 #include <stdint.h>
 
@@ -600,51 +601,7 @@ Value storechunk(const Array& params, bool fHelp)
 
 Value txoutdata_operation(const Array& params,int fHan)
 {
-    uint256 hash(params[0].get_str());
-    int n = params[1].get_int();
-    
-    CTransaction tx;
-    bool found=false;
-    if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
-    {
-        if(pwalletTxsMain->FindWalletTx(hash,NULL) == 0)
-        {
-            const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
-            tx=CTransaction(wtx);
-            found=true;
-        }
-    }
-    else
-    {
-        if (pwalletMain->mapWallet.count(hash))
-        {
-            const CWalletTx& wtx = pwalletMain->mapWallet[hash];
-            tx=CTransaction(wtx);
-            found=true;
-            
-        }
-    }
-    
-    if(!found)
-    {
-        uint256 hashBlock = 0;
-        if (!GetTransaction(hash, tx, hashBlock, true))
-        {
-            throw JSONRPCError(RPC_TX_NOT_FOUND, "No information available about transaction");
-        }
-    }
-
-    if( (n<0) || (n >= (int)tx.vout.size()) ) 
-    {
-        throw JSONRPCError(RPC_OUTPUT_NOT_FOUND, "Invalid vout");        
-    }
-            
-    const CScript& script1 = tx.vout[n].scriptPubKey;        
-    CScript::const_iterator pc1 = script1.begin();
-
-    mc_gState->m_TmpScript->Clear();
-    mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
-
+    CScript txout_script;
     uint32_t format;
     unsigned char *chunk_hashes;
     int chunk_count=0;   
@@ -655,55 +612,123 @@ Value txoutdata_operation(const Array& params,int fHan)
     string error_str;
     int errorCode;
     
-    if(mc_gState->m_TmpScript->IsOpReturnScript() == 0)                      
+    out_size=0;
+    format=MC_SCR_DATA_FORMAT_UNKNOWN;
+    elem=NULL;
+    
+    if(!pEF->DRF_GetData(params[0].get_str(),txout_script,&elem,&out_size,&format,error_str))
     {
-        unsigned char *ptr;
-        int size;
-        elem=NULL;
-        
-        for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
+        if(error_str.size())
         {
-            mc_gState->m_TmpScript->SetElement(e);
-            if(mc_gState->m_TmpScript->GetRawData(&ptr,&size) == 0)      
+            throw JSONRPCError(RPC_INVALID_PARAMETER, error_str);                    
+        }
+        if(params[1].type() == str_type)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid data reference");                                
+        }
+        
+        uint256 hash;
+        hash=uint256(params[0].get_str());
+    //    uint256 hash(params[0].get_str());
+        int n = params[1].get_int();
+
+        CTransaction tx;
+        bool found=false;
+        if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
+        {
+            if(pwalletTxsMain->FindWalletTx(hash,NULL) == 0)
             {
-                if(elem)
-                {
-                    throw JSONRPCError(RPC_NOT_ALLOWED, "This output has more than one data item");                                
-                }
-                format=MC_SCR_DATA_FORMAT_UNKNOWN;
-                if(e > 0)
-                {
-                    mc_gState->m_TmpScript->SetElement(e-1);
-                    mc_gState->m_TmpScript->GetDataFormat(&format);
-                }
-                elem=ptr;
-                elem_size=size;
-                out_size=elem_size;
-            }        
+                const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
+                tx=CTransaction(wtx);
+                found=true;
+            }
         }
-        if(elem == NULL)
+        else
         {
-            throw JSONRPCError(RPC_OUTPUT_NOT_DATA, "Output without metadata");        
+            if (pwalletMain->mapWallet.count(hash))
+            {
+                const CWalletTx& wtx = pwalletMain->mapWallet[hash];
+                tx=CTransaction(wtx);
+                found=true;
+
+            }
         }
-    }
-    else
-    {
-//        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
-        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
-        retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
-        if(retrieve_status & MC_OST_ERROR_MASK)
+
+        if(!found)
         {
-            error_str=OffChainError(retrieve_status,&errorCode);
-            throw JSONRPCError(errorCode, error_str);                    
+            uint256 hashBlock = 0;
+            if (!GetTransaction(hash, tx, hashBlock, true))
+            {
+                throw JSONRPCError(RPC_TX_NOT_FOUND, "No information available about transaction");
+            }
+        }
+
+        if( (n<0) || (n >= (int)tx.vout.size()) ) 
+        {
+            throw JSONRPCError(RPC_OUTPUT_NOT_FOUND, "Invalid vout");        
         }
         
-        elem_size=(size_t)out_size;
-        if( ( (retrieve_status & MC_OST_STATUS_MASK) != MC_OST_RETRIEVED ) && 
-            ( (retrieve_status & MC_OST_STORAGE_MASK) != MC_OST_ON_CHAIN ) )
+        txout_script = tx.vout[n].scriptPubKey;     
+    }
+            
+    if(txout_script.size())
+    {
+        const CScript& script1 = txout_script;        
+        CScript::const_iterator pc1 = script1.begin();
+
+        mc_gState->m_TmpScript->Clear();
+        mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+
+        if(mc_gState->m_TmpScript->IsOpReturnScript() == 0)                      
         {
-                throw JSONRPCError(RPC_OUTPUT_NOT_FOUND, "Data for this output is not available");        
-        }            
-//        elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
+            unsigned char *ptr;
+            int size;
+            elem=NULL;
+
+            for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
+            {
+                mc_gState->m_TmpScript->SetElement(e);
+                if(mc_gState->m_TmpScript->GetRawData(&ptr,&size) == 0)      
+                {
+                    if(elem)
+                    {
+                        throw JSONRPCError(RPC_NOT_ALLOWED, "This output has more than one data item");                                
+                    }
+                    format=MC_SCR_DATA_FORMAT_UNKNOWN;
+                    if(e > 0)
+                    {
+                        mc_gState->m_TmpScript->SetElement(e-1);
+                        mc_gState->m_TmpScript->GetDataFormat(&format);
+                    }
+                    elem=ptr;
+                    elem_size=size;
+                    out_size=elem_size;
+                }        
+            }
+            if(elem == NULL)
+            {
+                throw JSONRPCError(RPC_OUTPUT_NOT_DATA, "Output without metadata");        
+            }
+        }
+        else
+        {
+    //        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+            mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
+            retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
+            if(retrieve_status & MC_OST_ERROR_MASK)
+            {
+                error_str=OffChainError(retrieve_status,&errorCode);
+                throw JSONRPCError(errorCode, error_str);                    
+            }
+
+            elem_size=(size_t)out_size;
+            if( ( (retrieve_status & MC_OST_STATUS_MASK) != MC_OST_RETRIEVED ) && 
+                ( (retrieve_status & MC_OST_STORAGE_MASK) != MC_OST_ON_CHAIN ) )
+            {
+                    throw JSONRPCError(RPC_OUTPUT_NOT_FOUND, "Data for this output is not available");        
+            }            
+    //        elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
+        }
     }
 
     int64_t count,start;
@@ -752,7 +777,7 @@ Value txoutdata_operation(const Array& params,int fHan)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, must include all text or JSON data");                                                                            
         }
     }
-
+    
     if(fHan)
     {
         if(chunk_count > 1)

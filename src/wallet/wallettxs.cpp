@@ -2412,8 +2412,15 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
             int chunk_size,chunk_shift;
             size_t chunk_bytes;
             uint32_t salt_size;
+            uint32_t format;
+            uint32_t chunk_flags;
+            chunk_flags=0;
             
-            mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL,&chunk_hashes,&chunk_count,NULL,&salt_size,0);
+            mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,NULL,&salt_size,0);
+            if(chunk_count == 1)
+            {
+                chunk_flags=MC_CFL_SINGLE_CHUNK + (format & MC_CFL_FORMAT_MASK);
+            }
             if(mc_gState->m_TmpScript->GetNumElements() >= 3) // 2 OP_DROPs + OP_RETURN - item key
             {
                 mc_gState->m_TmpScript->DeleteDuplicatesInRange(1,mc_gState->m_TmpScript->GetNumElements()-1);
@@ -2453,7 +2460,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                         if(chunk_found)
                                         {
                                             memcpy(m_ChunkBuffer,chunk_found,chunk_size);
-                                            chunk_err=m_ChunkDB->AddChunk(chunk_hashes,&chunk_entity,(unsigned char*)&hash,i,m_ChunkBuffer,NULL,salt,chunk_size,0,salt_size,0);
+                                            chunk_err=m_ChunkDB->AddChunk(chunk_hashes,&chunk_entity,(unsigned char*)&hash,i,m_ChunkBuffer,NULL,salt,chunk_size,0,salt_size,chunk_flags);
                                             if(chunk_err)
                                             {
                                                 err=chunk_err;
@@ -2487,7 +2494,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                         }
                                         if(insert_it)
                                         {
-                                            m_ChunkCollector->InsertChunk(chunk_hashes,&chunk_entity,(unsigned char*)&hash,i,chunk_size,salt_size);
+                                            m_ChunkCollector->InsertChunk(chunk_hashes,&chunk_entity,(unsigned char*)&hash,i,chunk_size,salt_size,chunk_flags);
                                         }
                                         // Feeding async chunk retriever here
                                     }

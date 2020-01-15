@@ -14,6 +14,10 @@ int main(int argc, char* argv[])
     int isSetDataDirArg;
     FILE *fHan;
     
+#ifndef WIN32
+    umask(077);        
+#endif
+    
     mc_MultichainParams* params;
     mc_MultichainParams* paramsOld;
     mc_gState=new mc_State;
