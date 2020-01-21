@@ -5216,8 +5216,9 @@ void mc_InitRPCHelpMap22()
             "      offchainavailable-binary,offchainavailable-text,offchainavailable-json,offchainavailable-dataref,offchainavailable-timereceived, \n"
             "      offchainpurged-stream \n"
             "\nThe following events CAN NOT be disabled in addtofeed, updatefeed APIs, but still included in the feed\n"     
-            "      itemreceived\n"
+            "      blockaddstart,blockremovestart,itemreceived,iteminvalid\n"
             "\nThe following fields CAN NOT be disabled in addtofeed, updatefeed APIs, but still included in the feed\n"     
+            "      blockaddstart-hash,blockaddend-hash,blockremovestart-hash,blockremoveend-hash,\n"
             "      itemreceived-id,itemconfirmed-id,itemunconfirmed-id,iteminvalid-id,offchainavailable-id,offchainpurged-id\n"
         ));
     

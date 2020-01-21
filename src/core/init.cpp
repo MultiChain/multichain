@@ -2692,7 +2692,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         pEF->STR_PutSubscriptions(rescan_subscriptions);            
         delete rescan_subscriptions;
     }            
-        
+
     
     // ********************************************************* Step 8: load wallet
 #ifdef ENABLE_WALLET
@@ -2880,6 +2880,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             while (!fRequestShutdown && chainActive.Tip() == NULL)
                 MilliSleep(10);
         }
+        chainActive.Genesis()->nSize=GenesisBlockSize;
     }
 
     // ********************************************************* Step 10: start node
