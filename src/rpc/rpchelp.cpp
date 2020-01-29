@@ -5110,7 +5110,7 @@ void mc_InitRPCHelpMap22()
             "\nNote: This call can take minutes to complete if action=rescan.\n"
             "\nResult:\n"
             "\nExamples:\n"
-            + HelpExampleCli("addtofeed", "\"feed1\" \"test-stream\" \"\" \"{\\\"maxshowndata\\\":256}\"") 
+            + HelpExampleCli("addtofeed", "\"feed1\" \"test-stream\" \"\" \"rescan\" \"{\\\"maxshowndata\\\":256}\"") 
             + HelpExampleCli("addtofeed", "\"feed1\" \"test-stream\" blocks suspend") 
             + HelpExampleRpc("addtofeed", "\"feed1\", \"test-stream\"")
          ));
@@ -5138,7 +5138,7 @@ void mc_InitRPCHelpMap22()
             "\nNote: This call can take minutes to complete if action=rescan.\n"
             "\nResult:\n"
             "\nExamples:\n"
-            + HelpExampleCli("updatefeed", "\"feed1\" \"*\" \"\" \"{\\\"maxshowndata\\\":256}\"") 
+            + HelpExampleCli("updatefeed", "\"feed1\" \"*\" \"\" \"none\" \"{\\\"maxshowndata\\\":256}\"") 
             + HelpExampleCli("updatefeed", "\"feed1\" \"test-stream\" blocks suspend") 
             + HelpExampleRpc("updatefeed", "\"feed1\", \"test-stream\"")
          ));
