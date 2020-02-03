@@ -5198,6 +5198,7 @@ void mc_InitRPCHelpMap22()
             "      override (boolean, default false) - when used with entities='*', override previously defined options for each entity\n"
             "\nThe following parameters can be specified in 'options' parameter of addtofeed, updatefeed APIs:\n"
             "      maxshowndata (integer) - maximal size of the data which can be written in the feed file\n"
+            "      nostreamfilters (boolean, default false) - skip running of stream filters on feed items\n"
             "\nThe following events can be enabled/disabled in addtofeed, updatefeed APIs, boolean, default true \n"     
             "      blockaddend, blockremoveend  \n"
             "      itemconfirmed, itemunconfirmed  \n"
