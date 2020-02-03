@@ -601,7 +601,10 @@ void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransaction>& rem
             {
                 reason=wtx_reason;
             }
-            pEF->FED_EventInvalidateTx(tx,REJECT_INVALID,reason);
+            if(wtx_reason.size())
+            {                
+                pEF->FED_EventInvalidateTx(tx,REJECT_INVALID,reason);
+            }
             removed.push_back(tx);
             totalTxSize -= mapTx[hash].GetTxSize();
             mapTx.erase(hash);

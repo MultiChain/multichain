@@ -407,7 +407,7 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
             if(removed_type.size())
             {
                 LogPrintf("mchn: Tx %s removed from the mempool (%s), reason: %s\n",tx.GetHash().ToString().c_str(),removed_type.c_str(),reason.c_str());
-                pool.remove(tx, removed, true, "replay: "+reason);                    
+                pool.remove(tx, removed, true, "replay: "+removed_type);                    
             }
             else
             {
