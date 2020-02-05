@@ -43,6 +43,7 @@
 std::string BurnAddress(const std::vector<unsigned char>& vchVersion);
 std::string SetBannedTxs(std::string txlist);
 std::string SetLockedBlock(std::string hash);
+bool RecoverAfterCrash();
 
 /* MCHN END */
 
@@ -1028,7 +1029,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 /* MCHN END */
     
 //#ifndef WIN32
-    CreatePidFile(GetPidFile(), __US_GetPID());
+    bool crash_recovery_required=CreatePidFile(GetPidFile(), __US_GetPID());
 //#endif
     if (GetBoolArg("-shrinkdebugfile", !fDebug))
         ShrinkDebugFile();
@@ -2963,6 +2964,32 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         }        
     }
     
+    if(crash_recovery_required)
+    {
+        LogPrintf("Node didn't shut down normally, performing recovery\n");
+        if(!GetBoolArg("-shortoutput", false))
+        {    
+            sprintf(bufOutput,"Node didn't shut down normally, performing recovery\n\n");
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+        }        
+        fInRecovery=true;
+        bool success=RecoverAfterCrash();
+        fInRecovery=false;
+        if(success)
+        {
+            LogPrintf("Recovery completed succesfully\n");            
+        }
+        else
+        {
+            LogPrintf("Recovery failed\n");                        
+            if(!GetBoolArg("-shortoutput", false))
+            {    
+                sprintf(bufOutput,"Recovery failed\n\n");
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+            }        
+        }
+    }
+    
     SetRPCWarmupFinished();                                                     // Should be here, otherwise wallet can double spend
     uiInterface.InitMessage(_("Done loading"));
 
@@ -2974,7 +3001,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     }
     mc_InitRPCHelpMap();
 
-    LogPrintf("Node started\n");
+    LogPrintf("Node started\n");    
 /* MCHN END */    
     return !fRequestShutdown;
 }

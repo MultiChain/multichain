@@ -3109,6 +3109,89 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     return true;
 }
 
+bool RecoverAfterCrash()
+{
+    LOCK(cs_main);
+    
+    CBlock block;
+    CBlock *pblock;
+    CValidationState state;
+    CBlockIndex *pindexNew=chainActive.Tip();
+    int err;
+    
+    if(chainActive.Height() <= 0)
+    {
+        return true;
+    }
+    
+    if (!ReadBlockFromDisk(block, pindexNew))
+    {
+        LogPrintf("ERROR: Cannot load last block from disk\n");
+        return false;
+    }
+    pblock=&block;
+    
+    err=pEF->FED_EventBlock(*pblock, state, pindexNew,"check",true,true);
+    if(err)
+    {
+        LogPrintf("ERROR: Cannot connect(error) block %s in feeds, error %d\n",pindexNew->GetBlockHash().ToString().c_str(),err);
+        return false;
+    }        
+    
+    err=pEF->FED_EventBlock(*pblock, state, pindexNew,"check",true,false);
+    if(err)
+    {
+        LogPrintf("ERROR: Cannot connect(before) block %s in feeds, error %d\n",pindexNew->GetBlockHash().ToString().c_str(),err);
+        return false;
+    }        
+    
+    err=pEF->FED_EventBlock(*pblock, state, pindexNew,"add",false,false);
+    if(err)
+    {
+        LogPrintf("ERROR: Cannot add(before) block %s in feeds, error %d\n",pindexNew->GetBlockHash().ToString().c_str(),err);
+        return false;
+    }        
+    
+    CDiskTxPos pos1(pindexNew->GetBlockPos(), 80+GetSizeOfCompactSize(pblock->vtx.size()));
+    for (unsigned int i = 0; i < pblock->vtx.size(); i++)
+    {
+        const CTransaction &tx = pblock->vtx[i];
+        err=pEF->FED_EventTx(tx,pindexNew->nHeight,&pos1,i,pindexNew->GetBlockHash(),pblock->nTime);
+        if(err)
+        {
+            LogPrintf("ERROR: Cannot write tx %s to feeds in block, error %d\n",tx.GetHash().ToString().c_str(),err);
+            return false;
+        }
+        pos1.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
+    }
+    
+    err=pEF->FED_EventBlock(*pblock, state, pindexNew,"add",true,false);
+    if(err)
+    {
+        LogPrintf("ERROR: Cannot add(after) block %s in feeds, error %d\n",pindexNew->GetBlockHash().ToString().c_str(),err);
+        return false;
+    }        
+
+    for(int pos=0;pos<mempool.hashList->m_Count;pos++)
+    {
+        uint256 hash=*(uint256*)mempool.hashList->GetRow(pos);
+        if(mempool.exists(hash))
+        {
+            const CTxMemPoolEntry entry=mempool.mapTx[hash];
+            const CTransaction& tx = entry.GetTx();            
+            err=pEF->FED_EventTx(tx,-1,NULL,-1,0,0);            
+            if(err)
+            {
+                LogPrintf("ERROR: Cannot write tx %s to feeds in mempool, error %d\n",tx.GetHash().ToString().c_str(),err);
+                return false;
+            }
+        }
+    }
+    
+    return true;
+}
+
+
 /**
  * Return the tip of the chain with the most work in it, that isn't
  * known to be invalid (it's however far from certain to be valid).
