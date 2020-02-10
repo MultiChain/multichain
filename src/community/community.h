@@ -58,7 +58,7 @@ typedef struct mc_EnterpriseFeatures
     Value STR_RPCRetrieveStreamItems(const Array& params);
     Value STR_RPCPurgeStreamItems(const Array& params);    
     Value STR_RPCPurgePublishedItems(const Array& params);
-    int STR_RemoveDataFromFile(int fHan, uint32_t from, uint32_t size, uint32_t mode);
+    int STR_RemoveDataFromFile(const char *name);
     
     Value FED_RPCCreateFeed(const Array& params);
     Value FED_RPCDeleteFeed(const Array& params);

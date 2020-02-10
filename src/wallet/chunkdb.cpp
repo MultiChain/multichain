@@ -763,7 +763,6 @@ int mc_ChunkDB::RemoveEntityInternal(mc_TxEntity *entity,uint32_t *removed_chunk
                     file_offset=file_size;
                 }
             }
-//            pEF->STR_RemoveDataFromFile(FileHan,0,file_size,0);
         }
         
         
@@ -771,6 +770,8 @@ int mc_ChunkDB::RemoveEntityInternal(mc_TxEntity *entity,uint32_t *removed_chunk
         {
             close(FileHan);
         }
+        
+        pEF->STR_RemoveDataFromFile(FileName);
     }
     
     if(err == MC_ERR_NOERROR)
@@ -799,6 +800,7 @@ int mc_ChunkDB::RemoveEntityInternal(mc_TxEntity *entity,uint32_t *removed_chunk
         
         mc_RemoveDir(mc_gState->m_Params->NetworkName(),dir_name);
     }
+
 exitlbl:
             
 
