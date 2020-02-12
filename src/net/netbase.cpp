@@ -138,7 +138,6 @@ bool static LookupIntern(const char *pszName, std::vector<CNetAddr>& vIP, unsign
         {
             assert(aiTrav->ai_addrlen >= sizeof(sockaddr_in));
             vIP.push_back(CNetAddr(((struct sockaddr_in*)(aiTrav->ai_addr))->sin_addr));
-            LogPrintf("DEBUG: Found not Numeric %d\n",vIP.front().ToString().c_str());
         }
 
         if (aiTrav->ai_family == AF_INET6)
