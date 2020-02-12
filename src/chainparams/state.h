@@ -281,6 +281,7 @@ typedef struct mc_State
     uint32_t m_SessionFlags;
     unsigned char m_BurnAddress[20];
     int m_EnterpriseBuild;
+    char m_SeedResolvedAddress[256];
     
     mc_Script               *m_TmpScript;
     mc_Script               *m_TmpScript1;
@@ -307,6 +308,7 @@ typedef struct mc_State
         m_SessionFlags=MC_SSF_DEFAULT;
         m_EnterpriseBuild=0;
         memset(m_BurnAddress,0,20);
+        memset(m_SeedResolvedAddress,0,256);
         
         m_IPv4Address=0;
         m_WalletMode=0;
@@ -392,6 +394,7 @@ typedef struct mc_State
     int IsSupported(int version);
     int IsDeprecated(int version);
     const char* GetSeedNode();
+    int SetSeedNode(const char* seed_resolved);
 } cs_State;
 
 

@@ -1361,7 +1361,36 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     bool grant_message_printed=false;
     seed_node=mc_gState->GetSeedNode();
     mc_Buffer *rescan_subscriptions=NULL;
+    string seed_resolved="";
+    int resolved_port = 0;
+    string resolved_host = "";
+    if(seed_node)
+    {        
+        seed_resolved=string(seed_node);
+        
+        if((mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY) 
+           || (mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL))
+        {        
+            SplitHostPort(seed_resolved, resolved_port, resolved_host);
+            if(resolved_port == 0)
+            {
+                return InitError(strprintf("Couldn't connect to the seed node %s - please specify port number explicitly.",seed_node));                                        
+            }
 
+            LogPrintf("mchn: Checking seed address %s\n",seed_node);            
+            CService resolved_addr;
+            if(!Lookup(seed_node, resolved_addr, 0, 1))
+            {
+                return InitError(strprintf("Couldn't resolve seed address %s.",seed_node));                                                    
+            }
+            seed_resolved=resolved_addr.ToString();        
+        }
+        
+        mc_gState->SetSeedNode(seed_resolved.c_str());
+        LogPrintf("mchn: Seed address resolved: %s\n",mc_gState->GetSeedNode());    
+    }
+    
+    
     if(pEF->Prepare())
     {
         fprintf(stderr,"\nError: Cannot prepare Enterprise features. Exiting...\n\n");
@@ -1463,7 +1492,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 pNodeStatus->nSeedPort=seed_port;
             }
             
-            if(mc_QuerySeed(seedThreadGroup,seed_node))
+            if(mc_QuerySeed(seedThreadGroup,seed_resolved.c_str()))
             {
                 LOCK(cs_NodeStatus);
                 if((mc_gState->m_NetworkState == MC_NTS_SEED_READY) || (mc_gState->m_NetworkState == MC_NTS_SEED_NO_PARAMS) )

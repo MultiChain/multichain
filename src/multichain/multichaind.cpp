@@ -22,6 +22,7 @@
 static bool fDaemon;
 
 mc_EnterpriseFeatures* pEF = NULL;
+extern uint64_t nMainThreadID;
 
 void DebugPrintClose();
 
@@ -94,7 +95,8 @@ bool AppInit(int argc, char* argv[])
 #ifndef WIN32
     umask(077);        
 #endif
-       
+    nMainThreadID=0;   
+    
     mc_gState=new mc_State;
     
     mc_gState->m_Params->Parse(argc, argv, MC_ETP_DAEMON);
@@ -416,6 +418,7 @@ bool AppInit(int argc, char* argv[])
 */
         SoftSetBoolArg("-server", true);
         detectShutdownThread = new boost::thread(boost::bind(&DetectShutdownThread, &threadGroup));
+        nMainThreadID=__US_ThreadID();
         fRet = AppInit2(threadGroup,pipes[1]);
         if(is_daemon)
         {
