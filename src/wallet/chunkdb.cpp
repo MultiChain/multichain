@@ -771,7 +771,11 @@ int mc_ChunkDB::RemoveEntityInternal(mc_TxEntity *entity,uint32_t *removed_chunk
             close(FileHan);
         }
         
-        pEF->STR_RemoveDataFromFile(FileName);
+        string reason;
+        if(pEF->LIC_VerifyFeature(MC_EFT_STREAM_OFFCHAIN_SELECTIVE_PURGE,reason))
+        {
+            pEF->STR_RemoveDataFromFile(FileName);
+        }
     }
     
     if(err == MC_ERR_NOERROR)
