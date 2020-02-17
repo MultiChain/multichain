@@ -293,6 +293,8 @@ public:
     bool fCanConnectLocal;
     CKeyID kAddrRemote;
     CKeyID kAddrLocal;
+    int64_t nLastKBPerDestinationChangeTimestamp;
+    int nMaxKBPerDestination;
 
     CAddress addrFromVersion;
     

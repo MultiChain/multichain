@@ -6108,7 +6108,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         {
             if( (mc_gState->m_NodePausedState & MC_NPS_OFFCHAIN) == 0 )
             {
-                if(!pRelayManager->ProcessRelay(pfrom,vRecv,state,MC_VRA_DEFAULT))
+                bool msg_success=pRelayManager->ProcessRelay(pfrom,vRecv,state,MC_VRA_DEFAULT);
+                if(!msg_success)
                 {
                     int nDos = 0;
                     if (state.IsInvalid(nDos) && nDos > 0)
@@ -6116,6 +6117,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                         Misbehaving(pfrom->GetId(), nDos);
                     }
                 }
+                pwalletTxsMain->m_ChunkCollector->AdjustKBPerDestination(pfrom,msg_success);
             }
         }
     }

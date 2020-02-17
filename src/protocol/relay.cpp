@@ -2710,7 +2710,26 @@ mc_OffchainMessageID mc_RelayManager::SendRequest(CNode* pto,uint32_t msg_type,u
         {
             if( (pto == NULL) || (pnode == pto) )
             {
-                PushRelay(pnode,0,vEmptyHops,vEmptySendPaths,msg_type,msg_id,mc_OffchainMessageID(),flags,payload,vSigScriptsEmpty,NULL,0);                    
+                bool take_it=false;
+                int max_kb_per_destination=pwalletTxsMain->m_ChunkCollector->m_MaxKBPerDestination;
+                if(pEF->NET_IsFinalized(pnode))
+                {
+                    if( (pnode->nMaxKBPerDestination == 0) || (2 * pnode->nMaxKBPerDestination >= max_kb_per_destination) )
+                    {
+                        take_it=true;
+                    }
+                    else
+                    {
+                        if(mc_RandomInRange(1,max_kb_per_destination/pnode->nMaxKBPerDestination) == 1)
+                        {
+                            take_it=true;                            
+                        }
+                    }
+                }
+                if(take_it)
+                {
+                    PushRelay(pnode,0,vEmptyHops,vEmptySendPaths,msg_type,msg_id,mc_OffchainMessageID(),flags,payload,vSigScriptsEmpty,NULL,0);                    
+                }
             }
         }
     }

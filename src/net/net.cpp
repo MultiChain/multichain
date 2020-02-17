@@ -2332,6 +2332,8 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     fCanConnectLocal=false;
     fCanConnectRemote=false;
     fLastIgnoreIncoming=false;
+    nLastKBPerDestinationChangeTimestamp=0;
+    nMaxKBPerDestination=0;
     
     pEntData=NULL;
     nNextSendTime=0;    
