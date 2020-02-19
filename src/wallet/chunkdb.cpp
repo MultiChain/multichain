@@ -1544,18 +1544,23 @@ int mc_ChunkDB::AddChunkInternal(
     if(total_items == 0)
     {
         m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_CHUNK_SIZE,(unsigned char*)&chunk_size,sizeof(chunk_size));
-        if(chunk_size)
-        {
-            m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_CHUNK_DATA,chunk,chunk_size);                
-        }
     }
     else
     {
         m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ITEM_COUNT,(unsigned char*)&total_items,sizeof(total_items));        
     }
+    
+    chunk_def.m_HeaderSize=m_TmpScript->m_Size;
+    
+    if(total_items == 0)
+    {
+        if(chunk_size)
+        {
+            m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_CHUNK_DATA,chunk,chunk_size);                
+        }
+    }    
 
-    chunk_def.m_Size=chunk_size;
-    chunk_def.m_HeaderSize=m_TmpScript->m_Size-chunk_size;
+    chunk_def.m_Size=chunk_size;    
     chunk_def.m_Flags=flags;
     
     ptr=m_TmpScript->GetData(0,&bytes);
@@ -1765,6 +1770,11 @@ unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
         if(FileHan<=0)
         {
             return NULL;
+        }
+        
+        if(chunk_def->m_HeaderSize >=0x80000000)                                // Fixing the overflow bug if data is not written
+        {
+            chunk_def->m_HeaderSize+=chunk_def->m_Size;
         }
     
         read_from=chunk_def->m_InternalFileOffset;
