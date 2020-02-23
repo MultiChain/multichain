@@ -145,6 +145,12 @@ void mc_Coin::Zero()
     m_Block=-1;
     m_Flags=0;    
     m_LockTime=0;
+    m_CSAssets.clear();
+    m_CSDetails.m_Active=false;
+    m_CSDetails.m_CSDestination=CNoDestination();
+    m_CSDetails.m_Required=0;
+    m_CSDetails.m_WithInlineData=false;
+    m_CSDetails.m_IsEmpty=false;
 }
 
 bool mc_Coin::IsFinal() const

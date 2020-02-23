@@ -16,6 +16,7 @@
 extern mc_WalletTxs* pwalletTxsMain;
 void MultiChainTransaction_SetTmpOutputScript(const CScript& script1);
 int64_t MultiChainTransaction_OffchainFee(int64_t total_offchain_size);
+void AppendSpecialRowsToBuffer(mc_Buffer *amounts,uint256 hash,int expected_allowed,int expected_required,int *allowed,int *required,CAmount nValue);
 
 using namespace std;
 
@@ -757,6 +758,90 @@ bool InsertCoinIntoMatrix(int coin_id,                                          
     return true;
 }
 
+bool ParseFromCSCache(const COutput& out,mc_Buffer *amounts,CTxDestination& dest,int *required,bool *txout_with_inline_data,bool *is_empty)
+{
+    if(out.coin.m_CSDetails.m_Active)
+    {
+        dest=out.coin.m_CSDetails.m_CSDestination;
+        *required=out.coin.m_CSDetails.m_Required;
+        *txout_with_inline_data=out.coin.m_CSDetails.m_WithInlineData;
+        *is_empty=out.coin.m_CSDetails.m_IsEmpty;
+        amounts->Clear();
+        for(unsigned int i=0;i<out.coin.m_CSAssets.size();i++)
+        {
+            amounts->Add(out.coin.m_CSAssets[i].m_Asset);
+        }
+       
+//        printf("P (%s,%d) (%s,%d,%d,%d,%d)\n",out.coin.m_OutPoint.hash.ToString().c_str(),out.i,CBitcoinAddress(dest).ToString().c_str(),amounts->GetCount(),*required,*txout_with_inline_data,*is_empty);
+ 
+        return true;
+    }
+    return false;
+}
+
+bool StoreInCSCache(uint256 hash,uint32_t n,mc_Buffer *amounts,const CTxDestination& dest,int required,bool txout_with_inline_data,CAmount nValue)
+{    
+    if(pwalletTxsMain == NULL)
+    {
+        return false;
+    }
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return false;        
+    }
+
+    mc_CoinAssetBufRow asset_row;
+    bool is_empty=true;
+    map<COutPoint, mc_Coin>::iterator it = pwalletTxsMain->m_UTXOs[0].find(COutPoint(hash,n));
+    if(it != pwalletTxsMain->m_UTXOs[0].end())
+    {
+        it->second.m_CSDetails.m_Active=true;
+        it->second.m_CSDetails.m_CSDestination=dest;
+        it->second.m_CSDetails.m_Required=required;
+        it->second.m_CSDetails.m_WithInlineData=txout_with_inline_data;
+        if(nValue > 0)
+        {
+            is_empty=false;
+        }
+        for(int i=0;i<amounts->GetCount();i++)
+        {
+            if(mc_GetABRefType(amounts->GetRow(i)) != MC_AST_ASSET_REF_TYPE_SPECIAL)
+            {
+                memcpy(asset_row.m_Asset,amounts->GetRow(i),MC_AST_ASSET_FULLREF_BUF_SIZE);
+                it->second.m_CSAssets.push_back(asset_row);
+                is_empty=false;
+            }
+        }
+        it->second.m_CSDetails.m_IsEmpty=is_empty;
+//        printf("S (%s,%d) (%s,%d,%d,%d,%d)\n",hash.ToString().c_str(),n,CBitcoinAddress(dest).ToString().c_str(),(int)it->second.m_CSAssets.size(),required,txout_with_inline_data,is_empty);
+    }
+    
+    return is_empty;
+}
+
+
+int RecalculateCSCacheAllowed(CTxDestination& dest,int expected_allowed,map<uint32_t, uint256>* mapSpecialEntity)
+{
+    int allowed=CheckRequiredPermissions(dest,expected_allowed,mapSpecialEntity,NULL);
+    if(expected_allowed & MC_PTP_SEND)                
+    {
+        if(allowed & MC_PTP_SEND)
+        {
+            if(allowed & MC_PTP_RECEIVE)
+            {
+                allowed -= MC_PTP_RECEIVE;
+            }
+            else
+            {
+                allowed -= MC_PTP_SEND;
+            }
+        }
+    }
+    
+    return allowed;
+}
+
+
 /*
  * Find relevant coins for asset transfer
  */
@@ -781,7 +866,16 @@ bool FindRelevantCoins(CWallet *lpWallet,                                       
     int64_t pure_native;
     
     bool check_for_inline_coins=GetBoolArg("-lockinlinemetadata",true);
-    bool txout_with_inline_data;
+    bool txout_with_inline_data=false;
+    bool found_in_cache=false;
+    bool use_cache=false;
+    bool good_destination=false;
+    map<CTxDestination,int> mapAllowed;
+    
+    if(vCoins.size() > 2)
+    {
+        use_cache=true;
+    }
     
     if(debug_print)printf("debg: Inputs - normal\n");
     BOOST_FOREACH(const COutput& out, vCoins)
@@ -791,6 +885,8 @@ bool FindRelevantCoins(CWallet *lpWallet,                                       
         int required=expected_required;
         int out_i;
         bool is_relevant;
+        CTxDestination dest;
+        bool is_empty=false;
         
         CTxOut txout;
         uint256 hash=out.GetHashAndTxOut(txout);
@@ -798,7 +894,8 @@ bool FindRelevantCoins(CWallet *lpWallet,                                       
         out_i=out.i;
         tmp_amounts->Clear();
         if(custom_good_for_coin_selection(txout.scriptPubKey) &&
-            ParseMultichainTxOutToBuffer(hash,txout,tmp_amounts,lpScript,&allowed,&required,mapSpecialEntity,strError))
+            ( (use_cache && (found_in_cache=ParseFromCSCache(out,tmp_amounts,dest,&required,&txout_with_inline_data,&is_empty))) ||     
+            ParseMultichainTxOutToBuffer(hash,txout,tmp_amounts,lpScript,&allowed,&required,mapSpecialEntity,strError)))
         {
                                                                                 // All coins are taken, possible future optimization
 /*            
@@ -842,33 +939,85 @@ bool FindRelevantCoins(CWallet *lpWallet,                                       
             }
             if(is_relevant)
             {
-                if(mc_gState->m_Features->PerAssetPermissions())
+                if(found_in_cache)
                 {
-                    CTxDestination addressRet;        
-
-                    if(allowed & MC_PTP_SEND)
+                    std::map<CTxDestination,int>::iterator it=mapAllowed.find(dest);
+                    if(it == mapAllowed.end())
                     {
-                        if(ExtractDestinationScriptValid(txout.scriptPubKey, addressRet))
+//                        allowed=RecalculateCSCacheAllowed(dest,expected_required,mapSpecialEntity);
+                        allowed=CheckRequiredPermissions(dest,expected_required,mapSpecialEntity,NULL);
+                        mapAllowed.insert(make_pair(dest, allowed));
+                    }
+                    else
+                    {
+                        allowed=it->second;
+                    }
+                    if(expected_required & MC_PTP_SEND)                
+                    {
+                        if(allowed & MC_PTP_SEND)
                         {
-                            string strPerAssetFailReason;
-
-                            vector<CTxDestination> addressRets;
-                            addressRets.push_back(addressRet);
-
-                            if(!mc_VerifyAssetPermissions(tmp_amounts,addressRets,1,MC_PTP_SEND,strPerAssetFailReason) || 
-                               !mc_VerifyAssetPermissions(tmp_amounts,addressRets,1,MC_PTP_RECEIVE,strPerAssetFailReason))
+                            if(allowed & MC_PTP_RECEIVE)
                             {
-                                allowed -= MC_PTP_SEND;                                
+                                allowed -= MC_PTP_RECEIVE;
+                            }
+                            else
+                            {
+                                allowed -= MC_PTP_SEND;
+                                if(mc_gState->m_Features->AnyoneCanReceiveEmpty())                                
+                                {
+                                    if(is_empty)
+                                    {
+                                        allowed |= MC_PTP_SEND;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    AppendSpecialRowsToBuffer(tmp_amounts,hash,expected_required,expected_required,&allowed,&required,txout.nValue);
+                }
+                
+                good_destination=true;
+                if(!found_in_cache)
+                {
+                    is_empty=false;
+                    txout_with_inline_data=HasPerOutputDataEntries(txout,lpScript);
+                    dest=CNoDestination();
+                    good_destination=ExtractDestinationScriptValid(txout.scriptPubKey, dest);
+                    if(use_cache && good_destination)
+                    {
+                        is_empty=StoreInCSCache(hash,out_i,tmp_amounts,dest,required,txout_with_inline_data,txout.nValue);
+                    }
+                }
+                
+                if(!check_for_inline_coins)
+                {
+                    txout_with_inline_data=false;
+                }
+                
+                if(!is_empty)
+                {
+                    if(mc_gState->m_Features->PerAssetPermissions())
+                    {
+                        if(allowed & MC_PTP_SEND)
+                        {
+                            if(good_destination)
+                            {
+                                string strPerAssetFailReason;
+
+                                vector<CTxDestination> addressRets;
+                                addressRets.push_back(dest);
+
+                                if(!mc_VerifyAssetPermissions(tmp_amounts,addressRets,1,MC_PTP_SEND,strPerAssetFailReason) || 
+                                   !mc_VerifyAssetPermissions(tmp_amounts,addressRets,1,MC_PTP_RECEIVE,strPerAssetFailReason))
+                                {
+                                    allowed -= MC_PTP_SEND;                                
+                                }
                             }
                         }
                     }
                 }
                     
-                txout_with_inline_data=false;
-                if(check_for_inline_coins)
-                {
-                    txout_with_inline_data=HasPerOutputDataEntries(txout,lpScript);
-                }
                 
                 if(!txout_with_inline_data)
                 {
@@ -2433,6 +2582,10 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                     goto exitlbl;
                 }
                 
+                this_time=mc_TimeNowAsDouble();
+                if(csperf_debug_print)if(vecSend.size())printf("Inputs                  : %8.6f\n",this_time-last_time);
+                if(fDebug)LogPrint("mcperf","mcperf: CS: Input Parsing: Time: %8.6f \n", this_time-last_time);
+                last_time=this_time;
 
                 if(!SelectCoinsToUse(lpCoinsToUse,in_map,in_amounts,in_special_row,strFailReason))
                 {
@@ -2440,8 +2593,8 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                 }
                 
                 this_time=mc_TimeNowAsDouble();
-                if(csperf_debug_print)if(vecSend.size())printf("Inputs                  : %8.6f\n",this_time-last_time);
-                if(fDebug)LogPrint("mcperf","mcperf: CS: Input Parsing: Time: %8.6f \n", this_time-last_time);
+                if(csperf_debug_print)if(vecSend.size())printf("Select                  : %8.6f\n",this_time-last_time);
+                if(fDebug)LogPrint("mcperf","mcperf: CS: Input Select: Time: %8.6f \n", this_time-last_time);
                 last_time=this_time;
     
                 for(int asset=0;asset<out_amounts->GetCount();asset++)
@@ -3062,7 +3215,7 @@ bool CWallet::CreateAndCommitOptimizeTransaction(CWalletTx& wtx,std::string& str
  */
 
 
-bool CWallet::OptimizeUnspentList()
+int CWallet::OptimizeUnspentList()
 {
     if(mc_TimeNowAsUInt()<nNextUnspentOptimization)
     {
@@ -3078,6 +3231,16 @@ bool CWallet::OptimizeUnspentList()
     int max_inputs=GetArg("-autocombinemaxinputs", 100);
     int next_delay=GetArg("-autocombinedelay", 1);
     int min_outputs=min_inputs;
+    int max_combine_txs=2000*Params().TargetSpacing();
+    if(max_inputs > 0)
+    {
+        max_combine_txs /= max_inputs;
+    }
+    if(max_combine_txs < 1)
+    {
+        max_combine_txs=1;
+    }
+    max_combine_txs=GetArg("-autocombinemaxtxs", max_combine_txs);
 
     vector<COutput> vCoins;        
     AvailableCoins(vCoins, true, NULL,true,true);
@@ -3085,7 +3248,7 @@ bool CWallet::OptimizeUnspentList()
     map <CTxDestination, int> addressesToOptimize;
     vector <int> txOutCounts;
     int pos;
-    
+    int total=0;
 //    PurgeSpentCoins(8,1000);
     BOOST_FOREACH(const COutput& out, vCoins)
     {
@@ -3113,63 +3276,92 @@ bool CWallet::OptimizeUnspentList()
                             addressesToOptimize.insert(pair<CTxDestination, int>(addressRet, pos));
                             txOutCounts.push_back(1);
                         }
+                        total++;
                     }
                 }
             }
         }                        
     }        
            
-    bool result=false;
-
-    vector<CTxDestination> vAddresses;        
-    for (map<CTxDestination, int>::iterator it = addressesToOptimize.begin();
-         it != addressesToOptimize.end();
-         ++it)
+    int tx_sent=0;
+    
+    if(fDebug)LogPrint("mchn","mchn: Found %d UTXOs in %d addresses\n",total,(int)addressesToOptimize.size());
+    
+    while( (tx_sent<max_combine_txs) && (total > 0) )
     {
-        const unsigned char *aptr;
-
-        aptr=GetAddressIDPtr(it->first);
-        if(aptr)
+        start_time=mc_TimeNowAsDouble();
+        bool result=false;
+        total=0;
+        
+        vector<CTxDestination> vAddresses;        
+        for (map<CTxDestination, int>::iterator it = addressesToOptimize.begin();
+             it != addressesToOptimize.end();
+             ++it)
         {
-            if(mc_gState->m_Permissions->CanSend(NULL,aptr))
+            const unsigned char *aptr;
+
+            aptr=GetAddressIDPtr(it->first);
+            if(aptr)
             {
-                if(mc_gState->m_Permissions->CanReceive(NULL,aptr)) 
+                if(mc_gState->m_Permissions->CanSend(NULL,aptr))
                 {
-                    vAddresses.push_back(it->first);
+                    if(mc_gState->m_Permissions->CanReceive(NULL,aptr)) 
+                    {
+                        if(txOutCounts[it->second] >= min_outputs)
+                        {
+                            vAddresses.push_back(it->first);
+                            total+=txOutCounts[it->second];
+                            if(fDebug)LogPrint("mchn","mchn: Optimization required for address %s: %d UTXOs\n",CBitcoinAddress(it->first).ToString().c_str(),txOutCounts[it->second]);
+                        }
+                    }
                 }
             }
-        }
-    }   
-    
-    random_shuffle(vAddresses.begin(), vAddresses.end(), GetRandInt);
-    
-    BOOST_FOREACH (const CTxDestination& dest, vAddresses)
-    {
-        if(!result)
+        }   
+
+        if(vAddresses.size())
         {
-            map <CTxDestination, int>::iterator it=addressesToOptimize.find(dest);
-            if (it != addressesToOptimize.end())
+            random_shuffle(vAddresses.begin(), vAddresses.end(), GetRandInt);
+
+            BOOST_FOREACH (const CTxDestination& dest, vAddresses)
             {
-                if(txOutCounts[it->second] >= min_outputs)
+                if(!result)
                 {
-                    set<CTxDestination> thisAddresses;
-                    set<CTxDestination>* lpAddresses; 
-                    string strError;
-
-                    thisAddresses.clear();
-                    thisAddresses.insert(it->first);
-                    lpAddresses=&thisAddresses;
-
-                    const CKeyID *lpKeyID=boost::get<CKeyID> (&(it->first));        
-                    CBitcoinAddress bitcoin_address=CBitcoinAddress(*lpKeyID);
-                    if(lpKeyID)
+                    if(fDebug)LogPrint("mchn","mchn: Performing optimization for address %s\n",CBitcoinAddress(dest).ToString().c_str());
+                    
+                    map <CTxDestination, int>::iterator it=addressesToOptimize.find(dest);
+                    if (it != addressesToOptimize.end())
                     {
-                        CWalletTx wtx;
-                        result=CreateAndCommitOptimizeTransaction(wtx,strError,lpAddresses,min_conf,min_inputs,max_inputs);
-                        if(result)
+                        if(txOutCounts[it->second] >= min_outputs)
                         {
-                            LogPrintf("Combine transaction for address %s (%d inputs,%d outputs): %s; Time: %8.3fs\n",
-                                    bitcoin_address.ToString().c_str(), wtx.vin.size(),wtx.vout.size(),wtx.GetHash().GetHex().c_str(),mc_TimeNowAsDouble()-start_time);
+                            set<CTxDestination> thisAddresses;
+                            set<CTxDestination>* lpAddresses; 
+                            string strError;
+
+                            thisAddresses.clear();
+                            thisAddresses.insert(it->first);
+                            lpAddresses=&thisAddresses;
+
+                            const CKeyID *lpKeyID=boost::get<CKeyID> (&(it->first));        
+                            CBitcoinAddress bitcoin_address=CBitcoinAddress(*lpKeyID);
+                            if(lpKeyID)
+                            {
+                                CWalletTx wtx;
+                                result=CreateAndCommitOptimizeTransaction(wtx,strError,lpAddresses,min_conf,min_inputs,max_inputs);
+                                if(result)
+                                {
+                                    LogPrintf("Combine transaction for address %s (%d inputs,%d outputs): %s; Time: %8.3fs\n",
+                                            bitcoin_address.ToString().c_str(), wtx.vin.size(),wtx.vout.size(),wtx.GetHash().GetHex().c_str(),mc_TimeNowAsDouble()-start_time);
+                                    total-=txOutCounts[it->second];
+                                    txOutCounts[it->second]-=wtx.vin.size();
+                                    txOutCounts[it->second]+=wtx.vout.size();
+                                    total+=txOutCounts[it->second];
+                                    tx_sent++;
+                                }
+                                else
+                                {
+                                    txOutCounts[it->second]=0;                                    
+                                }
+                            }
                         }
                     }
                 }
@@ -3178,5 +3370,5 @@ bool CWallet::OptimizeUnspentList()
     }
         
     nNextUnspentOptimization=mc_TimeNowAsUInt()+next_delay;
-    return result;
+    return tx_sent;
 }
