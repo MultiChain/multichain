@@ -1370,15 +1370,13 @@ void static BitcoinMiner(CWallet *pwallet)
                           || (mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
                            ) && Params().MiningRequiresPeers())
                     {
+                        LOCK(cs_vNodes);
+                        vector<CNode*> vNodesCopy = vNodes;
+                        BOOST_FOREACH(CNode* pnode, vNodesCopy)
                         {
-                            LOCK(cs_vNodes);
-                            vector<CNode*> vNodesCopy = vNodes;
-                            BOOST_FOREACH(CNode* pnode, vNodesCopy)
+                            if(pnode->fSuccessfullyConnected)
                             {
-                                if(pnode->fSuccessfullyConnected)
-                                {
-                                    active_nodes++;
-                                }
+                                active_nodes++;
                             }
                         }
                     
@@ -1386,7 +1384,7 @@ void static BitcoinMiner(CWallet *pwallet)
                         {
                             MilliSleep(1000);
                             boost::this_thread::interruption_point();                                    
-                        }                        
+                        }
                     }
                 }
             }
