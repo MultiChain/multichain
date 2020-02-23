@@ -1557,6 +1557,7 @@ int mc_ChunkDB::AddChunkInternal(
         if(chunk_size)
         {
             m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_CHUNK_DATA,chunk,chunk_size);                
+            chunk_def.m_HeaderSize=m_TmpScript->m_Size-chunk_size;
         }
     }    
 
@@ -2026,7 +2027,7 @@ int mc_ChunkDB::FlushSourceChunks(uint32_t flush_mode)
         chunk_def=(mc_ChunkDBRow *)m_MemPool->GetRow(row);
         if(chunk_def->m_SubscriptionID == 1)
         {
-            size=chunk_def->m_Size+chunk_def->m_HeaderSize;
+            size=chunk_def->m_Size+chunk_def->m_HeaderSize;                     // In source, chunk stored only once, with data
             if(subscription->m_LastFileSize+size > MC_CDB_MAX_FILE_SIZE)                          // New file is needed
             {
                 FlushDataFile(subscription,subscription->m_LastFileID,0);
@@ -2107,7 +2108,12 @@ int mc_ChunkDB::CommitInternal(int block,uint32_t flush_mode)
 
             if( (chunk_def->m_StorageFlags & MC_CFL_STORAGE_FLUSHED) == 0)
             {
-                size=chunk_def->m_Size+chunk_def->m_HeaderSize;
+//                size=chunk_def->m_Size+chunk_def->m_HeaderSize;               // Fixed bug, chunk itself is not always stored
+                size=chunk_def->m_HeaderSize;
+                if( (chunk_def->m_Pos + chunk_def->m_TmpOnDiskItems) == 0)
+                {
+                    size+=chunk_def->m_Size;
+                }
                 if(subscription->m_LastFileSize+size > MC_CDB_MAX_FILE_SIZE)                          // New file is needed
                 {
                     FlushDataFile(subscription,subscription->m_LastFileID,flush_mode);
