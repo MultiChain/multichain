@@ -5288,13 +5288,25 @@ bool static LoadBlockIndexDB()
         
     
     if(fDebug)LogPrint("mchn","mchn: Rolling back permission DB to height %d\n",chainActive.Height());
-    mc_gState->m_Permissions->RollBack(chainActive.Height());
+    if(mc_gState->m_Permissions->RollBack(chainActive.Height()) != MC_ERR_NOERROR)
+    {
+        LogPrintf("ERROR: Couldn't roll back permission DB to height %d\n",chainActive.Height());                                    
+        return false;        
+    }
     if(fDebug)LogPrint("mchn","mchn: Rolling back asset DB to height %d\n",chainActive.Height());
-    mc_gState->m_Assets->RollBack(chainActive.Height());
+    if(mc_gState->m_Assets->RollBack(chainActive.Height() != MC_ERR_NOERROR))
+    {
+        LogPrintf("ERROR: Couldn't roll back asset DB to height %d\n",chainActive.Height());                                    
+        return false;        
+    }
     if(mc_gState->m_WalletMode & MC_WMD_TXS)
     {
         if(fDebug)LogPrint("mchn","mchn: Rolling back wallet txs DB to height %d\n",chainActive.Height());
-        pwalletTxsMain->RollBack(NULL,chainActive.Height());
+        if(pwalletTxsMain->RollBack(NULL,chainActive.Height()) != MC_ERR_NOERROR)
+        {
+            LogPrintf("ERROR: Couldn't roll back wallet txs DB to height %d\n",chainActive.Height());                                    
+            return false;
+        }
     }
     MultichainNode_ApplyUpgrades(chainActive.Height());        
     
