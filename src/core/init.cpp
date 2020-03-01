@@ -1085,6 +1085,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     // ********************************************************* Step 5: verify wallet database integrity
 #ifdef ENABLE_WALLET
     int currentwalletdatversion=0;
+    int foundwalletdatversion=0;
     int64_t wallet_mode=GetArg("-walletdbversion",MC_TDB_WALLET_VERSION);
     mc_gState->m_WalletMode=MC_WMD_NONE;
     std::vector<CDBConstEnv::KeyValPair> salvagedData;
@@ -1199,6 +1200,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         if (filesystem::exists(pathWalletDat))
         {
             currentwalletdatversion=GetWalletDatVersion(pathWalletDat.string());
+            foundwalletdatversion=currentwalletdatversion;
         }
         else
         {
@@ -1758,7 +1760,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         string strBurnAddress=BurnAddress(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS)); // Caching burn address
         LogPrint("mchn","mchn: Burn address: %s\n",strBurnAddress.c_str());                
         
-        wallet_mode=GetArg("-walletdbversion",0);
+        wallet_mode=GetArg("-walletdbversion",foundwalletdatversion);
         if(wallet_mode == 0)
         {
             mc_gState->m_WalletMode=MC_WMD_AUTO;

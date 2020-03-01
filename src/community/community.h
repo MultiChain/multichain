@@ -124,6 +124,7 @@ typedef struct mc_EnterpriseFeatures
     std::string ENT_TextConstant(const char* name);
     void ENT_InitRPCHelpMap();
     void ENT_MaybeStop();
+    void ENT_Debug(std::string action,std::string parameter);
     
     void LIC_RPCVerifyFeature(uint64_t feature,std::string message);
     bool LIC_VerifyFeature(uint64_t feature,std::string& reason);

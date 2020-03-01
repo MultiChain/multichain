@@ -384,6 +384,11 @@ void mc_EnterpriseFeatures::ENT_InitRPCHelpMap()
     
 }
 
+void mc_EnterpriseFeatures::ENT_Debug(std::string action,std::string parameter)
+{
+    
+}
+
 
 void mc_EnterpriseFeatures::LIC_RPCVerifyFeature(uint64_t feature,string message)
 {
