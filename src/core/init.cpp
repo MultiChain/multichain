@@ -439,6 +439,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -paytxfee=<amt>        " + strprintf(_("Fee (in BTC/kB) to add to transactions you send (default: %s)"), FormatMoney(payTxFee.GetFeePerK())) + "\n";
     strUsage += "  -rescan                " + _("Rescan the block chain for missing wallet transactions") + " " + _("on startup") + "\n";
     strUsage += "  -salvagewallet         " + _("Attempt to recover private keys from a corrupt wallet.dat") + " " + _("on startup") + "\n";
+    strUsage += "  -skipwalletchecks      " + _("Skip wallet consistency verification on startup") + "\n";
     strUsage += "  -sendfreetransactions  " + strprintf(_("Send transactions as zero-fee transactions if possible (default: %u)"), 0) + "\n";
     strUsage += "  -spendzeroconfchange=0|1" + strprintf(_("Spend unconfirmed change when sending transactions (default: %u)"), 1) + "\n";
     strUsage += "  -txconfirmtarget=0|1   " + strprintf(_("If paytxfee is not set, include enough fee so transactions begin confirmation on average within n blocks (default: %u)"), 1) + "\n";
@@ -2586,8 +2587,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 }
     
                 
-                if (!LoadBlockIndex()) {
-                    strLoadError = _("Error loading block database");
+                if (!LoadBlockIndex(strLoadError)) {
+                    if(strLoadError.size() == 0)
+                    {
+                        strLoadError = _("Error loading block database");                        
+                    }
                     break;
                 }
 

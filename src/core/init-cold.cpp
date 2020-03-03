@@ -1082,8 +1082,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
                     pwalletTxsMain->BindWallet(pwalletMain);
                 }
     
-                
-                if (!LoadBlockIndex()) {
+                if (!LoadBlockIndex(strLoadError)) {
                     strLoadError = _("Error loading block database");
                     break;
                 }

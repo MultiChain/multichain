@@ -5129,7 +5129,7 @@ CBlockIndex * InsertBlockIndex(uint256 hash)
     return pindexNew;
 }
 
-bool static LoadBlockIndexDB()
+bool static LoadBlockIndexDB(std::string& strError)
 {
     if (!pblocktree->LoadBlockIndexGuts())
         return false;
@@ -5294,7 +5294,7 @@ bool static LoadBlockIndexDB()
         return false;        
     }
     if(fDebug)LogPrint("mchn","mchn: Rolling back asset DB to height %d\n",chainActive.Height());
-    if(mc_gState->m_Assets->RollBack(chainActive.Height() != MC_ERR_NOERROR))
+    if(mc_gState->m_Assets->RollBack(chainActive.Height()) != MC_ERR_NOERROR)
     {
         LogPrintf("ERROR: Couldn't roll back asset DB to height %d\n",chainActive.Height());                                    
         return false;        
@@ -5305,7 +5305,11 @@ bool static LoadBlockIndexDB()
         if(pwalletTxsMain->RollBack(NULL,chainActive.Height()) != MC_ERR_NOERROR)
         {
             LogPrintf("ERROR: Couldn't roll back wallet txs DB to height %d\n",chainActive.Height());                                    
-            return false;
+            if(!GetBoolArg("-skipwalletchecks",false))
+            {
+                strError="Error: The wallet database is inconsistent. Restart MultiChain with -rescan to rebuild the wallet database from the blockchain (can take hours), or with -skipwalletchecks to continue operating anyway";
+                return false;
+            }
         }
     }
     MultichainNode_ApplyUpgrades(chainActive.Height());        
@@ -5460,10 +5464,10 @@ void UnloadBlockIndex()
     pindexBestInvalid = NULL;
 }
 
-bool LoadBlockIndex()
+bool LoadBlockIndex(std::string& strError)
 {
     // Load block index from databases
-    if (!fReindex && !LoadBlockIndexDB())
+    if (!fReindex && !LoadBlockIndexDB(strError))
         return false;
     return true;
 }
