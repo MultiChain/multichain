@@ -5007,7 +5007,6 @@ void mc_InitRPCHelpMap21()
             "\nArguments:\n"
             "1. \"license-request-hex\"                          (string, required) The license request hex string (output of getlicenserequest)\n"
 
-            "\nReturns array of license confirmations.\n"
             "\nExamples:\n"
             + HelpExampleCli("importlicenserequest", "\"hexstring\"")
             + HelpExampleRpc("importlicenserequest", "\"hexstring\"")
