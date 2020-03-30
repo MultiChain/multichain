@@ -5305,7 +5305,7 @@ bool static LoadBlockIndexDB(std::string& strError)
         if(pwalletTxsMain->RollBack(NULL,chainActive.Height()) != MC_ERR_NOERROR)
         {
             LogPrintf("ERROR: Couldn't roll back wallet txs DB to height %d\n",chainActive.Height());                                    
-            if(!GetBoolArg("-skipwalletchecks",false))
+            if(!GetBoolArg("-skipwalletchecks",false) && !GetBoolArg("-rescan", false))
             {
                 strError="Error: The wallet database is inconsistent. Restart MultiChain with -rescan to rebuild the wallet database from the blockchain (can take hours), or with -skipwalletchecks to continue operating anyway";
                 return false;
