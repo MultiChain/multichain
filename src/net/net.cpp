@@ -1650,7 +1650,7 @@ void ThreadOpenAddedConnections()
         BOOST_FOREACH(vector<CService>& vserv, lservAddressesToAdd)
         {
             CSemaphoreGrant grant(*semOutbound);
-            OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), &grant);
+            OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), &grant, NULL, false, true);
             MilliSleep(500);
         }
         if(GetBoolArg("-addnodeonly",false))
@@ -1665,7 +1665,7 @@ void ThreadOpenAddedConnections()
 }
 
 // if successful, this moves the passed grant to the constructed node
-bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot)
+bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot, bool fAllowSameIP)
 {
     //
     // Initiate outbound network connection
@@ -1675,7 +1675,7 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOu
 //        if (IsLocal(addrConnect)  ||
           if ((IsLocal(addrConnect) && (addrConnect.GetPort() == GetListenPort())) ||                
 //            FindNode((CNetAddr)addrConnect) || CNode::IsBanned(addrConnect) ||
-            (FindNode((CNetAddr)addrConnect) && !IsLocal(addrConnect)) || CNode::IsBanned(addrConnect) ||
+            (FindNode((CNetAddr)addrConnect) && !IsLocal(addrConnect) && !fAllowSameIP) || CNode::IsBanned(addrConnect) ||
             FindNode(addrConnect.ToStringIPPort()))
           {
             if(fDebug)LogPrint("net","net: Node found: %s\n",addrConnect.ToStringIPPort().c_str());
@@ -2332,6 +2332,8 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     fCanConnectLocal=false;
     fCanConnectRemote=false;
     fLastIgnoreIncoming=false;
+    nLastKBPerDestinationChangeTimestamp=0;
+    nMaxKBPerDestination=0;
     
     pEntData=NULL;
     nNextSendTime=0;    

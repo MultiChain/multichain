@@ -39,6 +39,7 @@ extern std::string strMiscWarning;
 extern bool fLogTimestamps;
 extern bool fLogIPs;
 extern bool fLogTimeMillis;
+extern bool fInRecovery;
 extern volatile bool fReopenDebugLog;
 
 void SetupEnvironment();
@@ -105,7 +106,7 @@ const boost::filesystem::path &GetLogDir(bool fNetSpecific = true);
 boost::filesystem::path GetConfigFile();
 //#ifndef WIN32
 boost::filesystem::path GetPidFile();
-void CreatePidFile(const boost::filesystem::path &path, int pid);
+bool CreatePidFile(const boost::filesystem::path &path, int pid);
 //#endif
 void ReadConfigFile(std::map<std::string, std::string>& mapSettingsRet, std::map<std::string, std::vector<std::string> >& mapMultiSettingsRet);
 #ifdef WIN32

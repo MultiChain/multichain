@@ -76,6 +76,20 @@ struct mc_WalletTxs;
 #define MC_CSF_SIGN                     0x00000008
 #define MC_CSF_ALLOWED_COINS_ARE_MINE   0x00000010
 
+struct mc_CoinAssetBufRow
+{
+    unsigned char m_Asset[MC_AST_ASSET_FULLREF_BUF_SIZE];
+};
+
+struct mc_CoinCSDetails
+{
+    CTxDestination m_CSDestination;
+    bool m_Active;
+    int m_Required;
+    bool m_WithInlineData;
+    bool m_IsEmpty;
+};
+
 
 class mc_Coin
 {
@@ -87,6 +101,9 @@ public:
     int m_Block;
     uint32_t m_Flags;    
     uint32_t m_LockTime;
+    
+    std::vector <mc_CoinAssetBufRow> m_CSAssets;
+    mc_CoinCSDetails m_CSDetails;
     
     mc_Coin()
     {
@@ -496,7 +513,7 @@ public:
                            const std::set<CTxDestination>* addresses = NULL,int min_conf = 1,int min_inputs = -1,int max_inputs = -1, const std::vector<COutPoint> *lpCoinsToUse = NULL, int *eErrorCode = NULL);
     bool CreateAndCommitOptimizeTransaction(CWalletTx& wtxNew,std::string& strFailReason,
                            const std::set<CTxDestination>* addresses = NULL,int min_conf = 1,int min_inputs = -1,int max_inputs = -1);
-    bool OptimizeUnspentList(); 
+    int OptimizeUnspentList(); 
     bool UpdateUnspentList(const CWalletTx& wtx, bool update_inputs);
     bool InitializeUnspentList();
     void PurgeSpentCoins(int min_depth,int max_coins);   

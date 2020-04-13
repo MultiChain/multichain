@@ -204,6 +204,10 @@ const char *mc_Params::SeedNode()
 
 const char* mc_State::GetSeedNode()
 {
+    if(m_SeedResolvedAddress[0])
+    {
+        return m_SeedResolvedAddress;
+    }
     const char *seed_node;
     seed_node=mc_gState->m_Params->SeedNode();
     if(seed_node == NULL)
@@ -219,6 +223,16 @@ const char* mc_State::GetSeedNode()
     }
     
     return seed_node;
+}
+
+int mc_State::SetSeedNode(const char* seed_resolved) 
+{
+    if(strlen(seed_resolved) >= 256)
+    {
+        return MC_ERR_INVALID_PARAMETER_VALUE;
+    }
+    strcpy(m_SeedResolvedAddress,seed_resolved);
+    return MC_ERR_NOERROR;
 }
 
 

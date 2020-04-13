@@ -12,6 +12,7 @@
 #include "utils/util.h"
 #include "utils/utilmoneystr.h"
 #include "version/bcversion.h"
+#include "community/community.h"
 
 #include <boost/circular_buffer.hpp>
 
@@ -595,12 +596,23 @@ void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransaction>& rem
             BOOST_FOREACH(const CTxIn& txin, tx.vin)
                 mapNextTx.erase(txin.prevout);
 
+            string reason="orphan";
+            if(hash == origTx.GetHash())
+            {
+                reason=wtx_reason;
+            }
+            if(wtx_reason.size())
+            {                
+                pEF->FED_EventInvalidateTx(tx,REJECT_INVALID,reason);
+            }
             removed.push_back(tx);
             totalTxSize -= mapTx[hash].GetTxSize();
             mapTx.erase(hash);
             nTransactionsUpdated++;
             if(wtx_reason.size())
-            {
+            {                
+                InvalidMempoolWTx(hash,reason.c_str());
+/*                
                 if(hash == origTx.GetHash())
                 {
                     InvalidMempoolWTx(hash,wtx_reason.c_str());        
@@ -609,6 +621,7 @@ void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransaction>& rem
                 {
                     InvalidMempoolWTx(hash,"orphan");                            
                 }
+ */ 
             }
         }
     }

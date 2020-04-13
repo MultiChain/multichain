@@ -5,6 +5,8 @@
 #include "wallet/chunkcollector.h"
 
 #define MC_IMPOSSIBLE_NEXT_ATTEMPT 0xFFFFFFFF
+#define MC_CCW_KBS_PER_SECOND_DELAY_UP         60000
+#define MC_CCW_KBS_PER_SECOND_DELAY_DOWN       15000
 
 void mc_ChunkEntityKey::Zero()
 {
@@ -50,6 +52,7 @@ void mc_ChunkCollector::Zero()
     m_DBName[0]=0;
     m_NextAutoCommitTimestamp=0;
     m_NextTryTimestamp=0;
+    m_LastKBPerDestinationChangeTimestamp=0;
     m_MarkPool=NULL;
     m_MemPool=NULL;
     m_MemPoolNext=NULL;
@@ -63,7 +66,7 @@ void mc_ChunkCollector::Zero()
     {
         m_TimeoutRequest=MC_CCW_TIMEOUT_REQUEST_SHIFT+1;
     }
-    int kb_per_sec=(int)GetArg("-chunkmaxkbpersecond",MC_CCW_MAX_MBS_PER_SECOND*1024);
+    int kb_per_sec=(int)GetArg("-chunkmaxkbpersecond",MC_CCW_MAX_KBS_PER_SECOND);
     
     m_MaxMBPerSecond=1;
     if(kb_per_sec > 1024)
@@ -74,11 +77,14 @@ void mc_ChunkCollector::Zero()
     {
         m_MaxMBPerSecond=1;
     }
-    if(m_MaxMBPerSecond > MC_CCW_MAX_MBS_PER_SECOND)
+    if(m_MaxMBPerSecond > MC_CCW_MAX_KBS_PER_SECOND*1024)
     {
-        m_MaxMBPerSecond=MC_CCW_MAX_MBS_PER_SECOND;
+        m_MaxMBPerSecond=MC_CCW_MAX_KBS_PER_SECOND*1024;
     }
-    m_MaxKBPerDestination=(m_TimeoutRequest-MC_CCW_TIMEOUT_REQUEST_SHIFT)*kb_per_sec;
+    m_MaxMaxKBPerDestination=(m_TimeoutRequest-MC_CCW_TIMEOUT_REQUEST_SHIFT)*kb_per_sec;
+    m_MinMaxKBPerDestination=(m_TimeoutRequest-MC_CCW_TIMEOUT_REQUEST_SHIFT)*MC_CCW_MIN_KBS_PER_SECOND;
+    m_MaxKBPerDestination=m_MaxMaxKBPerDestination;
+    
     m_TimeoutQuery=(int)GetArg("-chunkquerytimeout",MC_CCW_TIMEOUT_QUERY);
     m_TotalChunkCount=0;
     m_TotalChunkSize=0;
@@ -143,6 +149,67 @@ int mc_ChunkCollector::Lock(int write_mode,int allow_secondary)
     
     return 0;
 }
+
+void mc_ChunkCollector::AdjustKBPerDestination(CNode *pfrom,bool success)
+{
+    int64_t time_now=GetTimeMillis();
+    if(pfrom->nMaxKBPerDestination == 0)
+    {
+        pfrom->nMaxKBPerDestination=m_MaxKBPerDestination;
+    }
+    
+    if(success)
+    {
+        if(pfrom->nMaxKBPerDestination >= m_MaxMaxKBPerDestination)
+        {
+            return;
+        }
+        if( (time_now - pfrom->nLastKBPerDestinationChangeTimestamp) < MC_CCW_KBS_PER_SECOND_DELAY_UP )
+        {
+            return;
+        }
+        pfrom->nMaxKBPerDestination *= 2;
+        if(pfrom->nMaxKBPerDestination >= m_MaxMaxKBPerDestination)
+        {
+            pfrom->nMaxKBPerDestination = m_MaxMaxKBPerDestination;
+        }
+    }
+    else
+    {
+        if(pfrom->nMaxKBPerDestination <= m_MinMaxKBPerDestination)
+        {
+            return;
+        }
+        if( (time_now - pfrom->nLastKBPerDestinationChangeTimestamp) < MC_CCW_KBS_PER_SECOND_DELAY_DOWN )
+        {
+            return;
+        }
+        pfrom->nMaxKBPerDestination /= 2;
+        if(pfrom->nMaxKBPerDestination <= m_MinMaxKBPerDestination)
+        {
+            pfrom->nMaxKBPerDestination = m_MinMaxKBPerDestination;
+        }        
+    }
+    pfrom->nLastKBPerDestinationChangeTimestamp=time_now;        
+    int max_kb_per_destination=0;
+    LogPrintf("Adjusted offchain processing rate for peer %d on %s to %dMB\n",pfrom->id,(success ? "success" : "failure"),pfrom->nMaxKBPerDestination/1024);
+    {
+        LOCK(cs_vNodes);
+        BOOST_FOREACH(CNode* pnode, vNodes)
+        {
+            if(pnode->nMaxKBPerDestination > max_kb_per_destination)
+            {
+                max_kb_per_destination=pnode->nMaxKBPerDestination;
+            }
+        }        
+    }
+    if(max_kb_per_destination != m_MaxKBPerDestination)
+    {
+        m_MaxKBPerDestination=max_kb_per_destination;
+        LogPrintf("Adjusted global offchain processing rate on %s to %dMB\n",(success ? "success" : "failure"),m_MaxKBPerDestination/1024);        
+    }
+}
+
 
 void mc_ChunkCollector::UnLock()
 {    
