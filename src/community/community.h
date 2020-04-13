@@ -10,16 +10,18 @@
 
 #define MC_EFT_NONE                                 0x0000000000000000
 #define MC_EFT_STREAM_SELECTIVE_INDEX               0x0000000000000100
-#define MC_EFT_STREAM_OFFCHAIN_SELECTIVE_RETRIEVE   0x0000000000000200
-#define MC_EFT_STREAM_OFFCHAIN_SELECTIVE_PURGE      0x0000000000000400
-#define MC_EFT_STREAM_READ_RESTRICTED_READ          0x0000000000001000
-#define MC_EFT_STREAM_READ_RESTRICTED_WRITE         0x0000000000002000
-#define MC_EFT_STREAM_READ_RESTRICTED_DELIVER       0x0000000000004000
-#define MC_EFT_NETWORK_SIGNED_RECEIVE               0x0000000000010000
-#define MC_EFT_NETWORK_SIGNED_SEND                  0x0000000000020000
-#define MC_EFT_NETWORK_ENCRYPTED_CONNECTIONS        0x0000000000040000
-#define MC_EFT_FEEDS                                0x0000000000100000
-#define MC_EFT_DATAREFS                             0x0000000000200000
+#define MC_EFT_STREAM_SELECTIVE_SUBSCRIBE           0x0000000000000200
+#define MC_EFT_STREAM_OFFCHAIN_SELECTIVE_RETRIEVE   0x0000000000000400
+#define MC_EFT_STREAM_OFFCHAIN_SELECTIVE_PURGE      0x0000000000000800
+#define MC_EFT_STREAM_READ_RESTRICTED_READ          0x0000000000010000
+#define MC_EFT_STREAM_READ_RESTRICTED_WRITE         0x0000000000020000
+#define MC_EFT_STREAM_READ_RESTRICTED_DELIVER       0x0000000000040000
+#define MC_EFT_NETWORK_SIGNED_RECEIVE               0x0000000000100000
+#define MC_EFT_NETWORK_SIGNED_SEND                  0x0000000000200000
+#define MC_EFT_NETWORK_ENCRYPTED_CONNECTIONS        0x0000000000800000
+#define MC_EFT_FEEDS                                0x0000000001000000
+#define MC_EFT_FEEDS_API                            0x0000000002000000
+#define MC_EFT_DATAREFS                             0x0000000008000000
 
 #define MC_EFT_ALL                                  0xFFFFFFFFFFFFFFFF
 
@@ -58,7 +60,7 @@ typedef struct mc_EnterpriseFeatures
     Value STR_RPCRetrieveStreamItems(const Array& params);
     Value STR_RPCPurgeStreamItems(const Array& params);    
     Value STR_RPCPurgePublishedItems(const Array& params);
-    int STR_RemoveDataFromFile(int fHan, uint32_t from, uint32_t size, uint32_t mode);
+    int STR_RemoveDataFromFile(const char *name);
     
     Value FED_RPCCreateFeed(const Array& params);
     Value FED_RPCDeleteFeed(const Array& params);
@@ -122,6 +124,7 @@ typedef struct mc_EnterpriseFeatures
     std::string ENT_TextConstant(const char* name);
     void ENT_InitRPCHelpMap();
     void ENT_MaybeStop();
+    void ENT_Debug(std::string action,std::string parameter);
     
     void LIC_RPCVerifyFeature(uint64_t feature,std::string message);
     bool LIC_VerifyFeature(uint64_t feature,std::string& reason);

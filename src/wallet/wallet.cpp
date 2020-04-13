@@ -1620,7 +1620,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
                     err=MC_ERR_NOERROR;
                 }
                 
-                err=pwalletTxsMain->CompleteImport(imp,((pindexStart->nHeight > 0) & !fOnlySubscriptions) ? MC_EFL_NOT_IN_SYNC_AFTER_IMPORT : 0);
+                err=pwalletTxsMain->CompleteImport(imp,((pindexStart->nHeight > 0) && !fOnlySubscriptions) ? MC_EFL_NOT_IN_SYNC_AFTER_IMPORT : 0);
             }
             else
             {

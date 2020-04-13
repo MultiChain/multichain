@@ -43,6 +43,7 @@
 std::string BurnAddress(const std::vector<unsigned char>& vchVersion);
 std::string SetBannedTxs(std::string txlist);
 std::string SetLockedBlock(std::string hash);
+bool RecoverAfterCrash();
 
 /* MCHN END */
 
@@ -438,6 +439,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -paytxfee=<amt>        " + strprintf(_("Fee (in BTC/kB) to add to transactions you send (default: %s)"), FormatMoney(payTxFee.GetFeePerK())) + "\n";
     strUsage += "  -rescan                " + _("Rescan the block chain for missing wallet transactions") + " " + _("on startup") + "\n";
     strUsage += "  -salvagewallet         " + _("Attempt to recover private keys from a corrupt wallet.dat") + " " + _("on startup") + "\n";
+    strUsage += "  -skipwalletchecks      " + _("Skip wallet consistency verification on startup") + "\n";
     strUsage += "  -sendfreetransactions  " + strprintf(_("Send transactions as zero-fee transactions if possible (default: %u)"), 0) + "\n";
     strUsage += "  -spendzeroconfchange=0|1" + strprintf(_("Spend unconfirmed change when sending transactions (default: %u)"), 1) + "\n";
     strUsage += "  -txconfirmtarget=0|1   " + strprintf(_("If paytxfee is not set, include enough fee so transactions begin confirmation on average within n blocks (default: %u)"), 1) + "\n";
@@ -560,6 +562,8 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -acceptfiltertimeout=<n>                 " + strprintf(_("Timeout, after which filter execution will be aborted, when accepting new txs, in milliseconds, default %u"),DEFAULT_ACCEPT_FILTER_TIMEOUT) + "\n";
     strUsage += "  -sendfiltertimeout=<n>                   " + strprintf(_("Timeout, after which filter execution will be aborted, when tx is sent from this node, in milliseconds, default %u"),DEFAULT_SEND_FILTER_TIMEOUT) + "\n";
     strUsage += "  -lockinlinemetadata=0|1                  " + _("Outputs with inline metadata can be sent only using create/appendrawtransaction, default 1") + "\n";
+    strUsage += "  -purgemethod=<method>                    " + _("Overwrite data before purging. Available modes: unlink, simple(=zero, default), one, zeroone, random1-random4, dod, doe, rcmp, gutmann.") + "\n";
+    strUsage += "                                           " + _("Can be followed by '-pattern' (up to 6 characters), i.e. random2-mchn makes two random pattern passes followed by 'mchn'. Enterprise Edition only.") + "\n";
 
     strUsage += "\n" + _("MultiChain API response parameters") + "\n";        
     strUsage += "  -hideknownopdrops      " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON-RPC calls (default: %u)"), 0) + "\n";
@@ -1028,7 +1032,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 /* MCHN END */
     
 //#ifndef WIN32
-    CreatePidFile(GetPidFile(), __US_GetPID());
+    bool crash_recovery_required=CreatePidFile(GetPidFile(), __US_GetPID());
 //#endif
     if (GetBoolArg("-shrinkdebugfile", !fDebug))
         ShrinkDebugFile();
@@ -1082,6 +1086,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     // ********************************************************* Step 5: verify wallet database integrity
 #ifdef ENABLE_WALLET
     int currentwalletdatversion=0;
+    int foundwalletdatversion=0;
     int64_t wallet_mode=GetArg("-walletdbversion",MC_TDB_WALLET_VERSION);
     mc_gState->m_WalletMode=MC_WMD_NONE;
     std::vector<CDBConstEnv::KeyValPair> salvagedData;
@@ -1196,6 +1201,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         if (filesystem::exists(pathWalletDat))
         {
             currentwalletdatversion=GetWalletDatVersion(pathWalletDat.string());
+            foundwalletdatversion=currentwalletdatversion;
         }
         else
         {
@@ -1358,7 +1364,36 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     bool grant_message_printed=false;
     seed_node=mc_gState->GetSeedNode();
     mc_Buffer *rescan_subscriptions=NULL;
+    string seed_resolved="";
+    int resolved_port = 0;
+    string resolved_host = "";
+    if(seed_node)
+    {        
+        seed_resolved=string(seed_node);
+        
+        if((mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY) 
+           || (mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL))
+        {        
+            SplitHostPort(seed_resolved, resolved_port, resolved_host);
+            if(resolved_port == 0)
+            {
+                return InitError(strprintf("Couldn't connect to the seed node %s - please specify port number explicitly.",seed_node));                                        
+            }
 
+            LogPrintf("mchn: Checking seed address %s\n",seed_node);            
+            CService resolved_addr;
+            if(!Lookup(seed_node, resolved_addr, 0, 1))
+            {
+                return InitError(strprintf("Couldn't resolve seed address %s.",seed_node));                                                    
+            }
+            seed_resolved=resolved_addr.ToString();        
+        }
+        
+        mc_gState->SetSeedNode(seed_resolved.c_str());
+        LogPrintf("mchn: Seed address resolved: %s\n",mc_gState->GetSeedNode());    
+    }
+    
+    
     if(pEF->Prepare())
     {
         fprintf(stderr,"\nError: Cannot prepare Enterprise features. Exiting...\n\n");
@@ -1460,7 +1495,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 pNodeStatus->nSeedPort=seed_port;
             }
             
-            if(mc_QuerySeed(seedThreadGroup,seed_node))
+            if(mc_QuerySeed(seedThreadGroup,seed_resolved.c_str()))
             {
                 LOCK(cs_NodeStatus);
                 if((mc_gState->m_NetworkState == MC_NTS_SEED_READY) || (mc_gState->m_NetworkState == MC_NTS_SEED_NO_PARAMS) )
@@ -1726,7 +1761,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         string strBurnAddress=BurnAddress(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS)); // Caching burn address
         LogPrint("mchn","mchn: Burn address: %s\n",strBurnAddress.c_str());                
         
-        wallet_mode=GetArg("-walletdbversion",0);
+        wallet_mode=GetArg("-walletdbversion",foundwalletdatversion);
         if(wallet_mode == 0)
         {
             mc_gState->m_WalletMode=MC_WMD_AUTO;
@@ -2552,8 +2587,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 }
     
                 
-                if (!LoadBlockIndex()) {
-                    strLoadError = _("Error loading block database");
+                if (!LoadBlockIndex(strLoadError)) {
+                    if(strLoadError.size() == 0)
+                    {
+                        strLoadError = _("Error loading block database");                        
+                    }
                     break;
                 }
 
@@ -2692,7 +2730,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         pEF->STR_PutSubscriptions(rescan_subscriptions);            
         delete rescan_subscriptions;
     }            
-        
+
     
     // ********************************************************* Step 8: load wallet
 #ifdef ENABLE_WALLET
@@ -2880,6 +2918,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             while (!fRequestShutdown && chainActive.Tip() == NULL)
                 MilliSleep(10);
         }
+        chainActive.Genesis()->nSize=GenesisBlockSize;
     }
 
     // ********************************************************* Step 10: start node
@@ -2962,6 +3001,32 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         }        
     }
     
+    if(crash_recovery_required)
+    {
+        LogPrintf("Node didn't shut down normally, performing recovery\n");
+        if(!GetBoolArg("-shortoutput", false))
+        {    
+            sprintf(bufOutput,"Node didn't shut down normally, performing recovery\n\n");
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+        }        
+        fInRecovery=true;
+        bool success=RecoverAfterCrash();
+        fInRecovery=false;
+        if(success)
+        {
+            LogPrintf("Recovery completed succesfully\n");            
+        }
+        else
+        {
+            LogPrintf("Recovery failed\n");                        
+            if(!GetBoolArg("-shortoutput", false))
+            {    
+                sprintf(bufOutput,"Recovery failed\n\n");
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
+            }        
+        }
+    }
+    
     SetRPCWarmupFinished();                                                     // Should be here, otherwise wallet can double spend
     uiInterface.InitMessage(_("Done loading"));
 
@@ -2973,7 +3038,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     }
     mc_InitRPCHelpMap();
 
-    LogPrintf("Node started\n");
+    LogPrintf("Node started\n");    
 /* MCHN END */    
     return !fRequestShutdown;
 }

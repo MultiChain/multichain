@@ -2866,8 +2866,8 @@ bool static DisconnectTip(CValidationState &state) {
         if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, false, NULL))
         {
             LogPrintf("Tx not accepted in resurrection after block: %s\n",tx.GetHash().ToString().c_str());
-            pEF->FED_EventInvalidateTx(tx,stateDummy.GetRejectCode(),(stateDummy.GetRejectReason().size() > 0) ? stateDummy.GetRejectReason() : "unknown");
-            mempool.remove(tx, removed, true, "resurrection");
+            string reason=(stateDummy.GetRejectReason().size() > 0) ? stateDummy.GetRejectReason() : "unknown";
+            mempool.remove(tx, removed, true, "resurrection: "+reason);
         }
     }
 /* MCHN START */    
@@ -3108,6 +3108,89 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     if(fDebug)LogPrint("bench", "- Connect block: %.2fms [%.2fs]\n", (nTime6 - nTime1) * 0.001, nTimeTotal * 0.000001);
     return true;
 }
+
+bool RecoverAfterCrash()
+{
+    LOCK(cs_main);
+    
+    CBlock block;
+    CBlock *pblock;
+    CValidationState state;
+    CBlockIndex *pindexNew=chainActive.Tip();
+    int err;
+    
+    if(chainActive.Height() <= 0)
+    {
+        return true;
+    }
+    
+    if (!ReadBlockFromDisk(block, pindexNew))
+    {
+        LogPrintf("ERROR: Cannot load last block from disk\n");
+        return false;
+    }
+    pblock=&block;
+    
+    err=pEF->FED_EventBlock(*pblock, state, pindexNew,"check",true,true);
+    if(err)
+    {
+        LogPrintf("ERROR: Cannot connect(error) block %s in feeds, error %d\n",pindexNew->GetBlockHash().ToString().c_str(),err);
+        return false;
+    }        
+    
+    err=pEF->FED_EventBlock(*pblock, state, pindexNew,"check",true,false);
+    if(err)
+    {
+        LogPrintf("ERROR: Cannot connect(before) block %s in feeds, error %d\n",pindexNew->GetBlockHash().ToString().c_str(),err);
+        return false;
+    }        
+    
+    err=pEF->FED_EventBlock(*pblock, state, pindexNew,"add",false,false);
+    if(err)
+    {
+        LogPrintf("ERROR: Cannot add(before) block %s in feeds, error %d\n",pindexNew->GetBlockHash().ToString().c_str(),err);
+        return false;
+    }        
+    
+    CDiskTxPos pos1(pindexNew->GetBlockPos(), 80+GetSizeOfCompactSize(pblock->vtx.size()));
+    for (unsigned int i = 0; i < pblock->vtx.size(); i++)
+    {
+        const CTransaction &tx = pblock->vtx[i];
+        err=pEF->FED_EventTx(tx,pindexNew->nHeight,&pos1,i,pindexNew->GetBlockHash(),pblock->nTime);
+        if(err)
+        {
+            LogPrintf("ERROR: Cannot write tx %s to feeds in block, error %d\n",tx.GetHash().ToString().c_str(),err);
+            return false;
+        }
+        pos1.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
+    }
+    
+    err=pEF->FED_EventBlock(*pblock, state, pindexNew,"add",true,false);
+    if(err)
+    {
+        LogPrintf("ERROR: Cannot add(after) block %s in feeds, error %d\n",pindexNew->GetBlockHash().ToString().c_str(),err);
+        return false;
+    }        
+
+    for(int pos=0;pos<mempool.hashList->m_Count;pos++)
+    {
+        uint256 hash=*(uint256*)mempool.hashList->GetRow(pos);
+        if(mempool.exists(hash))
+        {
+            const CTxMemPoolEntry entry=mempool.mapTx[hash];
+            const CTransaction& tx = entry.GetTx();            
+            err=pEF->FED_EventTx(tx,-1,NULL,-1,0,0);            
+            if(err)
+            {
+                LogPrintf("ERROR: Cannot write tx %s to feeds in mempool, error %d\n",tx.GetHash().ToString().c_str(),err);
+                return false;
+            }
+        }
+    }
+    
+    return true;
+}
+
 
 /**
  * Return the tip of the chain with the most work in it, that isn't
@@ -5046,7 +5129,7 @@ CBlockIndex * InsertBlockIndex(uint256 hash)
     return pindexNew;
 }
 
-bool static LoadBlockIndexDB()
+bool static LoadBlockIndexDB(std::string& strError)
 {
     if (!pblocktree->LoadBlockIndexGuts())
         return false;
@@ -5205,13 +5288,29 @@ bool static LoadBlockIndexDB()
         
     
     if(fDebug)LogPrint("mchn","mchn: Rolling back permission DB to height %d\n",chainActive.Height());
-    mc_gState->m_Permissions->RollBack(chainActive.Height());
+    if(mc_gState->m_Permissions->RollBack(chainActive.Height()) != MC_ERR_NOERROR)
+    {
+        LogPrintf("ERROR: Couldn't roll back permission DB to height %d\n",chainActive.Height());                                    
+        return false;        
+    }
     if(fDebug)LogPrint("mchn","mchn: Rolling back asset DB to height %d\n",chainActive.Height());
-    mc_gState->m_Assets->RollBack(chainActive.Height());
+    if(mc_gState->m_Assets->RollBack(chainActive.Height()) != MC_ERR_NOERROR)
+    {
+        LogPrintf("ERROR: Couldn't roll back asset DB to height %d\n",chainActive.Height());                                    
+        return false;        
+    }
     if(mc_gState->m_WalletMode & MC_WMD_TXS)
     {
         if(fDebug)LogPrint("mchn","mchn: Rolling back wallet txs DB to height %d\n",chainActive.Height());
-        pwalletTxsMain->RollBack(NULL,chainActive.Height());
+        if(pwalletTxsMain->RollBack(NULL,chainActive.Height()) != MC_ERR_NOERROR)
+        {
+            LogPrintf("ERROR: Couldn't roll back wallet txs DB to height %d\n",chainActive.Height());                                    
+            if(!GetBoolArg("-skipwalletchecks",false) && !GetBoolArg("-rescan", false))
+            {
+                strError="Error: The wallet database is inconsistent. Restart MultiChain with -rescan to rebuild the wallet database from the blockchain (can take hours), or with -skipwalletchecks to continue operating anyway";
+                return false;
+            }
+        }
     }
     MultichainNode_ApplyUpgrades(chainActive.Height());        
     
@@ -5365,10 +5464,10 @@ void UnloadBlockIndex()
     pindexBestInvalid = NULL;
 }
 
-bool LoadBlockIndex()
+bool LoadBlockIndex(std::string& strError)
 {
     // Load block index from databases
-    if (!fReindex && !LoadBlockIndexDB())
+    if (!fReindex && !LoadBlockIndexDB(strError))
         return false;
     return true;
 }
@@ -6025,7 +6124,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         {
             if( (mc_gState->m_NodePausedState & MC_NPS_OFFCHAIN) == 0 )
             {
-                if(!pRelayManager->ProcessRelay(pfrom,vRecv,state,MC_VRA_DEFAULT))
+                bool msg_success=pRelayManager->ProcessRelay(pfrom,vRecv,state,MC_VRA_DEFAULT);
+                if(!msg_success)
                 {
                     int nDos = 0;
                     if (state.IsInvalid(nDos) && nDos > 0)
@@ -6033,6 +6133,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                         Misbehaving(pfrom->GetId(), nDos);
                     }
                 }
+                pwalletTxsMain->m_ChunkCollector->AdjustKBPerDestination(pfrom,msg_success);
             }
         }
     }

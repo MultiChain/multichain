@@ -108,6 +108,7 @@ string strMiscWarning;
 bool fLogTimestamps = false;
 bool fLogIPs = false;
 bool fLogTimeMillis = false;
+bool fInRecovery = false;
 volatile bool fReopenDebugLog = false;
 
 /** Init OpenSSL library multithreading support */
@@ -567,14 +568,16 @@ boost::filesystem::path GetPidFile()
     return pathPidFile;
 }
 
-void CreatePidFile(const boost::filesystem::path &path, int pid)
+bool CreatePidFile(const boost::filesystem::path &path, int pid)
 {
+    bool file_already_exist=boost::filesystem::exists(path);
     FILE* file = fopen(path.string().c_str(), "w");
     if (file)
     {
         fprintf(file, "%d\n", pid);
         fclose(file);
     }
+    return file_already_exist;
 }
 //#endif
 

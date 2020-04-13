@@ -5007,7 +5007,6 @@ void mc_InitRPCHelpMap21()
             "\nArguments:\n"
             "1. \"license-request-hex\"                          (string, required) The license request hex string (output of getlicenserequest)\n"
 
-            "\nReturns array of license confirmations.\n"
             "\nExamples:\n"
             + HelpExampleCli("importlicenserequest", "\"hexstring\"")
             + HelpExampleRpc("importlicenserequest", "\"hexstring\"")
@@ -5110,7 +5109,7 @@ void mc_InitRPCHelpMap22()
             "\nNote: This call can take minutes to complete if action=rescan.\n"
             "\nResult:\n"
             "\nExamples:\n"
-            + HelpExampleCli("addtofeed", "\"feed1\" \"test-stream\" \"\" \"{\\\"maxshowndata\\\":256}\"") 
+            + HelpExampleCli("addtofeed", "\"feed1\" \"test-stream\" \"\" \"rescan\" \"{\\\"maxshowndata\\\":256}\"") 
             + HelpExampleCli("addtofeed", "\"feed1\" \"test-stream\" blocks suspend") 
             + HelpExampleRpc("addtofeed", "\"feed1\", \"test-stream\"")
          ));
@@ -5138,7 +5137,7 @@ void mc_InitRPCHelpMap22()
             "\nNote: This call can take minutes to complete if action=rescan.\n"
             "\nResult:\n"
             "\nExamples:\n"
-            + HelpExampleCli("updatefeed", "\"feed1\" \"*\" \"\" \"{\\\"maxshowndata\\\":256}\"") 
+            + HelpExampleCli("updatefeed", "\"feed1\" \"*\" \"\" \"none\" \"{\\\"maxshowndata\\\":256}\"") 
             + HelpExampleCli("updatefeed", "\"feed1\" \"test-stream\" blocks suspend") 
             + HelpExampleRpc("updatefeed", "\"feed1\", \"test-stream\"")
          ));
@@ -5198,6 +5197,7 @@ void mc_InitRPCHelpMap22()
             "      override (boolean, default false) - when used with entities='*', override previously defined options for each entity\n"
             "\nThe following parameters can be specified in 'options' parameter of addtofeed, updatefeed APIs:\n"
             "      maxshowndata (integer) - maximal size of the data which can be written in the feed file\n"
+            "      nostreamfilters (boolean, default false) - skip running of stream filters on feed items\n"
             "\nThe following events can be enabled/disabled in addtofeed, updatefeed APIs, boolean, default true \n"     
             "      blockaddend, blockremoveend  \n"
             "      itemconfirmed, itemunconfirmed  \n"
@@ -5216,8 +5216,9 @@ void mc_InitRPCHelpMap22()
             "      offchainavailable-binary,offchainavailable-text,offchainavailable-json,offchainavailable-dataref,offchainavailable-timereceived, \n"
             "      offchainpurged-stream \n"
             "\nThe following events CAN NOT be disabled in addtofeed, updatefeed APIs, but still included in the feed\n"     
-            "      itemreceived\n"
+            "      blockaddstart,blockremovestart,itemreceived,iteminvalid\n"
             "\nThe following fields CAN NOT be disabled in addtofeed, updatefeed APIs, but still included in the feed\n"     
+            "      blockaddstart-hash,blockaddend-hash,blockremovestart-hash,blockremoveend-hash,\n"
             "      itemreceived-id,itemconfirmed-id,itemunconfirmed-id,iteminvalid-id,offchainavailable-id,offchainpurged-id\n"
         ));
     

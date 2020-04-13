@@ -91,7 +91,7 @@ Value mc_EnterpriseFeatures::STR_RPCPurgePublishedItems(const Array& params)
     return Value::null;
 }
 
-int mc_EnterpriseFeatures::STR_RemoveDataFromFile(int fHan, uint32_t from, uint32_t size, uint32_t mode)
+int mc_EnterpriseFeatures::STR_RemoveDataFromFile(const char *name)
 {
     return MC_ERR_NOERROR;
 }
@@ -380,6 +380,11 @@ void mc_EnterpriseFeatures::ENT_MaybeStop()
 }
 
 void mc_EnterpriseFeatures::ENT_InitRPCHelpMap()
+{
+    
+}
+
+void mc_EnterpriseFeatures::ENT_Debug(std::string action,std::string parameter)
 {
     
 }
