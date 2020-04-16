@@ -916,6 +916,7 @@ int mc_TerminalInput::LoadDataFromLog(const char* fileName)
     int err;
     int start,pos;
     
+    strcpy(m_Line,"");
     fHan=open(fileName,_O_BINARY | O_RDONLY);
     if(fHan<0)
     {
@@ -958,7 +959,6 @@ int mc_TerminalInput::LoadDataFromLog(const char* fileName)
         pos++;
     }
     
-    strcpy(m_Line,"");
     start=pos+24;
     while(start<size)
     {
