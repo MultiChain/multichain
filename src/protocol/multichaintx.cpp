@@ -1832,7 +1832,8 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     char asset_name[MC_ENT_MAX_NAME_SIZE+1];
     int multiple,out_count,issue_vout;
     int err;
-    int64_t quantity,total;
+    int64_t quantity,total,last_total,left_position;
+    int32_t chain_size;
     uint256 txid;
     bool new_issue,follow_on,issue_in_output;
     unsigned char *ptrOut;
@@ -2037,6 +2038,10 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
         follow_on=true;
     }   
     
+    last_total=0;
+    chain_size=0;
+    left_position=0;
+    
     if(follow_on)
     {
         total=0;
@@ -2087,10 +2092,16 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
         {
             details->SetRelevantEntity((unsigned char*)entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
         }
+        
+        last_total=mc_gState->m_Assets->GetTotalQuantity(&entity,&chain_size);
+        if(chain_size > 0)
+        {
+            left_position=mc_gState->m_Assets->GetChainLeftPosition(&entity,chain_size);
+        }
         if(ptrOut)
         {
             total=mc_GetABQuantity(ptrOut);
-            if(total+mc_gState->m_Assets->GetTotalQuantity(&entity) < 0)
+            if(total+last_total < 0)
             {
                 reason="Asset follow-on script rejected - exceeds maximal value for asset";
                 return false;                                                                                                                
@@ -2224,11 +2235,25 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
 
     err=MC_ERR_NOERROR;
     
+    last_total+=total;
+    
     mc_gState->m_TmpScript->Clear();
     mc_gState->m_TmpScript->AddElement();
     
     if(!details->fLicenseTokenIssuance)
     {
+        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ASSET_TOTAL,(unsigned char*)&last_total,sizeof(last_total));                            
+        
+        if(chain_size >= 0)
+        {
+            mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_CHAIN_INDEX,(unsigned char*)&chain_size,sizeof(chain_size));                            
+        }
+        
+        if(left_position > 0)
+        {
+            mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_LEFT_POSITION,(unsigned char*)&left_position,sizeof(left_position));                            
+        }
+        
         unsigned char issuer_buf[24];
         memset(issuer_buf,0,sizeof(issuer_buf));
         flags=MC_PFL_NONE;        

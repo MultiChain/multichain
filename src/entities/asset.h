@@ -60,14 +60,15 @@
 #define MC_ENT_TYPE_LICENSE_TOKEN     0x12
 #define MC_ENT_TYPE_MAX               0x12
 
-#define MC_ENT_SPRM_NAME                      0x01
+#define MC_ENT_SPRM_NAME                      0x01                              // Cross-entity parameters
 #define MC_ENT_SPRM_FOLLOW_ONS                0x02
 #define MC_ENT_SPRM_ISSUER                    0x03
 #define MC_ENT_SPRM_ANYONE_CAN_WRITE          0x04
 #define MC_ENT_SPRM_JSON_DETAILS              0x05
 #define MC_ENT_SPRM_PERMISSIONS               0x06
 #define MC_ENT_SPRM_RESTRICTIONS              0x07
-#define MC_ENT_SPRM_ASSET_MULTIPLE            0x41
+
+#define MC_ENT_SPRM_ASSET_MULTIPLE            0x41                              // Entity-specific parameters
 #define MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION  0x42
 #define MC_ENT_SPRM_UPGRADE_START_BLOCK       0x43
 #define MC_ENT_SPRM_UPGRADE_CHAIN_PARAMS      0x44
@@ -75,7 +76,11 @@
 #define MC_ENT_SPRM_FILTER_CODE               0x46
 #define MC_ENT_SPRM_FILTER_TYPE               0x47
 
-#define MC_ENT_SPRM_LICENSE_LICENSE_HASH      0x60
+#define MC_ENT_SPRM_ASSET_TOTAL               0x51                              // Optimization parameters
+#define MC_ENT_SPRM_CHAIN_INDEX               0x52 
+#define MC_ENT_SPRM_LEFT_POSITION             0x53 
+
+#define MC_ENT_SPRM_LICENSE_LICENSE_HASH      0x60                              // License parameters
 #define MC_ENT_SPRM_LICENSE_ISSUE_ADDRESS     0x61
 #define MC_ENT_SPRM_LICENSE_CONFIRMATION_TIME 0x62
 #define MC_ENT_SPRM_LICENSE_CONFIRMATION_REF  0x63
@@ -93,7 +98,7 @@
 #define MC_ENT_SPRM_LICENSE_SIGNATURE         0x6F
 
 
-#define MC_ENT_SPRM_TIMESTAMP                 0x81
+#define MC_ENT_SPRM_TIMESTAMP                 0x81                              // Chunk DB parameters
 #define MC_ENT_SPRM_CHUNK_HASH                0x82
 #define MC_ENT_SPRM_SOURCE_TXID               0x83
 #define MC_ENT_SPRM_SOURCE_VOUT               0x84
@@ -162,7 +167,7 @@ typedef struct mc_EntityLedgerRow
     uint32_t m_ScriptSize;                                                      // Script Size
     int64_t m_Quantity;                                                         // Total quantity of the entity (including follow-ons)
     uint32_t m_EntityType;                                                      // Entity type - MC_ENT_TYPE_ constants
-    int32_t m_ExtendedScript;                                                  // Size of extended script when in file, row+1 in temp buffer if in mempool
+    int32_t m_ExtendedScript;                                                   // Size of extended script when in file, row+1 in temp buffer if in mempool
     int64_t m_PrevPos;                                                          // Position of the previous entity in the ledger
     int64_t m_FirstPos;                                                         // Position in the ledger corresponding to first object in the chain
     int64_t m_LastPos;                                                          // Position in the ledger corresponding to last object in the chain before this object
@@ -318,6 +323,8 @@ typedef struct mc_AssetDB
     mc_Buffer *GetFollowOns(const void* txid);
     int HasFollowOns(const void* txid);
     int64_t GetTotalQuantity(mc_EntityDetails *entity);
+    int64_t GetTotalQuantity(mc_EntityDetails *entity,int32_t *chain_size);
+    int64_t GetChainLeftPosition(mc_EntityDetails *entity,int32_t index);
     
     void RemoveFiles();
     uint32_t MaxEntityType();
@@ -327,7 +334,9 @@ typedef struct mc_AssetDB
 //Internal functions    
     int Zero();
     int Destroy();
-    int64_t GetTotalQuantity(mc_EntityLedgerRow *row);
+    int64_t GetTotalQuantity(mc_EntityLedgerRow *row,int32_t *chain_size);
+    int64_t GetChainLeftPosition(mc_EntityLedgerRow *row,int32_t index);
+    int64_t GetChainPosition(mc_EntityLedgerRow *row,int32_t index);
         
 } mc_AssetDB;
 

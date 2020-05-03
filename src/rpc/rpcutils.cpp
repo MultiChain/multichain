@@ -2023,10 +2023,12 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
 
         Array issues;
         int64_t total=0;
-        if(( (output_level & 0x0020) !=0 ) ||                                   // issuers
+
+        if(( (output_level & 0x0020) !=0 ) )// ||                                   // issuers
                                                                                 // For listassets with followons
-             ( (mc_gState->m_Assets->HasFollowOns(txid) != 0) && (quantity < 0) && ( (output_level & 0x00C0) == 0) ))
+//             ( (mc_gState->m_Assets->HasFollowOns(txid) != 0) && (quantity < 0) && ( (output_level & 0x00C0) == 0) ))
         {
+            total=0;
             int64_t qty;
             mc_Buffer *followons;
             followons=mc_gState->m_Assets->GetFollowOns(txid);
@@ -2107,8 +2109,12 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         else
         {
             total=entity.GetQuantity();
+            if( (mc_gState->m_Assets->HasFollowOns(txid) != 0) && (quantity < 0) && ( (output_level & 0x00C0) == 0) )
+            {
+                total=mc_gState->m_Assets->GetTotalQuantity(genesis_entity);
+            }
         }
-        
+
         raw_output=quantity;
         if( (output_level & 0x0100) == 0)
         {
