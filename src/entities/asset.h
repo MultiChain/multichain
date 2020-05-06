@@ -172,6 +172,8 @@ typedef struct mc_EntityLedgerRow
     int64_t m_FirstPos;                                                         // Position in the ledger corresponding to first object in the chain
     int64_t m_LastPos;                                                          // Position in the ledger corresponding to last object in the chain before this object
     int64_t m_ChainPos;                                                         // Position in the ledger corresponding to last object in the chain
+    int32_t m_ScriptMemPoolPos;                                                 // Position of script in temp script buffer, -1 if not in temp buffer
+    int32_t m_ExtendedScriptMemPoolPos;                                         // Position of extended script in temp script buffer, -1 if not in temp buffer
     unsigned char m_Script[MC_ENT_SCRIPT_ALLOC_SIZE];                           // Script > MC_ENT_MAX_SCRIPT_SIZE + MC_ENT_MAX_FIXED_FIELDS_SIZE + 27*MC_ENT_MAX_STORED_ISSUERS
     
     void Zero();
@@ -232,6 +234,8 @@ typedef struct mc_EntityLedger
     uint32_t m_ValueOffset;                                                     // Offset of the value in mc_EntityLedgerRow structure, 36 
     uint32_t m_ValueSize;                                                       // Size of the ledger value 28 if protocol<=10003, 60 otherwise
     uint32_t m_TotalSize;                                                       // Totals size of the ledger row
+    uint32_t m_MemPoolSize;                                                     // Totals size of the ledger row in mempool
+    uint32_t m_MaxScriptMemPoolSize;                                            // Maximal script size stored in mempool
     unsigned char m_ZeroBuffer[96];
    
     mc_EntityLedger()
@@ -337,6 +341,8 @@ typedef struct mc_AssetDB
     int64_t GetTotalQuantity(mc_EntityLedgerRow *row,int32_t *chain_size);
     int64_t GetChainLeftPosition(mc_EntityLedgerRow *row,int32_t index);
     int64_t GetChainPosition(mc_EntityLedgerRow *row,int32_t index);
+    void AddToMemPool(mc_EntityLedgerRow *row);
+    void GetFromMemPool(mc_EntityLedgerRow *row,int mprow);
         
 } mc_AssetDB;
 
