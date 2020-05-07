@@ -1,4 +1,4 @@
-# Mac Build Notes (on MacOS Sierra)
+# Mac Build Notes (on MacOS Sierra and Mojave)
 
 ## Install XCode and XCode command line tools
 
@@ -30,7 +30,7 @@ Install git from git-scm, then
     cd v8build
 
     
-You can use pre-built headers and binaries of Google's V8 JavaScript engine by downloading and expanding [macos-v8.tar.gz](https://github.com/MultiChain/multichain-binaries/raw/master/macos-v8.tar.gz) in the current directory. If, on the other hand, you prefer to build the V8 component yourself, please follow the instructions in [V8_mac.md](/V8_mac.md/).
+You can use pre-built headers and binaries of Google's V8 JavaScript engine by downloading and expanding [macos-v8.tar.gz](https://github.com/MultiChain/multichain-binaries/raw/master/macos-v8.tar.gz) in the current directory. If, on the other hand, you prefer to build the V8 component yourself, please follow the instructions in [V8_mac.md](/V8_mac.md/) (only on On MacOS Sierra).
 
 ## Install dependencies
 
@@ -67,16 +67,15 @@ The default brew cookbook for berkeley-db and boost builds static libraries, but
 
 3. Tell brew to build openssl static libraries:
 
+        brew uninstall --ignore-dependencies openssl
+        brew tap-new $USER/old-openssl
+        brew extract --version=1.0.2q openssl $USER/old-openssl
+        brew install openssl@1.0.2q
+        export LDFLAGS=&quot;-L/usr/local/opt/openssl@1.0.2q/lib&quot;
+        export CPPFLAGS=&quot;-I/usr/local/opt/openssl@1.0.2q/include&quot;
+        export PKG_CONFIG_PATH=&quot;/usr/local/opt/openssl@1.0.2q/lib/pkgconfig&quot;
         brew edit openssl
         
-    In 'def install' => 'args =' change 'shared' to 'no-shared'
-    
-        brew install openssl --force
-<!--
-        export LDFLAGS=-L/usr/local/opt/openssl/lib
-        export CPPFLAGS=-I/usr/local/opt/openssl/include
--->
-
 ## Compile MultiChain for Mac (64-bit)
 
     cd $MULTICHAIN_HOME
