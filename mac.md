@@ -10,7 +10,7 @@
 
         xcode-select --install
         
--   Select XCode locatioh:
+-   Select XCode location:
 
         sudo xcode-select -s <path/to/Xcode.app>
 
@@ -30,7 +30,7 @@ Install git from git-scm, then
     cd v8build
 
     
-You can use pre-built headers and binaries of Google's V8 JavaScript engine by downloading and expanding [macos-v8.tar.gz](https://github.com/MultiChain/multichain-binaries/raw/master/macos-v8.tar.gz) in the current directory. If, on the other hand, you prefer to build the V8 component yourself, please follow the instructions in [V8_mac.md](/V8_mac.md/) (only on On MacOS Sierra).
+You can use the pre-built headers and binaries of Google's V8 JavaScript engine by downloading and expanding [macos-v8.tar.gz](https://github.com/MultiChain/multichain-binaries/raw/master/macos-v8.tar.gz) in the current directory. If, on the other hand, you prefer to build the V8 component yourself, please follow the instructions in [V8_mac.md](/V8_mac.md/) (only on Mac OS X Sierra).
 
 ## Install dependencies
 
@@ -49,13 +49,13 @@ If another Boost version was already installed, then do this:
 
 Apple does not support statically linked binaries as [documented here](https://developer.apple.com/library/content/qa/qa1118/_index.html), however, it is convenient for end-users to launch a binary without having to first install brew, a third-party system designed for developers.
 
-To create a statically linked MultiChain which only depends on default MacOS dylibs, the following steps are taken:
+To create a statically linked MultiChain which only depends on the default MacOS dylibs, the following steps are taken:
 
 1. Hide the brew boost dylibs from the build system:
 
         rename -e 's/.dylib/.dylib.hidden/' /usr/local/opt/boost\@1.57/lib/*.dylib
 
-2. Hide the brew berekley-db dylibs from the build system:
+2. Hide the brew berkeley-db dylibs from the build system:
 
         rename -e 's/.dylib/.dylib.hidden/' /usr/local/opt/berkeley-db\@4/lib/*.dylib
 
