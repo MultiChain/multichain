@@ -1,4 +1,4 @@
-# Mac Build Notes (MacOS X 10.12+)
+# Mac Build Notes (macOS 10.12+)
 
 ## Install XCode and XCode command line tools
 
