@@ -1,4 +1,4 @@
-# Mac Build Notes (on MacOS Sierra and Mojave)
+# Mac Build Notes (MacOS X 10.12+)
 
 ## Install XCode and XCode command line tools
 
@@ -30,7 +30,7 @@ Install git from git-scm, then
     cd v8build
 
     
-You can use the pre-built headers and binaries of Google's V8 JavaScript engine by downloading and expanding [macos-v8.tar.gz](https://github.com/MultiChain/multichain-binaries/raw/master/macos-v8.tar.gz) in the current directory. If, on the other hand, you prefer to build the V8 component yourself, please follow the instructions in [V8_mac.md](/V8_mac.md/) (only on Mac OS X Sierra).
+You can use the pre-built headers and binaries of Google's V8 JavaScript engine by downloading and expanding [macos-v8.tar.gz](https://github.com/MultiChain/multichain-binaries/raw/master/macos-v8.tar.gz) in the current directory. If, on the other hand, you prefer to build the V8 component yourself, please follow the instructions in [V8_mac.md](/V8_mac.md/).
 
 ## Install dependencies
 
