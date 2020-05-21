@@ -480,6 +480,39 @@ void ParseRawDetails(const Value *value,mc_Script *lpDetails,mc_Script *lpDetail
     }    
 }
 
+void ParseRawValue(const Value *value,mc_Script *lpDetails,mc_Script *lpDetailsScript,size_t *max_size,int *errorCode,string *strError)
+{
+    if(value->type() == obj_type)
+    {
+        size_t bytes;
+        int err;
+        const unsigned char *script;
+        lpDetailsScript->Clear();
+        lpDetailsScript->AddElement();
+        if((err = ubjson_write(*value,lpDetailsScript,MAX_FORMATTED_DATA_DEPTH)) != MC_ERR_NOERROR)
+        {
+            *strError=string("Couldn't transfer value JSON object to internal UBJSON format");    
+        }
+        else
+        {
+            script = lpDetailsScript->GetData(0,&bytes);
+            if(max_size)
+            {
+                if(bytes > *max_size)
+                {
+                    *max_size=bytes;
+                    return;
+                }
+            }
+            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_JSON_VALUE,script,bytes);            
+        }
+    }                
+    else
+    {
+        *strError=string("Invalid value, should be object");                                                            
+    }    
+}
+
 CScript RawDataScriptFormatted(Value *param,uint32_t *data_format,mc_Script *lpDetailsScript,int *errorCode,string *strError)
 {
     CScript scriptOpReturn=CScript();

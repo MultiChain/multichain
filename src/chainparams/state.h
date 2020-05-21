@@ -163,6 +163,7 @@ typedef struct mc_Features
     int License20010();
     int ExtendedEntityDetails();
     int FixedSpendingBigScripts();
+    int Variables();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo

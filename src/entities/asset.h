@@ -58,7 +58,8 @@
 #define MC_ENT_TYPE_UPGRADE           0x10
 #define MC_ENT_TYPE_FILTER            0x11
 #define MC_ENT_TYPE_LICENSE_TOKEN     0x12
-#define MC_ENT_TYPE_MAX               0x12
+#define MC_ENT_TYPE_VARIABLE          0x13
+#define MC_ENT_TYPE_MAX               0x13
 
 #define MC_ENT_SPRM_NAME                      0x01                              // Cross-entity parameters
 #define MC_ENT_SPRM_FOLLOW_ONS                0x02
@@ -67,6 +68,7 @@
 #define MC_ENT_SPRM_JSON_DETAILS              0x05
 #define MC_ENT_SPRM_PERMISSIONS               0x06
 #define MC_ENT_SPRM_RESTRICTIONS              0x07
+#define MC_ENT_SPRM_JSON_VALUE                0x08
 
 #define MC_ENT_SPRM_ASSET_MULTIPLE            0x41                              // Entity-specific parameters
 #define MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION  0x42
@@ -315,6 +317,8 @@ typedef struct mc_AssetDB
     int FindEntityByName(mc_EntityDetails *entity, const char* name);    
     int FindEntityByFollowOn(mc_EntityDetails *entity, const unsigned char* txid);    
     int FindEntityByFullRef (mc_EntityDetails *entity, unsigned char* full_ref);
+    int FindLastEntity(mc_EntityDetails *last_entity, mc_EntityDetails *entity);    
+    int FindLastEntityByGenesis(mc_EntityDetails *last_entity, mc_EntityDetails *genesis_entity);    
     
     unsigned char *CachedTxIDFromShortTxID(unsigned char *short_txid);
     int SetRollBackPos(int block,int offset,int inmempool);
@@ -325,6 +329,7 @@ typedef struct mc_AssetDB
     mc_Buffer *GetEntityList(mc_Buffer *old_result,const void* txid,uint32_t entity_type);
     void FreeEntityList(mc_Buffer *entities);
     mc_Buffer *GetFollowOns(const void* txid);
+    mc_Buffer *GetFollowOnsByLastEntity(mc_EntityDetails *last_entity,int count,int start);
     int HasFollowOns(const void* txid);
     int64_t GetTotalQuantity(mc_EntityDetails *entity);
     int64_t GetTotalQuantity(mc_EntityDetails *entity,int32_t *chain_size);

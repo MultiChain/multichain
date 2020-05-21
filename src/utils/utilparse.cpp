@@ -574,6 +574,10 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                             {
                                 *required |= MC_PTP_CREATE;                    
                             }
+                            if(new_entity_type == MC_ENT_TYPE_VARIABLE)
+                            {
+                                *required |= MC_PTP_CREATE;                    
+                            }
                             if(new_entity_type == MC_ENT_TYPE_UPGRADE)
                             {
                                 *required |= MC_PTP_CREATE | MC_PTP_ADMIN;                    
@@ -591,7 +595,7 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                         }
                     }
                     
-                    if(lpScript->GetNumElements() == 3)                         // Publish
+                    if(lpScript->GetNumElements() == 3)                         // Publish or set variable
                     {
                         unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
                         lpScript->SetElement(0);
@@ -625,6 +629,29 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                                             }
                                         }                                    
                                     }
+                                }
+                                if(entity.GetEntityType() == MC_ENT_TYPE_VARIABLE)
+                                {
+                                    if(mapSpecialEntity)
+                                    {
+                                        if(required)
+                                        {
+                                            *required |= MC_PTP_WRITE;                    
+                                        }
+                                        std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_WRITE);
+                                        if (it == mapSpecialEntity->end())
+                                        {
+                                            mapSpecialEntity->insert(make_pair(MC_PTP_WRITE,*(uint256*)(entity.GetTxID())));
+                                        }
+                                        else
+                                        {
+                                            if(it->second != *(uint256*)(entity.GetTxID()))
+                                            {
+                                                strFailReason="Invalid publish script, multiple variables";
+                                                return false;                                                                                                            
+                                            }
+                                        }
+                                    }                                    
                                 }
                             }                        
                             else

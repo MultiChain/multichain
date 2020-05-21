@@ -2455,6 +2455,7 @@ int mc_Features::ExtendedEntityDetails()
     return ret;    
     
 }
+
 int mc_Features::FixedSpendingBigScripts()
 {
     int ret=0;
@@ -2481,6 +2482,26 @@ int mc_Features::FixedSpendingBigScripts()
             {
                 ret=1;
             }            
+        }
+    }
+    
+    return ret;    
+}
+
+int mc_Features::Variables()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 20012)
+        {
+            ret=1;
         }
     }
     

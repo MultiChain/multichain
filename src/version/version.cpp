@@ -14,8 +14,8 @@ int mc_State::VersionInfo(int version)
         return custom_version;
     }
     
-    int this_build=20006901;
-    int this_protocol=20011;   
+    int this_build=20100901;
+    int this_protocol=20012;   
     
     if(mc_gState->m_EnterpriseBuild)
     {
@@ -85,7 +85,9 @@ int mc_State::IsDeprecated(int version)
             is_protocol_multichain=0;
         }
     }
-    
+    printf("A %d\n",version);
+    printf("B %d\n",build);
+    printf("C %d\n",GetNumericVersion());
     if(is_protocol_multichain)
     {
         if(build > 0)
