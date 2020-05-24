@@ -48,6 +48,8 @@ using namespace json_spirit;
 #define MC_DATA_API_PARAM_TYPE_RAW             0x00000200
 #define MC_DATA_API_PARAM_TYPE_FORMATTED       0x00000400
 #define MC_DATA_API_PARAM_TYPE_CIS             0x00001000
+#define MC_DATA_API_PARAM_TYPE_CREATE_VAR      0x00010000
+#define MC_DATA_API_PARAM_TYPE_UPDATE_VAR      0x00020000
 
 #define MC_DATA_API_PARAM_TYPE_SIMPLE          0x00000602
 #define MC_DATA_API_PARAM_TYPE_ALL             0xFFFFFFFF
@@ -79,6 +81,8 @@ using namespace json_spirit;
 #define MC_OST_ERROR_NOT_SUPPORTED             0x00040000
 #define MC_OST_ERROR_MASK                      0x00FF0000
 #define MC_OST_CONTROL_NO_DATA                 0x01000000
+
+#define MC_AST_MAX_NOT_EXTENDED_VARIABLE_SIZE   32767
 
 
 // codes for allowed_objects fields    

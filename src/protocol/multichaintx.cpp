@@ -784,7 +784,7 @@ bool MultiChainTransaction_CheckAssetUpdateDetails(mc_EntityDetails *entity,
         {
             unsigned char *ptr;
             size_t bytes;        
-            mc_gState->m_TmpScript->SetElement(1);
+            mc_gState->m_TmpScript->SetElement(2);
             err=mc_gState->m_TmpScript->GetExtendedDetails(&ptr,&bytes);
             if(err == 0)
             {
