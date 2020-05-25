@@ -2105,7 +2105,12 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
             {
                 reason="Details script rejected - entity not found";
                 return false;                                    
-            }                                           
+            }                            
+            if(entity.GetEntityType() != details->new_entity_type)              // Cannot happen before variables as asset was the only allowed followon
+            {                
+                reason="Details script rejected - entity type mismatch";
+                return false;                                    
+            }
             details->SetRelevantEntity(short_txid);
         }
         else
@@ -2293,6 +2298,10 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     if(issuers.size() == 0)
     {
         reason="Inputs don't belong to valid issuer";
+        if(details->new_entity_type == MC_ENT_TYPE_VARIABLE)                   
+        {
+            reason="Inputs don't belong to valid creator";            
+        }
         return false;
     }                
 
