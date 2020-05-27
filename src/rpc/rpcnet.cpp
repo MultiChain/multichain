@@ -15,6 +15,10 @@
 #include "utils/util.h"
 #include "version/bcversion.h"
 
+#ifdef HAVE_GETADDRINFO_A
+#include <netdb.h>
+#endif
+
 #ifndef WIN32
 #if HAVE_INET_PTON
 #include <arpa/inet.h>
@@ -166,6 +170,7 @@ Value addnode(const Array& params, bool fHelp)
 
     bool is_numeric=false;
     struct in_addr ipv4_addr;
+#ifdef HAVE_GETADDRINFO_A
 #ifdef HAVE_INET_PTON    
     if (inet_pton(AF_INET, hostname.c_str(), &ipv4_addr) > 0) {
         is_numeric=true;
@@ -175,6 +180,12 @@ Value addnode(const Array& params, bool fHelp)
     if (inet_pton(AF_INET6, hostname.c_str(), &ipv6_addr) > 0) {
         is_numeric=true;
     }    
+#else
+    ipv4_addr.s_addr = inet_addr(hostname.c_str());
+    if (ipv4_addr.s_addr != INADDR_NONE) {
+        is_numeric=true;
+    }
+#endif
 #else
     ipv4_addr.s_addr = inet_addr(hostname.c_str());
     if (ipv4_addr.s_addr != INADDR_NONE) {

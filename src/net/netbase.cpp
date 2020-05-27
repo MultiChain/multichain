@@ -103,6 +103,7 @@ bool static LookupIntern(const char *pszName, std::vector<CNetAddr>& vIP, unsign
     }
 
     struct in_addr ipv4_addr;
+#ifdef HAVE_GETADDRINFO_A
 #ifdef HAVE_INET_PTON
     
     if (inet_pton(AF_INET, pszName, &ipv4_addr) > 0) {
@@ -116,6 +117,13 @@ bool static LookupIntern(const char *pszName, std::vector<CNetAddr>& vIP, unsign
         return true;
     }
 
+#else
+    ipv4_addr.s_addr = inet_addr(pszName);
+    if (ipv4_addr.s_addr != INADDR_NONE) {
+        vIP.push_back(CNetAddr(ipv4_addr));
+        return true;
+    }
+#endif
 #else
     ipv4_addr.s_addr = inet_addr(pszName);
     if (ipv4_addr.s_addr != INADDR_NONE) {
