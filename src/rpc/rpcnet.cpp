@@ -15,6 +15,14 @@
 #include "utils/util.h"
 #include "version/bcversion.h"
 
+#ifndef WIN32
+#if HAVE_INET_PTON
+#include <arpa/inet.h>
+#endif
+#include <fcntl.h>
+#endif
+
+
 /* MCHN START */
 #include "structs/base58.h"
 /* MCHN END */
