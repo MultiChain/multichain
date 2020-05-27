@@ -1471,12 +1471,13 @@ void mc_InitRPCHelpMap06()
             "                                                           if (item.keys.length<2)\n"
             "                                                               return \"At least two keys required\";\n"
             "                                                       }   \n"
+/*    
             "  or \n"
             "1. entity-type                      (string, required) variable\n"
             "2. \"variable-name\"                  (string, required) Variable name, if not \"\" should be unique.\n"
             "3. open                             (boolean, optional) Should be false\n"
             "4. value                            (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
-
+*/
 
             "\nResult:\n"
             "\"transactionid\"  (string) The transaction id.\n"
@@ -1566,13 +1567,14 @@ void mc_InitRPCHelpMap06()
             "                                                             if (item.keys.length<2)\n"
             "                                                                 return \"At least two keys required\";\n"
             "                                                         }   \n"
+/*    
             "  or \n"
             "1. \"from-address\"                   (string, required) Address used for creating.\n"
             "2. entity-type                      (string, required) variable\n"
             "3. \"variable-name\"                  (string, required) Variable name, if not \"\" should be unique.\n"
             "4. open                             (boolean, optional) Should be false\n"
             "5. value                            (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
-
+*/
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -5246,6 +5248,10 @@ void mc_InitRPCHelpMap22()
             "      itemreceived-id,itemconfirmed-id,itemunconfirmed-id,iteminvalid-id,offchainavailable-id,offchainpurged-id\n"
         ));
     
+}
+
+void mc_InitRPCHelpMap23()
+{
     mapHelpStrings.insert(std::make_pair("setvariablevaluefrom",
             "setvariablevaluefrom \"from-address\" \"variable-identifier\" value \n"
             "\nSets variable value\n"
@@ -5307,10 +5313,6 @@ void mc_InitRPCHelpMap22()
             + HelpExampleRpc("getvariablehistory", "\"var1\"")
         ));
     
-}
-
-void mc_InitRPCHelpMap23()
-{
      mapHelpStrings.insert(std::make_pair("getvariableinfo",
             "getvariableinfo ( \"variable-identifier\" verbose )\n"
             "\nReturns information about defined variable\n"
@@ -5444,7 +5446,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap20();
     mc_InitRPCHelpMap21();
     mc_InitRPCHelpMap22();
-    mc_InitRPCHelpMap23();
+//    mc_InitRPCHelpMap23();
     
     pEF->ENT_InitRPCHelpMap();
     
