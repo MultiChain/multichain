@@ -322,7 +322,7 @@ void FindAddressesWithPublishPermission(vector<CTxDestination>& fromaddresses,mc
             if(mc_gState->m_Permissions->CanSend(NULL,aptr) == 0)
             {
                 throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have send permission");                                                                        
-            }                                                 
+            }        
         }
     }
     else

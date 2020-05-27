@@ -1397,7 +1397,7 @@ void mc_InitRPCHelpMap06()
     
     mapHelpStrings.insert(std::make_pair("create",
             "create \"entity-type\" \"entity-name\" open ( custom-fields )\n"
-            "\nCreates stream or upgrade\n"
+            "\nCreates stream, upgrade, filter or variable\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"entity-type\"                    (string, required) stream\n"
@@ -1488,7 +1488,7 @@ void mc_InitRPCHelpMap06()
     
     mapHelpStrings.insert(std::make_pair("createfrom",
             "createfrom \"from-address\" \"entity-type\" \"entity-name\" open ( custom-fields )\n"
-            "\nCreates stream using specific address\n"
+            "\nCreates stream, upgrade, filter or variable using specific address\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"from-address\"                   (string, required) Address used for creating.\n"
@@ -5277,12 +5277,12 @@ void mc_InitRPCHelpMap22()
     
      mapHelpStrings.insert(std::make_pair("listvariables",
             "listvariables ( variable-identifier(s) verbose count start )\n"
-            "\nReturns list of defined streams\n"
+            "\nReturns list of defined variables\n"
             "\nArguments:\n"
             "1. \"variable-identifier(s)\"           (string, optional, default=*) Variable identifier - one of: create txid, variable reference, variable name.\n"
             " or\n"
             "1. variable-identifier(s)             (array, optional) A json array of variable identifiers \n"                
-            "2. verbose                          (boolean, optional, default=false) If true, returns variable history \n"
+            "2. verbose                          (boolean, optional, default=false) If true, last txid and writers \n"
             "3. count                            (number, optional, default=INT_MAX - all) The number of variables to display\n"
             "4. start                            (number, optional, default=-count - last) Start from specific variable, 0 based, if negative - from the end\n"
             "\nResult:\n"
@@ -5316,7 +5316,7 @@ void mc_InitRPCHelpMap23()
             "\nReturns information about defined variable\n"
             "\nArguments:\n"
             "1. \"variable-identifier\"            (string, required) Variable identifier - one of: create txid, variable reference, variable name.\n"
-            "2. verbose                          (boolean, optional, default=false) If true, returns variable history\n"
+            "2. verbose                          (boolean, optional, default=false) If true, last txid and writers \n"
             "\nResult:\n"
             "An object containing information about defined variable\n"            
             "\nExamples:\n"

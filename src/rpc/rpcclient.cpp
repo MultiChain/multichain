@@ -671,6 +671,8 @@ static const CRPCConvertParamMayBeString vRPCConvertParamsMayBeString[] =
     { "addtofeed", 1 },
     { "updatefeed", 1 },
     { "listfeeds", 0 },
+    { "setvariablevaluefrom", 2 },                                                            
+    { "setvariablevalue", 1 },                                                                
 };
 
 class CRPCConvertTableMayBeString
