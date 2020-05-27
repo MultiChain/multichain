@@ -3981,7 +3981,8 @@ void mc_InitRPCHelpMap16()
             "        or\n"
             "      \"for\": entity-identifier(s)     (array, optional) Only for tx filters, A json array of asset/stream identifiers .\n"    
             "      \"code\": \"filter-code\"           (string, required) JavaScript filter code, see help filters.\n"
-            "    }\n"                                
+            "    }\n"    
+/*    
             " or\n"
             "create-new-variable                   (object, required) A json object with new variable details\n"
             "    {\n"                
@@ -3995,6 +3996,7 @@ void mc_InitRPCHelpMap16()
             "      \"update\" : \"variable-identifier\" (string, required) Variable identifier - one of: create txid, variable reference, variable name.\n"
             "      \"value\": value                  (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
             "    }\n"                                
+ */ 
         ));
 
     mapHelpStrings.insert(std::make_pair("data-with",
