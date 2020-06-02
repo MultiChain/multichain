@@ -14,7 +14,7 @@ int mc_State::VersionInfo(int version)
         return custom_version;
     }
     
-    int this_build=20006901;
+    int this_build=20007901;
     int this_protocol=20011;   
     
     if(mc_gState->m_EnterpriseBuild)
@@ -85,7 +85,6 @@ int mc_State::IsDeprecated(int version)
             is_protocol_multichain=0;
         }
     }
-    
     if(is_protocol_multichain)
     {
         if(build > 0)
