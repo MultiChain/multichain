@@ -156,8 +156,9 @@ int mc_Script::AddElement()
         return err;
     }
     
+    m_CurrentElement=m_NumElements;
     m_NumElements++;
-    m_CurrentElement++;
+//SCMF    m_CurrentElement++;
     m_lpCoord[2*m_CurrentElement + 0]=m_Size;
     m_lpCoord[2*m_CurrentElement + 1]=0;
     
@@ -219,6 +220,7 @@ const unsigned char*  mc_Script::GetData(int element, size_t* bytes)
         return NULL;
     }
 
+/* SCMF   
     m_CurrentElement=element;
     if(bytes)
     {
@@ -226,11 +228,24 @@ const unsigned char*  mc_Script::GetData(int element, size_t* bytes)
     }
     
     return m_lpData+m_lpCoord[2*m_CurrentElement + 0];
+ */
+    if(bytes)
+    {
+        *bytes=m_lpCoord[2*element + 1];
+    }
+    
+    return m_lpData+m_lpCoord[2*element + 0];
+    
 }
 
 int mc_Script::SetData(const unsigned char* src, const size_t bytes)
 {
     int err;
+    
+    if(m_CurrentElement < 0)    //SCMF
+    {
+        return MC_ERR_INTERNAL_ERROR;
+    }
     
     err=Resize(bytes,0);
     if(err)

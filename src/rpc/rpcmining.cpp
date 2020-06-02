@@ -154,6 +154,12 @@ Value setgenerate(const Array& params, bool fHelp)
     // -regtest mode: don't return until nGenProcLimit blocks are generated
     if (fGenerate && Params().MineBlocksOnDemand())
     {
+
+        if(fReindex)
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Creating new blocks is not allowed while reindexing");            
+        }
+
         int nHeightStart = 0;
         int nHeightEnd = 0;
         int nHeight = 0;

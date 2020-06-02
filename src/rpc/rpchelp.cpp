@@ -1397,7 +1397,7 @@ void mc_InitRPCHelpMap06()
     
     mapHelpStrings.insert(std::make_pair("create",
             "create \"entity-type\" \"entity-name\" open ( custom-fields )\n"
-            "\nCreates stream or upgrade\n"
+            "\nCreates stream, upgrade, filter or variable\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"entity-type\"                    (string, required) stream\n"
@@ -1418,7 +1418,7 @@ void mc_InitRPCHelpMap06()
             "1. \"entity-type\"                    (string, required) upgrade\n"
             "2. \"upgrade-name\"                   (string, required) Upgrade name, if not \"\" should be unique.\n"
             "3. open                             (boolean, required) Should be false\n"
-            "4  custom-fields                    (object, required)  a json object with custom fields\n"
+            "4. custom-fields                    (object, required) A json object with custom fields\n"
             "    {\n"
             "      \"protocol-version\": version   (numeric, optional) Protocol version to upgrade to\n"
             "      \"parameter-name\": value       (numeric, optional) New value for upgradable parameter, one of: \n"
@@ -1471,7 +1471,13 @@ void mc_InitRPCHelpMap06()
             "                                                           if (item.keys.length<2)\n"
             "                                                               return \"At least two keys required\";\n"
             "                                                       }   \n"
-
+/*    
+            "  or \n"
+            "1. entity-type                      (string, required) variable\n"
+            "2. \"variable-name\"                  (string, required) Variable name, if not \"\" should be unique.\n"
+            "3. open                             (boolean, optional) Should be false\n"
+            "4. value                            (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
+*/
 
             "\nResult:\n"
             "\"transactionid\"  (string) The transaction id.\n"
@@ -1483,7 +1489,7 @@ void mc_InitRPCHelpMap06()
     
     mapHelpStrings.insert(std::make_pair("createfrom",
             "createfrom \"from-address\" \"entity-type\" \"entity-name\" open ( custom-fields )\n"
-            "\nCreates stream using specific address\n"
+            "\nCreates stream, upgrade, filter or variable using specific address\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"from-address\"                   (string, required) Address used for creating.\n"
@@ -1505,8 +1511,8 @@ void mc_InitRPCHelpMap06()
             "1. \"from-address\"                   (string, required) Address used for creating.\n"
             "2. entity-type                      (string, required) upgrade\n"
             "3. \"upgrade-name\"                   (string, required) Upgrade name, if not \"\" should be unique.\n"
-            "4. open                             (boolean, required ) Should be false\n"
-            "5  custom-fields                    (object, required)  a json object with custom fields\n"
+            "4. open                             (boolean, required) Should be false\n"
+            "5. custom-fields                    (object, required) A json object with custom fields\n"
             "    {\n"
             "      \"protocol-version\": version   (numeric, optional) Protocol version to upgrade to \n"
             "      \"parameter-name\": value       (numeric, optional) New value for upgradable parameter, one of: \n"
@@ -1561,7 +1567,14 @@ void mc_InitRPCHelpMap06()
             "                                                             if (item.keys.length<2)\n"
             "                                                                 return \"At least two keys required\";\n"
             "                                                         }   \n"
-
+/*    
+            "  or \n"
+            "1. \"from-address\"                   (string, required) Address used for creating.\n"
+            "2. entity-type                      (string, required) variable\n"
+            "3. \"variable-name\"                  (string, required) Variable name, if not \"\" should be unique.\n"
+            "4. open                             (boolean, optional) Should be false\n"
+            "5. value                            (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
+*/
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -3967,8 +3980,23 @@ void mc_InitRPCHelpMap16()
             "      \"for\": \"entity-identifier\"      (string, optional) Only for tx filters, Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
             "        or\n"
             "      \"for\": entity-identifier(s)     (array, optional) Only for tx filters, A json array of asset/stream identifiers .\n"    
-            "      \"code\"                          (string, required) JavaScript filter code, see help filters.\n"
+            "      \"code\": \"filter-code\"           (string, required) JavaScript filter code, see help filters.\n"
+            "    }\n"    
+/*    
+            " or\n"
+            "create-new-variable                   (object, required) A json object with new variable details\n"
+            "    {\n"                
+            "      \"create\" : \"variable\"           (string, required) variable\n"
+            "      \"name\" : \"variable-name\"        (string, optional) Variable name\n"
+            "      \"value\": value                  (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
             "    }\n"                                
+            " or\n"
+            "set-variable-value                    (object, required) A json object with new variable value\n"
+            "    {\n"
+            "      \"update\" : \"variable-identifier\" (string, required) Variable identifier - one of: create txid, variable reference, variable name.\n"
+            "      \"value\": value                  (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
+            "    }\n"                                
+ */ 
         ));
 
     mapHelpStrings.insert(std::make_pair("data-with",
@@ -5222,9 +5250,100 @@ void mc_InitRPCHelpMap22()
             "      itemreceived-id,itemconfirmed-id,itemunconfirmed-id,iteminvalid-id,offchainavailable-id,offchainpurged-id\n"
         ));
     
-    mapHelpStrings.insert(std::make_pair("AAAAAAA",
+}
+
+void mc_InitRPCHelpMap23()
+{
+    mapHelpStrings.insert(std::make_pair("setvariablevaluefrom",
+            "setvariablevaluefrom \"from-address\" \"variable-identifier\" value \n"
+            "\nSets variable value\n"
+            + HelpRequiringPassphraseWrapper() +
+            "\nArguments:\n"
+            "1. \"from-address\"                   (string, required) Address used for setting variable value.\n"
+            "2. \"variable-identifier\"            (string, required) Variable identifier - one of: create txid, variable reference, variable name.\n"
+            "3. value                            (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
+            "\nResult:\n"
+            "\"transactionid\"                     (string) The transaction id.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("setvariablevaluefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"var1\" \"{\\\"count\\\":8}\"")
+            + HelpExampleRpc("setvariablevaluefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"var1\", \"{\\\"count\\\":8}\"")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("setvariablevalue",
+            "setvariablevalue \"variable-identifier\" value \n"
+            "\nChanges variable value\n"
+            + HelpRequiringPassphraseWrapper() +
+            "\nArguments:\n"
+            "1. \"variable-identifier\"            (string, required) Variable identifier - one of: create txid, variable reference, variable name.\n"
+            "2. value                            (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
+            "\nResult:\n"
+            "\"transactionid\"                     (string) The transaction id.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("setvariablevalue", "\"var1\" \"{\\\"count\\\":8}\"")
+            + HelpExampleRpc("setvariablevalue", "\"var1\", \"{\\\"count\\\":8}\"")
+        ));
+    
+     mapHelpStrings.insert(std::make_pair("listvariables",
+            "listvariables ( variable-identifier(s) verbose count start )\n"
+            "\nReturns list of defined variables\n"
+            "\nArguments:\n"
+            "1. \"variable-identifier(s)\"           (string, optional, default=*) Variable identifier - one of: create txid, variable reference, variable name.\n"
+            " or\n"
+            "1. variable-identifier(s)             (array, optional) A json array of variable identifiers \n"                
+            "2. verbose                          (boolean, optional, default=false) If true, last txid and writers \n"
+            "3. count                            (number, optional, default=INT_MAX - all) The number of variables to display\n"
+            "4. start                            (number, optional, default=-count - last) Start from specific variable, 0 based, if negative - from the end\n"
+            "\nResult:\n"
+            "An array containing list of defined variables\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("listvariables", "")
+            + HelpExampleRpc("listvariables", "")
+        ));
+    
+     mapHelpStrings.insert(std::make_pair("getvariablehistory",
+            "getvariablehistory ( \"variable-identifier\" verbose count start )\n"
+            "\nReturns variable value changes history\n"
+            "\nArguments:\n"
+            "1. \"variable-identifier\"            (string, required) Variable identifier - one of: create txid, variable reference, variable name.\n"
+            "2. verbose                          (boolean, optional, default=false) If true, returns txid and writer address\n"
+            "3. count                            (number, optional, default=INT_MAX - all) The number of value changes to display\n"
+            "4. start                            (number, optional, default=-count - last) Start from specific value change, 0 based, if negative - from the end\n"
+            "\nResult:\n"
+            "An array containing variable value changes history\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("getvariablehistory", "\"var1\"")
+            + HelpExampleRpc("getvariablehistory", "\"var1\"")
+        ));
+    
+     mapHelpStrings.insert(std::make_pair("getvariableinfo",
+            "getvariableinfo ( \"variable-identifier\" verbose )\n"
+            "\nReturns information about defined variable\n"
+            "\nArguments:\n"
+            "1. \"variable-identifier\"            (string, required) Variable identifier - one of: create txid, variable reference, variable name.\n"
+            "2. verbose                          (boolean, optional, default=false) If true, last txid and writers \n"
+            "\nResult:\n"
+            "An object containing information about defined variable\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("getvariableinfo", "\"var1\"")
+            + HelpExampleRpc("getvariableinfo", "\"var1\"")
+        ));
+    
+     mapHelpStrings.insert(std::make_pair("getvariablevalue",
+            "getvariablevalue ( \"variable-identifier\" )\n"
+            "\nReturns current variable value\n"
+            "\nArguments:\n"
+            "1. \"variable-identifier\"            (string, required) Variable identifier - one of: create txid, variable reference, variable name.\n"
+            "\nResult:\n"
+            "Current variable value\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("getvariablevalue", "\"var1\"")
+            + HelpExampleRpc("getvariablevalue", "\"var1\"")
+        ));
+    
+     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
+    
     
 }
 
@@ -5329,6 +5448,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap20();
     mc_InitRPCHelpMap21();
     mc_InitRPCHelpMap22();
+//    mc_InitRPCHelpMap23();
     
     pEF->ENT_InitRPCHelpMap();
     

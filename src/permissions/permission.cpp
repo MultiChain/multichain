@@ -759,6 +759,9 @@ uint32_t mc_Permissions::GetPossiblePermissionTypes(uint32_t entity_type)
                 full_type |= MC_PTP_READ;
             }
             break;
+        case MC_ENT_TYPE_VARIABLE:
+            full_type = MC_PTP_WRITE | MC_PTP_ACTIVATE | MC_PTP_ADMIN;
+            break;
         case MC_ENT_TYPE_NONE:
             full_type = MC_PTP_GLOBAL_ALL;
             break;

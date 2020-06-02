@@ -118,6 +118,41 @@ uint256 mc_GenesisCoinbaseTxID()
     return hGenesisCoinbaseTxID;
 }
 
+Value mc_ExtractValueJSONObject(mc_EntityDetails *lpEnt)
+{
+    size_t value_size;
+    int err;
+    const void* ptr=lpEnt->GetSpecialParam(MC_ENT_SPRM_JSON_VALUE,&value_size,1);
+    
+    if(ptr == NULL)
+    {
+        return Value::null;        
+    }
+    
+    Value value=ubjson_read((const unsigned char *)ptr,value_size,MAX_FORMATTED_DATA_DEPTH,&err);
+    
+    if(err)
+    {
+        return Value::null;        
+    }
+    
+    return value;
+}
+
+int mc_GetEntityIndex(mc_EntityDetails *lpEnt)
+{
+    size_t value_size;
+    const void* ptr=lpEnt->GetSpecialParam(MC_ENT_SPRM_CHAIN_INDEX,&value_size,1);
+    
+    if(ptr == NULL)
+    {
+        return -1;        
+    }
+    
+    return mc_GetLE((void*)ptr,value_size);
+}
+
+
 Value mc_ExtractDetailsJSONObject(mc_EntityDetails *lpEnt)
 {
     size_t value_size;
@@ -512,6 +547,38 @@ Value PermissionForFieldEntry(mc_EntityDetails *lpEntity)
                     streamref="0-0-0";                
                 }
                 entObject.push_back(Pair("streamref", streamref));
+            }
+        }
+        if(lpEntity->GetEntityType() == MC_ENT_TYPE_VARIABLE)
+        {
+            entObject.push_back(Pair("type", "variable"));      
+            ptr=(unsigned char *)lpEntity->GetName();
+            if(ptr && strlen((char*)ptr))
+            {
+                entObject.push_back(Pair("name", string((char*)ptr)));            
+            }
+            ptr=(unsigned char *)lpEntity->GetRef();
+            string streamref="";
+            if(lpEntity->IsUnconfirmedGenesis())
+            {
+                Value null_value;
+                entObject.push_back(Pair("variableref",null_value));
+            }
+            else
+            {
+                if((int)mc_GetLE(ptr,4))
+                {
+                    streamref += itostr((int)mc_GetLE(ptr,4));
+                    streamref += "-";
+                    streamref += itostr((int)mc_GetLE(ptr+4,4));
+                    streamref += "-";
+                    streamref += itostr((int)mc_GetLE(ptr+8,2));
+                }
+                else
+                {
+                    streamref="0-0-0";                
+                }
+                entObject.push_back(Pair("variableref", streamref));
             }
         }
         return entObject;
@@ -2023,10 +2090,12 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
 
         Array issues;
         int64_t total=0;
-        if(( (output_level & 0x0020) !=0 ) ||                                   // issuers
+
+        if(( (output_level & 0x0020) !=0 ) )// ||                                   // issuers
                                                                                 // For listassets with followons
-             ( (mc_gState->m_Assets->HasFollowOns(txid) != 0) && (quantity < 0) && ( (output_level & 0x00C0) == 0) ))
+//             ( (mc_gState->m_Assets->HasFollowOns(txid) != 0) && (quantity < 0) && ( (output_level & 0x00C0) == 0) ))
         {
+            total=0;
             int64_t qty;
             mc_Buffer *followons;
             followons=mc_gState->m_Assets->GetFollowOns(txid);
@@ -2107,8 +2176,12 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         else
         {
             total=entity.GetQuantity();
+            if( (mc_gState->m_Assets->HasFollowOns(txid) != 0) && (quantity < 0) && ( (output_level & 0x00C0) == 0) )
+            {
+                total=mc_gState->m_Assets->GetTotalQuantity(genesis_entity);
+            }
         }
-        
+
         raw_output=quantity;
         if( (output_level & 0x0100) == 0)
         {
@@ -2174,6 +2247,221 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         entry.push_back(Pair("assetref", null_value));
         entry.push_back(Pair("qty", null_value));
         entry.push_back(Pair("raw", quantity));
+    }
+    
+    return entry;
+}
+
+Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t output_level,string& lasttxid,Array& lastwriters)
+{
+    size_t value_size;
+    int64_t offset,new_offset;
+    uint32_t value_offset;
+    const unsigned char *ptr;
+    mc_EntityDetails sec_entity;
+    mc_EntityDetails *followon;
+    
+    followon=&sec_entity;
+    Array issues;
+
+    if(output_level & 0x0060)                                                   // For listvariables with followons                                 
+    {
+        mc_Buffer *followons;
+        followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(last_entity,count,start);
+        for(int i=followons->GetCount()-1;i>=0;i--)
+        {
+            Object issue;
+            followon->Zero();
+            if(mc_gState->m_Assets->FindEntityByTxID(followon,followons->GetRow(i)))
+            {
+                issue.push_back(Pair("value",mc_ExtractValueJSONObject(followon))); 
+                if(output_level & 0x0040)
+                {
+                    lasttxid=((uint256*)(followon->GetTxID()))->ToString();
+                    Array followon_issuers;
+
+                    ptr=followon->GetScript();
+                    offset=0;
+                    while(offset>=0)
+                    {
+                        new_offset=followon->NextParam(offset,&value_offset,&value_size);
+                        if(value_offset > 0)
+                        {
+                            if(ptr[offset] == 0)
+                            {
+                                if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
+                                {
+                                    if(value_size == 20)
+                                    {
+                                        followon_issuers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
+                                    }
+                                    if(value_size == 24)
+                                    {
+                                        unsigned char tptr[4];
+                                        memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
+                                        if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
+                                        {
+                                            followon_issuers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
+                                        }
+                                        else
+                                        {
+                                            followon_issuers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        offset=new_offset;
+                    }      
+
+                    issue.push_back(Pair("writers",followon_issuers));                    
+                    lastwriters=followon_issuers;
+                    issue.push_back(Pair("txid", ((uint256*)(followon->GetTxID()))->ToString().c_str()));    
+                    if(output_level & 0x0080)
+                    {
+                        int block=followon->m_LedgerRow.m_Block;
+                        int chain_height=chainActive.Height();
+                        issue.push_back(Pair("confirmations", chain_height-block+1));
+                        if(chain_height >= block)
+                        {
+                            uint256 blockHash=chainActive[block]->GetBlockHash();
+                            issue.push_back(Pair("blockhash", blockHash.GetHex()));
+                            issue.push_back(Pair("blockindex", block));
+                            issue.push_back(Pair("blocktime", mapBlockIndex[blockHash]->GetBlockTime()));                            
+                        }                        
+                    }
+                }
+                issues.push_back(issue);                    
+            }            
+        }
+        mc_gState->m_Assets->FreeEntityList(followons);
+    }
+    
+    return issues;
+}
+
+Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t output_level)
+{
+    string lasttxid;
+    Array lastwriters;
+    
+    return VariableHistory(last_entity,count,start,output_level,lasttxid,lastwriters);
+}
+
+Object VariableEntry(const unsigned char *txid,uint32_t output_level)
+{
+// output_level constants
+// 0x0000 minimal: name, variableref 
+// 0x0001 
+// 0x0002 current value
+// 0x0004 createtxid,     
+// 0x0008 
+// 0x0020 last txid and writers
+// 0x0040 history txid and writers
+// 0x0080 blockinfo
+// 0x0100 add "type":"variable"
+    
+    Object entry;
+    mc_EntityDetails entity;
+    mc_EntityDetails sec_entity;
+    mc_EntityDetails *genesis_entity;
+    mc_EntityDetails last_entity;
+    mc_TxEntityStat entStat;
+    unsigned char *ptr;
+
+    genesis_entity=&sec_entity;
+    
+    if(txid == NULL)
+    {
+        entry.push_back(Pair("variableref", ""));
+        return entry;
+    }
+    
+    uint256 hash=*(uint256*)txid;
+    
+    if(mc_gState->m_Assets->FindEntityByTxID(&entity,txid))
+    {
+        genesis_entity->Zero();
+        if(entity.IsFollowOn())
+        {
+            mc_gState->m_Assets->FindEntityByFollowOn(genesis_entity,txid);
+        }
+        else
+        {
+            memcpy(genesis_entity,&entity,sizeof(mc_EntityDetails));
+        }
+        
+        if(output_level & 0x100)
+        {
+            entry.push_back(Pair("type", "variable"));                        
+        }
+        
+        ptr=(unsigned char *)genesis_entity->GetName();
+        if(ptr && strlen((char*)ptr))
+        {
+            entry.push_back(Pair("name", string((char*)ptr)));            
+        }
+        if(output_level & 0x0004)
+        {
+            entry.push_back(Pair("createtxid", hash.GetHex()));
+        }
+        ptr=(unsigned char *)genesis_entity->GetRef();
+        string assetref="";
+        if(genesis_entity->IsUnconfirmedGenesis())
+        {
+            Value null_value;
+            entry.push_back(Pair("variableref",null_value));
+        }
+        else
+        {
+            assetref += itostr((int)mc_GetLE(ptr,4));
+            assetref += "-";
+            assetref += itostr((int)mc_GetLE(ptr+4,4));
+            assetref += "-";
+            assetref += itostr((int)mc_GetLE(ptr+8,2));
+            entry.push_back(Pair("variableref", assetref));
+        }
+
+        entStat.Zero();
+        memcpy(&entStat,genesis_entity->GetShortRef(),mc_gState->m_NetworkParams->m_AssetRefSize);
+        
+        int history_items=0;
+        
+        last_entity.Zero();
+        if(output_level & 0x0022)
+        {
+            history_items=mc_gState->m_Assets->FindLastEntityByGenesis(&last_entity,genesis_entity);
+            if(history_items)
+            {
+                history_items=mc_GetEntityIndex(&last_entity)+1;
+                entry.push_back(Pair("history",history_items)); 
+                entry.push_back(Pair("value",mc_ExtractValueJSONObject(&last_entity))); 
+            }
+            else
+            {
+                Value null_value;
+                entry.push_back(Pair("history",0)); 
+                entry.push_back(Pair("value",null_value)); 
+            }
+        }
+        
+
+        if(output_level & 0x0020)  
+        {
+            string lasttxid;
+            Array lastwriters;
+            Array issues=VariableHistory(&last_entity,1,history_items-1,output_level | 0x0040,lasttxid,lastwriters);
+//            entry.push_back(Pair("history",issues));                    
+            entry.push_back(Pair("lastwriters",lastwriters));                    
+            entry.push_back(Pair("lasttxid",lasttxid));                    
+        }        
+    }
+    else
+    {
+        Value null_value;
+        entry.push_back(Pair("name",null_value));
+        entry.push_back(Pair("createtxid",null_value));
+        entry.push_back(Pair("variableref", null_value));
     }
     
     return entry;
@@ -3969,6 +4257,10 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
             entity_nameU="Filter";
             entity_nameL="filter";
             break;
+        case MC_ENT_TYPE_VARIABLE:
+            entity_nameU="Variable";
+            entity_nameL="variable";
+            break;
         default:
             entity_nameU="Entity";
             entity_nameL="entity";
@@ -4064,6 +4356,10 @@ bool AssetCompareByRef(Value a,Value b)
         {
             assetref_a=p.value_;
         }
+        if(p.name_ == "variableref")
+        {
+            assetref_a=p.value_;
+        }
     }
 
     BOOST_FOREACH(const Pair& p, b.get_obj()) 
@@ -4077,6 +4373,10 @@ bool AssetCompareByRef(Value a,Value b)
             assetref_b=p.value_;
         }
         if(p.name_ == "filterref")
+        {
+            assetref_b=p.value_;
+        }
+        if(p.name_ == "variableref")
         {
             assetref_b=p.value_;
         }

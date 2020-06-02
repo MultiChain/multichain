@@ -246,6 +246,12 @@ static const std::string vAPINames[] =
 "listfeeds",
 "getdatarefdata", 
 "datareftobinarycache"
+"listvariables"
+"getvariableinfo"
+"setvariablevalue"
+"setvariablevaluefrom"
+"getvariablevalue"
+"getvariablehistory"
 };
 
 static const CRPCConvertParam vRPCConvertParams[] =
@@ -291,6 +297,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "issuemore", 4 },                                                            
     { "getassetinfo", 1 },                                                            
     { "getstreaminfo", 1 },                                                            
+    { "getvariableinfo", 1 },                                                            
     { "getfiltertxinput", 0 },                                                            
     { "listassets", 0 },
     { "listassets", 1 },                                                            
@@ -300,6 +307,13 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "liststreams", 1 },                                                            
     { "liststreams", 2 },                                                            
     { "liststreams", 3 },                                                            
+    { "listvariables", 0 },
+    { "listvariables", 1 },                                                            
+    { "listvariables", 2 },                                                            
+    { "listvariables", 3 },                                                            
+    { "getvariablehistory", 1 },                                                            
+    { "getvariablehistory", 2 },                                                            
+    { "getvariablehistory", 3 },                                                            
     { "listupgrades", 0 },
     { "listupgrades", 1 },                                                            
     { "listupgrades", 2 },                                                            
@@ -544,6 +558,8 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "getdatarefdata", 2 },
     { "datareftobinarycache", 2 },
     { "datareftobinarycache", 3 },
+    { "setvariablevaluefrom", 2 },                                                            
+    { "setvariablevalue", 1 },                                                            
 };
 
 class CRPCConvertTable
@@ -637,6 +653,7 @@ static const CRPCConvertParamMayBeString vRPCConvertParamsMayBeString[] =
     { "liststreamtxitems", 1 },
     { "listassets", 0 },
     { "liststreams", 0 },
+    { "listvariables", 0 },
     { "listupgrades", 0 },
     { "listtxfilters", 0 },                                                            
     { "liststreamfilters", 0 },                                                            
@@ -654,6 +671,8 @@ static const CRPCConvertParamMayBeString vRPCConvertParamsMayBeString[] =
     { "addtofeed", 1 },
     { "updatefeed", 1 },
     { "listfeeds", 0 },
+    { "setvariablevaluefrom", 2 },                                                            
+    { "setvariablevalue", 1 },                                                                
 };
 
 class CRPCConvertTableMayBeString

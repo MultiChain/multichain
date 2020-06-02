@@ -48,6 +48,8 @@ using namespace json_spirit;
 #define MC_DATA_API_PARAM_TYPE_RAW             0x00000200
 #define MC_DATA_API_PARAM_TYPE_FORMATTED       0x00000400
 #define MC_DATA_API_PARAM_TYPE_CIS             0x00001000
+#define MC_DATA_API_PARAM_TYPE_CREATE_VAR      0x00010000
+#define MC_DATA_API_PARAM_TYPE_UPDATE_VAR      0x00020000
 
 #define MC_DATA_API_PARAM_TYPE_SIMPLE          0x00000602
 #define MC_DATA_API_PARAM_TYPE_ALL             0xFFFFFFFF
@@ -79,6 +81,8 @@ using namespace json_spirit;
 #define MC_OST_ERROR_NOT_SUPPORTED             0x00040000
 #define MC_OST_ERROR_MASK                      0x00FF0000
 #define MC_OST_CONTROL_NO_DATA                 0x01000000
+
+#define MC_AST_MAX_NOT_EXTENDED_VARIABLE_SIZE   32767
 
 
 // codes for allowed_objects fields    
@@ -122,6 +126,8 @@ Value OpReturnFormatEntry(const unsigned char *elem,size_t elem_size,uint256 txi
 Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uint32_t stream_output_level);
 Object FilterEntry(const unsigned char *txid,uint32_t output_level,uint32_t filter_type);
 Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_level);
+Object VariableEntry(const unsigned char *txid,uint32_t output_level);
+Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t output_level);
 string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript,int *eErrorCode);
 bool FindPreparedTxOut(CTxOut& txout,COutPoint outpoint,string& reason);
 bool GetTxInputsAsTxOuts(const CTransaction& tx, vector <CTxOut>& inputs, vector <string>& errors,string& reason);
@@ -142,9 +148,12 @@ int ParseRescanParameter(Value rescan_identifier, bool *fRescan);
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);
 vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_format,mc_Script *lpDetailsScript,uint32_t in_options,uint32_t *out_options,int *errorCode,string *strError);
 void ParseRawDetails(const Value *value,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError);
+void ParseRawValue(const Value *value,mc_Script *lpDetails,mc_Script *lpDetailsScript,size_t *max_size,int *errorCode,string *strError);
 bool mc_IsJsonObjectForMerge(const Value *value,int level);
 Value mc_MergeValues(const Value *value1,const Value *value2,uint32_t mode,int level,int *error);
 Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total);
+Value mc_ExtractValueJSONObject(mc_EntityDetails *lpEnt);
+int mc_GetEntityIndex(mc_EntityDetails *lpEnt);
 void AppendOffChainFormatData(uint32_t data_format,uint32_t out_options,mc_Script *lpDetailsScript,vector<unsigned char>& vValue,vector<uint256>* vChunkHashes,int *errorCode,string *strError);
 int mc_BinaryCacheFile(string id,int mode);
 void mc_RemoveBinaryCacheFile(string id);

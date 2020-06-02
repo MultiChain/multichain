@@ -3227,6 +3227,7 @@ static CBlockIndex* FindMostWorkChain() {
                     if(work == max_work)
                     {
                         max_count++;
+                        VerifyBlockMiner(NULL,pindex);                          // Optimization in case of very long forks - start from the end
                     }                            
                 }
                 if(max_count>1)
@@ -3301,7 +3302,7 @@ static CBlockIndex* FindMostWorkChain() {
                         setDirtyBlockIndex.insert(pindexCandidate);
                     }
                 }
-        
+
                 
 //                if(!fLocked)
                 if(pindexCandidate->fPassedMinerPrecheck)

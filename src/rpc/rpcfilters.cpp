@@ -682,7 +682,7 @@ Value getfiltercode(const Array& params, bool fHelp)
     
     char *ptr;
     size_t value_size;
-    char filter_code[MC_ENT_MAX_SCRIPT_SIZE+1];
+    string filter_code="";
     
     ptr=(char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
 
@@ -693,12 +693,10 @@ Value getfiltercode(const Array& params, bool fHelp)
 
     if(value_size)
     {
-        memcpy(filter_code,ptr,value_size);
-        
+        filter_code.assign(ptr,value_size);        
     }
-    filter_code[value_size]=0x00;
-
-    return string(filter_code);
+    
+    return filter_code;
 }
 
 Value getfiltertxid(const Array& params, bool fHelp)
@@ -967,7 +965,7 @@ Value runtxfilter(const json_spirit::Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Wrong filter type");                                
     }
     
-    char filter_code[MC_ENT_MAX_SCRIPT_SIZE+1];
+    string filter_code="";
     std::vector <uint160> entities;   
     unsigned char *ptr;
     size_t value_size;
@@ -989,8 +987,10 @@ Value runtxfilter(const json_spirit::Array& params, bool fHelp)
     
     if(ptr)
     {
-        memcpy(filter_code,ptr,value_size);
-        filter_code[value_size]=0x00;    
+        if(value_size)
+        {
+            filter_code.assign((char*)ptr,value_size);        
+        }
     }                                    
 
 /*    
@@ -1007,7 +1007,7 @@ Value runtxfilter(const json_spirit::Array& params, bool fHelp)
         }
     }
 */    
-    return testfilter(entities, (char *)filter_code, (params.size() > 1) ? params[1] : Value::null, -1, MC_FLT_TYPE_TX);
+    return testfilter(entities, filter_code.c_str(), (params.size() > 1) ? params[1] : Value::null, -1, MC_FLT_TYPE_TX);
 }
 
 Value testtxfilter(const json_spirit::Array& params, bool fHelp)
@@ -1066,7 +1066,7 @@ Value runstreamfilter(const json_spirit::Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Wrong filter type");                                
     }
     
-    char filter_code[MC_ENT_MAX_SCRIPT_SIZE+1];
+    string filter_code="";
     std::vector <uint160> entities;   
     unsigned char *ptr;
     size_t value_size;
@@ -1089,8 +1089,10 @@ Value runstreamfilter(const json_spirit::Array& params, bool fHelp)
     
     if(ptr)
     {
-        memcpy(filter_code,ptr,value_size);
-        filter_code[value_size]=0x00;    
+        if(value_size)
+        {
+            filter_code.assign((char*)ptr,value_size);        
+        }
     }                                    
     
     if(params.size() > 2)
@@ -1116,7 +1118,7 @@ Value runstreamfilter(const json_spirit::Array& params, bool fHelp)
         }
     }
 */    
-    return testfilter(entities, (char *)filter_code, (params.size() > 1) ? params[1] : Value::null, vout, MC_FLT_TYPE_STREAM);
+    return testfilter(entities, filter_code.c_str(), (params.size() > 1) ? params[1] : Value::null, vout, MC_FLT_TYPE_STREAM);
 }
 
 Value teststreamfilter(const json_spirit::Array& params, bool fHelp)

@@ -68,6 +68,10 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     {
                         this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_FILTER;
                     }
+                    if(d.value_.get_str() == "variable")
+                    {
+                        this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_VAR;
+                    }
                 }
                 if(this_param_type == MC_DATA_API_PARAM_TYPE_NONE)
                 {
@@ -79,8 +83,23 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
             {
                 if(d.value_.type() != null_type && !d.value_.get_str().empty())
                 {
-                    ParseEntityIdentifier(d.value_,entity, MC_ENT_TYPE_ASSET);       
+                    ParseEntityIdentifier(d.value_,entity, MC_ENT_TYPE_ANY);       
+                    if(entity->GetEntityType() == MC_ENT_TYPE_ASSET)
+                    {
+                        this_param_type=MC_DATA_API_PARAM_TYPE_FOLLOWON;                
+                    }
+                    if(entity->GetEntityType() == MC_ENT_TYPE_VARIABLE)
+                    {
+                        this_param_type=MC_DATA_API_PARAM_TYPE_UPDATE_VAR;                
+                    }
                 }
+                if(this_param_type == MC_DATA_API_PARAM_TYPE_NONE)
+                {
+                    *strError=string("Asset or variable with this identifier not found");                            
+                    *errorCode=RPC_ENTITY_NOT_FOUND;
+                    goto exitlbl;                        
+                    }
+/*                
                 if(entity->GetEntityType() != MC_ENT_TYPE_ASSET)
                 {
                     *strError=string("Asset with this identifier not found");                                                           
@@ -88,6 +107,7 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     goto exitlbl;                        
                 }                
                 this_param_type=MC_DATA_API_PARAM_TYPE_FOLLOWON;                
+ */ 
             }
             if(d.name_ == "for")
             {
@@ -480,6 +500,32 @@ void ParseRawDetails(const Value *value,mc_Script *lpDetails,mc_Script *lpDetail
     }    
 }
 
+void ParseRawValue(const Value *value,mc_Script *lpDetails,mc_Script *lpDetailsScript,size_t *max_size,int *errorCode,string *strError)
+{
+    size_t bytes;
+    int err;
+    const unsigned char *script;
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();
+    if((err = ubjson_write(*value,lpDetailsScript,MAX_FORMATTED_DATA_DEPTH)) != MC_ERR_NOERROR)
+    {
+        *strError=string("Couldn't transfer value JSON  to internal UBJSON format");    
+    }
+    else
+    {
+        script = lpDetailsScript->GetData(0,&bytes);
+        if(max_size)
+        {
+            if(bytes > *max_size)
+            {
+                *max_size=bytes;
+                return;
+            }
+        }
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_JSON_VALUE,script,bytes);            
+    }
+}
+
 CScript RawDataScriptFormatted(Value *param,uint32_t *data_format,mc_Script *lpDetailsScript,int *errorCode,string *strError)
 {
     CScript scriptOpReturn=CScript();
@@ -820,7 +866,7 @@ CScript RawDataScriptCreateStream(Value *param,mc_Script *lpDetails,mc_Script *l
         {
             if(!missing_name)
             {
-                *strError=string("open field can appear only once in the object");                                                                                                        
+                *strError=string("name field can appear only once in the object");                                                                                                        
             }
             if(d.value_.type() != null_type && !d.value_.get_str().empty())
             {
@@ -1124,7 +1170,7 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
         {
             if(!missing_name)
             {
-                *strError=string("open field can appear only once in the object");                                                                                                        
+                *strError=string("name field can appear only once in the object");                                                                                                        
             }
             if(d.value_.type() != null_type && !d.value_.get_str().empty())
             {
@@ -1310,7 +1356,7 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
         {
             if(!missing_name)
             {
-                *strError=string("open field can appear only once in the object");                                                                                                        
+                *strError=string("name field can appear only once in the object");                                                                                                        
             }
             if(d.value_.type() != null_type && !d.value_.get_str().empty())
             {
@@ -1470,6 +1516,200 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
     
     return scriptOpReturn;
 }
+
+CScript RawDataScriptCreateVariable(Value *param,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError)
+{
+    CScript scriptOpReturn=CScript();
+    bool field_parsed;
+    size_t bytes;
+    const unsigned char *script;
+    string entity_name;
+    bool js_extended=false;
+    Value varvalue=Value::null;
+    size_t elem_size;
+    const unsigned char *elem;
+
+    bool missing_name=true;
+    bool missing_value=true;
+    
+    lpDetails->Clear();
+    lpDetails->AddElement();                   
+
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();                   
+        
+    unsigned char b=1;        
+    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);
+    
+    BOOST_FOREACH(const Pair& d, param->get_obj()) 
+    {
+        field_parsed=false;
+        if(d.name_ == "name")
+        {
+            if(!missing_name)
+            {
+                *strError=string("name field can appear only once in the object");                                                                                                        
+            }
+            if(d.value_.type() != null_type && !d.value_.get_str().empty())
+            {
+                entity_name=d.value_.get_str();
+                if(entity_name.size())
+                {
+                    if(entity_name.size() > MC_ENT_MAX_NAME_SIZE)
+                    {
+                        *strError=string("Invalid variable name - too long"); 
+                    }
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());
+                }
+            }
+            else
+            {
+                *strError=string("Invalid name");                            
+            }
+            missing_name=false;
+            field_parsed=true;
+        }        
+        if(d.name_ == "value")
+        {
+            if(!missing_value)
+            {
+                *strError=string("value field can appear only once in the object");                                                                                                        
+            }
+            size_t max_size=MC_AST_MAX_NOT_EXTENDED_VARIABLE_SIZE;
+            lpDetailsScript->Clear();
+            ParseRawValue(&(d.value_),lpDetails,lpDetailsScript,&max_size,errorCode,strError);        
+            if(max_size > MC_AST_MAX_NOT_EXTENDED_VARIABLE_SIZE)
+            {
+                js_extended=true;
+                varvalue=d.value_;
+            }
+            lpDetailsScript->Clear();
+            
+            missing_value=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "create")field_parsed=true;
+        if(!field_parsed)
+        {
+            *strError=strprintf("Invalid field: %s",d.name_.c_str());
+        }
+    }    
+    
+    if(strError->size() == 0)
+    {
+        int err;
+        script=lpDetails->GetData(0,&bytes);
+        lpDetailsScript->Clear();
+        err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_VARIABLE,0,script,bytes);
+        if(err)
+        {
+            *strError=string("Invalid value, too long");                                                            
+        }
+        else
+        {
+            script = lpDetailsScript->GetData(0,&bytes);
+            scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+            if(js_extended)
+            {
+                lpDetails->Clear();
+                lpDetails->AddElement();
+                ParseRawValue(&(varvalue),lpDetails,lpDetailsScript,NULL,errorCode,strError);        
+
+                elem=lpDetails->GetData(0,&elem_size);
+                lpDetailsScript->Clear();
+                lpDetailsScript->SetExtendedDetails(elem,elem_size);
+                elem = lpDetailsScript->GetData(0,&elem_size);
+                scriptOpReturn << vector<unsigned char>(elem, elem + elem_size);
+            }                    
+        }        
+    }
+    
+    return scriptOpReturn;
+}
+
+CScript RawDataScriptUpdateVariable(Value *param,mc_EntityDetails *entity,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError)
+{
+    CScript scriptOpReturn=CScript();
+    bool field_parsed;
+    size_t bytes;
+    const unsigned char *script;
+    bool js_extended=false;
+    Value varvalue=Value::null;
+    size_t elem_size;
+    const unsigned char *elem;
+    int err;
+
+    bool missing_value=true;
+    
+    lpDetails->Clear();
+    lpDetails->AddElement();                   
+
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();                   
+    
+    BOOST_FOREACH(const Pair& d, param->get_obj()) 
+    {
+        field_parsed=false;
+        if(d.name_ == "value")
+        {
+            if(!missing_value)
+            {
+                *strError=string("value field can appear only once in the object");                                                                                                        
+            }
+            size_t max_size=MC_AST_MAX_NOT_EXTENDED_VARIABLE_SIZE;
+            lpDetailsScript->Clear();
+            ParseRawValue(&(d.value_),lpDetails,lpDetailsScript,&max_size,errorCode,strError);        
+            if(max_size > MC_AST_MAX_NOT_EXTENDED_VARIABLE_SIZE)
+            {
+                js_extended=true;
+                varvalue=d.value_;
+            }
+            lpDetailsScript->Clear();
+            
+            missing_value=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "update")field_parsed=true;
+        if(!field_parsed)
+        {
+            *strError=strprintf("Invalid field: %s",d.name_.c_str());;                                
+        }
+    }    
+    
+    lpDetailsScript->Clear();
+    lpDetailsScript->SetEntity(entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET);
+    script = lpDetailsScript->GetData(0,&bytes);
+    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
+
+    lpDetailsScript->Clear();
+    script=lpDetails->GetData(0,&bytes);
+    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_VARIABLE,1,script,bytes);
+    if(err)
+    {
+        *strError=string("Invalid custom fields, too long");                                                            
+    }
+    else
+    {
+        script = lpDetailsScript->GetData(0,&bytes);
+        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+        if(js_extended)
+        {
+            lpDetails->Clear();
+            lpDetails->AddElement();
+            ParseRawValue(&(varvalue),lpDetails,lpDetailsScript,NULL,errorCode,strError);        
+
+            elem=lpDetails->GetData(0,&elem_size);
+            lpDetailsScript->Clear();
+            lpDetailsScript->SetExtendedDetails(elem,elem_size);
+            elem = lpDetailsScript->GetData(0,&elem_size);
+            scriptOpReturn << vector<unsigned char>(elem, elem + elem_size);
+        }                    
+    }
+    
+    return scriptOpReturn;
+}
+
+
 
 CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *data_format,mc_Script *lpDetailsScript,vector<uint256>* vChunkHashes,int *errorCode,string *strError)
 {
@@ -1926,6 +2166,12 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             break;
         case MC_DATA_API_PARAM_TYPE_CREATE_FILTER:
             scriptOpReturn=RawDataScriptCreateFilter(&param,lpDetails,lpDetailsScript,&errorCode,&strError);
+            break;
+        case MC_DATA_API_PARAM_TYPE_CREATE_VAR:
+            scriptOpReturn=RawDataScriptCreateVariable(&param,lpDetails,lpDetailsScript,&errorCode,&strError);
+            break;
+        case MC_DATA_API_PARAM_TYPE_UPDATE_VAR:
+            scriptOpReturn=RawDataScriptUpdateVariable(&param,&entity,lpDetails,lpDetailsScript,&errorCode,&strError);
             break;
         case MC_DATA_API_PARAM_TYPE_APPROVAL:
             scriptOpReturn=RawDataScriptApprove(&param,&entity,lpDetailsScript,&errorCode,&strError);

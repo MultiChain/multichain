@@ -101,14 +101,45 @@ bool static LookupIntern(const char *pszName, std::vector<CNetAddr>& vIP, unsign
             return true;
         }
     }
+
+    struct in_addr ipv4_addr;
+#ifdef HAVE_GETADDRINFO_A
+#ifdef HAVE_INET_PTON
     
+    if (inet_pton(AF_INET, pszName, &ipv4_addr) > 0) {
+        vIP.push_back(CNetAddr(ipv4_addr));
+        return true;
+    }
+
+    struct in6_addr ipv6_addr;
+    if (inet_pton(AF_INET6, pszName, &ipv6_addr) > 0) {
+        vIP.push_back(CNetAddr(ipv6_addr));
+        return true;
+    }
+
+#else
+    ipv4_addr.s_addr = inet_addr(pszName);
+    if (ipv4_addr.s_addr != INADDR_NONE) {
+        vIP.push_back(CNetAddr(ipv4_addr));
+        return true;
+    }
+#endif
+#else
+    ipv4_addr.s_addr = inet_addr(pszName);
+    if (ipv4_addr.s_addr != INADDR_NONE) {
+        vIP.push_back(CNetAddr(ipv4_addr));
+        return true;
+    }
+#endif
+
+/*    
     struct in_addr ipv4_addr;
     ipv4_addr.s_addr = inet_addr(pszName);
     if (ipv4_addr.s_addr != INADDR_NONE) {
         vIP.push_back(CNetAddr(ipv4_addr));
         return true;
     }
-    
+*/
     if(nMainThreadID != __US_ThreadID())
     {
         LogPrintf("ERROR: Calling address lookup for %s from secondary thread, please report this\n",pszName);
