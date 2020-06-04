@@ -1255,7 +1255,7 @@ int mc_AssetDB::InsertAssetFollowOn(const void* txid, int offset, uint64_t quant
         {
             mc_EntityLedgerRow* row=(mc_EntityLedgerRow*)(m_MemPool->GetRow(i));
             size=m_Ledger->m_TotalSize+mc_AllocSize(row->m_ScriptSize+row->m_ExtendedScript,m_Ledger->m_TotalSize,1);
-            if( ((mc_EntityLedgerRow*)(m_MemPool->GetRow(i)))->m_KeyType == (MC_ENT_KEYTYPE_FOLLOW_ON | MC_ENT_KEYTYPE_TXID) )
+            if( ((mc_EntityLedgerRow*)(m_MemPool->GetRow(i)))->m_KeyType & MC_ENT_KEYTYPE_FOLLOW_ON )
             {
                 if(((mc_EntityLedgerRow*)(m_MemPool->GetRow(i)))->m_FirstPos == first_pos)
                 {
@@ -1269,7 +1269,11 @@ int mc_AssetDB::InsertAssetFollowOn(const void* txid, int offset, uint64_t quant
     
     aldRow.Zero();
     memcpy(aldRow.m_Key,txid,MC_ENT_KEY_SIZE);
-    aldRow.m_KeyType=MC_ENT_KEYTYPE_FOLLOW_ON | MC_ENT_KEYTYPE_TXID;
+    aldRow.m_KeyType=MC_ENT_KEYTYPE_FOLLOW_ON | MC_ENT_KEYTYPE_TXID;    
+    if(entity_type == MC_ENT_TYPE_VARIABLE)
+    {
+        aldRow.m_KeyType |= MC_ENT_KEYTYPE_FOLLOW_MULTI;
+    }
     aldRow.m_Block=m_Block+1;
     aldRow.m_Offset=offset;
     if(offset<0)
@@ -1314,7 +1318,7 @@ int mc_AssetDB::InsertAssetFollowOn(const void* txid, int offset, uint64_t quant
     
     delete lpDetails;
     
-    for(pass=0;pass<1+update_mempool;pass++)
+    for(pass=1;pass<1+update_mempool;pass++)
     {
         if(pass)
         {
@@ -1367,7 +1371,7 @@ int mc_AssetDB::Commit()
                     {
                         m_Pos+=size;
                         aldRow.m_PrevPos=m_PrevPos;
-                        if(aldRow.m_KeyType == (MC_ENT_KEYTYPE_FOLLOW_ON | MC_ENT_KEYTYPE_TXID))
+                        if(aldRow.m_KeyType & MC_ENT_KEYTYPE_FOLLOW_ON)
                         {
                             if(aldRow.m_FirstPos < 0)
                             {
@@ -1585,7 +1589,7 @@ int mc_AssetDB::RollBack(int block)
             
             if(err == MC_ERR_NOERROR)
             {
-                if(aldRow.m_KeyType == (MC_ENT_KEYTYPE_FOLLOW_ON | MC_ENT_KEYTYPE_TXID))
+                if( aldRow.m_KeyType  & MC_ENT_KEYTYPE_FOLLOW_ON )
                 {
                     new_chain_pos=aldRow.m_LastPos;
                     err=m_Ledger->GetRow(aldRow.m_FirstPos,&aldRow);                        
@@ -2119,7 +2123,26 @@ int mc_EntityDetails::AllowedFollowOns()
     {
         if((bytes>0) && (bytes<=4))
         {
-            return (int)mc_GetLE(ptr,bytes);
+            return (int)mc_GetLE(ptr,bytes) & 0x01;
+        }
+    }
+    return 0;
+}
+
+int mc_EntityDetails::AnyoneCanIssueMore()
+{
+    if(mc_gState->m_Features->AnyoneCanIssueMore() == 0)
+    {
+        return 0;
+    }
+    unsigned char *ptr;
+    size_t bytes;
+    ptr=(unsigned char *)GetSpecialParam(MC_ENT_SPRM_FOLLOW_ONS,&bytes);
+    if(ptr)
+    {
+        if((bytes>0) && (bytes<=4))
+        {
+            return (int)mc_GetLE(ptr,bytes) & 0x02;
         }
     }
     return 0;
@@ -2833,6 +2856,7 @@ mc_Buffer *mc_AssetDB::GetFollowOns(const void* txid)
 
 mc_Buffer *mc_AssetDB::GetFollowOnsByLastEntity(mc_EntityDetails *last_entity,int count,int start)
 {
+    mc_EntityDetails entity;
     mc_EntityLedgerRow aldRow;
     int64_t pos,first_pos;
     int take_it,i,size;
@@ -2840,7 +2864,7 @@ mc_Buffer *mc_AssetDB::GetFollowOnsByLastEntity(mc_EntityDetails *last_entity,in
     
     result=new mc_Buffer;
         
-    result->Initialize(MC_ENT_KEY_SIZE,MC_ENT_KEY_SIZE,MC_BUF_MODE_DEFAULT);
+    result->Initialize(sizeof(mc_EntityDetails),sizeof(mc_EntityDetails),MC_BUF_MODE_DEFAULT);
 
     result->Clear();
     
@@ -2862,8 +2886,9 @@ mc_Buffer *mc_AssetDB::GetFollowOnsByLastEntity(mc_EntityDetails *last_entity,in
                 {
                     if(aldRow.m_FirstPos == first_pos)
                     {
-                        pos=aldRow.m_LastPos;            
-                        result->Add(aldRow.m_Key,NULL);                
+                        pos=aldRow.m_LastPos;
+                        entity.Set(&aldRow);
+                        result->Add(&entity,NULL);                
                         size++;
                         if(size >= count)
                         {
@@ -2883,7 +2908,9 @@ mc_Buffer *mc_AssetDB::GetFollowOnsByLastEntity(mc_EntityDetails *last_entity,in
             while(take_it)
             {
                 m_Ledger->GetRow(pos,&aldRow);
-                result->Add(aldRow.m_Key,NULL);
+                entity.Set(&aldRow);
+                result->Add(&entity,NULL);                
+//                result->Add(aldRow.m_Key,NULL);
                 size++;
                 if(pos != first_pos)
                 {

@@ -586,9 +586,10 @@ exitlbl:
 
 Value createfromcmd(const Array& params, bool fHelp)
 {
+/*    
     if (fHelp || params.size() < 4)
         throw runtime_error("Help message not found\n");
-    
+*/    
     if (strcmp(params[1].get_str().c_str(),"stream") == 0)
     {
         return createstreamfromcmd(params,fHelp);    
@@ -616,9 +617,10 @@ Value createfromcmd(const Array& params, bool fHelp)
 
 Value createcmd(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 3)
+/*    
+    if (fHelp || params.size() < 2)
         throw runtime_error("Help message not found\n");
-    
+*/        
     Array ext_params;
     ext_params.push_back("*");
     BOOST_FOREACH(const Value& value, params)

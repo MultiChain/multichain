@@ -164,6 +164,7 @@ typedef struct mc_Features
     int ExtendedEntityDetails();
     int FixedSpendingBigScripts();
     int Variables();
+    int AnyoneCanIssueMore();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo

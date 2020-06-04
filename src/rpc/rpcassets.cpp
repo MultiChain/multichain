@@ -126,6 +126,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
     int ret,type;
     string asset_name="";
     bool is_open=false;
+    bool is_anyone_can_issuemore=false;
     bool name_is_found=false;
     uint32_t permissions=0;
     
@@ -153,6 +154,24 @@ Value issuefromcmd(const Array& params, bool fHelp)
                     else
                     {
                         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'open' field, should be boolean");                                                                
+                    }
+                }
+                if(s.name_ == "anyone-can-issuemore")
+                {
+                    if(mc_gState->m_Features->AnyoneCanIssueMore())
+                    {
+                        if(s.value_.type() == bool_type)
+                        {
+                            is_anyone_can_issuemore=s.value_.get_bool();
+                        }
+                        else
+                        {
+                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'anyone-can-issuemore' field, should be boolean");                                                                
+                        }
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "anyone-can-issuemore flag is not supported in this protocol version");                                                                                        
                     }
                 }
                 if(s.name_ == "restrict")
@@ -223,6 +242,10 @@ Value issuefromcmd(const Array& params, bool fHelp)
     if(is_open)
     {
         unsigned char b=1;        
+        if(is_anyone_can_issuemore)
+        {
+            b |= 0x02;
+        }
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);
     }
     
@@ -544,13 +567,16 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
                 CKeyID *lpKeyID=boost::get<CKeyID> (&fromaddresses[0]);
                 if(lpKeyID != NULL)
                 {
-                    if(mc_gState->m_Permissions->CanIssue(entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
+                    if(entity.AnyoneCanIssueMore() == 0)
                     {
-                        strError= "Issuing more units for this asset is not allowed from this address";
-                        errorCode=RPC_INSUFFICIENT_PERMISSIONS;
-                        goto exitlbl;
-//                        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Issuing more units for this asset is not allowed from this address");                                                                        
-                    }                                                 
+                        if(mc_gState->m_Permissions->CanIssue(entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
+                        {
+                            strError= "Issuing more units for this asset is not allowed from this address";
+                            errorCode=RPC_INSUFFICIENT_PERMISSIONS;
+                            goto exitlbl;
+    //                        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Issuing more units for this asset is not allowed from this address");                                                                        
+                        }                                                 
+                    }
                 }
                 else
                 {
@@ -562,19 +588,26 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
             else
             {
                 bool issuer_found=false;
-                BOOST_FOREACH(const PAIRTYPE(CBitcoinAddress, CAddressBookData)& item, pwalletMain->mapAddressBook)
+                if(entity.AnyoneCanIssueMore() == 0)
                 {
-                    const CBitcoinAddress& address = item.first;
-                    CKeyID keyID;
-
-                    if(address.GetKeyID(keyID))
+                    BOOST_FOREACH(const PAIRTYPE(CBitcoinAddress, CAddressBookData)& item, pwalletMain->mapAddressBook)
                     {
-                        if(mc_gState->m_Permissions->CanIssue(entity.GetTxID(),(unsigned char*)(&keyID)))
+                        const CBitcoinAddress& address = item.first;
+                        CKeyID keyID;
+
+                        if(address.GetKeyID(keyID))
                         {
-                            issuer_found=true;
+                            if(mc_gState->m_Permissions->CanIssue(entity.GetTxID(),(unsigned char*)(&keyID)))
+                            {
+                                issuer_found=true;
+                            }
                         }
-                    }
-                }                    
+                    }                    
+                }
+                else
+                {
+                    issuer_found=true;                    
+                }
                 if(!issuer_found)
                 {
                     strError= "Issuing more units for this asset is not allowed from this wallet";

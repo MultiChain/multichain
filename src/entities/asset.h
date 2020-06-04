@@ -49,6 +49,7 @@
 #define MC_ENT_KEYTYPE_SHORT_TXID     0x00000004
 #define MC_ENT_KEYTYPE_MASK           0x000000FF
 #define MC_ENT_KEYTYPE_FOLLOW_ON      0x00000100
+#define MC_ENT_KEYTYPE_FOLLOW_MULTI   0x00000200
 
 #define MC_ENT_TYPE_ANY               0xFF
 #define MC_ENT_TYPE_NONE              0x00
@@ -69,6 +70,7 @@
 #define MC_ENT_SPRM_PERMISSIONS               0x06
 #define MC_ENT_SPRM_RESTRICTIONS              0x07
 #define MC_ENT_SPRM_JSON_VALUE                0x08
+#define MC_ENT_SPRM_VOUT                      0x09
 
 #define MC_ENT_SPRM_ASSET_MULTIPLE            0x41                              // Entity-specific parameters
 #define MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION  0x42
@@ -211,6 +213,7 @@ typedef struct mc_EntityDetails
     int IsFollowOn(); 
 //    int HasFollowOns(); 
     int AllowedFollowOns(); 
+    int AnyoneCanIssueMore(); 
     uint32_t Permissions(); 
     uint32_t Restrictions(); 
     int AnyoneCanWrite(); 

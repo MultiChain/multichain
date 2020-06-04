@@ -772,33 +772,10 @@ bool MultiChainTransaction_CheckAssetUpdateDetails(mc_EntityDetails *entity,
         }
         if(details->new_entity_type != MC_ENT_TYPE_ASSET)
         {
-            if((mc_gState->m_Features->Variables() == 0) || (details->new_entity_type != MC_ENT_TYPE_VARIABLE))
-            {
-                reason="Metadata script rejected - entity type mismatch in update script";
-                return false;
-            }
+            reason="Metadata script rejected - entity type mismatch in update script";
+            return false;
         }      
-        details->details_script_type=entity_update;
-        
-        if(mc_gState->m_Features->Variables())
-        {
-            unsigned char *ptr;
-            size_t bytes;        
-            mc_gState->m_TmpScript->SetElement(2);
-            err=mc_gState->m_TmpScript->GetExtendedDetails(&ptr,&bytes);
-            if(err == 0)
-            {
-                if(bytes)
-                {
-                    if(mc_gState->m_Features->ExtendedEntityDetails())
-                    {
-                        details->extended_script_row=mc_gState->m_Assets->m_ExtendedScripts->GetNumElements();
-                        mc_gState->m_Assets->m_ExtendedScripts->AddElement();
-                        mc_gState->m_Assets->m_ExtendedScripts->SetData(ptr,bytes);
-                    }                
-                }
-            }
-        }        
+        details->details_script_type=entity_update;        
     }          
     else
     {
@@ -807,6 +784,195 @@ bool MultiChainTransaction_CheckAssetUpdateDetails(mc_EntityDetails *entity,
     }
                                                                                 // The script itself will be processed later
     details->vOutputScriptFlags[vout] |= MC_MTX_OUTPUT_DETAIL_FLAG_FOLLOWON_DETAILS;
+    return true;
+}
+
+bool MultiChainTransaction_CheckVariableUpdateDetails(const CTransaction& tx,
+                                                   mc_EntityDetails *entity,
+                                                   int offset, 
+                                                   int vout,
+                                                   CMultiChainTxDetails *details,   
+                                                   string& reason)      
+{
+    int err;
+    int entity_update;
+    unsigned char details_script[MC_ENT_MAX_SCRIPT_SIZE];                       
+    int details_script_size;                                                    
+    int extended_script_row;                                                    
+    uint32_t new_entity_type;                                                   
+    int64_t total,last_total,left_position;
+    int32_t chain_size;
+    vector <uint160> issuers;
+    vector <uint32_t> issuer_flags;
+    uint32_t flags;
+    uint256 txid;
+    
+    if(mc_gState->m_TmpScript->GetNumElements() > 3)                            
+    {
+        reason="Metadata script rejected - too many elements in asset update script";
+        return false;
+    }
+    
+    if(mc_gState->m_Features->Variables() == 0)
+    {
+        reason="Metadata script rejected - variables not supported in this protocol version";
+        return false;        
+    }
+    
+    mc_gState->m_TmpScript->SetElement(1);
+    
+    extended_script_row=0;
+    
+    err=mc_gState->m_TmpScript->GetNewEntityType(&new_entity_type,&entity_update,details_script,&details_script_size);
+    
+    if(err == 0)    
+    {
+        if(entity_update == 0)
+        {
+            reason="Metadata script rejected - wrong element, should be entity update";
+            return false;
+        }
+        if(new_entity_type != MC_ENT_TYPE_VARIABLE)
+        {
+            reason="Metadata script rejected - entity type mismatch in update script, should be variable";
+            return false;
+        }      
+        
+        unsigned char *ptr;
+        size_t bytes;        
+        mc_gState->m_TmpScript->SetElement(2);
+        err=mc_gState->m_TmpScript->GetExtendedDetails(&ptr,&bytes);
+        if(err == 0)
+        {
+            if(bytes)
+            {
+                if(mc_gState->m_Features->ExtendedEntityDetails())
+                {
+                    extended_script_row=mc_gState->m_Assets->m_ExtendedScripts->GetNumElements();
+                    mc_gState->m_Assets->m_ExtendedScripts->AddElement();
+                    mc_gState->m_Assets->m_ExtendedScripts->SetData(ptr,bytes);
+                }                
+            }
+        }
+    }          
+    else
+    {
+        reason="Metadata script rejected - wrong element, should be entity update";
+        return false;
+    }
+    
+    if(entity->AllowedFollowOns() == 0)
+    {
+        reason="Asset follow-on script rejected - follow-ons not allowed for this asset";
+        return false;                                                                                    
+    }
+    details->SetRelevantEntity((unsigned char*)entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET);
+
+    total=0;
+    left_position=0;
+    chain_size=0;
+    last_total=mc_gState->m_Assets->GetTotalQuantity(entity,&chain_size);
+    if(chain_size > 0)
+    {
+        left_position=mc_gState->m_Assets->GetChainLeftPosition(entity,chain_size);
+    }
+    
+    issuers.clear();                                                            // Creating issuers list
+    for (unsigned int i = 0; i < tx.vin.size(); i++)
+    {
+        if(details->IsRelevantInput(i,details->new_entity_output))
+        {
+            bool can_issue=false;
+            if(mc_gState->m_Permissions->CanWrite(entity->GetTxID(),(unsigned char*)&(details->vInputDestinations[i])))
+            {                            
+                can_issue=true;
+            }    
+            if(can_issue)
+            {
+                issuers.push_back(details->vInputDestinations[i]);
+                flags=MC_PFL_NONE;
+                if(details->vInputScriptTypes[i] == TX_SCRIPTHASH)
+                {
+                    flags |= MC_PFL_IS_SCRIPTHASH;
+                }
+                issuer_flags.push_back(flags);                        
+            }
+        }
+    }        
+
+    if(issuers.size() == 0)
+    {
+        reason="Inputs don't belong to valid creator";            
+        return false;
+    }                
+    
+    err=MC_ERR_NOERROR;
+    
+    mc_gState->m_TmpScript->Clear();
+    mc_gState->m_TmpScript->AddElement();
+    
+    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ASSET_TOTAL,(unsigned char*)&last_total,sizeof(last_total));                            
+
+    if(chain_size >= 0)
+    {
+        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_CHAIN_INDEX,(unsigned char*)&chain_size,sizeof(chain_size));                            
+    }
+
+    if(left_position > 0)
+    {
+        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_LEFT_POSITION,(unsigned char*)&left_position,sizeof(left_position));                            
+    }
+        
+    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_VOUT,(unsigned char*)&vout,sizeof(vout));                            
+    
+    unsigned char issuer_buf[24];
+    memset(issuer_buf,0,sizeof(issuer_buf));
+    set <uint160> stored_issuers;
+
+    for (unsigned int i = 0; i < issuers.size(); i++)                           
+    {
+        if(err == MC_ERR_NOERROR)
+        {
+            if(stored_issuers.count(issuers[i]) == 0)
+            {
+                memcpy(issuer_buf,issuers[i].begin(),sizeof(uint160));
+                mc_PutLE(issuer_buf+sizeof(uint160),&issuer_flags[i],4);
+                if((int)i < mc_gState->m_Assets->MaxStoredIssuers())            // Adding list of issuers to the asset script
+                {
+                    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,sizeof(issuer_buf));            
+                }
+                stored_issuers.insert(issuers[i]);
+            }
+        }
+    }        
+
+    memset(issuer_buf,0,sizeof(issuer_buf));
+    mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,1);                    
+    
+    const unsigned char *special_script;
+    size_t special_script_size=0;
+    special_script=mc_gState->m_TmpScript->GetData(0,&special_script_size);
+    txid=tx.GetHash();
+    err=mc_gState->m_Assets->InsertAssetFollowOn(&txid,offset,total,details_script,details_script_size,special_script,special_script_size,extended_script_row,entity->GetTxID(),1);
+            
+          
+    string entity_type_str="Variable";
+    
+    if(err)           
+    {
+        reason="Variable update script rejected - could not insert new followon to database";
+        return false;                                            
+    }
+        
+    
+    if(offset>=0)
+    {
+        uint256 otxid;
+        memcpy(&otxid,entity->GetTxID(),32);
+        if(fDebug)LogPrint("mchn","Variable update. TxID: %s,  Original %s create txid: %s\n",
+                tx.GetHash().GetHex().c_str(),entity_type_str.c_str(),otxid.GetHex().c_str());
+    }
+    
     return true;
 }
 
@@ -978,9 +1144,19 @@ bool MultiChainTransaction_CheckEntityItem(const CTransaction& tx,
     if((entity.GetEntityType() == MC_ENT_TYPE_ASSET) || 
        (entity.GetEntityType() == MC_ENT_TYPE_VARIABLE))                        // Asset or variable update
     {
-        if(!MultiChainTransaction_CheckAssetUpdateDetails(&entity,vout,details,reason))
+        if(entity.GetEntityType() == MC_ENT_TYPE_ASSET)
         {
-            return false;            
+            if(!MultiChainTransaction_CheckAssetUpdateDetails(&entity,vout,details,reason))
+            {
+                return false;            
+            }
+        }
+        if(entity.GetEntityType() == MC_ENT_TYPE_VARIABLE)
+        {
+            if(!MultiChainTransaction_CheckVariableUpdateDetails(tx,&entity,offset,vout,details,reason))
+            {
+                return false;            
+            }
         }
     }
     else
@@ -2241,21 +2417,24 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     issuers.clear();                                                            // Creating issuers list
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        if(details->vInputHashTypes[i] == SIGHASH_ALL)
+        bool can_issue=false;
+        if(details->new_entity_type == MC_ENT_TYPE_VARIABLE)                   
         {
-            if(details->vInputDestinations[i] != 0)
+            if(details->IsRelevantInput(i,details->new_entity_output))
             {
-                bool can_issue=false;
-                if(new_issue)
+                if(mc_gState->m_Permissions->CanCreate(NULL,(unsigned char*)&(details->vInputDestinations[i])))
+                {                            
+                    can_issue=true;
+                }                                                    
+            }
+        }
+        else
+        {
+            if(details->vInputHashTypes[i] == SIGHASH_ALL)
+            {
+                if(details->vInputDestinations[i] != 0)
                 {
-                    if(details->new_entity_type == MC_ENT_TYPE_VARIABLE)                   
-                    {
-                        if(mc_gState->m_Permissions->CanCreate(NULL,(unsigned char*)&(details->vInputDestinations[i])))
-                        {                            
-                            can_issue=true;
-                        }                                                    
-                    }
-                    else
+                    if(new_issue)
                     {
                         if(mc_gState->m_Permissions->CanIssue(NULL,(unsigned char*)&(details->vInputDestinations[i])))
                         {                            
@@ -2263,35 +2442,32 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                         }                            
                         can_issue |= details->fLicenseTokenIssuance;
                     }
-                }
-                else
-                {
-                    if(details->new_entity_type == MC_ENT_TYPE_VARIABLE)                   
-                    {
-                        if(mc_gState->m_Permissions->CanWrite(entity.GetTxID(),(unsigned char*)&(details->vInputDestinations[i])))
-                        {                            
-                            can_issue=true;
-                        }    
-                    }
                     else
                     {
-                        if(mc_gState->m_Permissions->CanIssue(entity.GetTxID(),(unsigned char*)&(details->vInputDestinations[i])))
+                        if(entity.AnyoneCanIssueMore() == 0)
+                        {
+                            if(mc_gState->m_Permissions->CanIssue(entity.GetTxID(),(unsigned char*)&(details->vInputDestinations[i])))
+                            {
+                                can_issue=true;
+                            }                                                        
+                        }
+                        else
                         {
                             can_issue=true;
-                        }                                                        
-                    }
-                }                
-                if(can_issue)
-                {
-                    issuers.push_back(details->vInputDestinations[i]);
-                    flags=MC_PFL_NONE;
-                    if(details->vInputScriptTypes[i] == TX_SCRIPTHASH)
-                    {
-                        flags |= MC_PFL_IS_SCRIPTHASH;
-                    }
-                    issuer_flags.push_back(flags);                        
+                        }
+                    }                
                 }
             }
+        }
+        if(can_issue)
+        {
+            issuers.push_back(details->vInputDestinations[i]);
+            flags=MC_PFL_NONE;
+            if(details->vInputScriptTypes[i] == TX_SCRIPTHASH)
+            {
+                flags |= MC_PFL_IS_SCRIPTHASH;
+            }
+            issuer_flags.push_back(flags);                        
         }
     }        
 
@@ -2324,6 +2500,11 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
         if(left_position > 0)
         {
             mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_LEFT_POSITION,(unsigned char*)&left_position,sizeof(left_position));                            
+        }
+        
+        if(details->new_entity_type == MC_ENT_TYPE_VARIABLE)                   
+        {        
+            mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_VOUT,(unsigned char*)&(details->new_entity_output),sizeof(details->new_entity_output));                            
         }
         
         unsigned char issuer_buf[24];

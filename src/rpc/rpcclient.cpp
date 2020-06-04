@@ -701,6 +701,46 @@ CRPCConvertTableMayBeString::CRPCConvertTableMayBeString()
 
 static CRPCConvertTableMayBeString rpcCvtTableMayBeString;
 
+class CRPCConvertParamAnyType
+{
+public:
+    std::string methodName;            //! method whose params want conversion
+    int paramIdx;                      //! 0-based idx of param to convert
+};
+
+static const CRPCConvertParamAnyType vRPCConvertParamsAnyType[] =
+{
+    { "createfrom", 4 },                                                            
+    { "create", 3 },                                                            
+    { "setvariablevaluefrom", 2 },                                                            
+    { "setvariablevalue", 1 },                                                                
+};
+
+class CRPCConvertTableAnyType
+{
+private:
+    std::set<std::pair<std::string, int> > members;
+
+public:
+    CRPCConvertTableAnyType();
+
+    bool anytype(const std::string& method, int idx) {
+        return (members.count(std::make_pair(method, idx)) > 0);
+    }
+};
+
+CRPCConvertTableAnyType::CRPCConvertTableAnyType()
+{
+    const unsigned int n_elem =
+        (sizeof(vRPCConvertParamsAnyType) / sizeof(vRPCConvertParamsAnyType[0]));
+
+    for (unsigned int i = 0; i < n_elem; i++) {
+        members.insert(std::make_pair(vRPCConvertParamsAnyType[i].methodName,
+                                      vRPCConvertParamsAnyType[i].paramIdx));
+    }
+}
+
+static CRPCConvertTableAnyType rpcCvtTableAnyType;
 
 bool HaveAPIWithThisName(const std::string &strMethod)
 {
@@ -743,7 +783,8 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
             }
             else
             {
-                if (!rpcCvtTableMayBeString.maybestring(strMethod, idx)) 
+                if (!rpcCvtTableMayBeString.maybestring(strMethod, idx) ||
+                     rpcCvtTableAnyType.anytype(strMethod, idx)) 
                 {
                     params.push_back(jVal);                    
                 }

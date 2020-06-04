@@ -1471,13 +1471,13 @@ void mc_InitRPCHelpMap06()
             "                                                           if (item.keys.length<2)\n"
             "                                                               return \"At least two keys required\";\n"
             "                                                       }   \n"
-/*    
             "  or \n"
             "1. entity-type                      (string, required) variable\n"
             "2. \"variable-name\"                  (string, required) Variable name, if not \"\" should be unique.\n"
-            "3. open                             (boolean, optional) Should be false\n"
+            "3. open                             (boolean, optional) Should be true\n"
             "4. value                            (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
-*/
+
+
 
             "\nResult:\n"
             "\"transactionid\"  (string) The transaction id.\n"
@@ -1567,14 +1567,13 @@ void mc_InitRPCHelpMap06()
             "                                                             if (item.keys.length<2)\n"
             "                                                                 return \"At least two keys required\";\n"
             "                                                         }   \n"
-/*    
             "  or \n"
             "1. \"from-address\"                   (string, required) Address used for creating.\n"
             "2. entity-type                      (string, required) variable\n"
             "3. \"variable-name\"                  (string, required) Variable name, if not \"\" should be unique.\n"
-            "4. open                             (boolean, optional) Should be false\n"
+            "4. open                             (boolean, optional) Should be true\n"
             "5. value                            (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
-*/
+
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -2372,6 +2371,7 @@ void mc_InitRPCHelpMap10()
             "    {\n"
             "      \"name\" : \"asset-name\"         (string, optional) Asset name\n"
             "      \"open\" : true|false           (boolean, optional, default false) True if follow-on issues are allowed\n"
+            "      \"anyone-can-issuemore\" : true|false (boolean, optional, default false) True if issue permission is not required for issuemore\n"
             "      \"restrict\" : \"restrictions\"   (string, optional) Permission strings, comma delimited. Possible values: send,receive\n"
             "    }\n"                                
             "3. quantity                         (numeric, required) The asset total amount in display units. eg. 1234.56\n"
@@ -2403,6 +2403,7 @@ void mc_InitRPCHelpMap10()
             "    {\n"
             "      \"name\" : \"asset-name\"         (string, optional) Asset name\n"
             "      \"open\" : true|false           (boolean, optional, default false) True if follow-on issues are allowed\n"
+            "      \"anyone-can-issuemore\" : true|false (boolean, optional, default false) True if issue permission is not required for issuemore\n"
             "      \"restrict\" : \"restrictions\"   (string, optional) Permission strings, comma delimited. Possible values: send,receive\n"
             "    }\n"                                
             "4. quantity                         (numeric, required) The asset total amount in display units. eg. 1234.56\n"
@@ -3878,6 +3879,7 @@ void mc_InitRPCHelpMap16()
             "      \"name\" : \"asset-name\"           (string, optional) Asset name\n"
             "      \"multiple\" : n                  (numeric, optional, default 1) Number of raw units in one displayed unit\n"
             "      \"open\" : true|false             (boolean, optional, default false) True if follow-on issues are allowed\n"                
+            "      \"anyone-can-issuemore\" : true|false (boolean, optional, default false) True if issue permission is not required for issuemore\n"
             "      \"restrict\" : \"restrictions\"     (string, optional) Permission strings, comma delimited. Possible values: send,receive\n"
             "      \"details\" :                     (object, optional) A json object with custom fields\n"           
             "        {\n"
@@ -5448,7 +5450,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap20();
     mc_InitRPCHelpMap21();
     mc_InitRPCHelpMap22();
-//    mc_InitRPCHelpMap23();
+    mc_InitRPCHelpMap23();
     
     pEF->ENT_InitRPCHelpMap();
     

@@ -582,10 +582,12 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
     string entity_name;
     int multiple=1;
     int is_open=0;
+    int is_anyone_can_issuemore=0;
     uint32_t permissions=0;
     bool missing_name=true;
     bool missing_multiple=true;
     bool missing_open=true;
+    bool missing_anyone_can_issuemore=true;
     bool missing_details=true;
     
     lpDetails->Clear();
@@ -664,8 +666,32 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             {
                 *strError=string("Invalid open");                                            
             }
-            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,(unsigned char*)&is_open,1);                
+//            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,(unsigned char*)&is_open,1);                
             missing_open=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "anyone-can-issuemore")
+        {
+            if(!missing_anyone_can_issuemore)
+            {
+                *strError=string("anyone-can-issuemore field can appear only once in the object");                                                                                                        
+            }
+            if(mc_gState->m_Features->AnyoneCanIssueMore())
+            {
+                if(d.value_.type() == bool_type)
+                {
+                    is_anyone_can_issuemore=d.value_.get_bool();
+                }    
+                else
+                {
+                    *strError=string("Invalid anyone-can-issuemore");                                            
+                }
+            }
+            else
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "anyone-can-issuemore flag is not supported in this protocol version");                   
+            }
+            missing_anyone_can_issuemore=false;
             field_parsed=true;
         }
         if(d.name_ == "restrict")
@@ -716,6 +742,15 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             *strError=strprintf("Invalid field: %s",d.name_.c_str());
         }
     }    
+    
+    if(is_open)
+    {
+        if(is_anyone_can_issuemore)
+        {
+            is_open |= 0x02;
+        }
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,(unsigned char*)&is_open,1);                        
+    }
     
     if(strError->size() == 0)
     {

@@ -143,8 +143,8 @@ Value createvariablefromcmd(const Array& params, bool fHelp)
     {
         if(params[3].type() != bool_type)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid open flag, should be boolean");
-        if(params[3].get_bool())
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid open flag, should be false");
+        if(!params[3].get_bool())
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid open flag, should be true");
     }
     
     
@@ -234,6 +234,10 @@ Value setvariablevaluefrom(const Array& params, bool fHelp)
     if (params.size() > 1 && params[1].type() != null_type && !params[1].get_str().empty())
     {        
         ParseEntityIdentifier(params[1],&entity, MC_ENT_TYPE_VARIABLE);           
+        if(entity.IsFollowOn())
+        {
+            throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Variable with this create txid not found");                                                                
+        }
         memcpy(buf,entity.GetFullRef(),MC_AST_ASSET_FULLREF_SIZE);
     }
     else
@@ -447,6 +451,10 @@ Value getvariablevalue(const Array& params, bool fHelp)
     mc_EntityDetails last_entity;
     ParseEntityIdentifier(params[0],&variable_entity,MC_ENT_TYPE_VARIABLE);
 
+    if(variable_entity.IsFollowOn())
+    {
+        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Variable with this create txid not found");                                                                
+    }
     
     if(mc_gState->m_Assets->FindLastEntity(&last_entity,&variable_entity) == 0)
     {
@@ -458,7 +466,7 @@ Value getvariablevalue(const Array& params, bool fHelp)
 Value getvariablehistory(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 4)
-        throw runtime_error("Help message not found\n");
+        mc_ThrowHelpMessage("getvariablehistory");        
 
     if(mc_gState->m_Features->Variables() == 0)
     {
@@ -484,7 +492,12 @@ Value getvariablehistory(const Array& params, bool fHelp)
     mc_EntityDetails variable_entity;
     mc_EntityDetails last_entity;
     ParseEntityIdentifier(params[0],&variable_entity,MC_ENT_TYPE_VARIABLE);
-    
+
+    if(variable_entity.IsFollowOn())
+    {
+        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Variable with this create txid not found");                                                                
+    }
+
     if(mc_gState->m_Assets->FindLastEntity(&last_entity,&variable_entity) == 0)
     {
         throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Variable not found");                
@@ -525,6 +538,11 @@ Value getvariableinfo(const Array& params, bool fHelp)
     mc_EntityDetails entity;
     ParseEntityIdentifier(params[0].get_str(),&entity, MC_ENT_TYPE_VARIABLE);           
 
+    if(entity.IsFollowOn())
+    {
+        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Variable with this create txid not found");                                                                
+    }
+    
     output_level=0x06;
     
     if (params.size() > 1)    
@@ -595,6 +613,10 @@ Value listvariables(const Array& params, bool fHelp)
             {
                 mc_EntityDetails entity;
                 ParseEntityIdentifier(inputStrings[is],&entity, MC_ENT_TYPE_VARIABLE);           
+                if(entity.IsFollowOn())
+                {
+                    throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Variable with this create txid " + inputStrings[is] + "not found");                                                                
+                }
                 uint256 hash=*(uint256*)entity.GetTxID();
 
                 variables=mc_gState->m_Assets->GetEntityList(variables,(unsigned char*)&hash,MC_ENT_TYPE_VARIABLE);

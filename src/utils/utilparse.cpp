@@ -526,23 +526,26 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                             mc_EntityDetails entity;
                             if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ref))
                             {
-                                if(required)
+                                if(entity.AnyoneCanIssueMore() == 0)
                                 {
-                                    *required |= MC_PTP_ISSUE;                    
-                                }
-                                if(mapSpecialEntity)
-                                {
-                                    std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_ISSUE);
-                                    if (it == mapSpecialEntity->end())
+                                    if(required)
                                     {
-                                        mapSpecialEntity->insert(make_pair(MC_PTP_ISSUE,*(uint256*)(entity.GetTxID())));
+                                        *required |= MC_PTP_ISSUE;                    
                                     }
-                                    else
+                                    if(mapSpecialEntity)
                                     {
-                                        if(it->second != *(uint256*)(entity.GetTxID()))
+                                        std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_ISSUE);
+                                        if (it == mapSpecialEntity->end())
                                         {
-                                            strFailReason="Invalid asset follow-on script, multiple assets";
-                                            return false;                                                                                                            
+                                            mapSpecialEntity->insert(make_pair(MC_PTP_ISSUE,*(uint256*)(entity.GetTxID())));
+                                        }
+                                        else
+                                        {
+                                            if(it->second != *(uint256*)(entity.GetTxID()))
+                                            {
+                                                strFailReason="Invalid asset follow-on script, multiple assets";
+                                                return false;                                                                                                            
+                                            }
                                         }
                                     }
                                 }

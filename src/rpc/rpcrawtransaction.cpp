@@ -42,6 +42,7 @@ using namespace std;
 bool OutputCanSend(COutput out);
 uint32_t mc_CheckSigScriptForMutableTx(const unsigned char *src,int size);
 int mc_MaxOpReturnShown();
+Object VariableEntry(const CTxOut& txout,mc_Script *lpScript,const CTransaction& tx,int n);
 
 /* MCHN END */
 
@@ -399,6 +400,11 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         if(aFormatMetaData.size())
         {
             out.push_back(Pair("data", aFormatMetaData));            
+        }
+        Object variable=VariableEntry(txout,lpScript,tx,i);
+        if( variable.size() > 0 )
+        {
+            out.push_back(Pair("variable", variable));
         }
 /* MCHN END */    
         vout.push_back(out);
