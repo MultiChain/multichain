@@ -567,6 +567,13 @@ void mc_MultiChainFilterEngine::SetCallbackNames()
         callbacks.push_back("getfilterassetbalances");
     }
     
+    if(mc_gState->m_NetworkParams->ProtocolVersion() >= 20012)
+    {
+        callbacks.push_back("getvariableinfo");
+        callbacks.push_back("getvariablevalue");
+        callbacks.push_back("getvariablehistory");
+    }
+    
     m_CallbackNames.push_back(callbacks);                                       // Stream filters callbacks
     
     callbacks.clear();
