@@ -1060,7 +1060,22 @@ int CheckRequiredPermissions(const CTxDestination& addressRet,int expected_allow
             {
                 if( (allowed & MC_PTP_WRITE) == 0 )
                 {
-                    *strFailReason="Publishing in this stream is not allowed from this address";
+                    mc_EntityDetails details;
+                    if(mc_gState->m_Assets->FindEntityByTxID(&details,lpEntity))
+                    {
+                        if(details.GetEntityType() == MC_ENT_TYPE_VARIABLE)
+                        {
+                            *strFailReason="Setting value for this variable is not allowed from this address";                            
+                        }
+                        else
+                        {
+                            *strFailReason="Publishing in this stream is not allowed from this address";                            
+                        }
+                    }
+                    else
+                    {
+                        *strFailReason="Entity not found";
+                    }
                 }
             }
         }

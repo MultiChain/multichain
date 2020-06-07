@@ -146,6 +146,7 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
     else
     {    
         m_CreateError="Empty filter code";
+        return MC_ERR_ERROR_IN_SCRIPT;
     }
     return MC_ERR_NOERROR;    
 }

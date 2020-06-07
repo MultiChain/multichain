@@ -2668,7 +2668,11 @@ Object VariableEntry(const unsigned char *txid,uint32_t output_level)
         {
             string lasttxid;
             Array lastwriters;
-            Array issues=VariableHistory(&last_entity,1,history_items-1,output_level | 0x0040,lasttxid,lastwriters);
+            Array issues;
+            if(history_items > 0)
+            {
+                issues=VariableHistory(&last_entity,1,history_items-1,output_level | 0x0040,lasttxid,lastwriters);
+            }
 //            entry.push_back(Pair("history",issues));                    
             entry.push_back(Pair("lastwriters",lastwriters));                    
             entry.push_back(Pair("lasttxid",lasttxid));                    

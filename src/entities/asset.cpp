@@ -1880,7 +1880,7 @@ int mc_AssetDB::FindLastEntityByGenesis(mc_EntityDetails *last_entity, mc_Entity
 
     last_entity->Zero();
     
-    int i;
+    int i,result;
     int64_t pos,first_pos;
     
     pos=genesis_entity->m_LedgerRow.m_ChainPos;
@@ -1894,22 +1894,45 @@ int mc_AssetDB::FindLastEntityByGenesis(mc_EntityDetails *last_entity, mc_Entity
         {
             if(aldRow.m_FirstPos == first_pos)
             {
-                last_entity->Set(&aldRow);                
-                return 1;
+                pos=aldRow.m_LastPos;
+                if(m_RollBackPos.InBlock() == 0)
+                {
+                    last_entity->Set(&aldRow);                
+                    return 1;
+                }
             }
         }
     }
         
+    result=0;
     if(pos > 0)
     {
         m_Ledger->Open();
-        m_Ledger->GetRow(pos,&aldRow);
-        last_entity->Set(&aldRow);                
+        while(pos>0)
+        {
+            m_Ledger->GetRow(pos,&aldRow);
+            if( (m_RollBackPos.InBlock() == 0) || ((m_RollBackPos.IsOut(aldRow.m_Block,aldRow.m_Offset)) == 0) )
+            {
+                last_entity->Set(&aldRow);                
+                pos=-1;
+                result=1;
+            }
+            else
+            {
+                if(pos != first_pos)
+                {
+                    pos=aldRow.m_LastPos;
+                }
+                else
+                {
+                    pos=-1;
+                }
+            }
+        }
         m_Ledger->Close();
-        return 1;
     }
 
-    return 0;
+    return result;
 }
 
 int mc_AssetDB::FindLastEntity(mc_EntityDetails *last_entity, mc_EntityDetails *entity)
