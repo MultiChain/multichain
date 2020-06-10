@@ -2045,22 +2045,15 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                 {
                     entry.push_back(Pair("open",false));                                            
                 }
-                if(mc_gState->m_Features->AnyoneCanIssueMore())
-                {
-                    if(entity.AnyoneCanIssueMore())
-                    {
-                        entry.push_back(Pair("anyone-can-issuemore",true));                                
-                    }
-                    else
-                    {
-                        entry.push_back(Pair("anyone-can-issuemore",false));                                            
-                    }                    
-                }
                 if(mc_gState->m_Features->PerAssetPermissions())
                 {
                     Object pObject;
                     pObject.push_back(Pair("send",(permissions & MC_PTP_SEND) ? true : false));
                     pObject.push_back(Pair("receive",(permissions & MC_PTP_RECEIVE) ? true : false));
+                    if(mc_gState->m_Features->AnyoneCanIssueMore())
+                    {
+                        pObject.push_back(Pair("issue",(entity.AnyoneCanIssueMore()) ? false : true));
+                    }
                     entry.push_back(Pair("restrict",pObject));                                            
                 }
             }
@@ -2652,13 +2645,13 @@ Object VariableEntry(const unsigned char *txid,uint32_t output_level)
             if(history_items)
             {
                 history_items=mc_GetEntityIndex(&last_entity)+1;
-                entry.push_back(Pair("history",history_items)); 
+                entry.push_back(Pair("historylen",history_items)); 
                 entry.push_back(Pair("value",mc_ExtractValueJSONObject(&last_entity))); 
             }
             else
             {
                 Value null_value;
-                entry.push_back(Pair("history",0)); 
+                entry.push_back(Pair("historylen",0)); 
                 entry.push_back(Pair("value",null_value)); 
             }
         }

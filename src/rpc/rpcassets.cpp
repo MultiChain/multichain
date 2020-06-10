@@ -156,22 +156,22 @@ Value issuefromcmd(const Array& params, bool fHelp)
                         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'open' field, should be boolean");                                                                
                     }
                 }
-                if(s.name_ == "anyone-can-issuemore")
+                if(s.name_ == "unrestrict")
                 {
                     if(mc_gState->m_Features->AnyoneCanIssueMore())
                     {
-                        if(s.value_.type() == bool_type)
+                        if( (s.value_.type() == str_type) && (s.value_.get_str() == "issue") )
                         {
-                            is_anyone_can_issuemore=s.value_.get_bool();
+                            is_anyone_can_issuemore=true;
                         }
                         else
                         {
-                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'anyone-can-issuemore' field, should be boolean");                                                                
+                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'unrestrict' field");                                                                
                         }
                     }
                     else
                     {
-                        throw JSONRPCError(RPC_NOT_SUPPORTED, "anyone-can-issuemore flag is not supported in this protocol version");                                                                                        
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "unrestrict field is not supported in this protocol version");                                                                                        
                     }
                 }
                 if(s.name_ == "restrict")
@@ -247,6 +247,13 @@ Value issuefromcmd(const Array& params, bool fHelp)
             b |= 0x02;
         }
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);
+    }
+    else
+    {
+        if(is_anyone_can_issuemore)
+        {
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Asset cannot have unrestricted issue permission if follow-ons are not allowed");   
+        }        
     }
     
     if(permissions)

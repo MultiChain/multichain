@@ -670,26 +670,26 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             missing_open=false;
             field_parsed=true;
         }
-        if(d.name_ == "anyone-can-issuemore")
+        if(d.name_ == "unrestrict")
         {
             if(!missing_anyone_can_issuemore)
             {
-                *strError=string("anyone-can-issuemore field can appear only once in the object");                                                                                                        
+                *strError=string("unrestrict field can appear only once in the object");                                                                                                        
             }
             if(mc_gState->m_Features->AnyoneCanIssueMore())
             {
-                if(d.value_.type() == bool_type)
+                if( (d.value_.type() == str_type) && (d.value_.get_str() == "issue") )
                 {
-                    is_anyone_can_issuemore=d.value_.get_bool();
+                    is_anyone_can_issuemore=true;
                 }    
                 else
                 {
-                    *strError=string("Invalid anyone-can-issuemore");                                            
+                    *strError=string("Invalid unrestrict field");                                            
                 }
             }
             else
             {
-                throw JSONRPCError(RPC_NOT_SUPPORTED, "anyone-can-issuemore flag is not supported in this protocol version");                   
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "unrestrict field is not supported in this protocol version");                   
             }
             missing_anyone_can_issuemore=false;
             field_parsed=true;
@@ -750,6 +750,14 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             is_open |= 0x02;
         }
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,(unsigned char*)&is_open,1);                        
+    }
+    else
+    {
+        if(is_anyone_can_issuemore)
+        {
+            *errorCode=RPC_NOT_SUPPORTED;
+            *strError=string("Asset cannot have unrestricted issue permission if follow-ons are not allowed");   
+        }        
     }
     
     if(strError->size() == 0)
