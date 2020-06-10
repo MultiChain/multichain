@@ -509,6 +509,10 @@ int MultichainNode_ApplyUpgrades(int current_height)
         }
     }
     SetMultiChainParams();            
+    if(pMultiChainFilterEngine)
+    {
+        pMultiChainFilterEngine->SetCallbackNames();
+    }
     mc_gState->m_ProtocolVersionToUpgrade=mc_gState->m_NetworkParams->m_ProtocolVersion;
     
     
