@@ -562,7 +562,9 @@ void mc_MultiChainFilterEngine::SetCallbackNames()
     callbacks.push_back("verifymessage");    
     
     
-    if(mc_gState->m_NetworkParams->ProtocolVersion() >= 20005)
+//    if(mc_gState->m_NetworkParams->ProtocolVersion() >= 20005)
+    if( (mc_gState->m_NetworkParams->ProtocolVersion() >= 20012) ||             // Compensation for bug when version was not updated on upgrade
+        (mc_gState->m_NetworkParams->GetInt64Param("protocolversion") >= 20005))
     {
         callbacks.push_back("getfilterassetbalances");
     }
@@ -586,7 +588,9 @@ void mc_MultiChainFilterEngine::SetCallbackNames()
     callbacks.push_back("verifypermission");
     callbacks.push_back("verifymessage");    
     
-    if(mc_gState->m_NetworkParams->ProtocolVersion() >= 20005)
+//    if(mc_gState->m_NetworkParams->ProtocolVersion() >= 20005)
+    if( (mc_gState->m_NetworkParams->ProtocolVersion() >= 20012) ||             // Compensation for bug when version was not updated on upgrade
+        (mc_gState->m_NetworkParams->GetInt64Param("protocolversion") >= 20005))
     {
         callbacks.push_back("getfilterstreamitem");        
     }

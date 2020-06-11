@@ -509,7 +509,7 @@ int MultichainNode_ApplyUpgrades(int current_height)
         }
     }
     SetMultiChainParams();            
-    if(pMultiChainFilterEngine)
+    if(pMultiChainFilterEngine)                                                 // Added from version 20012. 
     {
         pMultiChainFilterEngine->SetCallbackNames();
     }
