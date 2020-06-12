@@ -2894,8 +2894,12 @@ mc_Buffer *mc_AssetDB::GetFollowOnsByLastEntity(mc_EntityDetails *last_entity,in
     aldRow.Zero();
     
     size=0;
+    pos=0;
     first_pos=last_entity->m_LedgerRow.m_FirstPos;
-    pos=GetChainPosition(&(last_entity->m_LedgerRow),start+count-1);
+    if(count > 0)
+    {
+        pos=GetChainPosition(&(last_entity->m_LedgerRow),start+count-1);
+    }
 
     if((pos != 0) && (count > 0))
     {
