@@ -12,7 +12,15 @@
 void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
 void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity);
 bool mc_JSInExtendedScript(size_t size);
-
+/*
+bool AcceptMultiChainTransaction(const CTransaction& tx, 
+                                 const CCoinsViewCache &inputs,
+                                 int offset,
+                                 bool accept,
+                                 string& reason,
+                                 int64_t *mandatory_fee_out,     
+                                 uint32_t *replay);
+*/
 void ParseFilterRestrictionsForField(Value param,mc_Script *lpDetailsScript,uint32_t filter_type)
 {
     lpDetailsScript->Clear();
@@ -906,12 +914,85 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, Valu
         strError="";
         if(relevant_filter)
         {
+            bool checkpoint=false;
+            if (filter_type == MC_FLT_TYPE_TX)
+            {
+                bool txsigned=true;
+                for(unsigned int i=0;i<tx.vin.size();i++)
+                {
+                    if(tx.vin[i].scriptSig.size() == 0)
+                    {
+                        txsigned=false;
+                    }
+                }
+                if(!txsigned)
+                {
+                    Array signrawtransaction_params;
+                    signrawtransaction_params.push_back(txhex);
+                    Value signedTx=signrawtransaction(signrawtransaction_params,false);
+
+                    if(signedTx.type() != obj_type)
+                    {
+                        errorCode=RPC_INTERNAL_ERROR;
+                        strFatal="Couldn't sign transaction";
+                        goto exitlbl;
+                    }
+                    BOOST_FOREACH(const Pair& s, signedTx.get_obj()) 
+                    {        
+                        if(s.name_=="complete")
+                        {
+                            if(!s.value_.get_bool())
+                            {
+                                errorCode=RPC_WALLET_ADDRESS_NOT_FOUND;
+                                strFatal="Transaction should be either signed properly or wallet has to have private keys to sign it";
+                                goto exitlbl;
+                            }
+                        }
+                        if(s.name_=="hex")
+                        {
+                            txhex=s.value_.get_str();
+                        }
+                    }
+
+                    if (!DecodeHexTx(tx,txhex))
+                    {
+                        errorCode=RPC_DESERIALIZATION_ERROR;
+                        strFatal="TX decode failed after signing";
+                        goto exitlbl;
+                    }
+                }
+
+                {
+                    LOCK(mempool.cs);
+                    string reason;
+                    CCoinsView dummy;
+                    CCoinsViewCache view(&dummy);
+                    CCoinsViewMemPool viewMemPool(pcoinsTip, mempool);
+                    view.SetBackend(viewMemPool);
+                    if(!AcceptMultiChainTransaction(tx,view,-1,MC_AMT_NO_FILTERS,reason,NULL,NULL))
+                    {
+                        errorCode=RPC_TRANSACTION_REJECTED;
+                        strFatal="TX will be rejected before filter with the following error: " + reason;
+                        goto exitlbl;
+                    }
+                    checkpoint=true;
+                }                
+
+            }
+            
             err=pMultiChainFilterEngine->RunFilterWithCallbackLog(tx,vout,worker,strError,callbacks);
             if(err)
             {
                 errorCode=RPC_INTERNAL_ERROR;
                 strFatal="Couldn't run filter";
             }
+
+            if(checkpoint)
+            {
+                mc_gState->m_Permissions->RollBackToCheckPoint();
+                mc_gState->m_Assets->RollBackToCheckPoint();                
+            }
+
         }
         
         if(strError.size())   

@@ -3053,7 +3053,7 @@ bool MultiChainTransaction_VerifyStandardCoinbase(const CTransaction& tx,       
 bool AcceptMultiChainTransaction   (const CTransaction& tx,                     // Tx to check
                                     const CCoinsViewCache &inputs,              // Tx inputs from UTXO database
                                     int offset,                                 // Tx offset in block, -1 if in memppol
-                                    bool accept,                                // Accept to mempools if successful
+                                    uint32_t flags,                             // Accept to mempools if successful, no filters
                                     string& reason,                             // Error message
                                     int64_t *mandatory_fee_out,                 // Mandatory fee
                                     uint32_t *replay)                           // Replay flag - if tx should be rechecked or only permissions
@@ -3061,7 +3061,12 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
     CMultiChainTxDetails details;
     bool fReject=false;
     int64_t mandatory_fee=0;
-            
+    bool accept=true;
+    if(flags & MC_AMT_NO_ACCEPT)
+    {
+        accept=false;
+    }
+    
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)                 
     {
         return true;
@@ -3124,7 +3129,10 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
         goto exitlbl;                                                                                
     }        
     
-    if( (details.emergency_disapproval_output < 0) && !details.fIsStandardCoinbase && !details.fLicenseTokenTransfer)
+    if( (details.emergency_disapproval_output < 0) && 
+        !details.fIsStandardCoinbase && 
+        !details.fLicenseTokenTransfer && 
+        ((flags & MC_AMT_NO_FILTERS) == 0) )
     {
         if(mc_gState->m_Features->Filters())
         {

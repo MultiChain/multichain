@@ -51,13 +51,6 @@ extern mc_MultiChainFilterEngine* pMultiChainFilterEngine;
 using namespace boost;
 using namespace std;
 
-bool AcceptMultiChainTransaction(const CTransaction& tx, 
-                                 const CCoinsViewCache &inputs,
-                                 int offset,
-                                 bool accept,
-                                 string& reason,
-                                 int64_t *mandatory_fee_out,     
-                                 uint32_t *replay);
 bool Is_MultiChainLicenseTokenTransfer(const CTransaction& tx);
 bool ExtractDestinationScriptValid(const CScript& scriptPubKey, CTxDestination& addressRet);
 bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs, string& reason);
@@ -1616,7 +1609,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         int permissions_from,permissions_to;
         permissions_from=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
         
-        if(!AcceptMultiChainTransaction(tx,view,-1,true,reason, &mandatory_fee, &replay))
+        if(!AcceptMultiChainTransaction(tx,view,-1,MC_AMT_DEFAULT,reason, &mandatory_fee, &replay))
         {
             return state.DoS(0,
                              error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
@@ -2398,7 +2391,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         {
             const CTransaction &tx = block.vtx[i];
             string reason;
-            if(!AcceptMultiChainTransaction(tx,view,offset,true,reason,NULL,NULL))
+            if(!AcceptMultiChainTransaction(tx,view,offset,MC_AMT_DEFAULT,reason,NULL,NULL))
             {
                 return state.DoS(100, error(reason.c_str()),
                              REJECT_INVALID, "bad-transaction");            
@@ -2560,7 +2553,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             string reason;
             if(!fJustCheck)
             {
-                if(!AcceptMultiChainTransaction(tx,view,offset,true,reason,NULL,NULL))
+                if(!AcceptMultiChainTransaction(tx,view,offset,MC_AMT_DEFAULT,reason,NULL,NULL))
                 {
                     return state.DoS(0,
                                      error("ConnectBlock: : AcceptMultiChainTransaction failed %s : %s", tx.GetHash().ToString(),reason),
@@ -2591,7 +2584,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             string reason;
             if(!fJustCheck)
             {
-                if(!AcceptMultiChainTransaction(tx,view,coinbase_offset,true,reason,NULL,NULL))
+                if(!AcceptMultiChainTransaction(tx,view,coinbase_offset,MC_AMT_DEFAULT,reason,NULL,NULL))
                 {
                     return state.DoS(0,
                                      error("ConnectBlock: : AcceptMultiChainTransaction failed %s : %s", tx.GetHash().ToString(),reason),
