@@ -4427,6 +4427,11 @@ void mc_InitRPCHelpMap18()
             "\nReturns an object with information about the filtered stream item.\n"
         ));
     
+    mapHelpStrings.insert(std::make_pair("getfilterstream",
+            "getfilterstream\n"
+            "\nReturns an object with information about the filtered stream.\n"
+        ));
+    
     mapHelpStrings.insert(std::make_pair("getlastblockinfo",
             "getlastblockinfo ( skip )\n"
             "\nReturns information about the last or recent blocks in the active chain.\n"
@@ -4498,6 +4503,7 @@ void mc_InitRPCHelpMap19()
             "                         getfiltertransaction \n"
             "                         getfiltertxid \n"
             "                         getfilterstreamitem (only for stream filters)\n"
+            "                         getfilterstream (only for stream filters)\n"
             "                         getfiltertxinput (only for tx filters)\n"
             "                         getfilterassetbalances (only for tx filters)\n"
             "                         setfilterparam \n"             

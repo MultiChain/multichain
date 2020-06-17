@@ -798,7 +798,7 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, Valu
         }
     }
     
-
+    uint256 stream_txid=0;
     string filter_main_name=MC_FLT_MAIN_NAME_TX;
     if (filter_type == MC_FLT_TYPE_STREAM)
     {
@@ -830,6 +830,7 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, Valu
                 {
                     vout_count++;
                     vout=i;
+                    stream_txid=*streams_already_seen.begin();
                 }                        
             }
             
@@ -848,6 +849,7 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, Valu
                     throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream item is not found in this output");                                                                                                    
                 }
             }
+            
         }
     }
     
@@ -980,7 +982,7 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, Valu
 
             }
             
-            err=pMultiChainFilterEngine->RunFilterWithCallbackLog(tx,vout,worker,strError,callbacks);
+            err=pMultiChainFilterEngine->RunFilterWithCallbackLog(tx,vout,stream_txid,worker,strError,callbacks);
             if(err)
             {
                 errorCode=RPC_INTERNAL_ERROR;

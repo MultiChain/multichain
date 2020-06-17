@@ -171,9 +171,10 @@ int mc_MultiChainFilterEngine::Zero()
 {
     m_Filters.clear();
     m_TxID=0;
+    m_EntityTxID=0;
     m_Workers=NULL;
     m_CallbackNames.clear();
-    m_CodeLibrary=NULL;
+    m_CodeLibrary=NULL;    
     
     return MC_ERR_NOERROR;
 }
@@ -360,7 +361,7 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
     int err=MC_ERR_NOERROR;
     strResult="";
     m_Tx=tx;
-    m_TxID=m_Tx.GetHash();
+    m_TxID=m_Tx.GetHash();    
     m_Vout=vout;
     m_Params.Init();
     
@@ -375,6 +376,8 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
     {
         goto exitlbl;
     }
+    
+    m_EntityTxID=*(uint256*)stream_entity_txid;
     
     mc_gState->m_Permissions->SetRollBackPos(block,offset,(offset != 0) ? 1 : 0);
     mc_gState->m_Assets->SetRollBackPos(block,offset,(offset != 0) ? 1 : 0);
@@ -431,6 +434,7 @@ exitlbl:
     mc_gState->m_Assets->ResetRollBackPos();
     mc_gState->m_Permissions->ResetRollBackPos();
     m_Params.Close();
+    m_EntityTxID=0;
     m_TxID=0;
     m_Vout=-1;
     return err;    
@@ -528,11 +532,12 @@ int mc_MultiChainFilterEngine::RunFilter(const CTransaction& tx,mc_Filter *filte
     return err;
 }
 
-int mc_MultiChainFilterEngine::RunFilterWithCallbackLog(const CTransaction& tx,int vout,mc_Filter *filter,std::string &strResult, json_spirit::Array& callbacks)
+int mc_MultiChainFilterEngine::RunFilterWithCallbackLog(const CTransaction& tx,int vout,uint256 stream_txid,mc_Filter *filter,std::string &strResult, json_spirit::Array& callbacks)
 {
     int err=MC_ERR_NOERROR;
     m_Tx=tx;
     m_TxID=m_Tx.GetHash();
+    m_EntityTxID=stream_txid;
     m_Params.Init();
     m_Vout=vout;
 
@@ -600,6 +605,7 @@ void mc_MultiChainFilterEngine::SetCallbackNames()
         callbacks.push_back("getvariableinfo");
         callbacks.push_back("getvariablevalue");
         callbacks.push_back("getvariablehistory");
+        callbacks.push_back("getfilterstream");        
     }
     
     m_CallbackNames.push_back(callbacks);    

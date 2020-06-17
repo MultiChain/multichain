@@ -82,6 +82,7 @@ typedef struct mc_MultiChainFilterEngine
     mc_Buffer *m_Workers;
     mc_Script *m_CodeLibrary;
     uint256 m_TxID;
+    uint256 m_EntityTxID;
     CTransaction m_Tx;
     int m_Vout;
     mc_MultiChainFilterParams m_Params;
@@ -106,7 +107,7 @@ typedef struct mc_MultiChainFilterEngine
     int RunTxFilters(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied,bool only_once);            
     int RunStreamFilters(const CTransaction& tx,int vout, unsigned char *stream_short_txid,int block,int offset,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied);            
     int RunFilter(const CTransaction& tx,mc_Filter *filter,std::string &strResult);            
-    int RunFilterWithCallbackLog(const CTransaction& tx,int vout,mc_Filter *filter,std::string &strResult, json_spirit::Array& callbacks);
+    int RunFilterWithCallbackLog(const CTransaction& tx,int vout,uint256 stream_txid,mc_Filter *filter,std::string &strResult, json_spirit::Array& callbacks);
     int NoStreamFilters();
     
     int Zero();

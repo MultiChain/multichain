@@ -622,7 +622,7 @@ Value getfilterstreamitem(const Array& params, bool fHelp)
     if (fHelp || params.size() != 0)                        
         mc_ThrowHelpMessage("getfilterstreamitem");        
 //        throw runtime_error("Help message not found\n");
-    
+
     if(pMultiChainFilterEngine->m_Vout < 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "This callback cannot be used in tx filters");                            
@@ -643,6 +643,33 @@ Value getfilterstreamitem(const Array& params, bool fHelp)
     
 //    result.get_obj().push_back(Pair("txid", pMultiChainFilterEngine->m_Tx.GetHash().GetHex()));
     result.get_obj().push_back(Pair("vout", pMultiChainFilterEngine->m_Vout));
+    
+    return result;
+}
+
+Value getfilterstream(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)                        
+        mc_ThrowHelpMessage("getfilterstream");        
+    
+    if(pMultiChainFilterEngine->m_Vout < 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "This callback cannot be used in tx filters");                            
+    }
+    
+    set<uint256> streams_already_seen;
+    
+    if(pMultiChainFilterEngine->m_Vout >= (int)pMultiChainFilterEngine->m_Tx.vout.size())
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "vout out of range");                                            
+    }
+
+    Value result=StreamEntry((unsigned char*)&(pMultiChainFilterEngine->m_EntityTxID),0x0002);
+    
+    if(result.type() != obj_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream input is not found in this output");                                    
+    }
     
     return result;
 }
