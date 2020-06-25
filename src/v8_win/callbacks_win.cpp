@@ -8,8 +8,29 @@
 #include "v8_win/v8utils.h"
 #include <cassert>
 
+#include <boost/foreach.hpp>
+using namespace std;
+
+
 namespace mc_v8
-{
+{    
+  std::map<std::string, std::string> callbackNameToFixed;
+  std::map<std::string, std::string> callbackFixedToName;
+
+  std::string callbackFixedName(std::string name)
+  {
+      std::map<std::string, std::string>::const_iterator it=callbackNameToFixed.find(name);
+      if(it == callbackNameToFixed.end())
+      {
+          int n=callbackNameToFixed.size();
+          string fixed=strprintf("fixed%06d",n);
+          callbackNameToFixed.insert(make_pair(name,fixed));
+          callbackFixedToName.insert(make_pair(fixed,name));
+          return name;
+      }
+      return it->second;
+  }
+    
 /**
  * Call an RPC function from a V8 JS callback.
  *
@@ -42,7 +63,11 @@ void CallRpcFunction(std::string name, const v8::FunctionCallbackInfo<v8::Value>
     V82Ubj(isolate, v8args, argsBlob);
     logger->debug("  argsBlob={}", argsBlob->ToString());
 
-    filterCallback->UbjCallback(name.c_str(),
+    std::map<std::string, std::string>::const_iterator it=callbackFixedToName.find(name);
+    std::string real_name=it->second;
+    logger->debug("CallRpcFunction(realname={}) - enter", real_name);
+    printf("%s -> %s\n",name.c_str(),real_name.c_str());
+    filterCallback->UbjCallback(real_name.c_str(),
                                 reinterpret_cast<Blob_t*>(argsBlob.get()),
                                 reinterpret_cast<Blob_t*>(resultBlob.get()));
     logger->debug("  resultBlob={}", resultBlob->ToString());
@@ -91,6 +116,39 @@ FILTER_FUNCTION(getstreaminfo)
 FILTER_FUNCTION(verifypermission)
 FILTER_FUNCTION(verifymessage)
 
+
+FILTER_FUNCTION(fixed000000)
+FILTER_FUNCTION(fixed000001)
+FILTER_FUNCTION(fixed000002)
+FILTER_FUNCTION(fixed000003)
+FILTER_FUNCTION(fixed000004)
+FILTER_FUNCTION(fixed000005)
+FILTER_FUNCTION(fixed000006)
+FILTER_FUNCTION(fixed000007)
+FILTER_FUNCTION(fixed000008)
+FILTER_FUNCTION(fixed000009)
+FILTER_FUNCTION(fixed000010)
+FILTER_FUNCTION(fixed000011)
+FILTER_FUNCTION(fixed000012)
+FILTER_FUNCTION(fixed000013)
+FILTER_FUNCTION(fixed000014)
+FILTER_FUNCTION(fixed000015)
+FILTER_FUNCTION(fixed000016)
+FILTER_FUNCTION(fixed000017)
+FILTER_FUNCTION(fixed000018)
+FILTER_FUNCTION(fixed000019)
+FILTER_FUNCTION(fixed000020)
+FILTER_FUNCTION(fixed000021)
+FILTER_FUNCTION(fixed000022)
+FILTER_FUNCTION(fixed000023)
+FILTER_FUNCTION(fixed000024)
+FILTER_FUNCTION(fixed000025)
+FILTER_FUNCTION(fixed000026)
+FILTER_FUNCTION(fixed000027)
+FILTER_FUNCTION(fixed000028)
+FILTER_FUNCTION(fixed000029)
+
+
 #define FILTER_LOOKUP(name) { #name, filter_##name }
 
 std::map<std::string, v8::FunctionCallback> callbackLookup{
@@ -108,7 +166,37 @@ std::map<std::string, v8::FunctionCallback> callbackLookup{
     FILTER_LOOKUP(getassetinfo),
     FILTER_LOOKUP(getstreaminfo),
     FILTER_LOOKUP(verifypermission),
-    FILTER_LOOKUP(verifymessage)
+    FILTER_LOOKUP(verifymessage),
+    FILTER_LOOKUP(fixed000000),
+    FILTER_LOOKUP(fixed000001),
+    FILTER_LOOKUP(fixed000002),
+    FILTER_LOOKUP(fixed000003),
+    FILTER_LOOKUP(fixed000004),
+    FILTER_LOOKUP(fixed000005),
+    FILTER_LOOKUP(fixed000006),
+    FILTER_LOOKUP(fixed000007),
+    FILTER_LOOKUP(fixed000008),
+    FILTER_LOOKUP(fixed000009),
+    FILTER_LOOKUP(fixed000010),
+    FILTER_LOOKUP(fixed000011),
+    FILTER_LOOKUP(fixed000012),
+    FILTER_LOOKUP(fixed000013),
+    FILTER_LOOKUP(fixed000014),
+    FILTER_LOOKUP(fixed000015),
+    FILTER_LOOKUP(fixed000016),
+    FILTER_LOOKUP(fixed000017),
+    FILTER_LOOKUP(fixed000018),
+    FILTER_LOOKUP(fixed000019),
+    FILTER_LOOKUP(fixed000020),
+    FILTER_LOOKUP(fixed000021),
+    FILTER_LOOKUP(fixed000022),
+    FILTER_LOOKUP(fixed000023),
+    FILTER_LOOKUP(fixed000024),
+    FILTER_LOOKUP(fixed000025),
+    FILTER_LOOKUP(fixed000026),
+    FILTER_LOOKUP(fixed000027),
+    FILTER_LOOKUP(fixed000028),
+    FILTER_LOOKUP(fixed000029),
 };
 // clang-format on
 } // namespace mc_v8
