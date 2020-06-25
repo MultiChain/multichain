@@ -765,6 +765,7 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, Valu
     int64_t nStart;
     int vout=vout_in;
     string txhex="";
+    bool txid_given=false;
     
     CTransaction tx;
 
@@ -786,6 +787,7 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, Valu
             uint256 hashBlock = 0;
             if (!GetTransaction(hash, tx, hashBlock, true))
                 throw JSONRPCError(RPC_TX_NOT_FOUND, "No information available about transaction");
+            txid_given=true;
         }
     }
     
@@ -917,7 +919,7 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, Valu
         if(relevant_filter)
         {
             bool checkpoint=false;
-            if (filter_type == MC_FLT_TYPE_TX)
+            if ( (filter_type == MC_FLT_TYPE_TX) && !txid_given)
             {
                 bool txsigned=true;
                 for(unsigned int i=0;i<tx.vin.size();i++)
