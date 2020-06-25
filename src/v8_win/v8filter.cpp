@@ -163,16 +163,16 @@ int V8Filter::Initialize(V8Engine *engine, std::string script, std::string funct
     logger->debug("  Processing RPC callbacks");
     for (std::string functionName : callbackNames)
     {
-        std::string fixeName=callbackFixedName(functionName);
-        if (callbackLookup.find(fixeName) == callbackLookup.end())
+        std::string fixedName=callbackFixedName(functionName);
+        if (callbackLookup.find(fixedName) == callbackLookup.end())
         {
-            logger->error("Undefined callback name: {}", fixeName);
-            strResult = strprintf("Undefined callback name: {}", fixeName);
+            logger->error("Undefined callback name: {}", fixedName);
+            strResult = strprintf("Undefined callback name: {}", fixedName);
             return MC_ERR_INTERNAL_ERROR;
         }
         logger->debug("    RPC callback: {}", functionName);
         global->Set(String2V8(isolate, functionName),
-                    v8::FunctionTemplate::New(isolate, callbackLookup[fixeName], filterCallback));
+                    v8::FunctionTemplate::New(isolate, callbackLookup[fixedName], filterCallback));
     }
 
     logger->debug("  Prepare context");

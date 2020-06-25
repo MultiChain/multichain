@@ -26,7 +26,7 @@ namespace mc_v8
           string fixed=strprintf("fixed%06d",n);
           callbackNameToFixed.insert(make_pair(name,fixed));
           callbackFixedToName.insert(make_pair(fixed,name));
-          return name;
+          return fixed;
       }
       return it->second;
   }
