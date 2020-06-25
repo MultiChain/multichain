@@ -5057,6 +5057,15 @@ void mc_InitRPCHelpMap21()
             + HelpExampleRpc("getinitstatus", "")
         ));
   
+     mapHelpStrings.insert(std::make_pair("gethealthcheck",
+            "gethealthcheck\n"
+            "\nReturns information about health of this node\n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("gethealthcheck", "")
+            + HelpExampleRpc("gethealthcheck", "")
+        ));
+  
     
     mapHelpStrings.insert(std::make_pair("createfeed",
             "createfeed \"feed-name\" ( parameters ) \n"

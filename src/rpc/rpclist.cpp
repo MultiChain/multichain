@@ -51,6 +51,7 @@ static const CRPCCommand vRPCCommands[] =
     /* Overall control/query calls */
     { "control",            "getinfo",                &getinfo,                true,      false,      false }, /* uses wallet if enabled */
     { "control",            "getinitstatus",          &getinitstatus,          true,      true,       false },
+    { "control",            "gethealthcheck",         &gethealthcheck,         true,      true,       false },
     { "control",            "help",                   &help,                   true,      true,       false },
     { "control",            "stop",                   &stop,                   true,      true,       false },
 /* MCHN START */    
