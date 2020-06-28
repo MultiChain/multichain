@@ -2687,6 +2687,12 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         {    
             sprintf(bufOutput,"Listening for API requests on port %d (local only - see rpcallowip setting)\n\n",(int)GetArg("-rpcport", BaseParams().RPCPort()));                            
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+            int hcPort = pEF->HCH_GetPort();
+            if(hcPort)
+            {
+                sprintf(bufOutput,"Listening for health check requests on port %d (local only - see rpcallowip setting)\n\n",hcPort);                            
+                bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));                        
+            }            
         }
     }
 /*    

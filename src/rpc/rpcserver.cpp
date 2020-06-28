@@ -115,7 +115,7 @@ void RPCThreadLoad::Update()
                 load[i%size]=m;
             }        
             load[start_sec%size]+=m-(start%m);
-            load[end_sec%size]+=end%m;       
+            load[end_sec%size]=end%m;       
         }
     }
     total=0;

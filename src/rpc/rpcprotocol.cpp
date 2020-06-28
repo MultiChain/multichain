@@ -36,6 +36,13 @@ using namespace json_spirit;
 //! Number of bytes to allocate and read at most at once in post data
 const size_t POST_READ_SIZE = 256 * 1024;
 
+string FormatFullMultiChainVersion()
+{
+    string ret=mc_BuildDescription(mc_gState->GetNumericVersion());
+    boost::replace_all(ret, " ", "-");
+    return ret;
+}
+
 /**
  * HTTP protocol
  * 
@@ -52,7 +59,7 @@ string HTTPPost(const string& strMsg, const map<string,string>& mapRequestHeader
     }
     ostringstream s;
     s << "POST / HTTP/1.1\r\n"
-      << "User-Agent: bitcoin-json-rpc/" << FormatFullVersion() << "\r\n"
+      << "User-Agent: multichain-json-rpc/" << FormatFullMultiChainVersion() << "\r\n"
       << "Host: " << host.c_str() << "\r\n"
 //      << "Host: 127.0.0.1\r\n"
       << "Content-Type: application/json\r\n"
@@ -88,7 +95,7 @@ string HTTPError(int nStatus, bool keepalive, bool headersOnly)
     if (nStatus == HTTP_UNAUTHORIZED)
         return strprintf("HTTP/1.0 401 Authorization Required\r\n"
             "Date: %s\r\n"
-            "Server: bitcoin-json-rpc/%s\r\n"
+            "Server: multichain-json-rpc/%s\r\n"
             "WWW-Authenticate: Basic realm=\"jsonrpc\"\r\n"
             "Content-Type: text/html\r\n"
             "Content-Length: 296\r\n"
@@ -101,7 +108,7 @@ string HTTPError(int nStatus, bool keepalive, bool headersOnly)
             "<META HTTP-EQUIV='Content-Type' CONTENT='text/html; charset=ISO-8859-1'>\r\n"
             "</HEAD>\r\n"
             "<BODY><H1>401 Unauthorized.</H1></BODY>\r\n"
-            "</HTML>\r\n", rfc1123Time(), FormatFullVersion());
+            "</HTML>\r\n", rfc1123Time(), FormatFullMultiChainVersion());
 
     return HTTPReply(nStatus, httpStatusDescription(nStatus), keepalive,
                      headersOnly, "text/plain");
@@ -115,7 +122,7 @@ string HTTPReplyHeader(int nStatus, bool keepalive, size_t contentLength, const 
             "Connection: %s\r\n"
             "Content-Length: %u\r\n"
             "Content-Type: %s\r\n"
-            "Server: bitcoin-json-rpc/%s\r\n"
+            "Server: multichain-json-rpc/%s\r\n"
             "\r\n",
         nStatus,
         httpStatusDescription(nStatus),
@@ -123,7 +130,7 @@ string HTTPReplyHeader(int nStatus, bool keepalive, size_t contentLength, const 
         keepalive ? "keep-alive" : "close",
         contentLength,
         contentType,
-        FormatFullVersion());
+        FormatFullMultiChainVersion());
 }
 
 string HTTPReply(int nStatus, const string& strMsg, bool keepalive,
