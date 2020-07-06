@@ -51,6 +51,7 @@ bool fPayAtLeastCustomFee = true;
 //CFeeRate CWallet::minTxFee = CFeeRate(1000);
 CFeeRate CWallet::minTxFee = CFeeRate(MIN_RELAY_TX_FEE);
 bool OutputCanSend(COutput out);
+string EncodeHexTx(const CTransaction& tx);
 
 struct CompareValueOnlyIntDesc
 {
@@ -3183,6 +3184,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
         {
             // This must not fail. The transaction has already been signed and recorded.
             LogPrintf("CommitTransaction() : Error: Transaction not valid: %s\n",reject_reason.c_str());  // MCHN
+            if(fDebug)LogPrint("mchn","mchn: Tx not committed (%s): %s\n",reject_reason.c_str(),EncodeHexTx(wtxNew));
             return false;
         }
 /*        
