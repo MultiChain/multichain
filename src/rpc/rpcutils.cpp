@@ -2279,6 +2279,7 @@ Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t
 //            followon->Zero();
 //            if(mc_gState->m_Assets->FindEntityByTxID(followon,followons->GetRow(i)))
             followon=(mc_EntityDetails *)followons->GetRow(i);
+            mc_gState->m_Assets->ReloadDetailsIfNeeded(followon);
             {
                 issue.push_back(Pair("value",mc_ExtractValueJSONObject(followon))); 
                 if(output_level & 0x0040)

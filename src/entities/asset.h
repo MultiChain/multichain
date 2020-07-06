@@ -194,6 +194,7 @@ typedef struct mc_EntityDetails
     uint32_t m_Permissions;
     uint32_t m_ScriptPermissions;
     uint32_t m_Restrictions;
+    int64_t m_ThisPos;
     unsigned char m_Reserved[36];   
     mc_EntityLedgerRow m_LedgerRow;
     void Zero();
@@ -322,6 +323,8 @@ typedef struct mc_AssetDB
     int FindEntityByFullRef (mc_EntityDetails *entity, unsigned char* full_ref);
     int FindLastEntity(mc_EntityDetails *last_entity, mc_EntityDetails *entity);    
     int FindLastEntityByGenesis(mc_EntityDetails *last_entity, mc_EntityDetails *genesis_entity);    
+    
+    void ReloadDetailsIfNeeded(mc_EntityDetails *entity);
     
     unsigned char *CachedTxIDFromShortTxID(unsigned char *short_txid);
     int SetRollBackPos(int block,int offset,int inmempool);

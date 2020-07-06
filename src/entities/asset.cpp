@@ -2877,6 +2877,23 @@ mc_Buffer *mc_AssetDB::GetFollowOns(const void* txid)
     return result;
 }
 
+void mc_AssetDB::ReloadDetailsIfNeeded(mc_EntityDetails *entity)
+{
+    mc_EntityLedgerRow aldRow;
+    if(entity->m_ThisPos > 0)
+    {
+        if(entity->m_LedgerRow.m_ExtendedScript)
+        {
+            int64_t pos=entity->m_ThisPos;
+            m_Ledger->Open();
+            m_Ledger->GetRow(pos,&aldRow);
+            entity->Set(&aldRow);
+            entity->m_ThisPos=pos;
+            m_Ledger->Close();
+        }        
+    }
+}
+
 mc_Buffer *mc_AssetDB::GetFollowOnsByLastEntity(mc_EntityDetails *last_entity,int count,int start)
 {
     mc_EntityDetails entity;
@@ -2913,8 +2930,9 @@ mc_Buffer *mc_AssetDB::GetFollowOnsByLastEntity(mc_EntityDetails *last_entity,in
                 {
                     if(aldRow.m_FirstPos == first_pos)
                     {
-                        pos=aldRow.m_LastPos;
                         entity.Set(&aldRow);
+                        entity.m_ThisPos=-i-1;
+                        pos=aldRow.m_LastPos;
                         result->Add(&entity,NULL);                
                         size++;
                         if(size >= count)
@@ -2936,6 +2954,7 @@ mc_Buffer *mc_AssetDB::GetFollowOnsByLastEntity(mc_EntityDetails *last_entity,in
             {
                 m_Ledger->GetRow(pos,&aldRow);
                 entity.Set(&aldRow);
+                entity.m_ThisPos=pos;
                 result->Add(&entity,NULL);                
 //                result->Add(aldRow.m_Key,NULL);
                 size++;
