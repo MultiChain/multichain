@@ -521,6 +521,14 @@ void ParseRawValue(const Value *value,mc_Script *lpDetails,mc_Script *lpDetailsS
                 *max_size=bytes;
                 return;
             }
+            else
+            {
+                if(bytes >  MAX_SCRIPT_ELEMENT_SIZE-128)
+                {
+                    *max_size += 1;
+                    return;
+                }
+            }
         }
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_JSON_VALUE,script,bytes);            
     }
@@ -1361,7 +1369,7 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
 
 bool mc_JSInExtendedScript(size_t size)
 {
-    if(size > 32768)
+    if( (size > 32768) || (size > MAX_SCRIPT_ELEMENT_SIZE-128) )
     {
         if(mc_gState->m_Features->ExtendedEntityDetails())
         {
