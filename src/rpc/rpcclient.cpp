@@ -248,13 +248,17 @@ static const std::string vAPINames[] =
 "purgefeed",       
 "listfeeds",
 "getdatarefdata", 
-"datareftobinarycache"
-"listvariables"
-"getvariableinfo"
-"setvariablevalue"
-"setvariablevaluefrom"
-"getvariablevalue"
-"getvariablehistory"
+"datareftobinarycache", 
+"listvariables", 
+"getvariableinfo", 
+"setvariablevalue", 
+"setvariablevaluefrom", 
+"getvariablevalue", 
+"getvariablehistory", 
+"listlibraries", 
+"addlibraryupdate", 
+"addlibraryupdatefrom", 
+"getlibrarycode"
 };
 
 static const CRPCConvertParam vRPCConvertParams[] =
@@ -314,6 +318,10 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "listvariables", 1 },                                                            
     { "listvariables", 2 },                                                            
     { "listvariables", 3 },                                                            
+    { "listlibraries", 0 },
+    { "listlibraries", 1 },                                                            
+    { "listlibraries", 2 },                                                            
+    { "listlibraries", 3 },                                                            
     { "getvariablehistory", 1 },                                                            
     { "getvariablehistory", 2 },                                                            
     { "getvariablehistory", 3 },                                                            
@@ -657,6 +665,7 @@ static const CRPCConvertParamMayBeString vRPCConvertParamsMayBeString[] =
     { "listassets", 0 },
     { "liststreams", 0 },
     { "listvariables", 0 },
+    { "listlibraries", 0 },
     { "listupgrades", 0 },
     { "listtxfilters", 0 },                                                            
     { "liststreamfilters", 0 },                                                            

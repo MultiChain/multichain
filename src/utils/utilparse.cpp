@@ -656,6 +656,29 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                                         }
                                     }                                    
                                 }
+                                if(entity.GetEntityType() == MC_ENT_TYPE_LIBRARY)
+                                {
+                                    if(mapSpecialEntity)
+                                    {
+                                        if(required)
+                                        {
+                                            *required |= MC_PTP_WRITE;                    
+                                        }
+                                        std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_WRITE);
+                                        if (it == mapSpecialEntity->end())
+                                        {
+                                            mapSpecialEntity->insert(make_pair(MC_PTP_WRITE,*(uint256*)(entity.GetTxID())));
+                                        }
+                                        else
+                                        {
+                                            if(it->second != *(uint256*)(entity.GetTxID()))
+                                            {
+                                                strFailReason="Invalid publish script, multiple libraries";
+                                                return false;                                                                                                            
+                                            }
+                                        }
+                                    }                                    
+                                }
                             }                        
                             else
                             {

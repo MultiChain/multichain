@@ -178,6 +178,15 @@ int mc_Script::DeleteElement(int element)
         m_lpCoord[2*elem + 0]=m_lpCoord[2*(elem+1) + 0];
         m_lpCoord[2*elem + 1]=m_lpCoord[2*(elem+1) + 1];
     }
+    
+    if(element == (m_NumElements-1))
+    {
+        if(m_Size == (m_lpCoord[2*(elem+1) + 0] + m_lpCoord[2*(elem+1) + 1]))
+        {
+            m_Size=m_lpCoord[2*element + 0];
+        }         
+    }
+
     m_NumElements--;
     m_CurrentElement=-1;
     

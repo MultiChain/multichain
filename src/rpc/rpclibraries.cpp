@@ -7,15 +7,17 @@
 
 #include "rpc/rpcwallet.h"
 
-Value createvariablefromcmd(const Array& params, bool fHelp)
+bool mc_JSInExtendedScript(size_t size);
+
+Value createlibraryfromcmd(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 2 || params.size() > 5)
+    if (fHelp || params.size() != 5)
         throw runtime_error("Help message not found\n");
 
-    if (strcmp(params[1].get_str().c_str(),"variable"))
+    if (strcmp(params[1].get_str().c_str(),"library"))
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type, should be stream");
 
-    if(mc_gState->m_Features->Variables() == 0)
+    if(mc_gState->m_Features->Libraries() == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
     }   
@@ -35,7 +37,7 @@ Value createvariablefromcmd(const Array& params, bool fHelp)
     int errorCode=RPC_INVALID_PARAMETER;
     
     if (params[2].type() != str_type)
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid variable name, should be string");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid library name, should be string");
             
     if(!params[2].get_str().empty())
     {        
@@ -44,13 +46,13 @@ Value createvariablefromcmd(const Array& params, bool fHelp)
         
     if(variable_name == "*")
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid variable name: *");                                                                                            
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid library name: *");                                                                                            
     }
 
     unsigned char buf_a[MC_AST_ASSET_REF_SIZE];    
     if(AssetRefDecode(buf_a,variable_name.c_str(),variable_name.size()))
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid variable name, looks like a variable reference");                                                                                                    
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid library name, looks like a library reference");                                                                                                    
     }
             
     
@@ -61,11 +63,11 @@ Value createvariablefromcmd(const Array& params, bool fHelp)
         {
             if(type == MC_ENT_KEYTYPE_NAME)
             {
-                throw JSONRPCError(RPC_DUPLICATE_NAME, "Variable, stream or asset with this name already exists");                                    
+                throw JSONRPCError(RPC_DUPLICATE_NAME, "Variable, library, stream or asset with this name already exists");                                    
             }
             else
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid variable name");                                    
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid library name");                                    
             }
         }        
     }
@@ -135,35 +137,59 @@ Value createvariablefromcmd(const Array& params, bool fHelp)
     {        
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(unsigned char*)(variable_name.c_str()),variable_name.size());
     }
-    unsigned char b=1;        
+    
+    unsigned char b=255;        
+    if(params[3].type() != obj_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid options flag, should be object");
+    }
+    BOOST_FOREACH(const Pair& d, params[3].get_obj()) 
+    {
+        if(d.name_ == "updates")
+        {
+            if(d.value_.type() != str_type)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid updates field");
+            }
+            if(d.value_.get_str() == "none")b=0x00;
+            if(d.value_.get_str() == "instant")b=0x01;
+            if(d.value_.get_str() == "approve")b=0x04;
+            if(b == 255)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid updates field");                        
+            }
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid option: "+d.name_);                    
+        }
+    }
+    
+    if(b == 255)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing updates field");                        
+    }
+    
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);
     
     
-    if (params.size() > 3)
-    {
-        if(params[3].type() != bool_type)
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid open flag, should be boolean");
-        if(!params[3].get_bool())
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid open flag, should be true");
-    }
-    
-    
     CScript scriptOpReturn=CScript();
-    bool js_extended=false;
-    size_t max_size=MC_AST_MAX_NOT_EXTENDED_VARIABLE_SIZE;
+    string js;
     lpDetailsScript->Clear();
-    if (params.size() > 4)
+    
+    if(params[4].type() != str_type)
     {
-        ParseRawValue(&(params[4]),lpDetails,lpDetailsScript,&max_size,&errorCode,&strError);        
-        if(strError.size())
-        {
-            goto exitlbl;
-        }
-        if(max_size > MC_AST_MAX_NOT_EXTENDED_VARIABLE_SIZE)
-        {
-            js_extended=true;
-        }
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid library code, expecting string");                            
     }
+    
+    js=params[4].get_str();
+    
+    bool js_extended=mc_JSInExtendedScript(js.size());
+    if(!js_extended)
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)js.c_str(),js.size());                                                        
+    }
+    
     lpDetailsScript->Clear();
     
     int err;
@@ -175,10 +201,10 @@ Value createvariablefromcmd(const Array& params, bool fHelp)
     size_t elem_size;
     const unsigned char *elem;
     
-    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_VARIABLE,0,script,bytes);
+    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_LIBRARY,0,script,bytes);
     if(err)
     {
-        strError= "Invalid value or variable name, too long";
+        strError= "Invalid value or library name, too long";
         goto exitlbl;
     }
 
@@ -189,12 +215,8 @@ Value createvariablefromcmd(const Array& params, bool fHelp)
     {
         lpDetails->Clear();
         lpDetails->AddElement();
-        ParseRawValue(&(params[4]),lpDetails,lpDetailsScript,NULL,&errorCode,&strError);        
-        if(strError.size())
-        {
-            goto exitlbl;
-        }
-
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)js.c_str(),js.size());                                                        
+        
         elem=lpDetails->GetData(0,&elem_size);
         lpDetailsScript->Clear();
         lpDetailsScript->SetExtendedDetails(elem,elem_size);
@@ -217,12 +239,13 @@ exitlbl:
     return wtx.GetHash().GetHex();    
 }
 
-Value setvariablevaluefrom(const Array& params, bool fHelp)
+
+Value addlibraryupdatefrom(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 2 || params.size() > 3)
+    if (fHelp || params.size() != 4)
         throw runtime_error("Help message not found\n");
 
-    if(mc_gState->m_Features->Variables() == 0)
+    if(mc_gState->m_Features->Libraries() == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
     }   
@@ -230,21 +253,28 @@ Value setvariablevaluefrom(const Array& params, bool fHelp)
     unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
     memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
     mc_EntityDetails entity;
+    mc_EntityDetails update_entity;
     
     if (params.size() > 1 && params[1].type() != null_type && !params[1].get_str().empty())
     {        
-        ParseEntityIdentifier(params[1],&entity, MC_ENT_TYPE_VARIABLE);           
+        ParseEntityIdentifier(params[1],&entity, MC_ENT_TYPE_LIBRARY);           
         if(entity.IsFollowOn())
         {
-            throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Variable with this identifier not found");                                                                
+            throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Library with this identifier not found");                                                                
         }
         memcpy(buf,entity.GetFullRef(),MC_AST_ASSET_FULLREF_SIZE);
     }
     else
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid variable identifier");        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid library identifier");        
     }
 
+    if(params[2].get_str().size() == 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid update name");                
+    }
+    
+    
     CWalletTx wtx;
     
     mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;    
@@ -265,22 +295,33 @@ Value setvariablevaluefrom(const Array& params, bool fHelp)
     CScript scriptOpReturn=CScript();
     int errorCode=RPC_INVALID_PARAMETER;
     string strError;    
-    bool js_extended=false;
-    size_t max_size=MC_AST_MAX_NOT_EXTENDED_VARIABLE_SIZE;
+    string js;
     lpDetailsScript->Clear();
-    if (params.size() > 2)
-    {
-        ParseRawValue(&(params[2]),lpDetails,lpDetailsScript,&max_size,&errorCode,&strError);        
-        if(strError.size())
-        {
-            goto exitlbl;
-        }
-        if(max_size > MC_AST_MAX_NOT_EXTENDED_VARIABLE_SIZE)
-        {
-            js_extended=true;
-        }
+    
+    string update_name=params[2].get_str();
+    
+    if(update_name.size())
+    {        
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPDATE_NAME,(unsigned char*)(update_name.c_str()),update_name.size());
     }
-    lpDetailsScript->Clear();
+    
+    if(mc_gState->m_Assets->FindUpdateByName(&update_entity,entity.GetTxID(),update_name.c_str()))
+    {
+        throw JSONRPCError(RPC_DUPLICATE_NAME, "Update with this name already exists");                                    
+    }
+    
+    if(params[3].type() != str_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid library code, expecting string");                            
+    }
+    
+    js=params[3].get_str();
+    
+    bool js_extended=mc_JSInExtendedScript(js.size());
+    if(!js_extended)
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)js.c_str(),js.size());                                                        
+    }
     
     int err;
     size_t bytes;
@@ -306,11 +347,7 @@ Value setvariablevaluefrom(const Array& params, bool fHelp)
     {
         lpDetails->Clear();
         lpDetails->AddElement();
-        ParseRawValue(&(params[2]),lpDetails,lpDetailsScript,NULL,&errorCode,&strError);        
-        if(strError.size())
-        {
-            goto exitlbl;
-        }
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)js.c_str(),js.size());                                                        
 
         elem=lpDetails->GetData(0,&elem_size);
         lpDetailsScript->Clear();
@@ -353,14 +390,14 @@ Value setvariablevaluefrom(const Array& params, bool fHelp)
                 {
                     if(mc_gState->m_Permissions->CanWrite(entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
                     {
-                        strError= "Setting variable value is not allowed from this address";
+                        strError= "Library update is not allowed from this address";
                         errorCode=RPC_INSUFFICIENT_PERMISSIONS;
                         goto exitlbl;
                     }                                                 
                 }
                 else
                 {
-                    strError= "Setting variable value is allowed only from P2PKH addresses";
+                    strError= "Library update is allowed only from P2PKH addresses";
                     goto exitlbl;
                 }
             }
@@ -382,7 +419,7 @@ Value setvariablevaluefrom(const Array& params, bool fHelp)
                 }                    
                 if(!issuer_found)
                 {
-                    strError= "Setting variable value is not allowed from this wallet";
+                    strError= "Library update is not allowed from this wallet";
                     errorCode=RPC_INSUFFICIENT_PERMISSIONS;
                     goto exitlbl;
                 }
@@ -390,14 +427,14 @@ Value setvariablevaluefrom(const Array& params, bool fHelp)
         }
         else
         {
-            strError= "Setting variable value not allowed for this variable: "+params[1].get_str();
+            strError= "Library update not allowed for this library: "+params[1].get_str();
             errorCode=RPC_NOT_ALLOWED;
             goto exitlbl;
         }
     }   
     else
     {
-        strError= "Variable not found";
+        strError= "Library not found";
         errorCode=RPC_ENTITY_NOT_FOUND;
         goto exitlbl;
     }
@@ -417,12 +454,12 @@ exitlbl:
     return wtx.GetHash().GetHex();    
 }
 
-Value setvariablevalue(const Array& params, bool fHelp)
+Value addlibraryupdate(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > 2)
+    if (fHelp || params.size() !=  3)
         throw runtime_error("Help message not found\n");
 
-    if(mc_gState->m_Features->Variables() == 0)
+    if(mc_gState->m_Features->Libraries() == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
     }   
@@ -434,140 +471,86 @@ Value setvariablevalue(const Array& params, bool fHelp)
         ext_params.push_back(value);
     }
     
-    return setvariablevaluefrom(ext_params,fHelp);    
+    return addlibraryupdatefrom(ext_params,fHelp);    
 }
 
-Value getvariablevalue(const Array& params, bool fHelp)
-{
-    if (fHelp || params.size() != 1)
-        mc_ThrowHelpMessage("getvariablevalue");        
-
-    if(mc_gState->m_Features->Variables() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
-    }   
-    
-    mc_EntityDetails variable_entity;
-    mc_EntityDetails last_entity;
-    ParseEntityIdentifier(params[0],&variable_entity,MC_ENT_TYPE_VARIABLE);
-
-    if(variable_entity.IsFollowOn())
-    {
-        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Variable with this create txid not found");                                                                
-    }
-    
-    if(mc_gState->m_Assets->FindLastEntity(&last_entity,&variable_entity) == 0)
-    {
-        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Variable not found");                
-    }
-    return mc_ExtractValueJSONObject(&last_entity);
-}
-
-Value getvariablehistory(const Array& params, bool fHelp)
-{
-    if (fHelp || params.size() < 1 || params.size() > 4)
-        mc_ThrowHelpMessage("getvariablehistory");        
-
-    if(mc_gState->m_Features->Variables() == 0)
-    {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
-    }   
-    
-    uint32_t output_level;
-    
-    int count,start;
-    int history_items;
-    
-    count=2147483647;
-    if (params.size() > 2)    
-    {
-        count=paramtoint(params[2],true,0,"Invalid count");
-    }
-    start=-count;
-    if (params.size() > 3)    
-    {
-        start=paramtoint(params[3],false,0,"Invalid start");
-    }
-    
-    mc_EntityDetails variable_entity;
-    mc_EntityDetails last_entity;
-    ParseEntityIdentifier(params[0],&variable_entity,MC_ENT_TYPE_VARIABLE);
-
-    if(variable_entity.IsFollowOn())
-    {
-        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Variable with this create txid not found");                                                                
-    }
-
-    if(mc_gState->m_Assets->FindLastEntity(&last_entity,&variable_entity) == 0)
-    {
-        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Variable not found");                
-    }
-    
-    history_items=mc_GetEntityIndex(&last_entity)+1;
-    output_level=0x40;
-    
-    if (params.size() > 1)    
-    {
-        if(paramtobool(params[1]))
-        {
-            output_level|=0x80;
-        }
-    }
-    
-    mc_AdjustStartAndCount(&count,&start,history_items);
-    
-    return VariableHistory(&last_entity,count,start,output_level);
-}
-
-Value getvariableinfo(const Array& params, bool fHelp)
+Value getlibrarycode(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
-        mc_ThrowHelpMessage("getvariableinfo");        
+        throw runtime_error("Help message not found\n");
     
-    if(mc_gState->m_Features->Variables() == 0)
+    if(mc_gState->m_Features->Filters() == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
     }   
     
-    if(params[0].type() != str_type)
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid variable identifier, expected string");                                                        
-    }
+    mc_EntityDetails filter_entity;
+    mc_EntityDetails update_entity;
+    mc_EntityDetails *entity_to_use;
     
-    uint32_t output_level;
-    mc_EntityDetails entity;
-    ParseEntityIdentifier(params[0].get_str(),&entity, MC_ENT_TYPE_VARIABLE);           
+    
+    ParseEntityIdentifier(params[0],&filter_entity,MC_ENT_TYPE_LIBRARY);
+    
 
-    if(entity.IsFollowOn())
+    if(filter_entity.IsFollowOn())
     {
-        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Variable with this create txid not found");                                                                
+        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Library with this create txid not found");                                                                
     }
     
-    output_level=0x06;
+    entity_to_use=&filter_entity;
     
-    if (params.size() > 1)    
+    if(params.size() == 1)
     {
-        if(paramtobool(params[1]))
+        if(mc_gState->m_Assets->FindLastEntity(&update_entity,&filter_entity) == 0)
         {
-            output_level|=0x20;
+            throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Library not found");                
+        }
+        entity_to_use=&update_entity;
+    }
+    else
+    {
+        if(params[1].get_str().size())
+        {
+            if(mc_gState->m_Assets->FindUpdateByName(&update_entity,filter_entity.GetTxID(),params[1].get_str().c_str()) == 0)
+            {
+                throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Library update not found");                
+            }            
+            entity_to_use=&update_entity;
         }
     }
+
+    char *ptr;
+    size_t value_size;
+    string filter_code="";
     
-    return VariableEntry(entity.GetTxID(),output_level);        
+    
+    ptr=(char *)entity_to_use->GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
+
+    if(ptr == NULL)
+    {
+        return Value::null;
+    }
+
+    if(value_size)
+    {
+        filter_code.assign(ptr,value_size);        
+    }
+    
+    return filter_code;
 }
 
-Value listvariables(const Array& params, bool fHelp)
+Value listlibraries(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 4)
        throw runtime_error("Help message not found\n");
 
-    if(mc_gState->m_Features->Variables() == 0)
+    if(mc_gState->m_Features->Libraries() == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
     }   
     
 
-    mc_Buffer *variables;
+    mc_Buffer *libraries;
     unsigned char *txid;
     uint32_t output_level;
     Array results;
@@ -584,7 +567,7 @@ Value listvariables(const Array& params, bool fHelp)
         start=paramtoint(params[3],false,0,"Invalid start");
     }
     
-    variables=NULL;
+    libraries=NULL;
     vector<string> inputStrings;
     if (params.size() > 0 && params[0].type() != null_type && ((params[0].type() != str_type) || (params[0].get_str() !="*" ) ) )
     {        
@@ -612,14 +595,14 @@ Value listvariables(const Array& params, bool fHelp)
             for(int is=0;is<(int)inputStrings.size();is++)
             {
                 mc_EntityDetails entity;
-                ParseEntityIdentifier(inputStrings[is],&entity, MC_ENT_TYPE_VARIABLE);           
+                ParseEntityIdentifier(inputStrings[is],&entity, MC_ENT_TYPE_LIBRARY);           
                 if(entity.IsFollowOn())
                 {
-                    throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Variable with this identifier " + inputStrings[is] + "not found");                                                                
+                    throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Library with this identifier " + inputStrings[is] + "not found");                                                                
                 }
                 uint256 hash=*(uint256*)entity.GetTxID();
 
-                variables=mc_gState->m_Assets->GetEntityList(variables,(unsigned char*)&hash,MC_ENT_TYPE_VARIABLE);
+                libraries=mc_gState->m_Assets->GetEntityList(libraries,(unsigned char*)&hash,MC_ENT_TYPE_LIBRARY);
             }
         }
     }
@@ -627,12 +610,12 @@ Value listvariables(const Array& params, bool fHelp)
     {        
         {
             LOCK(cs_main);
-            variables=mc_gState->m_Assets->GetEntityList(variables,NULL,MC_ENT_TYPE_VARIABLE);
+            libraries=mc_gState->m_Assets->GetEntityList(libraries,NULL,MC_ENT_TYPE_LIBRARY);
         }
     }
     
-    if(variables == NULL)
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot open variable database");
+    if(libraries == NULL)
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot open libraries database");
 
     output_level=0x06;
     
@@ -644,23 +627,23 @@ Value listvariables(const Array& params, bool fHelp)
         }
     }
     
-    mc_AdjustStartAndCount(&count,&start,variables->GetCount());
+    mc_AdjustStartAndCount(&count,&start,libraries->GetCount());
     
     Array partial_results;
     int unconfirmed_count=0;
     if(count > 0)
     {
-        for(int i=0;i<variables->GetCount();i++)
+        for(int i=0;i<libraries->GetCount();i++)
         {
             Object entry;
 
-            txid=variables->GetRow(i);
-            entry=VariableEntry(txid,output_level);
+            txid=libraries->GetRow(i);
+            entry=LibraryEntry(txid,output_level);
             if(entry.size()>0)
             {
                 BOOST_FOREACH(const Pair& p, entry) 
                 {
-                    if(p.name_ == "variableref")
+                    if(p.name_ == "libraryref")
                     {
                         if(p.value_.type() == str_type)
                         {
@@ -677,18 +660,18 @@ Value listvariables(const Array& params, bool fHelp)
 
         sort(results.begin(), results.end(), AssetCompareByRef);
         
-        for(int i=0;i<variables->GetCount();i++)
+        for(int i=0;i<libraries->GetCount();i++)
         {
             Object entry;
 
-            txid=variables->GetRow(i);
+            txid=libraries->GetRow(i);
 
-            entry=VariableEntry(txid,output_level);
+            entry=LibraryEntry(txid,output_level);
             if(entry.size()>0)
             {
                 BOOST_FOREACH(const Pair& p, entry) 
                 {
-                    if(p.name_ == "variableref")
+                    if(p.name_ == "libraryref")
                     {
                         if(p.value_.type() != str_type)
                         {
@@ -701,11 +684,11 @@ Value listvariables(const Array& params, bool fHelp)
     }
 
     bool return_partial=false;
-    if(count != variables->GetCount())
+    if(count != libraries->GetCount())
     {
         return_partial=true;
     }
-    mc_gState->m_Assets->FreeEntityList(variables);
+    mc_gState->m_Assets->FreeEntityList(libraries);
     if(return_partial)
     {
         for(int i=start;i<start+count;i++)

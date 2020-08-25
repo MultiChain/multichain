@@ -7,8 +7,30 @@
 #include "v8/v8utils.h"
 #include <cassert>
 
+#include <boost/foreach.hpp>
+using namespace std;
+
+
 namespace mc_v8
 {
+    
+  std::map<std::string, std::string> callbackNameToFixed;
+  std::map<std::string, std::string> callbackFixedToName;
+
+  std::string callbackFixedName(std::string name)
+  {
+      std::map<std::string, std::string>::const_iterator it=callbackNameToFixed.find(name);
+      if(it == callbackNameToFixed.end())
+      {
+          int n=callbackNameToFixed.size();
+          string fixed=strprintf("fixed%06d",n);
+          callbackNameToFixed.insert(make_pair(name,fixed));
+          callbackFixedToName.insert(make_pair(fixed,name));
+          return fixed;
+      }
+      return it->second;
+  }
+    
 /**
  * Call an RPC function from a V8 JS callback.
  *

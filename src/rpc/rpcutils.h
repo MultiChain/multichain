@@ -127,6 +127,7 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
 Object FilterEntry(const unsigned char *txid,uint32_t output_level,uint32_t filter_type);
 Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_level);
 Object VariableEntry(const unsigned char *txid,uint32_t output_level);
+Object LibraryEntry(const unsigned char *txid,uint32_t output_level);
 Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t output_level);
 string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript,int *eErrorCode);
 bool FindPreparedTxOut(CTxOut& txout,COutPoint outpoint,string& reason);

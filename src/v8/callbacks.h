@@ -10,7 +10,7 @@
 namespace mc_v8
 {
 extern std::map<std::string, v8::FunctionCallback> callbackLookup;
-
+  std::string callbackFixedName(std::string name);
 } // namespace mc_v8
 
 #endif /* MULTICHAIN_CALLBACKS_H_ */

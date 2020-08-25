@@ -2683,6 +2683,209 @@ Object VariableEntry(const unsigned char *txid,uint32_t output_level)
     return entry;
 }
 
+Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
+{
+// output_level constants
+// 0x0000 minimal: name, variableref 
+// 0x0001 
+// 0x0002 current value
+// 0x0004 createtxid,     
+// 0x0008 
+// 0x0020 last txid and writers
+// 0x0040 history txid and writers
+// 0x0080 blockinfo
+// 0x0100 add "type":"variable"
+    
+    Object entry;
+    mc_EntityDetails entity;
+    mc_EntityDetails sec_entity;
+    mc_EntityDetails *genesis_entity;
+    mc_EntityDetails *followon;
+    unsigned char *ptr;
+
+    genesis_entity=&sec_entity;
+    followon=&sec_entity;
+    
+    if(txid == NULL)
+    {
+        entry.push_back(Pair("libraryref", ""));
+        return entry;
+    }
+    
+    uint256 hash=*(uint256*)txid;
+    
+    if(mc_gState->m_Assets->FindEntityByTxID(&entity,txid))
+    {
+        genesis_entity->Zero();
+        if(entity.IsFollowOn())
+        {
+            mc_gState->m_Assets->FindEntityByFollowOn(genesis_entity,txid);
+        }
+        else
+        {
+            memcpy(genesis_entity,&entity,sizeof(mc_EntityDetails));
+        }
+        
+        if(output_level & 0x100)
+        {
+            entry.push_back(Pair("type", "library"));                        
+        }
+        
+        ptr=(unsigned char *)genesis_entity->GetName();
+        if(ptr && strlen((char*)ptr))
+        {
+            entry.push_back(Pair("name", string((char*)ptr)));            
+        }
+        if(output_level & 0x0004)
+        {
+            entry.push_back(Pair("createtxid", hash.GetHex()));
+        }
+        ptr=(unsigned char *)genesis_entity->GetRef();
+        string assetref="";
+        if(genesis_entity->IsUnconfirmedGenesis())
+        {
+            Value null_value;
+            entry.push_back(Pair("libraryref",null_value));
+        }
+        else
+        {
+            assetref += itostr((int)mc_GetLE(ptr,4));
+            assetref += "-";
+            assetref += itostr((int)mc_GetLE(ptr+4,4));
+            assetref += "-";
+            assetref += itostr((int)mc_GetLE(ptr+8,2));
+            entry.push_back(Pair("libraryref", assetref));
+        }
+
+        string updates_mode="none";
+        if(genesis_entity->AllowedFollowOns())
+        {
+            updates_mode="instant";
+            if(genesis_entity->ApproveRequired())
+            {
+                updates_mode="approve";
+            }
+        }
+        
+        entry.push_back(Pair("updates", updates_mode));
+        
+/*        
+        entStat.Zero();
+        memcpy(&entStat,genesis_entity->GetShortRef(),mc_gState->m_NetworkParams->m_AssetRefSize);
+        
+        int history_items=0;
+        
+        last_entity.Zero();
+        if(output_level & 0x0022)
+        {
+            history_items=mc_gState->m_Assets->FindLastEntityByGenesis(&last_entity,genesis_entity);
+            if(history_items)
+            {
+                history_items=mc_GetEntityIndex(&last_entity)+1;
+                entry.push_back(Pair("historylen",history_items)); 
+                entry.push_back(Pair("value",mc_ExtractValueJSONObject(&last_entity))); 
+            }
+            else
+            {
+                Value null_value;
+                entry.push_back(Pair("historylen",0)); 
+                entry.push_back(Pair("value",null_value)); 
+            }
+        }
+        
+
+        if(output_level & 0x0020)  
+        {
+            string lasttxid;
+            Array lastwriters;
+            Array issues;
+            if(history_items > 0)
+            {
+                issues=VariableHistory(&last_entity,1,history_items-1,output_level | 0x0040,lasttxid,lastwriters);
+            }
+//            entry.push_back(Pair("history",issues));                    
+            entry.push_back(Pair("lastwriters",lastwriters));                    
+            entry.push_back(Pair("lasttxid",lasttxid));                    
+        }        
+ */ 
+        Array updates;
+        size_t value_size;
+        int64_t offset,new_offset;
+        uint32_t value_offset;
+        const unsigned char *ptr;
+
+        if(( (output_level & 0x0020) !=0 ) )
+        {
+            mc_Buffer *followons;
+            followons=mc_gState->m_Assets->GetFollowOns(txid);
+            for(int i=followons->GetCount()-1;i>=0;i--)
+            {
+                Object issue;
+                followon->Zero();
+                if(mc_gState->m_Assets->FindEntityByTxID(followon,followons->GetRow(i)))
+                {
+                    if(output_level & 0x0020)
+                    {
+                        issue.push_back(Pair("txid", ((uint256*)(followon->GetTxID()))->ToString().c_str()));    
+
+                        Array followon_issuers;
+
+                        ptr=followon->GetScript();
+                        offset=0;
+                        while(offset>=0)
+                        {
+                            new_offset=followon->NextParam(offset,&value_offset,&value_size);
+                            if(value_offset > 0)
+                            {
+                                if(ptr[offset+1] == MC_ENT_SPRM_UPDATE_NAME)
+                                {
+                                    string update_name ((char*)ptr+value_offset,value_size);
+                                    issue.push_back(Pair("updatename",update_name));                    
+                                }
+                                if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
+                                {
+                                    if(value_size == 20)
+                                    {
+                                        followon_issuers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
+                                    }
+                                    if(value_size == 24)
+                                    {
+                                        unsigned char tptr[4];
+                                        memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
+                                        if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
+                                        {
+                                            followon_issuers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
+                                        }
+                                        else
+                                        {
+                                            followon_issuers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
+                                        }
+                                    }
+                                }
+                            }
+                            offset=new_offset;
+                        }      
+
+                        issue.push_back(Pair("issuers",followon_issuers));                    
+                        updates.push_back(issue);                    
+                    }
+                }            
+                entry.push_back(Pair("updates",updates));
+            }
+            mc_gState->m_Assets->FreeEntityList(followons);
+        }       
+    }
+    else
+    {
+        Value null_value;
+        entry.push_back(Pair("name",null_value));
+        entry.push_back(Pair("createtxid",null_value));
+        entry.push_back(Pair("libraryref", null_value));
+    }
+    
+    return entry;
+}
+
 
 string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, int *required,int *eErrorCode)
 {
@@ -4476,6 +4679,10 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
         case MC_ENT_TYPE_VARIABLE:
             entity_nameU="Variable";
             entity_nameL="variable";
+            break;
+        case MC_ENT_TYPE_LIBRARY:
+            entity_nameU="Library";
+            entity_nameL="library";
             break;
         default:
             entity_nameU="Entity";

@@ -24,6 +24,7 @@
 Value createupgradefromcmd(const Array& params, bool fHelp);
 Value createfilterfromcmd(const Array& params, bool fHelp);
 Value createvariablefromcmd(const Array& params, bool fHelp);
+Value createlibraryfromcmd(const Array& params, bool fHelp);
 
 void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
 {
@@ -610,6 +611,10 @@ Value createfromcmd(const Array& params, bool fHelp)
     if (strcmp(params[1].get_str().c_str(),"variable") == 0)
     {
         return createvariablefromcmd(params,fHelp);    
+    }
+    if (strcmp(params[1].get_str().c_str(),"library") == 0)
+    {
+        return createlibraryfromcmd(params,fHelp);    
     }
     
     throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type, should be stream");

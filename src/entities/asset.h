@@ -60,7 +60,8 @@
 #define MC_ENT_TYPE_FILTER            0x11
 #define MC_ENT_TYPE_LICENSE_TOKEN     0x12
 #define MC_ENT_TYPE_VARIABLE          0x13
-#define MC_ENT_TYPE_MAX               0x13
+#define MC_ENT_TYPE_LIBRARY           0x14
+#define MC_ENT_TYPE_MAX               0x14
 
 #define MC_ENT_SPRM_NAME                      0x01                              // Cross-entity parameters
 #define MC_ENT_SPRM_FOLLOW_ONS                0x02
@@ -71,6 +72,7 @@
 #define MC_ENT_SPRM_RESTRICTIONS              0x07
 #define MC_ENT_SPRM_JSON_VALUE                0x08
 #define MC_ENT_SPRM_VOUT                      0x09
+#define MC_ENT_SPRM_UPDATE_NAME               0x0a
 
 #define MC_ENT_SPRM_ASSET_MULTIPLE            0x41                              // Entity-specific parameters
 #define MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION  0x42
@@ -214,7 +216,9 @@ typedef struct mc_EntityDetails
     int IsFollowOn(); 
 //    int HasFollowOns(); 
     int AllowedFollowOns(); 
+    int UpdateMode(); 
     int AnyoneCanIssueMore(); 
+    int ApproveRequired();     
     uint32_t Permissions(); 
     uint32_t Restrictions(); 
     int AnyoneCanWrite(); 
@@ -323,6 +327,7 @@ typedef struct mc_AssetDB
     int FindEntityByFullRef (mc_EntityDetails *entity, unsigned char* full_ref);
     int FindLastEntity(mc_EntityDetails *last_entity, mc_EntityDetails *entity);    
     int FindLastEntityByGenesis(mc_EntityDetails *last_entity, mc_EntityDetails *genesis_entity);    
+    int FindUpdateByName(mc_EntityDetails *entity, const void* txid,const char* name);
     
     void ReloadDetailsIfNeeded(mc_EntityDetails *entity);
     

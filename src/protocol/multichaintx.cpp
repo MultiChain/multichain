@@ -825,6 +825,7 @@ bool MultiChainTransaction_CheckVariableUpdateDetails(const CTransaction& tx,
     
     err=mc_gState->m_TmpScript->GetNewEntityType(&new_entity_type,&entity_update,details_script,&details_script_size);
     
+    string entity_type_str="Variable";
     if(err == 0)    
     {
         if(entity_update == 0)
@@ -834,9 +835,39 @@ bool MultiChainTransaction_CheckVariableUpdateDetails(const CTransaction& tx,
         }
         if(new_entity_type != MC_ENT_TYPE_VARIABLE)
         {
-            reason="Metadata script rejected - entity type mismatch in update script, should be variable";
-            return false;
+            if(mc_gState->m_Features->Libraries())
+            {
+                if(new_entity_type != MC_ENT_TYPE_LIBRARY)
+                {
+                    reason="Metadata script rejected - entity type mismatch in update script, should be variable or library";
+                    return false;                    
+                }                
+                entity_type_str="Library";
+            }
+            else
+            {
+                reason="Metadata script rejected - entity type mismatch in update script, should be variable";
+                return false;
+            }
         }      
+        
+        if(new_entity_type == MC_ENT_TYPE_LIBRARY)
+        {
+            uint64_t value_offset;
+            size_t value_size;
+            mc_EntityDetails update_entity;
+            
+            value_offset=mc_FindSpecialParamInDetailsScript(details->details_script,details->details_script_size,MC_ENT_SPRM_UPDATE_NAME,&value_size);
+            if(value_offset<(uint32_t)details->details_script_size)
+            {
+                string update_name ((char*)(details->details_script)+value_offset,value_size);
+                if(mc_gState->m_Assets->FindUpdateByName(&update_entity,entity->GetTxID(),update_name.c_str()))
+                {
+                    reason="Metadata script rejected - entity with this update name already found";
+                    return false;
+                }                
+            }
+        }
         
         unsigned char *ptr;
         size_t bytes;        
@@ -863,9 +894,10 @@ bool MultiChainTransaction_CheckVariableUpdateDetails(const CTransaction& tx,
     
     if(entity->AllowedFollowOns() == 0)
     {
-        reason="Asset follow-on script rejected - follow-ons not allowed for this asset";
+        reason="Follow-on script rejected - follow-ons not allowed for this " + entity_type_str;
         return false;                                                                                    
     }
+    
     details->SetRelevantEntity((unsigned char*)entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET);
 
     total=0;
@@ -956,11 +988,10 @@ bool MultiChainTransaction_CheckVariableUpdateDetails(const CTransaction& tx,
     err=mc_gState->m_Assets->InsertAssetFollowOn(&txid,offset,total,details_script,details_script_size,special_script,special_script_size,extended_script_row,entity->GetTxID(),1);
             
           
-    string entity_type_str="Variable";
     
     if(err)           
     {
-        reason="Variable update script rejected - could not insert new followon to database";
+        reason=entity_type_str + " update script rejected - could not insert new followon to database";
         return false;                                            
     }
         
@@ -969,8 +1000,8 @@ bool MultiChainTransaction_CheckVariableUpdateDetails(const CTransaction& tx,
     {
         uint256 otxid;
         memcpy(&otxid,entity->GetTxID(),32);
-        if(fDebug)LogPrint("mchn","Variable update. TxID: %s,  Original %s create txid: %s\n",
-                tx.GetHash().GetHex().c_str(),entity_type_str.c_str(),otxid.GetHex().c_str());
+        if(fDebug)LogPrint("mchn","%s update. TxID: %s,  Original %s create txid: %s\n",
+                entity_type_str.c_str(),tx.GetHash().GetHex().c_str(),entity_type_str.c_str(),otxid.GetHex().c_str());
     }
     
     return true;
@@ -1142,7 +1173,8 @@ bool MultiChainTransaction_CheckEntityItem(const CTransaction& tx,
     details->SetRelevantEntity(short_txid);
     
     if((entity.GetEntityType() == MC_ENT_TYPE_ASSET) || 
-       (entity.GetEntityType() == MC_ENT_TYPE_VARIABLE))                        // Asset or variable update
+       (entity.GetEntityType() == MC_ENT_TYPE_VARIABLE) ||
+       (entity.GetEntityType() == MC_ENT_TYPE_LIBRARY))                         // Asset, variable or library update
     {
         if(entity.GetEntityType() == MC_ENT_TYPE_ASSET)
         {
@@ -1151,7 +1183,7 @@ bool MultiChainTransaction_CheckEntityItem(const CTransaction& tx,
                 return false;            
             }
         }
-        if(entity.GetEntityType() == MC_ENT_TYPE_VARIABLE)
+        if( (entity.GetEntityType() == MC_ENT_TYPE_VARIABLE) || (entity.GetEntityType() == MC_ENT_TYPE_LIBRARY))
         {
             if(!MultiChainTransaction_CheckVariableUpdateDetails(tx,&entity,offset,vout,details,reason))
             {
@@ -2067,7 +2099,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     issue_vout=-1;
     
     
-    if(details->details_script_type == 0)                                       // New asset/variable with details script
+    if(details->details_script_type == 0)                                       // New asset/variable/library with details script
     {
         value_offset=mc_FindSpecialParamInDetailsScript(details->details_script,details->details_script_size,MC_ENT_SPRM_NAME,&value_size);
         if(value_offset<(uint32_t)details->details_script_size)
@@ -2218,18 +2250,29 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
         }        
     }    
 
-    if(mc_gState->m_Features->Variables())
+    string entity_type_str="Asset";
+    if(details->new_entity_type == MC_ENT_TYPE_VARIABLE)
+    {
+        entity_type_str="Variable";        
+    }
+    if(details->new_entity_type == MC_ENT_TYPE_LIBRARY)
+    {
+        entity_type_str="Library";        
+    }
+    
+    if( ((mc_gState->m_Features->Variables() != 0) && (details->new_entity_type == MC_ENT_TYPE_VARIABLE)) ||
+        ((mc_gState->m_Features->Libraries() != 0) && (details->new_entity_type == MC_ENT_TYPE_LIBRARY)) )    
     {
         if(details->new_entity_type == MC_ENT_TYPE_VARIABLE)                   
         {
             if(new_issue)
             {
-                reason="Variable script rejected - genesis script found";
+                reason=entity_type_str + " script rejected - genesis script found";
                 return false;                                                            
             }
             if(mc_gState->m_TmpAssetsOut->GetCount())
             {
-                reason="Variable script rejected - followon script found";
+                reason=entity_type_str + " script rejected - followon script found";
                 return false;                                                                            
             }
         }
@@ -2237,14 +2280,15 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     
     if(details->details_script_type >= 0)
     {
-        if(details->details_script_type)                                        // Updates are allowed only for assets and variables
+        if(details->details_script_type)                                        // Updates are allowed only for assets, variables and libraries
         {
             follow_on=true;            
         }
         else
         {
             if((details->new_entity_type == MC_ENT_TYPE_ASSET) || 
-               (details->new_entity_type == MC_ENT_TYPE_VARIABLE))
+               (details->new_entity_type == MC_ENT_TYPE_VARIABLE) || 
+               (details->new_entity_type == MC_ENT_TYPE_LIBRARY))
                     // If not - we'll deal with it later
             {
                 new_issue=true;
@@ -2351,7 +2395,9 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     
     if(details->new_entity_output >= 0)
     {
-        if( (details->new_entity_type != MC_ENT_TYPE_ASSET) && (details->new_entity_type != MC_ENT_TYPE_VARIABLE) )
+        if( (details->new_entity_type != MC_ENT_TYPE_ASSET) && 
+            (details->new_entity_type != MC_ENT_TYPE_VARIABLE) && 
+            (details->new_entity_type != MC_ENT_TYPE_LIBRARY) )
         {
             if(details->new_entity_type == MC_ENT_TYPE_LICENSE_TOKEN)
             {                    
@@ -2418,7 +2464,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
         bool can_issue=false;
-        if(details->new_entity_type == MC_ENT_TYPE_VARIABLE)                   
+        if( (details->new_entity_type == MC_ENT_TYPE_VARIABLE) || (details->new_entity_type == MC_ENT_TYPE_LIBRARY) )                  
         {
             if(details->IsRelevantInput(i,details->new_entity_output))
             {
@@ -2474,7 +2520,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     if(issuers.size() == 0)
     {
         reason="Inputs don't belong to valid issuer";
-        if(details->new_entity_type == MC_ENT_TYPE_VARIABLE)                   
+        if( (details->new_entity_type == MC_ENT_TYPE_VARIABLE) || (details->new_entity_type == MC_ENT_TYPE_LIBRARY) )                  
         {
             reason="Inputs don't belong to valid creator";            
         }
@@ -2502,7 +2548,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
             mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_LEFT_POSITION,(unsigned char*)&left_position,sizeof(left_position));                            
         }
         
-        if(details->new_entity_type == MC_ENT_TYPE_VARIABLE)                   
+        if( (details->new_entity_type == MC_ENT_TYPE_VARIABLE) && (details->new_entity_type == MC_ENT_TYPE_LIBRARY) )                  
         {        
             mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_VOUT,(unsigned char*)&(details->new_entity_output),sizeof(details->new_entity_output));                            
         }
@@ -2529,7 +2575,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
         {
             all_permissions |= MC_PTP_ACTIVATE | MC_PTP_SEND | MC_PTP_RECEIVE;
         }
-        if(details->new_entity_type == MC_ENT_TYPE_VARIABLE)                   
+        if( (details->new_entity_type == MC_ENT_TYPE_VARIABLE) || (details->new_entity_type == MC_ENT_TYPE_LIBRARY) )                  
         {
             all_permissions = MC_PTP_ADMIN | MC_PTP_ACTIVATE | MC_PTP_WRITE;
         }
@@ -2576,6 +2622,10 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
         {
             entity_type=MC_ENT_TYPE_VARIABLE;
         }
+        if(details->new_entity_type == MC_ENT_TYPE_LIBRARY)                   
+        {
+            entity_type=MC_ENT_TYPE_LIBRARY;
+        }
         err=mc_gState->m_Assets->InsertAsset(&txid,offset,entity_type,
                 total,asset_name,multiple,details->details_script,details->details_script_size,special_script,special_script_size,details->extended_script_row,update_mempool);                      
     }
@@ -2585,14 +2635,9 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     }
             
           
-    string entity_type_str="Asset";
     if(details->fLicenseTokenIssuance)
     {
         entity_type_str="License token";
-    }
-    if(details->new_entity_type == MC_ENT_TYPE_VARIABLE)
-    {
-        entity_type_str="Variable";        
     }
     
     if(err)           
@@ -2675,6 +2720,11 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
     }
     
     if(details->new_entity_type == MC_ENT_TYPE_VARIABLE)                        // Processed in another place
+    {
+        return true;        
+    }
+    
+    if(details->new_entity_type == MC_ENT_TYPE_LIBRARY)                        // Processed in another place
     {
         return true;        
     }
