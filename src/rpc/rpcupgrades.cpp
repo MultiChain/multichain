@@ -283,6 +283,83 @@ exitlbl:
     return wtx.GetHash().GetHex();    
 }
 
+bool ParseLibraryApproval(Value param,mc_EntityDetails *library_entity,mc_EntityDetails *update_entity)
+{
+    bool field_parsed,update_found,approve_found;
+    bool approval=false;
+    
+    if(param.type() == obj_type)
+    {
+        Object objParams = param.get_obj();
+        update_found=false;
+        approve_found=false;
+        BOOST_FOREACH(const Pair& s, objParams) 
+        {
+            field_parsed=false;
+            if(s.name_ == "update")
+            {
+                if(update_found)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"update field can appear only once in the object");                               
+                }
+                if(s.value_.type() == str_type)
+                {
+                    if(s.value_.get_str().size() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "Approval is not required for original library code");        
+                    }
+                    if(mc_gState->m_Assets->FindUpdateByName(update_entity,library_entity->GetTxID(),s.value_.get_str().c_str()) == 0)
+                    {
+                        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Library update not found");                
+                    }            
+                    LogPrintf("mchn: Library update found: %s (%s)\n",s.value_.get_str().c_str(),((uint256*)update_entity->GetTxID())->ToString().c_str());
+                }
+                else
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"update field should be string");                               
+                }
+                field_parsed=true;
+                update_found=true;
+            }            
+            if(s.name_ == "approve")
+            {
+                if(approve_found)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"approve field can appear only once in the object");                               
+                }
+                if(s.value_.type() == bool_type)
+                {
+                    approval=s.value_.get_bool();
+                }
+                else
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"approve should be boolean");                               
+                }       
+                field_parsed=true;
+                approve_found=true;
+            }
+            if(!field_parsed)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid field: %s",s.name_.c_str()));                           
+            }
+        }
+        if(!update_found)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER,"missing update field");                                           
+        }
+        if(!approve_found)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER,"missing approve filed");                                           
+        }
+    }
+    else
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid library approval, should be object");                                        
+    }        
+    
+    return approval;    
+}
+
 bool ParseStreamFilterApproval(Value param,mc_EntityDetails *stream_entity)
 {
     bool field_parsed,for_found,approve_found;
@@ -317,7 +394,7 @@ bool ParseStreamFilterApproval(Value param,mc_EntityDetails *stream_entity)
             {
                 if(approve_found)
                 {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER,"for field can appear only once in the object");                               
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"approve field can appear only once in the object");                               
                 }
                 if(s.value_.type() == bool_type)
                 {
@@ -346,7 +423,7 @@ bool ParseStreamFilterApproval(Value param,mc_EntityDetails *stream_entity)
     }
     else
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid stream approval, should be object");                                        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid stream filter approval, should be object");                                        
     }        
     
     return approval;
@@ -375,6 +452,7 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
     string entity_nameL; 
     bool fIsUpgrade=true;
     bool fIsStreamFilter=false;
+    bool fIsLibrary=false;
     
     switch(entity.GetEntityType())
     {
@@ -402,12 +480,27 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
             entity_nameL="filter";
             fIsUpgrade=false;
             break;
+        case MC_ENT_TYPE_LIBRARY:
+            if(mc_gState->m_Features->Libraries() == 0)
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
+            }   
+            if(entity.ApproveRequired() == 0)
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "Approval is not required for this library");        
+            }
+            entity_nameU="Library";
+            entity_nameL="library";
+            fIsUpgrade=false;
+            fIsLibrary=true;
+            break;
         default:
             throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Invalid identifier, should be upgrade or filter");                                
             break;
     }
 
     mc_EntityDetails stream_entity;
+    mc_EntityDetails update_entity;
     stream_entity.Zero();
     
     if(fIsStreamFilter)
@@ -420,12 +513,23 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
     }
     else
     {
-        approval=1;
-        if (params.size() > 2)    
+        if(fIsLibrary)
         {
-            if(!paramtobool(params[2]))
+            if (params.size() <= 2)    
             {
-                approval=0;
+                throw JSONRPCError(RPC_INVALID_PARAMS, "Missing library upddate");                    
+            }        
+            approval=ParseLibraryApproval(params[2],&entity,&update_entity);            
+        }
+        else
+        {
+            approval=1;
+            if (params.size() > 2)    
+            {
+                if(!paramtobool(params[2]))
+                {
+                    approval=0;
+                }
             }
         }
     }
@@ -524,14 +628,36 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
         lpScript->SetPermission(MC_PTP_FILTER,0,approval ? 4294967295U : 0,timestamp);
         uint160 filter_address;
         filter_address=0;
-        memcpy(&filter_address,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+        if(fIsLibrary)
+        {
+            memcpy(&filter_address,update_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+            unsigned char *ptr;
+            size_t bytes;
+
+            ptr=(unsigned char *)update_entity.GetSpecialParam(MC_ENT_SPRM_VOUT,&bytes);
+            if(ptr)
+            {
+                if((bytes>0) && (bytes<=4))
+                {
+                   memcpy(((unsigned char*)&filter_address)+MC_AST_SHORT_TXID_SIZE,ptr,bytes);
+                }
+            }      
+            else
+            {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Corrupted Library database");                                                                
+            }
+        }
+        else
+        {
+            memcpy(&filter_address,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+        }
         addresses.push_back(CKeyID(filter_address));
     }
     
     
     LogPrintf("mchn: %s %s %s (%s) from address %s\n",(approval != 0) ? "Approving" : "Disapproving",entity_nameL.c_str(),
             ((uint256*)entity.GetTxID())->ToString().c_str(),entity.GetName(),CBitcoinAddress(fromaddresses[0]).ToString().c_str());
-        
+
     
     CWalletTx wtx;
     LOCK (pwalletMain->cs_wallet_send);    

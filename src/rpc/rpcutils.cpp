@@ -2699,12 +2699,14 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
     Object entry;
     mc_EntityDetails entity;
     mc_EntityDetails sec_entity;
+    mc_EntityDetails *active_entity;
     mc_EntityDetails *genesis_entity;
     mc_EntityDetails *followon;
     unsigned char *ptr;
 
     genesis_entity=&sec_entity;
     followon=&sec_entity;
+    active_entity=&sec_entity;
     
     if(txid == NULL)
     {
@@ -2767,7 +2769,32 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
             }
         }
         
-        entry.push_back(Pair("updates", updates_mode));
+        entry.push_back(Pair("updatemode", updates_mode));
+        
+        Array updates;
+        size_t value_size;
+        int64_t offset,new_offset;
+        uint32_t value_offset;
+        const unsigned char *ptr;
+        
+        mc_gState->m_Assets->FindActiveUpdate(active_entity,genesis_entity->GetTxID());
+        if(active_entity->IsFollowOn())
+        {
+            ptr=(unsigned char *)active_entity->GetSpecialParam(MC_ENT_SPRM_UPDATE_NAME,&value_size);
+            if(ptr)
+            {
+                string update_name ((char*)ptr,value_size);
+                entry.push_back(Pair("active", update_name));
+            }      
+            else
+            {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Corrupted Library database");                                                                
+            }            
+        }
+        else
+        {
+            entry.push_back(Pair("active", ""));
+        }
         
 /*        
         entStat.Zero();
@@ -2808,13 +2835,8 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
             entry.push_back(Pair("lasttxid",lasttxid));                    
         }        
  */ 
-        Array updates;
-        size_t value_size;
-        int64_t offset,new_offset;
-        uint32_t value_offset;
-        const unsigned char *ptr;
 
-        if(( (output_level & 0x0020) !=0 ) )
+        if(output_level & 0x0020)
         {
             mc_Buffer *followons;
             followons=mc_gState->m_Assets->GetFollowOns(txid);
@@ -2824,51 +2846,186 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
                 followon->Zero();
                 if(mc_gState->m_Assets->FindEntityByTxID(followon,followons->GetRow(i)))
                 {
-                    if(output_level & 0x0020)
+                    issue.push_back(Pair("txid", ((uint256*)(followon->GetTxID()))->ToString().c_str()));    
+
+                    Array followon_issuers;
+
+                    ptr=followon->GetScript();
+                    offset=0;
+                    while(offset>=0)
                     {
-                        issue.push_back(Pair("txid", ((uint256*)(followon->GetTxID()))->ToString().c_str()));    
-
-                        Array followon_issuers;
-
-                        ptr=followon->GetScript();
-                        offset=0;
-                        while(offset>=0)
+                        new_offset=followon->NextParam(offset,&value_offset,&value_size);
+                        if(value_offset > 0)
                         {
-                            new_offset=followon->NextParam(offset,&value_offset,&value_size);
-                            if(value_offset > 0)
+                            if(ptr[offset+1] == MC_ENT_SPRM_UPDATE_NAME)
                             {
-                                if(ptr[offset+1] == MC_ENT_SPRM_UPDATE_NAME)
+                                string update_name ((char*)ptr+value_offset,value_size);
+                                issue.push_back(Pair("updatename",update_name));                    
+                            }
+                            if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
+                            {
+                                if(value_size == 20)
                                 {
-                                    string update_name ((char*)ptr+value_offset,value_size);
-                                    issue.push_back(Pair("updatename",update_name));                    
+                                    followon_issuers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
                                 }
-                                if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
+                                if(value_size == 24)
                                 {
-                                    if(value_size == 20)
+                                    unsigned char tptr[4];
+                                    memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
+                                    if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
+                                    {
+                                        followon_issuers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
+                                    }
+                                    else
                                     {
                                         followon_issuers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
                                     }
-                                    if(value_size == 24)
-                                    {
-                                        unsigned char tptr[4];
-                                        memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
-                                        if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
-                                        {
-                                            followon_issuers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
-                                        }
-                                        else
-                                        {
-                                            followon_issuers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
-                                        }
-                                    }
                                 }
                             }
-                            offset=new_offset;
-                        }      
+                        }
+                        offset=new_offset;
+                    }      
 
-                        issue.push_back(Pair("issuers",followon_issuers));                    
-                        updates.push_back(issue);                    
+                    issue.push_back(Pair("issuers",followon_issuers));                    
+                    
+                    if( (updates_mode == "approve") && (followon->IsFollowOn() != 0) )
+                    {
+                        uint160 filter_address;
+                        filter_address=0;
+                        memcpy(&filter_address,followon->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+                        unsigned char *ptr;
+                        size_t bytes;
+
+                        ptr=(unsigned char *)followon->GetSpecialParam(MC_ENT_SPRM_VOUT,&bytes);
+                        if(ptr)
+                        {
+                            if((bytes>0) && (bytes<=4))
+                            {
+                               memcpy(((unsigned char*)&filter_address)+MC_AST_SHORT_TXID_SIZE,ptr,bytes);
+                            }
+                        }      
+                        else
+                        {
+                            throw JSONRPCError(RPC_INTERNAL_ERROR, "Corrupted Library database");                                                                
+                        }
+                        
+                        if(mc_gState->m_Permissions->FilterApproved(NULL,&filter_address))
+                        {
+                            issue.push_back(Pair("approved",true));                                                
+                        }
+                        else
+                        {
+                            issue.push_back(Pair("approved",false));                                                
+                        }
+                        
+                        mc_PermissionDetails *plsRow;
+                        mc_PermissionDetails *plsDet;
+                        mc_PermissionDetails *plsPend;
+                        int flags,consensus,remaining;
+                        
+                        
+                        Array admins;
+                        Array pending;
+
+                        mc_Buffer *permissions=NULL;
+                        permissions=mc_gState->m_Permissions->GetPermissionList(NULL,(unsigned char*)&filter_address,MC_PTP_FILTER,permissions);
+
+                        if(permissions->GetCount())
+                        {
+                            plsRow=(mc_PermissionDetails *)(permissions->GetRow(0));
+
+                            flags=plsRow->m_Flags;
+                            consensus=plsRow->m_RequiredAdmins;
+                            mc_Buffer *details;
+
+                            if((flags & MC_PFL_HAVE_PENDING) || (consensus>1))
+                            {
+                                details=mc_gState->m_Permissions->GetPermissionDetails(plsRow);                            
+                            }
+                            else
+                            {
+                                details=NULL;
+                            }
+
+                            if(details)
+                            {
+                                for(int j=0;j<details->GetCount();j++)
+                                {
+                                    plsDet=(mc_PermissionDetails *)(details->GetRow(j));
+                                    remaining=plsDet->m_RequiredAdmins;
+                                    if(remaining > 0)
+                                    {
+                                        uint160 addr;
+                                        memcpy(&addr,plsDet->m_LastAdmin,sizeof(uint160));
+                                        CKeyID lpKeyID=CKeyID(addr);
+                                        admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                                    }
+                                }                    
+                                for(int j=0;j<details->GetCount();j++)
+                                {
+                                    plsDet=(mc_PermissionDetails *)(details->GetRow(j));
+                                    remaining=plsDet->m_RequiredAdmins;
+                                    if(remaining == 0)
+                                    {
+                                        Object pend_obj;
+                                        Array pend_admins;
+                                        uint32_t block_from=plsDet->m_BlockFrom;
+                                        uint32_t block_to=plsDet->m_BlockTo;
+                                        for(int k=j;k<details->GetCount();k++)
+                                        {
+                                            plsPend=(mc_PermissionDetails *)(details->GetRow(k));
+                                            remaining=plsPend->m_RequiredAdmins;
+
+                                            if(remaining == 0)
+                                            {
+                                                if(block_from == plsPend->m_BlockFrom)
+                                                {
+                                                    if(block_to == plsPend->m_BlockTo)
+                                                    {
+                                                        uint160 addr;
+                                                        memcpy(&addr,plsPend->m_LastAdmin,sizeof(uint160));
+                                                        CKeyID lpKeyID=CKeyID(addr);
+                //                                        CKeyID lpKeyID=CKeyID(*(uint160*)((void*)(plsPend->m_LastAdmin)));
+                                                        pend_admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                                                        plsPend->m_RequiredAdmins=0x01010101;
+                                                    }                                    
+                                                }
+                                            }
+                                        }          
+                                        pend_obj.push_back(Pair("approve", block_from < block_to));                        
+                                        pend_obj.push_back(Pair("admins", pend_admins));
+                                        pend_obj.push_back(Pair("required", (int64_t)(consensus-pend_admins.size())));
+                                        pending.push_back(pend_obj);                            
+                                    }
+                                }                    
+                                mc_gState->m_Permissions->FreePermissionList(details);                    
+                            }
+                            else
+                            {
+                                uint160 addr;
+                                memcpy(&addr,plsRow->m_LastAdmin,sizeof(uint160));
+                                CKeyID lpKeyID=CKeyID(addr);
+                                admins.push_back(CBitcoinAddress(lpKeyID).ToString());                    
+                            }
+
+                            issue.push_back(Pair("admins", admins));
+                            issue.push_back(Pair("pending", pending));                                            
+                        }
+                        else
+                        {
+                            issue.push_back(Pair("admins", admins));
+                            issue.push_back(Pair("pending", pending));                                                            
+                        }
+                        mc_gState->m_Permissions->FreePermissionList(permissions);                    
+                    }    
+                    else
+                    {
+                        Array empty_array;
+                        issue.push_back(Pair("approved",true));                    
+                        issue.push_back(Pair("admins",empty_array));                    
+                        issue.push_back(Pair("pending",empty_array));                    
                     }
+                    updates.push_back(issue);                                        
                 }            
                 entry.push_back(Pair("updates",updates));
             }

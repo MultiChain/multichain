@@ -328,6 +328,7 @@ typedef struct mc_AssetDB
     int FindLastEntity(mc_EntityDetails *last_entity, mc_EntityDetails *entity);    
     int FindLastEntityByGenesis(mc_EntityDetails *last_entity, mc_EntityDetails *genesis_entity);    
     int FindUpdateByName(mc_EntityDetails *entity, const void* txid,const char* name);
+    int FindActiveUpdate(mc_EntityDetails *entity, const void* txid);
     
     void ReloadDetailsIfNeeded(mc_EntityDetails *entity);
     
