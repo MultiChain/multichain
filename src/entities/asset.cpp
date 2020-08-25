@@ -3025,6 +3025,10 @@ int mc_AssetDB::FindUpdateByName(mc_EntityDetails *entity, const void* txid,cons
             aldRow.m_EntityType=MC_ENT_TYPE_NONE;
             m_Ledger->Close();
         }
+        else
+        {
+            aldRow.m_EntityType=MC_ENT_TYPE_NONE;            
+        }
     }
         
 exitlbl:

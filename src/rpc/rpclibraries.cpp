@@ -6,6 +6,7 @@
 
 
 #include "rpc/rpcwallet.h"
+#include "filters/filter.h"
 
 bool mc_JSInExtendedScript(size_t size);
 
@@ -184,6 +185,24 @@ Value createlibraryfromcmd(const Array& params, bool fHelp)
     
     js=params[4].get_str();
     
+    mc_Filter *worker=new mc_Filter;
+    std::vector <std::string> callback_names;
+    int err;
+    
+    string dummy_main_function="filtersomethingimporssible";
+    string test_code="function "+dummy_main_function+"(){} "+js;
+    
+    err=pFilterEngine->CreateFilter(test_code,dummy_main_function,callback_names,worker,strError);
+    delete worker;
+    if(err)
+    {
+        throw JSONRPCError(RPC_INTERNAL_ERROR,"Couldn't create library");                                                                   
+    }
+    if(strError.size())
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER,strprintf("Couldn't compile library code: %s",strError.c_str()));                                                                               
+    }
+    
     bool js_extended=mc_JSInExtendedScript(js.size());
     if(!js_extended)
     {
@@ -192,7 +211,6 @@ Value createlibraryfromcmd(const Array& params, bool fHelp)
     
     lpDetailsScript->Clear();
     
-    int err;
     size_t bytes;
     const unsigned char *script;
     script=lpDetails->GetData(0,&bytes);
@@ -317,13 +335,30 @@ Value addlibraryupdatefrom(const Array& params, bool fHelp)
     
     js=params[3].get_str();
     
+    mc_Filter *worker=new mc_Filter;
+    std::vector <std::string> callback_names;
+    int err;
+    
+    string dummy_main_function="filtersomethingimporssible";
+    string test_code="function "+dummy_main_function+"(){} "+js;
+    
+    err=pFilterEngine->CreateFilter(test_code,dummy_main_function,callback_names,worker,strError);
+    delete worker;
+    if(err)
+    {
+        throw JSONRPCError(RPC_INTERNAL_ERROR,"Couldn't create library");                                                                   
+    }
+    if(strError.size())
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER,strprintf("Couldn't compile library code: %s",strError.c_str()));                                                                               
+    }
+    
     bool js_extended=mc_JSInExtendedScript(js.size());
     if(!js_extended)
     {
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)js.c_str(),js.size());                                                        
     }
     
-    int err;
     size_t bytes;
     const unsigned char *script;
     size_t elem_size;

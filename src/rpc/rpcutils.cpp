@@ -2885,6 +2885,11 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
                         }
                         offset=new_offset;
                     }      
+                    
+                    if(followon->IsFollowOn() == 0)
+                    {
+                        issue.push_back(Pair("updatename",""));                    
+                    }
 
                     issue.push_back(Pair("issuers",followon_issuers));                    
                     
@@ -4940,6 +4945,10 @@ bool AssetCompareByRef(Value a,Value b)
         {
             assetref_a=p.value_;
         }
+        if(p.name_ == "libraryref")
+        {
+            assetref_a=p.value_;
+        }
     }
 
     BOOST_FOREACH(const Pair& p, b.get_obj()) 
@@ -4957,6 +4966,10 @@ bool AssetCompareByRef(Value a,Value b)
             assetref_b=p.value_;
         }
         if(p.name_ == "variableref")
+        {
+            assetref_b=p.value_;
+        }
+        if(p.name_ == "libraryref")
         {
             assetref_b=p.value_;
         }
