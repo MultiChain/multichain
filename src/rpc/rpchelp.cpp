@@ -1476,6 +1476,14 @@ void mc_InitRPCHelpMap06()
             "2. \"variable-name\"                  (string, required) Variable name, if not \"\" should be unique.\n"
             "3. open                             (boolean, optional) Should be true\n"
             "4. value                            (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
+            "  or \n"
+            "1. entity-type                      (string, required) library\n"
+            "2. \"library-name\"                  (string, required) Library name, if not \"\" should be unique.\n"
+            "3. options                          (object, optional) Library update options\n"
+            "    {\n"
+            "      \"updates\" : \"update-mode\"   (string, optional) Library update mode. Possible values: none, instant, approve\n"
+            "    }\n"
+            "4. \"javascript-code\"                (string, required) JavaScript library code\n"
 
 
 
@@ -1573,6 +1581,15 @@ void mc_InitRPCHelpMap06()
             "3. \"variable-name\"                  (string, required) Variable name, if not \"\" should be unique.\n"
             "4. open                             (boolean, optional) Should be true\n"
             "5. value                            (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
+            "  or \n"
+            "1. \"from-address\"                   (string, required) Address used for creating.\n"
+            "2. entity-type                      (string, required) library\n"
+            "3. \"library-name\"                  (string, required) Library name, if not \"\" should be unique.\n"
+            "4. options                          (object, optional) Library update options\n"
+            "    {\n"
+            "      \"updates\" : \"update-mode\"   (string, optional) Library update mode. Possible values: none, instant, approve\n"
+            "    }\n"
+            "5. \"javascript-code\"                (string, required) JavaScript library code\n"
 
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
@@ -3725,6 +3742,14 @@ void mc_InitRPCHelpMap16()
             "      \"approve\" : approve           (boolean, required) Approve or disapprove\n"
             "      \"for\" : \"stream-identifier\"   (string, required)  Stream identifier - one of: create txid, stream reference, stream name.\n"
             "    }\n"                                
+            " or\n"
+            "1. \"from-address\"                   (string, required) Address used for approval.\n"
+            "2. \"library-identifier\"             (string, required) Library identifier - one of: create txid, library reference, library name.\n"
+            "3. approve                          (object, required)  Approval object\n"
+            "    {\n"                
+            "      \"approve\" : approve           (boolean, required) Approve or disapprove\n"
+            "      \"update\" : \"update-name\"      (string, required)  Update name to approve/disapprove.\n"
+            "    }\n"                                
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
             "\nExamples:\n"
@@ -5358,7 +5383,66 @@ void mc_InitRPCHelpMap23()
             + HelpExampleRpc("getvariablevalue", "\"var1\"")
         ));
     
-     mapHelpStrings.insert(std::make_pair("AAAAAAA",
+    mapHelpStrings.insert(std::make_pair("addlibraryupdatefrom",
+            "addlibraryupdatefrom \"from-address\" \"library-identifier\" \"update-name\" \"javascript-code\"\n"
+            "\nUpdate library code\n"
+            + HelpRequiringPassphraseWrapper() +
+            "\nArguments:\n"
+            "1. \"from-address\"                   (string, required) Address used for updating library code.\n"
+            "2. \"library-identifier\"             (string, required) Library identifier - one of: create txid, library reference, library name.\n"
+            "3. \"update-name\"                    (string, required) Update name.\n"
+            "4. \"javascript-code\"                (string, required) JavaScript code.\n"
+            "\nResult:\n"
+            "\"transactionid\"                     (string) The transaction id.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("addlibraryupdatefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"lib1\" \"update1\" \"function sum2(){return 2+2;}\"")
+            + HelpExampleRpc("addlibraryupdatefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\",\"lib1\",\"update1\",\"function sum2(){return 2+2;}\"")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("addlibraryupdate",
+            "addlibraryupdate \"library-identifier\" \"update-name\" \"javascript-code\"\n"
+            "\nUpdate library code\n"
+            + HelpRequiringPassphraseWrapper() +
+            "\nArguments:\n"
+            "1. \"library-identifier\"             (string, required) Library identifier - one of: create txid, library reference, library name.\n"
+            "2. \"update-name\"                    (string, required) Update name.\n"
+            "3. \"javascript-code\"                (string, required) JavaScript code.\n"
+            "\nResult:\n"
+            "\"transactionid\"                     (string) The transaction id.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("addlibraryupdate", "\"lib1\" \"update1\" \"function sum2(){return 2+2;}\"")
+            + HelpExampleRpc("addlibraryupdate", "\"lib1\",\"update1\",\"function sum2(){return 2+2;}\"")
+        ));
+    
+      mapHelpStrings.insert(std::make_pair("listlibraries",
+            "listlibraries ( library-identifier(s) verbose )\n"
+            "\nReturns list of defined stream filters\n"
+            "\nArguments:\n"
+            "1. \"library-identifier\"               (string, optional, default=*) Library identifier - one of: create txid, library reference, library name.\n"
+            " or\n"
+            "1. library-identifier(s)              (array, optional) A json array of library identifiers \n"                
+            "2. verbose                            (boolean, optional, default=false) If true, returns list of updates\n"
+            "\nResult:\n"
+            "An array containing list of defined libraries\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("listlibraries", "")
+            + HelpExampleRpc("listlibraries", "")
+        ));
+     
+     mapHelpStrings.insert(std::make_pair("getlibrarycode",
+            "getlibrarycode \"library-identifier\" ( \"update-name\" )\n"
+            "\nReturns code for specified library (library update)\n"
+            "\nArguments:\n"
+            "1. \"library-identifier\"               (string, required) Library identifier - one of: create txid, library reference, library name.\n"
+            "2. \"update-name\"                      (string, optional) Update name, "" for original library code. If omitted, active code is returned\n"
+            "\nResult:\n"
+            "Filter code in plain text\n"            
+           "\nExamples:\n"
+            + HelpExampleCli("getlibrarycode", "lib1")
+            + HelpExampleRpc("getlibrarycode", "lib1")
+        ));
+     
+    mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
     
