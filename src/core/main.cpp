@@ -1365,7 +1365,9 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
     if(IsTxBanned(tx.GetHash()))
     {
-        return error("AcceptToMemoryPool: banned transaction: %s",tx.GetHash().ToString());
+        return state.DoS(0, error("AcceptToMemoryPool: banned transaction: %s",tx.GetHash().ToString()),
+                         REJECT_INVALID, "banned");
+//        return error("AcceptToMemoryPool: banned transaction: %s",tx.GetHash().ToString());
     }
     
     // Coinbase is only valid in a block, not as a loose transaction

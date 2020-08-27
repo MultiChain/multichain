@@ -44,6 +44,7 @@ typedef struct CMultiChainTxDetails
     bool fIsStandardCoinbase;                                                   // Tx is standard coinbase - filters should not be applied
     bool fLicenseTokenIssuance;                                                 // New license token
     bool fLicenseTokenTransfer;                                                 // License token transfer
+    bool fLibraryUpdate;                                                        // Library update
     
     vector <txnouttype> vInputScriptTypes;                                      // Input script types
     vector <uint160> vInputDestinations;                                        // Addresses used in input scripts
@@ -54,6 +55,7 @@ typedef struct CMultiChainTxDetails
     set <string> vAllowedAdmins;                                                // Admin permissions before this tx - for grants
     set <string> vAllowedActivators;                                            // Activate permissions before this tx - for grants
     set <uint160> vRelevantEntities;                                            // Set of entities involved in this transaction
+    set <uint160> vAffectedLibraries;                                           // Set of libraries, which may change activated update in this transaction
     
     vector <uint32_t> vOutputScriptFlags;                                       // Output script flags, filled when script is processed for the first time
     vector <int> vOutputPermissionRequired;                                     // Number of required receive permissions 
@@ -86,6 +88,7 @@ typedef struct CMultiChainTxDetails
     bool IsRelevantInput(int vin,int vout);
     void SetRelevantEntity(void *entity);
     bool IsRelevantEntity(uint160 hash);
+    void SetAffectedLibrary(void *entity);
     
 } CMultiChainTxDetails;
 
@@ -115,6 +118,7 @@ void CMultiChainTxDetails::Zero()
     fIsStandardCoinbase=false;
     fLicenseTokenIssuance=false;
     fLicenseTokenTransfer=false;
+    fLibraryUpdate=false;
     
     details_script_size=0;
     details_script_type=-1;
@@ -153,6 +157,16 @@ void CMultiChainTxDetails::SetRelevantEntity(void *entity)
     {
         vRelevantEntities.insert(hash);
     }
+}
+
+void CMultiChainTxDetails::SetAffectedLibrary(void *entity)
+{
+    uint160 hash=0;
+    memcpy(&hash,entity,MC_AST_SHORT_TXID_SIZE);
+    if(vAffectedLibraries.find(hash) == vAffectedLibraries.end())
+    {
+        vAffectedLibraries.insert(hash);
+    }    
 }
 
 uint160 mc_GenesisAdmin(const CTransaction& tx)
@@ -853,19 +867,31 @@ bool MultiChainTransaction_CheckVariableUpdateDetails(const CTransaction& tx,
         
         if(new_entity_type == MC_ENT_TYPE_LIBRARY)
         {
+            if(details->fLibraryUpdate)
+            {
+                reason="Metadata script rejected - multiple library updates";
+                return false;                
+            }
+            details->fLibraryUpdate=true;
+            
             uint64_t value_offset;
             size_t value_size;
             mc_EntityDetails update_entity;
             
-            value_offset=mc_FindSpecialParamInDetailsScript(details->details_script,details->details_script_size,MC_ENT_SPRM_UPDATE_NAME,&value_size);
-            if(value_offset<(uint32_t)details->details_script_size)
+            value_offset=mc_FindSpecialParamInDetailsScript(details_script,details_script_size,MC_ENT_SPRM_UPDATE_NAME,&value_size);
+            if( (value_offset<(uint32_t)details_script_size) && (value_size>0) )
             {
-                string update_name ((char*)(details->details_script)+value_offset,value_size);
+                string update_name ((char*)details_script+value_offset,value_size);
                 if(mc_gState->m_Assets->FindUpdateByName(&update_entity,entity->GetTxID(),update_name.c_str()))
                 {
                     reason="Metadata script rejected - entity with this update name already found";
                     return false;
                 }                
+            }
+            else
+            {
+                reason="Metadata script rejected - library update name not found";
+                return false;                
             }
         }
         
@@ -896,6 +922,11 @@ bool MultiChainTransaction_CheckVariableUpdateDetails(const CTransaction& tx,
     {
         reason="Follow-on script rejected - follow-ons not allowed for this " + entity_type_str;
         return false;                                                                                    
+    }
+    
+    if(entity->ApproveRequired() == 0)
+    {
+        details->SetAffectedLibrary((unsigned char*)entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET);       
     }
     
     details->SetRelevantEntity((unsigned char*)entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET);
@@ -1315,6 +1346,21 @@ bool MultiChainTransaction_CheckDestinations(const CScript& script1,
     return true;
 }
 
+bool MultiChainTransaction_CheckIfLibraryApproval(unsigned char* ptr,
+                                                  CMultiChainTxDetails *details)
+{
+    mc_EntityDetails entity;
+    if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,ptr))
+    {
+        if(mc_gState->m_Assets->FindEntityByFollowOn(&entity,entity.GetTxID()))
+        {
+            details->SetAffectedLibrary((unsigned char*)entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);       
+            return true;
+        }
+    }
+    return false;
+}
+
 bool MultiChainTransaction_ProcessPermissions(const CTransaction& tx,
                                               int offset,  
                                               int vout,
@@ -1497,6 +1543,10 @@ bool MultiChainTransaction_ProcessPermissions(const CTransaction& tx,
                                     if(mc_gState->m_Permissions->SetPermission(entity.GetTxID(),ptr,type,(unsigned char*)&(details->vInputDestinations[i]),
                                             from,to,timestamp,flags,1,offset) == 0)
                                     {
+                                        if(type & MC_PTP_FILTER)
+                                        {
+                                            MultiChainTransaction_CheckIfLibraryApproval(ptr,details);
+                                        }
                                         fAdminFound=true;
                                     }
                                 }
@@ -3100,6 +3150,33 @@ bool MultiChainTransaction_VerifyStandardCoinbase(const CTransaction& tx,       
     return true;    
 }
 
+bool MultiChainTransaction_ProcessLibraryUpdates(CMultiChainTxDetails *details, // Tx details object
+                                                 string& reason)                // Error message
+{
+    if(details->vAffectedLibraries.size() == 0)
+    {
+        return true;
+    }
+    if(mc_gState->m_Features->Libraries() == 0)
+    {
+        return true;
+    }
+    
+    set<uint160>::iterator it;
+    mc_EntityDetails entity;
+    for (it = details->vAffectedLibraries.begin(); it != details->vAffectedLibraries.end(); ++it) 
+    {
+        uint160 hash=*it;
+        if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,(unsigned char*)&hash))
+        {
+            LogPrintf("mchn: Library active update change: %s (%s)\n",entity.GetName(),((uint256*)entity.GetTxID())->ToString().c_str());
+        }
+    }    
+    
+    return true;
+}
+
+
 bool AcceptMultiChainTransaction   (const CTransaction& tx,                     // Tx to check
                                     const CCoinsViewCache &inputs,              // Tx inputs from UTXO database
                                     int offset,                                 // Tx offset in block, -1 if in memppol
@@ -3179,6 +3256,12 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
         goto exitlbl;                                                                                
     }        
     
+    if(!MultiChainTransaction_ProcessLibraryUpdates(&details,reason))           
+    {
+        fReject=true;
+        goto exitlbl;                                                                                
+    }        
+    
     if( (details.emergency_disapproval_output < 0) && 
         !details.fIsStandardCoinbase && 
         !details.fLicenseTokenTransfer && 
@@ -3237,6 +3320,7 @@ exitlbl:
     {
         mc_gState->m_Permissions->RollBackToCheckPoint();
         mc_gState->m_Assets->RollBackToCheckPoint();
+        MultiChainTransaction_ProcessLibraryUpdates(&details,reason);
     }
 
     if(mandatory_fee_out)

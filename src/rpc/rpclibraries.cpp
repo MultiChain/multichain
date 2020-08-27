@@ -366,7 +366,7 @@ Value addlibraryupdatefrom(const Array& params, bool fHelp)
     
     script=lpDetails->GetData(0,&bytes);
     lpDetailsScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
-    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_VARIABLE,1,script,bytes);
+    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_LIBRARY,1,script,bytes);
     if(err)
     {
         strError= "Invalid value, too long";
