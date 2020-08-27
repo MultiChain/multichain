@@ -630,11 +630,12 @@ Value approvefrom(const json_spirit::Array& params, bool fHelp)
         filter_address=0;
         if(fIsLibrary)
         {
-            memcpy(&filter_address,update_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+//            memcpy(&filter_address,update_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+            memcpy(&filter_address,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
             unsigned char *ptr;
             size_t bytes;
 
-            ptr=(unsigned char *)update_entity.GetSpecialParam(MC_ENT_SPRM_VOUT,&bytes);
+            ptr=(unsigned char *)update_entity.GetSpecialParam(MC_ENT_SPRM_CHAIN_INDEX,&bytes);
             if(ptr)
             {
                 if((bytes>0) && (bytes<=4))

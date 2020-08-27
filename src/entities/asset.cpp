@@ -2868,6 +2868,8 @@ int mc_AssetDB::FindActiveUpdate(mc_EntityDetails *entity, const void* txid)
             return FindLastEntityByGenesis(entity,&genesis_entity);
         }
         
+        memcpy(filter_address,entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+        
         pos=aldRow.m_ChainPos;
         first_pos=aldRow.m_FirstPos;
 
@@ -2882,10 +2884,11 @@ int mc_AssetDB::FindActiveUpdate(mc_EntityDetails *entity, const void* txid)
                     {
                         return 1;
                     }
-                    value_offset=mc_FindSpecialParamInDetailsScript(aldRow.m_Script,aldRow.m_ScriptSize,MC_ENT_SPRM_VOUT,&value_size);
+                    value_offset=mc_FindSpecialParamInDetailsScript(aldRow.m_Script,aldRow.m_ScriptSize,MC_ENT_SPRM_CHAIN_INDEX,&value_size);
                     if(value_offset < aldRow.m_ScriptSize)
                     {   
-                        memcpy(filter_address,aldRow.m_Key+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+//                        memcpy(filter_address,aldRow.m_Key+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+//                        memcpy(filter_address,entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
 
                         if((value_size>0) && (value_size<=4))
                         {
@@ -2911,10 +2914,10 @@ int mc_AssetDB::FindActiveUpdate(mc_EntityDetails *entity, const void* txid)
                 m_Ledger->GetRow(pos,&aldRow);
                 if(aldRow.m_KeyType & MC_ENT_KEYTYPE_FOLLOW_ON)
                 {
-                    value_offset=mc_FindSpecialParamInDetailsScript(aldRow.m_Script,aldRow.m_ScriptSize,MC_ENT_SPRM_VOUT,&value_size);
+                    value_offset=mc_FindSpecialParamInDetailsScript(aldRow.m_Script,aldRow.m_ScriptSize,MC_ENT_SPRM_CHAIN_INDEX,&value_size);
                     if(value_offset < aldRow.m_ScriptSize)
                     {   
-                        memcpy(filter_address,aldRow.m_Key+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+//                        memcpy(filter_address,aldRow.m_Key+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
 
                         if((value_size>0) && (value_size<=4))
                         {
@@ -2946,8 +2949,6 @@ int mc_AssetDB::FindActiveUpdate(mc_EntityDetails *entity, const void* txid)
         return 1;
     }
         
-exitlbl:
-                
     return 0;    
 }
 

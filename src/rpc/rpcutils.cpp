@@ -2729,6 +2729,10 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
             memcpy(genesis_entity,&entity,sizeof(mc_EntityDetails));
         }
         
+        uint160 filter_address;
+        filter_address=0;
+        memcpy(&filter_address,genesis_entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+        
         if(output_level & 0x100)
         {
             entry.push_back(Pair("type", "library"));                        
@@ -2896,13 +2900,10 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
                     
                     if( (updates_mode == "approve") && (followon->IsFollowOn() != 0) )
                     {
-                        uint160 filter_address;
-                        filter_address=0;
-                        memcpy(&filter_address,followon->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
                         unsigned char *ptr;
                         size_t bytes;
 
-                        ptr=(unsigned char *)followon->GetSpecialParam(MC_ENT_SPRM_VOUT,&bytes);
+                        ptr=(unsigned char *)followon->GetSpecialParam(MC_ENT_SPRM_CHAIN_INDEX,&bytes);
                         if(ptr)
                         {
                             if((bytes>0) && (bytes<=4))
@@ -3776,11 +3777,11 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
                 approval=ParseLibraryApproval(s.value_,&entity,&update_entity);
                 uint160 filter_address;
                 filter_address=0;
-                memcpy(&filter_address,update_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+                memcpy(&filter_address,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
                 unsigned char *ptr;
                 size_t bytes;
 
-                ptr=(unsigned char *)update_entity.GetSpecialParam(MC_ENT_SPRM_VOUT,&bytes);
+                ptr=(unsigned char *)update_entity.GetSpecialParam(MC_ENT_SPRM_CHAIN_INDEX,&bytes);
                 if(ptr)
                 {
                     if((bytes>0) && (bytes<=4))

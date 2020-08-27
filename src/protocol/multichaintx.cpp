@@ -867,11 +867,13 @@ bool MultiChainTransaction_CheckVariableUpdateDetails(const CTransaction& tx,
         
         if(new_entity_type == MC_ENT_TYPE_LIBRARY)
         {
+/*            
             if(details->fLibraryUpdate)
             {
                 reason="Metadata script rejected - multiple library updates";
                 return false;                
             }
+ */ 
             details->fLibraryUpdate=true;
             
             uint64_t value_offset;
@@ -1352,11 +1354,8 @@ bool MultiChainTransaction_CheckIfLibraryApproval(unsigned char* ptr,
     mc_EntityDetails entity;
     if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,ptr))
     {
-        if(mc_gState->m_Assets->FindEntityByFollowOn(&entity,entity.GetTxID()))
-        {
-            details->SetAffectedLibrary((unsigned char*)entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);       
-            return true;
-        }
+        details->SetAffectedLibrary((unsigned char*)entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);       
+        return true;
     }
     return false;
 }
