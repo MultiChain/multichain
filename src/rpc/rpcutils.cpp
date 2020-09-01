@@ -582,6 +582,38 @@ Value PermissionForFieldEntry(mc_EntityDetails *lpEntity)
                 entObject.push_back(Pair("variableref", streamref));
             }
         }
+        if(lpEntity->GetEntityType() == MC_ENT_TYPE_LIBRARY)
+        {
+            entObject.push_back(Pair("type", "library"));      
+            ptr=(unsigned char *)lpEntity->GetName();
+            if(ptr && strlen((char*)ptr))
+            {
+                entObject.push_back(Pair("name", string((char*)ptr)));            
+            }
+            ptr=(unsigned char *)lpEntity->GetRef();
+            string streamref="";
+            if(lpEntity->IsUnconfirmedGenesis())
+            {
+                Value null_value;
+                entObject.push_back(Pair("libraryref",null_value));
+            }
+            else
+            {
+                if((int)mc_GetLE(ptr,4))
+                {
+                    streamref += itostr((int)mc_GetLE(ptr,4));
+                    streamref += "-";
+                    streamref += itostr((int)mc_GetLE(ptr+4,4));
+                    streamref += "-";
+                    streamref += itostr((int)mc_GetLE(ptr+8,2));
+                }
+                else
+                {
+                    streamref="0-0-0";                
+                }
+                entObject.push_back(Pair("libraryref", streamref));
+            }
+        }
         return entObject;
     }
     
@@ -2789,7 +2821,7 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
             if(ptr)
             {
                 string update_name ((char*)ptr,value_size);
-                entry.push_back(Pair("active", update_name));
+                entry.push_back(Pair("activeupdate", update_name));
             }      
             else
             {
@@ -2798,7 +2830,7 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
         }
         else
         {
-            entry.push_back(Pair("active", ""));
+            entry.push_back(Pair("activeupdate", ""));
         }
         
 /*        
@@ -2896,7 +2928,7 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
                         issue.push_back(Pair("updatename",""));                    
                     }
 
-                    issue.push_back(Pair("issuers",followon_issuers));                    
+                    issue.push_back(Pair("writers",followon_issuers));                    
                     
                     if( (updates_mode == "approve") && (followon->IsFollowOn() != 0) )
                     {

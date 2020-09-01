@@ -973,7 +973,7 @@ void StartRPCThreads(string& strError)
         try {
             asio::ip::address bindAddress = endpoint.address();
             straddress = bindAddress.to_string();
-            LogPrintf("Binding RPC on address %s port %i (IPv4+IPv6 bind any: %i)\n", straddress, endpoint.port(), bBindAny);
+            LogPrintf("Binding %s on address %s port %i (IPv4+IPv6 bind any: %i)\n", (endpoint.port() == hcPort) ? "health checker" : "RPC", straddress, endpoint.port(), bBindAny);
             boost::system::error_code v6_only_error;
             boost::shared_ptr<ip::tcp::acceptor> acceptor(new ip::tcp::acceptor((endpoint.port() == hcPort) ? *hc_io_service : *rpc_io_service));
 
@@ -1377,6 +1377,15 @@ void ServiceConnection(AcceptedConnection *conn)
     if(load_it != rpc_loads.end())
     {
         load_it->second.start=GetTimeMicros();
+    }
+    
+    string reason; 
+    if(conn->get_flags() & MC_ACF_ENTERPRISE)
+    {
+        if(pEF->LIC_VerifyFeature(MC_EFT_HEALTH_CHECK,reason) == 0)
+        {
+            MilliSleep(30000);        
+        }
     }
     
     while (fRun && !ShutdownRequested())

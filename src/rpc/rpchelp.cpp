@@ -1397,7 +1397,7 @@ void mc_InitRPCHelpMap06()
     
     mapHelpStrings.insert(std::make_pair("create",
             "create \"entity-type\" \"entity-name\" open ( custom-fields )\n"
-            "\nCreates stream, upgrade, filter or variable\n"
+            "\nCreates stream, upgrade, filter, variable or library\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"entity-type\"                    (string, required) stream\n"
@@ -1478,10 +1478,10 @@ void mc_InitRPCHelpMap06()
             "4. value                            (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
             "  or \n"
             "1. entity-type                      (string, required) library\n"
-            "2. \"library-name\"                  (string, required) Library name, if not \"\" should be unique.\n"
+            "2. \"library-name\"                   (string, required) Library name, if not \"\" should be unique.\n"
             "3. options                          (object, optional) Library update options\n"
             "    {\n"
-            "      \"updates\" : \"update-mode\"   (string, optional) Library update mode. Possible values: none, instant, approve\n"
+            "      \"updatemode\" : \"update-mode\"  (string, required) Library update mode. Possible values: none, instant, approve\n"
             "    }\n"
             "4. \"javascript-code\"                (string, required) JavaScript library code\n"
 
@@ -1497,7 +1497,7 @@ void mc_InitRPCHelpMap06()
     
     mapHelpStrings.insert(std::make_pair("createfrom",
             "createfrom \"from-address\" \"entity-type\" \"entity-name\" open ( custom-fields )\n"
-            "\nCreates stream, upgrade, filter or variable using specific address\n"
+            "\nCreates stream, upgrade, filter, variable or library using specific address\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"from-address\"                   (string, required) Address used for creating.\n"
@@ -1584,10 +1584,10 @@ void mc_InitRPCHelpMap06()
             "  or \n"
             "1. \"from-address\"                   (string, required) Address used for creating.\n"
             "2. entity-type                      (string, required) library\n"
-            "3. \"library-name\"                  (string, required) Library name, if not \"\" should be unique.\n"
+            "3. \"library-name\"                   (string, required) Library name, if not \"\" should be unique.\n"
             "4. options                          (object, optional) Library update options\n"
             "    {\n"
-            "      \"updates\" : \"update-mode\"   (string, optional) Library update mode. Possible values: none, instant, approve\n"
+            "      \"updatemode\" : \"update-mode\" (string, required) Library update mode. Possible values: none, instant, approve\n"
             "    }\n"
             "5. \"javascript-code\"                (string, required) JavaScript library code\n"
 
@@ -4026,14 +4026,14 @@ void mc_InitRPCHelpMap16()
             "    {\n"                
             "      \"create\" : \"library\"            (string, required) library\n"
             "      \"name\" : \"library-name\"         (string, optional) Library name\n"
-            "      \"updates\" : \"update-mode\"       (string, optional) Library update mode. Possible values: none, instant, approve\n"
+            "      \"updatemode\" : \"update-mode\"    (string, required) Library update mode. Possible values: none, instant, approve\n"
             "      \"code\": \"library-code\"          (string, required) JavaScript library code.\n"
             "    }\n"                                
             " or\n"
             "add-library-update                    (object, required) A json object with new library update\n"
             "    {\n"
             "      \"update\" : \"library-identifier\" (string, required) Library identifier - one of: create txid, library reference, library name.\n"
-            "      \"updatename\" : \"update-name\"    (string, optional) Library update name\n"
+            "      \"updatename\" : \"update-name\"    (string, required) Library update name\n"
             "      \"code\": \"library-code\"          (string, required) JavaScript library code.\n"
             "    }\n"                                
         ));
@@ -5456,7 +5456,7 @@ void mc_InitRPCHelpMap23()
             "\nReturns code for specified library (library update)\n"
             "\nArguments:\n"
             "1. \"library-identifier\"               (string, required) Library identifier - one of: create txid, library reference, library name.\n"
-            "2. \"update-name\"                      (string, optional) Update name, "" for original library code. If omitted, active code is returned\n"
+            "2. \"update-name\"                      (string, optional) Update name, \"\" for original library code. If omitted, active code is returned\n"
             "\nResult:\n"
             "Filter code in plain text\n"            
            "\nExamples:\n"

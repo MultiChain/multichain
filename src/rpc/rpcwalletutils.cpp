@@ -321,6 +321,10 @@ void FindAddressesWithPublishPermission(vector<CTxDestination>& fromaddresses,mc
                 {
                     throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Setting value for this variable is not allowed from this address");                                                                                            
                 }
+                if(stream_entity->GetEntityType() == MC_ENT_TYPE_LIBRARY)
+                {
+                    throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Adding library update is not allowed from this address");                                                                                            
+                }
                 throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Publishing in this stream is not allowed from this address");                                                                        
             }                                                 
             if(mc_gState->m_Permissions->CanSend(NULL,aptr) == 0)

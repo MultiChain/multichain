@@ -711,6 +711,9 @@ void mc_EntityDetails::Set(mc_EntityLedgerRow* row)
         case MC_ENT_TYPE_VARIABLE:
             m_Permissions |= MC_PTP_ADMIN | MC_PTP_ACTIVATE | MC_PTP_WRITE;
             break;
+        case MC_ENT_TYPE_LIBRARY:
+            m_Permissions |= MC_PTP_ADMIN | MC_PTP_ACTIVATE | MC_PTP_WRITE;
+            break;
         default:
             if(m_LedgerRow.m_EntityType <= MC_ENT_TYPE_STREAM_MAX)
             {

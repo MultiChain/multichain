@@ -146,18 +146,18 @@ Value createlibraryfromcmd(const Array& params, bool fHelp)
     }
     BOOST_FOREACH(const Pair& d, params[3].get_obj()) 
     {
-        if(d.name_ == "updates")
+        if(d.name_ == "updatemode")
         {
             if(d.value_.type() != str_type)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid updates field");
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid updatemode field");
             }
             if(d.value_.get_str() == "none")b=0x00;
             if(d.value_.get_str() == "instant")b=0x01;
             if(d.value_.get_str() == "approve")b=0x04;
             if(b == 255)
             {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid updates field");                        
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid updatemode field");                        
             }
         }
         else
@@ -168,7 +168,7 @@ Value createlibraryfromcmd(const Array& params, bool fHelp)
     
     if(b == 255)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing updates field");                        
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing updatemode field");                        
     }
     
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);
@@ -189,8 +189,8 @@ Value createlibraryfromcmd(const Array& params, bool fHelp)
     std::vector <std::string> callback_names;
     int err;
     
-    string dummy_main_function="filtersomethingimporssible";
-    string test_code="function "+dummy_main_function+"(){} "+js;
+    string dummy_main_function="_multichain_library_test_";
+    string test_code=js+"\n\n"+"function "+dummy_main_function+"(){} ";
     
     err=pFilterEngine->CreateFilter(test_code,dummy_main_function,callback_names,worker,strError);
     delete worker;
@@ -287,6 +287,11 @@ Value addlibraryupdatefrom(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid library identifier");        
     }
 
+    if(entity.AllowedFollowOns() == 0)
+    {
+        throw JSONRPCError(RPC_NOT_ALLOWED, "Library update not allowed for this library: "+params[1].get_str());        
+    }
+    
     if(params[2].get_str().size() == 0)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid update name");                
@@ -339,9 +344,9 @@ Value addlibraryupdatefrom(const Array& params, bool fHelp)
     std::vector <std::string> callback_names;
     int err;
     
-    string dummy_main_function="filtersomethingimporssible";
-    string test_code="function "+dummy_main_function+"(){} "+js;
-    
+    string dummy_main_function="_multichain_library_test_";
+    string test_code=js+"\n\n"+"function "+dummy_main_function+"(){} ";
+
     err=pFilterEngine->CreateFilter(test_code,dummy_main_function,callback_names,worker,strError);
     delete worker;
     if(err)
@@ -416,55 +421,46 @@ Value addlibraryupdatefrom(const Array& params, bool fHelp)
     
     if(mc_gState->m_Assets->FindEntityByFullRef(&entity,buf))
     {
-        if(entity.AllowedFollowOns())
+        if(fromaddresses.size() == 1)
         {
-            if(fromaddresses.size() == 1)
+            CKeyID *lpKeyID=boost::get<CKeyID> (&fromaddresses[0]);
+            if(lpKeyID != NULL)
             {
-                CKeyID *lpKeyID=boost::get<CKeyID> (&fromaddresses[0]);
-                if(lpKeyID != NULL)
+                if(mc_gState->m_Permissions->CanWrite(entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
                 {
-                    if(mc_gState->m_Permissions->CanWrite(entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
-                    {
-                        strError= "Library update is not allowed from this address";
-                        errorCode=RPC_INSUFFICIENT_PERMISSIONS;
-                        goto exitlbl;
-                    }                                                 
-                }
-                else
-                {
-                    strError= "Library update is allowed only from P2PKH addresses";
+                    strError= "Library update is not allowed from this address";
+                    errorCode=RPC_INSUFFICIENT_PERMISSIONS;
                     goto exitlbl;
-                }
+                }                                                 
             }
             else
             {
-                bool issuer_found=false;
-                BOOST_FOREACH(const PAIRTYPE(CBitcoinAddress, CAddressBookData)& item, pwalletMain->mapAddressBook)
-                {
-                    const CBitcoinAddress& address = item.first;
-                    CKeyID keyID;
-
-                    if(address.GetKeyID(keyID))
-                    {
-                        if(mc_gState->m_Permissions->CanWrite(entity.GetTxID(),(unsigned char*)(&keyID)))
-                        {
-                            issuer_found=true;
-                        }
-                    }
-                }                    
-                if(!issuer_found)
-                {
-                    strError= "Library update is not allowed from this wallet";
-                    errorCode=RPC_INSUFFICIENT_PERMISSIONS;
-                    goto exitlbl;
-                }
+                strError= "Library update is allowed only from P2PKH addresses";
+                goto exitlbl;
             }
         }
         else
         {
-            strError= "Library update not allowed for this library: "+params[1].get_str();
-            errorCode=RPC_NOT_ALLOWED;
-            goto exitlbl;
+            bool issuer_found=false;
+            BOOST_FOREACH(const PAIRTYPE(CBitcoinAddress, CAddressBookData)& item, pwalletMain->mapAddressBook)
+            {
+                const CBitcoinAddress& address = item.first;
+                CKeyID keyID;
+
+                if(address.GetKeyID(keyID))
+                {
+                    if(mc_gState->m_Permissions->CanWrite(entity.GetTxID(),(unsigned char*)(&keyID)))
+                    {
+                        issuer_found=true;
+                    }
+                }
+            }                    
+            if(!issuer_found)
+            {
+                strError= "Library update is not allowed from this wallet";
+                errorCode=RPC_INSUFFICIENT_PERMISSIONS;
+                goto exitlbl;
+            }
         }
     }   
     else

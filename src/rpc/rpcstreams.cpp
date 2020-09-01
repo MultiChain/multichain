@@ -617,7 +617,7 @@ Value createfromcmd(const Array& params, bool fHelp)
         return createlibraryfromcmd(params,fHelp);    
     }
     
-    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type, should be stream");
+    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity type");
 }
 
 Value createcmd(const Array& params, bool fHelp)

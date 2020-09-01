@@ -1781,7 +1781,7 @@ CScript RawDataScriptCreateLibrary(Value *param,mc_Script *lpDetails,mc_Script *
 
     bool missing_name=true;
     bool missing_code=true;
-    bool missing_updates=true;
+    bool missing_updatemode=true;
     
     lpDetails->Clear();
     lpDetails->AddElement();                   
@@ -1820,11 +1820,11 @@ CScript RawDataScriptCreateLibrary(Value *param,mc_Script *lpDetails,mc_Script *
             missing_name=false;
             field_parsed=true;
         }        
-        if(d.name_ == "updates")
+        if(d.name_ == "updatemode")
         {
-            if(!missing_updates)
+            if(!missing_updatemode)
             {
-                *strError=string("updates field can appear only once in the object");                                                                                                        
+                *strError=string("updatemode field can appear only once in the object");                                                                                                        
             }
             if(d.value_.type() == str_type)
             {
@@ -1835,7 +1835,7 @@ CScript RawDataScriptCreateLibrary(Value *param,mc_Script *lpDetails,mc_Script *
                 entity_name=d.value_.get_str();
                 if(b == 255)
                 {
-                    *strError=string("Invalid updates field");                     
+                    *strError=string("Invalid updatemode field");                     
                 }
                 else
                 {
@@ -1844,10 +1844,10 @@ CScript RawDataScriptCreateLibrary(Value *param,mc_Script *lpDetails,mc_Script *
             }
             else
             {
-                *strError=string("Invalid updates field");                            
+                *strError=string("Invalid updatemode field");                            
             }
             
-            missing_updates=false;
+            missing_updatemode=false;
             field_parsed=true;
         }        
         if(d.name_ == "code")
@@ -1885,9 +1885,9 @@ CScript RawDataScriptCreateLibrary(Value *param,mc_Script *lpDetails,mc_Script *
     
     if(strError->size() == 0)
     {
-        if(missing_updates)
+        if(missing_updatemode)
         {                 
-            *strError=string("Missing updates field");                                                                                                        
+            *strError=string("Missing updatemode field");                                                                                                        
         }        
     }
     
@@ -1902,8 +1902,8 @@ CScript RawDataScriptCreateLibrary(Value *param,mc_Script *lpDetails,mc_Script *
             std::vector <std::string> callback_names;
             int err;
 
-            string dummy_main_function="filtersomethingimporssible";
-            string test_code="function "+dummy_main_function+"(){} "+filter_code;
+            string dummy_main_function="_multichain_library_test_";
+            string test_code=filter_code+"\n\n"+"function "+dummy_main_function+"(){} ";
             
             mc_Filter *worker=new mc_Filter;
             string strFilterError;
@@ -2058,8 +2058,8 @@ CScript RawDataScriptUpdateLibrary(Value *param,mc_EntityDetails *entity,mc_Scri
             std::vector <std::string> callback_names;
             int err;
 
-            string dummy_main_function="filtersomethingimporssible";
-            string test_code="function "+dummy_main_function+"(){} "+filter_code;
+            string dummy_main_function="_multichain_library_test_";
+            string test_code=filter_code+"\n\n"+"function "+dummy_main_function+"(){} ";
             
             mc_Filter *worker=new mc_Filter;
             string strFilterError;
