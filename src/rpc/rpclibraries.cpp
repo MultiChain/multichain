@@ -189,8 +189,8 @@ Value createlibraryfromcmd(const Array& params, bool fHelp)
     std::vector <std::string> callback_names;
     int err;
     
-    string dummy_main_function="_multichain_library_test_";
-    string test_code=js+"\n\n"+"function "+dummy_main_function+"(){} ";
+    string dummy_main_function=MC_FLT_MAIN_NAME_TEST;
+    string test_code=js+MC_FLT_LIBRARY_GLUE+"function "+dummy_main_function+"(){} ";
     
     err=pFilterEngine->CreateFilter(test_code,dummy_main_function,callback_names,worker,strError);
     delete worker;
@@ -344,8 +344,8 @@ Value addlibraryupdatefrom(const Array& params, bool fHelp)
     std::vector <std::string> callback_names;
     int err;
     
-    string dummy_main_function="_multichain_library_test_";
-    string test_code=js+"\n\n"+"function "+dummy_main_function+"(){} ";
+    string dummy_main_function=MC_FLT_MAIN_NAME_TEST;
+    string test_code=js+MC_FLT_LIBRARY_GLUE+"function "+dummy_main_function+"(){} ";
 
     err=pFilterEngine->CreateFilter(test_code,dummy_main_function,callback_names,worker,strError);
     delete worker;
@@ -510,7 +510,7 @@ Value getlibrarycode(const Array& params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error("Help message not found\n");
     
-    if(mc_gState->m_Features->Filters() == 0)
+    if(mc_gState->m_Features->Libraries() == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
     }   
@@ -532,7 +532,8 @@ Value getlibrarycode(const Array& params, bool fHelp)
     
     if(params.size() == 1)
     {
-        if(mc_gState->m_Assets->FindLastEntity(&update_entity,&filter_entity) == 0)
+//        if(mc_gState->m_Assets->FindLastEntity(&update_entity,&filter_entity) == 0)
+        if(mc_gState->m_Assets->FindActiveUpdate(&update_entity,filter_entity.GetTxID()) == 0)
         {
             throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Library not found");                
         }
@@ -648,7 +649,7 @@ Value listlibraries(const Array& params, bool fHelp)
     if(libraries == NULL)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot open libraries database");
 
-    output_level=0x06;
+    output_level=0x0e;
     
     if (params.size() > 1)    
     {

@@ -813,6 +813,7 @@ Object FilterEntry(const unsigned char *txid,uint32_t output_level,uint32_t filt
             entry.push_back(Pair("language", "javascript"));
             
             Array entities;
+            Array libraries;
             ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
 
             if(ptr)
@@ -861,6 +862,37 @@ Object FilterEntry(const unsigned char *txid,uint32_t output_level,uint32_t filt
                 else
                 {
                     entry.push_back(Pair("for",entities));                                    
+                }            
+            }
+            if(mc_gState->m_Features->Libraries())
+            {
+                ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_FILTER_LIBRARIES,&value_size);
+
+                if(ptr)
+                {
+                    if(value_size % MC_AST_SHORT_TXID_SIZE)
+                    {
+                        entry.push_back(Pair("libraries","error"));                    
+                    }
+                    else
+                    {
+                        for(int i=0;i<(int)value_size/MC_AST_SHORT_TXID_SIZE;i++)
+                        {
+                            mc_EntityDetails library_entity;
+                            if(mc_gState->m_Assets->FindEntityByShortTxID(&library_entity,ptr+i*MC_AST_SHORT_TXID_SIZE))
+                            {
+                                if(library_entity.GetEntityType() == MC_ENT_TYPE_LIBRARY)
+                                {
+                                    libraries.push_back(LibraryEntry(library_entity.GetTxID(),0x04));
+                                }
+                            }                        
+                        }
+                        entry.push_back(Pair("libraries",libraries));                    
+                    }
+                }                           
+                else
+                {
+                    entry.push_back(Pair("libraries",libraries));                                    
                 }            
             }
         }
@@ -2723,7 +2755,7 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
 // 0x0001 
 // 0x0002 current value
 // 0x0004 createtxid,     
-// 0x0008 
+// 0x0008 updatemode and activeupdate
 // 0x0020 last txid and writers
 // 0x0040 history txid and writers
 // 0x0080 blockinfo
@@ -2806,31 +2838,35 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
             }
         }
         
-        entry.push_back(Pair("updatemode", updates_mode));
-        
         Array updates;
         size_t value_size;
         int64_t offset,new_offset;
         uint32_t value_offset;
         const unsigned char *ptr;
         
-        mc_gState->m_Assets->FindActiveUpdate(active_entity,genesis_entity->GetTxID());
-        if(active_entity->IsFollowOn())
+        if(output_level & 0x0008)
         {
-            ptr=(unsigned char *)active_entity->GetSpecialParam(MC_ENT_SPRM_UPDATE_NAME,&value_size);
-            if(ptr)
+            entry.push_back(Pair("updatemode", updates_mode));
+
+
+            mc_gState->m_Assets->FindActiveUpdate(active_entity,genesis_entity->GetTxID());
+            if(active_entity->IsFollowOn())
             {
-                string update_name ((char*)ptr,value_size);
-                entry.push_back(Pair("activeupdate", update_name));
-            }      
+                ptr=(unsigned char *)active_entity->GetSpecialParam(MC_ENT_SPRM_UPDATE_NAME,&value_size);
+                if(ptr)
+                {
+                    string update_name ((char*)ptr,value_size);
+                    entry.push_back(Pair("activeupdate", update_name));
+                }      
+                else
+                {
+                    throw JSONRPCError(RPC_INTERNAL_ERROR, "Corrupted Library database");                                                                
+                }            
+            }
             else
             {
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "Corrupted Library database");                                                                
-            }            
-        }
-        else
-        {
-            entry.push_back(Pair("activeupdate", ""));
+                entry.push_back(Pair("activeupdate", ""));
+            }
         }
         
 /*        

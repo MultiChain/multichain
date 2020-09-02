@@ -2883,24 +2883,28 @@ int mc_AssetDB::FindActiveUpdate(mc_EntityDetails *entity, const void* txid)
             {
                 if(aldRow.m_FirstPos == first_pos)
                 {
-                    if( (aldRow.m_KeyType & MC_ENT_KEYTYPE_FOLLOW_ON) == 0)
+                    if( (aldRow.m_KeyType & MC_ENT_KEYTYPE_FOLLOW_ON) == 0)     // m_RollBackPos.InBlock() check below is always true in this case
                     {
                         return 1;
                     }
-                    value_offset=mc_FindSpecialParamInDetailsScript(aldRow.m_Script,aldRow.m_ScriptSize,MC_ENT_SPRM_CHAIN_INDEX,&value_size);
-                    if(value_offset < aldRow.m_ScriptSize)
-                    {   
-//                        memcpy(filter_address,aldRow.m_Key+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-//                        memcpy(filter_address,entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+                    pos=aldRow.m_LastPos;
+                    if(m_RollBackPos.InBlock() == 0)
+                    {
+                        value_offset=mc_FindSpecialParamInDetailsScript(aldRow.m_Script,aldRow.m_ScriptSize,MC_ENT_SPRM_CHAIN_INDEX,&value_size);
+                        if(value_offset < aldRow.m_ScriptSize)
+                        {   
+    //                        memcpy(filter_address,aldRow.m_Key+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+    //                        memcpy(filter_address,entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
 
-                        if((value_size>0) && (value_size<=4))
-                        {
-                           memcpy((filter_address)+MC_AST_SHORT_TXID_SIZE,aldRow.m_Script+value_offset,value_size);
-                        }                        
-                        if(mc_gState->m_Permissions->FilterApproved(NULL,filter_address))
-                        {
-                            entity->Set(&aldRow);
-                            return 1;
+                            if((value_size>0) && (value_size<=4))
+                            {
+                               memcpy((filter_address)+MC_AST_SHORT_TXID_SIZE,aldRow.m_Script+value_offset,value_size);
+                            }                        
+                            if(mc_gState->m_Permissions->FilterApproved(NULL,filter_address))
+                            {
+                                entity->Set(&aldRow);
+                                return 1;
+                            }
                         }
                     }
                 }
@@ -2917,19 +2921,22 @@ int mc_AssetDB::FindActiveUpdate(mc_EntityDetails *entity, const void* txid)
                 m_Ledger->GetRow(pos,&aldRow);
                 if(aldRow.m_KeyType & MC_ENT_KEYTYPE_FOLLOW_ON)
                 {
-                    value_offset=mc_FindSpecialParamInDetailsScript(aldRow.m_Script,aldRow.m_ScriptSize,MC_ENT_SPRM_CHAIN_INDEX,&value_size);
-                    if(value_offset < aldRow.m_ScriptSize)
-                    {   
-//                        memcpy(filter_address,aldRow.m_Key+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+                    if( (m_RollBackPos.InBlock() == 0) || ((m_RollBackPos.IsOut(aldRow.m_Block,aldRow.m_Offset)) == 0) )
+                    {
+                        value_offset=mc_FindSpecialParamInDetailsScript(aldRow.m_Script,aldRow.m_ScriptSize,MC_ENT_SPRM_CHAIN_INDEX,&value_size);
+                        if(value_offset < aldRow.m_ScriptSize)
+                        {   
+    //                        memcpy(filter_address,aldRow.m_Key+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
 
-                        if((value_size>0) && (value_size<=4))
-                        {
-                           memcpy((filter_address)+MC_AST_SHORT_TXID_SIZE,aldRow.m_Script+value_offset,value_size);
-                        }                        
-                        if(mc_gState->m_Permissions->FilterApproved(NULL,filter_address))
-                        {
-                            entity->Set(&aldRow);
-                            take_it=0;
+                            if((value_size>0) && (value_size<=4))
+                            {
+                               memcpy((filter_address)+MC_AST_SHORT_TXID_SIZE,aldRow.m_Script+value_offset,value_size);
+                            }                        
+                            if(mc_gState->m_Permissions->FilterApproved(NULL,filter_address))
+                            {
+                                entity->Set(&aldRow);
+                                take_it=0;
+                            }
                         }
                     }
                 }

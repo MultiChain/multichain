@@ -49,9 +49,57 @@ std::vector <uint160>  mc_FillRelevantFilterEntitities(const unsigned char *ptr,
     return entities;
 }
 
+std::vector <uint160>  mc_FillFilterLibraries(const unsigned char *ptr, size_t value_size)
+{
+    std::vector <uint160> entities;
+    
+    if(ptr)
+    {
+        for(int i=0;i<(int)value_size/MC_AST_SHORT_TXID_SIZE;i++)
+        {
+            uint160 hash=0;
+            memcpy(&hash,ptr+i*MC_AST_SHORT_TXID_SIZE,MC_AST_SHORT_TXID_SIZE);
+            entities.push_back(hash);
+        }
+    }    
+    
+    return entities;
+}
+
+uint160 mc_LibraryIDForUpdate(uint160 hash)
+{
+    uint160 library_hash=hash;
+    memset((unsigned char*)&library_hash+MC_AST_SHORT_TXID_SIZE,0,4);
+    return library_hash;
+}
+
+int mc_MultiChainLibrary::Zero()
+{
+    m_CreateError="Not Initialized";
+    m_LibraryCaption="Unknown";
+    m_LibraryCodeRow=0;
+    m_ActiveUpdate=0;
+    m_MaxLoadedUpdate=0;
+    
+    return MC_ERR_NOERROR;
+}
+
+int mc_MultiChainLibrary::Destroy()
+{
+    Zero();
+    
+    return MC_ERR_NOERROR;
+}
+
+int mc_MultiChainLibrary::Initialize(const unsigned char* short_txid,uint32_t index)
+{
+    return MC_ERR_NOERROR;    
+}
+
 int mc_MultiChainFilter::Zero()
 {
     m_RelevantEntities.clear();
+    m_Libraries.clear();
     m_CreateError="Not Initialized";
     m_FilterType=MC_FLT_TYPE_TX;
     m_FilterCaption="Unknown";
@@ -131,6 +179,20 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
             }
             m_RelevantEntities=mc_FillRelevantFilterEntitities(ptr, value_size);
         }    
+    }
+    
+    if(mc_gState->m_Features->Libraries())
+    {
+        ptr=(unsigned char *)m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_LIBRARIES,&value_size);
+
+        if(ptr)
+        {
+            if(value_size % MC_AST_SHORT_TXID_SIZE)
+            {
+                return MC_ERR_ERROR_IN_SCRIPT;                        
+            }
+            m_Libraries=mc_FillFilterLibraries(ptr, value_size);
+        }            
     }
     
     
@@ -235,6 +297,123 @@ int mc_MultiChainFilterEngine::SetTimeout(int timeout)
     return MC_ERR_NOERROR;
 }
 
+uint160 mc_MultiChainFilterEngine::ActiveUpdateID(uint160 hash)
+{
+    map<uint160,mc_MultiChainLibrary>::iterator it=m_Libraries.find(hash);
+    if (it != m_Libraries.end())
+    {
+        uint160 update_hash=hash;
+        memcpy((unsigned char*)&update_hash+MC_AST_SHORT_TXID_SIZE,&(it->second.m_ActiveUpdate),4);
+        return update_hash;
+    }                
+    
+    return hash;
+}
+
+int mc_MultiChainFilterEngine::LoadLibrary(uint160 hash)
+{
+    int count;
+    size_t value_size;
+    unsigned char *ptr;
+    uint32_t update_id=0;
+    
+    mc_MultiChainLibrary library[2];
+    
+
+    count=0;
+    if(mc_gState->m_Assets->FindEntityByShortTxID(&(library[0].m_Details),(const unsigned char*)&hash) == 0)
+    {
+        LogPrintf("Library not found\n");
+        return MC_ERR_NOT_FOUND;
+    }
+    
+    count=1;
+    library[0].m_Hash=hash;
+    
+    if(mc_gState->m_Assets->FindActiveUpdate(&(library[1].m_Details),library[0].m_Details.GetTxID()) == 0)
+    {
+        LogPrintf("Library active update not found\n");
+        return MC_ERR_NOT_FOUND;
+    }
+
+    if(library[1].m_Details.IsFollowOn())
+    {
+        count=2;
+        ptr=(unsigned char *)library[1].m_Details.GetSpecialParam(MC_ENT_SPRM_CHAIN_INDEX,&value_size,1);
+
+        if( (ptr == NULL) || (value_size < 1) || (value_size > 4) )
+        {
+            LogPrintf("Library active update corrupted\n");
+            return MC_ERR_INTERNAL_ERROR;
+        }
+
+        update_id=mc_GetLE(ptr,value_size);
+        library[0].m_ActiveUpdate=update_id;
+        library[1].m_Hash=hash;
+        memcpy((unsigned char*)&library[1].m_Hash + MC_AST_SHORT_TXID_SIZE,ptr,value_size);
+    }
+    
+    for(int i=0;i<count;i++)
+    {
+        uint256 txid;
+        txid=*(uint256*)library[i].m_Details.GetTxID();
+        if(library[0].m_Details.m_Name[0])
+        {
+            library[i].m_LibraryCaption=strprintf("%s",library[0].m_Details.m_Name);
+        }
+        else
+        {
+            library[i].m_LibraryCaption=strprintf("(txid %s)",txid.ToString().c_str());        
+        }
+        if(i)
+        {
+            ptr=(unsigned char *)library[i].m_Details.GetSpecialParam(MC_ENT_SPRM_UPDATE_NAME,&value_size);
+            if(ptr)
+            {
+                string update_name ((char*)ptr,value_size);
+                library[i].m_LibraryCaption += ", Update " + update_name;
+            }                  
+        }
+        
+        ptr=(unsigned char *)library[i].m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
+        if(ptr)
+        {
+            unsigned char ntc=0x00;
+            library[i].m_LibraryCodeRow=pMultiChainFilterEngine->m_CodeLibrary->GetNumElements();
+            pMultiChainFilterEngine->m_CodeLibrary->AddElement();
+            pMultiChainFilterEngine->m_CodeLibrary->SetData(ptr,value_size);
+            pMultiChainFilterEngine->m_CodeLibrary->SetData(&ntc,1);        
+        }                                    
+        else
+        {    
+            LogPrintf("Library code not found\n");
+            return MC_ERR_INTERNAL_ERROR;
+        }
+
+        map<uint160,mc_MultiChainLibrary>::iterator it=m_Libraries.find(library[i].m_Hash);
+        if (it == m_Libraries.end())
+        {
+            if(i == 0)
+            {
+                library[i].m_MaxLoadedUpdate=update_id;
+            }
+            if(fDebug)LogPrint("filter","filter: Library loaded: %s\n",library[i].m_LibraryCaption.c_str());
+            m_Libraries.insert(make_pair(library[i].m_Hash, library[i]));        
+        }                    
+        else
+        {
+            if(i == 0)
+            {
+                if(update_id > it->second.m_MaxLoadedUpdate)
+                {
+                    it->second.m_MaxLoadedUpdate=update_id;
+                }
+            }
+        }
+    }
+    
+    return MC_ERR_NOERROR;
+}
 
 int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid,int for_block)
 {    
@@ -248,15 +427,59 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid,int for_block
         return err;
     }
     
+    for (unsigned int i=0;i<filter.m_Libraries.size();i++) 
+    {
+        err=LoadLibrary(filter.m_Libraries[i]);
+        if(err)
+        {
+            LogPrintf("Couldn't load library %d for filter %s, error: %d\n",i,filter.m_FilterCaption.c_str(),err);
+            filter.Destroy();
+            return err;
+        }
+        filter.m_Libraries[i]=ActiveUpdateID(filter.m_Libraries[i]);
+    }    
+    
     m_Filters.push_back(filter);
-    mc_Filter *worker=new mc_Filter;
-    m_Workers->Add(&worker);
     
     char *code;
     size_t code_size;
+    string library_code="";
+    
+    for (unsigned int i=0;i<filter.m_Libraries.size();i++) 
+    {
+        map<uint160,mc_MultiChainLibrary>::iterator it=m_Libraries.find(filter.m_Libraries[i]);
+        if (it != m_Libraries.end())
+        {
+            code=(char *)m_CodeLibrary->GetData(it->second.m_LibraryCodeRow,&code_size);
+            string this_library_code(code,code_size-1);
+            library_code+=this_library_code;
+            library_code+=MC_FLT_LIBRARY_GLUE;
+        }        
+        else
+        {
+            LogPrintf("Couldn't find active update for library %d for filter %s, error: %d\n",i,filter.m_FilterCaption.c_str(),err);
+            filter.Destroy();
+            return MC_ERR_INTERNAL_ERROR;            
+        }
+    }    
+    
+    mc_Filter *worker=new mc_Filter;
+    m_Workers->Add(&worker);
+    
     code=(char *)m_CodeLibrary->GetData(m_Filters.back().m_FilterCodeRow,&code_size);
     
-    err=pFilterEngine->CreateFilter(code,m_Filters.back().m_MainName.c_str(),
+    string filter_code (code,code_size);
+    string worker_code;
+    if(library_code.size())
+    {
+        worker_code=library_code.append(filter_code);
+    }
+    else
+    {
+        worker_code=filter_code;
+    }
+    
+    err=pFilterEngine->CreateFilter(worker_code.c_str(),m_Filters.back().m_MainName.c_str(),
             m_CallbackNames[m_Filters.back().m_FilterType],worker,(for_block == 0) ? GetAcceptTimeout() : 0,m_Filters.back().m_CreateError);
     if(err)
     {

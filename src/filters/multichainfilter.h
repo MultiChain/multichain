@@ -18,6 +18,9 @@
 
 #define MC_FLT_MAIN_NAME_TX                "filtertransaction"
 #define MC_FLT_MAIN_NAME_STREAM            "filterstreamitem"
+#define MC_FLT_MAIN_NAME_TEST              "_multichain_library_test_"
+
+#define MC_FLT_LIBRARY_GLUE                "\n\n"
 
 std::vector <uint160>  mc_FillRelevantFilterEntitities(const unsigned char *ptr, size_t value_size);
 
@@ -26,6 +29,7 @@ class mc_Filter;
 typedef struct mc_MultiChainFilter
 {
     std::vector <uint160> m_RelevantEntities;
+    std::vector <uint160> m_Libraries;
     
     mc_EntityDetails m_Details;
     std::string m_CreateError;
@@ -55,6 +59,33 @@ typedef struct mc_MultiChainFilter
     
 } mc_MultiChainFilter;
 
+typedef struct mc_MultiChainLibrary
+{
+    mc_EntityDetails m_Details;
+    std::string m_CreateError;
+    std::string m_LibraryCaption;
+    int m_LibraryCodeRow;
+    uint32_t m_ActiveUpdate;
+    uint32_t m_MaxLoadedUpdate;
+    uint160 m_Hash;
+    
+    mc_MultiChainLibrary()
+    {
+        Zero();
+    }
+    
+    ~mc_MultiChainLibrary()
+    {
+        Destroy();
+    }
+    
+    int Initialize(const unsigned char* short_txid,uint32_t index);
+    
+    int Zero();
+    int Destroy();   
+    
+} mc_MultiChainLibrary;
+
 typedef struct mc_MultiChainFilterParams
 {
     int m_MaxShownData;
@@ -79,6 +110,8 @@ typedef struct mc_MultiChainFilterEngine
 {
     std::vector <mc_MultiChainFilter> m_Filters;
     std::vector <std::vector <std::string>> m_CallbackNames;
+    std::map<uint160,mc_MultiChainLibrary> m_Libraries;
+    
     mc_Buffer *m_Workers;
     mc_Script *m_CodeLibrary;
     uint256 m_TxID;
@@ -109,6 +142,8 @@ typedef struct mc_MultiChainFilterEngine
     int RunFilter(const CTransaction& tx,mc_Filter *filter,std::string &strResult);            
     int RunFilterWithCallbackLog(const CTransaction& tx,int vout,uint256 stream_txid,mc_Filter *filter,std::string &strResult, json_spirit::Array& callbacks);
     int NoStreamFilters();
+    int LoadLibrary(uint160 hash);
+    uint160 ActiveUpdateID(uint160 hash);
     
     int Zero();
     int Destroy();   

@@ -18,6 +18,7 @@ using namespace std;
 using namespace json_spirit;
 
 void ParseFilterRestrictionsForField(Value param,mc_Script *lpDetailsScript,uint32_t filter_type);
+string ParseFilterOptionsLibraryField(Value param,mc_Script *lpDetailsScript);
 
 uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_EntityDetails *entity,uint32_t *data_format,int *errorCode,string *strError)
 {
@@ -1396,11 +1397,13 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
     string entity_name,filter_code,filter_main_name;
     uint32_t filter_type=MC_FLT_TYPE_TX;
     string js;
+    string library_code="";
     bool js_extended=false;
 
     bool missing_name=true;
     bool missing_code=true;
     bool missing_for=true;
+    bool missing_libraries=true;
     
     lpDetails->Clear();
     lpDetails->AddElement();                   
@@ -1454,6 +1457,28 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
             
             missing_for=false;
             field_parsed=true;
+        }
+        if(d.name_ == "libraries")
+        {
+            if(mc_gState->m_Features->Libraries())
+            {
+                if(!missing_libraries)
+                {
+                    *strError=string("libraries field can appear only once in the object");                                                                                                        
+                }
+
+                library_code=ParseFilterOptionsLibraryField(d.value_,lpDetailsScript);
+
+                script = lpDetailsScript->GetData(0,&bytes);
+
+                if(bytes)
+                {
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_LIBRARIES,script,bytes);
+                }
+
+                missing_libraries=false;
+                field_parsed=true;
+            }
         }
         
         if(d.name_ == "code")
@@ -1525,7 +1550,12 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
         {
             mc_Filter *worker=new mc_Filter;
             string strFilterError;
-            int err=pFilterEngine->CreateFilter(filter_code.c_str(),filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strFilterError);
+            string test_code=filter_code;
+            if(library_code.size())
+            {
+                test_code=library_code + MC_FLT_LIBRARY_GLUE + filter_code;
+            }
+            int err=pFilterEngine->CreateFilter(test_code.c_str(),filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strFilterError);
             delete worker;
             if(err)
             {
@@ -1902,8 +1932,8 @@ CScript RawDataScriptCreateLibrary(Value *param,mc_Script *lpDetails,mc_Script *
             std::vector <std::string> callback_names;
             int err;
 
-            string dummy_main_function="_multichain_library_test_";
-            string test_code=filter_code+"\n\n"+"function "+dummy_main_function+"(){} ";
+            string dummy_main_function=MC_FLT_MAIN_NAME_TEST;
+            string test_code=filter_code+MC_FLT_LIBRARY_GLUE+"function "+dummy_main_function+"(){} ";
             
             mc_Filter *worker=new mc_Filter;
             string strFilterError;
@@ -2058,8 +2088,8 @@ CScript RawDataScriptUpdateLibrary(Value *param,mc_EntityDetails *entity,mc_Scri
             std::vector <std::string> callback_names;
             int err;
 
-            string dummy_main_function="_multichain_library_test_";
-            string test_code=filter_code+"\n\n"+"function "+dummy_main_function+"(){} ";
+            string dummy_main_function=MC_FLT_MAIN_NAME_TEST;
+            string test_code=filter_code+MC_FLT_LIBRARY_GLUE+"function "+dummy_main_function+"(){} ";
             
             mc_Filter *worker=new mc_Filter;
             string strFilterError;

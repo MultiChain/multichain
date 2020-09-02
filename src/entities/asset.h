@@ -81,6 +81,7 @@
 #define MC_ENT_SPRM_FILTER_RESTRICTIONS       0x45
 #define MC_ENT_SPRM_FILTER_CODE               0x46
 #define MC_ENT_SPRM_FILTER_TYPE               0x47
+#define MC_ENT_SPRM_FILTER_LIBRARIES          0x48
 
 #define MC_ENT_SPRM_ASSET_TOTAL               0x51                              // Optimization parameters
 #define MC_ENT_SPRM_CHAIN_INDEX               0x52 

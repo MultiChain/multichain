@@ -46,16 +46,81 @@ void ParseFilterRestrictionsForField(Value param,mc_Script *lpDetailsScript,uint
     }
 }
 
-void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript,uint32_t filter_type)
+string ParseFilterOptionsLibraryField(Value param,mc_Script *lpDetailsScript)
 {
-    bool field_parsed,already_found;
+    string library_code="";
+    
+    if(lpDetailsScript)
+    {
+        lpDetailsScript->Clear();
+        lpDetailsScript->AddElement();                   
+    }
+    
+    vector<string> inputStrings;
+    if(param.type() != array_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid libraries field, expected array of strings");                                                        
+    }
+    inputStrings=ParseStringList(param);        
+    
+    for(int is=0;is<(int)inputStrings.size();is++)
+    {
+        mc_EntityDetails entity;
+        ParseEntityIdentifier(inputStrings[is],&entity, MC_ENT_TYPE_LIBRARY);           
+        if(lpDetailsScript)
+        {
+            lpDetailsScript->SetData(entity.GetShortRef(),MC_AST_SHORT_TXID_SIZE);
+        }
+        
+        Array params;
+        params.push_back(inputStrings[is]);
+        Value code=getlibrarycode(params,false);
+        if(library_code.size())
+        {
+            library_code += MC_FLT_LIBRARY_GLUE;
+        }
+        library_code += code.get_str();
+    }    
+    return library_code;
+}
+
+string  mc_LibraryCodeByLibraryList(const unsigned char *ptr, size_t value_size)
+{
+    Array entity_ids;
+    mc_EntityDetails entity;    
+    
+    if(ptr)
+    {
+        for(int i=0;i<(int)value_size/MC_AST_SHORT_TXID_SIZE;i++)
+        {
+            if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,ptr+i*MC_AST_SHORT_TXID_SIZE) == 0)
+            {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Library not found");                                                                        
+            }
+            entity_ids.push_back(((uint256*)(entity.GetTxID()))->ToString());
+        }
+    }    
+    
+    return ParseFilterOptionsLibraryField(entity_ids,NULL);
+}
+
+
+
+string ParseFilterRestrictions(Value param,mc_Script *lpDetails,mc_Script *lpDetailsScript,uint32_t filter_type)
+{
+    bool field_parsed,for_found,libraries_found;
+    size_t bytes;
+    const unsigned char *script;
+    
+    string library_code="";
     
     lpDetailsScript->Clear();
     lpDetailsScript->AddElement();            
     if(param.type() == obj_type)
     {
         Object objParams = param.get_obj();
-        already_found=false;
+        for_found=false;
+        libraries_found=false;
         BOOST_FOREACH(const Pair& s, objParams) 
         {
             field_parsed=false;
@@ -65,13 +130,41 @@ void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript,uint32_t fil
                 {
                     throw JSONRPCError(RPC_NOT_ALLOWED,"for field is allowed only for tx filters");                                                   
                 }
-                if(already_found)
+                if(for_found)
                 {
                     throw JSONRPCError(RPC_INVALID_PARAMETER,"for field can appear only once in the object");                               
                 }
                 ParseFilterRestrictionsForField(s.value_,lpDetailsScript,filter_type);
+                if(lpDetails)
+                {
+                    script = lpDetailsScript->GetData(0,&bytes);
+
+                    if(bytes)
+                    {
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_RESTRICTIONS,script,bytes);
+                    }
+                }
                 field_parsed=true;
-                already_found=true;
+                for_found=true;
+            }
+            if(s.name_ == "libraries")
+            {
+                if(libraries_found)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,"libraries field can appear only once in the object");                               
+                }
+                library_code=ParseFilterOptionsLibraryField(s.value_,(lpDetails == NULL) ? NULL : lpDetailsScript);
+                if(lpDetails)
+                {
+                    script = lpDetailsScript->GetData(0,&bytes);
+
+                    if(bytes)
+                    {
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_LIBRARIES,script,bytes);
+                    }
+                }
+                field_parsed=true;
+                libraries_found=true;
             }
             if(!field_parsed)
             {
@@ -93,6 +186,8 @@ void ParseFilterRestrictions(Value param,mc_Script *lpDetailsScript,uint32_t fil
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid restrictions, should be object or boolean false");                                        
         }
     }    
+    
+    return library_code;
 }
 
 string ParseFilterDetails(Value param)
@@ -208,15 +303,16 @@ Value createfilterfromcmd(const Array& params, bool fHelp)
     
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_TYPE,(unsigned char*)&filter_type,4);
     
-    ParseFilterRestrictions(params[3],lpDetailsScript,filter_type);
+    string library_code=ParseFilterRestrictions(params[3],lpDetails,lpDetailsScript,filter_type);
     
+/*    
     script = lpDetailsScript->GetData(0,&bytes);
 
     if(bytes)
     {
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_RESTRICTIONS,script,bytes);
     }
-    
+*/    
     vector<CTxDestination> addresses;    
     
     vector<CTxDestination> fromaddresses;        
@@ -292,7 +388,13 @@ Value createfilterfromcmd(const Array& params, bool fHelp)
 
     mc_Filter *worker=new mc_Filter;
 
-    err=pFilterEngine->CreateFilter(js.c_str(),filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strError);
+    string test_code=js;
+    if(library_code.size())
+    {
+        test_code=library_code + MC_FLT_LIBRARY_GLUE + js;
+    }
+    
+    err=pFilterEngine->CreateFilter(test_code.c_str(),filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strError);
     delete worker;
     if(err)
     {
@@ -753,7 +855,7 @@ Value setfilterparam(const json_spirit::Array& params, bool fHelp)
     return "Set";
 }
 
-Value testfilter(const vector <uint160>& entities,const  char *filter_code, Value txparam,int vout_in,uint32_t filter_type)
+Value testfilter(const vector <uint160>& entities,string filter_code, Value txparam,int vout_in,uint32_t filter_type,string library_code)
 {
     Object result;
     int err;
@@ -857,7 +959,13 @@ Value testfilter(const vector <uint160>& entities,const  char *filter_code, Valu
     
     mc_Filter *worker=new mc_Filter;
 //    err=pFilterEngine->CreateFilter(filter_code,filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strError);
-    err=pFilterEngine->CreateFilter(filter_code,filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,pMultiChainFilterEngine->GetSendTimeout(), strError);
+    string test_code=filter_code;
+    if(library_code.size())
+    {
+        test_code=library_code + MC_FLT_LIBRARY_GLUE + filter_code;
+    }
+
+    err=pFilterEngine->CreateFilter(test_code.c_str(),filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,pMultiChainFilterEngine->GetSendTimeout(), strError);
     if(err)
     {
         errorCode=RPC_INTERNAL_ERROR;
@@ -1068,6 +1176,18 @@ Value runtxfilter(const json_spirit::Array& params, bool fHelp)
     
     entities=mc_FillRelevantFilterEntitities(ptr, value_size);
     
+    ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_LIBRARIES,&value_size);
+
+    if(ptr)
+    {
+        if(value_size % MC_AST_SHORT_TXID_SIZE)
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Specified filter has invalid libraries value");        
+        }
+    }    
+    
+    string library_code= mc_LibraryCodeByLibraryList(ptr,value_size);
+    
     ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
     
     if(ptr)
@@ -1092,7 +1212,7 @@ Value runtxfilter(const json_spirit::Array& params, bool fHelp)
         }
     }
 */    
-    return testfilter(entities, filter_code.c_str(), (params.size() > 1) ? params[1] : Value::null, -1, MC_FLT_TYPE_TX);
+    return testfilter(entities, filter_code, (params.size() > 1) ? params[1] : Value::null, -1, MC_FLT_TYPE_TX,library_code);
 }
 
 Value testtxfilter(const json_spirit::Array& params, bool fHelp)
@@ -1111,7 +1231,7 @@ Value testtxfilter(const json_spirit::Array& params, bool fHelp)
     mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
     lpDetailsScript->Clear();
     
-    ParseFilterRestrictions(params[0],lpDetailsScript,filter_type);
+    string library_code=ParseFilterRestrictions(params[0],NULL,lpDetailsScript,filter_type);
     
     script = lpDetailsScript->GetData(0,&bytes);
 
@@ -1135,7 +1255,7 @@ Value testtxfilter(const json_spirit::Array& params, bool fHelp)
         }
     }
 */    
-    return testfilter(entities, js.c_str(), (params.size() > 2) ? params[2] : Value::null, -1, MC_FLT_TYPE_TX);
+    return testfilter(entities, js, (params.size() > 2) ? params[2] : Value::null, -1, MC_FLT_TYPE_TX, library_code);
 }
 
 Value runstreamfilter(const json_spirit::Array& params, bool fHelp)
@@ -1169,6 +1289,17 @@ Value runstreamfilter(const json_spirit::Array& params, bool fHelp)
     }    
     
     entities=mc_FillRelevantFilterEntitities(ptr, value_size);
+
+    ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_LIBRARIES,&value_size);
+    if(ptr)
+    {
+        if(value_size % MC_AST_SHORT_TXID_SIZE)
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Specified filter has invalid libraries value");        
+        }
+    }    
+    
+    string library_code= mc_LibraryCodeByLibraryList(ptr,value_size);
     
     ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
     
@@ -1203,7 +1334,7 @@ Value runstreamfilter(const json_spirit::Array& params, bool fHelp)
         }
     }
 */    
-    return testfilter(entities, filter_code.c_str(), (params.size() > 1) ? params[1] : Value::null, vout, MC_FLT_TYPE_STREAM);
+    return testfilter(entities, filter_code, (params.size() > 1) ? params[1] : Value::null, vout, MC_FLT_TYPE_STREAM, library_code);
 }
 
 Value teststreamfilter(const json_spirit::Array& params, bool fHelp)
@@ -1223,7 +1354,7 @@ Value teststreamfilter(const json_spirit::Array& params, bool fHelp)
     mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
     lpDetailsScript->Clear();
     
-    ParseFilterRestrictions(params[0],lpDetailsScript,filter_type);
+    string library_code=ParseFilterRestrictions(params[0],NULL,lpDetailsScript,filter_type);
     
     script = lpDetailsScript->GetData(0,&bytes);
 
@@ -1258,6 +1389,6 @@ Value teststreamfilter(const json_spirit::Array& params, bool fHelp)
     }
 */
     
-    return testfilter(entities, js.c_str(), (params.size() > 2) ? params[2] : Value::null, vout, MC_FLT_TYPE_STREAM);
+    return testfilter(entities, js, (params.size() > 2) ? params[2] : Value::null, vout, MC_FLT_TYPE_STREAM, library_code);
 }
 
