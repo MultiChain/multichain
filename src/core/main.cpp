@@ -2381,6 +2381,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     {
         mc_gState->m_Permissions->ClearMemPool();
         mc_gState->m_Assets->ClearMemPool();
+        if(pMultiChainFilterEngine)
+        {
+            pMultiChainFilterEngine->Reset(pindex->nHeight-1,1);
+        }
     }
 /* MCHN END */        
     
@@ -2923,10 +2927,12 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     int64_t nTime2 = GetTimeMicros(); nTimeReadFromDisk += nTime2 - nTime1;
     int64_t nTime3;
     if(fDebug)LogPrint("bench", "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
+/*    
     if(pMultiChainFilterEngine)
     {
         pMultiChainFilterEngine->Reset(pindexNew->nHeight-1,1);
     }
+ */ 
     if(pindexNew->nHeight == 0)
     {
         pindexNew->nSize=GenesisBlockSize;

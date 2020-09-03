@@ -68,6 +68,7 @@ typedef struct mc_MultiChainLibrary
     uint32_t m_ActiveUpdate;
     uint32_t m_MaxLoadedUpdate;
     uint160 m_Hash;
+    std::string m_Code;
     
     mc_MultiChainLibrary()
     {
@@ -142,8 +143,11 @@ typedef struct mc_MultiChainFilterEngine
     int RunFilter(const CTransaction& tx,mc_Filter *filter,std::string &strResult);            
     int RunFilterWithCallbackLog(const CTransaction& tx,int vout,uint256 stream_txid,mc_Filter *filter,std::string &strResult, json_spirit::Array& callbacks);
     int NoStreamFilters();
-    int LoadLibrary(uint160 hash);
+    int LoadLibrary(uint160 hash,bool *modified);
     uint160 ActiveUpdateID(uint160 hash);
+    int CheckLibraries(std::set <uint160>* lpAffectedLibraries,int for_block);
+    int RebuildFilter(int row,int for_block);
+    
     
     int Zero();
     int Destroy();   

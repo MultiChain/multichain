@@ -3149,7 +3149,8 @@ bool MultiChainTransaction_VerifyStandardCoinbase(const CTransaction& tx,       
     return true;    
 }
 
-bool MultiChainTransaction_ProcessLibraryUpdates(CMultiChainTxDetails *details, // Tx details object
+bool MultiChainTransaction_ProcessLibraryUpdates(int offset,
+                                                 CMultiChainTxDetails *details, // Tx details object                                                 
                                                  string& reason)                // Error message
 {
     if(details->vAffectedLibraries.size() == 0)
@@ -3172,6 +3173,14 @@ bool MultiChainTransaction_ProcessLibraryUpdates(CMultiChainTxDetails *details, 
         }
     }    
     
+    if(pMultiChainFilterEngine)
+    {    
+        if(pMultiChainFilterEngine->CheckLibraries(&(details->vAffectedLibraries),(offset >= 0)) != MC_ERR_NOERROR)
+        {
+            reason="Could not compile filters with new library update";
+            return false;
+        }
+    }
     return true;
 }
 
@@ -3255,7 +3264,7 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
         goto exitlbl;                                                                                
     }        
     
-    if(!MultiChainTransaction_ProcessLibraryUpdates(&details,reason))           
+    if(!MultiChainTransaction_ProcessLibraryUpdates(offset,&details,reason))           
     {
         fReject=true;
         goto exitlbl;                                                                                
@@ -3318,8 +3327,8 @@ exitlbl:
     if(!accept || fReject)                                                      // Rolling back permission database if we were just checking or error occurred    
     {
         mc_gState->m_Permissions->RollBackToCheckPoint();
-        mc_gState->m_Assets->RollBackToCheckPoint();
-        MultiChainTransaction_ProcessLibraryUpdates(&details,reason);
+        mc_gState->m_Assets->RollBackToCheckPoint();    
+        MultiChainTransaction_ProcessLibraryUpdates(offset,&details,reason);
     }
 
     if(mandatory_fee_out)

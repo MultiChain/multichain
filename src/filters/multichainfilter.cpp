@@ -303,14 +303,14 @@ uint160 mc_MultiChainFilterEngine::ActiveUpdateID(uint160 hash)
     if (it != m_Libraries.end())
     {
         uint160 update_hash=hash;
-        memcpy((unsigned char*)&update_hash+MC_AST_SHORT_TXID_SIZE,&(it->second.m_ActiveUpdate),4);
+        memcpy((unsigned char*)&update_hash+MC_AST_SHORT_TXID_SIZE,&(it->second.m_ActiveUpdate),sizeof(uint32_t));
         return update_hash;
     }                
     
     return hash;
 }
 
-int mc_MultiChainFilterEngine::LoadLibrary(uint160 hash)
+int mc_MultiChainFilterEngine::LoadLibrary(uint160 hash,bool *modified)
 {
     int count;
     size_t value_size;
@@ -319,6 +319,10 @@ int mc_MultiChainFilterEngine::LoadLibrary(uint160 hash)
     
     mc_MultiChainLibrary library[2];
     
+    if(modified)
+    {
+        *modified=false;
+    }
 
     count=0;
     if(mc_gState->m_Assets->FindEntityByShortTxID(&(library[0].m_Details),(const unsigned char*)&hash) == 0)
@@ -378,11 +382,15 @@ int mc_MultiChainFilterEngine::LoadLibrary(uint160 hash)
         ptr=(unsigned char *)library[i].m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
         if(ptr)
         {
+            string this_code ((char*)ptr,value_size);
+            library[i].m_Code=this_code;
+/*            
             unsigned char ntc=0x00;
             library[i].m_LibraryCodeRow=pMultiChainFilterEngine->m_CodeLibrary->GetNumElements();
             pMultiChainFilterEngine->m_CodeLibrary->AddElement();
             pMultiChainFilterEngine->m_CodeLibrary->SetData(ptr,value_size);
             pMultiChainFilterEngine->m_CodeLibrary->SetData(&ntc,1);        
+ */ 
         }                                    
         else
         {    
@@ -404,13 +412,201 @@ int mc_MultiChainFilterEngine::LoadLibrary(uint160 hash)
         {
             if(i == 0)
             {
+                if(update_id != it->second.m_ActiveUpdate)
+                {
+                    it->second.m_ActiveUpdate=update_id;
+                    if(modified)
+                    {
+                        *modified=true;
+                    }
+                }
                 if(update_id > it->second.m_MaxLoadedUpdate)
                 {
                     it->second.m_MaxLoadedUpdate=update_id;
                 }
             }
+            if(modified && *modified)
+            {
+                if(i == count-1)
+                {
+                    if(fDebug)LogPrint("filter","filter: Library active update modified: %s\n",library[i].m_LibraryCaption.c_str());                    
+                }
+            }
         }
     }
+    
+    return MC_ERR_NOERROR;
+}
+
+int mc_MultiChainFilterEngine::CheckLibraries(set<uint160>* lpAffectedLibraries, int for_block)
+{
+    int err;
+    bool modified;
+    map<uint160,mc_MultiChainLibrary>::iterator mit;
+    map<uint160,mc_MultiChainLibrary>::iterator lit;    
+    set <uint160>::iterator it;
+    
+    set <uint160> all_libraries;
+    set <uint160> modified_libraries;
+
+    if(lpAffectedLibraries)
+    {
+        for(int row=0;row<(int)m_Filters.size();row++)
+        {
+            for (unsigned int i=0;i<m_Filters[row].m_Libraries.size();i++) 
+            {
+                uint160 hash=mc_LibraryIDForUpdate(m_Filters[row].m_Libraries[i]);
+                if(lpAffectedLibraries->find(hash) != lpAffectedLibraries->end())
+                {
+                    if(all_libraries.find(hash) == all_libraries.end())
+                    {
+                        all_libraries.insert(hash);
+                    }
+                }                        
+            }                
+        }
+    }
+    else
+    {
+        for (mit = m_Libraries.begin(); mit != m_Libraries.end(); ++mit) 
+        {
+            if(mc_GetLE((unsigned char*)&(mit->first)+MC_AST_SHORT_TXID_SIZE,sizeof(uint32_t)) == 0)
+            {
+                all_libraries.insert(mit->first);
+            }
+        }        
+    }
+    
+    for (it = all_libraries.begin(); it != all_libraries.end(); ++it) 
+    {
+        err=LoadLibrary(*it,&modified);
+        if(err)
+        {
+            return err;
+        }
+        if(modified)
+        {
+            modified_libraries.insert(*it);
+        }
+    }    
+
+    if(modified_libraries.size() == 0)
+    {
+        return MC_ERR_NOERROR;
+    }
+        
+    for(int row=0;row<(int)m_Filters.size();row++)
+    {
+        bool rebuild=false;
+        for (unsigned int i=0;i<m_Filters[row].m_Libraries.size();i++) 
+        {
+            uint160 hash=mc_LibraryIDForUpdate(m_Filters[row].m_Libraries[i]);
+            if(modified_libraries.find(hash) != modified_libraries.end())
+            {
+                rebuild=true;
+                m_Filters[row].m_Libraries[i]=ActiveUpdateID(hash);
+            }
+        }
+        if(rebuild)
+        {
+            if(lpAffectedLibraries)
+            {
+                err=RebuildFilter(row,for_block);
+                if(err)
+                {
+                    return err;
+                }
+            }
+        }
+    }
+    
+    for (it = modified_libraries.begin(); it != modified_libraries.end(); ++it) 
+    {
+        lit=m_Libraries.find(*it);
+        if(lit == m_Libraries.end())
+        {
+            return MC_ERR_INTERNAL_ERROR;
+        }
+
+        
+        uint160 hash=*it;
+        for(uint32_t u=1;u<=lit->second.m_MaxLoadedUpdate;u++)
+        {
+            if(u != lit->second.m_ActiveUpdate)
+            {
+                mc_PutLE((unsigned char*)&hash+MC_AST_SHORT_TXID_SIZE,&u,sizeof(uint32_t));
+                mit=m_Libraries.find(hash);
+                if(mit != m_Libraries.end())
+                {
+                    if(fDebug)LogPrint("filter","filter: Library erased: %s\n",mit->second.m_LibraryCaption.c_str());
+                    m_Libraries.erase(mit);
+                }
+            }
+        }
+        lit->second.m_MaxLoadedUpdate=lit->second.m_ActiveUpdate;
+    }   
+    
+    return MC_ERR_NOERROR;
+}
+
+int mc_MultiChainFilterEngine::RebuildFilter(int row,int for_block)
+{
+    int err; 
+    
+    if(row >= (int)m_Filters.size())
+    {
+        LogPrintf("Couldn't rebuild filter %d, out of range\n",row);
+        return MC_ERR_INTERNAL_ERROR;
+    }
+    
+    mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(row);
+    
+    char *code;
+    size_t code_size;
+    string library_code="";
+    
+    for (unsigned int i=0;i<m_Filters[row].m_Libraries.size();i++) 
+    {
+        map<uint160,mc_MultiChainLibrary>::iterator it=m_Libraries.find(m_Filters[row].m_Libraries[i]);
+        if (it != m_Libraries.end())
+        {
+/*            
+            code=(char *)m_CodeLibrary->GetData(it->second.m_LibraryCodeRow,&code_size);
+            string this_library_code(code,code_size-1);
+            library_code+=this_library_code;
+ */ 
+            library_code+=it->second.m_Code;
+            library_code+=MC_FLT_LIBRARY_GLUE;
+        }        
+        else
+        {
+            LogPrintf("Couldn't find active update for library %d for filter %s, error: %d\n",i,m_Filters[row].m_FilterCaption.c_str(),err);
+            return MC_ERR_INTERNAL_ERROR;            
+        }
+    }    
+    
+    code=(char *)m_CodeLibrary->GetData(m_Filters[row].m_FilterCodeRow,&code_size);
+    
+    string filter_code (code,code_size);
+    string worker_code;
+    if(library_code.size())
+    {
+        worker_code=library_code.append(filter_code);
+    }
+    else
+    {
+        worker_code=filter_code;
+    }
+    
+    err=pFilterEngine->CreateFilter(worker_code.c_str(),m_Filters[row].m_MainName.c_str(),
+            m_CallbackNames[m_Filters[row].m_FilterType],worker,(for_block == 0) ? GetAcceptTimeout() : 0,m_Filters[row].m_CreateError);
+    if(err)
+    {
+        LogPrintf("Couldn't create filter with short txid %s, error: %d\n",m_Filters[row].m_FilterAddress.ToString().c_str(),err);
+        return err;
+    }
+    
+    m_Filters[row].m_AlreadyUsed=false;
     
     return MC_ERR_NOERROR;
 }
@@ -429,7 +625,7 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid,int for_block
     
     for (unsigned int i=0;i<filter.m_Libraries.size();i++) 
     {
-        err=LoadLibrary(filter.m_Libraries[i]);
+        err=LoadLibrary(filter.m_Libraries[i],NULL);
         if(err)
         {
             LogPrintf("Couldn't load library %d for filter %s, error: %d\n",i,filter.m_FilterCaption.c_str(),err);
@@ -440,7 +636,7 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid,int for_block
     }    
     
     m_Filters.push_back(filter);
-    
+/*    
     char *code;
     size_t code_size;
     string library_code="";
@@ -462,10 +658,11 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid,int for_block
             return MC_ERR_INTERNAL_ERROR;            
         }
     }    
-    
+*/    
     mc_Filter *worker=new mc_Filter;
     m_Workers->Add(&worker);
-    
+  
+/*    
     code=(char *)m_CodeLibrary->GetData(m_Filters.back().m_FilterCodeRow,&code_size);
     
     string filter_code (code,code_size);
@@ -478,7 +675,7 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid,int for_block
     {
         worker_code=filter_code;
     }
-    
+  
     err=pFilterEngine->CreateFilter(worker_code.c_str(),m_Filters.back().m_MainName.c_str(),
             m_CallbackNames[m_Filters.back().m_FilterType],worker,(for_block == 0) ? GetAcceptTimeout() : 0,m_Filters.back().m_CreateError);
     if(err)
@@ -488,7 +685,18 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid,int for_block
         m_Filters.pop_back();
         return err;
     }
-    
+*/    
+ 
+    err=RebuildFilter((int)m_Filters.size()-1,for_block);
+    if(err)
+    {
+        LogPrintf("Couldn't create filter with short txid %s, error: %d\n",filter.m_FilterAddress.ToString().c_str(),err);
+        delete worker;
+        m_Workers->SetCount(m_Workers->GetCount()-1);
+        m_Filters.pop_back();
+        return err;        
+    }
+            
     if(fDebug)LogPrint("filter","filter: Filter added: %s\n",m_Filters.back().m_FilterCaption.c_str());
     
     return MC_ERR_NOERROR;
@@ -530,9 +738,22 @@ int mc_MultiChainFilterEngine::Reset(int block,int for_block)
             }            
         }
     }
+    err=CheckLibraries(NULL,for_block);
+    if(err)
+    {
+        LogPrintf("Couldn't reset libraries, error: %d\n",err);
+        return err;        
+    }
     
     for(int i=0;i<(int)m_Filters.size();i++)
     {
+        err=RebuildFilter(i,for_block);
+        if(err)
+        {
+            LogPrintf("Couldn't prepare filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
+            return err;
+        }
+/*        
         mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
         
         char *code;
@@ -545,6 +766,7 @@ int mc_MultiChainFilterEngine::Reset(int block,int for_block)
             LogPrintf("Couldn't prepare filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
             return err;
         }        
+ */ 
     }    
     
     if(for_block == 0)
