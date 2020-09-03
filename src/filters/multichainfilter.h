@@ -147,6 +147,7 @@ typedef struct mc_MultiChainFilterEngine
     uint160 ActiveUpdateID(uint160 hash);
     int CheckLibraries(std::set <uint160>* lpAffectedLibraries,int for_block);
     int RebuildFilter(int row,int for_block);
+    mc_Filter *StreamFilterWorker(int row,bool *modified);
     
     
     int Zero();

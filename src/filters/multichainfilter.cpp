@@ -549,6 +549,105 @@ int mc_MultiChainFilterEngine::CheckLibraries(set<uint160>* lpAffectedLibraries,
     return MC_ERR_NOERROR;
 }
 
+mc_Filter *mc_MultiChainFilterEngine::StreamFilterWorker(int row,bool *modified)
+{
+    int err; 
+    char *code;
+    size_t code_size;
+    string library_code="";   
+    mc_Filter *worker;
+    
+    *modified=false;
+    
+    if(row >= (int)m_Filters.size())
+    {
+        LogPrintf("Couldn't build stream filter %d, out of range\n",row);
+        return NULL;
+    }
+    
+    for (unsigned int i=0;i<m_Filters[row].m_Libraries.size();i++) 
+    {
+        mc_EntityDetails update_entity;
+        map<uint160,mc_MultiChainLibrary>::iterator it=m_Libraries.find(mc_LibraryIDForUpdate(m_Filters[row].m_Libraries[i]));
+        if(it == m_Libraries.end())
+        {
+            LogPrintf("Couldn't fine library for stream filter %d\n",row);
+            return NULL;            
+        }
+        if(mc_gState->m_Assets->FindActiveUpdate(&update_entity,it->second.m_Details.GetTxID()) == 0)
+        {
+            LogPrintf("Library active update not found\n");
+            return NULL;
+        }
+        
+        size_t value_size;
+        unsigned char *ptr;
+        uint32_t update_id=0;
+        
+        ptr=(unsigned char *)update_entity.GetSpecialParam(MC_ENT_SPRM_CHAIN_INDEX,&value_size,1);
+
+        if( (ptr == NULL) || (value_size < 1) || (value_size > 4) )
+        {
+            LogPrintf("Library active update corrupted\n");
+            return NULL;
+        }
+
+        update_id=mc_GetLE(ptr,value_size);
+        if(update_id != it->second.m_ActiveUpdate)
+        {
+            printf("Using alternative worker %d\n",update_id);
+            *modified=true;
+            ptr=(unsigned char *)update_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
+            if(ptr)
+            {
+                string this_code ((char*)ptr,value_size);
+                library_code+=this_code;
+            }                                    
+            else
+            {    
+                LogPrintf("Library code not found\n");
+                return NULL;
+            }
+        }
+        else
+        {
+            library_code+=it->second.m_Code;           
+        }
+        library_code+=MC_FLT_LIBRARY_GLUE;        
+    }
+    
+    worker=*(mc_Filter **)m_Workers->GetRow(row);
+    if(*modified)
+    {
+        worker=new mc_Filter;
+        
+        code=(char *)m_CodeLibrary->GetData(m_Filters[row].m_FilterCodeRow,&code_size);
+
+        string filter_code (code,code_size);
+        string worker_code;
+        if(library_code.size())
+        {
+            worker_code=library_code.append(filter_code);
+        }
+        else
+        {
+            worker_code=filter_code;
+        }
+
+        err=pFilterEngine->CreateFilter(worker_code.c_str(),m_Filters[row].m_MainName.c_str(),
+                m_CallbackNames[m_Filters[row].m_FilterType],worker,GetAcceptTimeout(),m_Filters[row].m_CreateError);
+        if(err)
+        {
+            LogPrintf("Couldn't create worker for stream filter with short txid %s, error: %d\n",m_Filters[row].m_FilterAddress.ToString().c_str(),err);
+            delete worker;
+            *modified=false;
+            return NULL;
+        }        
+    }    
+    
+    return worker;
+}
+
 int mc_MultiChainFilterEngine::RebuildFilter(int row,int for_block)
 {
     int err; 
@@ -833,23 +932,36 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
         {
             if(mc_gState->m_Permissions->FilterApproved(stream_entity_txid,&(m_Filters[i].m_FilterAddress)))
             {
-                mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
+//                mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
+                bool modified=false;
+                mc_Filter *worker=StreamFilterWorker(i,&modified);//*(mc_Filter **)m_Workers->GetRow(i);
+                if(worker == NULL)
+                {
+                    LogPrintf("Error while creating worker for filter %s\n",m_Filters[i].m_FilterCaption.c_str());
+                    goto exitlbl;                    
+                }
                 bool run_it=true;
+                bool already_tried=false;
                 while(run_it)
                 {
                     err=pFilterEngine->RunFilter(worker,strResult);
                     if(err)
                     {
                         LogPrintf("Error while running filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
+                        if(modified)
+                        {
+                            delete worker;
+                        }
                         goto exitlbl;
                     }
                     run_it=false;
                     if(strResult.size())
                     {
-                        if(!only_once && !m_Filters[i].m_AlreadyUsed)
+                        if(!only_once && !already_tried && (!m_Filters[i].m_AlreadyUsed || modified))
                         {
                             if(fDebug)LogPrint("filter","filter: stream filter %s failure on first attempt: %s, retrying\n",m_Filters[i].m_FilterCaption.c_str(),strResult.c_str());
-                            run_it=true;
+                            run_it=true; 
+                            already_tried=true;
                             strResult="";
                         }
                     }
@@ -863,12 +975,20 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
                     }
                     if(fDebug)LogPrint("filter","filter: %s: %s\n",m_Filters[i].m_FilterCaption.c_str(),strResult.c_str());
 
+                    if(modified)
+                    {
+                        delete worker;
+                    }
                     goto exitlbl;
                 }
                 if(fDebug)LogPrint("filter","filter: Tx %s accepted, filter: %s\n",m_TxID.ToString().c_str(),m_Filters[i].m_FilterCaption.c_str());
                 if(applied)
                 {
                     *applied+=1;
+                }
+                if(modified)
+                {
+                    delete worker;
                 }
             }
         }
