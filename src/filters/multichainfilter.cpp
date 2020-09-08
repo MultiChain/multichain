@@ -100,18 +100,24 @@ int mc_MultiChainFilter::Zero()
 {
     m_RelevantEntities.clear();
     m_Libraries.clear();
+    m_CachedUpdateIDs.clear();
     m_CreateError="Not Initialized";
     m_FilterType=MC_FLT_TYPE_TX;
     m_FilterCaption="Unknown";
     m_FilterAddress=0;
     m_FilterCodeRow=0;
     m_AlreadyUsed=false;
+    m_CachedWorker=NULL;
     
     return MC_ERR_NOERROR;
 }
 
 int mc_MultiChainFilter::Destroy()
 {
+    if(m_CachedWorker)
+    {
+        delete m_CachedWorker;
+    }
     Zero();
     
     return MC_ERR_NOERROR;
@@ -556,6 +562,7 @@ mc_Filter *mc_MultiChainFilterEngine::StreamFilterWorker(int row,bool *modified)
     size_t code_size;
     string library_code="";   
     mc_Filter *worker;
+    vector <uint32_t> update_ids;
     
     *modified=false;
     
@@ -593,9 +600,10 @@ mc_Filter *mc_MultiChainFilterEngine::StreamFilterWorker(int row,bool *modified)
         }
 
         update_id=mc_GetLE(ptr,value_size);
+        update_ids.push_back(update_id);
+
         if(update_id != it->second.m_ActiveUpdate)
         {
-            printf("Using alternative worker %d\n",update_id);
             *modified=true;
             ptr=(unsigned char *)update_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
             if(ptr)
@@ -619,7 +627,35 @@ mc_Filter *mc_MultiChainFilterEngine::StreamFilterWorker(int row,bool *modified)
     worker=*(mc_Filter **)m_Workers->GetRow(row);
     if(*modified)
     {
+        if(m_Filters[row].m_CachedWorker)
+        {
+            bool cache_match=true;
+            for (unsigned int i=0;i<m_Filters[row].m_Libraries.size();i++) 
+            {
+                if(m_Filters[row].m_CachedUpdateIDs[i] != update_ids[i])
+                {
+                    cache_match=false;
+                }
+            }
+            if(cache_match)
+            {
+                worker=m_Filters[row].m_CachedWorker;
+                *modified=false;
+            }
+            else
+            {
+                delete m_Filters[row].m_CachedWorker;
+                m_Filters[row].m_CachedWorker=NULL;
+            }
+        }
+    }
+            
+    
+    if(*modified)
+    {
         worker=new mc_Filter;
+        m_Filters[row].m_CachedWorker=worker;
+        m_Filters[row].m_CachedUpdateIDs = update_ids;
         
         code=(char *)m_CodeLibrary->GetData(m_Filters[row].m_FilterCodeRow,&code_size);
 
@@ -948,10 +984,12 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
                     if(err)
                     {
                         LogPrintf("Error while running filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
+/*                        
                         if(modified)
                         {
                             delete worker;
                         }
+ */ 
                         goto exitlbl;
                     }
                     run_it=false;
@@ -974,11 +1012,12 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
                         *lppFilter=&(m_Filters[i]);
                     }
                     if(fDebug)LogPrint("filter","filter: %s: %s\n",m_Filters[i].m_FilterCaption.c_str(),strResult.c_str());
-
+/*
                     if(modified)
                     {
                         delete worker;
                     }
+ */ 
                     goto exitlbl;
                 }
                 if(fDebug)LogPrint("filter","filter: Tx %s accepted, filter: %s\n",m_TxID.ToString().c_str(),m_Filters[i].m_FilterCaption.c_str());
@@ -986,10 +1025,12 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
                 {
                     *applied+=1;
                 }
+/*                
                 if(modified)
                 {
                     delete worker;
                 }
+ */ 
             }
         }
     }    

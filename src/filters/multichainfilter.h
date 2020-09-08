@@ -30,7 +30,9 @@ typedef struct mc_MultiChainFilter
 {
     std::vector <uint160> m_RelevantEntities;
     std::vector <uint160> m_Libraries;
+    std::vector <uint32_t> m_CachedUpdateIDs;
     
+    mc_Filter *m_CachedWorker;
     mc_EntityDetails m_Details;
     std::string m_CreateError;
     std::string m_MainName;
@@ -39,6 +41,7 @@ typedef struct mc_MultiChainFilter
     int m_FilterCodeRow;
     uint160 m_FilterAddress;
     bool m_AlreadyUsed;
+    
     
     mc_MultiChainFilter()
     {
