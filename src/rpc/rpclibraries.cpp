@@ -9,7 +9,25 @@
 #include "filters/filter.h"
 
 bool mc_JSInExtendedScript(size_t size);
+class RPCTestLibraryUpdate
+{
+public:
+    mc_EntityDetails m_Library;
+    std::string m_LibraryName;
+    std::string m_UpdateName;
+    std::string m_Code;
+    bool m_LibraryOnChain;
+    bool m_UpdateOnChain;
+    
+    void Zero();
+    RPCTestLibraryUpdate()
+    {
+        Zero();
+    }
+};
 
+map<std::string, RPCTestLibraryUpdate> rpc_testlibraryupdates;
+ 
 Value createlibraryfromcmd(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 5)
@@ -518,11 +536,44 @@ Value getlibrarycode(const Array& params, bool fHelp)
     mc_EntityDetails filter_entity;
     mc_EntityDetails update_entity;
     mc_EntityDetails *entity_to_use;
+
+    mc_VerifyTestLibraryUpdates();
     
+    string tlu_update;
+    bool tlu_local_library;
+    string tlu_code;
+    
+    tlu_code=mc_GetTestLibraryUpdateCode(params[0].get_str(),&tlu_update,&tlu_local_library);
+    
+    if(tlu_local_library)
+    {
+        if(tlu_code.size())
+        {
+            if(params.size() > 1)
+            {
+                if(tlu_update != params[1].get_str())
+                {
+                    throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Update with this name not found");                                                                
+                }
+            }
+            return tlu_code;
+        }
+    }    
     
     ParseEntityIdentifier(params[0],&filter_entity,MC_ENT_TYPE_LIBRARY);
     
-
+    tlu_code=mc_GetTestLibraryUpdateCode(((uint256*)filter_entity.GetTxID())->GetHex(),&tlu_update,&tlu_local_library);
+    if(tlu_code.size())
+    {
+        if(params.size() > 1)
+        {
+            if(tlu_update == params[1].get_str())
+            {
+                return tlu_code;
+            }
+        }        
+    }
+    
     if(filter_entity.IsFollowOn())
     {
         throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Library with this create txid not found");                                                                
@@ -733,3 +784,272 @@ Value listlibraries(const Array& params, bool fHelp)
     return results;
 }
 
+Value mc_TestLibraryList()
+{
+    Array result;
+    std::map<std::string, RPCTestLibraryUpdate>::iterator it;
+    
+    for(it=rpc_testlibraryupdates.begin();it!=rpc_testlibraryupdates.end();++it)
+    {
+        Object entry;
+        bool is_local=false;
+        if(it->second.m_LibraryOnChain)
+        {
+            entry.push_back(Pair("library",LibraryEntry(it->second.m_Library.GetTxID(),0x0e)));
+            if(!it->second.m_UpdateOnChain)
+            {
+                is_local=true;
+            }
+        }
+        else
+        {
+            Object library_entry;
+            library_entry.push_back(Pair("name",it->second.m_LibraryName));     
+            library_entry.push_back(Pair("createtxid",Value::null));     
+            entry.push_back(Pair("library",library_entry));     
+            is_local=true;
+        }
+        entry.push_back(Pair("update",it->second.m_UpdateName));
+        entry.push_back(Pair("source",is_local ? "local" : "chain"));   
+        result.push_back(entry);
+    }
+    
+    return result;
+}
+
+int mc_VerifyTestLibraryUpdates()
+{
+    mc_EntityDetails entity;
+    mc_EntityDetails update_entity;
+    std::map<std::string, RPCTestLibraryUpdate>::iterator it;
+    for(it=rpc_testlibraryupdates.begin();it!=rpc_testlibraryupdates.end();++it)
+    {
+        try
+        {
+            ParseEntityIdentifier(it->second.m_LibraryName,&entity, MC_ENT_TYPE_ANY); 
+            if(!it->second.m_LibraryOnChain)
+            {
+                rpc_testlibraryupdates.erase(it);
+            }
+            else
+            {
+                if(entity.GetEntityType() != MC_ENT_TYPE_LIBRARY)               // Can happen on chain rollback                
+                {
+                    rpc_testlibraryupdates.erase(it);
+                }
+                else
+                {
+                    if(mc_gState->m_Assets->FindUpdateByName(&update_entity,entity.GetTxID(),it->second.m_UpdateName.c_str()))
+                    {
+                        if(!it->second.m_UpdateOnChain)
+                        {
+                            rpc_testlibraryupdates.erase(it);
+                        }
+                    }                    
+                    else
+                    {
+                        if(it->second.m_UpdateOnChain)
+                        {
+                            rpc_testlibraryupdates.erase(it);
+                        }
+                    }
+                }
+            }
+        }
+        catch(Object& objError)
+        {
+            if(it->second.m_LibraryOnChain)
+            {
+                rpc_testlibraryupdates.erase(it);                              // Can happen on chain rollback                
+            }
+        }
+    }
+    
+    return MC_ERR_NOERROR;
+}
+
+string mc_GetTestLibraryUpdateCode(string library,string *update,bool *local_library)
+{
+    std::map<std::string, RPCTestLibraryUpdate>::iterator it=rpc_testlibraryupdates.find(library);
+    if(it != rpc_testlibraryupdates.end())
+    {
+        if(update)
+        {
+            *update=it->second.m_UpdateName;            
+        }
+        if(local_library)
+        {
+            *local_library=!it->second.m_LibraryOnChain;
+        }
+        return it->second.m_Code;
+    }
+    return "";
+}
+
+void RPCTestLibraryUpdate::Zero()
+{
+    m_Library.Zero();
+    m_LibraryName="";
+    m_UpdateName="";
+    m_Code="";
+    m_LibraryOnChain=false;
+    m_UpdateOnChain=false;    
+}
+
+Value testlibrary(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 3)
+       throw runtime_error("Help message not found\n");
+    
+    int ret;
+    unsigned char buf[32];
+    RPCTestLibraryUpdate tlu;    
+    mc_EntityDetails update_entity;
+    string tlu_key="";
+    mc_EntityDetails *code_entity=NULL;
+    size_t value_size;
+    unsigned char *ptr;
+
+    mc_VerifyTestLibraryUpdates();
+    
+    if(params.size() > 0)
+    {
+        if (params[0].type() != null_type && !params[0].get_str().empty())
+        {                    
+            if(params[0].get_str() == "*")
+            {
+                if(params.size() > 1)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Update name should be omitted if all libraries are specified");                    
+                }
+                rpc_testlibraryupdates.clear();
+            }
+            else
+            {
+                tlu.m_LibraryName=params[0].get_str();
+                tlu_key=tlu.m_LibraryName;
+                ret=ParseAssetKey(params[0].get_str().c_str(),buf,NULL,NULL,NULL,NULL,MC_ENT_TYPE_ANY);
+                if(ret == MC_ASSET_KEY_VALID)
+                {
+                    if(mc_gState->m_Assets->FindEntityByTxID(&(tlu.m_Library),buf))
+                    {
+                        if(tlu.m_Library.GetEntityType() != MC_ENT_TYPE_LIBRARY)
+                        {
+                            throw JSONRPCError(RPC_NOT_ALLOWED, "Entity (not library) with this name already exists: "+params[0].get_str());                        
+                        }
+                        tlu.m_LibraryOnChain=true;
+                        uint256 hash=0;
+                        memcpy(&hash,tlu.m_Library.GetTxID(),32);
+                        tlu_key=hash.GetHex();
+                        tlu.m_LibraryName=tlu_key;
+                    }
+                }
+                else
+                {
+                    if(ret == MC_ASSET_KEY_INVALID_SIZE)
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Could not parse library key: "+params[0].get_str());
+                    }
+                }
+            }
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid library identifier");        
+        }        
+    }
+    
+    if(params.size() > 1)
+    {
+        tlu.m_UpdateName=params[1].get_str().c_str();
+        if(tlu.m_LibraryOnChain)
+        {
+            if(tlu.m_Library.AllowedFollowOns() == 0)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Library update not allowed for this library: "+params[0].get_str());        
+            }      
+            if(mc_gState->m_Assets->FindUpdateByName(&update_entity,tlu.m_Library.GetTxID(),tlu.m_UpdateName.c_str()))
+            {
+                tlu.m_UpdateOnChain=true;
+                code_entity=&update_entity;
+            }
+        }
+    } 
+    else
+    {
+        if(tlu_key.size())
+        {
+            std::map<std::string, RPCTestLibraryUpdate>::iterator it=rpc_testlibraryupdates.find(tlu_key);
+            if(it != rpc_testlibraryupdates.end())
+            {
+                rpc_testlibraryupdates.erase(tlu_key);                
+            }            
+            tlu_key="";
+        }
+    }
+    
+    if(params.size() > 2)
+    {
+        if(code_entity == NULL)
+        {
+            tlu.m_Code=params[2].get_str().c_str();
+            mc_Filter *worker=new mc_Filter;
+            std::vector <std::string> callback_names;
+            int err;
+            string strError;
+
+            string dummy_main_function=MC_FLT_MAIN_NAME_TEST;
+            string test_code=tlu.m_Code+MC_FLT_LIBRARY_GLUE+"function "+dummy_main_function+"(){} ";
+
+            err=pFilterEngine->CreateFilter(test_code,dummy_main_function,callback_names,worker,strError);
+            delete worker;
+            if(err)
+            {
+                throw JSONRPCError(RPC_INTERNAL_ERROR,"Couldn't create library");                                                                   
+            }
+            if(strError.size())
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,strprintf("Couldn't compile library code: %s",strError.c_str()));                                                                               
+            }
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Code parameter can be specified only for non-existent updates");                    
+        }
+    }
+    else
+    {
+        if(tlu_key.size())
+        {
+            if(code_entity == NULL)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Code parameter is required for non-existent updates");                    
+            }        
+        }
+    }
+
+    if(code_entity)
+    {
+        ptr=(unsigned char *)code_entity->GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
+        if(ptr)
+        {
+            string this_code ((char*)ptr,value_size);
+            tlu.m_Code=this_code;
+        }
+    }
+
+    if(tlu_key.size())
+    {
+        std::map<std::string, RPCTestLibraryUpdate>::iterator it=rpc_testlibraryupdates.find(tlu_key);
+        if(it == rpc_testlibraryupdates.end())
+        {
+            rpc_testlibraryupdates.insert(make_pair(tlu_key,tlu));
+        }
+        else
+        {
+            it->second=tlu;
+        }        
+    }
+            
+    return mc_TestLibraryList();
+}

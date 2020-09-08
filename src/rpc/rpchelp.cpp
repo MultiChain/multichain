@@ -5471,6 +5471,26 @@ void mc_InitRPCHelpMap23()
             + HelpExampleRpc("getlibrarycode", "lib1")
         ));
      
+     mapHelpStrings.insert(std::make_pair("testlibrary",
+            "getlibrarycode ( \"library-identifier\"  \"update-name\" \"javascript-code\")\n"
+            "\nSets library code to be used for testing in testtxfilter, runtxfilter, teststreamfilter and runstreamfilter \n"
+            "\nArguments:\n"
+            "1. \"library-identifier\"               (string, optional) Library identifier - one of: create txid, library reference, library name.\n"
+            "                                                           If omitted - API only reports list of library updates used for testing.\n"
+            "                                                           * - clears library updates used for testing (with omitted \"update-name\")  \n"
+            "                                                           If library doesn't exist, creates new library which can be used only in testtxfilter and teststreamfilter.\n"
+            "2. \"update-name\"                      (string, optional) Update to use in testing,\n"
+            "                                                           \"\" for original library code.\n"
+            "                                                           If omitted, active update is restored (testing update removed)\n"
+            "                                                           If update doesn't exist, create new update which can be used only in testing APIs.\n"     
+            "3. \"javascript-code\"                  (string, required) JavaScript code (for new libraries and updates).\n"
+            "\nResult:\n"
+            "List of library updates used for testing\n"            
+           "\nExamples:\n"
+            + HelpExampleCli("testlibrary", "lib1 update1")
+            + HelpExampleRpc("testlibrary", "lib1")
+        ));
+     
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));

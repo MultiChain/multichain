@@ -46,7 +46,7 @@ void ParseFilterRestrictionsForField(Value param,mc_Script *lpDetailsScript,uint
     }
 }
 
-string ParseFilterOptionsLibraryField(Value param,mc_Script *lpDetailsScript)
+string ParseFilterOptionsLibraryField(Value param,mc_Script *lpDetailsScript, bool for_test)
 {
     string library_code="";
     
@@ -63,28 +63,63 @@ string ParseFilterOptionsLibraryField(Value param,mc_Script *lpDetailsScript)
     }
     inputStrings=ParseStringList(param);        
     
+    if(for_test)
+    {
+        mc_VerifyTestLibraryUpdates();
+    }
+    
     for(int is=0;is<(int)inputStrings.size();is++)
     {
         mc_EntityDetails entity;
-        ParseEntityIdentifier(inputStrings[is],&entity, MC_ENT_TYPE_LIBRARY);           
-        if(lpDetailsScript)
-        {
-            lpDetailsScript->SetData(entity.GetShortRef(),MC_AST_SHORT_TXID_SIZE);
-        }
-        
-        Array params;
-        params.push_back(inputStrings[is]);
-        Value code=getlibrarycode(params,false);
         if(library_code.size())
         {
             library_code += MC_FLT_LIBRARY_GLUE;
         }
-        library_code += code.get_str();
+        string this_code="";
+        
+        if(for_test)
+        {
+            string tlu_code;
+            bool tlu_local_library;
+
+            tlu_code=mc_GetTestLibraryUpdateCode(inputStrings[is],NULL,&tlu_local_library);
+
+            if(tlu_local_library)
+            {
+                if(tlu_code.size())
+                {
+                    this_code=tlu_code;
+                }
+            }            
+        }
+        
+        if(this_code.size() == 0)
+        {
+            ParseEntityIdentifier(inputStrings[is],&entity, MC_ENT_TYPE_LIBRARY);           
+            if(lpDetailsScript)
+            {
+                lpDetailsScript->SetData(entity.GetShortRef(),MC_AST_SHORT_TXID_SIZE);
+            }
+            if(for_test)
+            {
+                this_code=mc_GetTestLibraryUpdateCode(((uint256*)entity.GetTxID())->GetHex(),NULL,NULL);
+            }
+        }
+        
+        if(this_code.size() == 0)
+        {
+            Array params;
+            params.push_back(inputStrings[is]);
+            Value code=getlibrarycode(params,false);
+            this_code=code.get_str();
+        }
+        
+        library_code += this_code;
     }    
     return library_code;
 }
 
-string  mc_LibraryCodeByLibraryList(const unsigned char *ptr, size_t value_size)
+string  mc_LibraryCodeByLibraryList(const unsigned char *ptr, size_t value_size, bool for_test)
 {
     Array entity_ids;
     mc_EntityDetails entity;    
@@ -101,12 +136,12 @@ string  mc_LibraryCodeByLibraryList(const unsigned char *ptr, size_t value_size)
         }
     }    
     
-    return ParseFilterOptionsLibraryField(entity_ids,NULL);
+    return ParseFilterOptionsLibraryField(entity_ids,NULL,for_test);
 }
 
 
 
-string ParseFilterRestrictions(Value param,mc_Script *lpDetails,mc_Script *lpDetailsScript,uint32_t filter_type)
+string ParseFilterRestrictions(Value param,mc_Script *lpDetails,mc_Script *lpDetailsScript,uint32_t filter_type, bool for_test)
 {
     bool field_parsed,for_found,libraries_found;
     size_t bytes;
@@ -153,7 +188,7 @@ string ParseFilterRestrictions(Value param,mc_Script *lpDetails,mc_Script *lpDet
                 {
                     throw JSONRPCError(RPC_INVALID_PARAMETER,"libraries field can appear only once in the object");                               
                 }
-                library_code=ParseFilterOptionsLibraryField(s.value_,(lpDetails == NULL) ? NULL : lpDetailsScript);
+                library_code=ParseFilterOptionsLibraryField(s.value_,(lpDetails == NULL) ? NULL : lpDetailsScript,for_test);
                 if(lpDetails)
                 {
                     script = lpDetailsScript->GetData(0,&bytes);
@@ -303,7 +338,7 @@ Value createfilterfromcmd(const Array& params, bool fHelp)
     
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_TYPE,(unsigned char*)&filter_type,4);
     
-    string library_code=ParseFilterRestrictions(params[3],lpDetails,lpDetailsScript,filter_type);
+    string library_code=ParseFilterRestrictions(params[3],lpDetails,lpDetailsScript,filter_type,false);
     
 /*    
     script = lpDetailsScript->GetData(0,&bytes);
@@ -1186,7 +1221,7 @@ Value runtxfilter(const json_spirit::Array& params, bool fHelp)
         }
     }    
     
-    string library_code= mc_LibraryCodeByLibraryList(ptr,value_size);
+    string library_code= mc_LibraryCodeByLibraryList(ptr,value_size,true);
     
     ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
     
@@ -1231,7 +1266,7 @@ Value testtxfilter(const json_spirit::Array& params, bool fHelp)
     mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
     lpDetailsScript->Clear();
     
-    string library_code=ParseFilterRestrictions(params[0],NULL,lpDetailsScript,filter_type);
+    string library_code=ParseFilterRestrictions(params[0],NULL,lpDetailsScript,filter_type,true);
     
     script = lpDetailsScript->GetData(0,&bytes);
 
@@ -1299,7 +1334,7 @@ Value runstreamfilter(const json_spirit::Array& params, bool fHelp)
         }
     }    
     
-    string library_code= mc_LibraryCodeByLibraryList(ptr,value_size);
+    string library_code= mc_LibraryCodeByLibraryList(ptr,value_size,true);
     
     ptr=(unsigned char *)filter_entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
     
@@ -1354,7 +1389,7 @@ Value teststreamfilter(const json_spirit::Array& params, bool fHelp)
     mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
     lpDetailsScript->Clear();
     
-    string library_code=ParseFilterRestrictions(params[0],NULL,lpDetailsScript,filter_type);
+    string library_code=ParseFilterRestrictions(params[0],NULL,lpDetailsScript,filter_type,true);
     
     script = lpDetailsScript->GetData(0,&bytes);
 

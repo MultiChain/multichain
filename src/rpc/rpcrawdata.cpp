@@ -18,7 +18,7 @@ using namespace std;
 using namespace json_spirit;
 
 void ParseFilterRestrictionsForField(Value param,mc_Script *lpDetailsScript,uint32_t filter_type);
-string ParseFilterOptionsLibraryField(Value param,mc_Script *lpDetailsScript);
+string ParseFilterOptionsLibraryField(Value param,mc_Script *lpDetailsScript, bool for_test);
 
 uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_EntityDetails *entity,uint32_t *data_format,int *errorCode,string *strError)
 {
@@ -1467,7 +1467,7 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
                     *strError=string("libraries field can appear only once in the object");                                                                                                        
                 }
 
-                library_code=ParseFilterOptionsLibraryField(d.value_,lpDetailsScript);
+                library_code=ParseFilterOptionsLibraryField(d.value_,lpDetailsScript,false);
 
                 script = lpDetailsScript->GetData(0,&bytes);
 

@@ -120,6 +120,7 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "addlibraryupdate",       &addlibraryupdate,       true,      false,      false },
     { "blockchain",         "addlibraryupdatefrom",   &addlibraryupdatefrom,   true,      false,      false },
     { "blockchain",         "getlibrarycode",         &getlibrarycode,         true,      false,      false },
+    { "blockchain",         "testlibrary",            &testlibrary,            true,      false,      false },
     
 /* MCHN END */    
     

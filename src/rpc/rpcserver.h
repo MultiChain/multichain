@@ -344,6 +344,7 @@ extern json_spirit::Value listlibraries(const json_spirit::Array& params, bool f
 extern json_spirit::Value addlibraryupdate(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value addlibraryupdatefrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getlibrarycode(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value testlibrary(const json_spirit::Array& params, bool fHelp);
 
 
 
