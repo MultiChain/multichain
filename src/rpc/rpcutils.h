@@ -166,6 +166,7 @@ bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_
 void CheckWalletError(int err,uint32_t entity_type,string message);
 int mc_VerifyTestLibraryUpdates();
 string mc_GetTestLibraryUpdateCode(string library,string *update,bool *local_library);
+mc_Buffer *mc_GetEntityTxIDList(uint32_t entity_type,int req_count,int req_start,bool *exact_results);
 
 #endif	/* RPCMULTICHAINUTILS_H */
 

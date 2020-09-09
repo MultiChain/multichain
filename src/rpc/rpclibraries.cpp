@@ -637,6 +637,7 @@ Value listlibraries(const Array& params, bool fHelp)
     unsigned char *txid;
     uint32_t output_level;
     Array results;
+    bool exact_results=false;
     
     int count,start;
     count=2147483647;
@@ -693,7 +694,8 @@ Value listlibraries(const Array& params, bool fHelp)
     {        
         {
             LOCK(cs_main);
-            libraries=mc_gState->m_Assets->GetEntityList(libraries,NULL,MC_ENT_TYPE_LIBRARY);
+            libraries=mc_GetEntityTxIDList(MC_ENT_TYPE_LIBRARY,count,start,&exact_results);
+//            libraries=mc_gState->m_Assets->GetEntityList(libraries,NULL,MC_ENT_TYPE_LIBRARY);
         }
     }
     
@@ -710,7 +712,15 @@ Value listlibraries(const Array& params, bool fHelp)
         }
     }
     
-    mc_AdjustStartAndCount(&count,&start,libraries->GetCount());
+    if(exact_results)
+    {
+        count=libraries->GetCount();
+        start=0;
+    }
+    else
+    {
+        mc_AdjustStartAndCount(&count,&start,libraries->GetCount());
+    }
     
     Array partial_results;
     int unconfirmed_count=0;
@@ -724,52 +734,65 @@ Value listlibraries(const Array& params, bool fHelp)
             entry=LibraryEntry(txid,output_level);
             if(entry.size()>0)
             {
-                BOOST_FOREACH(const Pair& p, entry) 
+                if(exact_results)
                 {
-                    if(p.name_ == "libraryref")
+                    results.push_back(entry);     
+                }
+                else
+                {
+                    BOOST_FOREACH(const Pair& p, entry) 
                     {
-                        if(p.value_.type() == str_type)
+                        if(p.name_ == "libraryref")
                         {
-                            results.push_back(entry);                        
+                            if(p.value_.type() == str_type)
+                            {
+                                results.push_back(entry);                        
+                            }
+                            else
+                            {
+                                unconfirmed_count++;
+                            }
                         }
-                        else
-                        {
-                            unconfirmed_count++;
-                        }
-                    }
-                }            
+                    }            
+                }
             }            
         }
 
-        sort(results.begin(), results.end(), AssetCompareByRef);
-        
-        for(int i=0;i<libraries->GetCount();i++)
+        if(!exact_results)
         {
-            Object entry;
+            sort(results.begin(), results.end(), AssetCompareByRef);
 
-            txid=libraries->GetRow(i);
-
-            entry=LibraryEntry(txid,output_level);
-            if(entry.size()>0)
+            for(int i=0;i<libraries->GetCount();i++)
             {
-                BOOST_FOREACH(const Pair& p, entry) 
+                Object entry;
+
+                txid=libraries->GetRow(i);
+
+                entry=LibraryEntry(txid,output_level);
+                if(entry.size()>0)
                 {
-                    if(p.name_ == "libraryref")
+                    BOOST_FOREACH(const Pair& p, entry) 
                     {
-                        if(p.value_.type() != str_type)
+                        if(p.name_ == "libraryref")
                         {
-                            results.push_back(entry);                        
+                            if(p.value_.type() != str_type)
+                            {
+                                results.push_back(entry);                        
+                            }
                         }
-                    }
+                    }            
                 }            
-            }            
+            }
         }
     }
 
     bool return_partial=false;
-    if(count != libraries->GetCount())
+    if(!exact_results)
     {
-        return_partial=true;
+        if(count != libraries->GetCount())
+        {
+            return_partial=true;
+        }
     }
     mc_gState->m_Assets->FreeEntityList(libraries);
     if(return_partial)

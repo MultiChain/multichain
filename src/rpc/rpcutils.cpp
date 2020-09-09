@@ -2321,6 +2321,49 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
     return entry;
 }
 
+mc_Buffer *mc_GetEntityTxIDList(uint32_t entity_type,int req_count,int req_start,bool *exact_results)
+{
+    mc_EntityDetails entitylist_entity;
+    
+    if(mc_gState->m_Assets->FindEntityList(&entitylist_entity,entity_type))
+    {
+        mc_EntityDetails last_entity;
+
+        if(mc_gState->m_Assets->FindLastEntity(&last_entity,&entitylist_entity))
+        {
+            int items=mc_GetEntityIndex(&last_entity)+1;
+            int count=req_count;
+            int start=req_start;
+            mc_Buffer *result;
+            result=new mc_Buffer;
+            result->Initialize(MC_ENT_KEY_SIZE,MC_ENT_KEY_SIZE,MC_BUF_MODE_DEFAULT);
+            
+            mc_AdjustStartAndCount(&count,&start,items);
+            mc_Buffer *followons;
+            followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(&last_entity,count,start);
+            for(int i=followons->GetCount()-1;i>=0;i--)
+            {
+                mc_EntityDetails *followon=(mc_EntityDetails *)followons->GetRow(i);
+                size_t value_size;
+                const void* ptr=followon->GetSpecialParam(MC_ENT_SPRM_ENTITY_TXID,&value_size,0);
+                
+                if(ptr)
+                {
+                    result->Add(ptr,NULL);
+                }                
+            }
+            mc_gState->m_Assets->FreeEntityList(followons);
+            
+            *exact_results=true;
+            return result;
+        }
+        
+    }
+    
+    *exact_results=false;
+    return mc_gState->m_Assets->GetEntityList(NULL,NULL,entity_type);
+}
+
 Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t output_level,string& lasttxid,Array& lastwriters)
 {
     size_t value_size;
