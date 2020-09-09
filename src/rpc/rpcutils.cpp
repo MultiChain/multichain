@@ -2764,6 +2764,7 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
     Object entry;
     mc_EntityDetails entity;
     mc_EntityDetails sec_entity;
+    mc_EntityDetails last_entity;
     mc_EntityDetails *active_entity;
     mc_EntityDetails *genesis_entity;
     mc_EntityDetails *followon;
@@ -2838,6 +2839,13 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
             }
         }
         
+        last_entity.Zero();
+        int update_count=mc_gState->m_Assets->FindLastEntityByGenesis(&last_entity,genesis_entity);
+        if(update_count)
+        {
+            update_count=mc_GetEntityIndex(&last_entity)+1;                
+        }
+        
         Array updates;
         size_t value_size;
         int64_t offset,new_offset;
@@ -2869,55 +2877,16 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
             }
         }
         
-/*        
-        entStat.Zero();
-        memcpy(&entStat,genesis_entity->GetShortRef(),mc_gState->m_NetworkParams->m_AssetRefSize);
-        
-        int history_items=0;
-        
-        last_entity.Zero();
-        if(output_level & 0x0022)
-        {
-            history_items=mc_gState->m_Assets->FindLastEntityByGenesis(&last_entity,genesis_entity);
-            if(history_items)
-            {
-                history_items=mc_GetEntityIndex(&last_entity)+1;
-                entry.push_back(Pair("historylen",history_items)); 
-                entry.push_back(Pair("value",mc_ExtractValueJSONObject(&last_entity))); 
-            }
-            else
-            {
-                Value null_value;
-                entry.push_back(Pair("historylen",0)); 
-                entry.push_back(Pair("value",null_value)); 
-            }
-        }
-        
-
-        if(output_level & 0x0020)  
-        {
-            string lasttxid;
-            Array lastwriters;
-            Array issues;
-            if(history_items > 0)
-            {
-                issues=VariableHistory(&last_entity,1,history_items-1,output_level | 0x0040,lasttxid,lastwriters);
-            }
-//            entry.push_back(Pair("history",issues));                    
-            entry.push_back(Pair("lastwriters",lastwriters));                    
-            entry.push_back(Pair("lasttxid",lasttxid));                    
-        }        
- */ 
 
         if(output_level & 0x0020)
         {
             mc_Buffer *followons;
-            followons=mc_gState->m_Assets->GetFollowOns(txid);
+            followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(&last_entity,update_count,0);
             for(int i=followons->GetCount()-1;i>=0;i--)
             {
                 Object issue;
-                followon->Zero();
-                if(mc_gState->m_Assets->FindEntityByTxID(followon,followons->GetRow(i)))
+                followon=(mc_EntityDetails *)followons->GetRow(i);
+                mc_gState->m_Assets->ReloadDetailsIfNeeded(followon);
                 {
                     issue.push_back(Pair("txid", ((uint256*)(followon->GetTxID()))->ToString().c_str()));    
 
