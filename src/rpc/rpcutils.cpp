@@ -2330,7 +2330,7 @@ mc_Buffer *mc_GetEntityTxIDList(uint32_t entity_type,int req_count,int req_start
         mc_EntityDetails last_entity;
 
         if(mc_gState->m_Assets->FindLastEntity(&last_entity,&entitylist_entity))
-        {
+        {            
             int items=mc_GetEntityIndex(&last_entity)+1;
             int count=req_count;
             int start=req_start;

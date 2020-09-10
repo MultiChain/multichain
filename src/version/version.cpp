@@ -14,7 +14,7 @@ int mc_State::VersionInfo(int version)
         return custom_version;
     }
     
-    int this_build=20100101;
+    int this_build=20100102;
     int this_protocol=20012;   
     
     if(mc_gState->m_EnterpriseBuild)

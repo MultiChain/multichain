@@ -1375,7 +1375,7 @@ int mc_AssetDB::UpdateEntityLists(const void* txid,int offset,int entity_type)
     mc_EntityLedgerRow aldRow;
     int64_t last_total,left_position;
     int32_t chain_size;
-    int64_t first_pos,last_pos;
+    int64_t size,first_pos,last_pos,tot_pos;
     
     last_total=0;
     chain_size=0;
@@ -1446,6 +1446,49 @@ int mc_AssetDB::UpdateEntityLists(const void* txid,int offset,int entity_type)
 
     first_pos=aldRow.m_FirstPos;
     last_pos=aldRow.m_ChainPos;
+    
+    tot_pos=m_Pos;
+    
+    int last_found=0;
+    int64_t gap_size=0;
+    int lrow=m_MemPool->GetCount()-1;
+    int last_last=0;
+    while(lrow>=0)
+    {
+        if( (((mc_EntityLedgerRow*)(m_MemPool->GetRow(lrow)))->m_KeyType  & MC_ENT_KEYTYPE_MASK) == MC_ENT_KEYTYPE_TXID)
+        {
+            mc_EntityLedgerRow* row=(mc_EntityLedgerRow*)(m_MemPool->GetRow(lrow));
+            size=m_Ledger->m_TotalSize+mc_AllocSize(row->m_ScriptSize+row->m_ExtendedScript,m_Ledger->m_TotalSize,1);
+            if(last_found)
+            {
+                gap_size+=size;
+            }
+            if( (row->m_KeyType & MC_ENT_KEYTYPE_FOLLOW_ON) || (first_pos < 0) )
+            {
+                if(row->m_FirstPos == first_pos)
+                {
+                    if(last_found)
+                    {
+                        last_pos=last_last+gap_size;
+                        lrow=-1;
+                    }
+                    else
+                    {
+                        last_found=1;
+                        last_last=row->m_LastPos;
+                    }
+                }
+            }
+        }        
+        lrow--;
+    }
+    if(last_found)
+    {
+        if(last_pos == aldRow.m_ChainPos)                                       // Single followon in memory
+        {
+            last_pos=tot_pos+gap_size;
+        }
+    }
     
     aldRow.Zero();
     memcpy(aldRow.m_Key,entitylist_key,MC_ENT_KEY_SIZE);
@@ -2869,7 +2912,8 @@ int64_t mc_AssetDB::GetChainPosition(mc_EntityLedgerRow *row,int32_t index)
                         x/=2;
                         n*=2;
                     }
-                    if( (x-n) < index )
+//                    if( (x-n) < index )
+                    if( (row_index-n) < index )
                     {
                         pos=aldRow.m_LastPos;
                     }
@@ -2936,6 +2980,15 @@ int64_t mc_AssetDB::GetTotalQuantity(mc_EntityLedgerRow *row,int32_t *chain_size
                             if( (value_size>0) && (value_size <= 4))
                             {
                                 *chain_size=mc_GetLE(aldRow.m_Script+value_offset,value_size)+1;
+                                value_offset=mc_FindSpecialParamInDetailsScript(aldRow.m_Script,aldRow.m_ScriptSize,MC_ENT_SPRM_ASSET_TOTAL,&value_size);
+                                if(value_offset < aldRow.m_ScriptSize)
+                                {
+                                    if( (value_size>0) && (value_size <= 8))
+                                    {
+                                        total=mc_GetLE(aldRow.m_Script+value_offset,value_size);
+                                        return total;
+                                    }
+                                }                                
                             }
                         }
                     }                    

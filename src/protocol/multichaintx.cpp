@@ -2597,7 +2597,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
             mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_LEFT_POSITION,(unsigned char*)&left_position,sizeof(left_position));                            
         }
         
-        if( (details->new_entity_type == MC_ENT_TYPE_VARIABLE) && (details->new_entity_type == MC_ENT_TYPE_LIBRARY) )                  
+        if( (details->new_entity_type == MC_ENT_TYPE_VARIABLE) || (details->new_entity_type == MC_ENT_TYPE_LIBRARY) )                  
         {        
             mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_VOUT,(unsigned char*)&(details->new_entity_output),sizeof(details->new_entity_output));                            
         }
