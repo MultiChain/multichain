@@ -1218,7 +1218,7 @@ int mc_AssetDB::InsertAssetFollowOn(const void* txid, int offset, uint64_t quant
 {
     mc_EntityLedgerRow aldRow;
     
-    int pass,i;
+    int pass;
     int64_t size,first_pos,last_pos,tot_pos;
     uint64_t value_offset;
     size_t value_size;
@@ -1259,8 +1259,8 @@ int mc_AssetDB::InsertAssetFollowOn(const void* txid, int offset, uint64_t quant
     entity_type=aldRow.m_EntityType;
     
     tot_pos=m_Pos;
-    
-    for(i=0;i<m_MemPool->GetCount();i++)
+/*    
+    for(int i=0;i<m_MemPool->GetCount();i++)
     {
         if( (((mc_EntityLedgerRow*)(m_MemPool->GetRow(i)))->m_KeyType  & MC_ENT_KEYTYPE_MASK) == MC_ENT_KEYTYPE_TXID)
         {
@@ -1276,7 +1276,47 @@ int mc_AssetDB::InsertAssetFollowOn(const void* txid, int offset, uint64_t quant
             tot_pos+=size;
         }        
     }
-    
+*/    
+    int last_found=0;
+    int64_t gap_size=0;
+    int lrow=m_MemPool->GetCount()-1;
+    int last_last=0;
+    while(lrow>=0)
+    {
+        if( (((mc_EntityLedgerRow*)(m_MemPool->GetRow(lrow)))->m_KeyType  & MC_ENT_KEYTYPE_MASK) == MC_ENT_KEYTYPE_TXID)
+        {
+            mc_EntityLedgerRow* row=(mc_EntityLedgerRow*)(m_MemPool->GetRow(lrow));
+            size=m_Ledger->m_TotalSize+mc_AllocSize(row->m_ScriptSize+row->m_ExtendedScript,m_Ledger->m_TotalSize,1);
+            if(last_found)
+            {
+                gap_size+=size;
+            }
+            if( (row->m_KeyType & MC_ENT_KEYTYPE_FOLLOW_ON) || (first_pos < 0) )
+            {
+                if(row->m_FirstPos == first_pos)
+                {
+                    if(last_found)
+                    {
+                        last_pos=last_last+gap_size;
+                        lrow=-1;
+                    }
+                    else
+                    {
+                        last_found=1;
+                        last_last=row->m_LastPos;
+                    }
+                }
+            }
+        }        
+        lrow--;
+    }
+    if(last_found)
+    {
+        if(last_pos == aldRow.m_ChainPos)                                       // Single followon in memory
+        {
+            last_pos=tot_pos+gap_size;
+        }
+    }
     
     aldRow.Zero();
     memcpy(aldRow.m_Key,txid,MC_ENT_KEY_SIZE);
