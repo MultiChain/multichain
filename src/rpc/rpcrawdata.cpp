@@ -1819,9 +1819,6 @@ CScript RawDataScriptCreateLibrary(Value *param,mc_Script *lpDetails,mc_Script *
     lpDetailsScript->Clear();
     lpDetailsScript->AddElement();                   
         
-    unsigned char b=1;        
-    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);
-    
     BOOST_FOREACH(const Pair& d, param->get_obj()) 
     {
         field_parsed=false;
