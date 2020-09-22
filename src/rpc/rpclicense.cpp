@@ -11,6 +11,8 @@
 #include "community/community.h"
 #include "rpc/rpcwallet.h"
 
+int mc_IsHexChar(unsigned char c);
+
 bool mc_GetLicenseAddress(CBitcoinAddress &license_address,bool create_new)
 {
     if(!create_new)
@@ -173,6 +175,65 @@ bool mc_GetLicenseEncryptionKey(vector<unsigned char> &vEncryptionPublicKey,uint
     return true;
 }
 
+bool mc_GetUUID(unsigned char *uuid)
+{
+    FILE *fHan;
+    
+    unsigned char c,p,q,x;
+
+    memset(uuid,0,16);
+    fHan = popen("/usr/sbin/dmidecode | grep UUID","r"); 
+
+    if(fHan == NULL)
+    {
+        return false;
+    }
+    
+    p=0;
+    q=0;
+    if(feof(fHan))
+    {
+        q=3;
+    }
+    
+    while(q<2)
+    {
+        c = (unsigned char)fgetc(fHan);
+        if(feof(fHan) || (c == 0x0a))
+        {
+            q=(p != 32) ? 3 : 2;
+        }
+        if(q)
+        {
+            x=mc_IsHexChar(c);
+            if(x)
+            {
+                x--;
+                if(p % 2)uuid[p/2]+=x;
+                else uuid[p/2]+=16*x;
+                p++;
+            }
+            else
+            {
+                if(p % 2)q=3;
+            }
+        }
+        else
+        {
+            if(c == ':')q=1;            
+        }
+    }
+    
+    fclose(fHan);    
+
+    if(q == 3)
+    {
+        return false;
+    }
+    
+    return true;
+}
+
 CLicenseRequest mc_GetLicenseRequest(int *errorCode,string *strError)
 {
     *errorCode=0;
@@ -186,6 +247,7 @@ CLicenseRequest mc_GetLicenseRequest(int *errorCode,string *strError)
     int param_size;
     uint32_t value32;
     unsigned char nonce[MC_LIC_NONCE_SIZE];
+    unsigned char uuid[16];
     
     if(!mc_GetLicenseAddress(license_address,false))
     {
@@ -283,6 +345,12 @@ CLicenseRequest mc_GetLicenseRequest(int *errorCode,string *strError)
     stored_param=(unsigned char*)(&mc_gState->m_IPv4Address);
     param_size=sizeof(uint32_t);
     lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_IP_ADDRESS,stored_param,param_size);    
+    
+    if(mc_GetUUID(uuid))
+    {
+        param_size=16;
+        lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_UUID,uuid,param_size);        
+    }
     
     value32=mc_gState->GetNumericVersion();
     stored_param=(unsigned char*)&value32;
