@@ -624,7 +624,7 @@ Value getlibrarycode(const Array& params, bool fHelp)
 
 Value listlibraries(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() > 4)
+    if (fHelp || params.size() > 2)
        throw runtime_error("Help message not found\n");
 
     if(mc_gState->m_Features->Libraries() == 0)

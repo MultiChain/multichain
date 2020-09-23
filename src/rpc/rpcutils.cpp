@@ -2364,7 +2364,7 @@ mc_Buffer *mc_GetEntityTxIDList(uint32_t entity_type,int req_count,int req_start
     return mc_gState->m_Assets->GetEntityList(NULL,NULL,entity_type);
 }
 
-Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t output_level,string& lasttxid,Array& lastwriters)
+Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t output_level,string& lasttxid,Array& lastwriters,int& lastvout)
 {
     size_t value_size;
     int64_t offset,new_offset;
@@ -2377,7 +2377,7 @@ Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t
 //    followon=&sec_entity;
     Array issues;
 
-    if(output_level & 0x0060)                                                   // For listvariables with followons                                 
+    if(output_level & 0x0660)                                                   // For listvariables with followons                                 
     {
         mc_Buffer *followons;
         followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(last_entity,count,start);
@@ -2390,7 +2390,7 @@ Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t
             mc_gState->m_Assets->ReloadDetailsIfNeeded(followon);
             {
                 issue.push_back(Pair("value",mc_ExtractValueJSONObject(followon))); 
-                if(output_level & 0x0040)
+                if(output_level & 0x0440)
                 {
                     lasttxid=((uint256*)(followon->GetTxID()))->ToString();
                     Array followon_issuers;
@@ -2436,10 +2436,17 @@ Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t
                         offset=new_offset;
                     }      
 
-                    issue.push_back(Pair("writers",followon_issuers));                    
+                    if(output_level & 0x0040)
+                    {
+                        issue.push_back(Pair("writers",followon_issuers));                    
+                    }
                     lastwriters=followon_issuers;
-                    issue.push_back(Pair("txid", ((uint256*)(followon->GetTxID()))->ToString().c_str()));    
-                    issue.push_back(Pair("vout", vout));    
+                    lastvout=vout;
+                    if(output_level & 0x0400)
+                    {
+                        issue.push_back(Pair("txid", ((uint256*)(followon->GetTxID()))->ToString().c_str()));    
+                        issue.push_back(Pair("vout", vout));
+                    }
                     if(output_level & 0x0080)
                     {
                         int block=followon->m_LedgerRow.m_Block;
@@ -2467,8 +2474,9 @@ Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t
 {
     string lasttxid;
     Array lastwriters;
+    int lastvout;
     
-    return VariableHistory(last_entity,count,start,output_level,lasttxid,lastwriters);
+    return VariableHistory(last_entity,count,start,output_level,lasttxid,lastwriters,lastvout);
 }
 
 Object VariableEntry(const CTxOut& txout,mc_Script *lpScript,const CTransaction& tx,int n)
@@ -2676,10 +2684,12 @@ Object VariableEntry(const unsigned char *txid,uint32_t output_level)
 // 0x0002 current value
 // 0x0004 createtxid,     
 // 0x0008 
-// 0x0020 last txid and writers
-// 0x0040 history txid and writers
+// 0x0020 last writers
+// 0x0040 history writers
 // 0x0080 blockinfo
 // 0x0100 add "type":"variable"
+// 0x0200 last txid and vout
+// 0x0400 history txid and vout
     
     Object entry;
     mc_EntityDetails entity;
@@ -2766,18 +2776,26 @@ Object VariableEntry(const unsigned char *txid,uint32_t output_level)
         }
         
 
-        if(output_level & 0x0020)  
+        if(output_level & 0x0220)  
         {
             string lasttxid;
             Array lastwriters;
+            int lastvout;
             Array issues;
             if(history_items > 0)
             {
-                issues=VariableHistory(&last_entity,1,history_items-1,output_level | 0x0040,lasttxid,lastwriters);
+                issues=VariableHistory(&last_entity,1,history_items-1,output_level | 0x0440,lasttxid,lastwriters,lastvout);
             }
 //            entry.push_back(Pair("history",issues));                    
-            entry.push_back(Pair("lastwriters",lastwriters));                    
-            entry.push_back(Pair("lasttxid",lasttxid));                    
+            if(output_level & 0x0020)  
+            {
+                entry.push_back(Pair("lastwriters",lastwriters));                    
+            }
+            if(output_level & 0x0200)  
+            {
+                entry.push_back(Pair("lasttxid",lasttxid));                    
+                entry.push_back(Pair("lastvout",lastvout));                    
+            }
         }        
     }
     else

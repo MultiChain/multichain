@@ -510,7 +510,7 @@ Value getvariablehistory(const Array& params, bool fHelp)
     {
         if(paramtobool(params[1]))
         {
-            output_level|=0x80;
+            output_level|=0x480;
         }
     }
     
@@ -543,13 +543,13 @@ Value getvariableinfo(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Variable with this create txid not found");                                                                
     }
     
-    output_level=0x06;
+    output_level=0x26;
     
     if (params.size() > 1)    
     {
         if(paramtobool(params[1]))
         {
-            output_level|=0x20;
+            output_level|=0x200;
         }
     }
     
@@ -636,13 +636,13 @@ Value listvariables(const Array& params, bool fHelp)
     if(variables == NULL)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot open variable database");
 
-    output_level=0x06;
+    output_level=0x26;
     
     if (params.size() > 1)    
     {
         if(paramtobool(params[1]))
         {
-            output_level|=0x20;
+            output_level|=0x200;
         }
     }
     
