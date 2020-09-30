@@ -10,6 +10,7 @@
 #include "community/license.h"
 #include "community/community.h"
 #include "rpc/rpcwallet.h"
+#include "json/json_spirit_ubjson.h"
 
 int mc_IsHexChar(unsigned char c);
 
@@ -175,63 +176,116 @@ bool mc_GetLicenseEncryptionKey(vector<unsigned char> &vEncryptionPublicKey,uint
     return true;
 }
 
-bool mc_GetUUID(unsigned char *uuid)
+string mc_GetUUID()
 {
     FILE *fHan;
     
-    unsigned char c,p,q,x;
-
-    memset(uuid,0,16);
+    char line[200];
+    string uuid="";
+    
     fHan = popen("/usr/sbin/dmidecode | grep UUID","r"); 
 
     if(fHan == NULL)
     {
-        return false;
+        return uuid;
     }
     
-    p=0;
-    q=0;
-    if(feof(fHan))
+    if(fgets(line,200,fHan))
     {
-        q=3;
-    }
-    
-    while(q<2)
-    {
-        c = (unsigned char)fgetc(fHan);
-        if(feof(fHan) || (c == 0x0a))
+        uuid=string(line);
+        size_t found = uuid.find("UUID:");
+        if(found != uuid.npos)
         {
-            q=(p != 32) ? 3 : 2;
-        }
-        if(q)
-        {
-            x=mc_IsHexChar(c);
-            if(x)
+            uuid = uuid.substr(found+5);
+            size_t endpos = uuid.find_last_not_of(" \n\r\t");
+            size_t startpos = uuid.find_first_not_of(" \n\r\t");
+            if(endpos != uuid.npos)
             {
-                x--;
-                if(p % 2)uuid[p/2]+=x;
-                else uuid[p/2]+=16*x;
-                p++;
+                uuid = uuid.substr( 0, endpos+1 );
+                uuid = uuid.substr( startpos );
             }
-            else
+            else 
             {
-                if(p % 2)q=3;
+                if(startpos != uuid.npos)
+                {
+                    uuid = uuid.substr( startpos );
+                }
             }
         }
         else
         {
-            if(c == ':')q=1;            
+            uuid="";
+        }
+    }
+        
+    fclose(fHan);    
+    return uuid;    
+}
+
+Array mc_GetIPs()
+{
+    Array results;
+    int max_ips=64;
+    uint32_t all_ips[64];
+    int found_ips=1;
+    found_ips=mc_FindIPv4ServerAddress(all_ips,max_ips);
+    int s_ips=-1;
+    for(int i_ips=0;i_ips<found_ips;i_ips++)
+    {
+        if(all_ips[i_ips] == mc_gState->m_IPv4Address)
+        {
+            s_ips=0;
+        }        
+    }
+    for(int i_ips=s_ips;i_ips<found_ips;i_ips++)
+    {
+        unsigned char *ptr;
+        if(i_ips >= 0)
+        {
+            ptr=(unsigned char *)(all_ips+i_ips);
+        }
+        else
+        {
+            ptr=(unsigned char *)(&(mc_gState->m_IPv4Address));
+        }
+        string sip=strprintf("%u.%u.%u.%u",ptr[3],ptr[2],ptr[1],ptr[0]);
+        results.push_back(sip);
+    }
+    
+    return results;
+}
+
+Array mc_GetMACs()
+{
+    Array results;
+    unsigned char *lpMACList;
+ 
+    if(__US_FindMacServerAddress(&lpMACList,NULL) == MC_ERR_NOERROR)
+    {
+        int k,n,l,c;
+        n=lpMACList[0];
+        n=n*256+lpMACList[1];
+
+
+        for(k=0;k<n;k++)
+        {
+            c=0;
+            for(l=1;l<6;l++)
+            {
+                if(lpMACList[2+k*6+l] == lpMACList[2+k*6+l-1])c++;
+            }
+            if(c != 5)
+            {
+                unsigned char *ptr=lpMACList+2+k*6;
+                string smac=strprintf("%02x:%02x:%02x:%02x:%02x:%02x",ptr[0],ptr[1],ptr[2],ptr[3],ptr[4],ptr[5]);
+                results.push_back(smac);
+            }            
         }
     }
     
-    fclose(fHan);    
-
-    if(q == 3)
-    {
-        return false;
-    }
+    delete [] lpMACList;
     
-    return true;
+    return results;
 }
 
 CLicenseRequest mc_GetLicenseRequest(int *errorCode,string *strError)
@@ -275,6 +329,9 @@ CLicenseRequest mc_GetLicenseRequest(int *errorCode,string *strError)
     mc_Script *lpScript=mc_gState->m_TmpBuffers->m_LicenseTmpBuffer;
     lpScript->Clear();
     lpScript->AddElement();
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;    
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();
     
     GetRandBytes(nonce,MC_LIC_NONCE_SIZE);
     lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_NONCE,nonce,MC_LIC_NONCE_SIZE);    
@@ -304,54 +361,25 @@ CLicenseRequest mc_GetLicenseRequest(int *errorCode,string *strError)
     param_size=1;
     lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_ADDRESS_TYPE,stored_param,param_size);    
     
-    unsigned char *lpMACList;
- 
-    if(lpMACList)
+    Object server_params;
+    server_params.push_back(Pair("ip",mc_GetIPs()));
+    server_params.push_back(Pair("mac",mc_GetMACs()));
+    server_params.push_back(Pair("system-uuid",mc_GetUUID()));
+    
+    size_t bytes;
+    const unsigned char *script;
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();
+    
+    if(ubjson_write(server_params,lpDetailsScript,MAX_FORMATTED_DATA_DEPTH) == MC_ERR_NOERROR)
     {
-        if(__US_FindMacServerAddress(&lpMACList,NULL) == MC_ERR_NOERROR)
+        script = lpDetailsScript->GetData(0,&bytes);
+        if(bytes)
         {
-            int k,n,l,c;
-            stored_param=NULL;
-            param_size=6;
-            n=lpMACList[0];
-            n=n*256+lpMACList[1];
-
-
-            for(k=0;k<n;k++)
-            {
-                if(stored_param == NULL)
-                {
-                    c=0;
-                    for(l=1;l<6;l++)
-                    {
-                        if(lpMACList[2+k*6+l] == lpMACList[2+k*6+l-1])c++;
-                    }
-                    if(c != 5)
-                    {
-                        stored_param=lpMACList+2+k*6;
-                    }
-                }
-            }
-            if(stored_param)
-            {
-                lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_MAC_ADDRESS,stored_param,param_size);    
-
-            }
+            lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_SYSTEM_PARAMS,script,bytes);    
         }
-        delete [] lpMACList;        
     }
-    
-        
-    stored_param=(unsigned char*)(&mc_gState->m_IPv4Address);
-    param_size=sizeof(uint32_t);
-    lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_IP_ADDRESS,stored_param,param_size);    
-    
-    if(mc_GetUUID(uuid))
-    {
-        param_size=16;
-        lpScript->SetSpecialParamValue(MC_ENT_SPRM_LICENSE_UUID,uuid,param_size);        
-    }
-    
+
     value32=mc_gState->GetNumericVersion();
     stored_param=(unsigned char*)&value32;
     param_size=sizeof(uint32_t);
