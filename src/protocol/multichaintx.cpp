@@ -2312,7 +2312,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     if( ((mc_gState->m_Features->Variables() != 0) && (details->new_entity_type == MC_ENT_TYPE_VARIABLE)) ||
         ((mc_gState->m_Features->Libraries() != 0) && (details->new_entity_type == MC_ENT_TYPE_LIBRARY)) )    
     {
-        if(details->new_entity_type == MC_ENT_TYPE_VARIABLE)                   
+//        if(details->new_entity_type == MC_ENT_TYPE_VARIABLE)                   
         {
             if(new_issue)
             {
