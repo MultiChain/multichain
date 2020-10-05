@@ -296,7 +296,7 @@ bool ParseLibraryApproval(Value param,mc_EntityDetails *library_entity,mc_Entity
         BOOST_FOREACH(const Pair& s, objParams) 
         {
             field_parsed=false;
-            if(s.name_ == "update")
+            if(s.name_ == "updatename")
             {
                 if(update_found)
                 {

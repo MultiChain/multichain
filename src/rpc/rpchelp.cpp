@@ -296,7 +296,12 @@ void mc_InitRPCHelpMap02()
             "listpermissions ( \"permission(s)\" address(es) verbose )\n"
             "\nReturns a list of all permissions which have been explicitly granted to addresses.\n"
             "\nArguments:\n"
-            "1. \"permission(s)\"                  (string, optional, default=*) Permission strings, comma delimited. Possible values: " + AllowedPermissions() + "\n"                
+            "1. \"permission(s)\"                  (string, optional, default=*) Permission strings, comma delimited. \n"
+            "                                                        Global: " + AllowedPermissions() + " \n"
+            "                                                        or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
+            "                                                        or per-stream: stream-identifier.write,read,activate,admin \n"
+            "                                                        or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                        or per-library: library-identifier.write,activate,admin \n"
             "2. \"address(es)\"                    (string, optional, default=*) The addresses to retrieve permissions for. \"*\" for all addresses\n"
             " or\n"
             "2. address(es)                      (array, optional) A json array of addresses to return permissions for\n"                
@@ -1396,7 +1401,7 @@ void mc_InitRPCHelpMap06()
         ));
     
     mapHelpStrings.insert(std::make_pair("create",
-            "create \"entity-type\" \"entity-name\" open ( custom-fields )\n"
+            "create \"entity-type\" \"entity-name\" ...\n"
             "\nCreates stream, upgrade, filter, variable or library\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -1481,7 +1486,7 @@ void mc_InitRPCHelpMap06()
             "  or \n"
             "1. entity-type                           (string, required) library\n"
             "2. \"library-name\"                        (string, required) Library name, if not \"\" should be unique.\n"
-            "3. options                               (object, optional) Library update options\n"
+            "3. options                               (object, required) Library update options\n"
             "    {\n"
             "      \"updatemode\" : \"update-mode\"       (string, required) Library update mode. Possible values: none, instant, approve\n"
             "    }\n"
@@ -1498,7 +1503,7 @@ void mc_InitRPCHelpMap06()
         ));
     
     mapHelpStrings.insert(std::make_pair("createfrom",
-            "createfrom \"from-address\" \"entity-type\" \"entity-name\" open ( custom-fields )\n"
+            "createfrom \"from-address\" \"entity-type\" \"entity-name\" ...\n"
             "\nCreates stream, upgrade, filter, variable or library using specific address\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -1589,7 +1594,7 @@ void mc_InitRPCHelpMap06()
             "1. \"from-address\"                        (string, required) Address used for creating.\n"
             "2. entity-type                           (string, required) library\n"
             "3. \"library-name\"                        (string, required) Library name, if not \"\" should be unique.\n"
-            "4. options                               (object, optional) Library update options\n"
+            "4. options                               (object, required) Library update options\n"
             "    {\n"
             "      \"updatemode\" : \"update-mode\"       (string, required) Library update mode. Possible values: none, instant, approve\n"
             "    }\n"
@@ -2178,6 +2183,8 @@ void mc_InitRPCHelpMap09()
             "                                                        Global: " + AllowedPermissions() + " \n"
             "                                                        or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
             "                                                        or per-stream: stream-identifier.write,read,activate,admin \n"
+            "                                                        or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                        or per-library: library-identifier.write,activate,admin \n"
             "3. native-amount                    (numeric, optional) Native currency amount to send. eg 0.1. Default - 0.0\n"
             "4. startblock                       (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
             "5. endblock                         (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
@@ -2207,6 +2214,8 @@ void mc_InitRPCHelpMap09()
             "                                                        Global: " + AllowedPermissions() + " \n"
             "                                                        or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
             "                                                        or per-stream: stream-identifier.write,read,activate,admin \n"
+            "                                                        or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                        or per-library: library-identifier.write,activate,admin \n"
             "4. native-amount                    (numeric, optional) Native currency amount to send. eg 0.1. Default - 0.0\n"
             "5. startblock                       (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
             "6. endblock                         (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
@@ -2233,6 +2242,8 @@ void mc_InitRPCHelpMap09()
             "                                                       Global: " + AllowedPermissions() + " \n"
             "                                                       or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
             "                                                       or per-stream: stream-identifier.write,activate,admin \n"
+            "                                                       or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                       or per-library: library-identifier.write,activate,admin \n"
             "3. data|publish-new-stream-item     (string or object, required) Data, see help data-with for details. \n"
             "4. native-amount                    (numeric, optional)  Native currency amount to send. eg 0.1. Default - 0.0\n"
             "5. startblock                       (numeric, optional)  Block to apply permissions from (inclusive). Default - 0\n"
@@ -2259,6 +2270,8 @@ void mc_InitRPCHelpMap10()
             "                                                        Global: " + AllowedPermissions() + " \n"
             "                                                        or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
             "                                                        or per-stream: stream-identifier.write,activate,admin \n"
+            "                                                        or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                        or per-library: library-identifier.write,activate,admin \n"
             "3. data|publish-new-stream-item     (string or object, required) Data, see help data-with for details. \n"
             "4. native-amount                    (numeric, optional)  Native currency amount to send. eg 0.1. Default - 0.0\n"
             "5. startblock                       (numeric, optional)  Block to apply permissions from (inclusive). Default - 0\n"
@@ -2283,6 +2296,8 @@ void mc_InitRPCHelpMap10()
             "                                                       Global: " + AllowedPermissions() + " \n"
             "                                                       or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
             "                                                       or per-stream: stream-identifier.write,activate,admin \n"
+            "                                                       or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                       or per-library: library-identifier.write,activate,admin \n"
             "4. data|publish-new-stream-item     (string or object, required) Data, see help data-with for details. \n"
             "5. native-amount                    (numeric, optional)  Native currency amount to send. eg 0.1. Default - 0.0\n"
             "6. startblock                       (numeric, optional)  Block to apply permissions from (inclusive). Default - 0\n"
@@ -2307,6 +2322,8 @@ void mc_InitRPCHelpMap10()
             "                                                       Global: " + AllowedPermissions() + " \n"
             "                                                       or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
             "                                                       or per-stream: stream-identifier.write,activate,admin \n"
+            "                                                       or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                       or per-library: library-identifier.write,activate,admin \n"
             "4. data|publish-new-stream-item     (string or object, required) Data, see help data-with for details. \n"
             "5. native-amount                    (numeric, optional)  Native currency amount to send. eg 0.1. Default - 0.0\n"
             "6. startblock                       (numeric, optional)  Block to apply permissions from (inclusive). Default - 0\n"
@@ -3181,6 +3198,8 @@ void mc_InitRPCHelpMap13()
             "                                                       Global: " + AllowedPermissions() + " \n"
             "                                                       or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
             "                                                       or per-stream: stream-identifier.write,activate,admin \n"
+            "                                                       or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                       or per-library: library-identifier.write,activate,admin \n"
             "3. native-amount                    (numeric, optional) native currency amount to send. eg 0.1. Default - 0\n"
             "4. \"comment\"                        (string, optional) A comment used to store what the transaction is for. \n"
             "                                                       This is not part of the transaction, just kept in your wallet.\n"
@@ -3206,6 +3225,8 @@ void mc_InitRPCHelpMap13()
             "                                                       Global: " + AllowedPermissions() + " \n"
             "                                                       or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
             "                                                       or per-stream: stream-identifier.write,activate,admin \n"
+            "                                                       or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                       or per-library: library-identifier.write,activate,admin \n"
             "4. native-amount                    (numeric, optional) native currency amount to send. eg 0.1. Default - 0\n"
             "5. \"comment\"                        (string, optional) A comment used to store what the transaction is for. \n"
             "                                                       This is not part of the transaction, just kept in your wallet.\n"
@@ -3727,8 +3748,8 @@ void mc_InitRPCHelpMap16()
         ));
     
     mapHelpStrings.insert(std::make_pair("approvefrom",
-            "approvefrom \"from-address\" \"upgrade-identifier\"|\"filter-identifier\" ( approve )\n"
-            "\nApprove upgrade using specific address.\n"
+            "approvefrom \"from-address\" \"entity-identifier\" ( approve )\n"
+            "\nApprove upgrade, txfilter, streamfilter or library update using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"from-address\"                   (string, required) Address used for approval.\n"
@@ -3752,7 +3773,7 @@ void mc_InitRPCHelpMap16()
             "3. approve                          (object, required)  Approval object\n"
             "    {\n"                
             "      \"approve\" : approve           (boolean, required) Approve or disapprove\n"
-            "      \"update\" : \"update-name\"      (string, required)  Update name to approve/disapprove.\n"
+            "      \"updatename\" : \"update-name\"  (string, required)  Update name to approve/disapprove.\n"
             "    }\n"                                
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
@@ -4126,7 +4147,11 @@ void mc_InitRPCHelpMap16()
             "      \"permissions\" : \n"
             "        {\n"
             "          \"type\" : \"permission(s)\"     (string, required) Permission strings, comma delimited. Possible values:\n"
-            "                                                          " + AllowedPermissions() + " \n"
+            "                                                        Global: " + AllowedPermissions() + " \n"
+            "                                                        or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
+            "                                                        or per-stream: stream-identifier.write,read,activate,admin \n"
+            "                                                        or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                        or per-library: library-identifier.write,activate,admin \n"
             "          \"for\": \"entity-identifier\"   (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
             "          \"startblock\" : n             (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
             "          \"endblock\"  : n              (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
@@ -4514,7 +4539,12 @@ void mc_InitRPCHelpMap19()
             "\nChecks whether the address has a specified permission.\n"
             "\nArguments:\n"
             "1. \"address\"                      (string, required) The address to verify permission for. \n"
-            "2. \"permission\"                   (string, required) Permission string. Possible values: " + AllowedPermissions() + ". \n"                
+            "2. \"permission\"                   (string, required) Permission string, Possible values: \n"
+            "                                                        Global: " + AllowedPermissions() + " \n"
+            "                                                        or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
+            "                                                        or per-stream: stream-identifier.write,read,activate,admin \n"
+            "                                                        or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                        or per-library: library-identifier.write,activate,admin \n"
             "\nResult:\n"
             "True if address has specified permission, false otherwise\n"            
             "\nExamples:\n"
@@ -5327,7 +5357,7 @@ void mc_InitRPCHelpMap22()
 void mc_InitRPCHelpMap23()
 {
     mapHelpStrings.insert(std::make_pair("setvariablevaluefrom",
-            "setvariablevaluefrom \"from-address\" \"variable-identifier\" value \n"
+            "setvariablevaluefrom \"from-address\" \"variable-identifier\" ( value )\n"
             "\nSets variable value\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -5342,7 +5372,7 @@ void mc_InitRPCHelpMap23()
         ));
     
     mapHelpStrings.insert(std::make_pair("setvariablevalue",
-            "setvariablevalue \"variable-identifier\" value \n"
+            "setvariablevalue \"variable-identifier\" ( value )\n"
             "\nChanges variable value\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -5373,7 +5403,7 @@ void mc_InitRPCHelpMap23()
         ));
     
      mapHelpStrings.insert(std::make_pair("getvariablehistory",
-            "getvariablehistory ( \"variable-identifier\" verbose count start )\n"
+            "getvariablehistory \"variable-identifier\" ( verbose count start )\n"
             "\nReturns variable value changes history\n"
             "\nArguments:\n"
             "1. \"variable-identifier\"            (string, required) Variable identifier - one of: create txid, variable reference, variable name.\n"
@@ -5388,7 +5418,7 @@ void mc_InitRPCHelpMap23()
         ));
     
      mapHelpStrings.insert(std::make_pair("getvariableinfo",
-            "getvariableinfo ( \"variable-identifier\" verbose )\n"
+            "getvariableinfo \"variable-identifier\" ( verbose )\n"
             "\nReturns information about defined variable\n"
             "\nArguments:\n"
             "1. \"variable-identifier\"            (string, required) Variable identifier - one of: create txid, variable reference, variable name.\n"
@@ -5401,7 +5431,7 @@ void mc_InitRPCHelpMap23()
         ));
     
      mapHelpStrings.insert(std::make_pair("getvariablevalue",
-            "getvariablevalue ( \"variable-identifier\" )\n"
+            "getvariablevalue \"variable-identifier\" \n"
             "\nReturns current variable value\n"
             "\nArguments:\n"
             "1. \"variable-identifier\"            (string, required) Variable identifier - one of: create txid, variable reference, variable name.\n"
@@ -5472,7 +5502,7 @@ void mc_InitRPCHelpMap23()
         ));
      
      mapHelpStrings.insert(std::make_pair("testlibrary",
-            "getlibrarycode ( \"library-identifier\"  \"update-name\" \"javascript-code\")\n"
+            "testlibrary ( \"library-identifier\"  \"update-name\" \"javascript-code\")\n"
             "\nSets library code to be used for testing in testtxfilter, runtxfilter, teststreamfilter and runstreamfilter \n"
             "\nArguments:\n"
             "1. \"library-identifier\"               (string, optional) Library identifier - one of: create txid, library reference, library name.\n"
@@ -5483,7 +5513,7 @@ void mc_InitRPCHelpMap23()
             "                                                           \"\" for original library code.\n"
             "                                                           If omitted, active update is restored (testing update removed)\n"
             "                                                           If update doesn't exist, create new update which can be used only in testing APIs.\n"     
-            "3. \"javascript-code\"                  (string, required) JavaScript code (for new libraries and updates).\n"
+            "3. \"javascript-code\"                  (string, optional) JavaScript code (for new libraries and updates).\n"
             "\nResult:\n"
             "List of library updates used for testing\n"            
            "\nExamples:\n"
