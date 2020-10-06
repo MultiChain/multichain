@@ -937,6 +937,8 @@ void mc_InitRPCHelpMap05()
             "       ,...\n"
             "     ]\n"
             "2. addresses                              (object, required) Object with addresses as keys, see help addresses-all for details.\n"
+            "  or \n"
+            "2. addresses                              (array, required) Array of addresses objects, see help addresses-all for details.\n"
 /*    
             "2. addresses                              (object, required) a json object with addresses as keys and amounts as values\n"
             "    {\n"
@@ -1639,6 +1641,8 @@ void mc_InitRPCHelpMap07()
             "\nArguments:\n"
             "1. \"from-address\"                           (string, required) Address to send from.\n"
             "2. addresses                                (object, required) Object with addresses as keys, see help addresses-all for details.\n"
+            "  or \n"
+            "2. addresses                                (array, required) Array of addresses objects, see help addresses-all for details.\n"
             "3. data                                     (array, optional) Array of hexadecimal strings or data objects, see help data-all for details.\n"
             "4. \"action\"                                 (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
                 
@@ -3813,6 +3817,8 @@ void mc_InitRPCHelpMap16()
             "       ,...\n"
             "     ]\n"
             "3. addresses                              (object, required) Object with addresses as keys, see help addresses-all for details.\n"
+            "  or \n"
+            "3. addresses                              (array, required) Array of addresses objects, see help addresses-all for details.\n"
             "4. data                                   (array, optional) Array of hexadecimal strings or data objects, see help data-all for details.\n"
             "5.\"action\"                                (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
                 

@@ -40,8 +40,27 @@ Value createrawsendfrom(const Array& params, bool fHelp)
         thisFromAddresses.insert(fromaddress);
     }    
     
-    Object sendTo = params[1].get_obj();
-
+    Object sendTo;
+    
+    if(params[1].type() == array_type)
+    {
+        BOOST_FOREACH(const Value& addrs, params[1].get_array()) 
+        {
+            if(addrs.type() != obj_type)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid addresses, should be either object or array of objects");                                        
+            }
+            BOOST_FOREACH(const Pair& d, addrs.get_obj()) 
+            {
+                sendTo.push_back(Pair(d.name_,d.value_));
+            }
+        }
+    }
+    else
+    {
+        sendTo = params[1].get_obj();
+    }
+    
     CWalletTx rawTx;
     mc_EntityDetails found_entity;
    

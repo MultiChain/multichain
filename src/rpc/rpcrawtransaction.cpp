@@ -1367,11 +1367,29 @@ Value appendrawtransaction(const Array& params, bool fHelp)
     
     if (params.size() > 2)         
     {    
-        if(params[2].type() != obj_type)
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid addresses, should be object");
-            
-        sendTo= params[2].get_obj();
+        if(params[2].type() == array_type)
+        {
+            BOOST_FOREACH(const Value& addrs, params[2].get_array()) 
+            {
+                if(addrs.type() != obj_type)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid addresses, should be either object or array of objects");                                        
+                }
+                BOOST_FOREACH(const Pair& d, addrs.get_obj()) 
+                {
+                    sendTo.push_back(Pair(d.name_,d.value_));
+                }
+            }
+        }
+        else
+        {
+            if(params[2].type() != obj_type)
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid addresses, should be either object or array of objects");
+
+            sendTo= params[2].get_obj();
+        }
     }
+    
     bool new_outputs=false;
     if(sendTo.size())
     {
@@ -1579,7 +1597,7 @@ Value createrawtransaction(const Array& params, bool fHelp)
     if (fHelp || params.size() < 2 || params.size() > 4)                                            // MCHN
         throw runtime_error("Help message not found\n");
     
-    RPCTypeCheck(params, list_of(array_type)(obj_type));
+    RPCTypeCheck(params, list_of(array_type));
 
     Array ext_params;
     ext_params.push_back("");
