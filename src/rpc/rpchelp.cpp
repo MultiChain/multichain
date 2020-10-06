@@ -4152,7 +4152,7 @@ void mc_InitRPCHelpMap16()
             "                                                        or per-stream: stream-identifier.write,read,activate,admin \n"
             "                                                        or per-variable: variable-identifier.write,activate,admin \n"
             "                                                        or per-library: library-identifier.write,activate,admin \n"
-            "          \"for\": \"entity-identifier\"   (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
+            "          \"for\": \"entity-identifier\"   (string, optional) Entity identifier - one of: name, ref, create txid.\n"
             "          \"startblock\" : n             (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
             "          \"endblock\"  : n              (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
             "          \"timestamp\" : n              (numeric, optional) This helps resolve conflicts between\n"
@@ -4204,7 +4204,7 @@ void mc_InitRPCHelpMap16()
             "  \"library-identifier\":                (string, required) Library identifier - one of: create txid, library reference, library name.\n"
             "   {\n"
             "     \"approve\" : approve               (boolean, required) Approve or disapprove\n"
-            "     \"update\" : \"update-name\"          (string, required) Update name.\n"
+            "     \"updatename\" : \"update-name\"      (string, required) Update name\n"
             "   }\n"                                
             "}\n"
         ));
