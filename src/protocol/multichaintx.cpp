@@ -1354,7 +1354,7 @@ bool MultiChainTransaction_CheckIfLibraryApproval(unsigned char* ptr,
     mc_EntityDetails entity;
     if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,ptr))
     {
-        if(entity->GetEntityType() == MC_ENT_TYPE_LIBRARY)
+        if(entity.GetEntityType() == MC_ENT_TYPE_LIBRARY)
         {
             details->SetAffectedLibrary((unsigned char*)entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);       
             return true;
