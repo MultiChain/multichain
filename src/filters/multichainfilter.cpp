@@ -391,13 +391,6 @@ int mc_MultiChainFilterEngine::LoadLibrary(uint160 hash,bool *modified)
         {
             string this_code ((char*)ptr,value_size);
             library[i].m_Code=this_code;
-/*            
-            unsigned char ntc=0x00;
-            library[i].m_LibraryCodeRow=pMultiChainFilterEngine->m_CodeLibrary->GetNumElements();
-            pMultiChainFilterEngine->m_CodeLibrary->AddElement();
-            pMultiChainFilterEngine->m_CodeLibrary->SetData(ptr,value_size);
-            pMultiChainFilterEngine->m_CodeLibrary->SetData(&ntc,1);        
- */ 
         }   
         else
         {
@@ -700,11 +693,6 @@ int mc_MultiChainFilterEngine::RebuildFilter(int row,int for_block)
         map<uint160,mc_MultiChainLibrary>::iterator it=m_Libraries.find(m_Filters[row].m_Libraries[i]);
         if (it != m_Libraries.end())
         {
-/*            
-            code=(char *)m_CodeLibrary->GetData(it->second.m_LibraryCodeRow,&code_size);
-            string this_library_code(code,code_size-1);
-            library_code+=this_library_code;
- */ 
             library_code+=it->second.m_Code;
             library_code+=MC_FLT_LIBRARY_GLUE;
         }        
@@ -766,57 +754,9 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid,int for_block
     }    
     
     m_Filters.push_back(filter);
-/*    
-    char *code;
-    size_t code_size;
-    string library_code="";
-    
-    for (unsigned int i=0;i<filter.m_Libraries.size();i++) 
-    {
-        map<uint160,mc_MultiChainLibrary>::iterator it=m_Libraries.find(filter.m_Libraries[i]);
-        if (it != m_Libraries.end())
-        {
-            code=(char *)m_CodeLibrary->GetData(it->second.m_LibraryCodeRow,&code_size);
-            string this_library_code(code,code_size-1);
-            library_code+=this_library_code;
-            library_code+=MC_FLT_LIBRARY_GLUE;
-        }        
-        else
-        {
-            LogPrintf("Couldn't find active update for library %d for filter %s, error: %d\n",i,filter.m_FilterCaption.c_str(),err);
-            filter.Destroy();
-            return MC_ERR_INTERNAL_ERROR;            
-        }
-    }    
-*/    
     mc_Filter *worker=new mc_Filter;
     m_Workers->Add(&worker);
-  
-/*    
-    code=(char *)m_CodeLibrary->GetData(m_Filters.back().m_FilterCodeRow,&code_size);
-    
-    string filter_code (code,code_size);
-    string worker_code;
-    if(library_code.size())
-    {
-        worker_code=library_code.append(filter_code);
-    }
-    else
-    {
-        worker_code=filter_code;
-    }
-  
-    err=pFilterEngine->CreateFilter(worker_code.c_str(),m_Filters.back().m_MainName.c_str(),
-            m_CallbackNames[m_Filters.back().m_FilterType],worker,(for_block == 0) ? GetAcceptTimeout() : 0,m_Filters.back().m_CreateError);
-    if(err)
-    {
-        LogPrintf("Couldn't create filter with short txid %s, error: %d\n",filter.m_FilterAddress.ToString().c_str(),err);
-        m_Workers->SetCount(m_Workers->GetCount()-1);
-        m_Filters.pop_back();
-        return err;
-    }
-*/    
- 
+   
     err=RebuildFilter((int)m_Filters.size()-1,for_block);
     if(err)
     {
@@ -883,20 +823,6 @@ int mc_MultiChainFilterEngine::Reset(int block,int for_block)
             LogPrintf("Couldn't prepare filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
             return err;
         }
-/*        
-        mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
-        
-        char *code;
-        size_t code_size;
-        code=(char *)m_CodeLibrary->GetData(m_Filters[i].m_FilterCodeRow,&code_size);
-        err=pFilterEngine->CreateFilter(code,m_Filters[i].m_MainName,m_CallbackNames[m_Filters[i].m_FilterType],
-                worker,m_Filters[i].m_CreateError);
-        if(err)
-        {
-            LogPrintf("Couldn't prepare filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
-            return err;
-        }        
- */ 
     }    
     
     if(for_block == 0)
@@ -963,9 +889,8 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
         {
             if(mc_gState->m_Permissions->FilterApproved(stream_entity_txid,&(m_Filters[i].m_FilterAddress)))
             {
-//                mc_Filter *worker=*(mc_Filter **)m_Workers->GetRow(i);
                 bool modified=false;
-                mc_Filter *worker=StreamFilterWorker(i,&modified);//*(mc_Filter **)m_Workers->GetRow(i);
+                mc_Filter *worker=StreamFilterWorker(i,&modified);
                 if(worker == NULL)
                 {
                     LogPrintf("Error while creating worker for filter %s\n",m_Filters[i].m_FilterCaption.c_str());
@@ -979,12 +904,6 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
                     if(err)
                     {
                         LogPrintf("Error while running filter %s, error: %d\n",m_Filters[i].m_FilterCaption.c_str(),err);
-/*                        
-                        if(modified)
-                        {
-                            delete worker;
-                        }
- */ 
                         goto exitlbl;
                     }
                     run_it=false;
@@ -1007,12 +926,6 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
                         *lppFilter=&(m_Filters[i]);
                     }
                     if(fDebug)LogPrint("filter","filter: %s: %s\n",m_Filters[i].m_FilterCaption.c_str(),strResult.c_str());
-/*
-                    if(modified)
-                    {
-                        delete worker;
-                    }
- */ 
                     goto exitlbl;
                 }
                 if(fDebug)LogPrint("filter","filter: Tx %s accepted, filter: %s\n",m_TxID.ToString().c_str(),m_Filters[i].m_FilterCaption.c_str());
@@ -1020,12 +933,6 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
                 {
                     *applied+=1;
                 }
-/*                
-                if(modified)
-                {
-                    delete worker;
-                }
- */ 
             }
         }
     }    
