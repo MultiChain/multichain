@@ -156,6 +156,7 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
     {
         if( (value_size <=0) || (value_size > 4) )
         {
+            m_CreateError="Bad filter type";
             return MC_ERR_ERROR_IN_SCRIPT;                        
         }
         m_FilterType=mc_GetLE(ptr,value_size);
@@ -182,6 +183,7 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
         {
             if(value_size % MC_AST_SHORT_TXID_SIZE)
             {
+                m_CreateError="Bad restrictions";
                 return MC_ERR_ERROR_IN_SCRIPT;                        
             }
             m_RelevantEntities=mc_FillRelevantFilterEntitities(ptr, value_size);
@@ -196,6 +198,7 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
         {
             if(value_size % MC_AST_SHORT_TXID_SIZE)
             {
+                m_CreateError="Bad libraries";    
                 return MC_ERR_ERROR_IN_SCRIPT;                        
             }
             m_Libraries=mc_FillFilterLibraries(ptr, value_size);
@@ -203,20 +206,28 @@ int mc_MultiChainFilter::Initialize(const unsigned char* short_txid)
     }
     
     
+    unsigned char ntc=0x00;
     ptr=(unsigned char *)m_Details.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
     if(ptr)
     {
-        unsigned char ntc=0x00;
         m_FilterCodeRow=pMultiChainFilterEngine->m_CodeLibrary->GetNumElements();
         pMultiChainFilterEngine->m_CodeLibrary->AddElement();
         pMultiChainFilterEngine->m_CodeLibrary->SetData(ptr,value_size);
         pMultiChainFilterEngine->m_CodeLibrary->SetData(&ntc,1);        
     }                                    
     else
+    {
+        m_FilterCodeRow=pMultiChainFilterEngine->m_CodeLibrary->GetNumElements();
+        pMultiChainFilterEngine->m_CodeLibrary->AddElement();
+        pMultiChainFilterEngine->m_CodeLibrary->SetData(&ntc,1);                
+    }
+/*    
+    else
     {    
         m_CreateError="Empty filter code";
         return MC_ERR_ERROR_IN_SCRIPT;
     }
+ */ 
     return MC_ERR_NOERROR;    
 }
 
@@ -571,7 +582,7 @@ mc_Filter *mc_MultiChainFilterEngine::StreamFilterWorker(int row,bool *modified)
         map<uint160,mc_MultiChainLibrary>::iterator it=m_Libraries.find(mc_LibraryIDForUpdate(m_Filters[row].m_Libraries[i]));
         if(it == m_Libraries.end())
         {
-            LogPrintf("Couldn't fine library for stream filter %d\n",row);
+            LogPrintf("Couldn't find library for stream filter %d\n",row);
             return NULL;            
         }
         if(mc_gState->m_Assets->FindActiveUpdate(&update_entity,it->second.m_Details.GetTxID()) == 0)
@@ -662,7 +673,7 @@ mc_Filter *mc_MultiChainFilterEngine::StreamFilterWorker(int row,bool *modified)
                 m_CallbackNames[m_Filters[row].m_FilterType],worker,GetAcceptTimeout(),m_Filters[row].m_CreateError);
         if(err)
         {
-            LogPrintf("Couldn't create worker for stream filter with short txid %s, error: %d\n",m_Filters[row].m_FilterAddress.ToString().c_str(),err);
+            LogPrintf("Couldn't create worker for stream filter with short txid %s, error: %d (%s)\n",m_Filters[row].m_FilterAddress.ToString().c_str(),err,m_Filters[row].m_CreateError.c_str());
             delete worker;
             *modified=false;
             return NULL;
@@ -715,12 +726,11 @@ int mc_MultiChainFilterEngine::RebuildFilter(int row,int for_block)
     {
         worker_code=filter_code;
     }
-    
     err=pFilterEngine->CreateFilter(worker_code.c_str(),m_Filters[row].m_MainName.c_str(),
             m_CallbackNames[m_Filters[row].m_FilterType],worker,(for_block == 0) ? GetAcceptTimeout() : 0,m_Filters[row].m_CreateError);
     if(err)
     {
-        LogPrintf("Couldn't create filter with short txid %s, error: %d\n",m_Filters[row].m_FilterAddress.ToString().c_str(),err);
+        LogPrintf("Couldn't create filter with short txid %s, error: %d (%s)\n",m_Filters[row].m_FilterAddress.ToString().c_str(),err,m_Filters[row].m_CreateError.c_str());
         return err;
     }
     
@@ -737,7 +747,7 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid,int for_block
     err=filter.Initialize(short_txid);
     if(err)
     {
-        LogPrintf("Couldn't add filter with short txid %s, error: %d\n",filter.m_FilterAddress.ToString().c_str(),err);
+        LogPrintf("Couldn't add filter %s with short txid %s, error: %d (%s)\n",filter.m_FilterCaption.c_str(),filter.m_FilterAddress.ToString().c_str(),err,filter.m_CreateError.c_str());
         return err;
     }
     
