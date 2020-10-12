@@ -80,6 +80,7 @@ int mc_MultiChainLibrary::Zero()
     m_LibraryCodeRow=0;
     m_ActiveUpdate=0;
     m_MaxLoadedUpdate=0;
+    m_Code="";
     
     return MC_ERR_NOERROR;
 }
@@ -397,11 +398,10 @@ int mc_MultiChainFilterEngine::LoadLibrary(uint160 hash,bool *modified)
             pMultiChainFilterEngine->m_CodeLibrary->SetData(ptr,value_size);
             pMultiChainFilterEngine->m_CodeLibrary->SetData(&ntc,1);        
  */ 
-        }                                    
+        }   
         else
-        {    
-            LogPrintf("Library code not found\n");
-            return MC_ERR_INTERNAL_ERROR;
+        {
+            library[i].m_Code="";            
         }
 
         map<uint160,mc_MultiChainLibrary>::iterator it=m_Libraries.find(library[i].m_Hash);
@@ -611,11 +611,6 @@ mc_Filter *mc_MultiChainFilterEngine::StreamFilterWorker(int row,bool *modified)
                 string this_code ((char*)ptr,value_size);
                 library_code+=this_code;
             }                                    
-            else
-            {    
-                LogPrintf("Library code not found\n");
-                return NULL;
-            }
         }
         else
         {
@@ -1287,5 +1282,5 @@ exitlbl:
             
     mc_gState->m_Assets->FreeEntityList(filters);
     
-    return MC_ERR_NOERROR;    
+    return err;    
 }
