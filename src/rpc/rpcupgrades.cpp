@@ -58,7 +58,7 @@ Value createupgradefromcmd(const Array& params, bool fHelp)
         {
             if(type == MC_ENT_KEYTYPE_NAME)
             {
-                throw JSONRPCError(RPC_DUPLICATE_NAME, "Upgrade, stream or asset with this name already exists");                                    
+                throw JSONRPCError(RPC_DUPLICATE_NAME, "Entity with this name already exists");                                    
             }
             else
             {
