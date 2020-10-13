@@ -704,6 +704,7 @@ int mc_MultiChainFilterEngine::RebuildFilter(int row,int for_block)
         map<uint160,mc_MultiChainLibrary>::iterator it=m_Libraries.find(m_Filters[row].m_Libraries[i]);
         if (it != m_Libraries.end())
         {
+            if(fDebug)LogPrint("filter","filter: Active library: %s\n",it->second.m_LibraryCaption.c_str());
             library_code+=it->second.m_Code;
             library_code+=MC_FLT_LIBRARY_GLUE;
         }        
@@ -734,6 +735,7 @@ int mc_MultiChainFilterEngine::RebuildFilter(int row,int for_block)
         return err;
     }
     
+    if(fDebug)LogPrint("filter","filter: Filter compiled: %s\n",m_Filters[row].m_FilterCaption.c_str());
     m_Filters[row].m_AlreadyUsed=false;
     
     return MC_ERR_NOERROR;
