@@ -3178,11 +3178,7 @@ bool MultiChainTransaction_ProcessLibraryUpdates(int offset,
     
     if(pMultiChainFilterEngine)
     {    
-        if(pMultiChainFilterEngine->CheckLibraries(&(details->vAffectedLibraries),(offset >= 0)) != MC_ERR_NOERROR)
-        {
-            reason="Could not compile filters with new library update";
-            return false;
-        }
+        pMultiChainFilterEngine->CheckLibraries(&(details->vAffectedLibraries),(offset >= 0));
     }
     return true;
 }
