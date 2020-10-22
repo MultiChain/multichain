@@ -53,6 +53,7 @@ static boost::asio::io_service::work *rpc_dummy_work = NULL;
 static std::vector<CSubNet> rpc_allow_subnets; //!< List of subnets to allow RPC connections from
 static std::vector< boost::shared_ptr<ip::tcp::acceptor> > rpc_acceptors;
 static map<uint64_t, RPCThreadLoad> rpc_loads;
+static map<uint64_t, int> rpc_slots;
 
 #define MC_ACF_NONE              0x00000000 
 #define MC_ACF_ENTERPRISE        0x00000001 
@@ -357,7 +358,7 @@ string CRPCTable::help(string strCommand) const
         if ((strCommand != "" || pcmd->category == "hidden") && strMethod != strCommand)
             continue;
 #ifdef ENABLE_WALLET
-        if (pcmd->reqWallet && !pwalletMain)
+        if (pcmd->reqWallet && !pwalletMain)                                    // Never happens, reqWallet is changed to require Wallet read lock 
             continue;
 #endif
 
@@ -1026,6 +1027,7 @@ void StartRPCThreads(string& strError)
     rpc_worker_group = new boost::thread_group();
     hc_worker_group = new boost::thread_group();
     rpc_loads.clear();
+    rpc_slots.clear();
 
 #ifdef MAC_OSX
     boost::thread::attributes attrs;
@@ -1039,6 +1041,7 @@ void StartRPCThreads(string& strError)
         RPCThreadLoad load;
         load.Zero();
         rpc_loads.insert(make_pair(thread_id,load));
+        rpc_slots.insert(make_pair(thread_id,i));
     }    
     if(hcPort)
     {
@@ -1053,12 +1056,14 @@ void StartRPCThreads(string& strError)
         RPCThreadLoad load;
         load.Zero();
         rpc_loads.insert(make_pair(thread_id,load));
+        rpc_slots.insert(make_pair(thread_id,i));
     }
     if(hcPort)
     {
         hc_worker_group->create_thread(boost::bind(&asio::io_service::run, hc_io_service));        
     }
 #endif
+    mc_gState->InitRPCThreads(rpc_slots.size());
     
     fRPCRunning = true;
     
@@ -1368,6 +1373,19 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
     return true;
 }
 
+int GetRPCSlot()
+{
+    uint64_t thread_id=__US_ThreadID();
+    map<uint64_t,int>::iterator slot_it=rpc_slots.find(thread_id);
+    if(slot_it != rpc_slots.end())
+    {
+        return slot_it->second;
+    }
+    
+    return -1;
+}
+
+
 void ServiceConnection(AcceptedConnection *conn)
 {
     bool fRun = true;
@@ -1444,7 +1462,7 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         }
     }
 #ifdef ENABLE_WALLET
-    if (pcmd->reqWallet && !pwalletMain)
+    if (pcmd->reqWallet && !pwalletMain)                                        // Never happens, reqWallet is changed to require Wallet read lock 
         throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Method not found (disabled)");
 #endif
 
