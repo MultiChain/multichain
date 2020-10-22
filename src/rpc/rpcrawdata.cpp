@@ -56,6 +56,12 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     }
                     if(d.value_.get_str() == "txfilter")
                     {
+                        if( mc_gState->m_Features->Filters() == 0 )
+                        {
+                            *errorCode=RPC_NOT_SUPPORTED;
+                            *strError=string("Tx filters are not supported by this protocol version");       
+                            goto exitlbl;
+                        }
                         if( (param_type == MC_DATA_API_PARAM_TYPE_PUBLISH) ||
                             (param_type == MC_DATA_API_PARAM_TYPE_APPROVAL) ) 
                         {
@@ -67,14 +73,32 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     }
                     if(d.value_.get_str() == "streamfilter")
                     {
+                        if( mc_gState->m_Features->StreamFilters() == 0 )
+                        {
+                            *errorCode=RPC_NOT_SUPPORTED;
+                            *strError=string("Stream filters are not supported by this protocol version");       
+                            goto exitlbl;
+                        }
                         this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_FILTER;
                     }
                     if(d.value_.get_str() == "variable")
                     {
+                        if( mc_gState->m_Features->Variables() == 0 )
+                        {
+                            *errorCode=RPC_NOT_SUPPORTED;
+                            *strError=string("Variables are not supported by this protocol version");       
+                            goto exitlbl;
+                        }
                         this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_VAR;
                     }
                     if(d.value_.get_str() == "library")
                     {
+                        if( mc_gState->m_Features->Libraries() == 0 )
+                        {
+                            *errorCode=RPC_NOT_SUPPORTED;
+                            *strError=string("Libraries are not supported by this protocol version");       
+                            goto exitlbl;
+                        }
                         this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_LIB;
                     }
                 }
