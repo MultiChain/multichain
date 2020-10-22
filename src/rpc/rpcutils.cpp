@@ -203,6 +203,19 @@ Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total)
 
 void CheckWalletError(int err,uint32_t entity_type,string message)
 {
+    int errCode=RPC_INTERNAL_ERROR;
+    string strError="";
+    
+    WRPCheckWalletError(err,entity_type,message,&errCode,&strError);
+    
+    if(strError.size())
+    {
+        throw JSONRPCError(errCode,strError);
+    }
+}
+
+void WRPCheckWalletError(int err,uint32_t entity_type,string message,int *errCode,string *strError)
+{
     string index;
     string msg;
     if(err)
@@ -210,7 +223,8 @@ void CheckWalletError(int err,uint32_t entity_type,string message)
         switch(err)
         {
             case MC_ERR_NOT_SUPPORTED:
-                throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is not supported in this build");                                        
+                *errCode=RPC_NOT_SUPPORTED;
+                *strError="This feature is not supported in this build";                                        
                 break;
             case MC_ERR_NOT_ALLOWED:
                 if(message.size())
@@ -243,10 +257,12 @@ void CheckWalletError(int err,uint32_t entity_type,string message)
                 {
                     msg="The index required is not available for this subscription.";
                 }
-                throw JSONRPCError(RPC_NOT_SUBSCRIBED, msg);                                        
+                *errCode=RPC_NOT_SUBSCRIBED;
+                *strError=msg;                                        
                 break;
             case MC_ERR_INTERNAL_ERROR:
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "Internal wallet error");                                        
+                *errCode=RPC_INTERNAL_ERROR;
+                *strError="Internal wallet error";                                        
                 break;
             default:
                 break;

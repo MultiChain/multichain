@@ -120,6 +120,8 @@ typedef struct mc_TxEntityStat
     int m_LastImportedBlock;                                                    // Last imported block before merging with chain. O for the chain import.
     uint32_t m_LastPos;                                                         // Current last position
     uint32_t m_LastClearedPos;                                                  // Last position without  mempool
+    uint32_t m_ReadLastPos;                                                     // Current last position
+    uint32_t m_ReadLastClearedPos;                                              // Last position without  mempool
     void Zero();    
 } mc_TxEntityStat;
 
@@ -257,7 +259,13 @@ typedef struct mc_TxDB
     uint64_t m_LockedBy;                                                        // ID of the thread locking it
     mc_TxDefRow m_TxCachedDef;                                                              
     uint32_t m_TxCachedFlags;                                                              
-    
+
+    void *m_WRPSemaphore;                                                      // Semaphore protecting resources used by read APIs
+    uint64_t m_WRPLockedBy;                                                    // ID of the thread locking it
+    mc_Buffer *m_WRPMemPool;                                                   // Read mc_TxEntityRow mempool
+    mc_Buffer *m_WRPRawMemPool;                                                // Read mc_TxDefRow mempool
+    mc_Buffer *m_WRPRawUpdatePool;                                             // Read Updated txs mempool
+        
     mc_TxDB()
     {
         Zero();
@@ -426,6 +434,31 @@ typedef struct mc_TxDB
     
     void LogString(const char *message);
     
+    int WRPLock(int allow_secondary);
+    void WRPUnLock(int ignore_unlocked);
+    int WRPUsed();
+    int WRPSync(int for_block);
+    
+    int WRPGetListSize(mc_TxEntity *entity,int *confirmed);    
+    int WRPGetListSize(mc_TxEntity *entity,int generation,int *confirmed);
+    
+    int WRPGetList(mc_TxEntity *entity,
+                    int generation,
+                    int from,
+                    int count,
+                    mc_Buffer *txs);
+    int WRPGetList(
+                mc_TxImport *import,
+                mc_TxEntity *entity,
+                int generation,
+                int from,
+                int count,
+                mc_Buffer *txs);
+    
+    int WRPGetTx(                                                              // Returns tx definition if found, error if not found
+              mc_TxDefRow *txdef,                                               // Output. Tx def
+              const unsigned char *hash,                                        // Input. Tx hash
+              int skip_db);                                       
     
 } mc_TxDB;
 

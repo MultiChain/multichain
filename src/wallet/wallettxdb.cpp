@@ -247,6 +247,13 @@ void mc_TxDB::Zero()
     m_Mode=MC_WMD_NONE;
     m_Semaphore=NULL;
     m_LockedBy=0;    
+    
+    m_WRPSemaphore=NULL;
+    m_WRPLockedBy=0;
+    m_WRPMemPool=NULL;                                          
+    m_WRPRawMemPool=NULL;                                       
+    m_WRPRawUpdatePool=NULL;                                     
+    
 }
 
 void mc_TxDB::LogString(const char *message)
@@ -289,6 +296,141 @@ void mc_TxDB::UnLock()
     __US_SemPost(m_Semaphore);
 }
 
+int mc_TxDB::WRPLock(int allow_secondary)
+{
+    if(WRPUsed() == 0)
+    {
+        return 0;        
+    }
+    
+    uint64_t this_thread;
+    this_thread=__US_ThreadID();
+    
+    if(this_thread == m_WRPLockedBy)
+    {
+        if(allow_secondary == 0)
+        {
+            LogString("Secondary read lock!!!");
+        }
+        return allow_secondary;
+    }
+    __US_SemWait(m_WRPSemaphore); 
+    m_WRPLockedBy=this_thread;
+    
+    return 0;    
+}
+
+void mc_TxDB::WRPUnLock(int ignore_unlocked)
+{
+    if(WRPUsed() == 0)
+    {
+        return;        
+    }
+    
+    if(ignore_unlocked)
+    {
+        uint64_t this_thread;
+        this_thread=__US_ThreadID();
+
+        if(this_thread != m_WRPLockedBy)
+        {
+            return;
+        }
+    }
+    
+    m_WRPLockedBy=0;
+    __US_SemPost(m_WRPSemaphore);    
+}
+
+int mc_TxDB::WRPUsed()
+{
+    if(m_WRPMemPool)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+int mc_TxDB::WRPSync(int for_block)
+{
+    int from,to,row,mprow;
+    mc_TxEntityStat* stat;
+    
+    if(WRPUsed())
+    {
+        if(for_block)
+        {            
+            m_WRPMemPool->Clear();                                          
+            m_WRPRawMemPool->Clear();                                       
+            m_WRPRawUpdatePool->Clear();   
+            
+            for(int i=0;i<m_Imports[0].m_Entities->GetCount();i++)                          
+            {
+                stat=(mc_TxEntityStat*)m_Imports[0].m_Entities->GetRow(i);                     
+                stat->m_ReadLastPos=stat->m_LastPos;
+                stat->m_ReadLastClearedPos=stat->m_ReadLastClearedPos;
+            }            
+        }
+        
+        from=m_WRPMemPool->GetCount();
+        to=m_MemPools[0]->GetCount();
+        for(row=from;row<to;row++)
+        {
+            m_WRPMemPool->Add(m_MemPools[0]->GetRow(row));
+            if(for_block == 0)
+            {
+                mc_TxEntityRow *erow=(mc_TxEntityRow*)(m_MemPools[0]->GetRow(row));
+                
+                if( (erow->m_Entity.m_EntityType & MC_TET_SUBKEY) == 0 )
+                {
+                    int entrow=m_Imports[0].m_Entities->Seek(&(erow->m_Entity));       
+                    if(entrow >= 0)
+                    {
+                        stat=(mc_TxEntityStat*)m_Imports[0].m_Entities->GetRow(entrow);                     
+                        stat->m_ReadLastPos=stat->m_LastPos;
+                        stat->m_ReadLastClearedPos=stat->m_ReadLastClearedPos;                    
+                    }
+                    else
+                    {
+                        LogString("ERROR: Cannot find entity in sync");                    
+                    }
+                }
+                else
+                {
+                    mc_TxEntityRow arow;
+                    arow.Zero();                                                            // Anchor row in mempool, will not be stored in database
+                    memcpy(&arow.m_Entity,&(erow->m_Entity),sizeof(mc_TxEntity));
+                    arow.m_Generation=erow->m_Generation;
+
+                    mprow=m_WRPMemPool->Seek(&arow);
+                    if((mprow >= 0) && (mprow+1 < row))                                                    
+                    {
+                        ((mc_TxEntityRow*)(m_WRPMemPool->GetRow(mprow+1)))->m_LastSubKeyPos=
+                        ((mc_TxEntityRow*)(m_MemPools[0]->GetRow(mprow+1)))->m_LastSubKeyPos;
+                    }
+                }
+            }
+        }
+        
+        from=m_WRPRawMemPool->GetCount();
+        to=m_RawMemPools[0]->GetCount();
+        
+        for(row=from;row<to;row++)
+        {
+            m_WRPRawMemPool->Add(m_RawMemPools[0]->GetRow(row));
+        }
+        
+        from=m_WRPRawUpdatePool->GetCount();
+        to=m_RawUpdatePool->GetCount();
+        
+        for(row=from;row<to;row++)
+        {
+            m_WRPRawUpdatePool->Add(m_RawUpdatePool->GetRow(row));
+        }
+    }
+    
+    return MC_ERR_NOERROR;
+}
 
 
 int mc_TxDB::Initialize(const char *name,uint32_t mode)
@@ -431,9 +573,11 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
         }        
         
         m_DBStat.Zero();
-        if(m_Mode == MC_WMD_AUTO)
+        if( m_Mode & MC_WMD_AUTO)
         {
-            m_Mode=MC_WMD_TXS | MC_WMD_ADDRESS_TXS;
+            m_Mode -= MC_WMD_AUTO;
+            m_Mode -= (m_Mode & MC_WMD_MODE_MASK);
+            m_Mode |= MC_WMD_TXS | MC_WMD_ADDRESS_TXS;
             if(MC_TDB_WALLET_VERSION >= 3)
             {
                 m_Mode |= MC_WMD_FLAT_DAT_FILE;
@@ -489,6 +633,25 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
         return MC_ERR_INTERNAL_ERROR;
     }
     
+    if((m_Mode & MC_WMD_NO_READ_POOLS) == 0)
+    {
+        m_WRPMemPool=new mc_Buffer;                                                // Key - entity with m_Pos set to 0 + txid
+        err=m_WRPMemPool->Initialize(MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE,m_Database->m_TotalSize,MC_BUF_MODE_MAP);
+
+        m_WRPRawMemPool=new mc_Buffer;    
+        err=m_WRPRawMemPool->Initialize(MC_TDB_TXID_SIZE,m_Database->m_TotalSize,MC_BUF_MODE_MAP);
+
+        m_WRPRawUpdatePool=new mc_Buffer;    
+        err=m_WRPRawUpdatePool->Initialize(MC_TDB_TXID_SIZE,m_Database->m_TotalSize,MC_BUF_MODE_MAP);        
+
+        m_WRPSemaphore=__US_SemCreate();
+        if(m_WRPSemaphore == NULL)
+        {
+            LogString("Initialize: Cannot initialize read semaphore");
+            return MC_ERR_INTERNAL_ERROR;
+        }
+    }
+    
     Dump("Initialize");
     sprintf(msg, "Initialized. Chain height: %d, Txs: %d",m_DBStat.m_Block,m_DBStat.m_Count);
     LogString(msg);
@@ -503,6 +666,7 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
         }
     }
    
+    WRPSync(1);
     
     return err;
 }
@@ -562,8 +726,29 @@ int mc_TxDB::Destroy()
     {
         __US_SemDestroy(m_Semaphore);
     }
-     
+    
+    if(m_WRPMemPool)
+    {
+        delete m_WRPMemPool;
+    }
+
+    if(m_WRPRawMemPool)
+    {
+        delete m_WRPRawMemPool;
+    }
+
+    if(m_WRPRawUpdatePool)
+    {
+        delete m_WRPRawUpdatePool;
+    }
+
+    if(m_WRPSemaphore)
+    {
+        __US_SemDestroy(m_WRPSemaphore);
+    }
+
     Zero();
+    
     return MC_ERR_NOERROR;    
 }
 
@@ -1612,6 +1797,79 @@ int mc_TxDB::GetTx(mc_TxDefRow *txdef,
     
 }
 
+int mc_TxDB::WRPGetTx(mc_TxDefRow *txdef,
+              const unsigned char *hash,
+              int skip_db)
+{
+    int err,value_len,mprow; 
+    unsigned char *ptr;
+
+    txdef->Zero();
+    
+    err=MC_ERR_NOERROR;
+
+    mc_Buffer *rawmempool=m_RawMemPools[0];
+    mc_Buffer *rawupdatemempool=m_RawUpdatePool;
+    
+    if(WRPUsed())
+    {
+        rawmempool=m_WRPRawMemPool;
+        rawupdatemempool=m_WRPRawUpdatePool; 
+    }
+    
+    
+    mprow=rawmempool->Seek((unsigned char*)hash);
+    if(mprow >= 0)
+    {
+        memcpy(txdef,(mc_TxDefRow *)rawmempool->GetRow(mprow),sizeof(mc_TxDefRow));
+        if(txdef->m_Block > m_DBStat.m_Block)                                   
+        {
+            txdef->m_Block=-1;
+        }
+        return MC_ERR_NOERROR;
+    }
+
+    mprow=rawupdatemempool->Seek((unsigned char*)hash);
+    if(mprow >= 0)
+    {
+        memcpy(txdef,(mc_TxDefRow *)rawupdatemempool->GetRow(mprow),sizeof(mc_TxDefRow));
+        if(txdef->m_Block > m_DBStat.m_Block)                   
+        {
+            txdef->m_Block=-1;
+        }
+        return MC_ERR_NOERROR;
+    }
+    
+    if(skip_db)
+    {
+        return MC_ERR_NOT_FOUND;
+    }
+    
+    memcpy(txdef->m_TxId,hash, MC_TDB_TXID_SIZE);
+    ptr=(unsigned char*)m_Database->m_DB->Read((char*)txdef+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err);
+    if(err)
+    {
+        return err;
+    }
+    
+    if(ptr)                                                                     
+    {
+        memcpy((char*)txdef+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);        
+        if(txdef->m_Block > m_DBStat.m_Block)                                   // On-disk records are not updated on rollback
+        {
+            txdef->m_Block=-1;
+        }
+    }
+    else
+    {
+        err=MC_ERR_NOT_FOUND;
+    }
+    
+    
+    return err;
+    
+}
+
 int mc_TxDB::BeforeCommit(mc_TxImport *import)
 {
     int err,i,j;
@@ -2237,6 +2495,136 @@ int mc_TxDB::GetList(
     return MC_ERR_NOERROR;
 }
 
+int mc_TxDB::WRPGetList(mc_TxEntity *entity,
+                int generation,
+                int from,
+                int count,
+                mc_Buffer *txs)
+{
+    return WRPGetList(m_Imports,entity,generation,from,count,txs);
+}
+
+int mc_TxDB::WRPGetList(
+                mc_TxImport *import,
+                mc_TxEntity *entity,
+                int generation,
+                int from,
+                int count,
+                mc_Buffer *txs)
+{
+    int first,last,i,confirmed;
+    mc_TxEntityRow erow;
+    mc_TxEntityRow *lpEnt;
+    mc_Buffer *mempool;
+    int value_len; 
+    unsigned char *ptr;
+    int err,mprow,found;
+    char msg[256];
+    
+    txs->Clear();
+    
+    if(IsCSkipped(entity->m_EntityType))
+    {
+        return MC_ERR_NOT_SUPPORTED;
+    }
+    
+    if(pEF->STR_IsIndexSkipped(import,NULL,entity))
+    {
+        return MC_ERR_NOT_ALLOWED;
+    }   
+    
+    mempool=m_MemPools[import-m_Imports];
+    if(WRPUsed())
+    {
+        mempool=m_WRPMemPool;    
+    }
+    
+    first=from;
+    last=WRPGetListSize(entity,generation,&confirmed);
+    
+    if(last <= 0)
+    {
+        return MC_ERR_NOERROR;
+    }
+    
+    if(first <= 0)
+    {
+        first=last-count+1+first;
+    }
+    if(first+count-1 < 1)
+    {
+        return MC_ERR_NOERROR;        
+    }
+    if(first<=0)
+    {
+        first=1;
+    }
+    if(first+count-1 <= last)
+    {
+        last=first+count-1;
+    }
+    
+    
+    erow.Zero();
+    memcpy(&erow.m_Entity,entity,sizeof(mc_TxEntity));
+    erow.m_Generation=generation;
+    mprow=-1;
+    for(i=first;i<=last;i++)
+    {
+        erow.m_Pos=i;
+        if((int)erow.m_Pos <= confirmed)                                // Database rows
+        {
+            erow.SwapPosBytes();
+            ptr=(unsigned char*)m_Database->m_DB->Read((char*)&erow+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err);
+            erow.SwapPosBytes();
+            if(err)
+            {
+                return err;
+            }
+
+            if(ptr)                                                                     
+            {
+                txs->Add((char*)&erow,ptr);
+            }
+            else
+            {
+                sprintf(msg,"GetList: couldn't find item %d in database, entity type %08X",i,erow.m_Entity.m_EntityType);
+                LogString(msg);
+                return MC_ERR_NOT_FOUND;
+            }        
+        }
+        else                                                                    // mempool rows
+        {
+            mprow++;
+            found=0;
+            while((found == 0) && (mprow < mempool->GetCount()))
+            {
+                lpEnt=(mc_TxEntityRow *)mempool->GetRow(mprow);
+                if( (lpEnt->m_TempPos == erow.m_Pos) && 
+                    (memcmp(&(lpEnt->m_Entity),entity,sizeof(mc_TxEntity)) == 0))
+                {
+                    memcpy(&erow,lpEnt,MC_TDB_ROW_SIZE);
+                    erow.m_Pos=i;                    
+                    txs->Add((char*)&erow,(char*)&erow+MC_TDB_ENTITY_KEY_SIZE);                
+                    found=1;
+                }
+                else
+                {
+                    mprow++;
+                }
+            }
+            if(mprow >= mempool->GetCount())
+            {
+                sprintf(msg,"GetList: couldn't find item %d in mempool, entity type %08X",i,erow.m_Entity.m_EntityType);
+                LogString(msg);
+                return MC_ERR_NOT_FOUND;                
+            }
+        }
+    }    
+    
+    return MC_ERR_NOERROR;
+}
+
 int mc_TxDB::GetList(mc_TxEntity *entity,
                 int generation,
                 int from,
@@ -2430,6 +2818,65 @@ int mc_TxDB::GetBlockItemIndex(mc_TxImport *import,mc_TxEntity *entity,int block
     return first;
 }
     
+int mc_TxDB::WRPGetListSize(mc_TxEntity *entity,int generation,int *confirmed)
+{
+    int last_pos,mprow,err,value_len,last_conf;
+    mc_TxEntityRow erow;
+    unsigned char *ptr;
+
+    mc_Buffer *mempool;
+    mempool=m_MemPools[0];
+    if(WRPUsed())
+    {
+        mempool=m_WRPMemPool;    
+    }
+    
+    last_conf=0;
+    if(entity->m_EntityType & MC_TET_SUBKEY)
+    {
+        erow.Zero();
+        memcpy(&erow.m_Entity,entity,sizeof(mc_TxEntity));
+        erow.m_Generation=generation;
+        
+        last_pos=0;
+        mprow=mempool->Seek(&erow);
+        if(mprow >= 0)                                                     
+        {
+            mprow+=1;                                                           // Anchor doesn't carry info except key, but the next row is the first for this entity
+            last_pos=((mc_TxEntityRow*)(mempool->GetRow(mprow)))->m_LastSubKeyPos;            
+            last_conf=((mc_TxEntityRow*)(mempool->GetRow(mprow)))->m_TempPos-1;
+        }
+        else
+        {
+            erow.Zero();
+            memcpy(&erow.m_Entity,entity,sizeof(mc_TxEntity));
+            erow.m_Generation=generation;
+            erow.m_Pos=1;
+            erow.SwapPosBytes();
+            ptr=(unsigned char*)m_Database->m_DB->Read((char*)&erow+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err);
+            erow.SwapPosBytes();
+            if(err)
+            {
+                return 0;
+            }
+            if(ptr)
+            {
+                memcpy((char*)&erow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
+                last_pos=erow.m_LastSubKeyPos;
+                last_conf=last_pos;
+            }
+        }
+        if(confirmed)
+        {
+            *confirmed=last_conf;
+        }
+    }
+    else
+    {
+        return WRPGetListSize(entity,confirmed);
+    }
+    return last_pos;    
+}
 
 int mc_TxDB::GetListSize(mc_TxEntity *entity,int generation,int *confirmed)
 {
@@ -2500,6 +2947,38 @@ int mc_TxDB::GetListSize(mc_TxEntity *entity,int *confirmed)
     if(confirmed)
     {
         *confirmed=stat->m_LastClearedPos;
+    }
+    
+    return (int)(stat->m_LastPos);    
+}
+
+int mc_TxDB::WRPGetListSize(mc_TxEntity *entity,int *confirmed)
+{
+    int row;
+    mc_TxEntityStat *stat;
+    
+    row=m_Imports[0].FindEntity(entity);
+    if(row < 0)
+    {
+        return 0;
+    }
+
+    stat=(mc_TxEntityStat*)m_Imports[0].m_Entities->GetRow(row);        
+    
+    int use_read=WRPUsed();
+    
+    if(confirmed)
+    {
+        *confirmed=stat->m_LastClearedPos;
+        if(use_read)
+        {
+            *confirmed=stat->m_ReadLastClearedPos;            
+        }
+    }
+    
+    if(use_read)
+    {        
+        return (int)(stat->m_ReadLastPos);            
     }
     
     return (int)(stat->m_LastPos);    

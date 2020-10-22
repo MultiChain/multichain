@@ -1889,6 +1889,10 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 {
                     mc_gState->m_WalletMode |= MC_WMD_NO_CHUNK_FLUSH;
                 }
+                if(GetBoolArg("-nowalletreadpools",false))
+                {
+                    mc_gState->m_WalletMode |= MC_WMD_NO_READ_POOLS;
+                }
                 
                 mc_gState->m_WalletMode |= mc_AutosubscribeWalletMode(GetArg("-autosubscribe","none"),false);
 /*                

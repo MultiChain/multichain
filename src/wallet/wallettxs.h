@@ -191,8 +191,17 @@ typedef struct mc_WalletTxs
     void Lock();
     void UnLock();
     
+    int WRPSync(int for_block);
+    void WRPLock();
+    void WRPUnLock();
     
+    int WRPGetListSize(mc_TxEntity *entity,int *confirmed);
     
+    int WRPGetListSize(mc_TxEntity *entity,int generation,int *confirmed);
+    int WRPGetList(mc_TxEntity *entity,int generation,int from,int count,mc_Buffer *txs);    
+    CWalletTx WRPGetWalletTx(uint256 hash,mc_TxDefRow *txdef,int *errOut);
+    
+    bool WRPFindEntity(mc_TxEntityStat *entity);                                    // Finds entity in chain import
 } mc_WalletTxs;
 
 

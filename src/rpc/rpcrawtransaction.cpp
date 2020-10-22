@@ -2216,6 +2216,9 @@ Value sendrawtransaction(const Array& params, bool fHelp)
             pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetSendTimeout());
         }
         bool accepted=AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, !fOverrideFees);
+        pwalletTxsMain->WRPLock();        
+        pwalletTxsMain->WRPSync(0);
+        pwalletTxsMain->WRPUnLock();
         if(pMultiChainFilterEngine)
         {
             pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetAcceptTimeout());

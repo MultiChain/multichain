@@ -387,6 +387,35 @@ int mc_WalletTxs::Destroy()
     
 }
 
+bool mc_WalletTxs::WRPFindEntity(mc_TxEntityStat *entity)
+{
+    int row;
+    if((m_Mode & MC_WMD_TXS) == 0)
+    {
+        return false;
+    }    
+    if(m_Database == NULL)
+    {
+        return false;
+    }
+    
+    int use_read=m_Database->WRPUsed();
+    
+    if(use_read == 0)
+    {
+        m_Database->Lock(0,0);
+    }
+    
+    row=m_Database->FindEntity(NULL,entity);
+    
+    if(use_read == 0)
+    {
+        m_Database->UnLock();
+    }
+    
+    return (row >= 0) ? true : false;
+}
+
 bool mc_WalletTxs::FindEntity(mc_TxEntityStat *entity)
 {
     int row;
@@ -449,6 +478,7 @@ mc_Buffer* mc_WalletTxs::GetEntityList()
 
 void mc_WalletTxs::Lock()
 {
+//    LogPrintf("Lock %ld\n",__US_ThreadID());
     if(m_Database)
     {
         m_Database->Lock(0,0);
@@ -457,10 +487,39 @@ void mc_WalletTxs::Lock()
 
 void mc_WalletTxs::UnLock()
 {
+//    LogPrintf("UnLock %ld\n",__US_ThreadID());
     if(m_Database)
     {
         m_Database->UnLock();
     }    
+}
+
+void mc_WalletTxs::WRPLock()
+{
+//    LogPrintf("WRPLock %ld\n",__US_ThreadID());
+    if(m_Database)
+    {
+        m_Database->WRPLock(1);
+    }
+}
+
+void mc_WalletTxs::WRPUnLock()
+{
+//    LogPrintf("WRPUnLock %ld\n",__US_ThreadID());
+    if(m_Database)
+    {
+        m_Database->WRPUnLock(1);
+    }    
+}
+
+int mc_WalletTxs::WRPSync(int for_block)
+{
+    if(m_Database)
+    {
+        return m_Database->WRPSync(for_block);
+    }        
+    
+    return MC_ERR_NOERROR;
 }
 
 int mc_WalletTxs::GetBlock()
@@ -1318,6 +1377,32 @@ int mc_WalletTxs::GetList(mc_TxEntity *entity,int generation,int from,int count,
     return err;            
 }
 
+int mc_WalletTxs::WRPGetList(mc_TxEntity *entity,int generation,int from,int count,mc_Buffer *txs)
+{
+    int err;
+    if((m_Mode & MC_WMD_TXS) == 0)
+    {
+        return MC_ERR_NOT_SUPPORTED;
+    }    
+    if(m_Database == NULL)
+    {
+        return MC_ERR_INTERNAL_ERROR;
+    }
+
+    int use_read=m_Database->WRPUsed();
+    
+    if(use_read == 0)
+    {
+        m_Database->Lock(0,0);
+    }
+    err=m_Database->WRPGetList(entity,generation,from,count,txs);
+    if(use_read == 0)
+    {
+        m_Database->UnLock();
+    }
+    return err;            
+}
+
 int mc_WalletTxs::GetBlockItemIndex(mc_TxEntity *entity, int block)
 {
     int res;
@@ -1345,6 +1430,32 @@ int mc_WalletTxs::GetListSize(mc_TxEntity *entity,int *confirmed)
     return res;                
 }
 
+int mc_WalletTxs::WRPGetListSize(mc_TxEntity *entity,int *confirmed)
+{
+    int res;
+    if((m_Mode & MC_WMD_TXS) == 0)
+    {
+        return 0;
+    }    
+    if(m_Database == NULL)
+    {
+        return 0;
+    }
+    
+    int use_read=m_Database->WRPUsed();
+    
+    if(use_read == 0)
+    {
+        m_Database->Lock(0,0);
+    }
+    res=m_Database->WRPGetListSize(entity,confirmed);
+    if(use_read == 0)
+    {
+        m_Database->UnLock();
+    }
+    return res;                
+}
+
 int mc_WalletTxs::GetListSize(mc_TxEntity *entity,int generation,int *confirmed)
 {
     int res;
@@ -1359,6 +1470,31 @@ int mc_WalletTxs::GetListSize(mc_TxEntity *entity,int generation,int *confirmed)
     m_Database->Lock(0,0);
     res=m_Database->GetListSize(entity,generation,confirmed);
     m_Database->UnLock();
+    return res;                
+}
+
+int mc_WalletTxs::WRPGetListSize(mc_TxEntity *entity,int generation,int *confirmed)
+{
+    int res;
+    if((m_Mode & MC_WMD_TXS) == 0)
+    {
+        return 0;
+    }    
+    if(m_Database == NULL)
+    {
+        return 0;
+    }
+    int use_read=m_Database->WRPUsed();
+    
+    if(use_read == 0)
+    {
+        m_Database->Lock(0,0);
+    }
+    res=m_Database->WRPGetListSize(entity,generation,confirmed);
+    if(use_read == 0)
+    {
+        m_Database->UnLock();
+    }
     return res;                
 }
 
@@ -3170,6 +3306,151 @@ exitlbl:
     }
 
     m_Database->UnLock();
+    return wtx;
+}
+
+
+CWalletTx mc_WalletTxs::WRPGetWalletTx(uint256 hash,mc_TxDefRow *txdef,int *errOut)
+{
+    int err;
+    CWalletTx wtx;
+    mc_TxDefRow StoredTxDef;
+    FILE* fHan;
+    char ShortName[65];                                     
+    char FileName[MC_DCT_DB_MAX_PATH];                      
+    
+    int use_read=m_Database->WRPUsed();
+    
+    if((m_Mode & MC_WMD_TXS) == 0)
+    {
+        err=MC_ERR_NOT_SUPPORTED;
+        goto exitlbl;
+    }    
+    err = MC_ERR_NOERROR;
+    
+    if(m_Database == NULL)
+    {
+        goto exitlbl;
+    }
+    
+    
+    if(use_read == 0)
+    {
+        m_Database->Lock(0,0);
+    }
+    
+    err=m_Database->WRPGetTx(&StoredTxDef,(unsigned char*)&hash,0);
+    if(err)
+    {
+        goto exitlbl;
+    }
+
+    if((StoredTxDef.m_Block >= 0) || (StoredTxDef.m_Size == StoredTxDef.m_FullSize))// We have full tx in wallet or in the block
+    {
+        sprintf(ShortName,"wallet/txs%05u",StoredTxDef.m_InternalFileID);
+
+        mc_GetFullFileName(m_Database->m_Name,ShortName,".dat",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,FileName);
+
+        fHan=fopen(FileName,"rb+");
+
+        if(fHan == NULL)
+        {
+            goto exitlbl;
+        }
+
+        CAutoFile filein(fHan, SER_DISK, CLIENT_VERSION);
+
+        fseek(filein.Get(), StoredTxDef.m_InternalFileOffset, SEEK_SET);
+        try 
+        {
+            filein >> wtx;                                                      // Extract wallet tx anyway - for metadata
+        } 
+        catch (std::exception &e) 
+        {           
+            err=MC_ERR_FILE_READ_ERROR;
+            goto exitlbl;
+        }
+        
+        if(StoredTxDef.m_Size != StoredTxDef.m_FullSize)                        // if tx is shortened, extract OP_RETURN metadata from block
+        {
+            CDiskTxPos postx(CDiskBlockPos(StoredTxDef.m_BlockFileID,StoredTxDef.m_BlockOffset),StoredTxDef.m_BlockTxOffset);
+            
+            CAutoFile file(OpenBlockFile(postx, true), SER_DISK, CLIENT_VERSION);
+            if (file.IsNull())
+            {
+                err=MC_ERR_FILE_READ_ERROR;
+                goto exitlbl;
+            }
+            CBlockHeader header;
+            CTransaction tx;
+            try 
+            {
+                file >> header;
+                fseek(file.Get(), postx.nTxOffset, SEEK_CUR);
+                file >> tx;
+            } 
+            catch (std::exception &e) 
+            {
+                err=MC_ERR_FILE_READ_ERROR;
+                goto exitlbl;
+            }
+
+            *static_cast<CTransaction*>(&wtx) = CTransaction(tx);           
+        }
+    }
+    else                                                                        // We have full tx only in unconfirmed sends
+    {
+        if(use_read)                                                            // Not locked yet
+        {
+            m_Database->Lock(0,0);
+        }
+        std::map<uint256,CWalletTx>::const_iterator it = m_UnconfirmedSends.find(hash);
+        if (it != m_UnconfirmedSends.end())
+        {
+            wtx=it->second;
+        }
+        else
+        {
+            err=MC_ERR_CORRUPTED;
+        }
+        if(use_read)
+        {
+            m_Database->UnLock();
+        }
+    }
+    
+    
+exitlbl:
+    
+    if(err == MC_ERR_NOERROR)
+    {
+        if(wtx.GetHash() != hash)
+        {
+            err=MC_ERR_CORRUPTED;            
+        }
+    }
+
+    if(err == MC_ERR_NOERROR)
+    {      
+        wtx.BindWallet(m_lpWallet);
+        wtx.nTimeReceived=StoredTxDef.m_TimeReceived;
+        wtx.nTimeSmart=StoredTxDef.m_TimeReceived;
+        memcpy(&wtx.txDef,&StoredTxDef,sizeof(mc_TxDefRow));
+        if(txdef)
+        {
+            memcpy(txdef,&StoredTxDef,sizeof(mc_TxDefRow));
+        }
+    }
+
+    if(errOut)
+    {
+        *errOut=err;
+    }
+
+    if(use_read == 0)
+    {
+        m_Database->UnLock();
+    }
     return wtx;
 }
 

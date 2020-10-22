@@ -11,11 +11,27 @@ string OpReturnFormatToText(int format);
 
 void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry)
 {
+    return MinimalWalletTxToJSON(wtx,entry);
+}
+
+void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry,mc_TxDefRow *txdef_in)
+{
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
         uint256 blockHash;
         int block=wtx.txDef.m_Block;
-        int confirms = wtx.GetDepthInMainChain();
+        int confirms=0;
+        if(txdef_in)
+        {
+            if(block >= 0)
+            {
+                confirms=chainActive.Height()-block+1;
+            }            
+        }
+        else            
+        {
+            confirms = wtx.GetDepthInMainChain();
+        }
         entry.push_back(Pair("confirmations", confirms));
         if (confirms > 0)
         {
@@ -40,12 +56,28 @@ void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry)
 
 void WalletTxToJSON(const CWalletTx& wtx, Object& entry,bool skipWalletConflicts, int vout)
 {
+    return WalletTxToJSON(wtx,entry,skipWalletConflicts,vout,NULL);
+}
+
+void WalletTxToJSON(const CWalletTx& wtx, Object& entry,bool skipWalletConflicts, int vout,mc_TxDefRow *txdef_in)
+{
     /* MCHN START */        
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
         int block=wtx.txDef.m_Block;
         uint256 blockHash;
-        int confirms = wtx.GetDepthInMainChain();
+        int confirms=0;
+        if(txdef_in)
+        {
+            if(block >= 0)
+            {
+                confirms=chainActive.Height()-block+1;
+            }            
+        }
+        else            
+        {
+            confirms = wtx.GetDepthInMainChain();
+        }
         entry.push_back(Pair("confirmations", confirms));
         if (wtx.IsCoinBase())
             entry.push_back(Pair("generated", true));
@@ -655,6 +687,11 @@ Object StreamItemEntry1(const CWalletTx& wtx,int first_output,const unsigned cha
 
 Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char *stream_id, bool verbose, vector<mc_QueryCondition> *given_conditions,int *output)
 {
+    return StreamItemEntry(-1,wtx,first_output,stream_id,verbose,given_conditions,output,NULL);
+}
+
+Object StreamItemEntry(int rpc_slot,const CWalletTx& wtx,int first_output,const unsigned char *stream_id, bool verbose, vector<mc_QueryCondition> *given_conditions,int *output,mc_TxDefRow *txdef_in)
+{
     Object entry;
     Array publishers;
     set<uint160> publishers_set;
@@ -672,6 +709,14 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
     Value format_item_value;
     string format_text_str;
     int start_from=first_output;
+    
+    mc_Script *tmpscript;
+    
+    tmpscript=mc_gState->m_TmpScript;
+    if(rpc_slot >= 0)
+    {
+        tmpscript=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcScript1;
+    }
     
     stream_output=-1;
     if(output)
@@ -696,30 +741,30 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
                 const CScript& script1 = wtx.vout[j].scriptPubKey;        
                 CScript::const_iterator pc1 = script1.begin();
 
-                mc_gState->m_TmpScript->Clear();
-                mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+                tmpscript->Clear();
+                tmpscript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
 
-                if(mc_gState->m_TmpScript->IsOpReturnScript())                      
+                if(tmpscript->IsOpReturnScript())                      
                 {
-                    if(mc_gState->m_TmpScript->GetNumElements()) // 2 OP_DROPs + OP_RETURN - item key
+                    if(tmpscript->GetNumElements()) // 2 OP_DROPs + OP_RETURN - item key
                     {
-                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
+                        tmpscript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
 //                        chunk_hashes=NULL;
-//                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+//                        tmpscript->ExtractAndDeleteDataFormat(&format);
 
                         unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
-                        mc_gState->m_TmpScript->SetElement(0);
+                        tmpscript->SetElement(0);
 
-                        if(mc_gState->m_TmpScript->GetEntity(short_txid) == 0)           
+                        if(tmpscript->GetEntity(short_txid) == 0)           
                         {
                             if(memcmp(short_txid,stream_id,MC_AST_SHORT_TXID_SIZE) == 0)
                             {
                                 stream_output=j;
-                                for(int e=1;e<mc_gState->m_TmpScript->GetNumElements()-1;e++)
+                                for(int e=1;e<tmpscript->GetNumElements()-1;e++)
                                 {
-                                    mc_gState->m_TmpScript->SetElement(e);
+                                    tmpscript->SetElement(e);
                                                                                                 // Should be spkk
-                                    if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
+                                    if(tmpscript->GetItemKey(item_key,&item_key_size))   // Item key
                                     {
                                         return entry;
                                     }                                            
@@ -758,8 +803,8 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
 
                                 const unsigned char *elem;
 
-//                                elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
-                                retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
+//                                elem = tmpscript->GetData(tmpscript->GetNumElements()-1,&elem_size);
+                                retrieve_status = GetFormattedData(tmpscript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
 //                                item_value=OpReturnEntry(elem,elem_size,wtx.GetHash(),j);
                                 format_item_value=OpReturnFormatEntry(elem,out_size,wtx.GetHash(),j,format,&format_text_str,retrieve_status);
                             }
@@ -878,7 +923,16 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
                 int applied=0;
                 string filter_error="";
                 mc_TxDefRow txdef;
-                if(pwalletTxsMain->FindWalletTx(wtx.GetHash(),&txdef))
+                int txdef_err=MC_ERR_NOERROR;
+                if(txdef_in)
+                {
+                    memcpy(&txdef,txdef_in,sizeof(mc_TxDefRow));
+                }
+                else
+                {
+                    txdef_err=pwalletTxsMain->FindWalletTx(wtx.GetHash(),&txdef); 
+                }
+                if(txdef_err)
                 {
                     full_error="Error while retreiving tx from the wallet";
                 }
@@ -943,11 +997,11 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
     
     if(verbose)
     {
-        WalletTxToJSON(wtx, entry, true, stream_output);
+        WalletTxToJSON(wtx, entry, true, stream_output, txdef_in);
     }
     else
     {
-        MinimalWalletTxToJSON(wtx, entry);
+        MinimalWalletTxToJSON(wtx, entry, txdef_in);
     }
     
     return entry;

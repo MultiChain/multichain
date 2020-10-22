@@ -50,8 +50,10 @@ void FindAddressesWithPublishPermission(std::vector<CTxDestination>& fromaddress
 set<string> ParseAddresses(Value param, isminefilter filter);
 bool CBitcoinAddressFromTxEntity(CBitcoinAddress &address,mc_TxEntity *lpEntity);
 Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char *stream_id, bool verbose, vector<mc_QueryCondition> *given_conditions,int *output);
+Object StreamItemEntry(int rpc_slot,const CWalletTx& wtx,int first_output,const unsigned char *stream_id, bool verbose, vector<mc_QueryCondition> *given_conditions,int *output,mc_TxDefRow *txdef_in);
 Object TxOutEntry(const CTxOut& TxOutIn,int vout,const CTxIn& TxIn,uint256 hash,mc_Buffer *amounts,mc_Script *lpScript);
 void WalletTxToJSON(const CWalletTx& wtx, Object& entry,bool skipWalletConflicts = false, int vout = -1);
+void WalletTxToJSON(const CWalletTx& wtx, Object& entry,bool skipWalletConflicts, int vout,mc_TxDefRow *txdef_in);
 void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry);
 Object AddressEntry(CBitcoinAddress& address,uint32_t verbose);
 void SetSynchronizedFlag(CTxDestination &dest,Object &ret);

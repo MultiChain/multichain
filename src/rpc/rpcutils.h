@@ -164,6 +164,7 @@ bool AvailableFromStatus(uint32_t status);
 string OffChainError(uint32_t status,int *errorCode); 
 bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,int *errorCode,string *strError);
 void CheckWalletError(int err,uint32_t entity_type,string message);
+void WRPCheckWalletError(int err,uint32_t entity_type,string message,int *errCode,string *strError);
 int mc_VerifyTestLibraryUpdates();
 string mc_GetTestLibraryUpdateCode(string library,string *update,bool *local_library);
 mc_Buffer *mc_GetEntityTxIDList(uint32_t entity_type,int req_count,int req_start,bool *exact_results);

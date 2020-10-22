@@ -1621,7 +1621,15 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
                     err=MC_ERR_NOERROR;
                 }
                 
+                pwalletTxsMain->WRPLock();
+
                 err=pwalletTxsMain->CompleteImport(imp,((pindexStart->nHeight > 0) && !fOnlySubscriptions) ? MC_EFL_NOT_IN_SYNC_AFTER_IMPORT : 0);
+
+                
+                pwalletTxsMain->WRPSync(1);
+
+                pwalletTxsMain->WRPUnLock();
+
             }
             else
             {
@@ -1676,6 +1684,9 @@ void CWallet::ReacceptWalletTransactions()
                                 LogPrintf("Tx %s was not accepted to mempool, setting INVALID flag\n", wtxid.ToString());
                                 pwalletTxsMain->SaveTxFlag((unsigned char*)&wtxid,MC_TFL_INVALID,1);
                             }
+                            pwalletTxsMain->WRPLock();        
+                            pwalletTxsMain->WRPSync(0);
+                            pwalletTxsMain->WRPUnLock();                            
                         }
                         else
                         {
@@ -3187,6 +3198,11 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
             if(fDebug)LogPrint("mchn","mchn: Tx not committed (%s): %s\n",reject_reason.c_str(),EncodeHexTx(wtxNew));
             return false;
         }
+        
+        pwalletTxsMain->WRPLock();        
+        pwalletTxsMain->WRPSync(0);
+        pwalletTxsMain->WRPUnLock();
+        
 /*        
         else
         {
