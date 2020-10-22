@@ -124,6 +124,9 @@ typedef struct mc_MultiChainFilterEngine
     int m_Vout;
     mc_MultiChainFilterParams m_Params;
 
+    void *m_Semaphore;
+    uint64_t m_LockedBy;
+    
     mc_MultiChainFilterEngine()
     {
         Zero();
@@ -139,7 +142,7 @@ typedef struct mc_MultiChainFilterEngine
     int GetAcceptTimeout();
     int GetSendTimeout();
     int SetTimeout(int timeout);    
-    int Add(const unsigned char* short_txid,int for_block);
+    int AddFilter(const unsigned char* short_txid,int for_block);
     int Reset(int block,int for_block);
     int RunTxFilters(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied,bool only_once);            
     int RunStreamFilters(const CTransaction& tx,int vout, unsigned char *stream_short_txid,int block,int offset,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied);            
@@ -155,6 +158,13 @@ typedef struct mc_MultiChainFilterEngine
     
     int Zero();
     int Destroy();   
+    void Lock(int write_mode);
+    void UnLock();
+    int SetTimeoutInternal(int timeout);    
+    int CheckLibrariesInternal(std::set <uint160>* lpAffectedLibraries,int for_block);
+    int AddFilterInternal(const unsigned char* short_txid,int for_block);
+    int ResetInternal(int block,int for_block);
+    void SetCallbackNamesInternal();
     
 } mc_MultiChainFilterEngine;
 
