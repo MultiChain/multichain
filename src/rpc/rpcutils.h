@@ -50,6 +50,8 @@ using namespace json_spirit;
 #define MC_DATA_API_PARAM_TYPE_CIS             0x00001000
 #define MC_DATA_API_PARAM_TYPE_CREATE_VAR      0x00010000
 #define MC_DATA_API_PARAM_TYPE_UPDATE_VAR      0x00020000
+#define MC_DATA_API_PARAM_TYPE_CREATE_LIB      0x00040000
+#define MC_DATA_API_PARAM_TYPE_UPDATE_LIB      0x00080000
 
 #define MC_DATA_API_PARAM_TYPE_SIMPLE          0x00000602
 #define MC_DATA_API_PARAM_TYPE_ALL             0xFFFFFFFF
@@ -127,6 +129,7 @@ Value DataItemEntry(const CTransaction& tx,int n,set <uint256>& already_seen,uin
 Object FilterEntry(const unsigned char *txid,uint32_t output_level,uint32_t filter_type);
 Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_level);
 Object VariableEntry(const unsigned char *txid,uint32_t output_level);
+Object LibraryEntry(const unsigned char *txid,uint32_t output_level);
 Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t output_level);
 string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript,int *eErrorCode);
 bool FindPreparedTxOut(CTxOut& txout,COutPoint outpoint,string& reason);
@@ -161,7 +164,9 @@ bool AvailableFromStatus(uint32_t status);
 string OffChainError(uint32_t status,int *errorCode); 
 bool RawDataParseRestrictParameter(const Value& param,uint32_t *restrict,uint32_t *permissions,int *errorCode,string *strError);
 void CheckWalletError(int err,uint32_t entity_type,string message);
-
+int mc_VerifyTestLibraryUpdates();
+string mc_GetTestLibraryUpdateCode(string library,string *update,bool *local_library);
+mc_Buffer *mc_GetEntityTxIDList(uint32_t entity_type,int req_count,int req_start,bool *exact_results);
 
 #endif	/* RPCMULTICHAINUTILS_H */
 

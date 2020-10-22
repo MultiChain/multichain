@@ -22,6 +22,7 @@
 #define MC_EFT_FEEDS                                0x0000000001000000
 #define MC_EFT_FEEDS_API                            0x0000000002000000
 #define MC_EFT_DATAREFS                             0x0000000008000000
+#define MC_EFT_HEALTH_CHECK                         0x0000010000000000
 
 #define MC_EFT_ALL                                  0xFFFFFFFFFFFFFFFF
 
@@ -115,6 +116,10 @@ typedef struct mc_EnterpriseFeatures
     bool NET_PushMsg(void *pNodeData,CDataStream& ssSend);
     void NET_CheckConnections();
     uint64_t NET_Services();
+    
+    int HCH_GetPort();
+    std::string HCH_ProcessRequest(std::string strRequest,std::string* strHeader);    
+    Value HCH_RPCHealthCheck(const Array& params);  
     
     std::string ENT_Edition();
     int ENT_EditionNumeric();

@@ -336,6 +336,21 @@ uint64_t mc_EnterpriseFeatures::NET_Services()
     return 0;
 }
 
+int mc_EnterpriseFeatures::HCH_GetPort()
+{
+    return 0;    
+}
+
+std::string mc_EnterpriseFeatures::HCH_ProcessRequest(std::string strRequest,std::string* strHeader)    
+{
+    *strHeader="";
+    return "";
+}
+
+Value mc_EnterpriseFeatures::HCH_RPCHealthCheck(const Array& params)
+{
+    return Value::null;
+}
 
 
 string mc_EnterpriseFeatures::ENT_Edition() 

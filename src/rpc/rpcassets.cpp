@@ -126,6 +126,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
     int ret,type;
     string asset_name="";
     bool is_open=false;
+    bool is_anyone_can_issuemore=false;
     bool name_is_found=false;
     uint32_t permissions=0;
     
@@ -153,6 +154,24 @@ Value issuefromcmd(const Array& params, bool fHelp)
                     else
                     {
                         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'open' field, should be boolean");                                                                
+                    }
+                }
+                if(s.name_ == "unrestrict")
+                {
+                    if(mc_gState->m_Features->AnyoneCanIssueMore())
+                    {
+                        if( (s.value_.type() == str_type) && (s.value_.get_str() == "issue") )
+                        {
+                            is_anyone_can_issuemore=true;
+                        }
+                        else
+                        {
+                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'unrestrict' field");                                                                
+                        }
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "unrestrict field is not supported in this protocol version");                                                                                        
                     }
                 }
                 if(s.name_ == "restrict")
@@ -202,7 +221,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
         {
             if(type == MC_ENT_KEYTYPE_NAME)
             {
-                throw JSONRPCError(RPC_DUPLICATE_NAME, "Asset or stream with this name already exists");                                    
+                throw JSONRPCError(RPC_DUPLICATE_NAME, "Entity with this name already exists");                                    
             }
             else
             {
@@ -223,7 +242,18 @@ Value issuefromcmd(const Array& params, bool fHelp)
     if(is_open)
     {
         unsigned char b=1;        
+        if(is_anyone_can_issuemore)
+        {
+            b |= 0x02;
+        }
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);
+    }
+    else
+    {
+        if(is_anyone_can_issuemore)
+        {
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Asset cannot have unrestricted issue permission if follow-ons are not allowed");   
+        }        
     }
     
     if(permissions)
@@ -544,13 +574,16 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
                 CKeyID *lpKeyID=boost::get<CKeyID> (&fromaddresses[0]);
                 if(lpKeyID != NULL)
                 {
-                    if(mc_gState->m_Permissions->CanIssue(entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
+                    if(entity.AnyoneCanIssueMore() == 0)
                     {
-                        strError= "Issuing more units for this asset is not allowed from this address";
-                        errorCode=RPC_INSUFFICIENT_PERMISSIONS;
-                        goto exitlbl;
-//                        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Issuing more units for this asset is not allowed from this address");                                                                        
-                    }                                                 
+                        if(mc_gState->m_Permissions->CanIssue(entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
+                        {
+                            strError= "Issuing more units for this asset is not allowed from this address";
+                            errorCode=RPC_INSUFFICIENT_PERMISSIONS;
+                            goto exitlbl;
+    //                        throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Issuing more units for this asset is not allowed from this address");                                                                        
+                        }                                                 
+                    }
                 }
                 else
                 {
@@ -562,19 +595,26 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
             else
             {
                 bool issuer_found=false;
-                BOOST_FOREACH(const PAIRTYPE(CBitcoinAddress, CAddressBookData)& item, pwalletMain->mapAddressBook)
+                if(entity.AnyoneCanIssueMore() == 0)
                 {
-                    const CBitcoinAddress& address = item.first;
-                    CKeyID keyID;
-
-                    if(address.GetKeyID(keyID))
+                    BOOST_FOREACH(const PAIRTYPE(CBitcoinAddress, CAddressBookData)& item, pwalletMain->mapAddressBook)
                     {
-                        if(mc_gState->m_Permissions->CanIssue(entity.GetTxID(),(unsigned char*)(&keyID)))
+                        const CBitcoinAddress& address = item.first;
+                        CKeyID keyID;
+
+                        if(address.GetKeyID(keyID))
                         {
-                            issuer_found=true;
+                            if(mc_gState->m_Permissions->CanIssue(entity.GetTxID(),(unsigned char*)(&keyID)))
+                            {
+                                issuer_found=true;
+                            }
                         }
-                    }
-                }                    
+                    }                    
+                }
+                else
+                {
+                    issuer_found=true;                    
+                }
                 if(!issuer_found)
                 {
                     strError= "Issuing more units for this asset is not allowed from this wallet";
@@ -1515,6 +1555,7 @@ Value listassets(const Array& params, bool fHelp)
     unsigned char *txid;
     uint32_t output_level;
     Array results;
+    bool exact_results=false;
     
     int count,start;
     count=2147483647;
@@ -1567,7 +1608,8 @@ Value listassets(const Array& params, bool fHelp)
     {        
         {
             LOCK(cs_main);
-            assets=mc_gState->m_Assets->GetEntityList(assets,NULL,MC_ENT_TYPE_ASSET);
+            assets=mc_GetEntityTxIDList(MC_ENT_TYPE_ASSET,count,start,&exact_results);
+//            assets=mc_gState->m_Assets->GetEntityList(assets,NULL,MC_ENT_TYPE_ASSET);
         }
     }
     
@@ -1584,7 +1626,15 @@ Value listassets(const Array& params, bool fHelp)
         }
     }
     
-    mc_AdjustStartAndCount(&count,&start,assets->GetCount());
+    if(exact_results)
+    {
+        count=assets->GetCount();
+        start=0;
+    }
+    else
+    {
+        mc_AdjustStartAndCount(&count,&start,assets->GetCount());
+    }
     
     Array partial_results;
     int unconfirmed_count=0;
@@ -1598,53 +1648,68 @@ Value listassets(const Array& params, bool fHelp)
             entry=AssetEntry(txid,-1,output_level);
             if(entry.size()>0)
             {
-                BOOST_FOREACH(const Pair& p, entry) 
+                if(exact_results)
                 {
-                    if(p.name_ == "assetref")
+                    results.push_back(entry);     
+                }
+                else
+                {
+                    BOOST_FOREACH(const Pair& p, entry) 
                     {
-                        if(p.value_.type() == str_type)
+                        if(p.name_ == "assetref")
                         {
-                            results.push_back(entry);                        
+                            if(p.value_.type() == str_type)
+                            {
+                                results.push_back(entry);                        
+                            }
+                            else
+                            {
+                                unconfirmed_count++;
+                            }
                         }
-                        else
-                        {
-                            unconfirmed_count++;
-                        }
-                    }
-                }            
+                    }            
+                }
             }            
         }
 
-        sort(results.begin(), results.end(), AssetCompareByRef);
-        
-        for(int i=0;i<assets->GetCount();i++)
+        if(!exact_results)
         {
-            Object entry;
+            sort(results.begin(), results.end(), AssetCompareByRef);
 
-            txid=assets->GetRow(i);
-
-            entry=AssetEntry(txid,-1,output_level);
-            if(entry.size()>0)
+            for(int i=0;i<assets->GetCount();i++)
             {
-                BOOST_FOREACH(const Pair& p, entry) 
+                Object entry;
+
+                txid=assets->GetRow(i);
+
+                entry=AssetEntry(txid,-1,output_level);
+                if(entry.size()>0)
                 {
-                    if(p.name_ == "assetref")
+                    BOOST_FOREACH(const Pair& p, entry) 
                     {
-                        if(p.value_.type() != str_type)
+                        if(p.name_ == "assetref")
                         {
-                            results.push_back(entry);                        
+                            if(p.value_.type() != str_type)
+                            {
+                                results.push_back(entry);                        
+                            }
                         }
-                    }
+                    }            
                 }            
-            }            
+            }
         }
     }
 
     bool return_partial=false;
-    if(count != assets->GetCount())
+    
+    if(!exact_results)
     {
-        return_partial=true;
+        if(count != assets->GetCount())
+        {
+            return_partial=true;
+        }
     }
+    
     mc_gState->m_Assets->FreeEntityList(assets);
     if(return_partial)
     {

@@ -87,12 +87,15 @@ static const std::string vAPINames[] =
 "getfilterassetbalances",
 "getfiltercode",
 "getfilterstreamitem",
+"getfilterstream",
 "getfiltertransaction",
 "getfiltertxid",
 "getfiltertxinput",
 "getgenerate",
 "gethashespersec",
+"gethealthcheck",
 "getinfo",
+"getinitstatus",
 "getlastblockinfo",
 "getmempoolinfo",
 "getmininginfo",
@@ -245,13 +248,17 @@ static const std::string vAPINames[] =
 "purgefeed",       
 "listfeeds",
 "getdatarefdata", 
-"datareftobinarycache"
-"listvariables"
-"getvariableinfo"
-"setvariablevalue"
-"setvariablevaluefrom"
-"getvariablevalue"
-"getvariablehistory"
+"datareftobinarycache", 
+"listvariables", 
+"getvariableinfo", 
+"setvariablevalue", 
+"setvariablevaluefrom", 
+"getvariablevalue", 
+"getvariablehistory", 
+"listlibraries", 
+"addlibraryupdate", 
+"addlibraryupdatefrom", 
+"getlibrarycode"
 };
 
 static const CRPCConvertParam vRPCConvertParams[] =
@@ -311,6 +318,10 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "listvariables", 1 },                                                            
     { "listvariables", 2 },                                                            
     { "listvariables", 3 },                                                            
+    { "listlibraries", 0 },
+    { "listlibraries", 1 },                                                            
+    { "listlibraries", 2 },                                                            
+    { "listlibraries", 3 },                                                            
     { "getvariablehistory", 1 },                                                            
     { "getvariablehistory", 2 },                                                            
     { "getvariablehistory", 3 },                                                            
@@ -654,6 +665,7 @@ static const CRPCConvertParamMayBeString vRPCConvertParamsMayBeString[] =
     { "listassets", 0 },
     { "liststreams", 0 },
     { "listvariables", 0 },
+    { "listlibraries", 0 },
     { "listupgrades", 0 },
     { "listtxfilters", 0 },                                                            
     { "liststreamfilters", 0 },                                                            
@@ -701,6 +713,46 @@ CRPCConvertTableMayBeString::CRPCConvertTableMayBeString()
 
 static CRPCConvertTableMayBeString rpcCvtTableMayBeString;
 
+class CRPCConvertParamAnyType
+{
+public:
+    std::string methodName;            //! method whose params want conversion
+    int paramIdx;                      //! 0-based idx of param to convert
+};
+
+static const CRPCConvertParamAnyType vRPCConvertParamsAnyType[] =
+{
+    { "createfrom", 4 },                                                            
+    { "create", 3 },                                                            
+    { "setvariablevaluefrom", 2 },                                                            
+    { "setvariablevalue", 1 },                                                                
+};
+
+class CRPCConvertTableAnyType
+{
+private:
+    std::set<std::pair<std::string, int> > members;
+
+public:
+    CRPCConvertTableAnyType();
+
+    bool anytype(const std::string& method, int idx) {
+        return (members.count(std::make_pair(method, idx)) > 0);
+    }
+};
+
+CRPCConvertTableAnyType::CRPCConvertTableAnyType()
+{
+    const unsigned int n_elem =
+        (sizeof(vRPCConvertParamsAnyType) / sizeof(vRPCConvertParamsAnyType[0]));
+
+    for (unsigned int i = 0; i < n_elem; i++) {
+        members.insert(std::make_pair(vRPCConvertParamsAnyType[i].methodName,
+                                      vRPCConvertParamsAnyType[i].paramIdx));
+    }
+}
+
+static CRPCConvertTableAnyType rpcCvtTableAnyType;
 
 bool HaveAPIWithThisName(const std::string &strMethod)
 {
@@ -743,7 +795,8 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
             }
             else
             {
-                if (!rpcCvtTableMayBeString.maybestring(strMethod, idx)) 
+                if (!rpcCvtTableMayBeString.maybestring(strMethod, idx) ||
+                     rpcCvtTableAnyType.anytype(strMethod, idx)) 
                 {
                     params.push_back(jVal);                    
                 }

@@ -296,7 +296,12 @@ void mc_InitRPCHelpMap02()
             "listpermissions ( \"permission(s)\" address(es) verbose )\n"
             "\nReturns a list of all permissions which have been explicitly granted to addresses.\n"
             "\nArguments:\n"
-            "1. \"permission(s)\"                  (string, optional, default=*) Permission strings, comma delimited. Possible values: " + AllowedPermissions() + "\n"                
+            "1. \"permission(s)\"                  (string, optional, default=*) Permission strings, comma delimited. \n"
+            "                                                        Global: " + AllowedPermissions() + " \n"
+            "                                                        or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
+            "                                                        or per-stream: stream-identifier.write,read,activate,admin \n"
+            "                                                        or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                        or per-library: library-identifier.write,activate,admin \n"
             "2. \"address(es)\"                    (string, optional, default=*) The addresses to retrieve permissions for. \"*\" for all addresses\n"
             " or\n"
             "2. address(es)                      (array, optional) A json array of addresses to return permissions for\n"                
@@ -932,6 +937,8 @@ void mc_InitRPCHelpMap05()
             "       ,...\n"
             "     ]\n"
             "2. addresses                              (object, required) Object with addresses as keys, see help addresses-all for details.\n"
+            "  or \n"
+            "2. addresses                              (array, required) Array of addresses objects, see help addresses-all for details.\n"
 /*    
             "2. addresses                              (object, required) a json object with addresses as keys and amounts as values\n"
             "    {\n"
@@ -1396,32 +1403,32 @@ void mc_InitRPCHelpMap06()
         ));
     
     mapHelpStrings.insert(std::make_pair("create",
-            "create \"entity-type\" \"entity-name\" open ( custom-fields )\n"
-            "\nCreates stream, upgrade, filter or variable\n"
+            "create \"entity-type\" \"entity-name\" ...\n"
+            "\nCreates stream, upgrade, filter, variable or library\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. \"entity-type\"                    (string, required) stream\n"
-            "2. \"stream-name\"                    (string, required) Stream name, if not \"\" should be unique.\n"
-            "3. open                             (boolean, required) Allow anyone to publish in this stream\n"
+            "1. \"entity-type\"                         (string, required) stream\n"
+            "2. \"stream-name\"                         (string, required) Stream name, if not \"\" should be unique.\n"
+            "3. open                                  (boolean, required) Allow anyone to publish in this stream\n"
             "  or \n"
-            "3. restrictions                     (object, optional) Stream restrictions\n"
+            "3. restrictions                          (object, optional) Stream restrictions\n"
             "    {\n"
-            "      \"restrict\" : \"restrictions\"   (string, optional) Stream restrictions, comma delimited. Possible values: write,read,offchain,onchain\n"
-            "      \"salted\" : true|false         (boolean, optional) Indicates whether offchain item chunk hashes should be salted\n"
+            "      \"restrict\" : \"restrictions\"        (string, optional) Stream restrictions, comma delimited. Possible values: write,read,offchain,onchain\n"
+            "      \"salted\" : true|false              (boolean, optional) Indicates whether offchain item chunk hashes should be salted\n"
             "    }\n"
-            "4  custom-fields                    (object, optional)  a json object with custom fields\n"
+            "4  custom-fields                         (object, optional)  a json object with custom fields\n"
             "    {\n"
-            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
+            "      \"param-name\": \"param-value\"        (strings, required) The key is the parameter name, the value is parameter value\n"
             "      ,...\n"
             "    }\n"
             "  or \n"
-            "1. \"entity-type\"                    (string, required) upgrade\n"
-            "2. \"upgrade-name\"                   (string, required) Upgrade name, if not \"\" should be unique.\n"
-            "3. open                             (boolean, required) Should be false\n"
-            "4. custom-fields                    (object, required) A json object with custom fields\n"
+            "1. \"entity-type\"                         (string, required) upgrade\n"
+            "2. \"upgrade-name\"                        (string, required) Upgrade name, if not \"\" should be unique.\n"
+            "3. open                                  (boolean, required) Should be false\n"
+            "4. custom-fields                         (object, required) A json object with custom fields\n"
             "    {\n"
-            "      \"protocol-version\": version   (numeric, optional) Protocol version to upgrade to\n"
-            "      \"parameter-name\": value       (numeric, optional) New value for upgradable parameter, one of: \n"
+            "      \"protocol-version\": version        (numeric, optional) Protocol version to upgrade to\n"
+            "      \"parameter-name\": value            (numeric, optional) New value for upgradable parameter, one of: \n"
             "                                                        target-block-time,\n"
             "                                                        maximum-block-size,\n"
             "                                                        max-std-tx-size,\n"
@@ -1436,20 +1443,21 @@ void mc_InitRPCHelpMap06()
             "                                                        anyone-can-issue,\n"
             "                                                        anyone-can-create,\n"
             "                                                        anyone-can-activate\n"
-            "      \"startblock\": block           (numeric, optional, default 0) Block to apply from \n"
+            "      \"startblock\": block                (numeric, optional, default 0) Block to apply from \n"
 //            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
             "      ,...\n"
             "    }\n"
             "  or \n"
-            "1. \"entity-type\"                    (string, required) txfilter\n"
-            "2. \"txfilter-name\"                  (string, required) Tx filter name, if not \"\" should be unique.\n"
-            "3. restrictions                     (object, required) A json object with optional filter restrictions\n"
+            "1. \"entity-type\"                         (string, required) txfilter\n"
+            "2. \"txfilter-name\"                       (string, required) Tx filter name, if not \"\" should be unique.\n"
+            "3. options                               (object, required) A json object with optional filter options\n"
             "    {\n"
-            "      \"for\": \"entity-identifier\"    (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
+            "      \"for\": \"entity-identifier\"         (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
             "        or\n"
-            "      \"for\": entity-identifier(s)   (array, optional) A json array of asset/stream identifiers.\n"    
+            "      \"for\": entity-identifier(s),       (array, optional) A json array of asset/stream identifiers.\n"    
+            "      \"libraries\": library-identifier(s) (array, optional) A json array of library identifiers.\n"    
             "    }\n"
-            "4. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
+            "4. \"javascript-code\"                     (string, required) JavaScript filter code, see help filters. Example:\n"
             "                                                       function filtertransaction()\n"
             "                                                       {\n"
             "                                                           var tx=getfiltertransaction();\n"
@@ -1458,12 +1466,13 @@ void mc_InitRPCHelpMap06()
             "                                                               return \"One output required\";\n"
             "                                                       }\n"
             "  or \n"
-            "1. \"entity-type\"                    (string, required) streamfilter\n"
-            "2. \"streamfilter-name\"              (string, required) Stream filter name, if not \"\" should be unique.\n"
-            "3. restrictions                     (object, required) A json object with filter restrictions\n"
+            "1. \"entity-type\"                         (string, required) streamfilter\n"
+            "2. \"streamfilter-name\"                   (string, required) Stream filter name, if not \"\" should be unique.\n"
+            "3. options                               (object, required) A json object with filter options\n"
             "    {\n"
+            "      \"libraries\": library-identifier(s) (array, optional) A json array of library identifiers.\n"    
             "    }\n"
-            "4. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
+            "4. \"javascript-code\"                     (string, required) JavaScript filter code, see help filters. Example:\n"
             "                                                       function filterstreamitem()\n"
             "                                                       {\n"
             "                                                           var item=getfilterstreamitem();\n"
@@ -1471,16 +1480,24 @@ void mc_InitRPCHelpMap06()
             "                                                           if (item.keys.length<2)\n"
             "                                                               return \"At least two keys required\";\n"
             "                                                       }   \n"
-/*    
             "  or \n"
-            "1. entity-type                      (string, required) variable\n"
-            "2. \"variable-name\"                  (string, required) Variable name, if not \"\" should be unique.\n"
-            "3. open                             (boolean, optional) Should be false\n"
-            "4. value                            (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
-*/
+            "1. entity-type                           (string, required) variable\n"
+            "2. \"variable-name\"                       (string, required) Variable name, if not \"\" should be unique.\n"
+            "3. open                                  (boolean, optional) Should be true\n"
+            "4. value                                 (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
+            "  or \n"
+            "1. entity-type                           (string, required) library\n"
+            "2. \"library-name\"                        (string, required) Library name, if not \"\" should be unique.\n"
+            "3. options                               (object, required) Library update options\n"
+            "    {\n"
+            "      \"updatemode\" : \"update-mode\"       (string, required) Library update mode. Possible values: none, instant, approve\n"
+            "    }\n"
+            "4. \"javascript-code\"                     (string, required) JavaScript library code\n"
+
+
 
             "\nResult:\n"
-            "\"transactionid\"  (string) The transaction id.\n"
+            "\"transactionid\"                          (string) The transaction id.\n"
             "\nExamples:\n"
             + HelpExampleCli("create", "stream test false ")
             + HelpExampleCli("create", "stream test false '{\"Description\":\"Test stream\"}'")
@@ -1488,34 +1505,34 @@ void mc_InitRPCHelpMap06()
         ));
     
     mapHelpStrings.insert(std::make_pair("createfrom",
-            "createfrom \"from-address\" \"entity-type\" \"entity-name\" open ( custom-fields )\n"
-            "\nCreates stream, upgrade, filter or variable using specific address\n"
+            "createfrom \"from-address\" \"entity-type\" \"entity-name\" ...\n"
+            "\nCreates stream, upgrade, filter, variable or library using specific address\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. \"from-address\"                   (string, required) Address used for creating.\n"
-            "2. entity-type                      (string, required) stream\n"
-            "3. \"stream-name\"                    (string, required) Stream name, if not \"\" should be unique.\n"
-            "4. open                             (boolean, required) Allow anyone to publish in this stream\n"
+            "1. \"from-address\"                        (string, required) Address used for creating.\n"
+            "2. entity-type                           (string, required) stream\n"
+            "3. \"stream-name\"                         (string, required) Stream name, if not \"\" should be unique.\n"
+            "4. open                                  (boolean, required) Allow anyone to publish in this stream\n"
             "  or \n"
-            "4. restrictions                     (object, optional) Stream restrictions\n"
+            "4. restrictions                          (object, optional) Stream restrictions\n"
             "    {\n"
-            "      \"restrict\" : \"restrictions\"   (string, optional) Stream restrictions, comma delimited. Possible values: write,offchain,onchain\n"
-            "      \"salted\" : true|false         (boolean, optional) Indicates whether offchain item chunk hashes should be salted\n"
+            "      \"restrict\" : \"restrictions\"        (string, optional) Stream restrictions, comma delimited. Possible values: write,offchain,onchain\n"
+            "      \"salted\" : true|false              (boolean, optional) Indicates whether offchain item chunk hashes should be salted\n"
             "    }\n"
-            "5  custom-fields                    (object, optional)  a json object with custom fields\n"
+            "5  custom-fields                         (object, optional)  a json object with custom fields\n"
             "    {\n"
-            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
+            "      \"param-name\": \"param-value\"        (strings, required) The key is the parameter name, the value is parameter value\n"
             "      ,...\n"
             "    }\n"
             "  or \n"
-            "1. \"from-address\"                   (string, required) Address used for creating.\n"
-            "2. entity-type                      (string, required) upgrade\n"
-            "3. \"upgrade-name\"                   (string, required) Upgrade name, if not \"\" should be unique.\n"
-            "4. open                             (boolean, required) Should be false\n"
-            "5. custom-fields                    (object, required) A json object with custom fields\n"
+            "1. \"from-address\"                        (string, required) Address used for creating.\n"
+            "2. entity-type                           (string, required) upgrade\n"
+            "3. \"upgrade-name\"                        (string, required) Upgrade name, if not \"\" should be unique.\n"
+            "4. open                                  (boolean, required) Should be false\n"
+            "5. custom-fields                         (object, required) A json object with custom fields\n"
             "    {\n"
-            "      \"protocol-version\": version   (numeric, optional) Protocol version to upgrade to \n"
-            "      \"parameter-name\": value       (numeric, optional) New value for upgradable parameter, one of: \n"
+            "      \"protocol-version\": version        (numeric, optional) Protocol version to upgrade to \n"
+            "      \"parameter-name\": value            (numeric, optional) New value for upgradable parameter, one of: \n"
             "                                                        target-block-time,\n"
             "                                                        maximum-block-size,\n"
             "                                                        max-std-tx-size,\n"
@@ -1530,21 +1547,22 @@ void mc_InitRPCHelpMap06()
             "                                                        anyone-can-issue,\n"
             "                                                        anyone-can-create,\n"
             "                                                        anyone-can-activate\n"
-            "      \"start-block\": block          (numeric, optional, default 0) Block to apply from \n"
+            "      \"start-block\": block               (numeric, optional, default 0) Block to apply from \n"
 //            "      \"param-name\": \"param-value\"   (strings, required) The key is the parameter name, the value is parameter value\n"
             "      ,...\n"
             "    }\n"
             "  or \n"
-            "1. \"from-address\"                   (string, required) Address used for creating.\n"
-            "2. \"entity-type\"                    (string, required) txfilter\n"
-            "3. \"txfilter-name\"                  (string, required) Tx filter name, if not \"\" should be unique.\n"
-            "4. restrictions                     (object, required)  a json object with filter restrictions\n"
+            "1. \"from-address\"                        (string, required) Address used for creating.\n"
+            "2. \"entity-type\"                         (string, required) txfilter\n"
+            "3. \"txfilter-name\"                       (string, required) Tx filter name, if not \"\" should be unique.\n"
+            "4. options                               (object, required)  a json object with filter options\n"
             "    {\n"
-            "      \"for\": \"entity-identifier\"    (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
+            "      \"for\": \"entity-identifier\"         (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
             "        or\n"
-            "      \"for\": entity-identifier(s)   (array, optional) A json array of asset/stream identifiers .\n"    
+            "      \"for\": entity-identifier(s),       (array, optional) A json array of asset/stream identifiers.\n"    
+            "      \"libraries\": library-identifier(s) (array, optional) A json array of library identifiers.\n"    
             "    }\n"
-            "5. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
+            "5. \"javascript-code\"                     (string, required) JavaScript filter code, see help filters. Example:\n"
             "                                                         function filtertransaction()\n"
             "                                                         {\n"
             "                                                             var tx=getfiltertransaction();\n"
@@ -1553,13 +1571,14 @@ void mc_InitRPCHelpMap06()
             "                                                                 return \"One output required\";\n"
             "                                                         }   \n "
             "  or \n"
-            "1. \"from-address\"                   (string, required) Address used for creating.\n"
-            "2. \"entity-type\"                    (string, required) streamfilter\n"
-            "3. \"streamfilter-name\"              (string, required) Stream filter name, if not \"\" should be unique.\n"
-            "4. restrictions                     (object, required) A json object with filter restrictions\n"
+            "1. \"from-address\"                        (string, required) Address used for creating.\n"
+            "2. \"entity-type\"                         (string, required) streamfilter\n"
+            "3. \"streamfilter-name\"                   (string, required) Stream filter name, if not \"\" should be unique.\n"
+            "4. options                               (object, required) A json object with filter options\n"
             "    {\n"
+            "      \"libraries\": library-identifier(s) (array, optional) A json array of library identifiers.\n"    
             "    }\n"
-            "5. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
+            "5. \"javascript-code\"                     (string, required) JavaScript filter code, see help filters. Example:\n"
             "                                                         function filterstreamitem()\n"
             "                                                         {\n"
             "                                                             var item=getfilterstreamitem();\n"
@@ -1567,16 +1586,24 @@ void mc_InitRPCHelpMap06()
             "                                                             if (item.keys.length<2)\n"
             "                                                                 return \"At least two keys required\";\n"
             "                                                         }   \n"
-/*    
             "  or \n"
-            "1. \"from-address\"                   (string, required) Address used for creating.\n"
-            "2. entity-type                      (string, required) variable\n"
-            "3. \"variable-name\"                  (string, required) Variable name, if not \"\" should be unique.\n"
-            "4. open                             (boolean, optional) Should be false\n"
-            "5. value                            (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
-*/
+            "1. \"from-address\"                        (string, required) Address used for creating.\n"
+            "2. entity-type                           (string, required) variable\n"
+            "3. \"variable-name\"                       (string, required) Variable name, if not \"\" should be unique.\n"
+            "4. open                                  (boolean, optional) Should be true\n"
+            "5. value                                 (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
+            "  or \n"
+            "1. \"from-address\"                        (string, required) Address used for creating.\n"
+            "2. entity-type                           (string, required) library\n"
+            "3. \"library-name\"                        (string, required) Library name, if not \"\" should be unique.\n"
+            "4. options                               (object, required) Library update options\n"
+            "    {\n"
+            "      \"updatemode\" : \"update-mode\"       (string, required) Library update mode. Possible values: none, instant, approve\n"
+            "    }\n"
+            "5. \"javascript-code\"                     (string, required) JavaScript library code\n"
+
             "\nResult:\n"
-            "\"transactionid\"                     (string) The transaction id.\n"
+            "\"transactionid\"                          (string) The transaction id.\n"
             "\nExamples:\n"
             + HelpExampleCli("createfrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" stream test false ")
             + HelpExampleCli("createfrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" stream test false '{\"Description\":\"Test stream\"}'")
@@ -1614,6 +1641,8 @@ void mc_InitRPCHelpMap07()
             "\nArguments:\n"
             "1. \"from-address\"                           (string, required) Address to send from.\n"
             "2. addresses                                (object, required) Object with addresses as keys, see help addresses-all for details.\n"
+            "  or \n"
+            "2. addresses                                (array, required) Array of addresses objects, see help addresses-all for details.\n"
             "3. data                                     (array, optional) Array of hexadecimal strings or data objects, see help data-all for details.\n"
             "4. \"action\"                                 (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
                 
@@ -2158,6 +2187,8 @@ void mc_InitRPCHelpMap09()
             "                                                        Global: " + AllowedPermissions() + " \n"
             "                                                        or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
             "                                                        or per-stream: stream-identifier.write,read,activate,admin \n"
+            "                                                        or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                        or per-library: library-identifier.write,activate,admin \n"
             "3. native-amount                    (numeric, optional) Native currency amount to send. eg 0.1. Default - 0.0\n"
             "4. startblock                       (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
             "5. endblock                         (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
@@ -2187,6 +2218,8 @@ void mc_InitRPCHelpMap09()
             "                                                        Global: " + AllowedPermissions() + " \n"
             "                                                        or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
             "                                                        or per-stream: stream-identifier.write,read,activate,admin \n"
+            "                                                        or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                        or per-library: library-identifier.write,activate,admin \n"
             "4. native-amount                    (numeric, optional) Native currency amount to send. eg 0.1. Default - 0.0\n"
             "5. startblock                       (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
             "6. endblock                         (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
@@ -2213,6 +2246,8 @@ void mc_InitRPCHelpMap09()
             "                                                       Global: " + AllowedPermissions() + " \n"
             "                                                       or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
             "                                                       or per-stream: stream-identifier.write,activate,admin \n"
+            "                                                       or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                       or per-library: library-identifier.write,activate,admin \n"
             "3. data|publish-new-stream-item     (string or object, required) Data, see help data-with for details. \n"
             "4. native-amount                    (numeric, optional)  Native currency amount to send. eg 0.1. Default - 0.0\n"
             "5. startblock                       (numeric, optional)  Block to apply permissions from (inclusive). Default - 0\n"
@@ -2239,6 +2274,8 @@ void mc_InitRPCHelpMap10()
             "                                                        Global: " + AllowedPermissions() + " \n"
             "                                                        or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
             "                                                        or per-stream: stream-identifier.write,activate,admin \n"
+            "                                                        or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                        or per-library: library-identifier.write,activate,admin \n"
             "3. data|publish-new-stream-item     (string or object, required) Data, see help data-with for details. \n"
             "4. native-amount                    (numeric, optional)  Native currency amount to send. eg 0.1. Default - 0.0\n"
             "5. startblock                       (numeric, optional)  Block to apply permissions from (inclusive). Default - 0\n"
@@ -2263,6 +2300,8 @@ void mc_InitRPCHelpMap10()
             "                                                       Global: " + AllowedPermissions() + " \n"
             "                                                       or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
             "                                                       or per-stream: stream-identifier.write,activate,admin \n"
+            "                                                       or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                       or per-library: library-identifier.write,activate,admin \n"
             "4. data|publish-new-stream-item     (string or object, required) Data, see help data-with for details. \n"
             "5. native-amount                    (numeric, optional)  Native currency amount to send. eg 0.1. Default - 0.0\n"
             "6. startblock                       (numeric, optional)  Block to apply permissions from (inclusive). Default - 0\n"
@@ -2287,6 +2326,8 @@ void mc_InitRPCHelpMap10()
             "                                                       Global: " + AllowedPermissions() + " \n"
             "                                                       or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
             "                                                       or per-stream: stream-identifier.write,activate,admin \n"
+            "                                                       or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                       or per-library: library-identifier.write,activate,admin \n"
             "4. data|publish-new-stream-item     (string or object, required) Data, see help data-with for details. \n"
             "5. native-amount                    (numeric, optional)  Native currency amount to send. eg 0.1. Default - 0.0\n"
             "6. startblock                       (numeric, optional)  Block to apply permissions from (inclusive). Default - 0\n"
@@ -2373,6 +2414,7 @@ void mc_InitRPCHelpMap10()
             "      \"name\" : \"asset-name\"         (string, optional) Asset name\n"
             "      \"open\" : true|false           (boolean, optional, default false) True if follow-on issues are allowed\n"
             "      \"restrict\" : \"restrictions\"   (string, optional) Permission strings, comma delimited. Possible values: send,receive\n"
+            "      \"unrestrict\" : \"issue\"        (string, optional) If set, issue permission is not required for follow-on issues. Possible value: issue\n"
             "    }\n"                                
             "3. quantity                         (numeric, required) The asset total amount in display units. eg. 1234.56\n"
             "4. smallest-unit                    (numeric, optional, default=1) Number of raw units in one displayed unit, eg 0.01 for cents\n"
@@ -2404,6 +2446,7 @@ void mc_InitRPCHelpMap10()
             "      \"name\" : \"asset-name\"         (string, optional) Asset name\n"
             "      \"open\" : true|false           (boolean, optional, default false) True if follow-on issues are allowed\n"
             "      \"restrict\" : \"restrictions\"   (string, optional) Permission strings, comma delimited. Possible values: send,receive\n"
+            "      \"unrestrict\" : \"issue\"        (string, optional) If set, issue permission is not required for follow-on issues. Possible value: issue\n"
             "    }\n"                                
             "4. quantity                         (numeric, required) The asset total amount in display units. eg. 1234.56\n"
             "5. smallest-unit                    (numeric, optional, default=1) Number of raw units in one displayed unit, eg 0.01 for cents\n"
@@ -3159,6 +3202,8 @@ void mc_InitRPCHelpMap13()
             "                                                       Global: " + AllowedPermissions() + " \n"
             "                                                       or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
             "                                                       or per-stream: stream-identifier.write,activate,admin \n"
+            "                                                       or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                       or per-library: library-identifier.write,activate,admin \n"
             "3. native-amount                    (numeric, optional) native currency amount to send. eg 0.1. Default - 0\n"
             "4. \"comment\"                        (string, optional) A comment used to store what the transaction is for. \n"
             "                                                       This is not part of the transaction, just kept in your wallet.\n"
@@ -3184,6 +3229,8 @@ void mc_InitRPCHelpMap13()
             "                                                       Global: " + AllowedPermissions() + " \n"
             "                                                       or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
             "                                                       or per-stream: stream-identifier.write,activate,admin \n"
+            "                                                       or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                       or per-library: library-identifier.write,activate,admin \n"
             "4. native-amount                    (numeric, optional) native currency amount to send. eg 0.1. Default - 0\n"
             "5. \"comment\"                        (string, optional) A comment used to store what the transaction is for. \n"
             "                                                       This is not part of the transaction, just kept in your wallet.\n"
@@ -3705,8 +3752,8 @@ void mc_InitRPCHelpMap16()
         ));
     
     mapHelpStrings.insert(std::make_pair("approvefrom",
-            "approvefrom \"from-address\" \"upgrade-identifier\"|\"filter-identifier\" ( approve )\n"
-            "\nApprove upgrade using specific address.\n"
+            "approvefrom \"from-address\" \"entity-identifier\" ( approve )\n"
+            "\nApprove upgrade, txfilter, streamfilter or library update using specific address.\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"from-address\"                   (string, required) Address used for approval.\n"
@@ -3723,6 +3770,14 @@ void mc_InitRPCHelpMap16()
             "    {\n"                
             "      \"approve\" : approve           (boolean, required) Approve or disapprove\n"
             "      \"for\" : \"stream-identifier\"   (string, required)  Stream identifier - one of: create txid, stream reference, stream name.\n"
+            "    }\n"                                
+            " or\n"
+            "1. \"from-address\"                   (string, required) Address used for approval.\n"
+            "2. \"library-identifier\"             (string, required) Library identifier - one of: create txid, library reference, library name.\n"
+            "3. approve                          (object, required)  Approval object\n"
+            "    {\n"                
+            "      \"approve\" : approve           (boolean, required) Approve or disapprove\n"
+            "      \"updatename\" : \"update-name\"  (string, required)  Update name to approve/disapprove.\n"
             "    }\n"                                
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
@@ -3762,6 +3817,8 @@ void mc_InitRPCHelpMap16()
             "       ,...\n"
             "     ]\n"
             "3. addresses                              (object, required) Object with addresses as keys, see help addresses-all for details.\n"
+            "  or \n"
+            "3. addresses                              (array, required) Array of addresses objects, see help addresses-all for details.\n"
             "4. data                                   (array, optional) Array of hexadecimal strings or data objects, see help data-all for details.\n"
             "5.\"action\"                                (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
                 
@@ -3879,6 +3936,7 @@ void mc_InitRPCHelpMap16()
             "      \"multiple\" : n                  (numeric, optional, default 1) Number of raw units in one displayed unit\n"
             "      \"open\" : true|false             (boolean, optional, default false) True if follow-on issues are allowed\n"                
             "      \"restrict\" : \"restrictions\"     (string, optional) Permission strings, comma delimited. Possible values: send,receive\n"
+            "      \"unrestrict\" : \"issue\"        (string, optional) If set, issue permission is not required for follow-on issues. Possible value: issue\n"
             "      \"details\" :                     (object, optional) A json object with custom fields\n"           
             "        {\n"
             "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
@@ -3980,9 +4038,9 @@ void mc_InitRPCHelpMap16()
             "      \"for\": \"entity-identifier\"      (string, optional) Only for tx filters, Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
             "        or\n"
             "      \"for\": entity-identifier(s)     (array, optional) Only for tx filters, A json array of asset/stream identifiers .\n"    
+            "      \"libraries\": library-identifier(s) (array, optional) A json array of library identifiers.\n"    
             "      \"code\": \"filter-code\"           (string, required) JavaScript filter code, see help filters.\n"
             "    }\n"    
-/*    
             " or\n"
             "create-new-variable                   (object, required) A json object with new variable details\n"
             "    {\n"                
@@ -3991,12 +4049,25 @@ void mc_InitRPCHelpMap16()
             "      \"value\": value                  (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
             "    }\n"                                
             " or\n"
-            "set-variable-value                    (object, required) A json object with new variable value\n"
+            "update-variable-value                 (object, required) A json object with new variable value\n"
             "    {\n"
-            "      \"update\" : \"variable-identifier\" (string, required) Variable identifier - one of: create txid, variable reference, variable name.\n"
+            "      \"update\" : \"variable-identifier\"(string, required) Variable identifier - one of: create txid, variable reference, variable name.\n"
             "      \"value\": value                  (any data, optional, default null) Variable value (JSON objects and arrays allowed).\n"
             "    }\n"                                
- */ 
+            "create-new-library                    (object, required) A json object with new library details\n"
+            "    {\n"                
+            "      \"create\" : \"library\"            (string, required) library\n"
+            "      \"name\" : \"library-name\"         (string, optional) Library name\n"
+            "      \"updatemode\" : \"update-mode\"    (string, required) Library update mode. Possible values: none, instant, approve\n"
+            "      \"code\": \"library-code\"          (string, required) JavaScript library code.\n"
+            "    }\n"                                
+            " or\n"
+            "add-library-update                    (object, required) A json object with new library update\n"
+            "    {\n"
+            "      \"update\" : \"library-identifier\" (string, required) Library identifier - one of: create txid, library reference, library name.\n"
+            "      \"updatename\" : \"update-name\"    (string, required) Library update name\n"
+            "      \"code\": \"library-code\"          (string, required) JavaScript library code.\n"
+            "    }\n"                                
         ));
 
     mapHelpStrings.insert(std::make_pair("data-with",
@@ -4082,8 +4153,12 @@ void mc_InitRPCHelpMap16()
             "      \"permissions\" : \n"
             "        {\n"
             "          \"type\" : \"permission(s)\"     (string, required) Permission strings, comma delimited. Possible values:\n"
-            "                                                          " + AllowedPermissions() + " \n"
-            "          \"for\": \"entity-identifier\"   (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
+            "                                                        Global: " + AllowedPermissions() + " \n"
+            "                                                        or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
+            "                                                        or per-stream: stream-identifier.write,read,activate,admin \n"
+            "                                                        or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                        or per-library: library-identifier.write,activate,admin \n"
+            "          \"for\": \"entity-identifier\"   (string, optional) Entity identifier - one of: name, ref, create txid.\n"
             "          \"startblock\" : n             (numeric, optional) Block to apply permissions from (inclusive). Default - 0\n"
             "          \"endblock\"  : n              (numeric, optional) Block to apply permissions to (exclusive). Default - 4294967295\n"
             "          \"timestamp\" : n              (numeric, optional) This helps resolve conflicts between\n"
@@ -4128,6 +4203,14 @@ void mc_InitRPCHelpMap16()
             "   {\n"
             "     \"approve\" : approve               (boolean, required) Approve or disapprove\n"
             "     \"for\" : \"stream-identifier\"       (string, required)  Stream identifier - one of: create txid, stream reference, stream name.\n"
+            "   }\n"                                
+            "}\n"
+            "  or \n"
+            "{\n"
+            "  \"library-identifier\":                (string, required) Library identifier - one of: create txid, library reference, library name.\n"
+            "   {\n"
+            "     \"approve\" : approve               (boolean, required) Approve or disapprove\n"
+            "     \"updatename\" : \"update-name\"      (string, required) Update name\n"
             "   }\n"                                
             "}\n"
         ));
@@ -4387,11 +4470,12 @@ void mc_InitRPCHelpMap18()
             "testtxfilter restrictions \"javascript-code\" ( \"tx-hex\"|\"txid\" )\n"
             "\nCompile a test filter and optionally test it on a transaction\n"
             "\nArguments:\n"
-            "1. restrictions                     (object, required)  a json object with filter restrictions\n"
+            "1. options                          (object, required)  a json object with filter options\n"
             "    {\n"
             "      \"for\": \"entity-identifier\"    (string, optional) Asset/stream identifier - one of: create txid, stream reference, stream name.\n"
             "        or\n"
             "      \"for\": entity-identifier(s)   (array, optional) A json array of asset/stream identifiers .\n"    
+            "      \"libraries\": library-identifier(s) (array, optional) A json array of library identifiers.\n"    
             "    }\n"
             "2. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
             "                                                         function filtertransaction()\n"
@@ -4427,6 +4511,11 @@ void mc_InitRPCHelpMap18()
             "\nReturns an object with information about the filtered stream item.\n"
         ));
     
+    mapHelpStrings.insert(std::make_pair("getfilterstream",
+            "getfilterstream\n"
+            "\nReturns an object with information about the filtered stream.\n"
+        ));
+    
     mapHelpStrings.insert(std::make_pair("getlastblockinfo",
             "getlastblockinfo ( skip )\n"
             "\nReturns information about the last or recent blocks in the active chain.\n"
@@ -4456,7 +4545,12 @@ void mc_InitRPCHelpMap19()
             "\nChecks whether the address has a specified permission.\n"
             "\nArguments:\n"
             "1. \"address\"                      (string, required) The address to verify permission for. \n"
-            "2. \"permission\"                   (string, required) Permission string. Possible values: " + AllowedPermissions() + ". \n"                
+            "2. \"permission\"                   (string, required) Permission string, Possible values: \n"
+            "                                                        Global: " + AllowedPermissions() + " \n"
+            "                                                        or per-asset: asset-identifier.issue,admin,activate,send,receive \n"
+            "                                                        or per-stream: stream-identifier.write,read,activate,admin \n"
+            "                                                        or per-variable: variable-identifier.write,activate,admin \n"
+            "                                                        or per-library: library-identifier.write,activate,admin \n"
             "\nResult:\n"
             "True if address has specified permission, false otherwise\n"            
             "\nExamples:\n"
@@ -4489,12 +4583,16 @@ void mc_InitRPCHelpMap19()
             "                         getlastblockinfo \n"
             "                         getassetinfo \n"
             "                         getstreaminfo \n"
+            "                         getvariablevalue \n"
+            "                         getvariableinfo \n"
+            "                         getvariablehistory \n"
             "                         verifypermission \n"
             "                         verifymessage \n"
             "\nThe following additional methods can be called from filter code (see help <method> for details):\n"
             "                         getfiltertransaction \n"
             "                         getfiltertxid \n"
             "                         getfilterstreamitem (only for stream filters)\n"
+            "                         getfilterstream (only for stream filters)\n"
             "                         getfiltertxinput (only for tx filters)\n"
             "                         getfilterassetbalances (only for tx filters)\n"
             "                         setfilterparam \n"             
@@ -4552,8 +4650,9 @@ void mc_InitRPCHelpMap19()
             "teststreamfilter restrictions \"javascript-code\" ( \"tx-hex\"|\"txid\" vout )\n"
             "\nCompile a test filter and optionally test it on a transaction\n"
             "\nArguments:\n"
-            "1. restrictions                     (object, required)  a json object with filter restrictions\n"
+            "1. options                          (object, required)  a json object with filter options\n"
             "    {\n"
+            "      \"libraries\": library-identifier(s) (array, optional) A json array of library identifiers.\n"    
             "    }\n"
             "2. \"javascript-code\"                (string, required) JavaScript filter code, see help filters. Example:\n"
             "                                                         function filterstreamitem()\n"
@@ -5048,6 +5147,15 @@ void mc_InitRPCHelpMap21()
             + HelpExampleRpc("getinitstatus", "")
         ));
   
+     mapHelpStrings.insert(std::make_pair("gethealthcheck",
+            "gethealthcheck\n"
+            "\nReturns information about health of this node\n"
+            "\nAvailable only in Enterprise Edition.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("gethealthcheck", "")
+            + HelpExampleRpc("gethealthcheck", "")
+        ));
+  
     
     mapHelpStrings.insert(std::make_pair("createfeed",
             "createfeed \"feed-name\" ( parameters ) \n"
@@ -5255,7 +5363,7 @@ void mc_InitRPCHelpMap22()
 void mc_InitRPCHelpMap23()
 {
     mapHelpStrings.insert(std::make_pair("setvariablevaluefrom",
-            "setvariablevaluefrom \"from-address\" \"variable-identifier\" value \n"
+            "setvariablevaluefrom \"from-address\" \"variable-identifier\" ( value )\n"
             "\nSets variable value\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -5270,7 +5378,7 @@ void mc_InitRPCHelpMap23()
         ));
     
     mapHelpStrings.insert(std::make_pair("setvariablevalue",
-            "setvariablevalue \"variable-identifier\" value \n"
+            "setvariablevalue \"variable-identifier\" ( value )\n"
             "\nChanges variable value\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -5290,7 +5398,7 @@ void mc_InitRPCHelpMap23()
             "1. \"variable-identifier(s)\"           (string, optional, default=*) Variable identifier - one of: create txid, variable reference, variable name.\n"
             " or\n"
             "1. variable-identifier(s)             (array, optional) A json array of variable identifiers \n"                
-            "2. verbose                          (boolean, optional, default=false) If true, last txid and writers \n"
+            "2. verbose                          (boolean, optional, default=false) If true, returns also last txid and vout \n"
             "3. count                            (number, optional, default=INT_MAX - all) The number of variables to display\n"
             "4. start                            (number, optional, default=-count - last) Start from specific variable, 0 based, if negative - from the end\n"
             "\nResult:\n"
@@ -5301,11 +5409,11 @@ void mc_InitRPCHelpMap23()
         ));
     
      mapHelpStrings.insert(std::make_pair("getvariablehistory",
-            "getvariablehistory ( \"variable-identifier\" verbose count start )\n"
+            "getvariablehistory \"variable-identifier\" ( verbose count start )\n"
             "\nReturns variable value changes history\n"
             "\nArguments:\n"
             "1. \"variable-identifier\"            (string, required) Variable identifier - one of: create txid, variable reference, variable name.\n"
-            "2. verbose                          (boolean, optional, default=false) If true, returns txid and writer address\n"
+            "2. verbose                          (boolean, optional, default=false) If true, returns txid, vout and confirmation information\n"
             "3. count                            (number, optional, default=INT_MAX - all) The number of value changes to display\n"
             "4. start                            (number, optional, default=-count - last) Start from specific value change, 0 based, if negative - from the end\n"
             "\nResult:\n"
@@ -5316,11 +5424,11 @@ void mc_InitRPCHelpMap23()
         ));
     
      mapHelpStrings.insert(std::make_pair("getvariableinfo",
-            "getvariableinfo ( \"variable-identifier\" verbose )\n"
+            "getvariableinfo \"variable-identifier\" ( verbose )\n"
             "\nReturns information about defined variable\n"
             "\nArguments:\n"
             "1. \"variable-identifier\"            (string, required) Variable identifier - one of: create txid, variable reference, variable name.\n"
-            "2. verbose                          (boolean, optional, default=false) If true, last txid and writers \n"
+            "2. verbose                          (boolean, optional, default=false) If true, returns also last txid and vout \n"
             "\nResult:\n"
             "An object containing information about defined variable\n"            
             "\nExamples:\n"
@@ -5329,7 +5437,7 @@ void mc_InitRPCHelpMap23()
         ));
     
      mapHelpStrings.insert(std::make_pair("getvariablevalue",
-            "getvariablevalue ( \"variable-identifier\" )\n"
+            "getvariablevalue \"variable-identifier\" \n"
             "\nReturns current variable value\n"
             "\nArguments:\n"
             "1. \"variable-identifier\"            (string, required) Variable identifier - one of: create txid, variable reference, variable name.\n"
@@ -5340,7 +5448,86 @@ void mc_InitRPCHelpMap23()
             + HelpExampleRpc("getvariablevalue", "\"var1\"")
         ));
     
-     mapHelpStrings.insert(std::make_pair("AAAAAAA",
+    mapHelpStrings.insert(std::make_pair("addlibraryupdatefrom",
+            "addlibraryupdatefrom \"from-address\" \"library-identifier\" \"update-name\" \"javascript-code\"\n"
+            "\nUpdate library code\n"
+            + HelpRequiringPassphraseWrapper() +
+            "\nArguments:\n"
+            "1. \"from-address\"                   (string, required) Address used for updating library code.\n"
+            "2. \"library-identifier\"             (string, required) Library identifier - one of: create txid, library reference, library name.\n"
+            "3. \"update-name\"                    (string, required) Update name.\n"
+            "4. \"javascript-code\"                (string, required) JavaScript code.\n"
+            "\nResult:\n"
+            "\"transactionid\"                     (string) The transaction id.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("addlibraryupdatefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"lib1\" \"update1\" \"function sum2(){return 2+2;}\"")
+            + HelpExampleRpc("addlibraryupdatefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\",\"lib1\",\"update1\",\"function sum2(){return 2+2;}\"")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("addlibraryupdate",
+            "addlibraryupdate \"library-identifier\" \"update-name\" \"javascript-code\"\n"
+            "\nUpdate library code\n"
+            + HelpRequiringPassphraseWrapper() +
+            "\nArguments:\n"
+            "1. \"library-identifier\"             (string, required) Library identifier - one of: create txid, library reference, library name.\n"
+            "2. \"update-name\"                    (string, required) Update name.\n"
+            "3. \"javascript-code\"                (string, required) JavaScript code.\n"
+            "\nResult:\n"
+            "\"transactionid\"                     (string) The transaction id.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("addlibraryupdate", "\"lib1\" \"update1\" \"function sum2(){return 2+2;}\"")
+            + HelpExampleRpc("addlibraryupdate", "\"lib1\",\"update1\",\"function sum2(){return 2+2;}\"")
+        ));
+    
+      mapHelpStrings.insert(std::make_pair("listlibraries",
+            "listlibraries ( library-identifier(s) verbose )\n"
+            "\nReturns list of defined stream filters\n"
+            "\nArguments:\n"
+            "1. \"library-identifier\"               (string, optional, default=*) Library identifier - one of: create txid, library reference, library name.\n"
+            " or\n"
+            "1. library-identifier(s)              (array, optional) A json array of library identifiers \n"                
+            "2. verbose                            (boolean, optional, default=false) If true, returns list of updates\n"
+            "\nResult:\n"
+            "An array containing list of defined libraries\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("listlibraries", "")
+            + HelpExampleRpc("listlibraries", "")
+        ));
+     
+     mapHelpStrings.insert(std::make_pair("getlibrarycode",
+            "getlibrarycode \"library-identifier\" ( \"update-name\" )\n"
+            "\nReturns code for specified library (library update)\n"
+            "\nArguments:\n"
+            "1. \"library-identifier\"               (string, required) Library identifier - one of: create txid, library reference, library name.\n"
+            "2. \"update-name\"                      (string, optional) Update name, \"\" for original library code. If omitted, active code is returned\n"
+            "\nResult:\n"
+            "Filter code in plain text\n"            
+           "\nExamples:\n"
+            + HelpExampleCli("getlibrarycode", "lib1")
+            + HelpExampleRpc("getlibrarycode", "lib1")
+        ));
+     
+     mapHelpStrings.insert(std::make_pair("testlibrary",
+            "testlibrary ( \"library-identifier\"  \"update-name\" \"javascript-code\")\n"
+            "\nSets library code to be used for testing in testtxfilter, runtxfilter, teststreamfilter and runstreamfilter \n"
+            "\nArguments:\n"
+            "1. \"library-identifier\"               (string, optional) Library identifier - one of: create txid, library reference, library name.\n"
+            "                                                           If omitted - API only reports list of library updates used for testing.\n"
+            "                                                           * - clears library updates used for testing (with omitted \"update-name\")  \n"
+            "                                                           If library doesn't exist, creates new library which can be used only in testtxfilter and teststreamfilter.\n"
+            "2. \"update-name\"                      (string, optional) Update to use in testing,\n"
+            "                                                           \"\" for original library code.\n"
+            "                                                           If omitted, active update is restored (testing update removed)\n"
+            "                                                           If update doesn't exist, create new update which can be used only in testing APIs.\n"     
+            "3. \"javascript-code\"                  (string, optional) JavaScript code (for new libraries and updates).\n"
+            "\nResult:\n"
+            "List of library updates used for testing\n"            
+           "\nExamples:\n"
+            + HelpExampleCli("testlibrary", "lib1 update1")
+            + HelpExampleRpc("testlibrary", "lib1")
+        ));
+     
+    mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
     
@@ -5448,7 +5635,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap20();
     mc_InitRPCHelpMap21();
     mc_InitRPCHelpMap22();
-//    mc_InitRPCHelpMap23();
+    mc_InitRPCHelpMap23();
     
     pEF->ENT_InitRPCHelpMap();
     

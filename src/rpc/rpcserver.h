@@ -31,8 +31,41 @@ public:
     virtual std::iostream& stream() = 0;
     virtual std::string peer_address_to_string() const = 0;
     virtual void close() = 0;
+    virtual uint32_t get_flags() = 0;
 };
 
+class JSONRequest
+{
+public:
+    json_spirit::Value id;
+    std::string strMethod;
+    json_spirit::Array params;
+
+    JSONRequest() { id = json_spirit::Value::null; }
+    void parse(const json_spirit::Value& valRequest);
+};
+
+class RPCThreadLoad
+{
+public:
+    int64_t size;
+    int64_t start;
+    int64_t end;
+    int64_t last;
+    int64_t total;
+    int64_t load[10];
+    RPCThreadLoad()
+    {
+        Zero();
+    }
+    
+    void Zero();
+    int64_t Calculate(int64_t *l,int64_t *s,int64_t *e);
+    void Update();
+    double ThreadLoad();
+};
+        
+        
 /** Start RPC threads */
 void StartRPCThreads(std::string& strError);
 /**
@@ -300,12 +333,18 @@ extern json_spirit::Value listlicenses(const json_spirit::Array& params, bool fH
 extern json_spirit::Value getlicenseconfirmation(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value importlicenserequest(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getinitstatus(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value gethealthcheck(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listvariables(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getvariableinfo(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value setvariablevalue(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value setvariablevaluefrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getvariablevalue(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getvariablehistory(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listlibraries(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value addlibraryupdate(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value addlibraryupdatefrom(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getlibrarycode(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value testlibrary(const json_spirit::Array& params, bool fHelp);
 
 
 
@@ -359,6 +398,7 @@ extern json_spirit::Value setmocktime(const json_spirit::Array& params, bool fHe
 extern json_spirit::Value getrawtransaction(const json_spirit::Array& params, bool fHelp); // in rcprawtransaction.cpp
 extern json_spirit::Value getfiltertransaction(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getfilterstreamitem(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getfilterstream(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getfilterassetbalances(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listunspent(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value lockunspent(const json_spirit::Array& params, bool fHelp);

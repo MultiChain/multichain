@@ -154,6 +154,16 @@ Value getinitstatus(const Array& params, bool fHelp)
     
 }
 
+Value gethealthcheck(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)  
+        throw runtime_error("Help message not found\n");
+
+    pEF->ENT_RPCVerifyEdition("gethealthcheck API");
+    
+    return pEF->HCH_RPCHealthCheck(params);
+}
+
 #ifdef ENABLE_WALLET
 class DescribeAddressVisitor : public boost::static_visitor<Object>
 {

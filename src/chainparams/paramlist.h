@@ -123,7 +123,7 @@ static const mc_OneMultichainParam MultichainParamArray[] =
     { "adminconsensustxfilter"               , "admin-consensus-txfilter"               , 
                    MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE | MC_PRM_DECIMAL , -1,    500000,          0,   1000000, 0.0, 20004, 0, "-mc-adminconsensustxfilter",
                    "adminconsensusadmin","",
-                   "<admin-consensus-txfilter>*<active admins> needed to approve filter in the chain."},
+                   "<admin-consensus-txfilter>*<active admins> needed to approve filter or library in the chain."},
     { "adminconsensusadmin"               , "admin-consensus-admin"               , 
                    MC_PRM_UINT32  | MC_PRM_USER | MC_PRM_CLONE | MC_PRM_DECIMAL , -1,    500000,          0,   1000000, 0.0, 10001, 0, "-mc-adminconsensusadmin",
                    "adminconsensusactivate","",

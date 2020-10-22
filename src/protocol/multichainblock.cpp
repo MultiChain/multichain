@@ -16,7 +16,7 @@ extern mc_WalletTxs* pwalletTxsMain;
 
 
 using namespace std;
-
+/*
 bool AcceptMultiChainTransaction(const CTransaction& tx, 
                                  const CCoinsViewCache &inputs,
                                  int offset,
@@ -24,6 +24,7 @@ bool AcceptMultiChainTransaction(const CTransaction& tx,
                                  string& reason,
                                  int64_t *mandatory_fee_out,     
                                  uint32_t *replay);
+ */ 
 bool AcceptAdminMinerPermissions(const CTransaction& tx,
                                  int offset,
                                  bool verify_signatures,
@@ -385,7 +386,7 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
                     CCoinsViewCache view(&dummy);
                     CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
                     view.SetBackend(viewMemPool);
-                    if(!AcceptMultiChainTransaction(tx,view,-1,accept,reason,NULL,NULL))
+                    if(!AcceptMultiChainTransaction(tx,view,-1,accept ? MC_AMT_DEFAULT : MC_AMT_NO_ACCEPT,reason,NULL,NULL))
                     {
                         removed_type="rejected";                    
                     }

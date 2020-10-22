@@ -2507,3 +2507,44 @@ int mc_Features::Variables()
     
     return ret;    
 }
+
+int mc_Features::Libraries()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 20012)
+        {
+            ret=1;
+        }
+    }
+    
+    return ret;    
+}
+
+int mc_Features::AnyoneCanIssueMore()
+{
+    int ret=0;
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    int protocol=mc_gState->m_NetworkParams->ProtocolVersion();
+    
+    if(protocol)
+    {
+        if(protocol >= 20012)
+        {
+            ret=1;
+        }
+    }
+    
+    return ret;    
+}
+
