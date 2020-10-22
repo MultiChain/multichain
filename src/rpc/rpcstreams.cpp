@@ -1407,6 +1407,7 @@ Value unsubscribe(const Array& params, bool fHelp)
             entity.Zero();
             memcpy(entity.m_EntityID,lpEntity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
             entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
+
             pEF->STR_TrimSubscription(&entity,"unsubscribe");        
         }
     }
@@ -1535,6 +1536,8 @@ Value liststreamitems(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this wallet version. For full streams functionality, run \"multichaind -walletdbversion=2 -rescan\" ");        
     }   
            
+    LOCK(cs_main);
+    
     mc_TxEntityStat entStat;
     
     mc_EntityDetails stream_entity;
@@ -2146,6 +2149,8 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
            
     mc_TxEntityStat entStat;
     mc_TxEntity entity;
+    int errCode;
+    string strError;
     
     mc_EntityDetails stream_entity;
     parseStreamIdentifier(params[0],&stream_entity);           
@@ -2184,38 +2189,77 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
     {
         entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
     }
-    if(!pwalletTxsMain->FindEntity(&entStat))
+    
+    bool entity_found=false;
+    string key_string=params[1].get_str();
+    vector <mc_QueryCondition> conditions;
+    mc_Buffer *entity_rows=NULL;
+    Array retArray;
+    bool fWRPLocked=false;
+     
+//    LOCK(cs_main);
+  
+    int rpc_slot=GetRPCSlot();
+    if(rpc_slot < 0)
     {
-        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
+        errCode=RPC_INTERNAL_ERROR;
+        strError="Couldn't find RPC Slot";
+        goto exitlbl;
+    }
+    
+    entity_found=pwalletTxsMain->WRPFindEntity(&entStat);
+    
+    if(!entity_found)
+    {
+        errCode=RPC_NOT_SUBSCRIBED;
+        strError="Not subscribed to this stream";
+        goto exitlbl;
     }
 
-    string key_string=params[1].get_str();
+        
     getSubKeyEntityFromKey(params[1].get_str(),entStat,&entity,false);
     
-    vector <mc_QueryCondition> conditions;
-
     conditions.push_back(mc_QueryCondition(MC_QCT_KEY,params[1].get_str()));
-   
-    mc_Buffer *entity_rows=mc_gState->m_TmpBuffers->m_RpcEntityRows;
+
+    entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
     entity_rows->Clear();
     
-    mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->GetListSize(&entity,entStat.m_Generation,NULL));
+    fWRPLocked=true;
+    pwalletTxsMain->WRPLock();
     
-    Array retArray;
-    CheckWalletError(pwalletTxsMain->GetList(&entity,entStat.m_Generation,start+1,count,entity_rows),entity.m_EntityType,"");
+    mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL));
+    
+    WRPCheckWalletError(pwalletTxsMain->WRPGetList(&entity,entStat.m_Generation,start+1,count,entity_rows),entity.m_EntityType,"",&errCode,&strError);
+    if(strError.size())
+    {
+        goto exitlbl;
+    }
     
     for(int i=0;i<entity_rows->GetCount();i++)
     {
         mc_TxEntityRow *lpEntTx;
+        mc_TxDefRow txdef;
         lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
         uint256 hash;
         int first_output=mc_GetHashAndFirstOutput(lpEntTx,&hash);
-        const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
-        Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,&conditions,NULL);
+        const CWalletTx& wtx=pwalletTxsMain->WRPGetWalletTx(hash,&txdef,NULL);
+        Object entry=StreamItemEntry(rpc_slot,wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,&conditions,NULL,&txdef);
         if(entry.size())
         {
             retArray.push_back(entry);                                
         }
+    }
+
+exitlbl:
+                
+    if(fWRPLocked)
+    {
+        pwalletTxsMain->WRPUnLock();
+    }
+
+    if(strError.size())
+    {
+        throw JSONRPCError(errCode, strError);            
     }
     
     return retArray;
