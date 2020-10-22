@@ -526,23 +526,26 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                             mc_EntityDetails entity;
                             if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ref))
                             {
-                                if(required)
+                                if(entity.AnyoneCanIssueMore() == 0)
                                 {
-                                    *required |= MC_PTP_ISSUE;                    
-                                }
-                                if(mapSpecialEntity)
-                                {
-                                    std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_ISSUE);
-                                    if (it == mapSpecialEntity->end())
+                                    if(required)
                                     {
-                                        mapSpecialEntity->insert(make_pair(MC_PTP_ISSUE,*(uint256*)(entity.GetTxID())));
+                                        *required |= MC_PTP_ISSUE;                    
                                     }
-                                    else
+                                    if(mapSpecialEntity)
                                     {
-                                        if(it->second != *(uint256*)(entity.GetTxID()))
+                                        std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_ISSUE);
+                                        if (it == mapSpecialEntity->end())
                                         {
-                                            strFailReason="Invalid asset follow-on script, multiple assets";
-                                            return false;                                                                                                            
+                                            mapSpecialEntity->insert(make_pair(MC_PTP_ISSUE,*(uint256*)(entity.GetTxID())));
+                                        }
+                                        else
+                                        {
+                                            if(it->second != *(uint256*)(entity.GetTxID()))
+                                            {
+                                                strFailReason="Invalid asset follow-on script, multiple assets";
+                                                return false;                                                                                                            
+                                            }
                                         }
                                     }
                                 }
@@ -648,6 +651,29 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                                             if(it->second != *(uint256*)(entity.GetTxID()))
                                             {
                                                 strFailReason="Invalid publish script, multiple variables";
+                                                return false;                                                                                                            
+                                            }
+                                        }
+                                    }                                    
+                                }
+                                if(entity.GetEntityType() == MC_ENT_TYPE_LIBRARY)
+                                {
+                                    if(mapSpecialEntity)
+                                    {
+                                        if(required)
+                                        {
+                                            *required |= MC_PTP_WRITE;                    
+                                        }
+                                        std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_WRITE);
+                                        if (it == mapSpecialEntity->end())
+                                        {
+                                            mapSpecialEntity->insert(make_pair(MC_PTP_WRITE,*(uint256*)(entity.GetTxID())));
+                                        }
+                                        else
+                                        {
+                                            if(it->second != *(uint256*)(entity.GetTxID()))
+                                            {
+                                                strFailReason="Invalid publish script, multiple libraries";
                                                 return false;                                                                                                            
                                             }
                                         }
@@ -1057,7 +1083,22 @@ int CheckRequiredPermissions(const CTxDestination& addressRet,int expected_allow
             {
                 if( (allowed & MC_PTP_WRITE) == 0 )
                 {
-                    *strFailReason="Publishing in this stream is not allowed from this address";
+                    mc_EntityDetails details;
+                    if(mc_gState->m_Assets->FindEntityByTxID(&details,lpEntity))
+                    {
+                        if(details.GetEntityType() == MC_ENT_TYPE_VARIABLE)
+                        {
+                            *strFailReason="Setting value for this variable is not allowed from this address";                            
+                        }
+                        else
+                        {
+                            *strFailReason="Publishing in this stream is not allowed from this address";                            
+                        }
+                    }
+                    else
+                    {
+                        *strFailReason="Entity not found";
+                    }
                 }
             }
         }

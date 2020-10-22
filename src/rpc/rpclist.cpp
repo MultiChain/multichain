@@ -51,6 +51,7 @@ static const CRPCCommand vRPCCommands[] =
     /* Overall control/query calls */
     { "control",            "getinfo",                &getinfo,                true,      false,      false }, /* uses wallet if enabled */
     { "control",            "getinitstatus",          &getinitstatus,          true,      true,       false },
+    { "control",            "gethealthcheck",         &gethealthcheck,         true,      true,       false },
     { "control",            "help",                   &help,                   true,      true,       false },
     { "control",            "stop",                   &stop,                   true,      true,       false },
 /* MCHN START */    
@@ -114,6 +115,13 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "setvariablevaluefrom",   &setvariablevaluefrom,   true,      false,      false },
     { "blockchain",         "getvariablevalue",       &getvariablevalue,       true,      false,      false },
     { "blockchain",         "getvariablehistory",     &getvariablehistory,     true,      false,      false },
+
+    { "blockchain",         "listlibraries",          &listlibraries,          true,      false,      false },
+    { "blockchain",         "addlibraryupdate",       &addlibraryupdate,       true,      false,      false },
+    { "blockchain",         "addlibraryupdatefrom",   &addlibraryupdatefrom,   true,      false,      false },
+    { "blockchain",         "getlibrarycode",         &getlibrarycode,         true,      false,      false },
+    { "blockchain",         "testlibrary",            &testlibrary,            true,      false,      false },
+    
 /* MCHN END */    
     
     /* Mining */
@@ -167,6 +175,7 @@ static const CRPCCommand vRPCCommands[] =
     { "hidden",             "feed-options",           &purehelpitem_nomethod,         true,      true,       true },
     
     { "hidden",             "getfilterstreamitem",    &purehelpitem_onlyfilter,      true,      false,      false },
+    { "hidden",             "getfilterstream",        &purehelpitem_onlyfilter,      true,      false,      false },
     { "hidden",             "getfiltertransaction",   &purehelpitem_onlyfilter,      true,      false,      false },
     { "hidden",             "getfilterassetbalances", &purehelpitem_onlyfilter,      true,      false,      false },
     { "hidden",             "getfiltertxid",          &purehelpitem_onlyfilter,          true,      true,       true },

@@ -71,9 +71,9 @@ The default brew cookbook for berkeley-db and boost builds static libraries, but
         brew tap-new $USER/old-openssl
         brew extract --version=1.0.2q openssl $USER/old-openssl
         brew install openssl@1.0.2q
-        export LDFLAGS=&quot;-L/usr/local/opt/openssl@1.0.2q/lib&quot;
-        export CPPFLAGS=&quot;-I/usr/local/opt/openssl@1.0.2q/include&quot;
-        export PKG_CONFIG_PATH=&quot;/usr/local/opt/openssl@1.0.2q/lib/pkgconfig&quot;
+        export LDFLAGS="-L/usr/local/opt/openssl@1.0.2q/lib"
+        export CPPFLAGS="-I/usr/local/opt/openssl@1.0.2q/include"
+        export PKG_CONFIG_PATH="/usr/local/opt/openssl@1.0.2q/lib/pkgconfig"
         brew edit openssl
         
 ## Compile MultiChain for Mac (64-bit)

@@ -42,6 +42,7 @@ int c_UTF8_charlen[256]={
 };
 
 bool ParseStreamFilterApproval(Value param,mc_EntityDetails *stream_entity);
+bool ParseLibraryApproval(Value param,mc_EntityDetails *library_entity,mc_EntityDetails *update_entity);
 
 CScript RemoveOpDropsIfNeeded(const CScript& scriptInput)
 {
@@ -581,6 +582,38 @@ Value PermissionForFieldEntry(mc_EntityDetails *lpEntity)
                 entObject.push_back(Pair("variableref", streamref));
             }
         }
+        if(lpEntity->GetEntityType() == MC_ENT_TYPE_LIBRARY)
+        {
+            entObject.push_back(Pair("type", "library"));      
+            ptr=(unsigned char *)lpEntity->GetName();
+            if(ptr && strlen((char*)ptr))
+            {
+                entObject.push_back(Pair("name", string((char*)ptr)));            
+            }
+            ptr=(unsigned char *)lpEntity->GetRef();
+            string streamref="";
+            if(lpEntity->IsUnconfirmedGenesis())
+            {
+                Value null_value;
+                entObject.push_back(Pair("libraryref",null_value));
+            }
+            else
+            {
+                if((int)mc_GetLE(ptr,4))
+                {
+                    streamref += itostr((int)mc_GetLE(ptr,4));
+                    streamref += "-";
+                    streamref += itostr((int)mc_GetLE(ptr+4,4));
+                    streamref += "-";
+                    streamref += itostr((int)mc_GetLE(ptr+8,2));
+                }
+                else
+                {
+                    streamref="0-0-0";                
+                }
+                entObject.push_back(Pair("libraryref", streamref));
+            }
+        }
         return entObject;
     }
     
@@ -780,6 +813,7 @@ Object FilterEntry(const unsigned char *txid,uint32_t output_level,uint32_t filt
             entry.push_back(Pair("language", "javascript"));
             
             Array entities;
+            Array libraries;
             ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_FILTER_CODE,&value_size,1);
 
             if(ptr)
@@ -828,6 +862,37 @@ Object FilterEntry(const unsigned char *txid,uint32_t output_level,uint32_t filt
                 else
                 {
                     entry.push_back(Pair("for",entities));                                    
+                }            
+            }
+            if(mc_gState->m_Features->Libraries())
+            {
+                ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_FILTER_LIBRARIES,&value_size);
+
+                if(ptr)
+                {
+                    if(value_size % MC_AST_SHORT_TXID_SIZE)
+                    {
+                        entry.push_back(Pair("libraries","error"));                    
+                    }
+                    else
+                    {
+                        for(int i=0;i<(int)value_size/MC_AST_SHORT_TXID_SIZE;i++)
+                        {
+                            mc_EntityDetails library_entity;
+                            if(mc_gState->m_Assets->FindEntityByShortTxID(&library_entity,ptr+i*MC_AST_SHORT_TXID_SIZE))
+                            {
+                                if(library_entity.GetEntityType() == MC_ENT_TYPE_LIBRARY)
+                                {
+                                    libraries.push_back(LibraryEntry(library_entity.GetTxID(),0x04));
+                                }
+                            }                        
+                        }
+                        entry.push_back(Pair("libraries",libraries));                    
+                    }
+                }                           
+                else
+                {
+                    entry.push_back(Pair("libraries",libraries));                                    
                 }            
             }
         }
@@ -2050,6 +2115,10 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                     Object pObject;
                     pObject.push_back(Pair("send",(permissions & MC_PTP_SEND) ? true : false));
                     pObject.push_back(Pair("receive",(permissions & MC_PTP_RECEIVE) ? true : false));
+                    if(mc_gState->m_Features->AnyoneCanIssueMore())
+                    {
+                        pObject.push_back(Pair("issue",(entity.AnyoneCanIssueMore()) ? false : true));
+                    }
                     entry.push_back(Pair("restrict",pObject));                                            
                 }
             }
@@ -2252,30 +2321,76 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
     return entry;
 }
 
-Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t output_level,string& lasttxid,Array& lastwriters)
+mc_Buffer *mc_GetEntityTxIDList(uint32_t entity_type,int req_count,int req_start,bool *exact_results)
+{
+    mc_EntityDetails entitylist_entity;
+    
+    if(mc_gState->m_Assets->FindEntityList(&entitylist_entity,entity_type))
+    {
+        mc_EntityDetails last_entity;
+
+        if(mc_gState->m_Assets->FindLastEntity(&last_entity,&entitylist_entity))
+        {            
+            int items=mc_GetEntityIndex(&last_entity)+1;
+            int count=req_count;
+            int start=req_start;
+            mc_Buffer *result;
+            result=new mc_Buffer;
+            result->Initialize(MC_ENT_KEY_SIZE,MC_ENT_KEY_SIZE,MC_BUF_MODE_DEFAULT);
+            
+            mc_AdjustStartAndCount(&count,&start,items);
+            mc_Buffer *followons;
+            followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(&last_entity,count,start);
+            for(int i=followons->GetCount()-1;i>=0;i--)
+            {
+                mc_EntityDetails *followon=(mc_EntityDetails *)followons->GetRow(i);
+                size_t value_size;
+                const void* ptr=followon->GetSpecialParam(MC_ENT_SPRM_ENTITY_TXID,&value_size,0);
+                
+                if(ptr)
+                {
+                    result->Add(ptr,NULL);
+                }                
+            }
+            mc_gState->m_Assets->FreeEntityList(followons);
+            
+            *exact_results=true;
+            return result;
+        }
+        
+    }
+    
+    *exact_results=false;
+    return mc_gState->m_Assets->GetEntityList(NULL,NULL,entity_type);
+}
+
+Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t output_level,string& lasttxid,Array& lastwriters,int& lastvout)
 {
     size_t value_size;
     int64_t offset,new_offset;
     uint32_t value_offset;
     const unsigned char *ptr;
-    mc_EntityDetails sec_entity;
+    int vout=-1;
+//    mc_EntityDetails sec_entity;
     mc_EntityDetails *followon;
     
-    followon=&sec_entity;
+//    followon=&sec_entity;
     Array issues;
 
-    if(output_level & 0x0060)                                                   // For listvariables with followons                                 
+    if(output_level & 0x0660)                                                   // For listvariables with followons                                 
     {
         mc_Buffer *followons;
         followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(last_entity,count,start);
         for(int i=followons->GetCount()-1;i>=0;i--)
         {
             Object issue;
-            followon->Zero();
-            if(mc_gState->m_Assets->FindEntityByTxID(followon,followons->GetRow(i)))
+//            followon->Zero();
+//            if(mc_gState->m_Assets->FindEntityByTxID(followon,followons->GetRow(i)))
+            followon=(mc_EntityDetails *)followons->GetRow(i);
+            mc_gState->m_Assets->ReloadDetailsIfNeeded(followon);
             {
                 issue.push_back(Pair("value",mc_ExtractValueJSONObject(followon))); 
-                if(output_level & 0x0040)
+                if(output_level & 0x0440)
                 {
                     lasttxid=((uint256*)(followon->GetTxID()))->ToString();
                     Array followon_issuers;
@@ -2309,14 +2424,29 @@ Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t
                                         }
                                     }
                                 }
+                                if(ptr[offset+1] == MC_ENT_SPRM_VOUT)
+                                {
+                                    if((value_size > 0) && (value_size <= 4))
+                                    {
+                                        vout=mc_GetLE((unsigned char*)ptr+value_offset,value_size);
+                                    }
+                                }
                             }
                         }
                         offset=new_offset;
                     }      
 
-                    issue.push_back(Pair("writers",followon_issuers));                    
+                    if(output_level & 0x0040)
+                    {
+                        issue.push_back(Pair("writers",followon_issuers));                    
+                    }
                     lastwriters=followon_issuers;
-                    issue.push_back(Pair("txid", ((uint256*)(followon->GetTxID()))->ToString().c_str()));    
+                    lastvout=vout;
+                    if(output_level & 0x0400)
+                    {
+                        issue.push_back(Pair("txid", ((uint256*)(followon->GetTxID()))->ToString().c_str()));    
+                        issue.push_back(Pair("vout", vout));
+                    }
                     if(output_level & 0x0080)
                     {
                         int block=followon->m_LedgerRow.m_Block;
@@ -2344,8 +2474,206 @@ Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t
 {
     string lasttxid;
     Array lastwriters;
+    int lastvout;
     
-    return VariableHistory(last_entity,count,start,output_level,lasttxid,lastwriters);
+    return VariableHistory(last_entity,count,start,output_level,lasttxid,lastwriters,lastvout);
+}
+
+Object VariableEntry(const CTxOut& txout,mc_Script *lpScript,const CTransaction& tx,int n)
+{
+    Object entry;
+    unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
+    mc_EntityDetails genesis_entity;
+    mc_EntityDetails this_entity;
+    mc_EntityDetails *lpEntity;
+    int err;
+    int entity_update;
+    unsigned char details_script[MC_ENT_MAX_SCRIPT_SIZE];                       
+    int details_script_size;                                                    
+    uint32_t new_entity_type;                                                   
+    int new_entity_element;
+    const unsigned char *ptr;
+    uint256 hash;
+    uint256 txid;
+    Array followon_issuers;
+    set<uint160> publishers_set;    
+    string assetref="";
+    
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return entry;
+    }    
+
+    if(mc_gState->m_Features->Variables() == 0)
+    {
+        return entry;        
+    }
+    
+    const CScript& script1 = txout.scriptPubKey;        
+    CScript::const_iterator pc1 = script1.begin();
+
+    lpScript->Clear();
+    lpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+
+    lpEntity=NULL;
+    
+    new_entity_element=-1;
+    
+    if( (lpScript->GetNumElements() != 2) && (lpScript->GetNumElements() != 3) )
+    {
+        return entry;                
+    }
+    txid=tx.GetHash();
+    
+    genesis_entity.Zero();                                                 
+    this_entity.Zero();
+    if(lpScript->GetNumElements() == 2)                                         // Create
+    {
+        if(mc_gState->m_Assets->FindEntityByTxID(&genesis_entity,(unsigned char*)&txid))
+        {
+            lpEntity=&genesis_entity;
+        }        
+        else
+        {
+            new_entity_element=0;
+        }
+    }
+    
+    if(lpScript->GetNumElements() == 3)                                         // Update
+    {
+        lpScript->SetElement(0);
+        if(lpScript->GetEntity(short_txid) == 0)      
+        {
+            if(mc_gState->m_Assets->FindEntityByShortTxID(&genesis_entity,short_txid) == 0)
+            {
+                goto exitlbl;
+            }                        
+        }        
+        else
+        {
+            goto exitlbl;   
+        }
+        new_entity_element=1;
+    }
+
+    if(new_entity_element >= 0)
+    {
+        mc_EntityLedgerRow entity_row;
+        memcpy(entity_row.m_Key,&txid,MC_ENT_KEY_SIZE);
+        entity_row.m_EntityType=MC_ENT_TYPE_VARIABLE;
+        entity_row.m_Block=mc_gState->m_Assets->m_Block;
+        entity_row.m_Offset=-1;
+        lpScript->SetElement(new_entity_element);
+        err=lpScript->GetNewEntityType(&new_entity_type,&entity_update,details_script,&details_script_size);
+        if(err)    
+        {
+            goto exitlbl;
+        }
+        if(new_entity_type != MC_ENT_TYPE_VARIABLE)
+        {
+            goto exitlbl;                
+        }
+        if(entity_update != new_entity_element)                                 // 0 for create, 1 for update
+        {
+            goto exitlbl;                
+        }            
+        entity_row.m_ScriptSize=details_script_size;
+        if(details_script_size)
+        {
+            memcpy(entity_row.m_Script,details_script,details_script_size);
+        }
+        unsigned char *ptr;
+        size_t bytes;        
+        lpScript->SetElement(new_entity_element+1);
+        err=lpScript->GetExtendedDetails(&ptr,&bytes);
+        if(err == 0)
+        {
+            if(bytes)
+            {
+                entity_row.m_ExtendedScriptMemPoolPos=mc_gState->m_Assets->m_ExtendedScripts->GetNumElements();
+                mc_gState->m_Assets->m_ExtendedScripts->AddElement();
+                mc_gState->m_Assets->m_ExtendedScripts->SetData(ptr,bytes);
+                entity_row.m_ExtendedScript=bytes;                    
+            }
+        }            
+        if(new_entity_element)
+        {
+            this_entity.Set(&entity_row);
+            lpEntity=&this_entity;
+        }
+        else
+        {            
+            genesis_entity.Set(&entity_row);
+            lpEntity=&genesis_entity;
+        }
+    }
+    if(genesis_entity.GetEntityType() != MC_ENT_TYPE_VARIABLE)
+    {
+        goto exitlbl;                                                   
+    }            
+    
+    ptr=(const unsigned char *)genesis_entity.GetName();
+    if(ptr && strlen((char*)ptr))
+    {
+        entry.push_back(Pair("name", string((char*)ptr)));            
+    }
+    ptr=(const unsigned char *)genesis_entity.GetTxID();
+    hash=*(uint256*)ptr;
+    entry.push_back(Pair("createtxid", hash.GetHex()));    
+    ptr=(const unsigned char *)genesis_entity.GetRef();
+    if(genesis_entity.IsUnconfirmedGenesis())
+    {
+        Value null_value;
+        entry.push_back(Pair("variableref",null_value));
+    }
+    else
+    {
+        assetref += itostr((int)mc_GetLE((char*)ptr,4));
+        assetref += "-";
+        assetref += itostr((int)mc_GetLE((char*)ptr+4,4));
+        assetref += "-";
+        assetref += itostr((int)mc_GetLE((char*)ptr+8,2));
+        entry.push_back(Pair("variableref", assetref));
+    }
+    
+    publishers_set.clear();
+    for (int i = 0; i < (int)tx.vin.size(); ++i)
+    {
+        int op_addr_offset,op_addr_size,is_redeem_script,sighash_type;
+                    
+        const CScript& script2 = tx.vin[i].scriptSig;        
+        CScript::const_iterator pc2 = script2.begin();
+                                          
+        ptr=mc_ExtractAddressFromInputScript((unsigned char*)(&pc2[0]),(int)(script2.end()-pc2),&op_addr_offset,&op_addr_size,&is_redeem_script,&sighash_type,0);
+        if(ptr)
+        {
+            if( (sighash_type == SIGHASH_ALL) || ( (sighash_type == SIGHASH_SINGLE) && (i == n) ) )
+            {
+                uint160 publisher_hash=Hash160(ptr+op_addr_offset,ptr+op_addr_offset+op_addr_size);
+                if(publishers_set.count(publisher_hash) == 0)
+                {
+                    publishers_set.insert(publisher_hash);
+                    if(is_redeem_script)
+                    {
+                        followon_issuers.push_back(CBitcoinAddress((CScriptID)publisher_hash).ToString());
+                    }
+                    else
+                    {
+                        followon_issuers.push_back(CBitcoinAddress((CKeyID)publisher_hash).ToString());                    
+                    }
+                }
+            }
+        }        
+    }
+    
+    entry.push_back(Pair("writers", followon_issuers));
+    entry.push_back(Pair("value",mc_ExtractValueJSONObject(lpEntity))); 
+
+    
+exitlbl:
+                        
+    return entry;
+    
 }
 
 Object VariableEntry(const unsigned char *txid,uint32_t output_level)
@@ -2356,10 +2684,12 @@ Object VariableEntry(const unsigned char *txid,uint32_t output_level)
 // 0x0002 current value
 // 0x0004 createtxid,     
 // 0x0008 
-// 0x0020 last txid and writers
-// 0x0040 history txid and writers
+// 0x0020 last writers
+// 0x0040 history writers
 // 0x0080 blockinfo
 // 0x0100 add "type":"variable"
+// 0x0200 last txid and vout
+// 0x0400 history txid and vout
     
     Object entry;
     mc_EntityDetails entity;
@@ -2434,26 +2764,38 @@ Object VariableEntry(const unsigned char *txid,uint32_t output_level)
             if(history_items)
             {
                 history_items=mc_GetEntityIndex(&last_entity)+1;
-                entry.push_back(Pair("history",history_items)); 
+                entry.push_back(Pair("historylen",history_items)); 
                 entry.push_back(Pair("value",mc_ExtractValueJSONObject(&last_entity))); 
             }
             else
             {
                 Value null_value;
-                entry.push_back(Pair("history",0)); 
+                entry.push_back(Pair("historylen",0)); 
                 entry.push_back(Pair("value",null_value)); 
             }
         }
         
 
-        if(output_level & 0x0020)  
+        if(output_level & 0x0220)  
         {
             string lasttxid;
             Array lastwriters;
-            Array issues=VariableHistory(&last_entity,1,history_items-1,output_level | 0x0040,lasttxid,lastwriters);
+            int lastvout;
+            Array issues;
+            if(history_items > 0)
+            {
+                issues=VariableHistory(&last_entity,1,history_items-1,output_level | 0x0440,lasttxid,lastwriters,lastvout);
+            }
 //            entry.push_back(Pair("history",issues));                    
-            entry.push_back(Pair("lastwriters",lastwriters));                    
-            entry.push_back(Pair("lasttxid",lasttxid));                    
+            if(output_level & 0x0020)  
+            {
+                entry.push_back(Pair("lastwriters",lastwriters));                    
+            }
+            if(output_level & 0x0200)  
+            {
+                entry.push_back(Pair("lasttxid",lasttxid));                    
+                entry.push_back(Pair("lastvout",lastvout));                    
+            }
         }        
     }
     else
@@ -2462,6 +2804,345 @@ Object VariableEntry(const unsigned char *txid,uint32_t output_level)
         entry.push_back(Pair("name",null_value));
         entry.push_back(Pair("createtxid",null_value));
         entry.push_back(Pair("variableref", null_value));
+    }
+    
+    return entry;
+}
+
+Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
+{
+// output_level constants
+// 0x0000 minimal: name, variableref 
+// 0x0001 
+// 0x0002 current value
+// 0x0004 createtxid,     
+// 0x0008 updatemode and activeupdate
+// 0x0020 last txid and writers
+// 0x0040 history txid and writers
+// 0x0080 blockinfo
+// 0x0100 add "type":"variable"
+    
+    Object entry;
+    mc_EntityDetails entity;
+    mc_EntityDetails sec_entity;
+    mc_EntityDetails last_entity;
+    mc_EntityDetails *active_entity;
+    mc_EntityDetails *genesis_entity;
+    mc_EntityDetails *followon;
+    unsigned char *ptr;
+
+    genesis_entity=&sec_entity;
+    followon=&sec_entity;
+    active_entity=&sec_entity;
+    
+    if(txid == NULL)
+    {
+        entry.push_back(Pair("libraryref", ""));
+        return entry;
+    }
+    
+    uint256 hash=*(uint256*)txid;
+    
+    if(mc_gState->m_Assets->FindEntityByTxID(&entity,txid))
+    {
+        genesis_entity->Zero();
+        if(entity.IsFollowOn())
+        {
+            mc_gState->m_Assets->FindEntityByFollowOn(genesis_entity,txid);
+        }
+        else
+        {
+            memcpy(genesis_entity,&entity,sizeof(mc_EntityDetails));
+        }
+        
+        uint160 filter_address;
+        filter_address=0;
+        memcpy(&filter_address,genesis_entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+        
+        if(output_level & 0x100)
+        {
+            entry.push_back(Pair("type", "library"));                        
+        }
+        
+        ptr=(unsigned char *)genesis_entity->GetName();
+        if(ptr && strlen((char*)ptr))
+        {
+            entry.push_back(Pair("name", string((char*)ptr)));            
+        }
+        if(output_level & 0x0004)
+        {
+            entry.push_back(Pair("createtxid", hash.GetHex()));
+        }
+        ptr=(unsigned char *)genesis_entity->GetRef();
+        string assetref="";
+        if(genesis_entity->IsUnconfirmedGenesis())
+        {
+            Value null_value;
+            entry.push_back(Pair("libraryref",null_value));
+        }
+        else
+        {
+            assetref += itostr((int)mc_GetLE(ptr,4));
+            assetref += "-";
+            assetref += itostr((int)mc_GetLE(ptr+4,4));
+            assetref += "-";
+            assetref += itostr((int)mc_GetLE(ptr+8,2));
+            entry.push_back(Pair("libraryref", assetref));
+        }
+
+        string updates_mode="none";
+        if(genesis_entity->AllowedFollowOns())
+        {
+            updates_mode="instant";
+            if(genesis_entity->ApproveRequired())
+            {
+                updates_mode="approve";
+            }
+        }
+        
+        last_entity.Zero();
+        int update_count=mc_gState->m_Assets->FindLastEntityByGenesis(&last_entity,genesis_entity);
+        if(update_count)
+        {
+            update_count=mc_GetEntityIndex(&last_entity)+1;                
+        }
+        
+        Array updates;
+        size_t value_size;
+        int64_t offset,new_offset;
+        uint32_t value_offset;
+        const unsigned char *ptr;
+        
+        if(output_level & 0x0008)
+        {
+            entry.push_back(Pair("updatemode", updates_mode));
+
+
+            mc_gState->m_Assets->FindActiveUpdate(active_entity,genesis_entity->GetTxID());
+            if(active_entity->IsFollowOn())
+            {
+                ptr=(unsigned char *)active_entity->GetSpecialParam(MC_ENT_SPRM_UPDATE_NAME,&value_size);
+                if(ptr)
+                {
+                    string update_name ((char*)ptr,value_size);
+                    entry.push_back(Pair("activeupdate", update_name));
+                }      
+                else
+                {
+                    throw JSONRPCError(RPC_INTERNAL_ERROR, "Corrupted Library database");                                                                
+                }            
+            }
+            else
+            {
+                entry.push_back(Pair("activeupdate", ""));
+            }
+        }
+        
+
+        if(output_level & 0x0020)
+        {
+            mc_Buffer *followons;
+            followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(&last_entity,update_count,0);
+            for(int i=followons->GetCount()-1;i>=0;i--)
+            {
+                Object issue;
+                followon=(mc_EntityDetails *)followons->GetRow(i);
+                mc_gState->m_Assets->ReloadDetailsIfNeeded(followon);
+                {
+                    issue.push_back(Pair("txid", ((uint256*)(followon->GetTxID()))->ToString().c_str()));    
+
+                    Array followon_issuers;
+
+                    ptr=followon->GetScript();
+                    offset=0;
+                    while(offset>=0)
+                    {
+                        new_offset=followon->NextParam(offset,&value_offset,&value_size);
+                        if(value_offset > 0)
+                        {
+                            if(ptr[offset+1] == MC_ENT_SPRM_UPDATE_NAME)
+                            {
+                                string update_name ((char*)ptr+value_offset,value_size);
+                                issue.push_back(Pair("updatename",update_name));                    
+                            }
+                            if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
+                            {
+                                if(value_size == 20)
+                                {
+                                    followon_issuers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
+                                }
+                                if(value_size == 24)
+                                {
+                                    unsigned char tptr[4];
+                                    memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
+                                    if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
+                                    {
+                                        followon_issuers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
+                                    }
+                                    else
+                                    {
+                                        followon_issuers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
+                                    }
+                                }
+                            }
+                        }
+                        offset=new_offset;
+                    }      
+                    
+                    if(followon->IsFollowOn() == 0)
+                    {
+                        issue.push_back(Pair("updatename",""));                    
+                    }
+
+                    issue.push_back(Pair("writers",followon_issuers));                    
+                    
+                    if( (updates_mode == "approve") && (followon->IsFollowOn() != 0) )
+                    {
+                        unsigned char *ptr;
+                        size_t bytes;
+
+                        ptr=(unsigned char *)followon->GetSpecialParam(MC_ENT_SPRM_CHAIN_INDEX,&bytes);
+                        if(ptr)
+                        {
+                            if((bytes>0) && (bytes<=4))
+                            {
+                               memcpy(((unsigned char*)&filter_address)+MC_AST_SHORT_TXID_SIZE,ptr,bytes);
+                            }
+                        }      
+                        else
+                        {
+                            throw JSONRPCError(RPC_INTERNAL_ERROR, "Corrupted Library database");                                                                
+                        }
+                        
+                        if(mc_gState->m_Permissions->FilterApproved(NULL,&filter_address))
+                        {
+                            issue.push_back(Pair("approved",true));                                                
+                        }
+                        else
+                        {
+                            issue.push_back(Pair("approved",false));                                                
+                        }
+                        
+                        mc_PermissionDetails *plsRow;
+                        mc_PermissionDetails *plsDet;
+                        mc_PermissionDetails *plsPend;
+                        int flags,consensus,remaining;
+                        
+                        
+                        Array admins;
+                        Array pending;
+
+                        mc_Buffer *permissions=NULL;
+                        permissions=mc_gState->m_Permissions->GetPermissionList(NULL,(unsigned char*)&filter_address,MC_PTP_FILTER,permissions);
+
+                        if(permissions->GetCount())
+                        {
+                            plsRow=(mc_PermissionDetails *)(permissions->GetRow(0));
+
+                            flags=plsRow->m_Flags;
+                            consensus=plsRow->m_RequiredAdmins;
+                            mc_Buffer *details;
+
+                            if((flags & MC_PFL_HAVE_PENDING) || (consensus>1))
+                            {
+                                details=mc_gState->m_Permissions->GetPermissionDetails(plsRow);                            
+                            }
+                            else
+                            {
+                                details=NULL;
+                            }
+
+                            if(details)
+                            {
+                                for(int j=0;j<details->GetCount();j++)
+                                {
+                                    plsDet=(mc_PermissionDetails *)(details->GetRow(j));
+                                    remaining=plsDet->m_RequiredAdmins;
+                                    if(remaining > 0)
+                                    {
+                                        uint160 addr;
+                                        memcpy(&addr,plsDet->m_LastAdmin,sizeof(uint160));
+                                        CKeyID lpKeyID=CKeyID(addr);
+                                        admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                                    }
+                                }                    
+                                for(int j=0;j<details->GetCount();j++)
+                                {
+                                    plsDet=(mc_PermissionDetails *)(details->GetRow(j));
+                                    remaining=plsDet->m_RequiredAdmins;
+                                    if(remaining == 0)
+                                    {
+                                        Object pend_obj;
+                                        Array pend_admins;
+                                        uint32_t block_from=plsDet->m_BlockFrom;
+                                        uint32_t block_to=plsDet->m_BlockTo;
+                                        for(int k=j;k<details->GetCount();k++)
+                                        {
+                                            plsPend=(mc_PermissionDetails *)(details->GetRow(k));
+                                            remaining=plsPend->m_RequiredAdmins;
+
+                                            if(remaining == 0)
+                                            {
+                                                if(block_from == plsPend->m_BlockFrom)
+                                                {
+                                                    if(block_to == plsPend->m_BlockTo)
+                                                    {
+                                                        uint160 addr;
+                                                        memcpy(&addr,plsPend->m_LastAdmin,sizeof(uint160));
+                                                        CKeyID lpKeyID=CKeyID(addr);
+                //                                        CKeyID lpKeyID=CKeyID(*(uint160*)((void*)(plsPend->m_LastAdmin)));
+                                                        pend_admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                                                        plsPend->m_RequiredAdmins=0x01010101;
+                                                    }                                    
+                                                }
+                                            }
+                                        }          
+                                        pend_obj.push_back(Pair("approve", block_from < block_to));                        
+                                        pend_obj.push_back(Pair("admins", pend_admins));
+                                        pend_obj.push_back(Pair("required", (int64_t)(consensus-pend_admins.size())));
+                                        pending.push_back(pend_obj);                            
+                                    }
+                                }                    
+                                mc_gState->m_Permissions->FreePermissionList(details);                    
+                            }
+                            else
+                            {
+                                uint160 addr;
+                                memcpy(&addr,plsRow->m_LastAdmin,sizeof(uint160));
+                                CKeyID lpKeyID=CKeyID(addr);
+                                admins.push_back(CBitcoinAddress(lpKeyID).ToString());                    
+                            }
+
+                            issue.push_back(Pair("admins", admins));
+                            issue.push_back(Pair("pending", pending));                                            
+                        }
+                        else
+                        {
+                            issue.push_back(Pair("admins", admins));
+                            issue.push_back(Pair("pending", pending));                                                            
+                        }
+                        mc_gState->m_Permissions->FreePermissionList(permissions);                    
+                    }    
+                    else
+                    {
+                        Array empty_array;
+                        issue.push_back(Pair("approved",true));                    
+                        issue.push_back(Pair("admins",empty_array));                    
+                        issue.push_back(Pair("pending",empty_array));                    
+                    }
+                    updates.push_back(issue);                                        
+                }            
+            }
+            entry.push_back(Pair("updates",updates));
+            mc_gState->m_Assets->FreeEntityList(followons);
+        }       
+    }
+    else
+    {
+        Value null_value;
+        entry.push_back(Pair("name",null_value));
+        entry.push_back(Pair("createtxid",null_value));
+        entry.push_back(Pair("libraryref", null_value));
     }
     
     return entry;
@@ -3090,11 +3771,14 @@ CScript GetScriptForString(string source,uint32_t entity_type,mc_EntityDetails *
             {
                 try 
                 {
-                    ParseEntityIdentifier(destinations[0],entity, entity_type);       
-                    uint160 filter_address;
-                    filter_address=0;
-                    memcpy(&filter_address,entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-                    return GetScriptForDestination(CKeyID(filter_address));
+                    ParseEntityIdentifier(destinations[0],entity, MC_ENT_TYPE_ANY);   
+                    if(entity_type & entity->GetEntityType())
+                    {
+                        uint160 filter_address;
+                        filter_address=0;
+                        memcpy(&filter_address,entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+                        return GetScriptForDestination(CKeyID(filter_address));
+                    }
                 }
                 catch (Object& objError)
                 {
@@ -3159,7 +3843,7 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
         mc_EntityDetails entity;
         
         entity.Zero();
-        CScript scriptPubKey = GetScriptForString(s.name_,MC_ENT_TYPE_FILTER,&entity);
+        CScript scriptPubKey = GetScriptForString(s.name_,MC_ENT_TYPE_FILTER | MC_ENT_TYPE_LIBRARY,&entity);
         CAmount nAmount=0;
 
         if(entity.GetEntityType())
@@ -3172,32 +3856,72 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
             timestamp=mc_TimeNowAsUInt();
             mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript4;
             lpScript->Clear();
-            if(entity.GetFilterType() == MC_FLT_TYPE_STREAM)
+            
+            
+//            bool ParseLibraryApproval(Value param,mc_EntityDetails *library_entity,mc_EntityDetails *update_entity)
+
+            if(entity.GetEntityType() == MC_ENT_TYPE_LIBRARY)
             {
-                mc_EntityDetails stream_entity;
-                stream_entity.Zero();
-                if(mc_gState->m_Features->StreamFilters() == 0)
+                mc_EntityDetails update_entity;
+                update_entity.Zero();                
+                if(mc_gState->m_Features->Libraries() == 0)
                 {
-                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Only Tx filters can be approved/disapproved in this protocol version.");        
+                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Libraries can not be approved/disapproved in this protocol version.");        
                 }        
-//                approval=ParseStreamFilterApproval(s.value_.get_obj()[0].value_,&stream_entity);
-                approval=ParseStreamFilterApproval(s.value_,&stream_entity);
-                lpScript->SetEntity(stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);                    
+                if(entity.ApproveRequired() == 0)
+                {
+                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Approval is not required for this library");        
+                }
+                approval=ParseLibraryApproval(s.value_,&entity,&update_entity);
+                uint160 filter_address;
+                filter_address=0;
+                memcpy(&filter_address,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+                unsigned char *ptr;
+                size_t bytes;
+
+                ptr=(unsigned char *)update_entity.GetSpecialParam(MC_ENT_SPRM_CHAIN_INDEX,&bytes);
+                if(ptr)
+                {
+                    if((bytes>0) && (bytes<=4))
+                    {
+                       memcpy(((unsigned char*)&filter_address)+MC_AST_SHORT_TXID_SIZE,ptr,bytes);
+                    }
+                }      
+                else
+                {
+                    throw JSONRPCError(RPC_INTERNAL_ERROR, "Corrupted Library database");                                                                
+                }
+                scriptPubKey = GetScriptForDestination(CKeyID(filter_address));
             }
             else
             {
-                if ( (s.value_.type() != obj_type) || 
-                     (s.value_.get_obj().size() != 1) || 
-                     (s.value_.get_obj()[0].name_ != "approve") )
+                if(entity.GetFilterType() == MC_FLT_TYPE_STREAM)
                 {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Filter approval should be object with single field - approve");                
+                    mc_EntityDetails stream_entity;
+                    stream_entity.Zero();
+                    if(mc_gState->m_Features->StreamFilters() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "Only Tx filters can be approved/disapproved in this protocol version.");        
+                    }        
+    //                approval=ParseStreamFilterApproval(s.value_.get_obj()[0].value_,&stream_entity);
+                    approval=ParseStreamFilterApproval(s.value_,&stream_entity);
+                    lpScript->SetEntity(stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);                    
                 }
-                approval=1;
-                if(!paramtobool(s.value_.get_obj()[0].value_))
+                else
                 {
-                    approval=0;
-                }
-            }            
+                    if ( (s.value_.type() != obj_type) || 
+                         (s.value_.get_obj().size() != 1) || 
+                         (s.value_.get_obj()[0].name_ != "approve") )
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Filter approval should be object with single field - approve");                
+                    }
+                    approval=1;
+                    if(!paramtobool(s.value_.get_obj()[0].value_))
+                    {
+                        approval=0;
+                    }
+                }            
+            }
             lpScript->SetPermission(MC_PTP_FILTER,0,approval ? 4294967295U : 0,timestamp);
             for(int element=0;element < lpScript->GetNumElements();element++)
             {
@@ -4261,6 +4985,10 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
             entity_nameU="Variable";
             entity_nameL="variable";
             break;
+        case MC_ENT_TYPE_LIBRARY:
+            entity_nameU="Library";
+            entity_nameL="library";
+            break;
         default:
             entity_nameU="Entity";
             entity_nameL="entity";
@@ -4270,7 +4998,6 @@ void ParseEntityIdentifier(Value entity_identifier,mc_EntityDetails *entity,uint
     if (entity_identifier.type() != null_type && !entity_identifier.get_str().empty())
     {        
         string str=entity_identifier.get_str();
-        
         if(entity_type & MC_ENT_TYPE_STREAM)
         {
             if(AssetRefDecode(buf_a,str.c_str(),str.size()))
@@ -4360,6 +5087,10 @@ bool AssetCompareByRef(Value a,Value b)
         {
             assetref_a=p.value_;
         }
+        if(p.name_ == "libraryref")
+        {
+            assetref_a=p.value_;
+        }
     }
 
     BOOST_FOREACH(const Pair& p, b.get_obj()) 
@@ -4377,6 +5108,10 @@ bool AssetCompareByRef(Value a,Value b)
             assetref_b=p.value_;
         }
         if(p.name_ == "variableref")
+        {
+            assetref_b=p.value_;
+        }
+        if(p.name_ == "libraryref")
         {
             assetref_b=p.value_;
         }

@@ -15,6 +15,7 @@
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #endif
+#include "community/community.h"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
@@ -42,16 +43,139 @@ static CCriticalSection cs_rpcWarmup;
 
 //! These are created by StartRPCThreads, destroyed in StopRPCThreads
 static asio::io_service* rpc_io_service = NULL;
+static asio::io_service* hc_io_service = NULL;
 static map<string, boost::shared_ptr<deadline_timer> > deadlineTimers;
 static ssl::context* rpc_ssl_context = NULL;
+static ssl::context* hc_ssl_context = NULL;
 static boost::thread_group* rpc_worker_group = NULL;
+static boost::thread_group* hc_worker_group = NULL;
 static boost::asio::io_service::work *rpc_dummy_work = NULL;
 static std::vector<CSubNet> rpc_allow_subnets; //!< List of subnets to allow RPC connections from
 static std::vector< boost::shared_ptr<ip::tcp::acceptor> > rpc_acceptors;
+static map<uint64_t, RPCThreadLoad> rpc_loads;
 
+#define MC_ACF_NONE              0x00000000 
+#define MC_ACF_ENTERPRISE        0x00000001 
 //! Convert boost::asio address to CNetAddr
 extern CNetAddr BoostAsioToCNetAddr(boost::asio::ip::address address);
 
+void RPCThreadLoad::Zero()
+{
+    size=10;
+    last=GetTimeMicros();
+    start=0;
+    end=0;
+    total=0;
+    
+    memset(load,0, size*sizeof(double));    
+}
+
+
+void RPCThreadLoad::Update()
+{
+    int64_t m=1000000;
+    if(start == 0)
+    {
+        return;
+    }
+    
+    int64_t last_sec=last/m;
+    int64_t start_sec=start/m;
+    int64_t end_sec=end/m;
+    
+    if(last+size*m <= start)
+    {
+        memset(load,0, size*sizeof(double));    
+    }
+    else
+    {
+        for(int64_t i=last_sec+1;i<=start_sec;i++)
+        {
+            load[i%size]=0;
+        }
+    }
+    
+    if(start+size*m <= end)
+    {
+        for(int64_t i=0;i<size;i++)
+        {
+            load[i]=m;
+        }        
+    }
+    else
+    {
+        if(start_sec == end_sec)
+        {
+            load[start_sec%size]+=end-start;
+        }
+        else
+        {
+            for(int64_t i=start_sec+1;i<=end_sec-1;i++)
+            {
+                load[i%size]=m;
+            }        
+            load[start_sec%size]+=m-(start%m);
+            load[end_sec%size]=end%m;       
+        }
+    }
+    total=0;
+    for(int64_t i=0;i<size;i++)
+    {            
+        total+=load[i];
+    }                
+    
+    start=0;    
+    last=end;
+    end=0;
+}
+
+double RPCThreadLoad::ThreadLoad()
+{    
+    int64_t now=GetTimeMicros();
+    
+    RPCThreadLoad test;
+    memcpy(&test,this,sizeof(RPCThreadLoad));
+    if(test.start == 0)
+    {        
+        test.start=now;
+    }
+    test.end=now;
+    test.Update();
+
+    return (double)test.total/(double)(test.size*1000000.);
+}
+
+double TotalRPCLoad(int *free_threads,int *total_threads)
+{   
+    double result=0.;
+    if(total_threads)
+    {
+        *total_threads=(int)rpc_loads.size();
+    }
+    if(free_threads)
+    {
+        *free_threads=0;
+    }
+    
+    for (map<uint64_t,RPCThreadLoad>::iterator it = rpc_loads.begin(); it != rpc_loads.end(); ++it)
+    {
+        result+=it->second.ThreadLoad();
+        if(free_threads)
+        {
+            if(it->second.start == 0)
+            {
+                *free_threads+=1;
+            }
+        }
+    }   
+    
+    if(rpc_loads.size())
+    {
+        result /= rpc_loads.size();
+    }
+    
+    return result;
+}
 
 string JSONRPCRequestForLog(const string& strMethod, const Array& params, const Value& id)
 {
@@ -549,10 +673,11 @@ public:
     AcceptedConnectionImpl(
             asio::io_service& io_service,
             ssl::context &context,
-            bool fUseSSL) :
+            bool fUseSSL, uint32_t flags) :
         sslStream(io_service, context),
         _d(sslStream, fUseSSL),
-        _stream(_d)
+        _stream(_d),
+        _flags(flags)        
     {
     }
 
@@ -571,12 +696,17 @@ public:
         _stream.close();
     }
 
+    virtual uint32_t get_flags()
+    {
+        return _flags;
+    }
     typename Protocol::endpoint peer;
     asio::ssl::stream<typename Protocol::socket> sslStream;
 
 private:
     SSLIOStreamDevice<Protocol> _d;
     iostreams::stream< SSLIOStreamDevice<Protocol> > _stream;
+    uint32_t _flags;
 };
 
 void ServiceConnection(AcceptedConnection *conn);
@@ -595,10 +725,10 @@ static void RPCAcceptHandler(boost::shared_ptr< basic_socket_acceptor<Protocol, 
 template <typename Protocol, typename SocketAcceptorService>
 static void RPCListen(boost::shared_ptr< basic_socket_acceptor<Protocol, SocketAcceptorService> > acceptor,
                    ssl::context& context,
-                   const bool fUseSSL)
+                   const bool fUseSSL,uint32_t flags)
 {
     // Accept connection
-    boost::shared_ptr< AcceptedConnectionImpl<Protocol> > conn(new AcceptedConnectionImpl<Protocol>(acceptor->get_io_service(), context, fUseSSL));
+    boost::shared_ptr< AcceptedConnectionImpl<Protocol> > conn(new AcceptedConnectionImpl<Protocol>(acceptor->get_io_service(), context, fUseSSL, flags));
 
     acceptor->async_accept(
             conn->sslStream.lowest_layer(),
@@ -622,11 +752,11 @@ static void RPCAcceptHandler(boost::shared_ptr< basic_socket_acceptor<Protocol, 
                              boost::shared_ptr< AcceptedConnection > conn,
                              const boost::system::error_code& error)
 {
+    AcceptedConnectionImpl<ip::tcp>* tcp_conn = dynamic_cast< AcceptedConnectionImpl<ip::tcp>* >(conn.get());
+
     // Immediately start accepting new connections, except when we're cancelled or our socket is closed.
     if (error != asio::error::operation_aborted && acceptor->is_open())
-        RPCListen(acceptor, context, fUseSSL);
-
-    AcceptedConnectionImpl<ip::tcp>* tcp_conn = dynamic_cast< AcceptedConnectionImpl<ip::tcp>* >(conn.get());
+        RPCListen(acceptor, context, fUseSSL, tcp_conn->get_flags());
 
     if (error)
     {
@@ -735,15 +865,24 @@ void StartRPCThreads(string& strError)
     rpc_io_service = new asio::io_service();
     rpc_ssl_context = new ssl::context(*rpc_io_service, ssl::context::sslv23);
 
+    assert(hc_io_service == NULL);
+    hc_io_service = new asio::io_service();
+    hc_ssl_context = new ssl::context(*hc_io_service, ssl::context::sslv23);
+
     const bool fUseSSL = GetBoolArg("-rpcssl", false);
 
     if (fUseSSL)
     {
         rpc_ssl_context->set_options(ssl::context::no_sslv2 | ssl::context::no_sslv3);
+        hc_ssl_context->set_options(ssl::context::no_sslv2 | ssl::context::no_sslv3);
 
         filesystem::path pathCertFile(GetArg("-rpcsslcertificatechainfile", "server.cert"));
         if (!pathCertFile.is_complete()) pathCertFile = filesystem::path(GetDataDir()) / pathCertFile;
-        if (filesystem::exists(pathCertFile)) rpc_ssl_context->use_certificate_chain_file(pathCertFile.string());
+        if (filesystem::exists(pathCertFile)) 
+        {
+            rpc_ssl_context->use_certificate_chain_file(pathCertFile.string());
+            hc_ssl_context->use_certificate_chain_file(pathCertFile.string());
+        }
         else
         {
             LogPrintf("ThreadRPCServer ERROR: missing server certificate file %s\n", pathCertFile.string());
@@ -752,7 +891,11 @@ void StartRPCThreads(string& strError)
 
         filesystem::path pathPKFile(GetArg("-rpcsslprivatekeyfile", "server.pem"));
         if (!pathPKFile.is_complete()) pathPKFile = filesystem::path(GetDataDir()) / pathPKFile;
-        if (filesystem::exists(pathPKFile)) rpc_ssl_context->use_private_key_file(pathPKFile.string(), ssl::context::pem);
+        if (filesystem::exists(pathPKFile)) 
+        {
+            rpc_ssl_context->use_private_key_file(pathPKFile.string(), ssl::context::pem);
+            hc_ssl_context->use_private_key_file(pathPKFile.string(), ssl::context::pem);
+        }
         else
         {
             LogPrintf("ThreadRPCServer ERROR: missing server private key file %s\n", pathPKFile.string());
@@ -761,15 +904,28 @@ void StartRPCThreads(string& strError)
 
         string strCiphers = GetArg("-rpcsslciphers", "TLSv1.2+HIGH:TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!3DES:@STRENGTH");
         SSL_CTX_set_cipher_list(rpc_ssl_context->impl(), strCiphers.c_str());
+        SSL_CTX_set_cipher_list(hc_ssl_context->impl(), strCiphers.c_str());
     }
 
     std::vector<ip::tcp::endpoint> vEndpoints;
     bool bBindAny = false;
     int defaultPort = GetArg("-rpcport", BaseParams().RPCPort());
+    int hcPort = pEF->HCH_GetPort();
+    if(hcPort == defaultPort)
+    {
+        uiInterface.ThreadSafeMessageBox("Health checker and RPC ports should be different", "", CClientUIInterface::MSG_ERROR);
+        StartShutdown();
+        return;
+    }
     if (!mapArgs.count("-rpcallowip")) // Default to loopback if not allowing external IPs
     {
         vEndpoints.push_back(ip::tcp::endpoint(asio::ip::address_v6::loopback(), defaultPort));
         vEndpoints.push_back(ip::tcp::endpoint(asio::ip::address_v4::loopback(), defaultPort));
+        if(hcPort)
+        {
+            vEndpoints.push_back(ip::tcp::endpoint(asio::ip::address_v6::loopback(), hcPort));
+            vEndpoints.push_back(ip::tcp::endpoint(asio::ip::address_v4::loopback(), hcPort));            
+        }
         if (mapArgs.count("-rpcbind"))
         {
             LogPrintf("WARNING: option -rpcbind was ignored because -rpcallowip was not specified, refusing to allow everyone to connect\n");
@@ -780,6 +936,10 @@ void StartRPCThreads(string& strError)
         {
             try {
                 vEndpoints.push_back(ParseEndpoint(addr, defaultPort));
+                if(hcPort)
+                {
+                    vEndpoints.push_back(ParseEndpoint(addr, hcPort));
+                }
             }
             catch(const boost::system::system_error &)
             {
@@ -793,22 +953,29 @@ void StartRPCThreads(string& strError)
     } else { // No specific bind address specified, bind to any
         vEndpoints.push_back(ip::tcp::endpoint(asio::ip::address_v6::any(), defaultPort));
         vEndpoints.push_back(ip::tcp::endpoint(asio::ip::address_v4::any(), defaultPort));
+        if(hcPort)
+        {
+            vEndpoints.push_back(ip::tcp::endpoint(asio::ip::address_v6::any(), hcPort));
+            vEndpoints.push_back(ip::tcp::endpoint(asio::ip::address_v4::any(), hcPort));
+        }
         // Prefer making the socket dual IPv6/IPv4 instead of binding
         // to both addresses seperately.
         bBindAny = true;
     }
 
     bool fListening = false;
+    bool hcOK=hcPort ? false : true;
     std::string strerr;
     std::string straddress;
+    std::string hcerr;
     BOOST_FOREACH(const ip::tcp::endpoint &endpoint, vEndpoints)
     {
         try {
             asio::ip::address bindAddress = endpoint.address();
             straddress = bindAddress.to_string();
-            LogPrintf("Binding RPC on address %s port %i (IPv4+IPv6 bind any: %i)\n", straddress, endpoint.port(), bBindAny);
+            LogPrintf("Binding %s on address %s port %i (IPv4+IPv6 bind any: %i)\n", (endpoint.port() == hcPort) ? "health checker" : "RPC", straddress, endpoint.port(), bBindAny);
             boost::system::error_code v6_only_error;
-            boost::shared_ptr<ip::tcp::acceptor> acceptor(new ip::tcp::acceptor(*rpc_io_service));
+            boost::shared_ptr<ip::tcp::acceptor> acceptor(new ip::tcp::acceptor((endpoint.port() == hcPort) ? *hc_io_service : *rpc_io_service));
 
             acceptor->open(endpoint.protocol());
             acceptor->set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
@@ -820,9 +987,13 @@ void StartRPCThreads(string& strError)
             acceptor->bind(endpoint);
             acceptor->listen(socket_base::max_connections);
 
-            RPCListen(acceptor, *rpc_ssl_context, fUseSSL);
+            RPCListen(acceptor, (endpoint.port() == hcPort) ? *hc_ssl_context : *rpc_ssl_context, fUseSSL, (endpoint.port() == hcPort) ? MC_ACF_ENTERPRISE : MC_ACF_NONE);
 
             fListening = true;
+            if(endpoint.port() == hcPort)
+            {
+                hcOK=true;
+            }
             rpc_acceptors.push_back(acceptor);
             // If dual IPv6/IPv4 bind successful, skip binding to IPv4 separately
             if(bBindAny && bindAddress == asio::ip::address_v6::any() && !v6_only_error)
@@ -831,7 +1002,11 @@ void StartRPCThreads(string& strError)
         catch(boost::system::system_error &e)
         {
             LogPrintf("ERROR: Binding RPC on address %s port %i failed: %s\n", straddress, endpoint.port(), e.what());
-            strerr = strprintf(_("An error occurred while setting up the RPC address %s port %u for listening: %s"), straddress, endpoint.port(), e.what());
+            strerr = strprintf(_("An error occurred while setting up the %s address %s port %u for listening: %s"),(endpoint.port() == hcPort) ? "health checker" : "RPC", straddress, endpoint.port(), e.what());
+            if(endpoint.port() == hcPort)
+            {
+                hcerr=strerr;
+            }
         }
     }
 
@@ -840,9 +1015,17 @@ void StartRPCThreads(string& strError)
         StartShutdown();
         return;
     }
+    
+    if(!hcOK)
+    {
+        uiInterface.ThreadSafeMessageBox(hcerr, "", CClientUIInterface::MSG_ERROR);
+        StartShutdown();
+        return;        
+    }
 
     rpc_worker_group = new boost::thread_group();
-    
+    hc_worker_group = new boost::thread_group();
+    rpc_loads.clear();
 
 #ifdef MAC_OSX
     boost::thread::attributes attrs;
@@ -851,12 +1034,32 @@ void StartRPCThreads(string& strError)
     for (int i = 0; i < GetArg("-rpcthreads", 4); i++)
     {
         boost::thread *lpThread=new thread(attrs,boost::bind(&asio::io_service::run, rpc_io_service));
+        uint64_t thread_id=(uint64_t)(lpThread->native_handle());
         rpc_worker_group->add_thread(lpThread);
+        RPCThreadLoad load;
+        load.Zero();
+        rpc_loads.insert(make_pair(thread_id,load));
     }    
+    if(hcPort)
+    {
+        boost::thread *lpThread=new thread(attrs,boost::bind(&asio::io_service::run, hc_io_service));
+        hc_worker_group->add_thread(lpThread);
+    }        
 #else    
     for (int i = 0; i < GetArg("-rpcthreads", 4); i++)
-        rpc_worker_group->create_thread(boost::bind(&asio::io_service::run, rpc_io_service));
+    {        
+        boost::thread *lpThread=rpc_worker_group->create_thread(boost::bind(&asio::io_service::run, rpc_io_service));        
+        uint64_t thread_id=(uint64_t)(lpThread->native_handle());
+        RPCThreadLoad load;
+        load.Zero();
+        rpc_loads.insert(make_pair(thread_id,load));
+    }
+    if(hcPort)
+    {
+        hc_worker_group->create_thread(boost::bind(&asio::io_service::run, hc_io_service));        
+    }
 #endif
+    
     fRPCRunning = true;
     
     if(strError.size())
@@ -905,13 +1108,19 @@ void StopRPCThreads()
     deadlineTimers.clear();
 
     rpc_io_service->stop();
+    hc_io_service->stop();
     cvBlockChange.notify_all();
     if (rpc_worker_group != NULL)
         rpc_worker_group->join_all();
+    if (hc_worker_group != NULL)
+        hc_worker_group->join_all();
     delete rpc_dummy_work; rpc_dummy_work = NULL;
     delete rpc_worker_group; rpc_worker_group = NULL;
+    delete hc_worker_group; hc_worker_group = NULL;
     delete rpc_ssl_context; rpc_ssl_context = NULL;
+    delete hc_ssl_context; hc_ssl_context = NULL;
     delete rpc_io_service; rpc_io_service = NULL;
+    delete hc_io_service; hc_io_service = NULL;
 }
 
 bool IsRPCRunning()
@@ -958,17 +1167,6 @@ void RPCRunLater(const std::string& name, boost::function<void(void)> func, int6
     deadlineTimers[name]->expires_from_now(posix_time::seconds(nSeconds));
     deadlineTimers[name]->async_wait(boost::bind(RPCRunHandler, _1, func));
 }
-
-class JSONRequest
-{
-public:
-    Value id;
-    string strMethod;
-    Array params;
-
-    JSONRequest() { id = Value::null; }
-    void parse(const Value& valRequest);
-};
 
 void JSONRequest::parse(const Value& valRequest)
 {
@@ -1083,50 +1281,69 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
 /* MCHN START */    
     bool jreq_parsed=false;
     uint32_t wallet_mode=mc_gState->m_WalletMode;
-    if(fDebug)LogPrint("mcapi","mcapi: API request from %s\n",conn->peer_address_to_string().c_str());
+    if( (conn->get_flags() & MC_ACF_ENTERPRISE) == 0)
+    {
+        if(fDebug)LogPrint("mcapi","mcapi: API request from %s\n",conn->peer_address_to_string().c_str());
+    }
 /* MCHN END */    
     try
     {
-        // Parse request
-        Value valRequest;
-        if (!read_string(strRequest, valRequest))
-            throw JSONRPCError(RPC_PARSE_ERROR, "Parse error");
-
-        // Return immediately if in warmup
+        string strReply;
+        string strHeader;        
+        
+        if(conn->get_flags() & MC_ACF_ENTERPRISE)
         {
-            LOCK(cs_rpcWarmup);
-            if (fRPCInWarmup)
             {
-                jreq.parse(valRequest);
-                jreq_parsed=true;
-                if( (jreq.strMethod != "stop") && (jreq.strMethod != "getinitstatus") )
+                LOCK(cs_rpcWarmup);
+                if (fRPCInWarmup)
                 {
                     throw JSONRPCError(RPC_IN_WARMUP, rpcWarmupStatus);                    
                 }
             }
+            strReply=pEF->HCH_ProcessRequest(strRequest,&strHeader);
         }
+        else
+        {            
+            // Parse request
+            Value valRequest;
+            if (!read_string(strRequest, valRequest))
+                throw JSONRPCError(RPC_PARSE_ERROR, "Parse error");
 
-        string strReply;
-
-        // singleton request
-        if (valRequest.type() == obj_type) {
-            if(!jreq_parsed)
+            // Return immediately if in warmup
             {
-                jreq.parse(valRequest);
+                LOCK(cs_rpcWarmup);
+                if (fRPCInWarmup)
+                {
+                    jreq.parse(valRequest);
+                    jreq_parsed=true;
+                    if( (jreq.strMethod != "stop") && (jreq.strMethod != "getinitstatus") )
+                    {
+                        throw JSONRPCError(RPC_IN_WARMUP, rpcWarmupStatus);                    
+                    }
+                }
             }
 
-            Value result = tableRPC.execute(jreq.strMethod, jreq.params,jreq.id);
+            // singleton request
+            if (valRequest.type() == obj_type) {
+                if(!jreq_parsed)
+                {
+                    jreq.parse(valRequest);
+                }
 
-            // Send reply
-            strReply = JSONRPCReply(result, Value::null, jreq.id);
+                Value result = tableRPC.execute(jreq.strMethod, jreq.params,jreq.id);
 
-        // array of requests
-        } else if (valRequest.type() == array_type)
-            strReply = JSONRPCExecBatch(valRequest.get_array());
-        else
-            throw JSONRPCError(RPC_PARSE_ERROR, "Top-level object parse error");
+                // Send reply
+                strReply = JSONRPCReply(result, Value::null, jreq.id);
 
-        conn->stream() << HTTPReplyHeader(HTTP_OK, fRun, strReply.size()) << strReply << std::flush;
+            // array of requests
+            } else if (valRequest.type() == array_type)
+                strReply = JSONRPCExecBatch(valRequest.get_array());
+            else
+                throw JSONRPCError(RPC_PARSE_ERROR, "Top-level object parse error");
+            
+            strHeader=HTTPReplyHeader(HTTP_OK, fRun, strReply.size());
+        }
+        conn->stream() << strHeader << strReply << std::flush;
     }
     catch (Object& objError)
     {
@@ -1154,6 +1371,23 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
 void ServiceConnection(AcceptedConnection *conn)
 {
     bool fRun = true;
+    
+    uint64_t thread_id=__US_ThreadID();
+    map<uint64_t,RPCThreadLoad>::iterator load_it=rpc_loads.find(thread_id);
+    if(load_it != rpc_loads.end())
+    {
+        load_it->second.start=GetTimeMicros();
+    }
+    
+    string reason; 
+    if(conn->get_flags() & MC_ACF_ENTERPRISE)
+    {
+        if(pEF->LIC_VerifyFeature(MC_EFT_HEALTH_CHECK,reason) == 0)
+        {
+            MilliSleep(30000);        
+        }
+    }
+    
     while (fRun && !ShutdownRequested())
     {
         int nProto = 0;
@@ -1185,6 +1419,12 @@ void ServiceConnection(AcceptedConnection *conn)
             conn->stream() << HTTPError(HTTP_NOT_FOUND, false) << std::flush;
             break;
         }
+    }
+    
+    if(load_it != rpc_loads.end())
+    {
+        load_it->second.end=GetTimeMicros();
+        load_it->second.Update();
     }
 }
 

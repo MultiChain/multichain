@@ -356,6 +356,17 @@ void V8Filter::ReportException(v8::TryCatch *tryCatch, std::string &strResult)
         if (fDebug)
             LogPrint("v8filter", "v8filter: %s:%d %s\n", filename, linenum, strResult);
         std::string sourceline = V82String(isolate, message->GetSourceLine(context).ToLocalChecked());
+        int snippet_end=end+20;
+        if(snippet_end > (int)sourceline.size())
+        {
+            snippet_end=(int)sourceline.size();
+        }
+        std::string snippet=sourceline.substr(start,snippet_end-start+1);
+        if(snippet.size() > 40)
+        {
+            snippet=snippet.substr(0,40);
+        }
+        strResult += strprintf(" (line: %d, cols: %d-%d): ... %s ...",linenum,start,end,snippet.c_str());
         if (fDebug)
             LogPrint("v8filter", "v8filter: %s\n", sourceline);
         if (fDebug)

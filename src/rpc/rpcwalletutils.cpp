@@ -317,6 +317,14 @@ void FindAddressesWithPublishPermission(vector<CTxDestination>& fromaddresses,mc
         {
             if((stream_entity->AnyoneCanWrite() == 0) && (mc_gState->m_Permissions->CanWrite(stream_entity->GetTxID(),aptr) == 0))
             {
+                if(stream_entity->GetEntityType() == MC_ENT_TYPE_VARIABLE)
+                {
+                    throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Setting value for this variable is not allowed from this address");                                                                                            
+                }
+                if(stream_entity->GetEntityType() == MC_ENT_TYPE_LIBRARY)
+                {
+                    throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Adding library update is not allowed from this address");                                                                                            
+                }
                 throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Publishing in this stream is not allowed from this address");                                                                        
             }                                                 
             if(mc_gState->m_Permissions->CanSend(NULL,aptr) == 0)
@@ -347,6 +355,10 @@ void FindAddressesWithPublishPermission(vector<CTxDestination>& fromaddresses,mc
         }                    
         if(!publisher_found)
         {
+            if(stream_entity->GetEntityType() == MC_ENT_TYPE_VARIABLE)
+            {
+                throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet contains no addresses with permission to write variable value and global send permission.");                                                                                            
+            }
             throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "This wallet contains no addresses with permission to write to this stream and global send permission.");                                                                                            
         }
     }    

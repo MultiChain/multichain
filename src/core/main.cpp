@@ -51,13 +51,6 @@ extern mc_MultiChainFilterEngine* pMultiChainFilterEngine;
 using namespace boost;
 using namespace std;
 
-bool AcceptMultiChainTransaction(const CTransaction& tx, 
-                                 const CCoinsViewCache &inputs,
-                                 int offset,
-                                 bool accept,
-                                 string& reason,
-                                 int64_t *mandatory_fee_out,     
-                                 uint32_t *replay);
 bool Is_MultiChainLicenseTokenTransfer(const CTransaction& tx);
 bool ExtractDestinationScriptValid(const CScript& scriptPubKey, CTxDestination& addressRet);
 bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs, string& reason);
@@ -509,6 +502,10 @@ int MultichainNode_ApplyUpgrades(int current_height)
         }
     }
     SetMultiChainParams();            
+    if(pMultiChainFilterEngine)                                                 // Added from version 20012. 
+    {
+        pMultiChainFilterEngine->SetCallbackNames();
+    }
     mc_gState->m_ProtocolVersionToUpgrade=mc_gState->m_NetworkParams->m_ProtocolVersion;
     
     
@@ -1368,7 +1365,9 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
     if(IsTxBanned(tx.GetHash()))
     {
-        return error("AcceptToMemoryPool: banned transaction: %s",tx.GetHash().ToString());
+        return state.DoS(0, error("AcceptToMemoryPool: banned transaction: %s",tx.GetHash().ToString()),
+                         REJECT_INVALID, "banned");
+//        return error("AcceptToMemoryPool: banned transaction: %s",tx.GetHash().ToString());
     }
     
     // Coinbase is only valid in a block, not as a loose transaction
@@ -1612,7 +1611,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         int permissions_from,permissions_to;
         permissions_from=mc_gState->m_Permissions->m_MempoolPermissions->GetCount();
         
-        if(!AcceptMultiChainTransaction(tx,view,-1,true,reason, &mandatory_fee, &replay))
+        if(!AcceptMultiChainTransaction(tx,view,-1,MC_AMT_DEFAULT,reason, &mandatory_fee, &replay))
         {
             return state.DoS(0,
                              error("AcceptToMemoryPool: : AcceptMultiChainTransaction failed %s : %s", hash.ToString(),reason),
@@ -2382,6 +2381,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     {
         mc_gState->m_Permissions->ClearMemPool();
         mc_gState->m_Assets->ClearMemPool();
+        if(pMultiChainFilterEngine)
+        {
+            pMultiChainFilterEngine->Reset(pindex->nHeight-1,1);
+        }
     }
 /* MCHN END */        
     
@@ -2394,7 +2397,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         {
             const CTransaction &tx = block.vtx[i];
             string reason;
-            if(!AcceptMultiChainTransaction(tx,view,offset,true,reason,NULL,NULL))
+            if(!AcceptMultiChainTransaction(tx,view,offset,MC_AMT_DEFAULT,reason,NULL,NULL))
             {
                 return state.DoS(100, error(reason.c_str()),
                              REJECT_INVALID, "bad-transaction");            
@@ -2556,7 +2559,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             string reason;
             if(!fJustCheck)
             {
-                if(!AcceptMultiChainTransaction(tx,view,offset,true,reason,NULL,NULL))
+                if(!AcceptMultiChainTransaction(tx,view,offset,MC_AMT_DEFAULT,reason,NULL,NULL))
                 {
                     return state.DoS(0,
                                      error("ConnectBlock: : AcceptMultiChainTransaction failed %s : %s", tx.GetHash().ToString(),reason),
@@ -2587,7 +2590,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             string reason;
             if(!fJustCheck)
             {
-                if(!AcceptMultiChainTransaction(tx,view,coinbase_offset,true,reason,NULL,NULL))
+                if(!AcceptMultiChainTransaction(tx,view,coinbase_offset,MC_AMT_DEFAULT,reason,NULL,NULL))
                 {
                     return state.DoS(0,
                                      error("ConnectBlock: : AcceptMultiChainTransaction failed %s : %s", tx.GetHash().ToString(),reason),
@@ -2924,10 +2927,12 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     int64_t nTime2 = GetTimeMicros(); nTimeReadFromDisk += nTime2 - nTime1;
     int64_t nTime3;
     if(fDebug)LogPrint("bench", "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
+/*    
     if(pMultiChainFilterEngine)
     {
         pMultiChainFilterEngine->Reset(pindexNew->nHeight-1,1);
     }
+ */ 
     if(pindexNew->nHeight == 0)
     {
         pindexNew->nSize=GenesisBlockSize;

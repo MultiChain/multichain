@@ -132,6 +132,11 @@ int mc_HexToBin(void *dest,const void *src,int len)
     return len;
 }
 
+int mc_IsHexChar(unsigned char c)
+{
+    return c_IsHexNumeric[c];
+}
+
 int mc_BinToHex(void *dest,const void *src,int len)
 {
     int i;

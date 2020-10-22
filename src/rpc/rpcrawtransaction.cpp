@@ -42,6 +42,7 @@ using namespace std;
 bool OutputCanSend(COutput out);
 uint32_t mc_CheckSigScriptForMutableTx(const unsigned char *src,int size);
 int mc_MaxOpReturnShown();
+Object VariableEntry(const CTxOut& txout,mc_Script *lpScript,const CTransaction& tx,int n);
 
 /* MCHN END */
 
@@ -400,6 +401,11 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         {
             out.push_back(Pair("data", aFormatMetaData));            
         }
+        Object variable=VariableEntry(txout,lpScript,tx,i);
+        if( variable.size() > 0 )
+        {
+            out.push_back(Pair("variable", variable));
+        }
 /* MCHN END */    
         vout.push_back(out);
     }
@@ -616,7 +622,7 @@ Value getfilterstreamitem(const Array& params, bool fHelp)
     if (fHelp || params.size() != 0)                        
         mc_ThrowHelpMessage("getfilterstreamitem");        
 //        throw runtime_error("Help message not found\n");
-    
+
     if(pMultiChainFilterEngine->m_Vout < 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "This callback cannot be used in tx filters");                            
@@ -637,6 +643,33 @@ Value getfilterstreamitem(const Array& params, bool fHelp)
     
 //    result.get_obj().push_back(Pair("txid", pMultiChainFilterEngine->m_Tx.GetHash().GetHex()));
     result.get_obj().push_back(Pair("vout", pMultiChainFilterEngine->m_Vout));
+    
+    return result;
+}
+
+Value getfilterstream(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)                        
+        mc_ThrowHelpMessage("getfilterstream");        
+    
+    if(pMultiChainFilterEngine->m_Vout < 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "This callback cannot be used in tx filters");                            
+    }
+    
+    set<uint256> streams_already_seen;
+    
+    if(pMultiChainFilterEngine->m_Vout >= (int)pMultiChainFilterEngine->m_Tx.vout.size())
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "vout out of range");                                            
+    }
+
+    Value result=StreamEntry((unsigned char*)&(pMultiChainFilterEngine->m_EntityTxID),0x0002);
+    
+    if(result.type() != obj_type)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Stream input is not found in this output");                                    
+    }
     
     return result;
 }
@@ -1334,11 +1367,29 @@ Value appendrawtransaction(const Array& params, bool fHelp)
     
     if (params.size() > 2)         
     {    
-        if(params[2].type() != obj_type)
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid addresses, should be object");
-            
-        sendTo= params[2].get_obj();
+        if(params[2].type() == array_type)
+        {
+            BOOST_FOREACH(const Value& addrs, params[2].get_array()) 
+            {
+                if(addrs.type() != obj_type)
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid addresses, should be either object or array of objects");                                        
+                }
+                BOOST_FOREACH(const Pair& d, addrs.get_obj()) 
+                {
+                    sendTo.push_back(Pair(d.name_,d.value_));
+                }
+            }
+        }
+        else
+        {
+            if(params[2].type() != obj_type)
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid addresses, should be either object or array of objects");
+
+            sendTo= params[2].get_obj();
+        }
     }
+    
     bool new_outputs=false;
     if(sendTo.size())
     {
@@ -1546,7 +1597,7 @@ Value createrawtransaction(const Array& params, bool fHelp)
     if (fHelp || params.size() < 2 || params.size() > 4)                                            // MCHN
         throw runtime_error("Help message not found\n");
     
-    RPCTypeCheck(params, list_of(array_type)(obj_type));
+    RPCTypeCheck(params, list_of(array_type));
 
     Array ext_params;
     ext_params.push_back("");

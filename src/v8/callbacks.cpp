@@ -7,8 +7,30 @@
 #include "v8/v8utils.h"
 #include <cassert>
 
+#include <boost/foreach.hpp>
+using namespace std;
+
+
 namespace mc_v8
 {
+    
+  std::map<std::string, std::string> callbackNameToFixed;
+  std::map<std::string, std::string> callbackFixedToName;
+
+  std::string callbackFixedName(std::string name)
+  {
+      std::map<std::string, std::string>::const_iterator it=callbackNameToFixed.find(name);
+      if(it == callbackNameToFixed.end())
+      {
+          int n=callbackNameToFixed.size();
+          string fixed=strprintf("fixed%06d",n);
+          callbackNameToFixed.insert(make_pair(name,fixed));
+          callbackFixedToName.insert(make_pair(fixed,name));
+          return fixed;
+      }
+      return it->second;
+  }
+    
 /**
  * Call an RPC function from a V8 JS callback.
  *
@@ -57,7 +79,11 @@ void CallRpcFunction(std::string name, const v8::FunctionCallbackInfo<v8::Value>
 FILTER_FUNCTION(getfiltertxid)
 FILTER_FUNCTION(getfiltertransaction)
 FILTER_FUNCTION(getfilterstreamitem)
+FILTER_FUNCTION(getfilterstream)
 FILTER_FUNCTION(getfilterassetbalances)
+FILTER_FUNCTION(getvariableinfo)
+FILTER_FUNCTION(getvariablevalue)
+FILTER_FUNCTION(getvariablehistory)
 FILTER_FUNCTION(setfilterparam)
 FILTER_FUNCTION(getfiltertxinput)
 FILTER_FUNCTION(getlastblockinfo)
@@ -72,7 +98,11 @@ std::map<std::string, v8::FunctionCallback> callbackLookup{
     FILTER_LOOKUP(getfiltertxid),
     FILTER_LOOKUP(getfiltertransaction),
     FILTER_LOOKUP(getfilterstreamitem),
+    FILTER_LOOKUP(getfilterstream),
     FILTER_LOOKUP(getfilterassetbalances),
+    FILTER_LOOKUP(getvariableinfo),
+    FILTER_LOOKUP(getvariablevalue),
+    FILTER_LOOKUP(getvariablehistory),
     FILTER_LOOKUP(setfilterparam),
     FILTER_LOOKUP(getfiltertxinput),
     FILTER_LOOKUP(getlastblockinfo),

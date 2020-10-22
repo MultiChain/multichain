@@ -155,6 +155,20 @@ static const uint64_t nMinDiskSpace = 52428800;
 
 
 /* MCHN START */
+
+#define MC_AMT_DEFAULT                                     0x00000000 
+#define MC_AMT_NO_ACCEPT                                   0x00000001
+#define MC_AMT_NO_FILTERS                                  0x00000002
+
+
+bool AcceptMultiChainTransaction(const CTransaction& tx, 
+                                 const CCoinsViewCache &inputs,
+                                 int offset,
+                                 uint32_t flags,
+                                 std::string& reason,
+                                 int64_t *mandatory_fee_out,     
+                                 uint32_t *replay);
+
 std::string MultichainServerAddress(bool check_external_ip);
 void ClearMemPools();
 std::string SetLastBlock(uint256 hash);

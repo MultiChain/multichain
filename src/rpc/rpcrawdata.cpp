@@ -18,6 +18,7 @@ using namespace std;
 using namespace json_spirit;
 
 void ParseFilterRestrictionsForField(Value param,mc_Script *lpDetailsScript,uint32_t filter_type);
+string ParseFilterOptionsLibraryField(Value param,mc_Script *lpDetailsScript, bool for_test);
 
 uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_EntityDetails *entity,uint32_t *data_format,int *errorCode,string *strError)
 {
@@ -72,6 +73,10 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     {
                         this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_VAR;
                     }
+                    if(d.value_.get_str() == "library")
+                    {
+                        this_param_type=MC_DATA_API_PARAM_TYPE_CREATE_LIB;
+                    }
                 }
                 if(this_param_type == MC_DATA_API_PARAM_TYPE_NONE)
                 {
@@ -91,6 +96,10 @@ uint32_t ParseRawDataParamType(Value *param,mc_EntityDetails *given_entity,mc_En
                     if(entity->GetEntityType() == MC_ENT_TYPE_VARIABLE)
                     {
                         this_param_type=MC_DATA_API_PARAM_TYPE_UPDATE_VAR;                
+                    }
+                    if(entity->GetEntityType() == MC_ENT_TYPE_LIBRARY)
+                    {
+                        this_param_type=MC_DATA_API_PARAM_TYPE_UPDATE_LIB;                
                     }
                 }
                 if(this_param_type == MC_DATA_API_PARAM_TYPE_NONE)
@@ -521,6 +530,14 @@ void ParseRawValue(const Value *value,mc_Script *lpDetails,mc_Script *lpDetailsS
                 *max_size=bytes;
                 return;
             }
+            else
+            {
+                if(bytes >  MAX_SCRIPT_ELEMENT_SIZE-128)
+                {
+                    *max_size += 1;
+                    return;
+                }
+            }
         }
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_JSON_VALUE,script,bytes);            
     }
@@ -582,10 +599,12 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
     string entity_name;
     int multiple=1;
     int is_open=0;
+    int is_anyone_can_issuemore=0;
     uint32_t permissions=0;
     bool missing_name=true;
     bool missing_multiple=true;
     bool missing_open=true;
+    bool missing_anyone_can_issuemore=true;
     bool missing_details=true;
     
     lpDetails->Clear();
@@ -664,8 +683,32 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             {
                 *strError=string("Invalid open");                                            
             }
-            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,(unsigned char*)&is_open,1);                
+//            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,(unsigned char*)&is_open,1);                
             missing_open=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "unrestrict")
+        {
+            if(!missing_anyone_can_issuemore)
+            {
+                *strError=string("unrestrict field can appear only once in the object");                                                                                                        
+            }
+            if(mc_gState->m_Features->AnyoneCanIssueMore())
+            {
+                if( (d.value_.type() == str_type) && (d.value_.get_str() == "issue") )
+                {
+                    is_anyone_can_issuemore=true;
+                }    
+                else
+                {
+                    *strError=string("Invalid unrestrict field");                                            
+                }
+            }
+            else
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "unrestrict field is not supported in this protocol version");                   
+            }
+            missing_anyone_can_issuemore=false;
             field_parsed=true;
         }
         if(d.name_ == "restrict")
@@ -716,6 +759,23 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             *strError=strprintf("Invalid field: %s",d.name_.c_str());
         }
     }    
+    
+    if(is_open)
+    {
+        if(is_anyone_can_issuemore)
+        {
+            is_open |= 0x02;
+        }
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,(unsigned char*)&is_open,1);                        
+    }
+    else
+    {
+        if(is_anyone_can_issuemore)
+        {
+            *errorCode=RPC_NOT_SUPPORTED;
+            *strError=string("Asset cannot have unrestricted issue permission if follow-ons are not allowed");   
+        }        
+    }
     
     if(strError->size() == 0)
     {
@@ -1318,7 +1378,7 @@ CScript RawDataScriptCreateUpgrade(Value *param,mc_Script *lpDetails,mc_Script *
 
 bool mc_JSInExtendedScript(size_t size)
 {
-    if(size > 32768)
+    if( (size > 32768) || (size > MAX_SCRIPT_ELEMENT_SIZE-128) )
     {
         if(mc_gState->m_Features->ExtendedEntityDetails())
         {
@@ -1337,11 +1397,13 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
     string entity_name,filter_code,filter_main_name;
     uint32_t filter_type=MC_FLT_TYPE_TX;
     string js;
+    string library_code="";
     bool js_extended=false;
 
     bool missing_name=true;
     bool missing_code=true;
     bool missing_for=true;
+    bool missing_libraries=true;
     
     lpDetails->Clear();
     lpDetails->AddElement();                   
@@ -1395,6 +1457,28 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
             
             missing_for=false;
             field_parsed=true;
+        }
+        if(d.name_ == "libraries")
+        {
+            if(mc_gState->m_Features->Libraries())
+            {
+                if(!missing_libraries)
+                {
+                    *strError=string("libraries field can appear only once in the object");                                                                                                        
+                }
+
+                library_code=ParseFilterOptionsLibraryField(d.value_,lpDetailsScript,false);
+
+                script = lpDetailsScript->GetData(0,&bytes);
+
+                if(bytes)
+                {
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_LIBRARIES,script,bytes);
+                }
+
+                missing_libraries=false;
+                field_parsed=true;
+            }
         }
         
         if(d.name_ == "code")
@@ -1466,7 +1550,12 @@ CScript RawDataScriptCreateFilter(Value *param,mc_Script *lpDetails,mc_Script *l
         {
             mc_Filter *worker=new mc_Filter;
             string strFilterError;
-            int err=pFilterEngine->CreateFilter(filter_code.c_str(),filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strFilterError);
+            string test_code=filter_code;
+            if(library_code.size())
+            {
+                test_code=library_code + MC_FLT_LIBRARY_GLUE + filter_code;
+            }
+            int err=pFilterEngine->CreateFilter(test_code.c_str(),filter_main_name,pMultiChainFilterEngine->m_CallbackNames[filter_type],worker,strFilterError);
             delete worker;
             if(err)
             {
@@ -1709,6 +1798,347 @@ CScript RawDataScriptUpdateVariable(Value *param,mc_EntityDetails *entity,mc_Scr
     return scriptOpReturn;
 }
 
+CScript RawDataScriptCreateLibrary(Value *param,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError)
+{
+    CScript scriptOpReturn=CScript();
+    bool field_parsed;
+    size_t bytes;
+    const unsigned char *script;
+    string entity_name;
+    bool js_extended=false;
+    string filter_code;
+    string js;
+
+    bool missing_name=true;
+    bool missing_code=true;
+    bool missing_updatemode=true;
+    
+    lpDetails->Clear();
+    lpDetails->AddElement();                   
+
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();                   
+        
+    BOOST_FOREACH(const Pair& d, param->get_obj()) 
+    {
+        field_parsed=false;
+        if(d.name_ == "name")
+        {
+            if(!missing_name)
+            {
+                *strError=string("name field can appear only once in the object");                                                                                                        
+            }
+            if(d.value_.type() != null_type && !d.value_.get_str().empty())
+            {
+                entity_name=d.value_.get_str();
+                if(entity_name.size())
+                {
+                    if(entity_name.size() > MC_ENT_MAX_NAME_SIZE)
+                    {
+                        *strError=string("Invalid library name - too long"); 
+                    }
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(const unsigned char*)(entity_name.c_str()),entity_name.size());
+                }
+            }
+            else
+            {
+                *strError=string("Invalid name");                            
+            }
+            missing_name=false;
+            field_parsed=true;
+        }        
+        if(d.name_ == "updatemode")
+        {
+            if(!missing_updatemode)
+            {
+                *strError=string("updatemode field can appear only once in the object");                                                                                                        
+            }
+            if(d.value_.type() == str_type)
+            {
+                unsigned char b=255;        
+                if(d.value_.get_str() == "none")b=0x00;
+                if(d.value_.get_str() == "instant")b=0x01;
+                if(d.value_.get_str() == "approve")b=0x04;
+                entity_name=d.value_.get_str();
+                if(b == 255)
+                {
+                    *strError=string("Invalid updatemode field");                     
+                }
+                else
+                {
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);                    
+                }
+            }
+            else
+            {
+                *strError=string("Invalid updatemode field");                            
+            }
+            
+            missing_updatemode=false;
+            field_parsed=true;
+        }        
+        if(d.name_ == "code")
+        {
+            if(!missing_code)
+            {
+                *strError=string("code field can appear only once in the object");                                                                                                        
+            }
+            if(d.value_.type() == str_type)
+            {
+                js_extended=mc_JSInExtendedScript(d.value_.get_str().size());
+                if(!js_extended)
+                {
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)d.value_.get_str().c_str(),d.value_.get_str().size());                                                        
+                }
+                else
+                {
+                    js=d.value_.get_str();
+                }
+            }
+            else
+            {
+                *strError=string("Invalid code field type");                            
+            }
+            filter_code=d.value_.get_str();
+            missing_code=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "create")field_parsed=true;
+        if(!field_parsed)
+        {
+            *strError=strprintf("Invalid field: %s",d.name_.c_str());
+        }
+    }    
+    
+    if(strError->size() == 0)
+    {
+        if(missing_updatemode)
+        {                 
+            *strError=string("Missing updatemode field");                                                                                                        
+        }        
+    }
+    
+    if(strError->size() == 0)
+    {
+        if(missing_code)
+        {                    
+            *strError=string("Missing code");                                                                                            
+        }        
+        else
+        {
+            std::vector <std::string> callback_names;
+            int err;
+
+            string dummy_main_function=MC_FLT_MAIN_NAME_TEST;
+            string test_code=filter_code+MC_FLT_LIBRARY_GLUE+"function "+dummy_main_function+"(){} ";
+            
+            mc_Filter *worker=new mc_Filter;
+            string strFilterError;
+            err=pFilterEngine->CreateFilter(test_code,dummy_main_function,callback_names,worker,strFilterError);
+            delete worker;
+            if(err)
+            {
+                *strError=string("Couldn't create filter");                                                                                                        
+                *errorCode=RPC_INTERNAL_ERROR;                
+            }
+            else
+            {      
+                if(strFilterError.size())
+                {
+                    *strError=strprintf("Couldn't compile filter code: %s",strFilterError.c_str());                                                                                                      
+                }
+            }            
+        }
+    }
+    
+    
+    if(strError->size() == 0)
+    {
+        int err;
+        script=lpDetails->GetData(0,&bytes);
+        lpDetailsScript->Clear();
+        err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_LIBRARY,0,script,bytes);
+        if(err)
+        {
+            *strError=string("Invalid code, too long");                                                            
+        }
+        else
+        {
+            script = lpDetailsScript->GetData(0,&bytes);
+            scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+            if(js_extended)
+            {
+                lpDetails->Clear();
+                lpDetails->AddElement();
+                lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)js.c_str(),js.size());                                                        
+
+                script=lpDetails->GetData(0,&bytes);
+                lpDetailsScript->Clear();
+                lpDetailsScript->SetExtendedDetails(script,bytes);
+                script = lpDetailsScript->GetData(0,&bytes);
+                scriptOpReturn << vector<unsigned char>(script, script + bytes);
+            }
+        }        
+    }
+    
+    return scriptOpReturn;
+}
+
+CScript RawDataScriptUpdateLibrary(Value *param,mc_EntityDetails *entity,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError)
+{
+    CScript scriptOpReturn=CScript();
+    bool field_parsed;
+    size_t bytes;
+    const unsigned char *script;
+    bool js_extended=false;
+    string update_name;
+    int err;
+    string filter_code;
+    string js;
+
+    bool missing_code=true;
+    bool missing_updatename=true;
+    
+    lpDetails->Clear();
+    lpDetails->AddElement();                   
+
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();                   
+    
+    BOOST_FOREACH(const Pair& d, param->get_obj()) 
+    {
+        field_parsed=false;
+        if(d.name_ == "updatename")
+        {
+            if(!missing_updatename)
+            {
+                *strError=string("updatename field can appear only once in the object");                                                                                                        
+            }
+            if(d.value_.type() == str_type)
+            {
+                update_name=d.value_.get_str();
+                if(update_name.size())
+                {        
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_UPDATE_NAME,(unsigned char*)(update_name.c_str()),update_name.size());
+                }
+                else
+                {
+                    *strError=string("updatename cannot be empty");                                                                                                                            
+                }
+            }
+            else
+            {
+                *strError=string("Invalid updatename");                            
+            }
+            missing_updatename=false;
+            field_parsed=true;            
+        }
+        if(d.name_ == "code")
+        {
+            if(!missing_code)
+            {
+                *strError=string("code field can appear only once in the object");                                                                                                        
+            }
+            if(d.value_.type() == str_type)
+            {
+                js_extended=mc_JSInExtendedScript(d.value_.get_str().size());
+                if(!js_extended)
+                {
+                    lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)d.value_.get_str().c_str(),d.value_.get_str().size());                                                        
+                }
+                else
+                {
+                    js=d.value_.get_str();
+                }
+            }
+            else
+            {
+                *strError=string("Invalid code field type");                            
+            }
+            filter_code=d.value_.get_str();
+            missing_code=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "update")field_parsed=true;
+        if(!field_parsed)
+        {
+            *strError=strprintf("Invalid field: %s",d.name_.c_str());;                                
+        }
+    }    
+    
+    if(strError->size() == 0)
+    {
+        if(missing_updatename)
+        {                 
+            *strError=string("Missing updatename field");                                                                                                        
+        }        
+    }
+    
+    if(strError->size() == 0)
+    {
+        if(missing_code)
+        {                    
+            *strError=string("Missing code");                                                                                            
+        }        
+        else
+        {
+            std::vector <std::string> callback_names;
+            int err;
+
+            string dummy_main_function=MC_FLT_MAIN_NAME_TEST;
+            string test_code=filter_code+MC_FLT_LIBRARY_GLUE+"function "+dummy_main_function+"(){} ";
+            
+            mc_Filter *worker=new mc_Filter;
+            string strFilterError;
+            err=pFilterEngine->CreateFilter(test_code,dummy_main_function,callback_names,worker,strFilterError);
+            delete worker;
+            if(err)
+            {
+                *strError=string("Couldn't create filter");                                                                                                        
+                *errorCode=RPC_INTERNAL_ERROR;                
+            }
+            else
+            {      
+                if(strFilterError.size())
+                {
+                    *strError=strprintf("Couldn't compile filter code: %s",strFilterError.c_str());                                                                                                      
+                }
+            }            
+        }
+    }
+    
+    lpDetailsScript->Clear();
+    lpDetailsScript->SetEntity(entity->GetTxID()+MC_AST_SHORT_TXID_OFFSET);
+    script = lpDetailsScript->GetData(0,&bytes);
+    scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP;
+
+    lpDetailsScript->Clear();
+    script=lpDetails->GetData(0,&bytes);
+    err=lpDetailsScript->SetNewEntityType(MC_ENT_TYPE_LIBRARY,1,script,bytes);
+    if(err)
+    {
+        *strError=string("Invalid custom fields, too long");                                                            
+    }
+    else
+    {
+        script = lpDetailsScript->GetData(0,&bytes);
+        scriptOpReturn << vector<unsigned char>(script, script + bytes) << OP_DROP << OP_RETURN;
+        if(js_extended)
+        {
+            lpDetails->Clear();
+            lpDetails->AddElement();
+            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FILTER_CODE,(unsigned char*)js.c_str(),js.size());                                                        
+
+            script=lpDetails->GetData(0,&bytes);
+            lpDetailsScript->Clear();
+            lpDetailsScript->SetExtendedDetails(script,bytes);
+            script = lpDetailsScript->GetData(0,&bytes);
+            scriptOpReturn << vector<unsigned char>(script, script + bytes);
+        }
+    }
+    
+    return scriptOpReturn;
+}
 
 
 CScript RawDataScriptPublish(Value *param,mc_EntityDetails *entity,uint32_t *data_format,mc_Script *lpDetailsScript,vector<uint256>* vChunkHashes,int *errorCode,string *strError)
@@ -2172,6 +2602,12 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
             break;
         case MC_DATA_API_PARAM_TYPE_UPDATE_VAR:
             scriptOpReturn=RawDataScriptUpdateVariable(&param,&entity,lpDetails,lpDetailsScript,&errorCode,&strError);
+            break;
+        case MC_DATA_API_PARAM_TYPE_CREATE_LIB:
+            scriptOpReturn=RawDataScriptCreateLibrary(&param,lpDetails,lpDetailsScript,&errorCode,&strError);
+            break;
+        case MC_DATA_API_PARAM_TYPE_UPDATE_LIB:
+            scriptOpReturn=RawDataScriptUpdateLibrary(&param,&entity,lpDetails,lpDetailsScript,&errorCode,&strError);
             break;
         case MC_DATA_API_PARAM_TYPE_APPROVAL:
             scriptOpReturn=RawDataScriptApprove(&param,&entity,lpDetailsScript,&errorCode,&strError);
