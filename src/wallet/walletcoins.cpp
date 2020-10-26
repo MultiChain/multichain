@@ -3193,8 +3193,10 @@ bool CWallet::CreateAndCommitOptimizeTransaction(CWalletTx& wtx,std::string& str
         
     if (!CreateTransaction(scriptPubKeys, nValue, scriptOpReturn, wtx, reservekey, nFeeRequired, strFailReason, NULL, addresses, min_conf, min_inputs, max_inputs))
     {
-        if (nValue + nFeeRequired > GetBalance())
-            strFailReason = strprintf("This transaction requires a transaction fee of at least %s because of its amount, complexity, or use of recently received funds!", FormatMoney(nFeeRequired));
+        if(nFeeRequired > 0)
+        {
+            LogPrintf("CreateAndCommitOptimizeTransaction() : %s\n", strFailReason.c_str());
+        }
     }
     else
     {    
@@ -3219,10 +3221,9 @@ int CWallet::OptimizeUnspentList()
 {
     if(mc_TimeNowAsUInt()<nNextUnspentOptimization)
     {
-        return false;
+        return 0;
     }
 
-    if(fDebug)LogPrint("mchn","mchn: Wallet optimization\n");
     
     double start_time=mc_TimeNowAsDouble();
     
@@ -3242,6 +3243,28 @@ int CWallet::OptimizeUnspentList()
     }
     max_combine_txs=GetArg("-autocombinemaxtxs", max_combine_txs);
 
+    if(max_combine_txs == 0)
+    {
+        return 0;        
+    }
+    
+    if(max_inputs < 2)
+    {
+        return 0;
+    }
+    
+    if(min_inputs < 2)
+    {
+        min_inputs=2;
+    }
+    
+    if(min_inputs > max_inputs)
+    {
+        return 0;
+    }
+    
+    if(fDebug)LogPrint("mchn","mchn: Wallet optimization\n");
+    
     vector<COutput> vCoins;        
     AvailableCoins(vCoins, true, NULL,true,true);
         

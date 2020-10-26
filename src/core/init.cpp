@@ -580,6 +580,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -autocombinemaxinputs=<n>  " + _("Maximum inputs in automatically created combine transaction, default 100") + "\n";
     strUsage += "  -autocombinedelay=<n>      " + _("Minimium delay between two auto-combine transactions, in seconds, default 1") + "\n";
     strUsage += "  -autocombinesuspend=<n>    " + _("Auto-combine transaction delay after listunspent API call, in seconds, default 15") + "\n";
+    strUsage += "  -autocombinemaxtxs=<n>     " + _("Maximum number of auto-combine transactions per block, default unlimited. Set to 0 to disable automatic combine transactions creation.") + "\n";
     
     
     
