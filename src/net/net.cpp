@@ -845,6 +845,13 @@ void ThreadSocketHandler()
                     // close socket and cleanup
 /* MCHN START */                    
                     if(fDebug)LogPrint("net","disconnect flag set\n");
+                    if(!pnode->fInbound)                                        // Refresh connection time for good nodes we are disconnecting from
+                    {
+                        if(pnode->fParameterSetVerified)
+                        {
+                            addrman.Good(pnode->addr);
+                        }
+                    }
 /* MCHN END */                    
                     pnode->CloseSocketDisconnect();
 
@@ -880,6 +887,13 @@ void ThreadSocketHandler()
                     if (fDelete)
                     {
                         vNodesDisconnected.remove(pnode);
+
+                        if(mc_gState->m_pSeedNode == (void*)pnode)
+                        {
+                            mc_gState->m_pSeedNode=NULL;
+                            if(fDebug)LogPrint("mchn","mchn: Disconnected from seed node\n");
+                        }
+
                         delete pnode;
                     }
                 }

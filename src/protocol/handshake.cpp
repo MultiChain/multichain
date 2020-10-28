@@ -31,6 +31,10 @@ bool MultichainNode_CanConnect(CNode *pnode)
         {
             ret=false;
         }
+        else
+        {
+            LogPrintf("Seed node doesn't have connect permission, ignored\n");
+        }
     }
     
     pnode->fCanConnectRemote=ret;        
