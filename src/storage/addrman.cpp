@@ -493,6 +493,7 @@ void CAddrMan::SCRecalculate_(int64_t nNow)
         bool fNewDead;        
         int64_t nLastTried;
         
+        it->second.GetChance(nNow,NULL);
         dNewChance=it->second.GetSC(&fNewInvalid,&fNewDead,&nLastTried);
                 
         if(nLastTried)
