@@ -258,6 +258,8 @@ int mc_MultiChainFilterEngine::Zero()
     
     m_Semaphore=NULL;
     m_LockedBy=0;
+    
+    m_CoinsCache=NULL;
         
     return MC_ERR_NOERROR;
 }

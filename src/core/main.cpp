@@ -2946,7 +2946,15 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
         {
             LogPrintf("ERROR: Cannot connect(before) block %s in feeds, error %d\n",pindexNew->GetBlockHash().ToString().c_str(),err);
         }        
+        if(pMultiChainFilterEngine)
+        {
+            pMultiChainFilterEngine->m_CoinsCache=&view;
+        }
         bool rv = ConnectBlock(*pblock, state, pindexNew, view);        
+        if(pMultiChainFilterEngine)
+        {
+            pMultiChainFilterEngine->m_CoinsCache=NULL;
+        }
         if(rv)
         {
             if(!VerifyBlockSignatureType(pblock))
@@ -5452,14 +5460,26 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
             {
                 LogPrintf("ERROR: Cannot connect(before) block %s in feeds, error %d\n",pindex->GetBlockHash().ToString().c_str(),err);
             }        
+            if(pMultiChainFilterEngine)
+            {
+                pMultiChainFilterEngine->m_CoinsCache=&coins;
+            }            
             if (!ConnectBlock(block, state, pindex, coins))
             {
+                if(pMultiChainFilterEngine)
+                {
+                    pMultiChainFilterEngine->m_CoinsCache=NULL;
+                }
                 err=pEF->FED_EventBlock(block, state, pindex,"check",true,true);
                 if(err)
                 {
                     LogPrintf("ERROR: Cannot connect(before) block %s in feeds, error %d\n",pindex->GetBlockHash().ToString().c_str(),err);
                 }        
                 return error("VerifyDB() : *** found unconnectable block at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
+            }
+            if(pMultiChainFilterEngine)
+            {
+                pMultiChainFilterEngine->m_CoinsCache=NULL;
             }
             err=pEF->FED_EventBlock(block, state, pindex,"check",true,false);
             if(err)

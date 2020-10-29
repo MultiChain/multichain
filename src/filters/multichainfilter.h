@@ -123,7 +123,8 @@ typedef struct mc_MultiChainFilterEngine
     CTransaction m_Tx;
     int m_Vout;
     mc_MultiChainFilterParams m_Params;
-
+    void *m_CoinsCache;
+    
     void *m_Semaphore;
     uint64_t m_LockedBy;
     
