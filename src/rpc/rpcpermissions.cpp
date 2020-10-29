@@ -501,7 +501,7 @@ Value verifypermission(const Array& params, bool fHelp)
 
     CBitcoinAddress address(params[0].get_str());
     if (!address.IsValid())
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+params[1].get_str());            
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+params[0].get_str());            
 
     CTxDestination dest=address.Get();
     CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
