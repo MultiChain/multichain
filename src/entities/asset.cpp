@@ -375,7 +375,9 @@ int mc_AssetDB::Initialize(const char *name,int mode)
         adbRow.Zero();
         adbRow.m_Block=(uint32_t)adbBlock;
         adbRow.m_LedgerPos=adbLastPos;
+#ifndef MAC_OSX
         adbRow.m_Flags|=MC_ENT_FLAG_ENTITYLIST;
+#endif        
         err=m_Database->m_DB->Write((char*)&adbRow+m_Database->m_KeyOffset,m_Database->m_KeySize,(char*)&adbRow+m_Database->m_ValueOffset,m_Database->m_ValueSize,0);
         if(err)
         {
@@ -2027,7 +2029,9 @@ int mc_AssetDB::RollBackInternal(int block)
         adbRow.m_LedgerPos=m_PrevPos;
         if(block<0)
         {
-            adbRow.m_Flags|=MC_ENT_FLAG_ENTITYLIST;            
+#ifndef MAC_OSX
+            adbRow.m_Flags|=MC_ENT_FLAG_ENTITYLIST;
+#endif        
             m_Flags=adbRow.m_Flags;
         }
         
