@@ -283,6 +283,13 @@ void* __US_SemCreate();
 void __US_SemWait(void* sem);
 void __US_SemPost(void* sem);
 void __US_SemDestroy(void* sem);
+void* __US_RWLockCreate();
+void __US_RWLockDestroy(void *lock);
+void __US_RWLockRDLock(void *lock);
+void __US_RWLockRDUnlock(void *lock);
+void __US_RWLockWRLock(void *lock);
+void __US_RWLockWRUnlock(void *lock);
+
 uint64_t __US_ThreadID();
 const char* __US_UserHomeDir();
 char * __US_FullPath(const char* path, char *full_path, int len);

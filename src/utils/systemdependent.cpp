@@ -116,6 +116,80 @@ int __US_BecomeDaemon()
     return res;
 }
 
+typedef struct mc_RWLock
+{    
+    pthread_mutex_t m_Lock;
+    pthread_cond_t m_Cond;
+    int m_ReadActive;
+    int m_WriteWaiting;
+    int m_WriteActive;    
+} mc_RWLock;
+
+void* __US_RWLockCreate()
+{
+    mc_RWLock *lpRWLock;
+    lpRWLock=new mc_RWLock;
+    pthread_cond_init(&(lpRWLock->m_Cond), NULL);
+    pthread_mutex_init(&(lpRWLock->m_Lock), NULL); 
+    lpRWLock->m_ReadActive=0;
+    lpRWLock->m_WriteWaiting=0;
+    lpRWLock->m_WriteActive=0;
+    return lpRWLock;
+}
+
+void __US_RWLockDestroy(void *lock)
+{
+    mc_RWLock *lpRWLock=(mc_RWLock *)lock;
+    delete lpRWLock;
+}
+
+void __US_RWLockRDLock(void *lock)
+{
+    mc_RWLock *lpRWLock=(mc_RWLock *)lock; 
+    pthread_mutex_lock(&(lpRWLock->m_Lock));
+    while( (lpRWLock->m_WriteWaiting>0) || (lpRWLock->m_WriteActive>0) )
+    {
+        pthread_cond_wait(&(lpRWLock->m_Cond),&(lpRWLock->m_Lock));
+    }
+    lpRWLock->m_ReadActive+=1;
+    pthread_mutex_unlock(&(lpRWLock->m_Lock));
+}
+
+void __US_RWLockRDUnlock(void *lock)
+{
+    mc_RWLock *lpRWLock=(mc_RWLock *)lock; 
+    pthread_mutex_lock(&(lpRWLock->m_Lock));
+    lpRWLock->m_ReadActive-=1;
+    if(lpRWLock->m_ReadActive == 0)
+    {
+        pthread_cond_broadcast(&(lpRWLock->m_Cond));
+    }
+    pthread_mutex_unlock(&(lpRWLock->m_Lock));
+}
+
+void __US_RWLockWRLock(void *lock)
+{
+    mc_RWLock *lpRWLock=(mc_RWLock *)lock; 
+    pthread_mutex_lock(&(lpRWLock->m_Lock));
+    lpRWLock->m_WriteWaiting+=1;
+    while( (lpRWLock->m_ReadActive>0) || (lpRWLock->m_WriteActive>0) )
+    {
+        pthread_cond_wait(&(lpRWLock->m_Cond),&(lpRWLock->m_Lock));
+    }
+    lpRWLock->m_WriteWaiting-=1;
+    lpRWLock->m_WriteActive=1;
+    pthread_mutex_unlock(&(lpRWLock->m_Lock));
+}
+
+void __US_RWLockWRUnlock(void *lock)
+{
+    mc_RWLock *lpRWLock=(mc_RWLock *)lock; 
+    pthread_mutex_lock(&(lpRWLock->m_Lock));
+    lpRWLock->m_WriteActive=0;
+    pthread_cond_broadcast(&(lpRWLock->m_Cond));
+    pthread_mutex_unlock(&(lpRWLock->m_Lock));
+}
+
 void* __US_SemCreate()
 {
     sem_t *lpsem;
@@ -412,6 +486,88 @@ int __US_BecomeDaemon()
 void __US_Sleep (int dwMilliseconds)
 {
     Sleep(dwMilliseconds);
+}
+
+typedef struct mc_RWLock
+{    
+    void *m_Lock;
+    void *m_CountLock;
+    HANDLE m_Cond;
+    int m_ReadActive;
+    int m_WriteWaiting;
+} mc_RWLock;
+
+void* __US_RWLockCreate()
+{
+    mc_RWLock *lpRWLock;
+    lpRWLock=new mc_RWLock;
+    lpRWLock->m_Lock=__US_SemCreate();
+    lpRWLock->m_CountLock=__US_SemCreate();
+    lpRWLock->m_Cond = CreateEvent (NULL, FALSE, FALSE, NULL);
+    lpRWLock->m_ReadActive=0;
+    lpRWLock->m_WriteWaiting=0;
+    return lpRWLock;
+}
+
+void __US_RWLockDestroy(void *lock)
+{
+    mc_RWLock *lpRWLock=(mc_RWLock *)lock;
+    __US_SemDestroy(lpRWLock->m_Lock);
+    __US_SemDestroy(lpRWLock->m_CountLock);
+	CloseHandle(lpRWLock->m_Cond);
+    delete lpRWLock;
+}
+
+void __US_RWLockRDLock(void *lock)
+{
+    mc_RWLock *lpRWLock=(mc_RWLock *)lock; 
+    __US_SemWait(lpRWLock->m_Lock);
+    __US_SemWait(lpRWLock->m_CountLock);
+    lpRWLock->m_ReadActive+=1;
+    __US_SemPost(lpRWLock->m_CountLock);
+    __US_SemPost(lpRWLock->m_Lock);
+}
+
+void __US_RWLockRDUnlock(void *lock)
+{
+    mc_RWLock *lpRWLock=(mc_RWLock *)lock; 
+    __US_SemWait(lpRWLock->m_CountLock);
+    lpRWLock->m_ReadActive-=1;
+    if(lpRWLock->m_ReadActive == 0)
+    {
+        if(lpRWLock->m_WriteWaiting > 0)
+        {
+            lpRWLock->m_WriteWaiting=0;
+            SetEvent(lpRWLock->m_Cond);
+        }
+    }
+    __US_SemPost(lpRWLock->m_CountLock);
+}
+
+void __US_RWLockWRLock(void *lock)
+{
+    mc_RWLock *lpRWLock=(mc_RWLock *)lock; 
+    __US_SemWait(lpRWLock->m_Lock);
+    if(lpRWLock->m_ReadActive > 0)
+    {
+        __US_SemWait(lpRWLock->m_CountLock);
+        if(lpRWLock->m_ReadActive > 0)
+        {
+            lpRWLock->m_WriteWaiting=1;
+            __US_SemPost(lpRWLock->m_CountLock);
+            WaitForSingleObject(lpRWLock->m_Cond, INFINITE);
+        }       
+        else
+        {
+            __US_SemPost(lpRWLock->m_CountLock);            
+        }
+    }
+}
+
+void __US_RWLockWRUnlock(void *lock)
+{
+    mc_RWLock *lpRWLock=(mc_RWLock *)lock; 
+    __US_SemPost(lpRWLock->m_Lock);
 }
 
 
