@@ -169,6 +169,14 @@ typedef struct mc_Database
         int Options,                                                            /* Options - not used */
         int *error                                                              /* Error */
     );
+    char *Read(                                                                 /* Reads value for specified key, no freeing required, pointer is valid until next read */
+        char  *key,                                                             /* key */
+        int key_len,                                                            /* key length, -1 if strlen is should be used */
+        int *value_len,                                                         /* value length */
+        int Options,                                                            /* Options - not used */
+        int *error,                                                             /* Error */
+        char *out_ptr                                                            /* Use output buffer, NULL if thread-safe */
+    );
     int BatchRead(
         char *Data,
         int *results,

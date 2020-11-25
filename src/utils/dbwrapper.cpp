@@ -408,6 +408,11 @@ char *cs_Database::MoveNextKeyLevels(int key_levels,int *error)
 
 char *cs_Database::Read(char *key,int key_len,int *value_len,int Options,int *error)
 {
+    return Read(key,key_len,value_len,Options,error,NULL);
+}
+
+char *cs_Database::Read(char *key,int key_len,int *value_len,int Options,int *error,char *out_ptr)
+{
     char *err = NULL;
     const char *lpIterRead;
     const char *lpIterReadKey;
@@ -501,28 +506,36 @@ char *cs_Database::Read(char *key,int key_len,int *value_len,int Options,int *er
             return NULL;
             break;
     }
-    
-    if(*value_len+klen+1>m_ReadBufferSize)
+ 
+    if(out_ptr == NULL)
     {
-        NewSize=((*value_len+klen)/MC_DCT_DB_READ_BUFFER_SIZE + 1) * MC_DCT_DB_READ_BUFFER_SIZE;
-        lpNewBuffer=(char*)mc_New(NewSize);
-        if(lpNewBuffer  == NULL)
+        if(*value_len+klen+1>m_ReadBufferSize)
         {
-            *value_len=0;
-            *error=MC_ERR_ALLOCATION;
-            return NULL;
+            NewSize=((*value_len+klen)/MC_DCT_DB_READ_BUFFER_SIZE + 1) * MC_DCT_DB_READ_BUFFER_SIZE;
+            lpNewBuffer=(char*)mc_New(NewSize);
+            if(lpNewBuffer  == NULL)
+            {
+                *value_len=0;
+                *error=MC_ERR_ALLOCATION;
+                return NULL;
+            }
+
+            mc_Delete(m_ReadBuffer);
+            m_ReadBuffer=lpNewBuffer;
+            m_ReadBufferSize=NewSize;
         }
-
-        mc_Delete(m_ReadBuffer);
-        m_ReadBuffer=lpNewBuffer;
-        m_ReadBufferSize=NewSize;
+        if(lpRead)
+        {
+            memcpy(m_ReadBuffer,lpRead,*value_len);
+            m_ReadBuffer[*value_len]=0;
+        }
     }
-
-    if(lpRead)
+    else
     {
-        memcpy(m_ReadBuffer,lpRead,*value_len);
-        m_ReadBuffer[*value_len]=0;
+        memcpy(out_ptr,lpRead,*value_len);
+        out_ptr[*value_len]=0;        
     }
+
     if(lpIterRead)
     {
         if(Options & MC_OPT_DB_DATABASE_NEXT_ON_READ)
@@ -549,7 +562,10 @@ char *cs_Database::Read(char *key,int key_len,int *value_len,int Options,int *er
 
             break;
     }
-    
+    if(out_ptr)
+    {
+        return out_ptr;
+    }
     return m_ReadBuffer;    
 }
 
