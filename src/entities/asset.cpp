@@ -1899,7 +1899,7 @@ int mc_AssetDB::RollBackInternal(int block)
     err=MC_ERR_NOERROR;
     
 
-    ClearMemPool();
+    ClearMemPoolInternal();
     
     if(m_Ledger->Open() <= 0)
     {
@@ -2168,7 +2168,6 @@ int mc_AssetDB::FindEntityByShortTxIDInternal (mc_EntityDetails *entity, const u
 {
     mc_EntityLedgerRow aldRow;
 
-    Lock(0);
     int res=0;
     
     entity->Zero();
@@ -2190,7 +2189,6 @@ int mc_AssetDB::FindEntityByShortTxIDInternal (mc_EntityDetails *entity, const u
 
 exitlbl:
             
-    UnLock();
     return res;        
 }
 
