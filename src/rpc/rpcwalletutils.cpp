@@ -11,13 +11,18 @@ string OpReturnFormatToText(int format);
 
 void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry)
 {
-    return MinimalWalletTxToJSON(wtx,entry);
+    MinimalWalletTxToJSON(wtx,entry,NULL,-1);
 }
 
-void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry,mc_TxDefRow *txdef_in)
+void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry,mc_TxDefRow *txdef_in,int chain_height)
 {
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
+        int last_block=chain_height;
+        if(last_block < 0)
+        {
+            last_block=chainActive.Height();
+        }
         uint256 blockHash;
         int block=wtx.txDef.m_Block;
         int confirms=0;
@@ -25,7 +30,7 @@ void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry,mc_TxDefRow *txde
         {
             if(block >= 0)
             {
-                confirms=chainActive.Height()-block+1;
+                confirms=last_block-block+1;
             }            
         }
         else            
@@ -56,14 +61,19 @@ void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry,mc_TxDefRow *txde
 
 void WalletTxToJSON(const CWalletTx& wtx, Object& entry,bool skipWalletConflicts, int vout)
 {
-    return WalletTxToJSON(wtx,entry,skipWalletConflicts,vout,NULL);
+    return WalletTxToJSON(wtx,entry,skipWalletConflicts,vout,NULL,-1);
 }
 
-void WalletTxToJSON(const CWalletTx& wtx, Object& entry,bool skipWalletConflicts, int vout,mc_TxDefRow *txdef_in)
+void WalletTxToJSON(const CWalletTx& wtx, Object& entry,bool skipWalletConflicts, int vout,mc_TxDefRow *txdef_in,int chain_height)
 {
     /* MCHN START */        
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
+        int last_block=chain_height;
+        if(last_block < 0)
+        {
+            last_block=chainActive.Height();
+        }
         int block=wtx.txDef.m_Block;
         uint256 blockHash;
         int confirms=0;
@@ -71,7 +81,7 @@ void WalletTxToJSON(const CWalletTx& wtx, Object& entry,bool skipWalletConflicts
         {
             if(block >= 0)
             {
-                confirms=chainActive.Height()-block+1;
+                confirms=last_block-block+1;
             }            
         }
         else            
@@ -687,10 +697,11 @@ Object StreamItemEntry1(const CWalletTx& wtx,int first_output,const unsigned cha
 
 Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char *stream_id, bool verbose, vector<mc_QueryCondition> *given_conditions,int *output)
 {
-    return StreamItemEntry(-1,wtx,first_output,stream_id,verbose,given_conditions,output,NULL);
+    return StreamItemEntry(-1,wtx,first_output,stream_id,verbose,given_conditions,output,NULL,-1);
 }
 
-Object StreamItemEntry(int rpc_slot,const CWalletTx& wtx,int first_output,const unsigned char *stream_id, bool verbose, vector<mc_QueryCondition> *given_conditions,int *output,mc_TxDefRow *txdef_in)
+Object StreamItemEntry(int rpc_slot,const CWalletTx& wtx,int first_output,const unsigned char *stream_id, bool verbose, vector<mc_QueryCondition> *given_conditions,int *output,
+                        mc_TxDefRow *txdef_in,int chain_height)
 {
     Object entry;
     Array publishers;
@@ -997,11 +1008,11 @@ Object StreamItemEntry(int rpc_slot,const CWalletTx& wtx,int first_output,const 
     
     if(verbose)
     {
-        WalletTxToJSON(wtx, entry, true, stream_output, txdef_in);
+        WalletTxToJSON(wtx, entry, true, stream_output, txdef_in, chain_height);
     }
     else
     {
-        MinimalWalletTxToJSON(wtx, entry, txdef_in);
+        MinimalWalletTxToJSON(wtx, entry, txdef_in, chain_height);
     }
     
     return entry;

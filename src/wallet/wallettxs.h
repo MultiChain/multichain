@@ -192,8 +192,10 @@ typedef struct mc_WalletTxs
     void UnLock();
     
     int WRPSync(int for_block);
-    void WRPLock();
-    void WRPUnLock();
+    void WRPReadLock();
+    void WRPWriteLock();
+    void WRPReadUnLock();
+    void WRPWriteUnLock();
     
     int WRPGetListSize(mc_TxEntity *entity,int *confirmed);
     

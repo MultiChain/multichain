@@ -494,21 +494,39 @@ void mc_WalletTxs::UnLock()
     }    
 }
 
-void mc_WalletTxs::WRPLock()
+void mc_WalletTxs::WRPReadLock()
 {
 //    LogPrintf("WRPLock %ld\n",__US_ThreadID());
     if(m_Database)
     {
-        m_Database->WRPLock(1);
+        m_Database->WRPReadLock();
     }
 }
 
-void mc_WalletTxs::WRPUnLock()
+void mc_WalletTxs::WRPWriteLock()
+{
+//    LogPrintf("WRPLock %ld\n",__US_ThreadID());
+    if(m_Database)
+    {
+        m_Database->WRPWriteLock(1);
+    }
+}
+
+void mc_WalletTxs::WRPReadUnLock()
 {
 //    LogPrintf("WRPUnLock %ld\n",__US_ThreadID());
     if(m_Database)
     {
-        m_Database->WRPUnLock(1);
+        m_Database->WRPReadUnLock();
+    }    
+}
+
+void mc_WalletTxs::WRPWriteUnLock()
+{
+//    LogPrintf("WRPUnLock %ld\n",__US_ThreadID());
+    if(m_Database)
+    {
+        m_Database->WRPWriteUnLock(1);
     }    
 }
 

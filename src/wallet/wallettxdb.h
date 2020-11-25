@@ -260,7 +260,7 @@ typedef struct mc_TxDB
     mc_TxDefRow m_TxCachedDef;                                                              
     uint32_t m_TxCachedFlags;                                                              
 
-    void *m_WRPSemaphore;                                                      // Semaphore protecting resources used by read APIs
+    void *m_WRPRWLock;                                                      // Semaphore protecting resources used by read APIs
     uint64_t m_WRPLockedBy;                                                    // ID of the thread locking it
     mc_Buffer *m_WRPMemPool;                                                   // Read mc_TxEntityRow mempool
     mc_Buffer *m_WRPRawMemPool;                                                // Read mc_TxDefRow mempool
@@ -434,8 +434,10 @@ typedef struct mc_TxDB
     
     void LogString(const char *message);
     
-    int WRPLock(int allow_secondary);
-    void WRPUnLock(int ignore_unlocked);
+    int WRPReadLock();
+    int WRPWriteLock(int allow_secondary);
+    void WRPReadUnLock();
+    void WRPWriteUnLock(int ignore_unlocked);
     int WRPUsed();
     int WRPSync(int for_block);
     

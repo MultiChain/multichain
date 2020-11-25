@@ -3066,7 +3066,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
         }
     }
     
-    pwalletTxsMain->WRPLock();
+    pwalletTxsMain->WRPWriteLock();
     
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, commit                  (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
     if(err == MC_ERR_NOERROR)
@@ -3461,10 +3461,10 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Best chain activation\n");
     // Disconnect active blocks which are no longer in the best chain.
     while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
-        pwalletTxsMain->WRPLock();
+        pwalletTxsMain->WRPWriteLock();
         if (!DisconnectTip(state))
         {
-            pwalletTxsMain->WRPUnLock();
+            pwalletTxsMain->WRPWriteUnLock();
             return false;
         }
     }
@@ -3498,7 +3498,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
                 break;
             } else {
                 // A system error occurred (disk space, database error, ...).
-                pwalletTxsMain->WRPUnLock();
+                pwalletTxsMain->WRPWriteUnLock();
                 return false;
             }
         } else {
@@ -3564,7 +3564,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
         
         pwalletTxsMain->WRPSync(1);
         
-        pwalletTxsMain->WRPUnLock();
+        pwalletTxsMain->WRPWriteUnLock();
         
 /* MCHN END */    
         
@@ -6543,9 +6543,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         
         if (AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
         {
-            pwalletTxsMain->WRPLock();        
+            pwalletTxsMain->WRPWriteLock();        
             pwalletTxsMain->WRPSync(0);
-            pwalletTxsMain->WRPUnLock();
+            pwalletTxsMain->WRPWriteUnLock();
             mempool.check(pcoinsTip);
             RelayTransaction(tx);
             vWorkQueue.push_back(inv.hash);
@@ -6580,9 +6580,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                         continue;
                     if (AcceptToMemoryPool(mempool, stateDummy, orphanTx, true, &fMissingInputs2))
                     {
-                        pwalletTxsMain->WRPLock();        
+                        pwalletTxsMain->WRPWriteLock();        
                         pwalletTxsMain->WRPSync(0);
-                        pwalletTxsMain->WRPUnLock();
+                        pwalletTxsMain->WRPWriteUnLock();
                         if(fDebug)LogPrint("mempool", "   accepted orphan tx %s\n", orphanHash.ToString());
                         RelayTransaction(orphanTx);
                         vWorkQueue.push_back(orphanHash);

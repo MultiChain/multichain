@@ -301,7 +301,6 @@ CLicenseRequest mc_GetLicenseRequest(int *errorCode,string *strError)
     int param_size;
     uint32_t value32;
     unsigned char nonce[MC_LIC_NONCE_SIZE];
-    unsigned char uuid[16];
     
     if(!mc_GetLicenseAddress(license_address,false))
     {

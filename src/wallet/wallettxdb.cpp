@@ -153,7 +153,8 @@ int mc_TxImport::FindEntity(mc_TxEntityStat *entity)
 
 int mc_TxImport::FindEntity(mc_TxEntity *entity)
 {
-    return m_Entities->Seek((unsigned char*)entity);
+    int ret= m_Entities->Seek((unsigned char*)entity);
+    return ret;
 }
 
 mc_TxEntityStat *mc_TxImport::GetEntity(int row)
@@ -248,7 +249,7 @@ void mc_TxDB::Zero()
     m_Semaphore=NULL;
     m_LockedBy=0;    
     
-    m_WRPSemaphore=NULL;
+    m_WRPRWLock=NULL;
     m_WRPLockedBy=0;
     m_WRPMemPool=NULL;                                          
     m_WRPRawMemPool=NULL;                                       
@@ -296,7 +297,19 @@ void mc_TxDB::UnLock()
     __US_SemPost(m_Semaphore);
 }
 
-int mc_TxDB::WRPLock(int allow_secondary)
+int mc_TxDB::WRPReadLock()
+{
+    if(WRPUsed() == 0)
+    {
+        return 0;        
+    }
+    
+    __US_RWLockRDLock(m_WRPRWLock); 
+    
+    return 0;    
+}
+
+int mc_TxDB::WRPWriteLock(int allow_secondary)
 {
     if(WRPUsed() == 0)
     {
@@ -314,13 +327,24 @@ int mc_TxDB::WRPLock(int allow_secondary)
         }
         return allow_secondary;
     }
-    __US_SemWait(m_WRPSemaphore); 
+    __US_RWLockWRLock(m_WRPRWLock); 
+
     m_WRPLockedBy=this_thread;
     
     return 0;    
 }
 
-void mc_TxDB::WRPUnLock(int ignore_unlocked)
+void mc_TxDB::WRPReadUnLock()
+{
+    if(WRPUsed() == 0)
+    {
+        return;        
+    }
+    
+    __US_RWLockRDUnlock(m_WRPRWLock);    
+}
+
+void mc_TxDB::WRPWriteUnLock(int ignore_unlocked)
 {
     if(WRPUsed() == 0)
     {
@@ -339,7 +363,8 @@ void mc_TxDB::WRPUnLock(int ignore_unlocked)
     }
     
     m_WRPLockedBy=0;
-    __US_SemPost(m_WRPSemaphore);    
+
+    __US_RWLockWRUnlock(m_WRPRWLock);     
 }
 
 int mc_TxDB::WRPUsed()
@@ -355,7 +380,7 @@ int mc_TxDB::WRPSync(int for_block)
 {
     int from,to,row,mprow;
     mc_TxEntityStat* stat;
-    
+
     if(WRPUsed())
     {
         if(for_block)
@@ -644,8 +669,8 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
         m_WRPRawUpdatePool=new mc_Buffer;    
         err=m_WRPRawUpdatePool->Initialize(MC_TDB_TXID_SIZE,m_Database->m_TotalSize,MC_BUF_MODE_MAP);        
 
-        m_WRPSemaphore=__US_SemCreate();
-        if(m_WRPSemaphore == NULL)
+        m_WRPRWLock=__US_RWLockCreate();
+        if(m_WRPRWLock == NULL)
         {
             LogString("Initialize: Cannot initialize read semaphore");
             return MC_ERR_INTERNAL_ERROR;
@@ -742,9 +767,9 @@ int mc_TxDB::Destroy()
         delete m_WRPRawUpdatePool;
     }
 
-    if(m_WRPSemaphore)
+    if(m_WRPRWLock)
     {
-        __US_SemDestroy(m_WRPSemaphore);
+        __US_RWLockDestroy(m_WRPRWLock);
     }
 
     Zero();
@@ -2538,7 +2563,7 @@ int mc_TxDB::WRPGetList(
     {
         mempool=m_WRPMemPool;    
     }
-    
+            
     first=from;
     last=WRPGetListSize(entity,generation,&confirmed);
     

@@ -2196,7 +2196,7 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
     mc_Buffer *entity_rows=NULL;
     Array retArray;
     bool fWRPLocked=false;
-     
+    int chain_height; 
 //    LOCK(cs_main);
   
     int rpc_slot=GetRPCSlot();
@@ -2207,6 +2207,8 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
         goto exitlbl;
     }
     
+    fWRPLocked=true;
+    pwalletTxsMain->WRPReadLock();
     entity_found=pwalletTxsMain->WRPFindEntity(&entStat);
     
     if(!entity_found)
@@ -2223,10 +2225,7 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
 
     entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
     entity_rows->Clear();
-    
-    fWRPLocked=true;
-    pwalletTxsMain->WRPLock();
-    
+        
     mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL));
     
     WRPCheckWalletError(pwalletTxsMain->WRPGetList(&entity,entStat.m_Generation,start+1,count,entity_rows),entity.m_EntityType,"",&errCode,&strError);
@@ -2235,6 +2234,7 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
         goto exitlbl;
     }
     
+    chain_height=chainActive.Height();
     for(int i=0;i<entity_rows->GetCount();i++)
     {
         mc_TxEntityRow *lpEntTx;
@@ -2243,7 +2243,7 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
         uint256 hash;
         int first_output=mc_GetHashAndFirstOutput(lpEntTx,&hash);
         const CWalletTx& wtx=pwalletTxsMain->WRPGetWalletTx(hash,&txdef,NULL);
-        Object entry=StreamItemEntry(rpc_slot,wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,&conditions,NULL,&txdef);
+        Object entry=StreamItemEntry(rpc_slot,wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,&conditions,NULL,&txdef,chain_height);
         if(entry.size())
         {
             retArray.push_back(entry);                                
@@ -2254,7 +2254,7 @@ exitlbl:
                 
     if(fWRPLocked)
     {
-        pwalletTxsMain->WRPUnLock();
+        pwalletTxsMain->WRPReadUnLock();
     }
 
     if(strError.size())
