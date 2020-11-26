@@ -60,7 +60,7 @@ int mc_EntityDB::Open()
     m_DB->SetOption("KeySize",0,m_KeySize);
     m_DB->SetOption("ValueSize",0,m_ValueSize);
         
-    return m_DB->Open(m_FileName,MC_OPT_DB_DATABASE_CREATE_IF_MISSING | MC_OPT_DB_DATABASE_TRANSACTIONAL | MC_OPT_DB_DATABASE_LEVELDB);
+    return m_DB->Open(m_FileName,MC_OPT_DB_DATABASE_CREATE_IF_MISSING | MC_OPT_DB_DATABASE_TRANSACTIONAL | MC_OPT_DB_DATABASE_LEVELDB | MC_OPT_DB_DATABASE_THREAD_SAFE);
 }
 
 /** Close database */

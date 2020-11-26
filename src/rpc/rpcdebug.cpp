@@ -65,7 +65,7 @@ int64_t mcd_OpenDatabase(const char *name,const char *dbname,int key_size,int va
     m_DB->SetOption("ValueSize",0,value_size);
     
     
-    err=m_DB->Open(m_DBName,MC_OPT_DB_DATABASE_CREATE_IF_MISSING | MC_OPT_DB_DATABASE_TRANSACTIONAL | MC_OPT_DB_DATABASE_LEVELDB);
+    err=m_DB->Open(m_DBName,MC_OPT_DB_DATABASE_CREATE_IF_MISSING | MC_OPT_DB_DATABASE_TRANSACTIONAL | MC_OPT_DB_DATABASE_LEVELDB | MC_OPT_DB_DATABASE_THREAD_SAFE);
     if(err)
     {
         return -1;

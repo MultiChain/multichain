@@ -6,7 +6,6 @@
 #include "community/community.h"
 
 #define MC_TDB_MAX_TXS_FILE_SIZE             0x8000000                          // Maximal data file size, 128MB
-#define MC_TDB_MAX_DB_ROW_SIZE                     128                          // Should be above max db row size+1 byte, for thread-safe read
 
 int IsCSkipped(int type)
 {
@@ -212,7 +211,7 @@ int mc_TxEntityDB::Open()
     m_DB->SetOption("KeySize",0,m_KeySize);
     m_DB->SetOption("ValueSize",0,m_ValueSize);
         
-    return m_DB->Open(m_FileName,MC_OPT_DB_DATABASE_CREATE_IF_MISSING | MC_OPT_DB_DATABASE_TRANSACTIONAL | MC_OPT_DB_DATABASE_LEVELDB);
+    return m_DB->Open(m_FileName,MC_OPT_DB_DATABASE_CREATE_IF_MISSING | MC_OPT_DB_DATABASE_TRANSACTIONAL | MC_OPT_DB_DATABASE_LEVELDB | MC_OPT_DB_DATABASE_THREAD_SAFE);
 }
 
 int mc_TxEntityDB::Close()
@@ -1829,7 +1828,6 @@ int mc_TxDB::WRPGetTx(mc_TxDefRow *txdef,
 {
     int err,value_len,mprow; 
     unsigned char *ptr;
-    char dbrow[MC_TDB_MAX_DB_ROW_SIZE];
 
     txdef->Zero();
     
@@ -1873,7 +1871,7 @@ int mc_TxDB::WRPGetTx(mc_TxDefRow *txdef,
     }
     
     memcpy(txdef->m_TxId,hash, MC_TDB_TXID_SIZE);
-    ptr=(unsigned char*)m_Database->m_DB->Read((char*)txdef+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err,dbrow);
+    ptr=(unsigned char*)m_Database->m_DB->Read((char*)txdef+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err);
     if(err)
     {
         return err;
@@ -2547,7 +2545,6 @@ int mc_TxDB::WRPGetList(
     unsigned char *ptr;
     int err,mprow,found;
     char msg[256];
-    char dbrow[MC_TDB_MAX_DB_ROW_SIZE];
     
     txs->Clear();
     
@@ -2603,7 +2600,7 @@ int mc_TxDB::WRPGetList(
         if((int)erow.m_Pos <= confirmed)                                // Database rows
         {
             erow.SwapPosBytes();
-            ptr=(unsigned char*)m_Database->m_DB->Read((char*)&erow+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err,dbrow);
+            ptr=(unsigned char*)m_Database->m_DB->Read((char*)&erow+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err);
             erow.SwapPosBytes();
             if(err)
             {
