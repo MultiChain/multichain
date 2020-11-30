@@ -24,7 +24,7 @@ int cs_Database::Zero()
     m_ReadBufferSize=0;
     
     m_ShMemKey=0;
-    m_MaxClients=MC_DCT_DB_DEFAULT_MAX_CLIENTS;
+    m_MaxClients=MC_PRM_MAX_THREADS;                                            // MC_DCT_DB_DEFAULT_MAX_CLIENTS;
     m_KeySize=MC_DCT_DB_DEFAULT_MAX_KEY_SIZE;
     m_ValueSize=MC_DCT_DB_DEFAULT_MAX_VALUE_SIZE;
     m_MaxRows=MC_DCT_DB_DEFAULT_MAX_ROWS;
@@ -241,14 +241,14 @@ char *cs_Database::GetReadBuffer()
     }
     
     uint64_t thread_id=__US_ThreadID();
-    __US_SemWait(m_Semaphore);
     int mprow=m_ThreadReadBuffers->Seek(&thread_id);
     if(mprow < 0)
     {
+        __US_SemWait(m_Semaphore);
         mprow=m_ThreadReadBuffers->GetCount();
         m_ThreadReadBuffers->Add(&thread_id,NULL);        
+        __US_SemPost(m_Semaphore);
     }
-    __US_SemPost(m_Semaphore);
     
     return (char*)m_ThreadReadBuffers->GetRow(mprow)+sizeof(uint64_t);    
 }
@@ -567,12 +567,14 @@ char *cs_Database::Read(char *key,int key_len,int *value_len,int Options,int *er
             memcpy(m_ReadBuffer,lpRead,*value_len);
             m_ReadBuffer[*value_len]=0;
         }
+//            printf("BAD\n");
     }
     else
     {        
         if(lpRead)
         {
             read_buf=GetReadBuffer();
+//            printf("%16X %16X %ld %d\n",(uint64_t)this,(uint64_t)read_buf,__US_ThreadID(),m_KeySize+m_ValueSize);
             memcpy(read_buf,lpRead,*value_len);
             read_buf[*value_len]=0;        
         }

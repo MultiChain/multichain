@@ -70,6 +70,7 @@
 
 
 #define MC_PRM_NETWORK_NAME_MAX_SIZE    32
+#define MC_PRM_MAX_THREADS              256
 
 #endif	/* MULTICHAIN_DEFINE_H */
 

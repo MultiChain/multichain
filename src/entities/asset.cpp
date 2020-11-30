@@ -311,11 +311,12 @@ int mc_AssetDB::Zero()
     m_PrevPos=-1;
     m_Pos=0;
     m_DBRowCount=0;     
-    m_RollBackPos.Zero();
     m_Flags=0;
     
     m_Semaphore=NULL;
     m_LockedBy=0;
+    
+    m_ThreadRollBackPos=NULL;
     
     return MC_ERR_NOERROR;
 }
@@ -493,8 +494,31 @@ int mc_AssetDB::Initialize(const char *name,int mode)
     {
         return MC_ERR_INTERNAL_ERROR;
     }
+    
+    m_ThreadRollBackPos=new mc_Buffer;
+    m_ThreadRollBackPos->Initialize(sizeof(uint64_t),sizeof(mc_RollBackPos)+sizeof(uint64_t),MC_BUF_MODE_MAP);    
+    m_ThreadRollBackPos->Realloc(MC_PRM_MAX_THREADS);
+    
+    for(int mprow=0;mprow<MC_PRM_MAX_THREADS;mprow++)
+    {
+        mc_RollBackPos *rollback_pos=(mc_RollBackPos*)(m_ThreadRollBackPos->GetRow(mprow)+sizeof(uint64_t));    
+        rollback_pos->Zero();
+    }
 
     return MC_ERR_NOERROR;
+}
+
+mc_RollBackPos *mc_AssetDB::GetRollBackPos()
+{
+    uint64_t thread_id=__US_ThreadID();
+    int mprow=m_ThreadRollBackPos->Seek(&thread_id);
+    if(mprow < 0)
+    {
+        return NULL;
+    }
+    
+    return (mc_RollBackPos*)(m_ThreadRollBackPos->GetRow(mprow)+sizeof(uint64_t));    
+    
 }
 
 void mc_AssetDB::RemoveFiles()
@@ -556,6 +580,12 @@ int mc_AssetDB::Destroy()
         delete m_RowExtendedScript;
     }
     
+    if(m_ThreadRollBackPos)
+    {
+        delete m_ThreadRollBackPos;
+        m_ThreadRollBackPos=NULL;
+    }
+    
     Zero();
     
     return MC_ERR_NOERROR;
@@ -613,6 +643,26 @@ int mc_AssetDB::RollBackToCheckPoint()
 
 int mc_AssetDB::SetRollBackPos(int block,int offset,int inmempool)
 {
+    mc_RollBackPos *rollback_pos=GetRollBackPos();
+    if(rollback_pos == NULL)
+    {
+        Lock(1);
+        uint64_t thread_id=__US_ThreadID();
+        m_ThreadRollBackPos->Add(&thread_id,NULL);        
+        UnLock();        
+        rollback_pos=GetRollBackPos();
+        if(rollback_pos == NULL)
+        {
+            return MC_ERR_INTERNAL_ERROR;
+        }
+        rollback_pos->Zero();
+    }
+    
+    rollback_pos->m_Block=block;
+    rollback_pos->m_Offset=offset;
+    rollback_pos->m_InMempool=inmempool;
+    
+/*    
     Lock(1);
 
     m_RollBackPos.m_Block=block;
@@ -620,17 +670,26 @@ int mc_AssetDB::SetRollBackPos(int block,int offset,int inmempool)
     m_RollBackPos.m_InMempool=inmempool;
     
     UnLock();
-    
+*/    
     return MC_ERR_NOERROR;
 }
 
 void mc_AssetDB::ResetRollBackPos()
 {
+    mc_RollBackPos *rollback_pos=GetRollBackPos();
+    if(rollback_pos == NULL)
+    {
+        return;
+    }
+    rollback_pos->Zero();
+    
+/*    
     Lock(1);
 
     m_RollBackPos.Zero();
     
     UnLock();    
+ */ 
 }
 
 
@@ -640,6 +699,7 @@ int mc_AssetDB::GetEntity(mc_EntityLedgerRow* row)
     int err,value_len,mprow;
     int result;
     mc_EntityDBRow adbRow;
+    mc_RollBackPos *rollback_pos=GetRollBackPos();
     
     unsigned char *ptr;
 
@@ -670,17 +730,20 @@ int mc_AssetDB::GetEntity(mc_EntityLedgerRow* row)
         row->m_ChainPos=adbRow.m_ChainPos;
         m_Ledger->Close();
         
-        if(m_RollBackPos.InBlock())
+        if(rollback_pos)
         {
-            if(m_RollBackPos.IsOut(row->m_Block,row->m_Offset))
+            if(rollback_pos->InBlock())
             {
-                result=0;                
+                if(rollback_pos->IsOut(row->m_Block,row->m_Offset))
+                {
+                    result=0;                
+                }
             }
         }
         return result;
     }
     
-    if(m_RollBackPos.InBlock() == 0)
+    if((rollback_pos == NULL) || (rollback_pos->InBlock() == 0))
     {
         mprow=m_MemPool->Seek((unsigned char*)row);
         if(mprow>=0)
@@ -2312,6 +2375,7 @@ int mc_AssetDB::FindLastEntityByGenesis(mc_EntityDetails *last_entity, mc_Entity
 int mc_AssetDB::FindLastEntityByGenesisInternal(mc_EntityDetails *last_entity, mc_EntityDetails *genesis_entity)
 {
     mc_EntityLedgerRow aldRow;
+    mc_RollBackPos *rollback_pos=GetRollBackPos();
 
     last_entity->Zero();
     
@@ -2330,7 +2394,7 @@ int mc_AssetDB::FindLastEntityByGenesisInternal(mc_EntityDetails *last_entity, m
             if(aldRow.m_FirstPos == first_pos)
             {
                 pos=aldRow.m_LastPos;
-                if(m_RollBackPos.InBlock() == 0)
+                if((rollback_pos == NULL) || (rollback_pos->InBlock() == 0))
                 {
                     last_entity->Set(&aldRow);                
                     return 1;
@@ -2346,7 +2410,7 @@ int mc_AssetDB::FindLastEntityByGenesisInternal(mc_EntityDetails *last_entity, m
         while(pos>0)
         {
             m_Ledger->GetRow(pos,&aldRow);
-            if( (m_RollBackPos.InBlock() == 0) || ((m_RollBackPos.IsOut(aldRow.m_Block,aldRow.m_Offset)) == 0) )
+            if( (rollback_pos == NULL) || (rollback_pos->InBlock() == 0) || ((rollback_pos->IsOut(aldRow.m_Block,aldRow.m_Offset)) == 0) )
             {
                 last_entity->Set(&aldRow);                
                 pos=-1;
@@ -3335,6 +3399,7 @@ int mc_AssetDB::FindActiveUpdate(mc_EntityDetails *entity, const void* txid)
     size_t value_size;
     unsigned char filter_address[20];
     memset(filter_address,0,20);
+    mc_RollBackPos *rollback_pos=GetRollBackPos();
     
     aldRow.Zero();
     
@@ -3369,13 +3434,13 @@ int mc_AssetDB::FindActiveUpdate(mc_EntityDetails *entity, const void* txid)
             {
                 if(aldRow.m_FirstPos == first_pos)
                 {
-                    if( (aldRow.m_KeyType & MC_ENT_KEYTYPE_FOLLOW_ON) == 0)     // m_RollBackPos.InBlock() check below is always true in this case
+                    if( (aldRow.m_KeyType & MC_ENT_KEYTYPE_FOLLOW_ON) == 0)     // rollback_pos->InBlock() check below is always true in this case
                     {
                         res=1;
                         goto exitlbl;
                     }
                     pos=aldRow.m_LastPos;
-                    if(m_RollBackPos.InBlock() == 0)
+                    if((rollback_pos == NULL) || (rollback_pos->InBlock() == 0))
                     {
                         value_offset=mc_FindSpecialParamInDetailsScript(aldRow.m_Script,aldRow.m_ScriptSize,MC_ENT_SPRM_CHAIN_INDEX,&value_size);
                         if(value_offset < aldRow.m_ScriptSize)
@@ -3409,7 +3474,7 @@ int mc_AssetDB::FindActiveUpdate(mc_EntityDetails *entity, const void* txid)
                 m_Ledger->GetRow(pos,&aldRow);
                 if(aldRow.m_KeyType & MC_ENT_KEYTYPE_FOLLOW_ON)
                 {
-                    if( (m_RollBackPos.InBlock() == 0) || ((m_RollBackPos.IsOut(aldRow.m_Block,aldRow.m_Offset)) == 0) )
+                    if( (rollback_pos == NULL) || (rollback_pos->InBlock() == 0) || ((rollback_pos->IsOut(aldRow.m_Block,aldRow.m_Offset)) == 0) )
                     {
                         value_offset=mc_FindSpecialParamInDetailsScript(aldRow.m_Script,aldRow.m_ScriptSize,MC_ENT_SPRM_CHAIN_INDEX,&value_size);
                         if(value_offset < aldRow.m_ScriptSize)

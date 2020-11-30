@@ -287,7 +287,8 @@ typedef struct mc_Permissions
     int m_CheckForMempoolFlag;
     mc_Buffer               *m_MempoolPermissions;
     mc_Buffer               *m_MempoolPermissionsToReplay;    
-    mc_RollBackPos m_RollBackPos;
+    
+    mc_Buffer   *m_ThreadRollBackPos;
     
     void *m_Semaphore;
     uint64_t m_LockedBy;
@@ -419,6 +420,7 @@ typedef struct mc_Permissions
     void LogString(const char *message);
     void Dump();
     
+    mc_RollBackPos *GetRollBackPos();
     
 } mc_Permissions;
 

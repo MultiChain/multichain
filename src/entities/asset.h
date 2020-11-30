@@ -294,9 +294,9 @@ typedef struct mc_AssetDB
     int64_t m_CheckPointPos;
     uint64_t m_CheckPointMemPoolSize;
     int m_DBRowCount;
-    mc_RollBackPos m_RollBackPos;
     uint32_t m_Flags;
     
+    mc_Buffer   *m_ThreadRollBackPos;    
     
     void *m_Semaphore;
     uint64_t m_LockedBy;
@@ -380,6 +380,8 @@ typedef struct mc_AssetDB
      
     void Lock(int write_mode);
     void UnLock();
+    
+    mc_RollBackPos *GetRollBackPos();
     
 } mc_AssetDB;
 

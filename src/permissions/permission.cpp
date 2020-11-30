@@ -292,7 +292,8 @@ int mc_Permissions::Zero()
     m_MempoolPermissions=NULL;
     m_MempoolPermissionsToReplay=NULL;
     m_CheckForMempoolFlag=0;
-    m_RollBackPos.Zero();
+    
+    m_ThreadRollBackPos=NULL;
     
     return MC_ERR_NOERROR;
 }
@@ -488,6 +489,16 @@ int mc_Permissions::Initialize(const char *name,int mode)
     m_Block=pdbBlock;
     m_Row=pdbLastRow;            
 
+    m_ThreadRollBackPos=new mc_Buffer;
+    m_ThreadRollBackPos->Initialize(sizeof(uint64_t),sizeof(mc_RollBackPos)+sizeof(uint64_t),MC_BUF_MODE_MAP);    
+    m_ThreadRollBackPos->Realloc(MC_PRM_MAX_THREADS);
+
+    for(int mprow=0;mprow<MC_PRM_MAX_THREADS;mprow++)
+    {
+        mc_RollBackPos *rollback_pos=(mc_RollBackPos*)(m_ThreadRollBackPos->GetRow(mprow)+sizeof(uint64_t));    
+        rollback_pos->Zero();
+    }
+    
     err=UpdateCounts();
     if(err)
     {
@@ -533,10 +544,24 @@ int mc_Permissions::Initialize(const char *name,int mode)
         return MC_ERR_INTERNAL_ERROR;
     }
 
+    
     sprintf(msg,"Initialized: Admin count: %d, Miner count: %d, ledger rows: %ld",m_AdminCount,m_MinerCount,m_Row);
     LogString(msg);
     return MC_ERR_NOERROR;
 }
+
+mc_RollBackPos *mc_Permissions::GetRollBackPos()
+{
+    uint64_t thread_id=__US_ThreadID();
+    int mprow=m_ThreadRollBackPos->Seek(&thread_id);
+    if(mprow < 0)
+    {
+        return NULL;
+    }
+    
+    return (mc_RollBackPos*)(m_ThreadRollBackPos->GetRow(mprow)+sizeof(uint64_t));        
+}
+
 
 void mc_Permissions::MempoolPermissionsCopy()
 {
@@ -670,6 +695,12 @@ int mc_Permissions::Destroy()
     if(m_MempoolPermissionsToReplay)
     {
         delete m_MempoolPermissionsToReplay;
+    }
+    
+    if(m_ThreadRollBackPos)
+    {
+        delete m_ThreadRollBackPos;
+        m_ThreadRollBackPos=NULL;
     }
     
     Zero();
@@ -905,23 +936,54 @@ int mc_RollBackPos::NotApplied()
 
 int mc_Permissions::SetRollBackPos(int block,int offset,int inmempool)
 {
+    mc_RollBackPos *rollback_pos=GetRollBackPos();
+    if(rollback_pos == NULL)
+    {
+        Lock(1);
+        uint64_t thread_id=__US_ThreadID();
+        m_ThreadRollBackPos->Add(&thread_id,NULL);        
+        UnLock();        
+        rollback_pos=GetRollBackPos();
+        if(rollback_pos == NULL)
+        {
+            LogString("Couldn't create rollback object");
+            return MC_ERR_INTERNAL_ERROR;
+        }
+        rollback_pos->Zero();
+    }
+    
+    rollback_pos->m_Block=block;
+    rollback_pos->m_Offset=offset;
+    rollback_pos->m_InMempool=inmempool;
+    
+/*    
     m_RollBackPos.m_Block=block;
     m_RollBackPos.m_Offset=offset;
     m_RollBackPos.m_InMempool=inmempool;
-    
+*/    
     return MC_ERR_NOERROR;
 }
 
 void mc_Permissions::ResetRollBackPos()
 {
-    m_RollBackPos.Zero();
+    mc_RollBackPos *rollback_pos=GetRollBackPos();
+    if(rollback_pos == NULL)
+    {
+        char msg[256];
+        uint64_t thread_id=__US_ThreadID();
+        sprintf(msg,"Couldn't find rollback_pos for thread %ld\n",thread_id);
+        return;
+    }
+    rollback_pos->Zero();
+//    m_RollBackPos.Zero();
 }
 
 /** Rewinds permission sequence to specific position, returns true if mempool should be checked */
 
 int mc_Permissions::RewindToRollBackPos(mc_PermissionLedgerRow *row)
 {
-    if(m_RollBackPos.InBlock() == 0)
+    mc_RollBackPos *rollback_pos=GetRollBackPos();
+    if((rollback_pos == NULL) || (rollback_pos->InBlock() == 0))
     {
         return MC_ERR_NOERROR;
     }
@@ -933,12 +995,12 @@ int mc_Permissions::RewindToRollBackPos(mc_PermissionLedgerRow *row)
     }
     
     m_Ledger->GetRow(row->m_ThisRow,row);
-    while( (row->m_PrevRow > 0 ) && m_RollBackPos.IsOut(row->m_BlockReceived,row->m_Offset) )
+    while( (row->m_PrevRow > 0 ) && (rollback_pos != NULL) && (rollback_pos->IsOut(row->m_BlockReceived,row->m_Offset)))
     {
         m_Ledger->GetRow(row->m_PrevRow,row);
     }
 
-    if(m_RollBackPos.IsOut(row->m_BlockReceived,row->m_Offset))
+    if((rollback_pos != NULL) && (rollback_pos->IsOut(row->m_BlockReceived,row->m_Offset)))
     {
         row->Zero();        
     }
@@ -1065,9 +1127,10 @@ uint32_t mc_Permissions::GetPermission(const void* lpEntity,const void* lpAddres
     }
     if(checkmempool != 0)
     { 
-        if( ( m_RollBackPos.NotApplied() != 0) ||
-            ( (m_RollBackPos.InMempool() != 0) && (type != MC_PTP_FILTER) ) )
-        {
+        mc_RollBackPos *rollback_pos=GetRollBackPos();
+        if( (rollback_pos == NULL) || ( rollback_pos->NotApplied() != 0) ||
+            ( (rollback_pos->InMempool() != 0) && (type != MC_PTP_FILTER) ) )
+        {            
             mprow=0;
             while(mprow>=0)
             {
