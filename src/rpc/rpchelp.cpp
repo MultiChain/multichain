@@ -3189,7 +3189,7 @@ void mc_InitRPCHelpMap13()
     
     mapHelpStrings.insert(std::make_pair("resendwallettransactions",
             "resendwallettransactions\n"
-            "\nStop Resends wallet transactions."
+            "\n Resends wallet transactions."
         ));
     
     mapHelpStrings.insert(std::make_pair("revoke",

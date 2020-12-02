@@ -3067,6 +3067,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     }
     
     pwalletTxsMain->WRPWriteLock();
+    if(fDebug)LogPrint("mcwrp","mcwrp: DB synchronization for block %d\n",pindexNew->nHeight);
     
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, commit                  (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
     if(err == MC_ERR_NOERROR)
@@ -3460,10 +3461,17 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Best chain activation\n");
     // Disconnect active blocks which are no longer in the best chain.
+    if(fDebug)LogPrint("mcwrp","mcwrp: Activating best chain %d -> %d -> %d\n",chainActive.Height(),pindexFork->nHeight,pindexMostWork->nHeight);
+    if(pindexFork->nHeight < chainActive.Height())
+    {
+        if(fDebug)LogPrint("mcwrp","mcwrp: Reorg on block (%d -> %d)\n",pindexFork->nHeight+1,chainActive.Height());        
+    }
     while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
+        if(fDebug)LogPrint("mcwrp","mcwrp: Locking wallet for disconnection of block %d\n",chainActive.Height());
         pwalletTxsMain->WRPWriteLock();
         if (!DisconnectTip(state))
         {
+            if(fDebug)LogPrint("mcwrp","mcwrp: Wallet unlocked after failed disconnection\n");
             pwalletTxsMain->WRPWriteUnLock();
             return false;
         }
@@ -3498,6 +3506,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
                 break;
             } else {
                 // A system error occurred (disk space, database error, ...).
+                if(fDebug)LogPrint("mcwrp","mcwrp: Wallet unlocked after failed connection\n");
                 pwalletTxsMain->WRPWriteUnLock();
                 return false;
             }
@@ -3564,6 +3573,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
         
         pwalletTxsMain->WRPSync(1);
         
+        if(fDebug)LogPrint("mcwrp","mcwrp: Wallet unlocked after block %d\n",chainActive.Height());
         pwalletTxsMain->WRPWriteUnLock();
         
 /* MCHN END */    

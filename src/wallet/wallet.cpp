@@ -1622,12 +1622,14 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
                 }
                 
                 pwalletTxsMain->WRPWriteLock();
+                if(fDebug)LogPrint("mcwrp","mcwrp: Synchronization for import started\n");
 
                 err=pwalletTxsMain->CompleteImport(imp,((pindexStart->nHeight > 0) && !fOnlySubscriptions) ? MC_EFL_NOT_IN_SYNC_AFTER_IMPORT : 0);
 
                 
                 pwalletTxsMain->WRPSync(1);
 
+                if(fDebug)LogPrint("mcwrp","mcwrp: Synchronization for import completed\n");
                 pwalletTxsMain->WRPWriteUnLock();
 
             }

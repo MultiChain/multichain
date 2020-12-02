@@ -534,7 +534,16 @@ int mc_WalletTxs::WRPSync(int for_block)
 {
     if(m_Database)
     {
-        return m_Database->WRPSync(for_block);
+        if(for_block)
+        {
+            if(fDebug)LogPrint("mcwrp","mcwrp: Mempool synchronization for block started\n");
+        }
+        int ret=m_Database->WRPSync(for_block);
+        if(for_block)
+        {
+            if(fDebug)LogPrint("mcwrp","mcwrp: Mempool synchronization for block completed\n");
+        }
+        return ret;
     }        
     
     return MC_ERR_NOERROR;
