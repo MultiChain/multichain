@@ -393,7 +393,7 @@ int mc_TxDB::WRPSync(int for_block)
             {
                 stat=(mc_TxEntityStat*)m_Imports[0].m_Entities->GetRow(i);                     
                 stat->m_ReadLastPos=stat->m_LastPos;
-                stat->m_ReadLastClearedPos=stat->m_ReadLastClearedPos;
+                stat->m_ReadLastClearedPos=stat->m_LastClearedPos;
             }            
         }
         
@@ -413,7 +413,7 @@ int mc_TxDB::WRPSync(int for_block)
                     {
                         stat=(mc_TxEntityStat*)m_Imports[0].m_Entities->GetRow(entrow);                     
                         stat->m_ReadLastPos=stat->m_LastPos;
-                        stat->m_ReadLastClearedPos=stat->m_ReadLastClearedPos;                    
+                        stat->m_ReadLastClearedPos=stat->m_LastClearedPos;                    
                     }
                     else
                     {
@@ -2463,10 +2463,12 @@ int mc_TxDB::GetList(
     erow.Zero();
     memcpy(&erow.m_Entity,&(stat->m_Entity),sizeof(mc_TxEntity));
     erow.m_Generation=stat->m_Generation;
+    printf("%d\n",erow.m_Generation);
     mprow=-1;
+    printf("%d %d %d\n",first,last,stat->m_LastClearedPos);
     for(i=first;i<=last;i++)
     {
-        erow.m_Pos=i;
+        erow.m_Pos=i;        
         if(erow.m_Pos <= stat->m_LastClearedPos)                                // Database rows
         {
             erow.SwapPosBytes();
