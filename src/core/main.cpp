@@ -3461,10 +3461,13 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Best chain activation\n");
     // Disconnect active blocks which are no longer in the best chain.
-    if(fDebug)LogPrint("mcwrp","mcwrp: Activating best chain %d -> %d -> %d\n",chainActive.Height(),pindexFork->nHeight,pindexMostWork->nHeight);
-    if(pindexFork->nHeight < chainActive.Height())
+    if(pindexFork)
     {
-        if(fDebug)LogPrint("mcwrp","mcwrp: Reorg on block (%d -> %d)\n",pindexFork->nHeight+1,chainActive.Height());        
+        if(fDebug)LogPrint("mcwrp","mcwrp: Activating best chain %d -> %d -> %d\n",chainActive.Height(),pindexFork->nHeight,pindexMostWork->nHeight);
+        if(pindexFork->nHeight < chainActive.Height())
+        {
+            if(fDebug)LogPrint("mcwrp","mcwrp: Reorg on block (%d -> %d)\n",pindexFork->nHeight+1,chainActive.Height());        
+        }
     }
     while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
         if(fDebug)LogPrint("mcwrp","mcwrp: Locking wallet for disconnection of block %d\n",chainActive.Height());
