@@ -202,6 +202,8 @@ typedef struct mc_WalletTxs
     int WRPGetListSize(mc_TxEntity *entity,int generation,int *confirmed);
     int WRPGetList(mc_TxEntity *entity,int generation,int from,int count,mc_Buffer *txs);    
     CWalletTx WRPGetWalletTx(uint256 hash,mc_TxDefRow *txdef,int *errOut);
+    std::string WRPGetSubKey(void *hash,mc_TxDefRow *txdef,int *errOut);         
+    int WRPGetRow(mc_TxEntityRow *erow);
     
     bool WRPFindEntity(mc_TxEntityStat *entity);                                    // Finds entity in chain import
 } mc_WalletTxs;

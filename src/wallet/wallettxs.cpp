@@ -1370,6 +1370,32 @@ int mc_WalletTxs::GetRow(
     return err;                
 }
 
+int mc_WalletTxs::WRPGetRow(
+               mc_TxEntityRow *erow)
+{
+    int err;
+    if((m_Mode & MC_WMD_TXS) == 0)
+    {
+        return MC_ERR_NOT_SUPPORTED;
+    }    
+    if(m_Database == NULL)
+    {
+        return MC_ERR_INTERNAL_ERROR;
+    }
+    int use_read=m_Database->WRPUsed();
+    
+    if(use_read == 0)
+    {
+        m_Database->Lock(0,0);
+    }
+    err=m_Database->GetRow(erow);
+    if(use_read == 0)
+    {
+        m_Database->UnLock();
+    }
+    return err;                
+}
+
 int mc_WalletTxs::GetList(mc_TxEntity *entity,int from,int count,mc_Buffer *txs)
 {
     int err;
@@ -3659,6 +3685,123 @@ exitlbl:
     {
         *errOut=err;
     }
+
+    return ret;    
+}
+
+string mc_WalletTxs::WRPGetSubKey(void *hash,mc_TxDefRow *txdef,int *errOut)
+{
+    int err;
+    string ret;
+    mc_TxDefRow StoredTxDef;
+    char ShortName[65];                                     
+    char FileName[MC_DCT_DB_MAX_PATH];                      
+    int  fHan=0;
+    uint160 subkey_hash;
+    
+    err = MC_ERR_NOERROR;
+
+    int use_read=m_Database->WRPUsed();
+        
+    if(use_read == 0)
+    {
+        m_Database->Lock(0,0);
+    }
+    
+    ret="";
+    
+    err=m_Database->WRPGetTx(&StoredTxDef,(unsigned char*)hash,0);
+    
+    if(err)
+    {
+        goto exitlbl;
+    }
+    else
+    {
+        if(StoredTxDef.m_Flags & MC_SFL_NODATA)
+        {
+            if(StoredTxDef.m_Flags & MC_SFL_IS_ADDRESS)
+            {
+                memcpy(&subkey_hash,StoredTxDef.m_TxId,MC_TDB_ENTITY_ID_SIZE);
+                if(StoredTxDef.m_Flags & MC_SFL_IS_SCRIPTHASH)
+                {
+                    ret=CBitcoinAddress((CScriptID)subkey_hash).ToString();
+                }
+                else
+                {
+                    ret=CBitcoinAddress((CKeyID)subkey_hash).ToString();                    
+                }
+            }
+        }
+        else
+        {
+            unsigned char buf[256];
+            int total_bytes_read,bytes_to_read;
+            
+            sprintf(ShortName,"wallet/txs%05u",StoredTxDef.m_InternalFileID);
+
+            mc_GetFullFileName(m_Database->m_Name,ShortName,".dat",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,FileName);
+            
+            fHan=open(FileName,_O_BINARY | O_RDONLY, S_IRUSR | S_IWUSR);
+
+            if(fHan <= 0)
+            {
+                err= MC_ERR_FILE_READ_ERROR;
+                goto exitlbl;
+                
+            }
+
+            if(lseek64(fHan,StoredTxDef.m_InternalFileOffset,SEEK_SET) != StoredTxDef.m_InternalFileOffset)
+            {
+                err= MC_ERR_FILE_READ_ERROR;
+                goto exitlbl;
+            }
+                        
+            total_bytes_read=0;
+            while(total_bytes_read < (int)StoredTxDef.m_Size)
+            {
+                bytes_to_read=StoredTxDef.m_Size-total_bytes_read;
+                if(bytes_to_read > 256)
+                {
+                    bytes_to_read=256;
+                }
+                if(read(fHan,buf,bytes_to_read) != bytes_to_read)
+                {
+                    err= MC_ERR_FILE_READ_ERROR;
+                    goto exitlbl;
+                }
+                total_bytes_read+=bytes_to_read;
+                ret += string((char*)buf,bytes_to_read);
+            }
+        }
+    }
+           
+exitlbl:
+    
+    if(fHan)
+    {
+        close(fHan);
+    }
+                                                
+
+    if(err == MC_ERR_NOERROR)
+    {
+        if(txdef)
+        {
+            memcpy(txdef,&StoredTxDef,sizeof(mc_TxDefRow));
+        }
+    }
+
+    if(errOut)
+    {
+        *errOut=err;
+    }
+
+    if(use_read == 0)
+    {
+        m_Database->UnLock();
+    }
+
 
     return ret;    
 }

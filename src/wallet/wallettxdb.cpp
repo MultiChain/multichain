@@ -2391,6 +2391,53 @@ int mc_TxDB::GetRow(
     
 }
 
+int mc_TxDB::WRPGetRow(
+               mc_TxEntityRow *erow)
+{
+    int err, value_len,i;
+    unsigned char *ptr;
+    mc_Buffer *mempool;
+    mc_TxEntityRow *lpEnt;
+
+    mempool=m_MemPools[0];
+    if(WRPUsed())
+    {
+        mempool=m_WRPMemPool;    
+    }
+    
+    err=MC_ERR_NOERROR;
+
+    erow->SwapPosBytes();
+    ptr=(unsigned char*)m_Database->m_DB->Read((char*)erow+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err);
+    erow->SwapPosBytes();
+    if(err)
+    {
+        return err;
+    }
+    if(ptr)
+    {
+        memcpy((char*)erow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
+        return MC_ERR_NOERROR;
+    }
+    else
+    {
+        for(i=0;i<mempool->GetCount();i++)
+        {
+            lpEnt=(mc_TxEntityRow *)mempool->GetRow(i);
+            if( (lpEnt->m_TempPos == erow->m_Pos) && 
+                (memcmp(&(lpEnt->m_Entity),&(erow->m_Entity),sizeof(mc_TxEntity)) == 0))
+            {
+                memcpy(erow,lpEnt,MC_TDB_ROW_SIZE);
+                erow->m_Pos=lpEnt->m_TempPos;
+                return MC_ERR_NOERROR;
+            }            
+        }
+    }
+    
+    return MC_ERR_NOT_FOUND;
+    
+}
+
 int mc_TxDB::GetList(mc_TxEntity *entity,
                 int from,
                 int count,

@@ -462,6 +462,9 @@ typedef struct mc_TxDB
               const unsigned char *hash,                                        // Input. Tx hash
               int skip_db);                                       
     
+    int WRPGetRow(
+               mc_TxEntityRow *erow);
+    
 } mc_TxDB;
 
 
