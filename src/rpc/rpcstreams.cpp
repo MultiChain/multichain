@@ -1592,7 +1592,7 @@ Value liststreamitems(const Array& params, bool fHelp)
     mc_Buffer *entity_rows=NULL;
     mc_EntityDetails stream_entity;
     Array retArray;
-    int errCode;
+    int errCode=0;
     string strError;
     
     parseStreamIdentifier(params[0],&stream_entity);           
@@ -1917,6 +1917,7 @@ bool WRPSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity
     {
         return false;
     }
+    
     uint160 stream_subkey_hash;
     CBitcoinAddress address(str);
     if (!address.IsValid())
@@ -1973,38 +1974,15 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     
     mc_EntityDetails stream_entity;
     parseStreamIdentifier(params[0],&stream_entity);           
-
-    entStat.Zero();
-    memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-    entStat.m_Entity.m_EntityType=MC_TET_STREAM_KEY;
-    if(fPublisher)
-    {
-        entStat.m_Entity.m_EntityType=MC_TET_STREAM_PUBLISHER;        
-    }
-    entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
-    if(!pwalletTxsMain->FindEntity(&entStat))
-    {
-        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
-    }
+    int errCode=0;
+    string strError;
 
     bool fFirstPublisher=false;
     bool fFirstPublisherAll=false;
-    string key_string=params[1].get_str();    
-    vector <mc_QueryCondition> conditions;
+    Object empty_object;
+    Object obj;
+    bool fWRPLocked=false;
 
-    if(fPublisher)
-    {
-        getSubKeyEntityFromPublisher(params[1].get_str(),entStat,&entity,false);    
-        conditions.push_back(mc_QueryCondition(MC_QCT_PUBLISHER,params[1].get_str()));
-    }
-    else
-    {
-        getSubKeyEntityFromKey(params[1].get_str(),entStat,&entity,false);
-        conditions.push_back(mc_QueryCondition(MC_QCT_KEY,params[1].get_str()));
-    }
-    
-    set<string> setFirstPublishers;
-    
     vector<string> inputStrings;
     inputStrings=ParseStringList(params[2]);
     uint32_t mode=0;
@@ -2076,20 +2054,69 @@ Value getstreamsummary(const Array& params, bool fPublisher)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "missing jsonobjectmerge");                                                    
     }
     
-    mc_Buffer *entity_rows=mc_gState->m_TmpBuffers->m_RpcEntityRows;
-    entity_rows->Clear();
-        
-    Object empty_object;
-    Object obj;
     int i,n,c,m,err,pcount;
     bool available;
     bool first_item=true;
+    int chain_height;
+    Value result;
+    string key_string=params[1].get_str();    
+    vector <mc_QueryCondition> conditions;
+    set<string> setFirstPublishers;
+    
+    mc_Buffer *entity_rows=NULL;
+    
+    entStat.Zero();
+    memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+    entStat.m_Entity.m_EntityType=MC_TET_STREAM_KEY;
+    if(fPublisher)
+    {
+        entStat.m_Entity.m_EntityType=MC_TET_STREAM_PUBLISHER;        
+    }
+    entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
+
+    int rpc_slot=GetRPCSlot();
+    if(rpc_slot < 0)
+    {
+        errCode=RPC_INTERNAL_ERROR;
+        strError="Couldn't find RPC Slot";
+        goto exitlbl;
+    }
+    
+    fWRPLocked=true;
+    pwalletTxsMain->WRPReadLock();
+    if(!pwalletTxsMain->WRPFindEntity(&entStat))
+    {
+        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
+    }
+
+
+    if(fPublisher)
+    {
+        WRPSubKeyEntityFromPublisher(params[1].get_str(),entStat,&entity,false,&errCode,&strError);    
+        conditions.push_back(mc_QueryCondition(MC_QCT_PUBLISHER,params[1].get_str()));
+    }
+    else
+    {
+        WRPSubKeyEntityFromKey(params[1].get_str(),entStat,&entity,false,&errCode,&strError);
+        conditions.push_back(mc_QueryCondition(MC_QCT_KEY,params[1].get_str()));
+    }
+    
+    if(strError.size())
+    {
+        goto exitlbl;
+    }
+    
+    
+    entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
+    entity_rows->Clear();
+        
     err=MC_ERR_NOERROR;
-    n=pwalletTxsMain->GetListSize(&entity,entStat.m_Generation,NULL);
+    n=pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL);
     i=0;
     m=10;
+    chain_height=chainActive.Height();
     
-    Value result=obj;
+    result=obj;
     
     while(i<n)
     {
@@ -2100,15 +2127,20 @@ Value getstreamsummary(const Array& params, bool fPublisher)
             {
                 c=n-i;
             }
-            CheckWalletError(pwalletTxsMain->GetList(&entity,entStat.m_Generation,i+1,c,entity_rows),entity.m_EntityType,"");
+            WRPCheckWalletError(pwalletTxsMain->WRPGetList(&entity,entStat.m_Generation,i+1,c,entity_rows),entity.m_EntityType,"",&errCode,&strError);
+            if(strError.size())
+            {
+                goto exitlbl;
+            }
         }
         mc_TxEntityRow *lpEntTx;
         lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i % m);
         uint256 hash;
-        int first_output=mc_GetHashAndFirstOutput(lpEntTx,&hash);
-        const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,NULL,NULL);
+        mc_TxDefRow txdef;        
+        int first_output=WRPGetHashAndFirstOutput(lpEntTx,&hash);
+        const CWalletTx& wtx=pwalletTxsMain->WRPGetWalletTx(hash,&txdef,NULL);
         Object entry;
-        entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,false,&conditions,NULL);
+        entry=StreamItemEntry(rpc_slot,wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,false,&conditions,NULL,&txdef,chain_height);
 /*        
         if(fPublisher)
         {
@@ -2223,7 +2255,9 @@ Value getstreamsummary(const Array& params, bool fPublisher)
                     {
                         if(!available)
                         {
-                            throw JSONRPCError(RPC_NOT_ALLOWED, "Some items to be merged are missing (try using \'ignoremissing\')" );                                                                            
+                            errCode=RPC_NOT_ALLOWED;
+                            strError="Some items to be merged are missing (try using \'ignoremissing\')";
+                            goto exitlbl;
                         }
                     }                    
                 }
@@ -2260,7 +2294,18 @@ exitlbl:
 
     if(err)
     {
-        throw JSONRPCError(RPC_NOT_ALLOWED, "Some items to be merged are in the wrong format (try using \'ignoreother\')" );                                                    
+        errCode=RPC_NOT_ALLOWED;
+        strError="Some items to be merged are in the wrong format (try using \'ignoreother\')" ;
+    }
+
+    if(fWRPLocked)
+    {
+        pwalletTxsMain->WRPReadUnLock();
+    }
+
+    if(strError.size())
+    {
+        throw JSONRPCError(errCode, strError);            
     }
 
     return result;

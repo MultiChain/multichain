@@ -314,8 +314,8 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "gettxoutdata",           &gettxoutdata,            false,     false,      true },
     { "wallet",             "txouttobinarycache",     &txouttobinarycache,      false,     false,      true },
     { "wallet",             "liststreamblockitems",   &liststreamblockitems,    false,     false,      false },
-    { "wallet",             "getstreamkeysummary",    &getstreamkeysummary,     false,     false,      true },
-    { "wallet",             "getstreampublishersummary",&getstreampublishersummary,false,  false,      true },
+    { "wallet",             "getstreamkeysummary",    &getstreamkeysummary,     false,     true,      true },
+    { "wallet",             "getstreampublishersummary",&getstreampublishersummary,false,  true,      true },
     { "hidden",             "storechunk",             &storechunk,              false,     false,      true },
     
 /* MCHN END */    
