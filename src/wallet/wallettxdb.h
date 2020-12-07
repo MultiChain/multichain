@@ -465,6 +465,10 @@ typedef struct mc_TxDB
     int WRPGetRow(
                mc_TxEntityRow *erow);
     
+    int WRPGetBlockItemIndex(                                                      // Returns item id for the last item confirmed in this block or before
+                    mc_TxImport *import,                                        // Import object, if NULL - chain
+                    mc_TxEntity *entity,                                        // Entity to return info for
+                    int block);                                                 // Block to find item for
 } mc_TxDB;
 
 

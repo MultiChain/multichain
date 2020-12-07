@@ -206,6 +206,9 @@ typedef struct mc_WalletTxs
     int WRPGetRow(mc_TxEntityRow *erow);
     
     bool WRPFindEntity(mc_TxEntityStat *entity);                                    // Finds entity in chain import
+    int WRPGetBlockItemIndex(                                                      // Returns item id for the last item confirmed in this block or before
+                    mc_TxEntity *entity,                                        // Entity to return info for
+                    int block);                                                 // Block to find item for
 } mc_WalletTxs;
 
 

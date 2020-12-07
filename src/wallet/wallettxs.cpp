@@ -1465,6 +1465,23 @@ int mc_WalletTxs::GetBlockItemIndex(mc_TxEntity *entity, int block)
     return res;            
 }
 
+int mc_WalletTxs::WRPGetBlockItemIndex(mc_TxEntity *entity, int block)
+{
+    int res;
+    int use_read=m_Database->WRPUsed();
+    
+    if(use_read == 0)
+    {
+        m_Database->Lock(0,0);
+    }
+    res=m_Database->WRPGetBlockItemIndex(NULL,entity,block);
+    if(use_read == 0)
+    {
+        m_Database->UnLock();
+    }
+    return res;            
+}
+
 
 int mc_WalletTxs::GetListSize(mc_TxEntity *entity,int *confirmed)
 {

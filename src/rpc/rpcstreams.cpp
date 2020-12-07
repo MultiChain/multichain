@@ -1648,7 +1648,9 @@ Value liststreamitems(const Array& params, bool fHelp)
     
     if(!pwalletTxsMain->WRPFindEntity(&entStat))
     {
-        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
+        errCode=RPC_NOT_SUBSCRIBED;
+        strError="Not subscribed to this stream";
+        goto exitlbl;
     }
     
     entity_rows=mc_gState->m_TmpBuffers->m_RpcEntityRows;
@@ -1690,18 +1692,22 @@ exitlbl:
     return retArray;
 }
 
-void getTxsForBlockRange(vector <uint256>& txids,mc_TxEntity *entity,int height_from,int height_to,mc_Buffer *entity_rows)
+void WRPTxsForBlockRange(vector <uint256>& txids,mc_TxEntity *entity,int generation,int height_from,int height_to,mc_Buffer *entity_rows,int *errCode,string *strError)
 {
     int first_item,last_item,count,i;
     
-    last_item=pwalletTxsMain->GetBlockItemIndex(entity,height_to);
+    last_item=pwalletTxsMain->WRPGetBlockItemIndex(entity,height_to);
     if(last_item)
     {
-        first_item=pwalletTxsMain->GetBlockItemIndex(entity,height_from-1)+1;
+        first_item=pwalletTxsMain->WRPGetBlockItemIndex(entity,height_from-1)+1;
         count=last_item-first_item+1;
         if(count > 0)
         {
-            CheckWalletError(pwalletTxsMain->GetList(entity,first_item,count,entity_rows),entity->m_EntityType,"");
+            WRPCheckWalletError(pwalletTxsMain->WRPGetList(entity,generation,first_item,count,entity_rows),entity->m_EntityType,"",errCode,strError);
+            if(strError->size())
+            {
+                return;
+            }
             
             mc_TxEntityRow *lpEntTx;
             uint256 hash;
@@ -1729,12 +1735,36 @@ Value liststreamblockitems(const Array& params, bool fHelp)
     }   
            
     mc_TxEntityStat entStat;
-    
-    mc_EntityDetails stream_entity;
-    parseStreamIdentifier(params[0],&stream_entity);           
+    int errCode;
+    string strError;
 
+    mc_Buffer *entity_rows=NULL;
+    Array retArray;
+
+    int chain_height; 
+    vector <int> heights;
+    vector <uint256> txids;
+    int height_from,height_to;
+    bool fWRPLocked=false;
     int count,start;
     bool verbose=false;
+    
+    mc_EntityDetails stream_entity;
+    
+    parseStreamIdentifier(params[0],&stream_entity);           
+    
+    int rpc_slot=GetRPCSlot();
+    if(rpc_slot < 0)
+    {
+        errCode=RPC_INTERNAL_ERROR;
+        strError="Couldn't find RPC Slot";
+        goto exitlbl;
+    }
+    
+    fWRPLocked=true;
+    pwalletTxsMain->WRPReadLock();
+    
+
     
     if (params.size() > 2)    
     {
@@ -1751,62 +1781,83 @@ Value liststreamblockitems(const Array& params, bool fHelp)
     {
         start=paramtoint(params[4],false,0,"Invalid start");
     }
+    chain_height=chainActive.Height();
+    heights=ParseBlockSetIdentifier(params[1],chain_height);              
+    if(heights.size() == 0)
+    {
+        goto exitlbl;
+    }
     
     entStat.Zero();
     memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
     entStat.m_Entity.m_EntityType=MC_TET_STREAM;
     entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
-    if(!pwalletTxsMain->FindEntity(&entStat))
+  
+        
+    if(!pwalletTxsMain->WRPFindEntity(&entStat))
     {
-        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
+        errCode=RPC_NOT_SUBSCRIBED;
+        strError="Not subscribed to this stream";
+        goto exitlbl;
     }
     
     
-    vector <int> heights=ParseBlockSetIdentifier(params[1]);
-    vector <uint256> txids;
-    
-    Array retArray;
-    if(heights.size() == 0)
-    {
-        return retArray;
-    }
-    
-    int height_from,height_to;
     height_from=heights[0];
     height_to=heights[0];
 
-    mc_Buffer *entity_rows=mc_gState->m_TmpBuffers->m_RpcEntityRows;
+    entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
     entity_rows->Clear();
     
     for(unsigned int i=1;i<heights.size();i++)
     {
         if(heights[i] > height_to + 1)
         {
-            getTxsForBlockRange(txids,&entStat.m_Entity,height_from,height_to,entity_rows);
+            WRPTxsForBlockRange(txids,&entStat.m_Entity,entStat.m_Generation,height_from,height_to,entity_rows,&errCode,&strError);
+            if(strError.size())
+            {
+                goto exitlbl;                
+            }
             height_from=heights[i];
         }
         height_to=heights[i];
     }
     
     
-    getTxsForBlockRange(txids,&entStat.m_Entity,height_from,height_to,entity_rows);
+    WRPTxsForBlockRange(txids,&entStat.m_Entity,entStat.m_Generation,height_from,height_to,entity_rows,&errCode,&strError);
+    if(strError.size())
+    {
+        goto exitlbl;                
+    }
     
     mc_AdjustStartAndCount(&count,&start,txids.size());
     
     for(int i=start;i<start+count;i++)
     {
-        const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(txids[i],NULL,NULL);
+        mc_TxDefRow txdef;
+        const CWalletTx& wtx=pwalletTxsMain->WRPGetWalletTx(txids[i],&txdef,NULL);
         int first_output=0;
         int stream_output;
         while(first_output < (int)wtx.vout.size())
         {
-            Object entry=StreamItemEntry(wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,NULL,&stream_output);
+            Object entry=StreamItemEntry(rpc_slot,wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,NULL,&stream_output,&txdef,chain_height);
             if(entry.size())
             {
                 retArray.push_back(entry);                                
             }
             first_output=stream_output+1;
         }
+    }
+    
+exitlbl:                
+    
+    if(fWRPLocked)
+    {
+        pwalletTxsMain->WRPReadUnLock();
+    }
+
+    if(strError.size())
+    {
+        throw JSONRPCError(errCode, strError);            
     }
     
     return retArray;
@@ -2086,7 +2137,9 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     pwalletTxsMain->WRPReadLock();
     if(!pwalletTxsMain->WRPFindEntity(&entStat))
     {
-        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
+        errCode=RPC_NOT_SUBSCRIBED;
+        strError="Not subscribed to this stream";
+        goto exitlbl;
     }
 
 
@@ -2562,7 +2615,9 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
     pwalletTxsMain->WRPReadLock();
     if(!pwalletTxsMain->WRPFindEntity(&entStat))
     {
-        throw JSONRPCError(RPC_NOT_SUBSCRIBED, "Not subscribed to this stream");                                
+        errCode=RPC_NOT_SUBSCRIBED;
+        strError="Not subscribed to this stream";
+        goto exitlbl;
     }
 
     WRPSubKeyEntityFromPublisher(params[1].get_str(),entStat,&entity,false,&errCode,&strError);

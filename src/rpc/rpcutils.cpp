@@ -5291,11 +5291,18 @@ int ParseRescanParameter(Value rescan_identifier, bool *fRescan)
     return start_block;
 }
 
-vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
+vector<int> ParseBlockSetIdentifier(Value blockset_identifier,int chain_height_in)
 {
     vector<int> block_set;
     vector<int> result;
     int last_block;
+
+    int chain_height=chain_height_in;
+    
+    if(chain_height < 0)
+    {
+        chain_height=chainActive.Height();
+    }
     
     if(blockset_identifier.type() == obj_type)
     {
@@ -5342,7 +5349,7 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
         
         if(starttime <= endtime)
         {
-            for(int block=0; block<=chainActive.Height();block++)
+            for(int block=0; block<=chain_height;block++)
             {
                 if( (chainActive[block]->nTime >= starttime) && (chainActive[block]->nTime <= endtime) )
                 {
@@ -5373,8 +5380,8 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
                 to=value;
                 if(value < 0)
                 {
-                    to=chainActive.Height();
-                    from=chainActive.Height()+value+1;
+                    to=chain_height;
+                    from=chain_height+value+1;
                 }
             }
             else
@@ -5402,9 +5409,9 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
             {
                 from=0;
             }
-            if(to>chainActive.Height())
+            if(to>chain_height)
             {
-                to=chainActive.Height();
+                to=chain_height;
             }
             
             for(int block=from;block<=to;block++)
@@ -5432,6 +5439,10 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
     return result;
 }
 
+vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
+{
+    return ParseBlockSetIdentifier(blockset_identifier,-1);
+}
 
 
 Array AssetArrayFromAmounts(mc_Buffer *asset_amounts,int issue_asset_id,uint256 hash,int show_type)

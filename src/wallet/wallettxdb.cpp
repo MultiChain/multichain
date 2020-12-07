@@ -2510,9 +2510,7 @@ int mc_TxDB::GetList(
     erow.Zero();
     memcpy(&erow.m_Entity,&(stat->m_Entity),sizeof(mc_TxEntity));
     erow.m_Generation=stat->m_Generation;
-    printf("%d\n",erow.m_Generation);
     mprow=-1;
-    printf("%d %d %d\n",first,last,stat->m_LastClearedPos);
     for(i=first;i<=last;i++)
     {
         erow.m_Pos=i;        
@@ -2879,6 +2877,73 @@ int mc_TxDB::GetBlockItemIndex(mc_TxImport *import,mc_TxEntity *entity,int block
         next=(last+first)/2;
         erow.m_Pos=next;
         GetRow(&erow);
+        if(erow.m_Block > block)
+        {
+            last=next;
+        }
+        else
+        {
+            first=next;
+        }
+    }
+    
+    return first;
+}
+    
+int mc_TxDB::WRPGetBlockItemIndex(mc_TxImport *import,mc_TxEntity *entity,int block)
+{
+    mc_TxImport *imp;
+    int first,last,next;
+   
+    imp=m_Imports;
+    if(import)
+    {
+        imp=import;
+    }
+    
+    mc_TxEntityRow erow;
+    int row;
+    mc_TxEntityStat *stat;
+    
+    row=imp->FindEntity(entity);
+    if(row < 0)
+    {
+        return 0;
+    }
+    
+    stat=(mc_TxEntityStat*)imp->m_Entities->GetRow(row);
+    
+    first=1;
+    WRPGetListSize(entity,stat->m_Generation,&last);
+        
+    if(last <= 0)
+    {
+        return 0;
+    }
+    
+    erow.Zero();
+    memcpy(&erow.m_Entity,&(stat->m_Entity),sizeof(mc_TxEntity));
+    erow.m_Generation=stat->m_Generation;
+    
+    erow.m_Pos=first;
+    WRPGetRow(&erow);
+    if(erow.m_Block > block)
+    {
+        return 0;
+    }
+    
+    erow.m_Pos=last;
+    WRPGetRow(&erow);
+    if(erow.m_Block <= block)
+    {
+        return last;        
+    }
+    
+    while(last-first > 1)
+    {
+        next=(last+first)/2;
+        erow.m_Pos=next;
+        WRPGetRow(&erow);
         if(erow.m_Block > block)
         {
             last=next;
