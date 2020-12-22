@@ -78,7 +78,7 @@ static const CRPCCommand vRPCCommands[] =
     /* Block chain and UTXO */
     { "blockchain",         "getblockchaininfo",      &getblockchaininfo,      true,      false,      false },
     { "blockchain",         "getbestblockhash",       &getbestblockhash,       true,      false,      false },
-    { "blockchain",         "getblockcount",          &getblockcount,          true,      false,      false },
+    { "blockchain",         "getblockcount",          &getblockcount,          true,       true,      false },
     { "blockchain",         "getlastblockinfo",       &getlastblockinfo,       true,      false,      false },
     { "blockchain",         "getblock",               &getblock,               true,      false,      false },
     { "blockchain",         "getblockhash",           &getblockhash,           true,      false,      false },
@@ -313,7 +313,7 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "liststreampublishers",   &liststreampublishers,    false,      true,      true },
     { "wallet",             "gettxoutdata",           &gettxoutdata,            false,     false,      true },
     { "wallet",             "txouttobinarycache",     &txouttobinarycache,      false,     false,      true },
-    { "wallet",             "liststreamblockitems",   &liststreamblockitems,    false,     false,      false },
+    { "wallet",             "liststreamblockitems",   &liststreamblockitems,    false,     true,      false },
     { "wallet",             "getstreamkeysummary",    &getstreamkeysummary,     false,     true,      true },
     { "wallet",             "getstreampublishersummary",&getstreampublishersummary,false,  true,      true },
     { "hidden",             "storechunk",             &storechunk,              false,     false,      true },

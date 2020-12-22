@@ -1653,10 +1653,10 @@ Value liststreamitems(const Array& params, bool fHelp)
         goto exitlbl;
     }
     
-    entity_rows=mc_gState->m_TmpBuffers->m_RpcEntityRows;
+    entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
     entity_rows->Clear();
     
-    mc_AdjustStartAndCount(&count,&start,entStat.m_LastPos);
+    mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->WRPGetListSize(&entStat.m_Entity,entStat.m_Generation,NULL));
     
 //    CheckWalletError(pwalletTxsMain->GetList(&entStat.m_Entity,start+1,count,entity_rows),entStat.m_Entity.m_EntityType,"");
     WRPCheckWalletError(pwalletTxsMain->WRPGetList(&entStat.m_Entity,entStat.m_Generation,start+1,count,entity_rows),entStat.m_Entity.m_EntityType,"",&errCode,&strError);
@@ -3411,7 +3411,7 @@ Value liststreamqueryitems(const Array& params, bool fHelp)
     fWRPLocked=true;
     pwalletTxsMain->WRPReadLock();
 
-    entity_rows=mc_gState->m_TmpBuffers->m_RpcEntityRows;
+    entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
     entity_rows->Clear();
     
     dirty_count=WRPGetAndQueryDirtyList(conditions,&stream_entity,false,entity_rows,&errCode,&strError);

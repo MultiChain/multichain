@@ -1388,7 +1388,7 @@ int mc_WalletTxs::WRPGetRow(
     {
         m_Database->Lock(0,0);
     }
-    err=m_Database->GetRow(erow);
+    err=m_Database->WRPGetRow(erow);
     if(use_read == 0)
     {
         m_Database->UnLock();
