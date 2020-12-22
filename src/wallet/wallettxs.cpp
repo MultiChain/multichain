@@ -2240,7 +2240,8 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     uint160 subkey_hash160;
     uint160 stream_subkey_hash160;
     set<uint160> publishers_set;
-    map<uint160,int> subkey_count_map;
+//    map<uint160,int> subkey_count_map;
+    map<uint160,mc_TxEntityRowExtension> subkey_extension_map;
     
     int import_pos;
     bool fFound;
@@ -2791,7 +2792,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                 }
 
                                 mc_GetCompoundHash160(&stream_subkey_hash160,entity.m_EntityID,&subkey_hash160);
-
+/*
                                 map<uint160,int>::iterator it = subkey_count_map.find(stream_subkey_hash160);
                                 if (it == subkey_count_map.end())
                                 {
@@ -2802,12 +2803,27 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                     it->second += 1;
                                     extension.m_Count=it->second;
                                 }
+ */ 
+                                map<uint160,mc_TxEntityRowExtension>::iterator it = subkey_extension_map.find(stream_subkey_hash160);
+                                if (it == subkey_extension_map.end())
+                                {
+                                    mc_TxEntityRowExtension new_extension;
+                                    new_extension.Zero();
+                                    new_extension.m_Output=i;
+                                    subkey_extension_map.insert(make_pair(stream_subkey_hash160,new_extension));
+                                    it = subkey_extension_map.find(stream_subkey_hash160);
+                                }                                
+                                else
+                                {
+                                    it->second.m_Count += 1;
+                                    it->second.m_Output=i;
+                                }
                                 
                                 entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_CHAINPOS;
                                 subkey_entity.Zero();
                                 memcpy(subkey_entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
                                 subkey_entity.m_EntityType=MC_TET_SUBKEY_STREAM_KEY | MC_TET_CHAINPOS;
-                                err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,&extension,block,0,fFound ? 0 : 1);
+                                err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,&(it->second),block,0,fFound ? 0 : 1);
                                 if(err)
                                 {
                                     goto exitlbl;
@@ -2815,7 +2831,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
 
                                 entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_TIMERECEIVED;
                                 subkey_entity.m_EntityType=MC_TET_SUBKEY_STREAM_KEY | MC_TET_TIMERECEIVED;
-                                err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,&extension,block,0,fFound ? 0 : 1);
+                                err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,&(it->second),block,0,fFound ? 0 : 1);
                                 if(err)
                                 {
                                     goto exitlbl;
@@ -2855,7 +2871,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                             }
                                             
                                             mc_GetCompoundHash160(&stream_subkey_hash160,entity.m_EntityID,&subkey_hash160);
-                            
+/*                            
                                             map<uint160,int>::iterator it = subkey_count_map.find(stream_subkey_hash160);
                                             if (it == subkey_count_map.end())
                                             {
@@ -2866,12 +2882,27 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                                 it->second += 1;
                                                 extension.m_Count=it->second;
                                             }
+ */ 
+                                            map<uint160,mc_TxEntityRowExtension>::iterator it = subkey_extension_map.find(stream_subkey_hash160);
+                                            if (it == subkey_extension_map.end())
+                                            {
+                                                mc_TxEntityRowExtension new_extension;
+                                                new_extension.Zero();
+                                                new_extension.m_Output=i;
+                                                subkey_extension_map.insert(make_pair(stream_subkey_hash160,new_extension));
+                                                it = subkey_extension_map.find(stream_subkey_hash160);
+                                            }                                
+                                            else
+                                            {
+                                                it->second.m_Count += 1;
+                                                it->second.m_Output=i;
+                                            }
                                             
                                             entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS;
                                             subkey_entity.Zero();
                                             memcpy(subkey_entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
                                             subkey_entity.m_EntityType=MC_TET_SUBKEY_STREAM_PUBLISHER | MC_TET_CHAINPOS;
-                                            err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,&extension,block,0,fFound ? 0 : 1);
+                                            err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,&(it->second),block,0,fFound ? 0 : 1);
                                             if(err)
                                             {
                                                 goto exitlbl;
@@ -2879,7 +2910,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                             
                                             entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_TIMERECEIVED;
                                             subkey_entity.m_EntityType=MC_TET_SUBKEY_STREAM_PUBLISHER | MC_TET_TIMERECEIVED;
-                                            err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,&extension,block,0,fFound ? 0 : 1);
+                                            err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,&(it->second),block,0,fFound ? 0 : 1);
                                             if(err)
                                             {
                                                 goto exitlbl;
