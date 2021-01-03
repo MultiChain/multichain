@@ -882,97 +882,100 @@ int mc_WalletTxs::RollBackSubKeys(mc_TxImport *import,int block,mc_TxEntityStat 
                 if(fInBlocks &&                                                 // Still in loop, no error
                   (entrow->m_Block > block))                                    // Block to delete, mempool rows will be deleted in db rollback
                 {
-                    uint256 hash;
-                    memcpy(&hash,entrow->m_TxId,MC_TDB_TXID_SIZE);
-                    CWalletTx wtx=GetInternalWalletTx(hash,NULL,&err);  // Tx to delete
-                    if(err)
+                    if((entrow->m_Flags & MC_TFL_IS_EXTENSION) == 0)            // Extension rows are ignored, tx will appear in normal row and decrement subkey several times                     
                     {
-                        LogPrintf("wtxs: RollBackSubKeys: Couldn't find tx %s, error: %d\n",hash.ToString().c_str(),err);        
-                        fInBlocks=false;                                                                
-                    }
-                    else
-                    {
-                        for(i=0;i<(int)wtx.vout.size();i++)             
+                        uint256 hash;
+                        memcpy(&hash,entrow->m_TxId,MC_TDB_TXID_SIZE);
+                        CWalletTx wtx=GetInternalWalletTx(hash,NULL,&err);  // Tx to delete
+                        if(err)
                         {
-                            const CTxOut txout=wtx.vout[i];
-                            const CScript& script1 = txout.scriptPubKey;        
-                            CScript::const_iterator pc1 = script1.begin();
-
-                            mc_gState->m_TmpScript->Clear();
-                            mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
-                            mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);
-                            if( (mc_gState->m_TmpScript->IsOpReturnScript() != 0 ) && (mc_gState->m_TmpScript->GetNumElements() >= 3) )
+                            LogPrintf("wtxs: RollBackSubKeys: Couldn't find tx %s, error: %d\n",hash.ToString().c_str(),err);        
+                            fInBlocks=false;                                                                
+                        }
+                        else
+                        {
+                            for(i=0;i<(int)wtx.vout.size();i++)             
                             {
-                                mc_gState->m_TmpScript->DeleteDuplicatesInRange(1,mc_gState->m_TmpScript->GetNumElements()-1);
-                                unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
-                                mc_gState->m_TmpScript->SetElement(0);
+                                const CTxOut txout=wtx.vout[i];
+                                const CScript& script1 = txout.scriptPubKey;        
+                                CScript::const_iterator pc1 = script1.begin();
 
-                                if( (mc_gState->m_TmpScript->GetEntity(short_txid) == 0) &&           
-                                    (memcmp(short_txid,parent_entity->m_Entity.m_EntityID,MC_AST_SHORT_TXID_SIZE) == 0) )    
+                                mc_gState->m_TmpScript->Clear();
+                                mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+                                mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);
+                                if( (mc_gState->m_TmpScript->IsOpReturnScript() != 0 ) && (mc_gState->m_TmpScript->GetNumElements() >= 3) )
                                 {
-                                    entity.Zero();
-                                    memcpy(entity.m_EntityID,short_txid,MC_AST_SHORT_TXID_SIZE);
-                                    entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_CHAINPOS;
-                                    
-                                    for(int e=mc_gState->m_TmpScript->GetNumElements()-2;e>=1;e--)
+                                    mc_gState->m_TmpScript->DeleteDuplicatesInRange(1,mc_gState->m_TmpScript->GetNumElements()-1);
+                                    unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
+                                    mc_gState->m_TmpScript->SetElement(0);
+
+                                    if( (mc_gState->m_TmpScript->GetEntity(short_txid) == 0) &&           
+                                        (memcmp(short_txid,parent_entity->m_Entity.m_EntityID,MC_AST_SHORT_TXID_SIZE) == 0) )    
                                     {
-                                        mc_gState->m_TmpScript->SetElement(e);
-                                        if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
-                                        {
-                                            err=MC_ERR_INTERNAL_ERROR;
-                                            goto exitlbl;                                                                                                                                        
-                                        }                    
+                                        entity.Zero();
+                                        memcpy(entity.m_EntityID,short_txid,MC_AST_SHORT_TXID_SIZE);
+                                        entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_CHAINPOS;
 
-                                        subkey_hash160=Hash160(item_key,item_key+item_key_size);
-                                        mc_GetCompoundHash160(&stream_subkey_hash160,parent_entity->m_Entity.m_EntityID,&subkey_hash160);
-
-                                        subkey_entity.Zero();
-                                        memcpy(subkey_entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
-                                        subkey_entity.m_EntityType=MC_TET_SUBKEY_STREAM_KEY | MC_TET_CHAINPOS;
-                                        err= m_Database->DecrementSubKey(imp,&entity,&subkey_entity);
-                                        if(err)
+                                        for(int e=mc_gState->m_TmpScript->GetNumElements()-2;e>=1;e--)
                                         {
-                                            goto exitlbl;
+                                            mc_gState->m_TmpScript->SetElement(e);
+                                            if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
+                                            {
+                                                err=MC_ERR_INTERNAL_ERROR;
+                                                goto exitlbl;                                                                                                                                        
+                                            }                    
+
+                                            subkey_hash160=Hash160(item_key,item_key+item_key_size);
+                                            mc_GetCompoundHash160(&stream_subkey_hash160,parent_entity->m_Entity.m_EntityID,&subkey_hash160);
+
+                                            subkey_entity.Zero();
+                                            memcpy(subkey_entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+                                            subkey_entity.m_EntityType=MC_TET_SUBKEY_STREAM_KEY | MC_TET_CHAINPOS;
+                                            err= m_Database->DecrementSubKey(imp,&entity,&subkey_entity);
+                                            if(err)
+                                            {
+                                                goto exitlbl;
+                                            }
                                         }
-                                    }
-                                    
-                                    publishers_set.clear();
-                                    for (j = 0; j < (int)wtx.vin.size(); ++j)
-                                    {
-                                        int op_addr_offset,op_addr_size,is_redeem_script,sighash_type;
-                                        const unsigned char *ptr;
 
-                                        const CScript& script2 = wtx.vin[j].scriptSig;        
-                                        CScript::const_iterator pc2 = script2.begin();
-
-                                        ptr=mc_ExtractAddressFromInputScript((unsigned char*)(&pc2[0]),(int)(script2.end()-pc2),
-                                                &op_addr_offset,&op_addr_size,&is_redeem_script,&sighash_type,0);                                
-                                        if(ptr)
+                                        publishers_set.clear();
+                                        for (j = 0; j < (int)wtx.vin.size(); ++j)
                                         {
-                                            if( (sighash_type == SIGHASH_ALL) || ( (sighash_type == SIGHASH_SINGLE) && (j == i) ) )
-                                            {                                        
-                                                subkey_hash160=Hash160(ptr+op_addr_offset,ptr+op_addr_offset+op_addr_size);
-                                                if(publishers_set.count(subkey_hash160) == 0)
-                                                {
-                                                    publishers_set.insert(subkey_hash160);
-                                                    mc_GetCompoundHash160(&stream_subkey_hash160,parent_entity->m_Entity.m_EntityID,&subkey_hash160);
+                                            int op_addr_offset,op_addr_size,is_redeem_script,sighash_type;
+                                            const unsigned char *ptr;
 
-                                                    entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS;
-                                                    subkey_entity.Zero();
-                                                    memcpy(subkey_entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
-                                                    subkey_entity.m_EntityType=MC_TET_SUBKEY_STREAM_PUBLISHER | MC_TET_CHAINPOS;
-                                                    err= m_Database->DecrementSubKey(imp,&entity,&subkey_entity);
-                                                    if(err)
+                                            const CScript& script2 = wtx.vin[j].scriptSig;        
+                                            CScript::const_iterator pc2 = script2.begin();
+
+                                            ptr=mc_ExtractAddressFromInputScript((unsigned char*)(&pc2[0]),(int)(script2.end()-pc2),
+                                                    &op_addr_offset,&op_addr_size,&is_redeem_script,&sighash_type,0);                                
+                                            if(ptr)
+                                            {
+                                                if( (sighash_type == SIGHASH_ALL) || ( (sighash_type == SIGHASH_SINGLE) && (j == i) ) )
+                                                {                                        
+                                                    subkey_hash160=Hash160(ptr+op_addr_offset,ptr+op_addr_offset+op_addr_size);
+                                                    if(publishers_set.count(subkey_hash160) == 0)
                                                     {
-                                                        goto exitlbl;
+                                                        publishers_set.insert(subkey_hash160);
+                                                        mc_GetCompoundHash160(&stream_subkey_hash160,parent_entity->m_Entity.m_EntityID,&subkey_hash160);
+
+                                                        entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS;
+                                                        subkey_entity.Zero();
+                                                        memcpy(subkey_entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+                                                        subkey_entity.m_EntityType=MC_TET_SUBKEY_STREAM_PUBLISHER | MC_TET_CHAINPOS;
+                                                        err= m_Database->DecrementSubKey(imp,&entity,&subkey_entity);
+                                                        if(err)
+                                                        {
+                                                            goto exitlbl;
+                                                        }
                                                     }
                                                 }
-                                            }
+                                            }                            
                                         }                            
-                                    }                            
-                                }
-                            }                            
-                        }                        
+                                    }
+                                }                            
+                            }                        
+                        }
                     }
                 }
                 else
