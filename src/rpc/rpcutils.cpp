@@ -1529,7 +1529,7 @@ const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes
     return mc_gState->m_TmpBuffers->m_RpcChunkScript1->GetData(0,&elem_size);
 }
 
-uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t total_size,int max_shown)
+uint32_t GetFormattedData(int rpc_slot,mc_Script *lpScript,const unsigned char **elem,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t total_size,int max_shown)
 {
     uint32_t status;  
     mc_ChunkDBRow chunk_def;
@@ -1568,10 +1568,17 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
         return MC_OST_OFF_CHAIN | MC_OST_ERROR_NOT_SUPPORTED;
     }
     
+    mc_Script *tmpscript;
+    tmpscript=mc_gState->m_TmpBuffers->m_RpcChunkScript1;
+    if(rpc_slot >= 0)
+    {
+        tmpscript=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcChunkScript1;
+    }
+    
     if(use_tmp_buf)
     {
-        mc_gState->m_TmpBuffers->m_RpcChunkScript1->Clear();
-        mc_gState->m_TmpBuffers->m_RpcChunkScript1->AddElement();
+        tmpscript->Clear();
+        tmpscript->AddElement();
     }
     
     status=MC_OST_OFF_CHAIN;
@@ -1610,7 +1617,7 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
                 {
                     if(use_tmp_buf)
                     {
-                        mc_gState->m_TmpBuffers->m_RpcChunkScript1->SetData(*elem,elem_size);
+                        tmpscript->SetData(*elem,elem_size);
                     }
                 }
                 else
@@ -1633,7 +1640,7 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
     
     if(use_tmp_buf)
     {
-        *elem = mc_gState->m_TmpBuffers->m_RpcChunkScript1->GetData(0,&elem_size);
+        *elem = tmpscript->GetData(0,&elem_size);
     }
     else
     {
@@ -1653,6 +1660,11 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
     }
     
     return status;
+}
+
+uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t total_size,int max_shown)
+{
+    return GetFormattedData(-1,lpScript,elem,out_size,hashes,chunk_count,total_size,max_shown);
 }
 
 string OffChainError(uint32_t status,int *errorCode) 

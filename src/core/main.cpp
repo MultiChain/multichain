@@ -3066,7 +3066,23 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
         }
     }
     
+    int blk_sleep=GetArg("-debug-block-total-sleep",0);
+    int wrp_sleep=GetArg("-debug-block-wallet-sleep",0);
+    blk_sleep-=wrp_sleep;
+    if(blk_sleep > 0)
+    {
+        LogPrintf("DEBUG: block-no-wallet sleep - start\n");
+        MilliSleep(blk_sleep);
+        LogPrintf("DEBUG: block-no-wallet sleep - end\n");
+    }
+    
     pwalletTxsMain->WRPWriteLock();
+    if(wrp_sleep > 0)
+    {
+        LogPrintf("DEBUG: block-wallet sleep - start\n");
+        MilliSleep(wrp_sleep);
+        LogPrintf("DEBUG: block-wallet sleep - end\n");
+    }
     if(fDebug)LogPrint("mcwrp","mcwrp: DB synchronization for block %d\n",pindexNew->nHeight);
     
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, commit                  (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");

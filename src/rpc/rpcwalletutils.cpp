@@ -815,7 +815,7 @@ Object StreamItemEntry(int rpc_slot,const CWalletTx& wtx,int first_output,const 
                                 const unsigned char *elem;
 
 //                                elem = tmpscript->GetData(tmpscript->GetNumElements()-1,&elem_size);
-                                retrieve_status = GetFormattedData(tmpscript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
+                                retrieve_status = GetFormattedData(rpc_slot,tmpscript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
 //                                item_value=OpReturnEntry(elem,elem_size,wtx.GetHash(),j);
                                 format_item_value=OpReturnFormatEntry(elem,out_size,wtx.GetHash(),j,format,&format_text_str,retrieve_status);
                             }
