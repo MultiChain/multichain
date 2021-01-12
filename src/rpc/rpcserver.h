@@ -244,6 +244,7 @@ extern json_spirit::Value issuecmd(const json_spirit::Array& params, bool fHelp)
 extern json_spirit::Value issuemorecmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listassets(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listpermissions(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listminers(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getassetbalances(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value gettotalbalances(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value sendassettoaddress(const json_spirit::Array& params, bool fHelp);

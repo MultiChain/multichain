@@ -1683,6 +1683,30 @@ int mc_Permissions::CanMine(const void* lpEntity,const void* lpAddress)
     return result;
 }
 
+int mc_Permissions::GetMinerInfo(const void* lpAddress,uint32_t *confirmed_start_block,uint32_t *confirmed_end_block,uint32_t *last_mined)
+{
+    mc_PermissionLedgerRow row;
+    
+    int result;    
+    int32_t last;
+        
+    Lock(0);
+
+    int check_mempool=0;        
+    
+    result = GetPermission(NULL,lpAddress,MC_PTP_MINE,&row,check_mempool);        
+ 
+    *confirmed_start_block=row.m_BlockFrom;
+    *confirmed_end_block=row.m_BlockTo;
+    
+    GetPermission(NULL,lpAddress,MC_PTP_BLOCK_MINER,&row,0);    
+    *last_mined=row.m_BlockFrom;
+    
+    UnLock();
+    
+    return result;
+}
+
 /** Returns non-zero value if address can mine block with specific height */
 
 // WARNING! Possible bug in this functiom, But function is not used
@@ -3132,11 +3156,11 @@ mc_Buffer *mc_Permissions::GetPermissionList(const void* lpEntity,const void* lp
                         plsRow.m_BlockTo=pdbRow.m_BlockTo;
                         plsRow.m_Flags=pdbRow.m_Flags;
                         plsRow.m_LastRow=pdbRow.m_LedgerRow;
-                        if(mc_IsUpgradeEntity(lpEntity))
+                        pldRow.m_BlockReceived=INT_MAX;                         // For listminers, which checks only if it is unconfirmed
+                        if(mc_IsUpgradeEntity(lpEntity) > 0)
                         {
-                            m_Ledger->GetRow(pdbRow.m_LedgerRow,&pldRow);                            
+                            plsRow.m_BlockReceived=pldRow.m_BlockReceived;
                         }
-                        plsRow.m_BlockReceived=pldRow.m_BlockReceived;
                         result->Add(&plsRow,(unsigned char*)&plsRow+m_Database->m_ValueOffset);
                     }
                 }
@@ -3195,6 +3219,7 @@ mc_Buffer *mc_Permissions::GetPermissionList(const void* lpEntity,const void* lp
                         ptrFound->m_BlockTo=pldRow.m_BlockTo;
                         ptrFound->m_Flags=pldRow.m_Flags;
                         ptrFound->m_LastRow=pldRow.m_ThisRow;
+                        ptrFound->m_BlockReceived=pldRow.m_BlockReceived;
                     }
                     else
                     {

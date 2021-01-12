@@ -377,7 +377,7 @@ typedef struct mc_Permissions
     int GetBlockAdminMinerGrants(const void* lpHash,int record,int32_t *offsets);
     int CanMineBlockOnFork(const void* lpAddress,uint32_t block,uint32_t last_after_fork);
     int IsBarredByDiversity(uint32_t block,uint32_t last,int miner_count);
-    
+    int GetMinerInfo(const void* lpAddress,uint32_t *confirmed_start_block,uint32_t *confirmed_end_block,uint32_t *last_mined);    
     
     
 // Internal functions    

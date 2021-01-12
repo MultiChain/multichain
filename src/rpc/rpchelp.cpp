@@ -5507,6 +5507,10 @@ void mc_InitRPCHelpMap23()
             + HelpExampleRpc("getlibrarycode", "lib1")
         ));
      
+}
+
+void mc_InitRPCHelpMap24()
+{
      mapHelpStrings.insert(std::make_pair("testlibrary",
             "testlibrary ( \"library-identifier\"  \"update-name\" \"javascript-code\")\n"
             "\nSets library code to be used for testing in testtxfilter, runtxfilter, teststreamfilter and runstreamfilter \n"
@@ -5527,11 +5531,22 @@ void mc_InitRPCHelpMap23()
             + HelpExampleRpc("testlibrary", "lib1")
         ));
      
+    mapHelpStrings.insert(std::make_pair("listminers",
+            "listminers ( verbose )\n"
+            "\nReturns information about miners.\n"
+            "\nArguments:\n"
+            "1. verbose                          (boolean, optional, default=false) If true, returns block range for permitted mining\n"
+            "\nResult:\n"
+            "An array containing information about miners\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("listminers", "")
+            + HelpExampleRpc("listminers", "")
+        ));
+        
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
-    
-    
+       
 }
 
 void mc_InitRPCLogParamCountMap()
@@ -5636,6 +5651,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap21();
     mc_InitRPCHelpMap22();
     mc_InitRPCHelpMap23();
+    mc_InitRPCHelpMap24();
     
     pEF->ENT_InitRPCHelpMap();
     

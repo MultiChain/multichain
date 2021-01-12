@@ -95,6 +95,7 @@ static const CRPCCommand vRPCCommands[] =
 /* MCHN START */    
     { "blockchain",         "listassets",             &listassets,             true,      false,      false },
     { "blockchain",         "listpermissions",        &listpermissions,        true,      false,      false },
+    { "blockchain",         "listminers",             &listminers,             true,      false,      false },
     { "blockchain",         "liststreams",            &liststreams,            true,      false,      false },
     { "blockchain",         "listupgrades",           &listupgrades,           true,      false,      false },
     { "blockchain",         "listtxfilters",          &listtxfilters,          true,      false,      false },
