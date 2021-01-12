@@ -62,6 +62,11 @@ public:
 uint64_t nLastBlockTx = 0;
 uint64_t nLastBlockSize = 0;
 
+
+
+uint32_t nMiningStatus = MC_MST_NO_MINER;
+CPubKey kActiveMiner;
+
 // We want to sort transactions by priority and fee rate, so:
 typedef boost::tuple<double, CFeeRate, const CTransaction*> TxPriority;
 class TxPriorityCompare
@@ -1056,6 +1061,7 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
         return *lpdMiningStartTime;
     }        
     
+    nMiningStatus &= MC_MST_PROC_MASK;
     
     dMinerDrift=Params().MiningTurnover();
     if(dMinerDrift > 1.0)
@@ -1169,10 +1175,14 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
         fInMinerPool=false;
         if(!pwallet->GetKeyFromAddressBook(kThisMiner,MC_PTP_MINE,&sThisMinerPool))
         {
-            pwallet->GetKeyFromAddressBook(kThisMiner,MC_PTP_MINE);
+            if(pwallet->GetKeyFromAddressBook(kThisMiner,MC_PTP_MINE))
+            {
+                nMiningStatus |= MC_MST_FOUND;
+            }
         }
         else
         {
+            nMiningStatus |= MC_MST_RECENT;
             fInMinerPool=true;
         }
         
@@ -1194,6 +1204,7 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
             {            
                 if( (*lpdActiveMiners < 0.5) || ( mc_RandomDouble() < dMinerDrift /(*lpdActiveMiners)))
                 {
+                    nMiningStatus |= MC_MST_DRIFT;
                     fInMinerPool=true;
                     nMinerPoolSize++;
                 }
@@ -1269,6 +1280,12 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
     return *lpdMiningStartTime;
 }
 
+uint32_t mc_GetMiningStatus(CPubKey &miner)
+{
+    miner=kActiveMiner;
+    return nMiningStatus;
+}
+
 void static BitcoinMiner(CWallet *pwallet)
 {
     LogPrintf("MultiChainMiner started\n");
@@ -1317,17 +1334,27 @@ void static BitcoinMiner(CWallet *pwallet)
     
 /* MCHN END */            
     
+    kActiveMiner=CPubKey();
+    uint32_t nLastStatus=MC_MST_MINER_READY;
+    if(GetArg("-genproclimit", 1) > 1)
+    {
+        nLastStatus |= MC_MST_MANY_MINERS;
+    }
 
     try {
         while (true) {
 /* MCHN START */            
             bool not_setup_period=true;
+            nMiningStatus=nLastStatus;
             
             if(mc_gState->m_NodePausedState & MC_NPS_MINING)
             {
+                nMiningStatus|=MC_MST_PAUSED;
                 __US_Sleep(1000);
                 boost::this_thread::interruption_point();                                    
             }            
+            
+            nMiningStatus=nLastStatus;
             
             if(mc_gState->m_NetworkParams->IsProtocolMultichain())
             {
@@ -1382,6 +1409,7 @@ void static BitcoinMiner(CWallet *pwallet)
                             }
                         }
                     
+                        nMiningStatus|=MC_MST_NO_PEERS;
                         if(active_nodes == 0)
                         {
                             MilliSleep(1000);
@@ -1391,6 +1419,7 @@ void static BitcoinMiner(CWallet *pwallet)
                 }
             }
             
+            nMiningStatus=nLastStatus;
             //
             // Create new block
             //
@@ -1456,7 +1485,7 @@ void static BitcoinMiner(CWallet *pwallet)
             {
                 nMemPoolSize=1;
             }
-            
+                
             double wAvTimePerBlock=0;
             for(int w=0;w<wSize;w++)
             {
@@ -1467,12 +1496,24 @@ void static BitcoinMiner(CWallet *pwallet)
             canMine=MC_PTP_MINE;
             if(mc_TimeNowAsDouble() < GetMinerAndExpectedMiningStartTime(pwallet, &kMiner,&sMinerPool, &dMiningStartTime,&dActiveMiners,&hLastBlockHash,&nMemPoolSize,wAvTimePerBlock))
             {
+                if( !fMineEmptyBlocks
+                        && not_setup_period
+                        && (mempool.hashList->m_Count == 0)
+                        )
+                {
+                    nMiningStatus|=MC_MST_NO_TXS;
+                }
+                else
+                {
+                    nMiningStatus|=MC_MST_SLEEPING;
+                }
                 canMine=0;
             }
             else
             {
                 if(!kMiner.IsValid())
                 {
+                    nMiningStatus|=MC_MST_NO_MINER;
                     canMine=0;                    
                 }
                 else
@@ -1482,36 +1523,43 @@ void static BitcoinMiner(CWallet *pwallet)
                             && (mempool.hashList->m_Count == 0)
                             )
                     {
+                        nMiningStatus|=MC_MST_NO_TXS;
                         canMine=0;
                     }
                     else
                     {
                         if(!CanMineWithLockedBlock())
                         {
+                            nMiningStatus|=MC_MST_NO_LOCKED_BLOCK;
                             canMine=0;
                         }
                     }
                 }
             }
+            kActiveMiner=kMiner;
             
 //            if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
             if( (mc_gState->m_ProtocolVersionToUpgrade > 0) && (mc_gState->IsSupported(mc_gState->m_ProtocolVersionToUpgrade) == 0) )
             {
+                nMiningStatus|=MC_MST_BAD_VERSION;
                 canMine=0;
             }
 
             if(mc_gState->m_NodePausedState & MC_NPS_MINING)
             {
+                nMiningStatus|=MC_MST_PAUSED;
                 canMine=0;
             }            
             
             if(fReindex)
             {
+                nMiningStatus|=MC_MST_REINDEX;
                 canMine=0;                
             }
             
             if(canMine & MC_PTP_MINE)
             {
+                nMiningStatus|=MC_MST_MINING;
 //                const unsigned char *pubkey_hash=(unsigned char *)Hash160(kMiner.begin(),kMiner.end()).begin();
                 unsigned char pubkey_hash[20];
                 uint160 pkhash=Hash160(kMiner.begin(),kMiner.end());
@@ -1695,6 +1743,7 @@ void static BitcoinMiner(CWallet *pwallet)
                     __US_Sleep(100);                
                 }
             }
+            nLastStatus=nMiningStatus;
 /* MCHN END */    
         }
     }
