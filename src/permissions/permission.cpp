@@ -3159,6 +3159,7 @@ mc_Buffer *mc_Permissions::GetPermissionList(const void* lpEntity,const void* lp
                         pldRow.m_BlockReceived=INT_MAX;                         // For listminers, which checks only if it is unconfirmed
                         if(mc_IsUpgradeEntity(lpEntity) > 0)
                         {
+                            m_Ledger->GetRow(pdbRow.m_LedgerRow,&pldRow);
                             plsRow.m_BlockReceived=pldRow.m_BlockReceived;
                         }
                         result->Add(&plsRow,(unsigned char*)&plsRow+m_Database->m_ValueOffset);
