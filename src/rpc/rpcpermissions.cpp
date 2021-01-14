@@ -1028,7 +1028,7 @@ Value listminers(const Array& params, bool fHelp)
         bool is_mine=IsMine(*pwalletMain, (CKeyID)(miners[i].m_Address));
         Object entry;
         entry.push_back(Pair("address",CBitcoinAddress((CKeyID)(miners[i].m_Address)).ToString()));
-        entry.push_back(Pair("ismine",is_mine));
+        entry.push_back(Pair("islocal",is_mine));
         entry.push_back(Pair("permitted",miners[i].m_Active));
         if(miners[i].m_WaitBlocks != INT_MAX)
         {
