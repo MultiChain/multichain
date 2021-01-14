@@ -599,7 +599,7 @@ Value storechunk(const Array& params, bool fHelp)
 
 
 
-Value txoutdata_operation(const Array& params,int fHan)
+Value txoutdata_operation(const Array& params,int fHan,int *errCode,string *strError)
 {
     CScript txout_script;
     uint32_t format;
@@ -839,7 +839,7 @@ Value txouttobinarycache(const Array& params, bool fHelp)
     
     if(size)
     {
-        close(fHan);
+        mc_CloseBinaryCache(fHan);
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Binary cache item is not empty");                                                                                                                                            
     }
 
@@ -854,9 +854,19 @@ Value txouttobinarycache(const Array& params, bool fHelp)
         param_count++;
     }
     
-    size=txoutdata_operation(ext_params,fHan).get_int64();    
+    int errCode;
+    string strError;
+    
+    size=txoutdata_operation(ext_params,fHan,&errCode,&strError).get_int64();    
+    
+    mc_CloseBinaryCache(fHan);
+    
+    if(strError.size())
+    {
+        throw JSONRPCError(errCode, strError);     
+    }
+    
 
-    close(fHan);
         
     return size;
     
@@ -867,7 +877,18 @@ Value gettxoutdata(const Array& params, bool fHelp)
     if (fHelp || params.size() < 2 || params.size() > 4)                        // MCHN
         throw runtime_error("Help message not found\n");
     
-    return txoutdata_operation(params,0);    
+    int errCode;
+    string strError;
+    
+    Value ret= txoutdata_operation(params,0,&errCode,&strError);
+    
+    if(strError.size())
+    {
+        throw JSONRPCError(errCode, strError);     
+    }
+    
+    return ret;
+    
 }
 
 /* MCHN END */

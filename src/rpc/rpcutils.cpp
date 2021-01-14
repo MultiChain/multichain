@@ -5818,7 +5818,25 @@ int mc_BinaryCacheFile(string id,int mode)
     {
        flags=O_RDWR; 
     }
-    return open(file_name,_O_BINARY | flags, S_IRUSR | S_IWUSR);
+    int fHan=open(file_name,_O_BINARY | flags, S_IRUSR | S_IWUSR);
+    if(fHan > 0)
+    {
+        if(__US_LockFile(fHan,mode & 3,1) != 0)
+        {
+            close(fHan);
+            fHan=0;
+        }
+    }
+    return fHan;
+}
+
+void mc_CloseBinaryCache(int fHan)
+{
+    if(fHan>0)
+    {
+        __US_UnLockFile(fHan);
+        close(fHan);
+    }
 }
 
 void mc_RemoveBinaryCacheFile(string id)

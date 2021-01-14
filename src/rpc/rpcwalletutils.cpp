@@ -1232,7 +1232,7 @@ void AppendOffChainFormatData(uint32_t data_format,
                 if(lseek64(fHan,0,SEEK_SET) != 0)
                 {
                     *strError="Cannot read binary cache item";
-                    close(fHan);
+                    mc_CloseBinaryCache(fHan);
                     return;                                         
                 }
                 if(total_size)
@@ -1269,7 +1269,7 @@ void AppendOffChainFormatData(uint32_t data_format,
                     {
                         *errorCode=RPC_INTERNAL_ERROR;
                         *strError="Cannot read binary cache item";
-                        close(fHan);
+                        mc_CloseBinaryCache(fHan);
                         return;                     
                     }
                 }
@@ -1297,7 +1297,7 @@ void AppendOffChainFormatData(uint32_t data_format,
                             *strError="Internal error: couldn't store chunk";
                             if(fHan > 0)
                             {
-                                close(fHan);
+                                mc_CloseBinaryCache(fHan);
                             }
                             return; 
                     }
@@ -1316,7 +1316,7 @@ void AppendOffChainFormatData(uint32_t data_format,
         }
         if(fHan > 0)
         {
-            close(fHan);
+            mc_CloseBinaryCache(fHan);
             fHan=0;
         }
     }

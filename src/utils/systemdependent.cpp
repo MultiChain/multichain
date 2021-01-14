@@ -319,9 +319,19 @@ void __US_FlushFileWithMode(int FileHan,uint32_t use_data_sync)
     }
 }
 
-int __US_LockFile(int FileHan)
+int __US_LockFile(int FileHan,int exclusive,int non_blocking)
 {
-    return flock(FileHan,LOCK_EX);
+    int operation=LOCK_SH;
+    if(exclusive)
+    {
+        operation=LOCK_EX;
+    }
+    if(non_blocking)
+    {
+        operation|=LOCK_NB;
+    }
+        
+    return flock(FileHan,operation);
 }
 
 int __US_UnLockFile(int FileHan)
@@ -627,13 +637,22 @@ void __US_FlushFileWithMode(int FileHan,uint32_t use_data_sync)
     FlushFileBuffers(hFile);
 }
 
-int __US_LockFile(int FileHan)
+int __US_LockFile(int FileHan,int exclusive,int non_blocking)
 {
     HANDLE hFile = (HANDLE)_get_osfhandle(FileHan);
     OVERLAPPED overlapvar = { 0 };
 
-    if(LockFileEx(hFile, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
-                                0, MAXDWORD, MAXDWORD, &overlapvar))
+    int operation=0;
+    if(exclusive)
+    {
+        operation=LOCKFILE_EXCLUSIVE_LOCK;
+    }
+    if(non_blocking)
+    {
+        operation|=LOCKFILE_FAIL_IMMEDIATELY;
+    }
+    
+    if(LockFileEx(hFile, operation, 0, MAXDWORD, MAXDWORD, &overlapvar))
     {
         return 0;
     }        

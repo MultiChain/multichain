@@ -20,14 +20,14 @@ Value createbinarycache(const Array& params, bool fHelp)
         fHan=mc_BinaryCacheFile(str,0);
         if(fHan > 0)
         {
-            close(fHan);
+            mc_CloseBinaryCache(fHan);
         }
         else
         {
             fHan=mc_BinaryCacheFile(str,1);
             if(fHan > 0)
             {
-                close(fHan);
+                mc_CloseBinaryCache(fHan);
             }
             else
             {
@@ -78,12 +78,12 @@ Value appendbinarycache(const Array& params, bool fHelp)
     {
         if(write(fHan,&vValue[0],vValue.size()) != (int)vValue.size())
         {
-            close(fHan);
+            mc_CloseBinaryCache(fHan);
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Cannot store binary cache item");                                                                                                                                    
         }
     }
     
-    close(fHan);
+    mc_CloseBinaryCache(fHan);
     
     size+=vValue.size();
     
@@ -106,7 +106,7 @@ Value deletebinarycache(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Binary cache item with this identifier not found");                                                                                                                        
     }
     
-    close(fHan);
+    mc_CloseBinaryCache(fHan);
     
     mc_RemoveBinaryCacheFile(params[0].get_str());
     

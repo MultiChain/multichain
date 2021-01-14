@@ -367,7 +367,6 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
                                         {
                                             *strError="Cannot read binary cache item";
                                             *errorCode=RPC_INTERNAL_ERROR;
-                                            close(fHan);
                                         }
                                     }
                                     if(strError->size() == 0)
@@ -376,7 +375,6 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
                                         {
                                             *strError="Binary cache item too big";
                                             *errorCode=RPC_NOT_SUPPORTED;
-                                            close(fHan);                                        
                                         }
                                     }
                                     if(strError->size() == 0)
@@ -391,7 +389,6 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
                                                 *errorCode=RPC_INTERNAL_ERROR;
                                                 *strError="Cannot read binary cache item";
                                             }
-                                            close(fHan);
                                             vValue=vector<unsigned char> (ptr,ptr+total_size);                                              
                                         }
                                         else
@@ -399,6 +396,7 @@ vector<unsigned char> ParseRawFormattedData(const Value *value,uint32_t *data_fo
                                             vValue.clear();
                                         }
                                     }
+                                    mc_CloseBinaryCache(fHan);
                                 }
                             }
                             else
