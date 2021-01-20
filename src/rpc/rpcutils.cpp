@@ -1450,7 +1450,7 @@ int mc_IsUTF8(const unsigned char *elem,size_t elem_size)
     return 1;
 }
 
-const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t start,int64_t count,int fHan)
+const unsigned char *GetChunkDataInRange(int rpc_slot,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t start,int64_t count,int fHan)
 {
     mc_ChunkDBRow chunk_def;
     int size,shift,chunk;
@@ -1460,8 +1460,16 @@ const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes
     unsigned char *elem;
     int64_t read_from,read_size;
 
-    mc_gState->m_TmpBuffers->m_RpcChunkScript1->Clear();
-    mc_gState->m_TmpBuffers->m_RpcChunkScript1->AddElement();
+    mc_Script *tmpscript;
+    tmpscript=mc_gState->m_TmpBuffers->m_RpcChunkScript1;
+    if(rpc_slot >= 0)
+    {
+        tmpscript=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcChunkScript1;
+    }
+    
+    
+    tmpscript->Clear();
+    tmpscript->AddElement();
     
     *out_size=0;
     
@@ -1511,7 +1519,7 @@ const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes
                     }
                     else
                     {
-                        mc_gState->m_TmpBuffers->m_RpcChunkScript1->SetData(elem+read_from,read_size);                        
+                        tmpscript->SetData(elem+read_from,read_size);                        
                     }                    
                     
                     *out_size+=read_size;
@@ -1526,7 +1534,7 @@ const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes
         ptr+=MC_CDB_CHUNK_HASH_SIZE;
     }
     
-    return mc_gState->m_TmpBuffers->m_RpcChunkScript1->GetData(0,&elem_size);
+    return tmpscript->GetData(0,&elem_size);
 }
 
 uint32_t GetFormattedData(int rpc_slot,mc_Script *lpScript,const unsigned char **elem,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t total_size,int max_shown)

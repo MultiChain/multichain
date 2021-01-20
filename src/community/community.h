@@ -74,7 +74,7 @@ typedef struct mc_EnterpriseFeatures
     
     Value DRF_RPCGetDataRefData(const Array& params);
     Value DRF_RPCDataRefToBinaryCache(const Array& params);
-    bool DRF_GetData(string dataref,CScript &script,const unsigned char **elem,int64_t *size,uint32_t *format,std::string &strError);
+    bool DRF_GetData(int rpc_slot,string dataref,CScript &script,const unsigned char **elem,int64_t *size,uint32_t *format,std::string &strError);
     
     
     int FED_EventTx(const CTransaction& tx,int block,CDiskTxPos* block_pos,uint32_t block_tx_index,uint256 block_hash,uint32_t block_timestamp);
