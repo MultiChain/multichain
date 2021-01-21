@@ -3789,6 +3789,7 @@ void mc_InitRPCHelpMap16()
     
     mapHelpStrings.insert(std::make_pair("listupgrades",
             "listupgrades (upgrade-identifier(s))\n"
+            "\nArguments:\n"
             "1. \"upgrade-identifier(s)\"          (string, optional, default=*) Upgrade identifier - one of:\n"
             "                                                                                create txid, upgrade name.\n"
             " or\n"
