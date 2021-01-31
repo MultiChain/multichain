@@ -143,6 +143,7 @@ typedef struct mc_ChunkDB
     mc_Script *m_ChunkData;
     mc_Script *m_TmpScript;
     
+    mc_Buffer *m_ThreadTmpScripts;
     int m_FeedPos;
 
     void *m_Semaphore;                                                          // mc_TxDB object semaphore
@@ -168,6 +169,7 @@ typedef struct mc_ChunkDB
     int RemoveEntity(mc_TxEntity *entity,uint32_t *removed_chunks,uint64_t *removed_size);                          
     int RemoveEntityInternal(mc_TxEntity *entity,uint32_t *removed_chunks,uint64_t *removed_size);                          
     int SourceChunksRecovery();                          
+    mc_Script *GetTmpScript();
     
     mc_SubscriptionDBRow *FindSubscription(const mc_TxEntity *entity);                // Finds subscription
     int FindSubscription(const mc_TxEntity *entity,mc_SubscriptionDBRow *subscription);   // Finds subscription
