@@ -46,7 +46,8 @@ bool ParseLibraryApproval(Value param,mc_EntityDetails *library_entity,mc_Entity
 
 CScript RemoveOpDropsIfNeeded(const CScript& scriptInput)
 {
-    if(pMultiChainFilterEngine->m_TxID != 0)
+//    if(pMultiChainFilterEngine->m_TxID != 0)
+    if(pMultiChainFilterEngine->InFilter() != 0)
     {
         return scriptInput;        
     }
@@ -93,7 +94,8 @@ bool AssetRefDecode(unsigned char *bin, const char* string, const size_t stringL
 int mc_MaxOpReturnShown()
 {
     int res=GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN);    
-    if(pMultiChainFilterEngine->m_TxID != 0)
+//    if(pMultiChainFilterEngine->m_TxID != 0)
+    if(pMultiChainFilterEngine->InFilter())
     {
         res=MAX_OP_RETURN_SHOWN;    
         if(pMultiChainFilterEngine->m_Params.m_MaxShownData >= 0)
@@ -1172,7 +1174,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
             entry.push_back(Pair("creators",openers));                    
         }
         
-        if( ( (output_level & 0x0040)  != 0) && (pMultiChainFilterEngine->m_TxID == 0) )
+        if( ( (output_level & 0x0040)  != 0) && (pMultiChainFilterEngine->InFilter() == 0) )
         {
             Array filters;
             for(int i=0;i<(int)pMultiChainFilterEngine->m_Filters.size();i++)
@@ -1188,7 +1190,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
             entry.push_back(Pair("filters",filters));                    
         }
         
-        if( ( (output_level & 0x0018)  != 0) && (pMultiChainFilterEngine->m_TxID == 0) )
+        if( ( (output_level & 0x0018)  != 0) && (pMultiChainFilterEngine->InFilter() == 0) )
         {
             entStat.Zero();
             memcpy(&entStat,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
@@ -1796,7 +1798,7 @@ Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 tx
         *format_text_out="gettxoutdata";
     }
     
-    if( (pMultiChainFilterEngine->m_TxID == 0) || (mc_gState->m_Features->StreamFilters() == 0) )
+    if( (pMultiChainFilterEngine->InFilter() == 0) || (mc_gState->m_Features->StreamFilters() == 0) )
     {        
         metadata_object.push_back(Pair("txid", txid.ToString()));
         metadata_object.push_back(Pair("vout", vout));
@@ -2316,7 +2318,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         }
         
         
-        if( ((output_level & 0x0008) != 0) && ((mc_gState->m_WalletMode & MC_WMD_TXS) != 0) && (pMultiChainFilterEngine->m_TxID == 0) )
+        if( ((output_level & 0x0008) != 0) && ((mc_gState->m_WalletMode & MC_WMD_TXS) != 0) && (pMultiChainFilterEngine->InFilter() == 0) )
         {
             entStat.m_Entity.m_EntityType=MC_TET_ASSET | MC_TET_CHAINPOS;
             if(pwalletTxsMain->FindEntity(&entStat))

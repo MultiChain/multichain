@@ -36,7 +36,7 @@ std::string mc_RPCHelpString(std::string strMethod)
 
 void mc_ThrowHelpMessage(std::string strMethod)
 {
-    if(pMultiChainFilterEngine->m_TxID != 0)
+    if(pMultiChainFilterEngine->InFilter())
     {
         throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");          
         //throw JSONRPCError(RPC_MISC_ERROR, mc_RPCHelpString(strMethod));

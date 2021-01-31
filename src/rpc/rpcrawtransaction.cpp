@@ -66,7 +66,8 @@ void ScriptPubKeyToJSON(const CScript& scriptPubKey, Object& out, bool fIncludeH
     
     if(mc_gState->m_Features->StreamFilters())
     {
-        if(pMultiChainFilterEngine->m_TxID != 0)
+//        if(pMultiChainFilterEngine->m_TxID != 0)
+        if(pMultiChainFilterEngine->InFilter())
         {
             max_hex_size=mc_MaxOpReturnShown();
         }
@@ -683,7 +684,8 @@ Value getfiltertransaction(const Array& params, bool fHelp)
 /*    
     CTransaction tx;
     uint256 hashBlock = 0;
-    if(pMultiChainFilterEngine->m_TxID != 0)
+//    if(pMultiChainFilterEngine->m_TxID != 0)
+    if(pMultiChainFilterEngine->InFilter)
     {
         if(params.size())
         {

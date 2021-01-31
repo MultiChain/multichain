@@ -316,6 +316,20 @@ void mc_MultiChainFilterEngine::UnLock()
     __US_SemPost(m_Semaphore);
 }
 
+int mc_MultiChainFilterEngine::InFilter()
+{    
+    if(__US_ThreadID() != m_LockedBy)
+    {
+        return 0;
+    }
+    if(m_TxID == 0)
+    {
+        return 0;
+    }
+    return 1;
+}
+
+
 
 int mc_MultiChainFilterEngine::GetAcceptTimeout()
 {    

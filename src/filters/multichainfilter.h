@@ -156,7 +156,7 @@ typedef struct mc_MultiChainFilterEngine
     int RebuildFilter(int row,int for_block);
     mc_Filter *StreamFilterWorker(int row,bool *modified);
     
-    
+    int InFilter();
     int Zero();
     int Destroy();   
     void Lock(int write_mode);

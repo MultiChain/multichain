@@ -501,7 +501,8 @@ Value getblock(const Array& params, bool fHelp)
     CBlock block;
     CBlockIndex* pblockindex = mapBlockIndex[hash];
 
-    if(pMultiChainFilterEngine->m_TxID != 0)
+//    if(pMultiChainFilterEngine->m_TxID != 0)
+    if(pMultiChainFilterEngine->InFilter())
     {
         if (!chainActive.Contains(pblockindex))
         {
@@ -598,7 +599,7 @@ Value gettxout(const Array& params, bool fHelp)
             CCoinsViewMemPool view(pcoinsTip, mempool);
             if (!view.GetCoins(hash, coins))
                 return Value::null;
-            if(pMultiChainFilterEngine->m_TxID == 0)                                // In filter we already checked this input exists, but mempool is dirty
+            if(pMultiChainFilterEngine->InFilter() == 0)                                // In filter we already checked this input exists, but mempool is dirty
             {
                 mempool.pruneSpent(hash, coins); // TODO: this should be done by the CCoinsViewMemPool
             }
