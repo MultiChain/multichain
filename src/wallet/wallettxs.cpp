@@ -444,7 +444,9 @@ int mc_WalletTxs::AddEntity(mc_TxEntity *entity,uint32_t flags)
         return MC_ERR_INTERNAL_ERROR;
     }
     m_Database->Lock(1,0);
+    WRPWriteLock();
     err=m_Database->AddEntity(entity,flags);    
+    WRPWriteUnLock();
     m_Database->UnLock();
     
     if(err == MC_ERR_NOERROR)
@@ -1582,8 +1584,10 @@ int mc_WalletTxs::Unsubscribe(mc_Buffer* lpEntities,bool purge)
     {
         return MC_ERR_INTERNAL_ERROR;
     }
-    m_Database->Lock(1,0);    
+    m_Database->Lock(1,0);   
+    WRPWriteLock();
     err=m_Database->Unsubscribe(lpEntities);
+    WRPWriteUnLock();
     if(err==MC_ERR_NOERROR)
     {
         if(mc_gState->m_Features->Chunks())
