@@ -1549,6 +1549,8 @@ uint32_t GetFormattedData(int rpc_slot,mc_Script *lpScript,const unsigned char *
     bool skip_read=false;    
     size_t elem_size;
         
+    if(fDebug)LogPrint("drutl01","drutl01: %d: -->\n",rpc_slot);
+    
     if(chunk_count > 1) 
     {
         int max_size=mc_MaxOpReturnShown();
@@ -1571,6 +1573,7 @@ uint32_t GetFormattedData(int rpc_slot,mc_Script *lpScript,const unsigned char *
     *out_size=elem_size;
     if(hashes == NULL)
     {
+        if(fDebug)LogPrint("drutl01","drutl01: %d: <-- A %ld\n",rpc_slot,*out_size);
         return MC_OST_ON_CHAIN;
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
@@ -1641,6 +1644,7 @@ uint32_t GetFormattedData(int rpc_slot,mc_Script *lpScript,const unsigned char *
         {
             status=MC_OST_OFF_CHAIN;
             *out_size=total_size;
+            if(fDebug)LogPrint("drutl01","drutl01: %d: <-- B %ld\n",rpc_slot,*out_size);
             return status;            
         }
         ptr+=MC_CDB_CHUNK_HASH_SIZE;
@@ -1669,6 +1673,7 @@ uint32_t GetFormattedData(int rpc_slot,mc_Script *lpScript,const unsigned char *
         *out_size=elem_size;
     }
     
+    if(fDebug)LogPrint("drutl01","drutl01: %d: <-- C %ld\n",rpc_slot,*out_size);
     return status;
 }
 
@@ -1743,6 +1748,8 @@ Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 tx
     int errorCode;
     int err;
     
+    if(fDebug)LogPrint("drutl02","drutl02: %d: --> %ld %s\n",GetRPCSlot(),elem_size,txid.ToString());
+    
     available=AvailableFromStatus(status);
     
     if(status & MC_OST_ERROR_MASK)
@@ -1791,6 +1798,7 @@ Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 tx
                 metadata=HexStr(elem,elem+elem_size);
                 break;
         }
+        if(fDebug)LogPrint("drutl02","drutl02: %d: <-- A %ld %s\n",GetRPCSlot(),elem_size,txid.ToString());
         return metadata;
     }    
     if(format_text_out)
@@ -1815,6 +1823,8 @@ Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 tx
         metadata_object.push_back(Pair("available", available));        
     }
  */ 
+    if(fDebug)LogPrint("drutl02","drutl02: %d: <-- B %ld %s\n",GetRPCSlot(),elem_size,txid.ToString());
+    
     return metadata_object;    
 }
 
@@ -5606,13 +5616,15 @@ int paramtoint(Value param,bool check_for_min,int min_value,string error_message
     return result;
 }
 
-int64_t paramtoint64(Value param,bool check_for_min,int64_t min_value,string error_message)
+int64_t paramtoint64(Value param,bool check_for_min,int64_t min_value,int *errCode)
 {
-    int64_t result;
+    int64_t result=0;
     
+    *errCode=0;
     if(param.type() != int_type)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, error_message);        
+        *errCode=RPC_INVALID_PARAMETER;
+        return result;
     }
     
     result=param.get_int64();
@@ -5620,7 +5632,8 @@ int64_t paramtoint64(Value param,bool check_for_min,int64_t min_value,string err
     {
         if(result < min_value)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, error_message);                    
+            *errCode=RPC_INVALID_PARAMETER;
+            return result;
         }
     }
     
