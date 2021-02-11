@@ -146,7 +146,7 @@ void ParseRawAction(string action,bool& lock_it, bool& sign_it,bool& send_it);
 bool paramtobool(Value param);
 bool paramtobool(Value param,bool strict);
 int paramtoint(Value param,bool check_for_min,int min_value,string error_message);
-int64_t paramtoint64(Value param,bool check_for_min,int64_t min_value,string error_message);
+int64_t paramtoint64(Value param,bool check_for_min,int64_t min_value,int *errCode);
 int ParseBlockIdentifier(Value blockset_identifier);
 int ParseRescanParameter(Value rescan_identifier, bool *fRescan);
 vector<int> ParseBlockSetIdentifier(Value blockset_identifier);

@@ -630,6 +630,7 @@ Value txoutdata_operation(int rpc_slot,const Array& params,int fHan,int *errCode
     format=MC_SCR_DATA_FORMAT_UNKNOWN;
     elem=NULL;
     
+    if(fDebug)LogPrint("drwlt01","drwlt01: %d: --> %s\n",rpc_slot,params[0].get_str().c_str());
     if(!pEF->DRF_GetData(rpc_slot,params[0].get_str(),txout_script,&elem,&out_size,&format,error_str))
     {
         if(error_str.size())
@@ -654,6 +655,7 @@ Value txoutdata_operation(int rpc_slot,const Array& params,int fHan,int *errCode
         if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
         {
             int errOut=MC_ERR_NOERROR;
+            if(fDebug)LogPrint("drwlt01","drwlt01: %d: A %s\n",rpc_slot,params[0].get_str().c_str());
             const CWalletTx& wtx=pwalletTxsMain->WRPGetWalletTx(hash,NULL,&errOut);
             if(errOut == MC_ERR_NOERROR)
             {
@@ -720,6 +722,8 @@ Value txoutdata_operation(int rpc_slot,const Array& params,int fHan,int *errCode
         txout_script = tx.vout[n].scriptPubKey;     
     }
 
+    if(fDebug)LogPrint("drwlt01","drwlt01: %d: B %s\n",rpc_slot,params[0].get_str().c_str());
+    
     if(!fWRPLocked && (rpc_slot >= 0))
     {
         pwalletTxsMain->WRPReadLock();
@@ -764,6 +768,7 @@ Value txoutdata_operation(int rpc_slot,const Array& params,int fHan,int *errCode
             {
                 *errCode=RPC_OUTPUT_NOT_DATA;
                 *strError="Output without metadata";                                        
+                if(fDebug)LogPrint("drwlt01","drwlt01: %d: C %s\n",rpc_slot,params[0].get_str().c_str());
                 return 0;
             }
         }
@@ -785,6 +790,7 @@ Value txoutdata_operation(int rpc_slot,const Array& params,int fHan,int *errCode
             {
                 *errCode=RPC_OUTPUT_NOT_FOUND;
                 *strError="Data for this output is not available";                                        
+                if(fDebug)LogPrint("drwlt01","drwlt01: %d: D %s\n",rpc_slot,params[0].get_str().c_str());
                 return 0;
             }            
         }
@@ -796,11 +802,21 @@ Value txoutdata_operation(int rpc_slot,const Array& params,int fHan,int *errCode
     
     if (params.size() > 2)    
     {
-        count=paramtoint64(params[2],true,0,"Invalid count");
+        count=paramtoint64(params[2],true,0,errCode);
+        if(*errCode)
+        {
+            *strError="Invalid count";
+            return 0;
+        }   
     }
     if (params.size() > 3)    
     {
-        start=paramtoint64(params[3],false,0,"Invalid start");
+        start=paramtoint64(params[3],false,0,errCode);
+        if(*errCode)
+        {
+            *strError="Invalid start";
+            return 0;
+        }   
     }
 
     if(start < 0)
@@ -824,7 +840,7 @@ Value txoutdata_operation(int rpc_slot,const Array& params,int fHan,int *errCode
     if( (format == MC_SCR_DATA_FORMAT_UBJSON) || (format == MC_SCR_DATA_FORMAT_UTF8) )
     {
         if(fHan)
-    {
+        {
             *errCode=RPC_NOT_SUPPORTED;
             *strError="This API is not supported for text and JSON data";                                        
             return 0;
@@ -859,21 +875,20 @@ Value txoutdata_operation(int rpc_slot,const Array& params,int fHan,int *errCode
                 return count;
             }
         }        
-        else
+        if(write(fHan,elem+start,count) != count)
         {
-            if(write(fHan,elem+start,count) != count)
-            {
-                *errCode=RPC_INTERNAL_ERROR;
-                *strError="Cannot store binary cache item";                                        
-                return 0;
-            }            
-            return count;
-        }
+            *errCode=RPC_INTERNAL_ERROR;
+            *strError="Cannot store binary cache item";                                        
+            return 0;
+        }            
+        return count;
     }
     
     if(count > 0x4000000)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid count, must be below 64MB");                                                                            
+        *errCode=RPC_INVALID_PARAMETER;
+        *strError="Invalid count, must be below 64MB";                                        
+        return 0;
     }
     
     if(chunk_count > 1)
@@ -890,7 +905,11 @@ Value txoutdata_operation(int rpc_slot,const Array& params,int fHan,int *errCode
             return OpReturnFormatEntry(elem,count,0,0,format,NULL);        
         }
     }
-    return OpReturnFormatEntry(elem+start,count,0,0,format,NULL);            
+    Value ret=OpReturnFormatEntry(elem+start,count,0,0,format,NULL);            
+    
+    if(fDebug)LogPrint("drwlt01","drwlt01: %d: <-- %s\n",rpc_slot,params[0].get_str().c_str());
+    
+    return ret;
 }
 
 Value txouttobinarycache(const Array& params, bool fHelp)

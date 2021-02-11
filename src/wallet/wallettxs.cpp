@@ -2294,6 +2294,8 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     import_pos=imp-m_Database->m_Imports;
     hash=tx.GetHash();
     
+    if(fDebug)LogPrint("dwtxs02","dwtxs02:    --> %s\n",hash.ToString().c_str());
+    
     fullTx=&tx;
     storedTx=&tx;
     
@@ -3246,6 +3248,9 @@ exitlbl:
     {
         m_Database->UnLock();
     }
+
+    if(fDebug)LogPrint("dwtxs02","dwtxs02:    <-- %s\n",hash.ToString().c_str());
+    
     return err;
 }
 
@@ -3427,6 +3432,8 @@ CWalletTx mc_WalletTxs::WRPGetWalletTx(uint256 hash,mc_TxDefRow *txdef,int *errO
     char ShortName[65];                                     
     char FileName[MC_DCT_DB_MAX_PATH];                      
     
+    if(fDebug)LogPrint("dwtxs01","dwtxs01: %d: --> %s\n",GetRPCSlot(),hash.ToString().c_str());
+    
     int use_read=m_Database->WRPUsed();
     
     if((m_Mode & MC_WMD_TXS) == 0)
@@ -3446,7 +3453,7 @@ CWalletTx mc_WalletTxs::WRPGetWalletTx(uint256 hash,mc_TxDefRow *txdef,int *errO
     {
         m_Database->Lock(0,0);
     }
-    
+        
     err=m_Database->WRPGetTx(&StoredTxDef,(unsigned char*)&hash,0);
     if(err)
     {
@@ -3559,6 +3566,9 @@ exitlbl:
     {
         m_Database->UnLock();
     }
+
+    if(fDebug)LogPrint("dwtxs01","dwtxs01: %d: <-- %s\n",GetRPCSlot(),hash.ToString().c_str());
+
     return wtx;
 }
 

@@ -1504,6 +1504,7 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         {
             string strRequest = JSONRPCRequestForLog(strMethod, params, req_id);
             LogPrint("mcapi","mcapi: API request: %s\n",strRequest.c_str());
+            LogPrint("drsrv01","drsrv01: %d: --> %s\n",GetRPCSlot(),strMethod.c_str());            
         }
         
         Value result;
@@ -1569,6 +1570,7 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         }
 /* MCHN START */        
         if(fDebug)LogPrint("mcapi","mcapi: API request successful: %s\n",JSONRPCMethodIDForLog(strMethod,req_id).c_str());
+        if(fDebug)LogPrint("drsrv01","drsrv01: %d: <-- %s\n",GetRPCSlot(),strMethod.c_str());            
 /* MCHN END */        
         return result;
     }
