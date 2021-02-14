@@ -22,6 +22,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
 bool CBitcoinAddressFromTxEntity(CBitcoinAddress &address,mc_TxEntity *lpEntity);
 bool IsLicenseTokenIssuance(mc_Script *lpScript,uint256 hash);
 bool IsLicenseTokenTransfer(mc_Script *lpScript,mc_Buffer *amounts);
+void SetRPCWRPReadLockFlag(int lock);
 
 using namespace std;
 
@@ -502,6 +503,7 @@ void mc_WalletTxs::WRPReadLock()
     if(m_Database)
     {
         m_Database->WRPReadLock();
+        SetRPCWRPReadLockFlag(1);
     }
 }
 
@@ -519,6 +521,7 @@ void mc_WalletTxs::WRPReadUnLock()
 //    LogPrintf("WRPUnLock %ld\n",__US_ThreadID());
     if(m_Database)
     {
+        SetRPCWRPReadLockFlag(0);
         m_Database->WRPReadUnLock();
     }    
 }
