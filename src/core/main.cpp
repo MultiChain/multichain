@@ -4149,7 +4149,11 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     // to avoid miners withholding blocks but broadcasting headers, to get a
     // competitive advantage.
     pindexNew->nSequenceId = 0;
+    if(fDebug)LogPrint("mcblock","mchn-block: Adding block %s\n",hash.ToString().c_str());
+    mc_gState->ChainLock();
     BlockMap::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
+    mc_gState->ChainUnLock();
+    if(fDebug)LogPrint("mcblock","mchn-block: Added block %s\n",hash.ToString().c_str());
     pindexNew->phashBlock = &((*mi).first);
     BlockMap::iterator miPrev = mapBlockIndex.find(block.hashPrevBlock);
     if (miPrev != mapBlockIndex.end())
@@ -5178,7 +5182,9 @@ CBlockIndex * InsertBlockIndex(uint256 hash)
     CBlockIndex* pindexNew = new CBlockIndex();
     if (!pindexNew)
         throw runtime_error("LoadBlockIndex() : new CBlockIndex failed");
+    mc_gState->ChainLock();
     mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
+    mc_gState->ChainUnLock();
     pindexNew->phashBlock = &((*mi).first);
 
     return pindexNew;

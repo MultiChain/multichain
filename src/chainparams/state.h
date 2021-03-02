@@ -302,6 +302,8 @@ typedef struct mc_State
 
     mc_TmpBuffers           **m_TmpRPCBuffers;
     
+    void *m_ChainSemaphore;                                                     
+    
     void  InitDefaults()
     {
         m_Params=new mc_Params;     
@@ -341,6 +343,7 @@ typedef struct mc_State
         m_TmpRPCBuffers=NULL;
         
         m_pSeedNode=NULL;
+        m_ChainSemaphore=__US_SemCreate();
     }
     
     void  Destroy()
@@ -401,6 +404,11 @@ typedef struct mc_State
             }
             mc_Delete(m_TmpRPCBuffers);
         }
+        if(m_ChainSemaphore)
+        {
+            __US_SemDestroy(m_ChainSemaphore);
+        }
+        
     }
     
     int VersionInfo(int version);
@@ -417,6 +425,8 @@ typedef struct mc_State
     int SetSeedNode(const char* seed_resolved);
     
     int InitRPCThreads(int num_threads);
+    void ChainLock();
+    void ChainUnLock();
     
 } cs_State;
 

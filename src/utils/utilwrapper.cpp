@@ -256,6 +256,18 @@ int mc_State::InitRPCThreads(int num_threads)
 }
 
 
+void mc_State::ChainLock() 
+{
+    __US_SemWait(m_ChainSemaphore); 
+}
+
+void mc_State::ChainUnLock() 
+{
+    __US_SemPost(m_ChainSemaphore); 
+}
+
+
+
 const char *mc_Params::Command()
 {
     if(m_FirstArgumentType == MC_FAT_COMMAND)

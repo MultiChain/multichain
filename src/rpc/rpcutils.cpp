@@ -2497,6 +2497,7 @@ Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t
                     }
                     if(output_level & 0x0080)
                     {
+                        mc_gState->ChainLock();
                         int block=followon->m_LedgerRow.m_Block;
                         int chain_height=chainActive.Height();
                         issue.push_back(Pair("confirmations", chain_height-block+1));
@@ -2504,9 +2505,10 @@ Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t
                         {
                             uint256 blockHash=chainActive[block]->GetBlockHash();
                             issue.push_back(Pair("blockhash", blockHash.GetHex()));
-                            issue.push_back(Pair("blockindex", block));
+                            issue.push_back(Pair("blockindex", block));                            
                             issue.push_back(Pair("blocktime", mapBlockIndex[blockHash]->GetBlockTime()));                            
                         }                        
+                        mc_gState->ChainUnLock();
                     }
                 }
                 issues.push_back(issue);                    
@@ -5422,14 +5424,20 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier,int chain_height_i
                 {
                     uint256 hash = ParseHashV(str, "Block hash");
                     
+                    mc_gState->ChainLock();
                     if (mapBlockIndex.count(hash) == 0)
+                    {
+                        mc_gState->ChainUnLock();
                         throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block " + str + " not found");
+                    }
 
                     CBlockIndex* pblockindex = mapBlockIndex[hash];
                     if(!chainActive.Contains(pblockindex))
                     {
+                        mc_gState->ChainUnLock();
                         throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block " + str + " not found in active chain");
                     }
+                    mc_gState->ChainUnLock();
                     from=pblockindex->nHeight;
                     to=from;
                 }

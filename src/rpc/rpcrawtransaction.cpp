@@ -540,6 +540,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
 
     if (hashBlock != 0) {
         entry.push_back(Pair("blockhash", hashBlock.GetHex()));
+        mc_gState->ChainLock();
         BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
         if (mi != mapBlockIndex.end() && (*mi).second) {
             CBlockIndex* pindex = (*mi).second;
@@ -551,6 +552,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
             else
                 entry.push_back(Pair("confirmations", 0));
         }
+        mc_gState->ChainUnLock();
     }
 }
 

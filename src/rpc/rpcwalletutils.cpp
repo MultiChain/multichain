@@ -21,6 +21,7 @@ void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry,mc_TxDefRow *txde
         int last_block=chain_height;
         if(last_block < 0)
         {
+            if(fDebug)LogPrint("drwut03","drwut03: %d: ?01 %s\n",GetRPCSlot(),wtx.GetHash().ToString().c_str());
             last_block=chainActive.Height();
         }
         uint256 blockHash;
@@ -35,14 +36,20 @@ void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry,mc_TxDefRow *txde
         }
         else            
         {
+            if(fDebug)LogPrint("drwut03","drwut03: %d: ?02 %s\n",GetRPCSlot(),wtx.GetHash().ToString().c_str());
             confirms = wtx.GetDepthInMainChain();
         }
         entry.push_back(Pair("confirmations", confirms));
+        mc_gState->ChainLock();
         if (confirms > 0)
         {
+            if(fDebug)LogPrint("drwut04","drwut04: %d: --> %d\n",GetRPCSlot(),block);
             blockHash=chainActive[block]->GetBlockHash();
+            if(fDebug)LogPrint("drwut04","drwut04: %d: ... %s\n",GetRPCSlot(),blockHash.ToString().c_str());
             entry.push_back(Pair("blocktime", mapBlockIndex[blockHash]->GetBlockTime()));
+            if(fDebug)LogPrint("drwut04","drwut04: %d: <-- %s\n",GetRPCSlot(),wtx.GetHash().ToString().c_str());
         }
+        mc_gState->ChainUnLock();
         uint256 hash = wtx.GetHash();
         entry.push_back(Pair("txid", hash.GetHex()));
     }
@@ -92,6 +99,7 @@ void WalletTxToJSON(const CWalletTx& wtx, Object& entry,bool skipWalletConflicts
         if (wtx.IsCoinBase())
             entry.push_back(Pair("generated", true));
         int64_t nTimeSmart=(int64_t)wtx.txDef.m_TimeReceived;
+        mc_gState->ChainLock();
         if (confirms > 0)
         {
             blockHash=chainActive[block]->GetBlockHash();
@@ -103,6 +111,7 @@ void WalletTxToJSON(const CWalletTx& wtx, Object& entry,bool skipWalletConflicts
                 nTimeSmart=mapBlockIndex[blockHash]->GetBlockTime();
             }
         }
+        mc_gState->ChainUnLock();
         uint256 hash = wtx.GetHash();
         entry.push_back(Pair("txid", hash.GetHex()));
         if(vout >= 0)
@@ -907,6 +916,7 @@ Object StreamItemEntry(int rpc_slot,const CWalletTx& wtx,int first_output,const 
         return entry;
     }
 
+    if(fDebug)LogPrint("drwut01","drwut01: %d: --> %s\n",rpc_slot,wtx.GetHash().ToString().c_str());
     
     entry.push_back(Pair("publishers", publishers));
     entry.push_back(Pair("keys", keys));
@@ -961,6 +971,7 @@ Object StreamItemEntry(int rpc_slot,const CWalletTx& wtx,int first_output,const 
                         filter_offset=-1;                                    
                     }
                     
+                    if(fDebug)LogPrint("drwut02","drwut02: %d: --> %s\n",rpc_slot,wtx.GetHash().ToString().c_str());
                     if(pMultiChainFilterEngine->RunStreamFilters(wtx,stream_output,(unsigned char *)stream_id,filter_block,filter_offset, 
                             filter_error,&lpFilter,&applied) != MC_ERR_NOERROR)
                     {
@@ -973,6 +984,7 @@ Object StreamItemEntry(int rpc_slot,const CWalletTx& wtx,int first_output,const 
                             full_error=strprintf("Stream item did not pass filter %s: %s",lpFilter->m_FilterCaption.c_str(),filter_error.c_str());
                         }
                     }                                
+                    if(fDebug)LogPrint("drwut02","drwut02: %d: ... %s\n",rpc_slot,wtx.GetHash().ToString().c_str());
                 }
                 if(full_error.size())
                 {    
@@ -1006,6 +1018,7 @@ Object StreamItemEntry(int rpc_slot,const CWalletTx& wtx,int first_output,const 
         entry.push_back(Pair("data", format_item_value));        
     }
     
+    if(fDebug)LogPrint("drwut02","drwut02: %d: <-- %s\n",rpc_slot,wtx.GetHash().ToString().c_str());
     if(verbose)
     {
         WalletTxToJSON(wtx, entry, true, stream_output, txdef_in, chain_height);
@@ -1015,6 +1028,7 @@ Object StreamItemEntry(int rpc_slot,const CWalletTx& wtx,int first_output,const 
         MinimalWalletTxToJSON(wtx, entry, txdef_in, chain_height);
     }
     
+    if(fDebug)LogPrint("drwut01","drwut01: %d: <-- %s\n",rpc_slot,wtx.GetHash().ToString().c_str());
     return entry;
 }
 
