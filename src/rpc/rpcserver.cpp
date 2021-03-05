@@ -1054,6 +1054,9 @@ void StartRPCThreads(string& strError)
     {        
         boost::thread *lpThread=rpc_worker_group->create_thread(boost::bind(&asio::io_service::run, rpc_io_service));        
         uint64_t thread_id=(uint64_t)(lpThread->native_handle());
+#ifdef WIN32        
+        thread_id=GetThreadId((HANDLE)thread_id);
+#endif
         RPCThreadLoad load;
         load.Zero();
         rpc_loads.insert(make_pair(thread_id,load));
