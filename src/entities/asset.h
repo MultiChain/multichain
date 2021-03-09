@@ -294,8 +294,12 @@ typedef struct mc_AssetDB
     int64_t m_CheckPointPos;
     uint64_t m_CheckPointMemPoolSize;
     int m_DBRowCount;
-    mc_RollBackPos m_RollBackPos;
     uint32_t m_Flags;
+    
+    mc_Buffer   *m_ThreadRollBackPos;    
+    
+    void *m_Semaphore;
+    uint64_t m_LockedBy;
     
     mc_AssetDB()
     {
@@ -368,7 +372,17 @@ typedef struct mc_AssetDB
     int64_t GetChainPosition(mc_EntityLedgerRow *row,int32_t index);
     void AddToMemPool(mc_EntityLedgerRow *row);
     void GetFromMemPool(mc_EntityLedgerRow *row,int mprow);
-        
+    int RollBackInternal(int block);
+    int ClearMemPoolInternal();
+    int FindEntityByShortTxIDInternal (mc_EntityDetails *entity, const unsigned char* short_txid);
+    int FindLastEntityByGenesisInternal(mc_EntityDetails *last_entity, mc_EntityDetails *genesis_entity);    
+    int FindEntityByFollowOnInternal(mc_EntityDetails *entity, const unsigned char* txid);    
+     
+    void Lock(int write_mode);
+    void UnLock();
+    
+    mc_RollBackPos *GetRollBackPos();
+    
 } mc_AssetDB;
 
 

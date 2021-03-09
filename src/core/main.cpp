@@ -2946,7 +2946,15 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
         {
             LogPrintf("ERROR: Cannot connect(before) block %s in feeds, error %d\n",pindexNew->GetBlockHash().ToString().c_str(),err);
         }        
+        if(pMultiChainFilterEngine)
+        {
+            pMultiChainFilterEngine->m_CoinsCache=&view;
+        }
         bool rv = ConnectBlock(*pblock, state, pindexNew, view);        
+        if(pMultiChainFilterEngine)
+        {
+            pMultiChainFilterEngine->m_CoinsCache=NULL;
+        }
         if(rv)
         {
             if(!VerifyBlockSignatureType(pblock))
@@ -3057,6 +3065,25 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
             LogPrintf("ERROR: Cannot write offchain items in block, error %d\n",err);
         }
     }
+    
+    int blk_sleep=GetArg("-debug-block-total-sleep",0);
+    int wrp_sleep=GetArg("-debug-block-wallet-sleep",0);
+    blk_sleep-=wrp_sleep;
+    if(blk_sleep > 0)
+    {
+        LogPrintf("DEBUG: block-no-wallet sleep - start\n");
+        MilliSleep(blk_sleep);
+        LogPrintf("DEBUG: block-no-wallet sleep - end\n");
+    }
+    
+    pwalletTxsMain->WRPWriteLock();
+    if(wrp_sleep > 0)
+    {
+        LogPrintf("DEBUG: block-wallet sleep - start\n");
+        MilliSleep(wrp_sleep);
+        LogPrintf("DEBUG: block-wallet sleep - end\n");
+    }
+    if(fDebug)LogPrint("mcwrp","mcwrp: DB synchronization for block %d\n",pindexNew->nHeight);
     
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Wallet, commit                  (%s)\n",(mc_gState->m_WalletMode & MC_WMD_TXS) ? pwalletTxsMain->Summary() : "");
     if(err == MC_ERR_NOERROR)
@@ -3447,12 +3474,26 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     bool fInvalidFound = false;
     const CBlockIndex *pindexOldTip = chainActive.Tip();
     const CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
-
+    
     if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Best chain activation\n");
     // Disconnect active blocks which are no longer in the best chain.
+    if(pindexFork)
+    {
+        if(fDebug)LogPrint("mcwrp","mcwrp: Activating best chain %d -> %d -> %d\n",chainActive.Height(),pindexFork->nHeight,pindexMostWork->nHeight);
+        if(pindexFork->nHeight < chainActive.Height())
+        {
+            if(fDebug)LogPrint("mcwrp","mcwrp: Reorg on block (%d -> %d)\n",pindexFork->nHeight+1,chainActive.Height());        
+        }
+    }
     while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
+        if(fDebug)LogPrint("mcwrp","mcwrp: Locking wallet for disconnection of block %d\n",chainActive.Height());
+        pwalletTxsMain->WRPWriteLock();
         if (!DisconnectTip(state))
+        {
+            if(fDebug)LogPrint("mcwrp","mcwrp: Wallet unlocked after failed disconnection\n");
+            pwalletTxsMain->WRPWriteUnLock();
             return false;
+        }
     }
 
     // Build list of new blocks to connect.
@@ -3484,6 +3525,8 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
                 break;
             } else {
                 // A system error occurred (disk space, database error, ...).
+                if(fDebug)LogPrint("mcwrp","mcwrp: Wallet unlocked after failed connection\n");
+                pwalletTxsMain->WRPWriteUnLock();
                 return false;
             }
         } else {
@@ -3546,6 +3589,12 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
                 SyncWithWallets(emptyTx, pblock);
             }
         }
+        
+        pwalletTxsMain->WRPSync(1);
+        
+        if(fDebug)LogPrint("mcwrp","mcwrp: Wallet unlocked after block %d\n",chainActive.Height());
+        pwalletTxsMain->WRPWriteUnLock();
+        
 /* MCHN END */    
         
     }
@@ -4100,7 +4149,11 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     // to avoid miners withholding blocks but broadcasting headers, to get a
     // competitive advantage.
     pindexNew->nSequenceId = 0;
+    if(fDebug)LogPrint("mcblock","mchn-block: Adding block %s\n",hash.ToString().c_str());
+    mc_gState->ChainLock();
     BlockMap::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
+    mc_gState->ChainUnLock();
+    if(fDebug)LogPrint("mcblock","mchn-block: Added block %s\n",hash.ToString().c_str());
     pindexNew->phashBlock = &((*mi).first);
     BlockMap::iterator miPrev = mapBlockIndex.find(block.hashPrevBlock);
     if (miPrev != mapBlockIndex.end())
@@ -5129,7 +5182,9 @@ CBlockIndex * InsertBlockIndex(uint256 hash)
     CBlockIndex* pindexNew = new CBlockIndex();
     if (!pindexNew)
         throw runtime_error("LoadBlockIndex() : new CBlockIndex failed");
+    mc_gState->ChainLock();
     mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
+    mc_gState->ChainUnLock();
     pindexNew->phashBlock = &((*mi).first);
 
     return pindexNew;
@@ -5440,14 +5495,26 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
             {
                 LogPrintf("ERROR: Cannot connect(before) block %s in feeds, error %d\n",pindex->GetBlockHash().ToString().c_str(),err);
             }        
+            if(pMultiChainFilterEngine)
+            {
+                pMultiChainFilterEngine->m_CoinsCache=&coins;
+            }            
             if (!ConnectBlock(block, state, pindex, coins))
             {
+                if(pMultiChainFilterEngine)
+                {
+                    pMultiChainFilterEngine->m_CoinsCache=NULL;
+                }
                 err=pEF->FED_EventBlock(block, state, pindex,"check",true,true);
                 if(err)
                 {
                     LogPrintf("ERROR: Cannot connect(before) block %s in feeds, error %d\n",pindex->GetBlockHash().ToString().c_str(),err);
                 }        
                 return error("VerifyDB() : *** found unconnectable block at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
+            }
+            if(pMultiChainFilterEngine)
+            {
+                pMultiChainFilterEngine->m_CoinsCache=NULL;
             }
             err=pEF->FED_EventBlock(block, state, pindex,"check",true,false);
             if(err)
@@ -6511,6 +6578,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         
         if (AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
         {
+            pwalletTxsMain->WRPWriteLock();        
+            pwalletTxsMain->WRPSync(0);
+            pwalletTxsMain->WRPWriteUnLock();
             mempool.check(pcoinsTip);
             RelayTransaction(tx);
             vWorkQueue.push_back(inv.hash);
@@ -6545,6 +6615,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                         continue;
                     if (AcceptToMemoryPool(mempool, stateDummy, orphanTx, true, &fMissingInputs2))
                     {
+                        pwalletTxsMain->WRPWriteLock();        
+                        pwalletTxsMain->WRPSync(0);
+                        pwalletTxsMain->WRPWriteUnLock();
                         if(fDebug)LogPrint("mempool", "   accepted orphan tx %s\n", orphanHash.ToString());
                         RelayTransaction(orphanTx);
                         vWorkQueue.push_back(orphanHash);

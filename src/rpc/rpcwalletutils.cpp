@@ -11,17 +11,45 @@ string OpReturnFormatToText(int format);
 
 void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry)
 {
+    MinimalWalletTxToJSON(wtx,entry,NULL,-1);
+}
+
+void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry,mc_TxDefRow *txdef_in,int chain_height)
+{
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
+        int last_block=chain_height;
+        if(last_block < 0)
+        {
+            if(fDebug)LogPrint("drwut03","drwut03: %d: ?01 %s\n",GetRPCSlot(),wtx.GetHash().ToString().c_str());
+            last_block=chainActive.Height();
+        }
         uint256 blockHash;
         int block=wtx.txDef.m_Block;
-        int confirms = wtx.GetDepthInMainChain();
+        int confirms=0;
+        if(txdef_in)
+        {
+            if(block >= 0)
+            {
+                confirms=last_block-block+1;
+            }            
+        }
+        else            
+        {
+            if(fDebug)LogPrint("drwut03","drwut03: %d: ?02 %s\n",GetRPCSlot(),wtx.GetHash().ToString().c_str());
+            confirms = wtx.GetDepthInMainChain();
+        }
         entry.push_back(Pair("confirmations", confirms));
+        mc_gState->ChainLock();
         if (confirms > 0)
         {
+            if(fDebug)LogPrint("drwut04","drwut04: %d: --> %d\n",GetRPCSlot(),block);
             blockHash=chainActive[block]->GetBlockHash();
+            if(fDebug)LogPrint("drwut04","drwut04: %d: ... %s\n",GetRPCSlot(),blockHash.ToString().c_str());
             entry.push_back(Pair("blocktime", mapBlockIndex[blockHash]->GetBlockTime()));
+            if(fDebug)LogPrint("drwut04","drwut04: %d: <-- %s\n",GetRPCSlot(),wtx.GetHash().ToString().c_str());
         }
+        mc_gState->ChainUnLock();
         uint256 hash = wtx.GetHash();
         entry.push_back(Pair("txid", hash.GetHex()));
     }
@@ -40,16 +68,38 @@ void MinimalWalletTxToJSON(const CWalletTx& wtx, Object& entry)
 
 void WalletTxToJSON(const CWalletTx& wtx, Object& entry,bool skipWalletConflicts, int vout)
 {
+    return WalletTxToJSON(wtx,entry,skipWalletConflicts,vout,NULL,-1);
+}
+
+void WalletTxToJSON(const CWalletTx& wtx, Object& entry,bool skipWalletConflicts, int vout,mc_TxDefRow *txdef_in,int chain_height)
+{
     /* MCHN START */        
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {
+        int last_block=chain_height;
+        if(last_block < 0)
+        {
+            last_block=chainActive.Height();
+        }
         int block=wtx.txDef.m_Block;
         uint256 blockHash;
-        int confirms = wtx.GetDepthInMainChain();
+        int confirms=0;
+        if(txdef_in)
+        {
+            if(block >= 0)
+            {
+                confirms=last_block-block+1;
+            }            
+        }
+        else            
+        {
+            confirms = wtx.GetDepthInMainChain();
+        }
         entry.push_back(Pair("confirmations", confirms));
         if (wtx.IsCoinBase())
             entry.push_back(Pair("generated", true));
         int64_t nTimeSmart=(int64_t)wtx.txDef.m_TimeReceived;
+        mc_gState->ChainLock();
         if (confirms > 0)
         {
             blockHash=chainActive[block]->GetBlockHash();
@@ -61,6 +111,7 @@ void WalletTxToJSON(const CWalletTx& wtx, Object& entry,bool skipWalletConflicts
                 nTimeSmart=mapBlockIndex[blockHash]->GetBlockTime();
             }
         }
+        mc_gState->ChainUnLock();
         uint256 hash = wtx.GetHash();
         entry.push_back(Pair("txid", hash.GetHex()));
         if(vout >= 0)
@@ -655,6 +706,12 @@ Object StreamItemEntry1(const CWalletTx& wtx,int first_output,const unsigned cha
 
 Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char *stream_id, bool verbose, vector<mc_QueryCondition> *given_conditions,int *output)
 {
+    return StreamItemEntry(-1,wtx,first_output,stream_id,verbose,given_conditions,output,NULL,-1);
+}
+
+Object StreamItemEntry(int rpc_slot,const CWalletTx& wtx,int first_output,const unsigned char *stream_id, bool verbose, vector<mc_QueryCondition> *given_conditions,int *output,
+                        mc_TxDefRow *txdef_in,int chain_height)
+{
     Object entry;
     Array publishers;
     set<uint160> publishers_set;
@@ -672,6 +729,14 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
     Value format_item_value;
     string format_text_str;
     int start_from=first_output;
+    
+    mc_Script *tmpscript;
+    
+    tmpscript=mc_gState->m_TmpScript;
+    if(rpc_slot >= 0)
+    {
+        tmpscript=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcScript1;
+    }
     
     stream_output=-1;
     if(output)
@@ -696,30 +761,30 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
                 const CScript& script1 = wtx.vout[j].scriptPubKey;        
                 CScript::const_iterator pc1 = script1.begin();
 
-                mc_gState->m_TmpScript->Clear();
-                mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+                tmpscript->Clear();
+                tmpscript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
 
-                if(mc_gState->m_TmpScript->IsOpReturnScript())                      
+                if(tmpscript->IsOpReturnScript())                      
                 {
-                    if(mc_gState->m_TmpScript->GetNumElements()) // 2 OP_DROPs + OP_RETURN - item key
+                    if(tmpscript->GetNumElements()) // 2 OP_DROPs + OP_RETURN - item key
                     {
-                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
+                        tmpscript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
 //                        chunk_hashes=NULL;
-//                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format);
+//                        tmpscript->ExtractAndDeleteDataFormat(&format);
 
                         unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
-                        mc_gState->m_TmpScript->SetElement(0);
+                        tmpscript->SetElement(0);
 
-                        if(mc_gState->m_TmpScript->GetEntity(short_txid) == 0)           
+                        if(tmpscript->GetEntity(short_txid) == 0)           
                         {
                             if(memcmp(short_txid,stream_id,MC_AST_SHORT_TXID_SIZE) == 0)
                             {
                                 stream_output=j;
-                                for(int e=1;e<mc_gState->m_TmpScript->GetNumElements()-1;e++)
+                                for(int e=1;e<tmpscript->GetNumElements()-1;e++)
                                 {
-                                    mc_gState->m_TmpScript->SetElement(e);
+                                    tmpscript->SetElement(e);
                                                                                                 // Should be spkk
-                                    if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
+                                    if(tmpscript->GetItemKey(item_key,&item_key_size))   // Item key
                                     {
                                         return entry;
                                     }                                            
@@ -758,8 +823,8 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
 
                                 const unsigned char *elem;
 
-//                                elem = mc_gState->m_TmpScript->GetData(mc_gState->m_TmpScript->GetNumElements()-1,&elem_size);
-                                retrieve_status = GetFormattedData(mc_gState->m_TmpScript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
+//                                elem = tmpscript->GetData(tmpscript->GetNumElements()-1,&elem_size);
+                                retrieve_status = GetFormattedData(rpc_slot,tmpscript,&elem,&out_size,chunk_hashes,chunk_count,total_chunk_size);
 //                                item_value=OpReturnEntry(elem,elem_size,wtx.GetHash(),j);
                                 format_item_value=OpReturnFormatEntry(elem,out_size,wtx.GetHash(),j,format,&format_text_str,retrieve_status);
                             }
@@ -851,6 +916,7 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
         return entry;
     }
 
+    if(fDebug)LogPrint("drwut01","drwut01: %d: --> %s\n",rpc_slot,wtx.GetHash().ToString().c_str());
     
     entry.push_back(Pair("publishers", publishers));
     entry.push_back(Pair("keys", keys));
@@ -878,7 +944,16 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
                 int applied=0;
                 string filter_error="";
                 mc_TxDefRow txdef;
-                if(pwalletTxsMain->FindWalletTx(wtx.GetHash(),&txdef))
+                int txdef_err=MC_ERR_NOERROR;
+                if(txdef_in)
+                {
+                    memcpy(&txdef,txdef_in,sizeof(mc_TxDefRow));
+                }
+                else
+                {
+                    txdef_err=pwalletTxsMain->FindWalletTx(wtx.GetHash(),&txdef); 
+                }
+                if(txdef_err)
                 {
                     full_error="Error while retreiving tx from the wallet";
                 }
@@ -896,6 +971,7 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
                         filter_offset=-1;                                    
                     }
                     
+                    if(fDebug)LogPrint("drwut02","drwut02: %d: --> %s\n",rpc_slot,wtx.GetHash().ToString().c_str());
                     if(pMultiChainFilterEngine->RunStreamFilters(wtx,stream_output,(unsigned char *)stream_id,filter_block,filter_offset, 
                             filter_error,&lpFilter,&applied) != MC_ERR_NOERROR)
                     {
@@ -908,6 +984,7 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
                             full_error=strprintf("Stream item did not pass filter %s: %s",lpFilter->m_FilterCaption.c_str(),filter_error.c_str());
                         }
                     }                                
+                    if(fDebug)LogPrint("drwut02","drwut02: %d: ... %s\n",rpc_slot,wtx.GetHash().ToString().c_str());
                 }
                 if(full_error.size())
                 {    
@@ -941,15 +1018,17 @@ Object StreamItemEntry(const CWalletTx& wtx,int first_output,const unsigned char
         entry.push_back(Pair("data", format_item_value));        
     }
     
+    if(fDebug)LogPrint("drwut02","drwut02: %d: <-- %s\n",rpc_slot,wtx.GetHash().ToString().c_str());
     if(verbose)
     {
-        WalletTxToJSON(wtx, entry, true, stream_output);
+        WalletTxToJSON(wtx, entry, true, stream_output, txdef_in, chain_height);
     }
     else
     {
-        MinimalWalletTxToJSON(wtx, entry);
+        MinimalWalletTxToJSON(wtx, entry, txdef_in, chain_height);
     }
     
+    if(fDebug)LogPrint("drwut01","drwut01: %d: <-- %s\n",rpc_slot,wtx.GetHash().ToString().c_str());
     return entry;
 }
 
@@ -1167,7 +1246,7 @@ void AppendOffChainFormatData(uint32_t data_format,
                 if(lseek64(fHan,0,SEEK_SET) != 0)
                 {
                     *strError="Cannot read binary cache item";
-                    close(fHan);
+                    mc_CloseBinaryCache(fHan);
                     return;                                         
                 }
                 if(total_size)
@@ -1204,7 +1283,7 @@ void AppendOffChainFormatData(uint32_t data_format,
                     {
                         *errorCode=RPC_INTERNAL_ERROR;
                         *strError="Cannot read binary cache item";
-                        close(fHan);
+                        mc_CloseBinaryCache(fHan);
                         return;                     
                     }
                 }
@@ -1232,7 +1311,7 @@ void AppendOffChainFormatData(uint32_t data_format,
                             *strError="Internal error: couldn't store chunk";
                             if(fHan > 0)
                             {
-                                close(fHan);
+                                mc_CloseBinaryCache(fHan);
                             }
                             return; 
                     }
@@ -1251,7 +1330,7 @@ void AppendOffChainFormatData(uint32_t data_format,
         }
         if(fHan > 0)
         {
-            close(fHan);
+            mc_CloseBinaryCache(fHan);
             fHan=0;
         }
     }

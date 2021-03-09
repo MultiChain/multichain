@@ -501,7 +501,8 @@ Value getblock(const Array& params, bool fHelp)
     CBlock block;
     CBlockIndex* pblockindex = mapBlockIndex[hash];
 
-    if(pMultiChainFilterEngine->m_TxID != 0)
+//    if(pMultiChainFilterEngine->m_TxID != 0)
+    if(pMultiChainFilterEngine->InFilter())
     {
         if (!chainActive.Contains(pblockindex))
         {
@@ -586,18 +587,26 @@ Value gettxout(const Array& params, bool fHelp)
         fMempool = params[2].get_bool();
 
     CCoins coins;
-    if (fMempool) {
-        LOCK(mempool.cs);
-        CCoinsViewMemPool view(pcoinsTip, mempool);
-        if (!view.GetCoins(hash, coins))
-            return Value::null;
-        if(pMultiChainFilterEngine->m_TxID == 0)                                // In filter we already checked this input exists, but mempool is dirty
-        {
-            mempool.pruneSpent(hash, coins); // TODO: this should be done by the CCoinsViewMemPool
+    if(pMultiChainFilterEngine->m_CoinsCache)
+    {
+        if (!((CCoinsViewCache*)(pMultiChainFilterEngine->m_CoinsCache))->GetCoins(hash, coins))
+            return Value::null;        
+    }
+    else
+    {
+        if (fMempool) {
+            LOCK(mempool.cs);
+            CCoinsViewMemPool view(pcoinsTip, mempool);
+            if (!view.GetCoins(hash, coins))
+                return Value::null;
+            if(pMultiChainFilterEngine->InFilter() == 0)                                // In filter we already checked this input exists, but mempool is dirty
+            {
+                mempool.pruneSpent(hash, coins); // TODO: this should be done by the CCoinsViewMemPool
+            }
+        } else {
+            if (!pcoinsTip->GetCoins(hash, coins))
+                return Value::null;
         }
-    } else {
-        if (!pcoinsTip->GetCoins(hash, coins))
-            return Value::null;
     }
     if (n<0 || (unsigned int)n>=coins.vout.size() || coins.vout[n].IsNull())
         return Value::null;

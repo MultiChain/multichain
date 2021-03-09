@@ -66,7 +66,8 @@ void ScriptPubKeyToJSON(const CScript& scriptPubKey, Object& out, bool fIncludeH
     
     if(mc_gState->m_Features->StreamFilters())
     {
-        if(pMultiChainFilterEngine->m_TxID != 0)
+//        if(pMultiChainFilterEngine->m_TxID != 0)
+        if(pMultiChainFilterEngine->InFilter())
         {
             max_hex_size=mc_MaxOpReturnShown();
         }
@@ -539,6 +540,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
 
     if (hashBlock != 0) {
         entry.push_back(Pair("blockhash", hashBlock.GetHex()));
+        mc_gState->ChainLock();
         BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
         if (mi != mapBlockIndex.end() && (*mi).second) {
             CBlockIndex* pindex = (*mi).second;
@@ -550,6 +552,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
             else
                 entry.push_back(Pair("confirmations", 0));
         }
+        mc_gState->ChainUnLock();
     }
 }
 
@@ -683,7 +686,8 @@ Value getfiltertransaction(const Array& params, bool fHelp)
 /*    
     CTransaction tx;
     uint256 hashBlock = 0;
-    if(pMultiChainFilterEngine->m_TxID != 0)
+//    if(pMultiChainFilterEngine->m_TxID != 0)
+    if(pMultiChainFilterEngine->InFilter)
     {
         if(params.size())
         {
@@ -2216,6 +2220,9 @@ Value sendrawtransaction(const Array& params, bool fHelp)
             pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetSendTimeout());
         }
         bool accepted=AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, !fOverrideFees);
+        pwalletTxsMain->WRPWriteLock();        
+        pwalletTxsMain->WRPSync(0);
+        pwalletTxsMain->WRPWriteUnLock();
         if(pMultiChainFilterEngine)
         {
             pMultiChainFilterEngine->SetTimeout(pMultiChainFilterEngine->GetAcceptTimeout());

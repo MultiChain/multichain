@@ -110,6 +110,11 @@ void RPCTypeCheck(const json_spirit::Object& o,
  */
 void RPCRunLater(const std::string& name, boost::function<void(void)> func, int64_t nSeconds);
 
+/**
+ * Returns RPC slot of this thread
+ */
+
+int GetRPCSlot();
 
 typedef json_spirit::Value(*rpcfn_type)(const json_spirit::Array& params, bool fHelp);
 
@@ -239,6 +244,7 @@ extern json_spirit::Value issuecmd(const json_spirit::Array& params, bool fHelp)
 extern json_spirit::Value issuemorecmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listassets(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listpermissions(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listminers(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getassetbalances(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value gettotalbalances(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value sendassettoaddress(const json_spirit::Array& params, bool fHelp);

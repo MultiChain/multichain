@@ -7,6 +7,8 @@
 #include "wallet/wallettxs.h"
 #include "net/net.h"
 
+void *mcd_RWLock=NULL;
+
 void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity);
 
 string mcd_ParamStringValue(const Object& params,string name,string default_value)
@@ -63,7 +65,7 @@ int64_t mcd_OpenDatabase(const char *name,const char *dbname,int key_size,int va
     m_DB->SetOption("ValueSize",0,value_size);
     
     
-    err=m_DB->Open(m_DBName,MC_OPT_DB_DATABASE_CREATE_IF_MISSING | MC_OPT_DB_DATABASE_TRANSACTIONAL | MC_OPT_DB_DATABASE_LEVELDB);
+    err=m_DB->Open(m_DBName,MC_OPT_DB_DATABASE_CREATE_IF_MISSING | MC_OPT_DB_DATABASE_TRANSACTIONAL | MC_OPT_DB_DATABASE_LEVELDB | MC_OPT_DB_DATABASE_THREAD_SAFE);
     if(err)
     {
         return -1;
@@ -323,6 +325,29 @@ Value mcd_DebugRequest(string method,const Object& params)
     if(method == "issuelicensetoken")
     {
         return mcd_DebugIssueLicenseToken(params);
+    }
+    if(method == "rwlock")
+    {
+        if(mcd_RWLock == NULL)
+        {
+            mcd_RWLock=__US_RWLockCreate();
+        }
+        string type=mcd_ParamStringValue(params,"type","");
+        int sleep=mcd_ParamIntValue(params,"sleep",-1);
+        double start=mc_TimeNowAsDouble();
+        if(type == "read")
+        {
+            __US_RWLockRDLock(mcd_RWLock);
+            __US_Sleep(sleep);            
+            __US_RWLockRDUnlock(mcd_RWLock);
+        }            
+        if(type == "write")
+        {
+            __US_RWLockWRLock(mcd_RWLock);
+            __US_Sleep(sleep);            
+            __US_RWLockWRUnlock(mcd_RWLock);
+        }                   
+        return strprintf("%8.3f",mc_TimeNowAsDouble()-start);
     }
     if(method == "dbopen")
     {

@@ -2030,11 +2030,20 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
         int n=pMultiChainFilterEngine->m_Tx.vin[j].prevout.n;
         CCoins coins;
         {
-            LOCK(mempool.cs);
-            CCoinsViewMemPool view(pcoinsTip, mempool);
-            if (!view.GetCoins(pMultiChainFilterEngine->m_Tx.vin[j].prevout.hash, coins))
+            if(pMultiChainFilterEngine->m_CoinsCache)
             {
-                return Value::null;                                                                 
+                if (!((CCoinsViewCache*)(pMultiChainFilterEngine->m_CoinsCache))->GetCoins(pMultiChainFilterEngine->m_Tx.vin[j].prevout.hash, coins))
+                    return Value::null;        
+            }
+            else
+            {
+                LOCK(mempool.cs);
+
+                CCoinsViewMemPool view(pcoinsTip, mempool);
+                if (!view.GetCoins(pMultiChainFilterEngine->m_Tx.vin[j].prevout.hash, coins))
+                {
+                    return Value::null;                                                                 
+                }
             }
             if (n<0 || (unsigned int)n>=coins.vout.size() || coins.vout[n].IsNull())
                 return Value::null;

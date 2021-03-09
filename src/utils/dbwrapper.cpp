@@ -24,7 +24,7 @@ int cs_Database::Zero()
     m_ReadBufferSize=0;
     
     m_ShMemKey=0;
-    m_MaxClients=MC_DCT_DB_DEFAULT_MAX_CLIENTS;
+    m_MaxClients=MC_PRM_MAX_THREADS;                                            // MC_DCT_DB_DEFAULT_MAX_CLIENTS;
     m_KeySize=MC_DCT_DB_DEFAULT_MAX_KEY_SIZE;
     m_ValueSize=MC_DCT_DB_DEFAULT_MAX_VALUE_SIZE;
     m_MaxRows=MC_DCT_DB_DEFAULT_MAX_ROWS;
@@ -44,6 +44,8 @@ int cs_Database::Zero()
     m_DeleteCount=0;
     
     m_Name[0]=0;
+    
+    m_ThreadReadBuffers=NULL;
     
     return MC_ERR_NOERROR;
 }
@@ -67,6 +69,17 @@ int cs_Database::Destroy()
     {
         mc_Delete(m_ReadBuffer);
         m_ReadBuffer=NULL;
+    }
+    
+    if(m_ThreadReadBuffers)
+    {
+        delete m_ThreadReadBuffers;
+        m_ThreadReadBuffers=NULL;
+    }
+
+    if(m_Semaphore)
+    {
+        __US_SemDestroy(m_Semaphore);
     }
     
     Zero();
@@ -207,9 +220,37 @@ int cs_Database::Open(char *name,int Options)
             break;
     }
             
+    if(m_Options & MC_OPT_DB_DATABASE_THREAD_SAFE)
+    {
+        m_ThreadReadBuffers=new mc_Buffer;
+        m_ThreadReadBuffers->Initialize(sizeof(uint64_t),sizeof(uint64_t)+m_KeySize+m_ValueSize+1,MC_BUF_MODE_MAP);    
+        m_ThreadReadBuffers->Realloc(m_MaxClients);
+        m_Semaphore=__US_SemCreate();
+    }
+    
     m_Status=MC_STT_DB_DATABASE_OPENED;  
     
     return MC_ERR_NOERROR;    
+}
+
+char *cs_Database::GetReadBuffer()
+{
+    if(m_ThreadReadBuffers == NULL)
+    {
+        return NULL;
+    }
+    
+    uint64_t thread_id=__US_ThreadID();
+    int mprow=m_ThreadReadBuffers->Seek(&thread_id);
+    if(mprow < 0)
+    {
+        __US_SemWait(m_Semaphore);
+        mprow=m_ThreadReadBuffers->GetCount();
+        m_ThreadReadBuffers->Add(&thread_id,NULL);        
+        __US_SemPost(m_Semaphore);
+    }
+    
+    return (char*)m_ThreadReadBuffers->GetRow(mprow)+sizeof(uint64_t);    
 }
 
 int cs_Database::Close()
@@ -414,6 +455,7 @@ char *cs_Database::Read(char *key,int key_len,int *value_len,int Options,int *er
     char *lpRead;
     char *lpNewBuffer;
     int NewSize;
+    char *read_buf;
     size_t vallen;
     size_t kallen;
 
@@ -501,28 +543,43 @@ char *cs_Database::Read(char *key,int key_len,int *value_len,int Options,int *er
             return NULL;
             break;
     }
-    
-    if(*value_len+klen+1>m_ReadBufferSize)
+ 
+    read_buf=NULL;
+    if(m_ThreadReadBuffers==NULL)
     {
-        NewSize=((*value_len+klen)/MC_DCT_DB_READ_BUFFER_SIZE + 1) * MC_DCT_DB_READ_BUFFER_SIZE;
-        lpNewBuffer=(char*)mc_New(NewSize);
-        if(lpNewBuffer  == NULL)
+        if(*value_len+klen+1>m_ReadBufferSize)
         {
-            *value_len=0;
-            *error=MC_ERR_ALLOCATION;
-            return NULL;
+            NewSize=((*value_len+klen)/MC_DCT_DB_READ_BUFFER_SIZE + 1) * MC_DCT_DB_READ_BUFFER_SIZE;
+            lpNewBuffer=(char*)mc_New(NewSize);
+            if(lpNewBuffer  == NULL)
+            {
+                *value_len=0;
+                *error=MC_ERR_ALLOCATION;
+                return NULL;
+            }
+
+            mc_Delete(m_ReadBuffer);
+            m_ReadBuffer=lpNewBuffer;
+            m_ReadBufferSize=NewSize;
         }
-
-        mc_Delete(m_ReadBuffer);
-        m_ReadBuffer=lpNewBuffer;
-        m_ReadBufferSize=NewSize;
+        if(lpRead)
+        {
+            memcpy(m_ReadBuffer,lpRead,*value_len);
+            m_ReadBuffer[*value_len]=0;
+        }
+//            printf("BAD\n");
+    }
+    else
+    {        
+        if(lpRead)
+        {
+            read_buf=GetReadBuffer();
+//            printf("%16X %16X %ld %d\n",(uint64_t)this,(uint64_t)read_buf,__US_ThreadID(),m_KeySize+m_ValueSize);
+            memcpy(read_buf,lpRead,*value_len);
+            read_buf[*value_len]=0;        
+        }
     }
 
-    if(lpRead)
-    {
-        memcpy(m_ReadBuffer,lpRead,*value_len);
-        m_ReadBuffer[*value_len]=0;
-    }
     if(lpIterRead)
     {
         if(Options & MC_OPT_DB_DATABASE_NEXT_ON_READ)
@@ -549,7 +606,10 @@ char *cs_Database::Read(char *key,int key_len,int *value_len,int Options,int *er
 
             break;
     }
-    
+    if(read_buf)
+    {
+        return read_buf;
+    }
     return m_ReadBuffer;    
 }
 
@@ -674,7 +734,12 @@ int cs_Database::SetOption(const char* option, int suboption, int value)
     
     if(strcmp(option,"MaxRows") == 0)
     {
-        m_ValueSize=value;
+        m_MaxRows=value;
+    }
+    
+    if(strcmp(option,"MaxClients") == 0)
+    {
+        m_MaxClients=value;
     }
     
     return MC_ERR_NOERROR;

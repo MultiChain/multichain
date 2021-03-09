@@ -36,7 +36,7 @@ std::string mc_RPCHelpString(std::string strMethod)
 
 void mc_ThrowHelpMessage(std::string strMethod)
 {
-    if(pMultiChainFilterEngine->m_TxID != 0)
+    if(pMultiChainFilterEngine->InFilter())
     {
         throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong number of parameters");          
         //throw JSONRPCError(RPC_MISC_ERROR, mc_RPCHelpString(strMethod));
@@ -3015,7 +3015,8 @@ void mc_InitRPCHelpMap12()
             "Also see the listunspent call\n"
             "\nArguments:\n"
             "1. unlock                           (boolean, required) Whether to unlock (true) or lock (false) the specified transactions\n"
-            "2. transactions                     (array, required) A json array of objects. Each object the txid (string) vout (numeric)\n"
+            "2. transactions                     (array, optional) A json array of objects. Each object the txid (string) vout (numeric). \n"
+            "                                                      If omitted and unlock=true, all outputs are unlocked.\n"
             "     [                              (json array of json objects)\n"
             "       {\n"
             "         \"txid\":\"id\",               (string) The transaction id\n"
@@ -3189,7 +3190,7 @@ void mc_InitRPCHelpMap13()
     
     mapHelpStrings.insert(std::make_pair("resendwallettransactions",
             "resendwallettransactions\n"
-            "\nStop Resends wallet transactions."
+            "\n Resends wallet transactions."
         ));
     
     mapHelpStrings.insert(std::make_pair("revoke",
@@ -5507,6 +5508,10 @@ void mc_InitRPCHelpMap23()
             + HelpExampleRpc("getlibrarycode", "lib1")
         ));
      
+}
+
+void mc_InitRPCHelpMap24()
+{
      mapHelpStrings.insert(std::make_pair("testlibrary",
             "testlibrary ( \"library-identifier\"  \"update-name\" \"javascript-code\")\n"
             "\nSets library code to be used for testing in testtxfilter, runtxfilter, teststreamfilter and runstreamfilter \n"
@@ -5527,11 +5532,22 @@ void mc_InitRPCHelpMap23()
             + HelpExampleRpc("testlibrary", "lib1")
         ));
      
+    mapHelpStrings.insert(std::make_pair("listminers",
+            "listminers ( verbose )\n"
+            "\nReturns information about miners.\n"
+            "\nArguments:\n"
+            "1. verbose                          (boolean, optional, default=false) If true, returns block range for permitted mining\n"
+            "\nResult:\n"
+            "An array containing information about miners\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("listminers", "")
+            + HelpExampleRpc("listminers", "")
+        ));
+        
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));
-    
-    
+       
 }
 
 void mc_InitRPCLogParamCountMap()
@@ -5636,6 +5652,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap21();
     mc_InitRPCHelpMap22();
     mc_InitRPCHelpMap23();
+    mc_InitRPCHelpMap24();
     
     pEF->ENT_InitRPCHelpMap();
     

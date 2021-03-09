@@ -53,6 +53,8 @@ static boost::asio::io_service::work *rpc_dummy_work = NULL;
 static std::vector<CSubNet> rpc_allow_subnets; //!< List of subnets to allow RPC connections from
 static std::vector< boost::shared_ptr<ip::tcp::acceptor> > rpc_acceptors;
 static map<uint64_t, RPCThreadLoad> rpc_loads;
+static map<uint64_t, int> rpc_slots;
+static uint32_t rpc_thread_flags[MC_PRM_MAX_THREADS];
 
 #define MC_ACF_NONE              0x00000000 
 #define MC_ACF_ENTERPRISE        0x00000001 
@@ -357,7 +359,7 @@ string CRPCTable::help(string strCommand) const
         if ((strCommand != "" || pcmd->category == "hidden") && strMethod != strCommand)
             continue;
 #ifdef ENABLE_WALLET
-        if (pcmd->reqWallet && !pwalletMain)
+        if (pcmd->reqWallet && !pwalletMain)                                    // Never happens, reqWallet is changed to require Wallet read lock 
             continue;
 #endif
 
@@ -1026,6 +1028,7 @@ void StartRPCThreads(string& strError)
     rpc_worker_group = new boost::thread_group();
     hc_worker_group = new boost::thread_group();
     rpc_loads.clear();
+    rpc_slots.clear();
 
 #ifdef MAC_OSX
     boost::thread::attributes attrs;
@@ -1039,6 +1042,7 @@ void StartRPCThreads(string& strError)
         RPCThreadLoad load;
         load.Zero();
         rpc_loads.insert(make_pair(thread_id,load));
+        rpc_slots.insert(make_pair(thread_id,i));
     }    
     if(hcPort)
     {
@@ -1050,15 +1054,21 @@ void StartRPCThreads(string& strError)
     {        
         boost::thread *lpThread=rpc_worker_group->create_thread(boost::bind(&asio::io_service::run, rpc_io_service));        
         uint64_t thread_id=(uint64_t)(lpThread->native_handle());
+#ifdef WIN32        
+        thread_id=GetThreadId((HANDLE)thread_id);
+#endif
         RPCThreadLoad load;
         load.Zero();
         rpc_loads.insert(make_pair(thread_id,load));
-    }
+        rpc_slots.insert(make_pair(thread_id,i));
+    }    
     if(hcPort)
     {
         hc_worker_group->create_thread(boost::bind(&asio::io_service::run, hc_io_service));        
     }
 #endif
+    memset(rpc_thread_flags,0,MC_PRM_MAX_THREADS*sizeof(uint32_t));
+    mc_gState->InitRPCThreads(rpc_slots.size());
     
     fRPCRunning = true;
     
@@ -1122,6 +1132,29 @@ void StopRPCThreads()
     delete rpc_io_service; rpc_io_service = NULL;
     delete hc_io_service; hc_io_service = NULL;
 }
+
+int IsRPCWRPReadLockFlagSet() 
+{
+    uint64_t thread_id=__US_ThreadID();
+    map<uint64_t,int>::iterator slot_it=rpc_slots.find(thread_id);
+    if(slot_it != rpc_slots.end())
+    {
+        return (rpc_thread_flags[slot_it->second] & 0x01);
+    }    
+    return 0;
+}
+
+void CheckFlagsOnException(const string& strMethod,const Value& req_id,const string& message)
+{
+    if(IsRPCWRPReadLockFlagSet())
+    {
+        LogPrintf("WARNING: Unlocking wallet after failure: method: %s, error: %s\n",JSONRPCMethodIDForLog(strMethod,req_id).c_str(),message);
+        pwalletTxsMain->WRPReadUnLock();
+    }   
+}
+
+
+
 
 bool IsRPCRunning()
 {
@@ -1227,6 +1260,9 @@ static Object JSONRPCExecOne(const Value& req)
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
+        string strReply = JSONRPCReply(Value::null, objError, jreq.id);
+        CheckFlagsOnException(jreq.strMethod,jreq.id,strReply);
+        
         if(fDebug)LogPrint("mcapi","mcapi: API request failure A: %s\n",JSONRPCMethodIDForLog(jreq.strMethod,jreq.id).c_str());        
 /* MCHN END */    
         rpc_result = JSONRPCReplyObj(Value::null, objError, jreq.id);
@@ -1235,6 +1271,7 @@ static Object JSONRPCExecOne(const Value& req)
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
+        CheckFlagsOnException(jreq.strMethod,jreq.id,e.what());
         if(fDebug)LogPrint("mcapi","mcapi: API request failure B: %s\n",JSONRPCMethodIDForLog(jreq.strMethod,jreq.id).c_str());        
 /* MCHN END */    
         rpc_result = JSONRPCReplyObj(Value::null,
@@ -1349,6 +1386,9 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
+        string strReply = JSONRPCReply(Value::null, objError, jreq.id);
+        CheckFlagsOnException(jreq.strMethod,jreq.id,strReply);
+        
         if(fDebug)LogPrint("mcapi","mcapi: API request failure: %s, code: %d\n",JSONRPCMethodIDForLog(jreq.strMethod,jreq.id).c_str(),find_value(objError, "code").get_int());
         
 //        if(fDebug)LogPrint("mcapi","mcapi: API request failure C\n");        
@@ -1360,6 +1400,7 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
     {
 /* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
+        CheckFlagsOnException(jreq.strMethod,jreq.id,e.what());
         if(fDebug)LogPrint("mcapi","mcapi: API request failure D: %s\n",JSONRPCMethodIDForLog(jreq.strMethod,jreq.id).c_str());        
 /* MCHN END */    
         ErrorReply(conn->stream(), JSONRPCError(RPC_PARSE_ERROR, e.what()), jreq.id);
@@ -1367,6 +1408,36 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
     }
     return true;
 }
+
+int GetRPCSlot()
+{
+    uint64_t thread_id=__US_ThreadID();
+    map<uint64_t,int>::iterator slot_it=rpc_slots.find(thread_id);
+    if(slot_it != rpc_slots.end())
+    {
+        return slot_it->second;
+    }
+    
+    return -1;
+}
+
+void SetRPCWRPReadLockFlag(int lock)
+{
+    uint64_t thread_id=__US_ThreadID();
+    map<uint64_t,int>::iterator slot_it=rpc_slots.find(thread_id);
+    if(slot_it != rpc_slots.end())
+    {
+        if(lock)
+        {
+            rpc_thread_flags[slot_it->second] |= 0x01;
+        }
+        else
+        {
+            if(rpc_thread_flags[slot_it->second] & 0x01)rpc_thread_flags[slot_it->second]-=0x01;
+        }
+    }    
+}
+
 
 void ServiceConnection(AcceptedConnection *conn)
 {
@@ -1444,7 +1515,7 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         }
     }
 #ifdef ENABLE_WALLET
-    if (pcmd->reqWallet && !pwalletMain)
+    if (pcmd->reqWallet && !pwalletMain)                                        // Never happens, reqWallet is changed to require Wallet read lock 
         throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Method not found (disabled)");
 #endif
 
@@ -1486,6 +1557,7 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         {
             string strRequest = JSONRPCRequestForLog(strMethod, params, req_id);
             LogPrint("mcapi","mcapi: API request: %s\n",strRequest.c_str());
+            LogPrint("drsrv01","drsrv01: %d: --> %s\n",GetRPCSlot(),strMethod.c_str());            
         }
         
         Value result;
@@ -1551,11 +1623,13 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         }
 /* MCHN START */        
         if(fDebug)LogPrint("mcapi","mcapi: API request successful: %s\n",JSONRPCMethodIDForLog(strMethod,req_id).c_str());
+        if(fDebug)LogPrint("drsrv01","drsrv01: %d: <-- %s\n",GetRPCSlot(),strMethod.c_str());            
 /* MCHN END */        
         return result;
     }
     catch (std::exception& e)
     {
+        CheckFlagsOnException(strMethod,req_id,e.what());
         if(fDebug)LogPrint("mcapi","mcapi: API request failure: %s\n",JSONRPCMethodIDForLog(strMethod,req_id).c_str());//strMethod.c_str());
         if(strcmp(e.what(),"Help message not found\n") == 0)
         {

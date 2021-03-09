@@ -6,6 +6,7 @@
 
 
 #include "rpc/rpcwallet.h"
+#include "miner/miner.h"
 
 
 string AllowedPermissions()
@@ -501,7 +502,7 @@ Value verifypermission(const Array& params, bool fHelp)
 
     CBitcoinAddress address(params[0].get_str());
     if (!address.IsValid())
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+params[1].get_str());            
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: "+params[0].get_str());            
 
     CTxDestination dest=address.Get();
     CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
@@ -586,11 +587,8 @@ Value verifypermission(const Array& params, bool fHelp)
     return (result != 0);
 }
 
-Value listpermissions(const Array& params, bool fHelp)
+Value listpermissions_operation(const Array& params, bool fOnlyPermittedOrPending)
 {
-    if (fHelp || params.size() > 3)
-        throw runtime_error("Help message not found\n");
-    
     mc_Buffer *permissions;
     
     Array results;
@@ -754,11 +752,14 @@ Value listpermissions(const Array& params, bool fHelp)
             }
         }
         entry.push_back(Pair("startblock", (int64_t)plsRow->m_BlockFrom));
-        entry.push_back(Pair("endblock", (int64_t)plsRow->m_BlockTo));                        
-        if( (plsRow->m_BlockFrom >= plsRow->m_BlockTo) && 
-                (((flags & MC_PFL_HAVE_PENDING) == 0) || !verbose) )
+        entry.push_back(Pair("endblock", (int64_t)plsRow->m_BlockTo));           
+        if(fOnlyPermittedOrPending)
         {
-            take_it=false;
+            if( (plsRow->m_BlockFrom >= plsRow->m_BlockTo) && 
+                    (((flags & MC_PFL_HAVE_PENDING) == 0) || !verbose) )
+            {
+                take_it=false;
+            }
         }
         if(take_it)
         {
@@ -850,3 +851,295 @@ Value listpermissions(const Array& params, bool fHelp)
     return results;
 }
 
+Value listpermissions(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 3)
+        throw runtime_error("Help message not found\n");
+    
+    return listpermissions_operation(params,true);
+}
+
+typedef struct mc_MinerInfo
+{
+    uint160 m_Address;
+    uint32_t m_StartBlock;
+    uint32_t m_EndBlock;
+    uint32_t m_BlockReceived;
+    uint32_t m_ConfirmedStartBlock;
+    uint32_t m_ConfirmedEndBlock;
+    uint32_t m_LastMined;
+    bool m_Active;
+    Value m_Pending;
+    int m_Recent;
+    uint32_t m_WaitBlocks;
+    uint32_t m_NextAllowed;
+            
+    void Zero();
+    
+    mc_MinerInfo()
+    {
+        Zero();
+    }
+    
+} mc_MinerInfo;
+
+void mc_MinerInfo::Zero()
+{
+    m_Address=0;
+    m_StartBlock=0;
+    m_EndBlock=0;
+    m_BlockReceived=0;
+    m_ConfirmedStartBlock=0;
+    m_ConfirmedEndBlock=0;
+    m_LastMined=0;
+    m_Active=false;
+    m_Pending=Value::null;
+    m_Recent=-1;
+    m_WaitBlocks=INT_MAX;    
+    m_NextAllowed=INT_MAX;
+}
+
+bool ListMinersSort(mc_MinerInfo a,mc_MinerInfo b)
+{ 
+    if(a.m_WaitBlocks == b.m_WaitBlocks)
+    {
+        return (a.m_LastMined > b.m_LastMined);
+    }
+    
+    return (a.m_WaitBlocks<b.m_WaitBlocks);
+}
+
+Value listminers(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 1)
+        throw runtime_error("Help message not found\n");
+
+    mc_Buffer *permissions;
+    permissions=mc_gState->m_Permissions->GetPermissionList(NULL,NULL,MC_PTP_MINE,NULL);
+
+    int verbose=0;
+    if (params.size() > 0)    
+    {
+        if(paramtobool(params[0]))
+        {
+            verbose=1;
+        }        
+    }
+    
+    uint32_t next_block=chainActive.Height()+1;
+    
+    vector <mc_MinerInfo> miners;
+    vector <int> block_miner_counts;
+    int miner_count=0;
+    for(int i=0;i<permissions->GetCount();i++)
+    {
+        mc_PermissionDetails *plsRow;
+        plsRow=(mc_PermissionDetails *)(permissions->GetRow(i));
+        mc_MinerInfo miner;
+        miner.Zero();
+        miner.m_StartBlock=plsRow->m_BlockFrom;
+        miner.m_EndBlock=plsRow->m_BlockTo;
+        miner.m_BlockReceived=plsRow->m_BlockReceived;
+        miner.m_Address=*(uint160*)(plsRow->m_Address);
+        
+        mc_gState->m_Permissions->GetMinerInfo(plsRow->m_Address,&miner.m_ConfirmedStartBlock,&miner.m_ConfirmedEndBlock,&miner.m_LastMined);
+        miner.m_Active=false;
+        if(next_block >= miner.m_ConfirmedStartBlock)
+        {
+            if(next_block < miner.m_ConfirmedEndBlock)
+            {
+                miner.m_Active=true;
+                miner_count++;
+            }                                
+        }
+        if(miner.m_BlockReceived == next_block)
+        {
+            miner.m_Pending=false;
+            if(miner.m_StartBlock < miner.m_EndBlock)
+            {
+                miner.m_Pending=true;                
+            }        
+        }
+        miners.push_back(miner);
+    }    
+        
+    block_miner_counts.push_back(miner_count);
+    for(int i=0;i<(int)miners.size();i++)
+    {
+        uint32_t try_block=next_block;
+        if(miners[i].m_Active)
+        {
+            uint32_t shift=try_block-next_block;
+            bool in_range=(try_block >= miners[i].m_ConfirmedStartBlock) && (try_block < miners[i].m_ConfirmedEndBlock);
+            while((mc_gState->m_Permissions->IsBarredByDiversity(try_block,miners[i].m_LastMined,block_miner_counts[shift])) && in_range)                  
+            {
+                shift++;
+                try_block++;
+                in_range=(try_block >= miners[i].m_ConfirmedStartBlock) && (try_block < miners[i].m_ConfirmedEndBlock);
+                if(in_range)
+                {
+                    if(shift>=block_miner_counts.size())
+                    {
+                        int miner_count=0;
+                        for(int j=0;j<(int)miners.size();j++)
+                        {
+                            if((try_block >= miners[j].m_ConfirmedStartBlock) && (try_block < miners[j].m_ConfirmedEndBlock))
+                            {
+                                miner_count++;
+                            }
+                        }    
+                        block_miner_counts.push_back(miner_count);
+                    }
+                }
+            }
+            if(in_range)
+            {
+                miners[i].m_WaitBlocks=shift;
+                miners[i].m_NextAllowed=try_block;
+            }
+        }
+        else
+        {
+            if(miners[i].m_ConfirmedStartBlock < miners[i].m_ConfirmedEndBlock)
+            {
+                if(miners[i].m_ConfirmedStartBlock > next_block)
+                {
+                    miners[i].m_WaitBlocks=miners[i].m_ConfirmedStartBlock-next_block;
+                }
+            }
+        }
+    }
+    
+    mc_gState->m_Permissions->FreePermissionList(permissions);
+    
+    sort(miners.begin(), miners.end(), ListMinersSort);
+    CPubKey active_miner;    
+    uint32_t status=mc_GetMiningStatus(active_miner);
+    uint160 miner_hash=0;
+    if(active_miner.IsValid())
+    {
+        miner_hash=active_miner.GetID();
+    }
+            
+    Array result;
+    
+    for(int i=0;i<(int)miners.size();i++)
+    {
+        bool is_mine=IsMine(*pwalletMain, (CKeyID)(miners[i].m_Address));
+        Object entry;
+        entry.push_back(Pair("address",CBitcoinAddress((CKeyID)(miners[i].m_Address)).ToString()));
+        entry.push_back(Pair("islocal",is_mine));
+        entry.push_back(Pair("permitted",miners[i].m_Active));
+        if(miners[i].m_WaitBlocks != INT_MAX)
+        {
+            entry.push_back(Pair("diversitywaitblocks",(int64_t)miners[i].m_WaitBlocks));
+//            entry.push_back(Pair("nextallowed",(int64_t)miners[i].m_NextAllowed));
+        }
+        else
+        {
+            entry.push_back(Pair("diversitywaitblocks",Value::null));
+//            entry.push_back(Pair("nextallowed",Value::null));            
+        }
+        if(verbose)
+        {
+            entry.push_back(Pair("startblock",(int64_t)miners[i].m_ConfirmedStartBlock));
+            entry.push_back(Pair("endblock",(int64_t)miners[i].m_ConfirmedEndBlock));            
+        }
+        if(miners[i].m_LastMined > 0)
+        {
+            entry.push_back(Pair("lastmined",(int64_t)miners[i].m_LastMined));
+        }
+        else
+        {
+            entry.push_back(Pair("lastmined",Value::null));            
+        }
+        string chain_state= "no-mine-permissions" ;
+        if(miners[i].m_Active)
+        {
+            chain_state="mining-permitted";
+            if(miners[i].m_WaitBlocks > 0)
+            {
+                chain_state="waiting-mining-diversity";                
+            }
+            else
+            {
+                if(!miners[i].m_Pending.is_null() && !miners[i].m_Pending.get_bool())
+                {
+                    if(!miners[i].m_Pending.get_bool())
+                    {
+                        chain_state="mining-permitted-pending-revoke";                
+                    }
+                }                
+            }
+        }
+        else
+        {
+            if(!miners[i].m_Pending.is_null() &&  miners[i].m_Pending.get_bool())
+            {
+                chain_state="pending-mine-permissions";                                
+            }            
+        }
+        entry.push_back(Pair("chainstate",chain_state));            
+        
+        if(is_mine)
+        {
+            string node_state=chain_state;
+//            if(chain_state=="mining-permitted" )
+            if(miners[i].m_Active && (miners[i].m_WaitBlocks == 0))            
+            {
+                node_state="";
+                if(node_state.size() == 0)if( (status & MC_MST_MINER_READY) == 0 )  node_state="disabled-by-gen-parameter";
+                if(node_state.size() == 0)if( status & MC_MST_PAUSED )              node_state="mining-paused";
+                if(node_state.size() == 0)if( status & MC_MST_NO_PEERS )            node_state="mining-requires-peers";
+                if(node_state.size() == 0)if( status & MC_MST_NO_TXS )              node_state="waiting-new-transactions";
+                if(node_state.size() == 0)if( status & MC_MST_NO_LOCKED_BLOCK )     node_state="waiting-for-lockblock";
+                if(node_state.size() == 0)if( status & MC_MST_BAD_VERSION )         node_state="unsupported-protocol-version";
+                if(node_state.size() == 0)if( status & MC_MST_REINDEX )             node_state="waiting-reindex-finish";
+                if(node_state.size() == 0)
+                {
+                    if(status & MC_MST_MINING)
+                    {
+                        if(miners[i].m_Address == miner_hash)                   node_state="mining-block-now";
+                        else                                                    node_state="other-local-address-mining";
+                    }
+                    else
+                    {
+                        if(miners[i].m_Address == miner_hash)
+                        {
+                            if(status & MC_MST_RECENT)
+                            {
+                                node_state="waiting-block-time";
+                            }
+                            else
+                            {
+                                if(status & MC_MST_DRIFT)
+                                {
+                                    node_state="waiting-block-time";
+                                }
+                                else
+                                {
+                                    node_state="waiting-mining-turnover";
+                                }                                
+                            }
+                        }
+                        else
+                        {
+                            node_state="other-local-address-preferred";
+                        }
+                    }
+                }
+            }
+            entry.push_back(Pair("localstate",node_state));                                    
+        }
+        else
+        {
+            entry.push_back(Pair("localstate",Value::null));                                    
+        }
+        
+        
+        result.push_back(entry);
+    }   
+    
+    return  result;
+}
+    

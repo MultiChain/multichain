@@ -256,11 +256,21 @@ int mc_MultiChainFilterEngine::Zero()
     m_CallbackNames.clear();
     m_CodeLibrary=NULL;    
     
+    m_Semaphore=NULL;
+    m_LockedBy=0;
+    
+    m_CoinsCache=NULL;
+        
     return MC_ERR_NOERROR;
 }
 
 int mc_MultiChainFilterEngine::Destroy()
 {
+    if(m_Semaphore)
+    {
+        __US_SemDestroy(m_Semaphore);
+    }
+    
     for(int i=0;i<(int)m_Filters.size();i++)
     {
         if(m_Workers)
@@ -286,6 +296,41 @@ int mc_MultiChainFilterEngine::Destroy()
     return MC_ERR_NOERROR;
 }
 
+void mc_MultiChainFilterEngine::Lock(int write_mode)
+{        
+    uint64_t this_thread;
+    this_thread=__US_ThreadID();
+    
+    if(this_thread == m_LockedBy)
+    {
+        return;
+    }
+    
+    __US_SemWait(m_Semaphore); 
+    m_LockedBy=this_thread;
+}
+
+void mc_MultiChainFilterEngine::UnLock()
+{    
+    m_LockedBy=0;
+    __US_SemPost(m_Semaphore);
+}
+
+int mc_MultiChainFilterEngine::InFilter()
+{    
+    if(__US_ThreadID() != m_LockedBy)
+    {
+        return 0;
+    }
+    if(m_TxID == 0)
+    {
+        return 0;
+    }
+    return 1;
+}
+
+
+
 int mc_MultiChainFilterEngine::GetAcceptTimeout()
 {    
     return GetArg("-acceptfiltertimeout",DEFAULT_ACCEPT_FILTER_TIMEOUT);
@@ -306,6 +351,16 @@ int mc_MultiChainFilterEngine::GetSendTimeout()
 }
 
 int mc_MultiChainFilterEngine::SetTimeout(int timeout)
+{
+    Lock(1);
+    
+    int err=SetTimeoutInternal(timeout);
+    
+    UnLock();
+    return err;
+}
+
+int mc_MultiChainFilterEngine::SetTimeoutInternal(int timeout)
 {
     for(int i=0;i<(int)m_Filters.size();i++)
     {
@@ -449,6 +504,16 @@ int mc_MultiChainFilterEngine::LoadLibrary(uint160 hash,bool *modified)
 }
 
 int mc_MultiChainFilterEngine::CheckLibraries(set<uint160>* lpAffectedLibraries, int for_block)
+{
+    Lock(1);
+    
+    int err=CheckLibrariesInternal(lpAffectedLibraries,for_block);
+    
+    UnLock();
+    return err;
+}
+
+int mc_MultiChainFilterEngine::CheckLibrariesInternal(set<uint160>* lpAffectedLibraries, int for_block)
 {
     int err;
     bool modified;
@@ -741,7 +806,17 @@ int mc_MultiChainFilterEngine::RebuildFilter(int row,int for_block)
     return MC_ERR_NOERROR;
 }
 
-int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid,int for_block)
+int mc_MultiChainFilterEngine::AddFilter(const unsigned char* short_txid,int for_block)
+{
+    Lock(1);
+    
+    int err=AddFilterInternal(short_txid,for_block);
+    
+    UnLock();
+    return err;
+}
+
+int mc_MultiChainFilterEngine::AddFilterInternal(const unsigned char* short_txid,int for_block)
 {    
     int err;
     mc_MultiChainFilter filter;
@@ -786,6 +861,16 @@ int mc_MultiChainFilterEngine::Add(const unsigned char* short_txid,int for_block
 
 int mc_MultiChainFilterEngine::Reset(int block,int for_block)
 {
+    Lock(1);
+    
+    int err=ResetInternal(block,for_block);
+    
+    UnLock();
+    return err;
+}
+
+int mc_MultiChainFilterEngine::ResetInternal(int block,int for_block)
+{
     int filter_block;
     int err;
 
@@ -820,7 +905,7 @@ int mc_MultiChainFilterEngine::Reset(int block,int for_block)
             }            
         }
     }
-    err=CheckLibraries(NULL,for_block);
+    err=CheckLibrariesInternal(NULL,for_block);
     if(err)
     {
         LogPrintf("Couldn't reset libraries, error: %d\n",err);
@@ -839,7 +924,7 @@ int mc_MultiChainFilterEngine::Reset(int block,int for_block)
     
     if(for_block == 0)
     {
-        SetTimeout(GetAcceptTimeout());
+        SetTimeoutInternal(GetAcceptTimeout());
     }
     
     if(fDebug)LogPrint("filter","filter: Filter engine reset\n");
@@ -847,20 +932,28 @@ int mc_MultiChainFilterEngine::Reset(int block,int for_block)
 }
 int mc_MultiChainFilterEngine::NoStreamFilters()
 {
+    int ret=1;
+    
+    Lock(0);
+    
     if(mc_gState->m_Features->StreamFilters() == 0)
     {
-        return 1;
+        goto exitlbl;
     }
     
     for(int i=0;i<(int)m_Filters.size();i++)
     {
         if( (m_Filters[i].m_FilterType == MC_FLT_TYPE_STREAM) && (m_Filters[i].m_CreateError.size() == 0) )
         {
-            return 0;
+            ret=0;
+            goto exitlbl;
         }
     }
-    
-    return 1;
+
+exitlbl:
+
+    UnLock();
+    return ret;
 }
 
 int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout, unsigned char *stream_short_txid,int block,int offset,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied)            
@@ -869,6 +962,8 @@ int mc_MultiChainFilterEngine::RunStreamFilters(const CTransaction& tx,int vout,
     {
         return MC_ERR_NOERROR;
     }
+    
+    Lock(0);
     
     bool only_once=false;
     int err=MC_ERR_NOERROR;
@@ -957,11 +1052,15 @@ exitlbl:
     m_EntityTxID=0;
     m_TxID=0;
     m_Vout=-1;
+    
+    UnLock();
     return err;    
 }
 
 int mc_MultiChainFilterEngine::RunTxFilters(const CTransaction& tx,std::set <uint160>& sRelevantEntities,std::string &strResult,mc_MultiChainFilter **lppFilter,int *applied,bool only_once)
-{
+{    
+    Lock(0);
+    
     int err=MC_ERR_NOERROR;
     strResult="";
     m_Tx=tx;
@@ -1035,11 +1134,14 @@ exitlbl:
             
     m_Params.Close();
     m_TxID=0;
+    
+    UnLock();
     return err;
 }
 
 int mc_MultiChainFilterEngine::RunFilter(const CTransaction& tx,mc_Filter *filter,std::string &strResult)
 {
+    Lock(0);
     int err=MC_ERR_NOERROR;
     m_Tx=tx;
     m_TxID=m_Tx.GetHash();
@@ -1049,11 +1151,13 @@ int mc_MultiChainFilterEngine::RunFilter(const CTransaction& tx,mc_Filter *filte
     
     m_Params.Close();
     m_TxID=0;
+    UnLock();
     return err;
 }
 
 int mc_MultiChainFilterEngine::RunFilterWithCallbackLog(const CTransaction& tx,int vout,uint256 stream_txid,mc_Filter *filter,std::string &strResult, json_spirit::Array& callbacks)
 {
+    Lock(0);
     int err=MC_ERR_NOERROR;
     m_Tx=tx;
     m_TxID=m_Tx.GetHash();
@@ -1066,10 +1170,20 @@ int mc_MultiChainFilterEngine::RunFilterWithCallbackLog(const CTransaction& tx,i
     m_Params.Close();
     m_Vout=-1;
     m_TxID=0;
+    UnLock();
     return err;
 }
 
 void mc_MultiChainFilterEngine::SetCallbackNames()
+{
+    Lock(1);
+    
+    SetCallbackNamesInternal();
+    
+    UnLock();
+}
+
+void mc_MultiChainFilterEngine::SetCallbackNamesInternal()
 {
     m_CallbackNames.clear();
     
@@ -1147,7 +1261,7 @@ int mc_MultiChainFilterEngine::Initialize()
     m_CodeLibrary->Clear();
     m_CodeLibrary->AddElement();
     
-    SetCallbackNames();
+    SetCallbackNamesInternal();
     
     filters=NULL;
     filters=mc_gState->m_Assets->GetEntityList(filters,NULL,MC_ENT_TYPE_FILTER);
@@ -1188,12 +1302,19 @@ int mc_MultiChainFilterEngine::Initialize()
     
     for(it=filter_refs.begin();it != filter_refs.end();it++)
     {
-        err=Add((unsigned char*)&(it->second)+MC_AST_SHORT_TXID_OFFSET,0);
+        err=AddFilter((unsigned char*)&(it->second)+MC_AST_SHORT_TXID_OFFSET,0);
         if(err)
         {
             goto exitlbl;
         }
     }
+    
+    m_Semaphore=__US_SemCreate();
+    if(m_Semaphore == NULL)
+    {
+        err=MC_ERR_INTERNAL_ERROR;
+    }
+
     
     LogPrintf("Filter initialization completed\n");
     

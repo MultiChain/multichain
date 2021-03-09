@@ -697,7 +697,7 @@ void CDBFlat::Lock(bool for_size)
 {
     if(m_FileHan)
     {
-        __US_LockFile(m_FileHan);
+        __US_LockFile(m_FileHan,1,0);
         
         if(!for_size)
         {

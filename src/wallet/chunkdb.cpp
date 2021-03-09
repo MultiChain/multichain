@@ -76,6 +76,7 @@ void mc_ChunkDB::Zero()
     m_MemPool=NULL;
     m_ChunkData=NULL;
     m_TmpScript=NULL;
+    m_ThreadTmpScripts=NULL;
     
     m_FeedPos=0;
     
@@ -110,6 +111,16 @@ int mc_ChunkDB::Destroy()
     if(m_TmpScript)
     {
         delete m_TmpScript;
+    }
+    
+    if(m_ThreadTmpScripts)
+    {
+        for(int row=0;row<m_ThreadTmpScripts->GetCount();row++)
+        {
+            mc_Script *script=*(mc_Script **)(m_ThreadTmpScripts->GetRow(row)+sizeof(uint64_t));
+            delete script;
+        }
+        delete m_ThreadTmpScripts;
     }
     
     if(m_Semaphore)
@@ -878,7 +889,7 @@ int mc_ChunkDB::Initialize(const char *name,uint32_t mode)
     m_DB->SetOption("ValueSize",0,m_ValueSize);
     
     
-    err=m_DB->Open(m_DBName,MC_OPT_DB_DATABASE_CREATE_IF_MISSING | MC_OPT_DB_DATABASE_TRANSACTIONAL | MC_OPT_DB_DATABASE_LEVELDB);
+    err=m_DB->Open(m_DBName,MC_OPT_DB_DATABASE_CREATE_IF_MISSING | MC_OPT_DB_DATABASE_TRANSACTIONAL | MC_OPT_DB_DATABASE_LEVELDB | MC_OPT_DB_DATABASE_THREAD_SAFE);
     
     if(err)
     {
@@ -997,6 +1008,10 @@ int mc_ChunkDB::Initialize(const char *name,uint32_t mode)
     
     memset(null_txid,0,MC_TDB_TXID_SIZE);    
     
+    m_ThreadTmpScripts=new mc_Buffer;
+    m_ThreadTmpScripts->Initialize(sizeof(uint64_t),sizeof(uint64_t)+sizeof(mc_Script *),MC_BUF_MODE_MAP);    
+    m_ThreadTmpScripts->Realloc(MC_PRM_MAX_THREADS);
+            
     m_Semaphore=__US_SemCreate();
     if(m_Semaphore == NULL)
     {
@@ -1016,6 +1031,26 @@ int mc_ChunkDB::Initialize(const char *name,uint32_t mode)
     
     return err;   
 }
+
+mc_Script *mc_ChunkDB::GetTmpScript()
+{
+    if(m_ThreadTmpScripts == NULL)
+    {
+        return NULL;
+    }
+    
+    uint64_t thread_id=__US_ThreadID();
+    int mprow=m_ThreadTmpScripts->Seek(&thread_id);    
+    if(mprow < 0)
+    {
+        mc_Script *script=new mc_Script;
+        mprow=m_ThreadTmpScripts->GetCount();
+        m_ThreadTmpScripts->Add(&thread_id,&script);        
+    }
+    
+    return *(mc_Script**)(m_ThreadTmpScripts->GetRow(mprow)+sizeof(uint64_t));    
+}
+
 
 void mc_ChunkDB::Dump(const char *message)
 {
@@ -1718,6 +1753,8 @@ unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
     int FileHan;
     uint32_t read_from;
     mc_ChunkDBRow chunk_def_zero;
+    mc_Script *tmpscript;
+    
     
     ptr=NULL;
     if((offset >= 0) && (chunk_def->m_Pos > 0) )
@@ -1735,6 +1772,9 @@ unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
         }
         return NULL;
     }
+
+    tmpscript=GetTmpScript();
+    tmpscript->Clear();
     
     FileHan=0;
     if(chunk_def->m_InternalFileID < 0)
@@ -1755,7 +1795,16 @@ unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
         {
             *bytes=bytes_to_read;
         }
-        return ptr+read_from;
+        if(bytes_to_read)
+        {
+            if(tmpscript->Resize(bytes_to_read,1))
+            {
+                goto exitlbl;                                
+            }
+            memcpy(tmpscript->m_lpData,ptr+read_from,bytes_to_read);
+        }
+        return tmpscript->m_lpData;
+//        return ptr+read_from;
     }
     else
     {
@@ -1788,17 +1837,17 @@ unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
                 {
                     goto exitlbl;
                 }
-                m_TmpScript->Clear();
-                if(m_TmpScript->Resize(bytes_to_read,1))
+                tmpscript->Clear();
+                if(tmpscript->Resize(bytes_to_read,1))
                 {
                     goto exitlbl;                                
                 }
     
-                if(read(FileHan,m_TmpScript->m_lpData,bytes_to_read) != (int)bytes_to_read)
+                if(read(FileHan,tmpscript->m_lpData,bytes_to_read) != (int)bytes_to_read)
                 {
                     goto exitlbl;
                 }
-                mc_GetChunkSalt(m_TmpScript->m_lpData,chunk_def->m_HeaderSize,salt,salt_size);                
+                mc_GetChunkSalt(tmpscript->m_lpData,chunk_def->m_HeaderSize,salt,salt_size);                
             }
 
             read_from+=chunk_def->m_HeaderSize+offset;
@@ -1814,18 +1863,18 @@ unsigned char *mc_ChunkDB::GetChunkInternal(mc_ChunkDBRow *chunk_def,
             goto exitlbl;
         }
         
-        m_TmpScript->Clear();
-        if(m_TmpScript->Resize(bytes_to_read,1))
+        tmpscript->Clear();
+        if(tmpscript->Resize(bytes_to_read,1))
         {
             goto exitlbl;            
         }
     
-        if(read(FileHan,m_TmpScript->m_lpData,bytes_to_read) != (int)bytes_to_read)
+        if(read(FileHan,tmpscript->m_lpData,bytes_to_read) != (int)bytes_to_read)
         {
             goto exitlbl;
         }
         
-        ptr=m_TmpScript->m_lpData;        
+        ptr=tmpscript->m_lpData;        
         if(bytes)
         {
             *bytes=bytes_to_read;

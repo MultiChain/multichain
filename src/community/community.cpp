@@ -149,7 +149,7 @@ Value mc_EnterpriseFeatures::DRF_RPCDataRefToBinaryCache(const Array& params)
     return Value::null;
 }
 
-bool mc_EnterpriseFeatures::DRF_GetData(string dataref,CScript &script,const unsigned char **elem,int64_t *size,uint32_t *format,std::string &strError)
+bool mc_EnterpriseFeatures::DRF_GetData(int rpc_slot,string dataref,CScript &script,const unsigned char **elem,int64_t *size,uint32_t *format,std::string &strError)
 {
     return false;
 }

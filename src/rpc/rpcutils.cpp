@@ -46,7 +46,8 @@ bool ParseLibraryApproval(Value param,mc_EntityDetails *library_entity,mc_Entity
 
 CScript RemoveOpDropsIfNeeded(const CScript& scriptInput)
 {
-    if(pMultiChainFilterEngine->m_TxID != 0)
+//    if(pMultiChainFilterEngine->m_TxID != 0)
+    if(pMultiChainFilterEngine->InFilter() != 0)
     {
         return scriptInput;        
     }
@@ -93,7 +94,8 @@ bool AssetRefDecode(unsigned char *bin, const char* string, const size_t stringL
 int mc_MaxOpReturnShown()
 {
     int res=GetArg("-maxshowndata",MAX_OP_RETURN_SHOWN);    
-    if(pMultiChainFilterEngine->m_TxID != 0)
+//    if(pMultiChainFilterEngine->m_TxID != 0)
+    if(pMultiChainFilterEngine->InFilter())
     {
         res=MAX_OP_RETURN_SHOWN;    
         if(pMultiChainFilterEngine->m_Params.m_MaxShownData >= 0)
@@ -203,6 +205,19 @@ Value mc_ExtractDetailsJSONObject(const unsigned char *script,uint32_t total)
 
 void CheckWalletError(int err,uint32_t entity_type,string message)
 {
+    int errCode=RPC_INTERNAL_ERROR;
+    string strError="";
+    
+    WRPCheckWalletError(err,entity_type,message,&errCode,&strError);
+    
+    if(strError.size())
+    {
+        throw JSONRPCError(errCode,strError);
+    }
+}
+
+void WRPCheckWalletError(int err,uint32_t entity_type,string message,int *errCode,string *strError)
+{
     string index;
     string msg;
     if(err)
@@ -210,7 +225,8 @@ void CheckWalletError(int err,uint32_t entity_type,string message)
         switch(err)
         {
             case MC_ERR_NOT_SUPPORTED:
-                throw JSONRPCError(RPC_NOT_SUPPORTED, "This feature is not supported in this build");                                        
+                *errCode=RPC_NOT_SUPPORTED;
+                *strError="This feature is not supported in this build";                                        
                 break;
             case MC_ERR_NOT_ALLOWED:
                 if(message.size())
@@ -243,10 +259,12 @@ void CheckWalletError(int err,uint32_t entity_type,string message)
                 {
                     msg="The index required is not available for this subscription.";
                 }
-                throw JSONRPCError(RPC_NOT_SUBSCRIBED, msg);                                        
+                *errCode=RPC_NOT_SUBSCRIBED;
+                *strError=msg;                                        
                 break;
             case MC_ERR_INTERNAL_ERROR:
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "Internal wallet error");                                        
+                *errCode=RPC_INTERNAL_ERROR;
+                *strError="Internal wallet error";                                        
                 break;
             default:
                 break;
@@ -1156,7 +1174,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
             entry.push_back(Pair("creators",openers));                    
         }
         
-        if( ( (output_level & 0x0040)  != 0) && (pMultiChainFilterEngine->m_TxID == 0) )
+        if( ( (output_level & 0x0040)  != 0) && (pMultiChainFilterEngine->InFilter() == 0) )
         {
             Array filters;
             for(int i=0;i<(int)pMultiChainFilterEngine->m_Filters.size();i++)
@@ -1172,7 +1190,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
             entry.push_back(Pair("filters",filters));                    
         }
         
-        if( ( (output_level & 0x0018)  != 0) && (pMultiChainFilterEngine->m_TxID == 0) )
+        if( ( (output_level & 0x0018)  != 0) && (pMultiChainFilterEngine->InFilter() == 0) )
         {
             entStat.Zero();
             memcpy(&entStat,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
@@ -1434,7 +1452,7 @@ int mc_IsUTF8(const unsigned char *elem,size_t elem_size)
     return 1;
 }
 
-const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t start,int64_t count,int fHan)
+const unsigned char *GetChunkDataInRange(int rpc_slot,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t start,int64_t count,int fHan)
 {
     mc_ChunkDBRow chunk_def;
     int size,shift,chunk;
@@ -1444,8 +1462,16 @@ const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes
     unsigned char *elem;
     int64_t read_from,read_size;
 
-    mc_gState->m_TmpBuffers->m_RpcChunkScript1->Clear();
-    mc_gState->m_TmpBuffers->m_RpcChunkScript1->AddElement();
+    mc_Script *tmpscript;
+    tmpscript=mc_gState->m_TmpBuffers->m_RpcChunkScript1;
+    if(rpc_slot >= 0)
+    {
+        tmpscript=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcChunkScript1;
+    }
+    
+    
+    tmpscript->Clear();
+    tmpscript->AddElement();
     
     *out_size=0;
     
@@ -1495,7 +1521,7 @@ const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes
                     }
                     else
                     {
-                        mc_gState->m_TmpBuffers->m_RpcChunkScript1->SetData(elem+read_from,read_size);                        
+                        tmpscript->SetData(elem+read_from,read_size);                        
                     }                    
                     
                     *out_size+=read_size;
@@ -1510,10 +1536,10 @@ const unsigned char *GetChunkDataInRange(int64_t *out_size,unsigned char* hashes
         ptr+=MC_CDB_CHUNK_HASH_SIZE;
     }
     
-    return mc_gState->m_TmpBuffers->m_RpcChunkScript1->GetData(0,&elem_size);
+    return tmpscript->GetData(0,&elem_size);
 }
 
-uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t total_size,int max_shown)
+uint32_t GetFormattedData(int rpc_slot,mc_Script *lpScript,const unsigned char **elem,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t total_size,int max_shown)
 {
     uint32_t status;  
     mc_ChunkDBRow chunk_def;
@@ -1523,6 +1549,8 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
     bool skip_read=false;    
     size_t elem_size;
         
+    if(fDebug)LogPrint("drutl01","drutl01: %d: -->\n",rpc_slot);
+    
     if(chunk_count > 1) 
     {
         int max_size=mc_MaxOpReturnShown();
@@ -1545,6 +1573,7 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
     *out_size=elem_size;
     if(hashes == NULL)
     {
+        if(fDebug)LogPrint("drutl01","drutl01: %d: <-- A %ld\n",rpc_slot,*out_size);
         return MC_OST_ON_CHAIN;
     }
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)
@@ -1552,10 +1581,17 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
         return MC_OST_OFF_CHAIN | MC_OST_ERROR_NOT_SUPPORTED;
     }
     
+    mc_Script *tmpscript;
+    tmpscript=mc_gState->m_TmpBuffers->m_RpcChunkScript1;
+    if(rpc_slot >= 0)
+    {
+        tmpscript=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcChunkScript1;
+    }
+    
     if(use_tmp_buf)
     {
-        mc_gState->m_TmpBuffers->m_RpcChunkScript1->Clear();
-        mc_gState->m_TmpBuffers->m_RpcChunkScript1->AddElement();
+        tmpscript->Clear();
+        tmpscript->AddElement();
     }
     
     status=MC_OST_OFF_CHAIN;
@@ -1594,7 +1630,7 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
                 {
                     if(use_tmp_buf)
                     {
-                        mc_gState->m_TmpBuffers->m_RpcChunkScript1->SetData(*elem,elem_size);
+                        tmpscript->SetData(*elem,elem_size);
                     }
                 }
                 else
@@ -1608,6 +1644,7 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
         {
             status=MC_OST_OFF_CHAIN;
             *out_size=total_size;
+            if(fDebug)LogPrint("drutl01","drutl01: %d: <-- B %ld\n",rpc_slot,*out_size);
             return status;            
         }
         ptr+=MC_CDB_CHUNK_HASH_SIZE;
@@ -1617,7 +1654,7 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
     
     if(use_tmp_buf)
     {
-        *elem = mc_gState->m_TmpBuffers->m_RpcChunkScript1->GetData(0,&elem_size);
+        *elem = tmpscript->GetData(0,&elem_size);
     }
     else
     {
@@ -1636,7 +1673,13 @@ uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t
         *out_size=elem_size;
     }
     
+    if(fDebug)LogPrint("drutl01","drutl01: %d: <-- C %ld\n",rpc_slot,*out_size);
     return status;
+}
+
+uint32_t GetFormattedData(mc_Script *lpScript,const unsigned char **elem,int64_t *out_size,unsigned char* hashes,int chunk_count,int64_t total_size,int max_shown)
+{
+    return GetFormattedData(-1,lpScript,elem,out_size,hashes,chunk_count,total_size,max_shown);
 }
 
 string OffChainError(uint32_t status,int *errorCode) 
@@ -1705,6 +1748,8 @@ Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 tx
     int errorCode;
     int err;
     
+    if(fDebug)LogPrint("drutl02","drutl02: %d: --> %ld %s\n",GetRPCSlot(),elem_size,txid.ToString());
+    
     available=AvailableFromStatus(status);
     
     if(status & MC_OST_ERROR_MASK)
@@ -1753,6 +1798,7 @@ Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 tx
                 metadata=HexStr(elem,elem+elem_size);
                 break;
         }
+        if(fDebug)LogPrint("drutl02","drutl02: %d: <-- A %ld %s\n",GetRPCSlot(),elem_size,txid.ToString());
         return metadata;
     }    
     if(format_text_out)
@@ -1760,7 +1806,7 @@ Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 tx
         *format_text_out="gettxoutdata";
     }
     
-    if( (pMultiChainFilterEngine->m_TxID == 0) || (mc_gState->m_Features->StreamFilters() == 0) )
+    if( (pMultiChainFilterEngine->InFilter() == 0) || (mc_gState->m_Features->StreamFilters() == 0) )
     {        
         metadata_object.push_back(Pair("txid", txid.ToString()));
         metadata_object.push_back(Pair("vout", vout));
@@ -1777,6 +1823,8 @@ Value OpReturnFormatEntry(const unsigned char *elem,int64_t elem_size,uint256 tx
         metadata_object.push_back(Pair("available", available));        
     }
  */ 
+    if(fDebug)LogPrint("drutl02","drutl02: %d: <-- B %ld %s\n",GetRPCSlot(),elem_size,txid.ToString());
+    
     return metadata_object;    
 }
 
@@ -2280,7 +2328,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         }
         
         
-        if( ((output_level & 0x0008) != 0) && ((mc_gState->m_WalletMode & MC_WMD_TXS) != 0) && (pMultiChainFilterEngine->m_TxID == 0) )
+        if( ((output_level & 0x0008) != 0) && ((mc_gState->m_WalletMode & MC_WMD_TXS) != 0) && (pMultiChainFilterEngine->InFilter() == 0) )
         {
             entStat.m_Entity.m_EntityType=MC_TET_ASSET | MC_TET_CHAINPOS;
             if(pwalletTxsMain->FindEntity(&entStat))
@@ -2449,6 +2497,7 @@ Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t
                     }
                     if(output_level & 0x0080)
                     {
+                        mc_gState->ChainLock();
                         int block=followon->m_LedgerRow.m_Block;
                         int chain_height=chainActive.Height();
                         issue.push_back(Pair("confirmations", chain_height-block+1));
@@ -2456,9 +2505,10 @@ Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t
                         {
                             uint256 blockHash=chainActive[block]->GetBlockHash();
                             issue.push_back(Pair("blockhash", blockHash.GetHex()));
-                            issue.push_back(Pair("blockindex", block));
+                            issue.push_back(Pair("blockindex", block));                            
                             issue.push_back(Pair("blocktime", mapBlockIndex[blockHash]->GetBlockTime()));                            
                         }                        
+                        mc_gState->ChainUnLock();
                     }
                 }
                 issues.push_back(issue);                    
@@ -5275,11 +5325,18 @@ int ParseRescanParameter(Value rescan_identifier, bool *fRescan)
     return start_block;
 }
 
-vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
+vector<int> ParseBlockSetIdentifier(Value blockset_identifier,int chain_height_in)
 {
     vector<int> block_set;
     vector<int> result;
     int last_block;
+
+    int chain_height=chain_height_in;
+    
+    if(chain_height < 0)
+    {
+        chain_height=chainActive.Height();
+    }
     
     if(blockset_identifier.type() == obj_type)
     {
@@ -5326,7 +5383,7 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
         
         if(starttime <= endtime)
         {
-            for(int block=0; block<=chainActive.Height();block++)
+            for(int block=0; block<=chain_height;block++)
             {
                 if( (chainActive[block]->nTime >= starttime) && (chainActive[block]->nTime <= endtime) )
                 {
@@ -5357,8 +5414,8 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
                 to=value;
                 if(value < 0)
                 {
-                    to=chainActive.Height();
-                    from=chainActive.Height()+value+1;
+                    to=chain_height;
+                    from=chain_height+value+1;
                 }
             }
             else
@@ -5367,14 +5424,20 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
                 {
                     uint256 hash = ParseHashV(str, "Block hash");
                     
+                    mc_gState->ChainLock();
                     if (mapBlockIndex.count(hash) == 0)
+                    {
+                        mc_gState->ChainUnLock();
                         throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block " + str + " not found");
+                    }
 
                     CBlockIndex* pblockindex = mapBlockIndex[hash];
                     if(!chainActive.Contains(pblockindex))
                     {
+                        mc_gState->ChainUnLock();
                         throw JSONRPCError(RPC_BLOCK_NOT_FOUND, "Block " + str + " not found in active chain");
                     }
+                    mc_gState->ChainUnLock();
                     from=pblockindex->nHeight;
                     to=from;
                 }
@@ -5386,9 +5449,9 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
             {
                 from=0;
             }
-            if(to>chainActive.Height())
+            if(to>chain_height)
             {
-                to=chainActive.Height();
+                to=chain_height;
             }
             
             for(int block=from;block<=to;block++)
@@ -5416,6 +5479,10 @@ vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
     return result;
 }
 
+vector<int> ParseBlockSetIdentifier(Value blockset_identifier)
+{
+    return ParseBlockSetIdentifier(blockset_identifier,-1);
+}
 
 
 Array AssetArrayFromAmounts(mc_Buffer *asset_amounts,int issue_asset_id,uint256 hash,int show_type)
@@ -5557,13 +5624,15 @@ int paramtoint(Value param,bool check_for_min,int min_value,string error_message
     return result;
 }
 
-int64_t paramtoint64(Value param,bool check_for_min,int64_t min_value,string error_message)
+int64_t paramtoint64(Value param,bool check_for_min,int64_t min_value,int *errCode)
 {
-    int64_t result;
+    int64_t result=0;
     
+    *errCode=0;
     if(param.type() != int_type)
     {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, error_message);        
+        *errCode=RPC_INVALID_PARAMETER;
+        return result;
     }
     
     result=param.get_int64();
@@ -5571,7 +5640,8 @@ int64_t paramtoint64(Value param,bool check_for_min,int64_t min_value,string err
     {
         if(result < min_value)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, error_message);                    
+            *errCode=RPC_INVALID_PARAMETER;
+            return result;
         }
     }
     
@@ -5779,7 +5849,25 @@ int mc_BinaryCacheFile(string id,int mode)
     {
        flags=O_RDWR; 
     }
-    return open(file_name,_O_BINARY | flags, S_IRUSR | S_IWUSR);
+    int fHan=open(file_name,_O_BINARY | flags, S_IRUSR | S_IWUSR);
+    if(fHan > 0)
+    {
+        if(__US_LockFile(fHan,mode & 3,1) != 0)
+        {
+            close(fHan);
+            fHan=0;
+        }
+    }
+    return fHan;
+}
+
+void mc_CloseBinaryCache(int fHan)
+{
+    if(fHan>0)
+    {
+        __US_UnLockFile(fHan);
+        close(fHan);
+    }
 }
 
 void mc_RemoveBinaryCacheFile(string id)

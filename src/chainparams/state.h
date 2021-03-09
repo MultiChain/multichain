@@ -49,6 +49,7 @@
 #define MC_WMD_AUTOSUBSCRIBE_ASSETS  0x04000000
 #define MC_WMD_NO_CHUNK_FLUSH        0x08000000
 #define MC_WMD_AUTO                  0x10000000
+#define MC_WMD_NO_READ_POOLS         0x20000000
 
 #define MC_VCM_NONE                  0x00000000
 #define MC_VCM_1_0                   0x00000001
@@ -188,6 +189,7 @@ typedef struct mc_TmpBuffers
         Destroy();
     }
     
+    uint64_t                m_ThreadID;
     mc_Script               *m_RpcScript1;
     mc_Script               *m_RpcScript2;
     mc_Script               *m_RpcScript3;
@@ -208,6 +210,7 @@ typedef struct mc_TmpBuffers
     
     void  Init()
     {
+        m_ThreadID=0;
         m_RpcScript1=new mc_Script();
         m_RpcScript2=new mc_Script();
         m_RpcScript3=new mc_Script();
@@ -285,6 +288,7 @@ typedef struct mc_State
     unsigned char m_BurnAddress[20];
     int m_EnterpriseBuild;
     char m_SeedResolvedAddress[256];
+    int m_NumRPCThreads;
     
     mc_Script               *m_TmpScript;
     mc_Script               *m_TmpScript1;
@@ -295,6 +299,10 @@ typedef struct mc_State
     mc_Buffer               *m_BlockHeaderSuccessors;
     
     mc_TmpBuffers           *m_TmpBuffers;
+
+    mc_TmpBuffers           **m_TmpRPCBuffers;
+    
+    void *m_ChainSemaphore;                                                     
     
     void  InitDefaults()
     {
@@ -331,7 +339,11 @@ typedef struct mc_State
         
         m_TmpBuffers=new mc_TmpBuffers;
         
+        m_NumRPCThreads=0;
+        m_TmpRPCBuffers=NULL;
+        
         m_pSeedNode=NULL;
+        m_ChainSemaphore=__US_SemCreate();
     }
     
     void  Destroy()
@@ -384,6 +396,19 @@ typedef struct mc_State
         {
             delete m_TmpBuffers;
         }
+        if(m_TmpRPCBuffers)
+        {
+            for(int i=0;i<m_NumRPCThreads;i++)
+            {
+                delete m_TmpRPCBuffers[i];
+            }
+            mc_Delete(m_TmpRPCBuffers);
+        }
+        if(m_ChainSemaphore)
+        {
+            __US_SemDestroy(m_ChainSemaphore);
+        }
+        
     }
     
     int VersionInfo(int version);
@@ -398,6 +423,11 @@ typedef struct mc_State
     int IsDeprecated(int version);
     const char* GetSeedNode();
     int SetSeedNode(const char* seed_resolved);
+    
+    int InitRPCThreads(int num_threads);
+    void ChainLock();
+    void ChainUnLock();
+    
 } cs_State;
 
 

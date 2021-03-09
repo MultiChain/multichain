@@ -236,6 +236,38 @@ int mc_State::SetSeedNode(const char* seed_resolved)
 }
 
 
+int mc_State::InitRPCThreads(int num_threads)
+{
+    if(m_TmpRPCBuffers)
+    {
+        return MC_ERR_INTERNAL_ERROR;
+    }
+
+    m_NumRPCThreads=num_threads;
+    
+    m_TmpRPCBuffers=(mc_TmpBuffers**)mc_New(m_NumRPCThreads*sizeof(mc_TmpBuffers*)); 
+    
+    for(int i=0;i<m_NumRPCThreads;i++)
+    {
+        m_TmpRPCBuffers[i]=new mc_TmpBuffers;
+    }    
+    
+    return MC_ERR_NOERROR;
+}
+
+
+void mc_State::ChainLock() 
+{
+    __US_SemWait(m_ChainSemaphore); 
+}
+
+void mc_State::ChainUnLock() 
+{
+    __US_SemPost(m_ChainSemaphore); 
+}
+
+
+
 const char *mc_Params::Command()
 {
     if(m_FirstArgumentType == MC_FAT_COMMAND)

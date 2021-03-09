@@ -1621,7 +1621,17 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
                     err=MC_ERR_NOERROR;
                 }
                 
+                pwalletTxsMain->WRPWriteLock();
+                if(fDebug)LogPrint("mcwrp","mcwrp: Synchronization for import started\n");
+
                 err=pwalletTxsMain->CompleteImport(imp,((pindexStart->nHeight > 0) && !fOnlySubscriptions) ? MC_EFL_NOT_IN_SYNC_AFTER_IMPORT : 0);
+
+                
+                pwalletTxsMain->WRPSync(1);
+
+                if(fDebug)LogPrint("mcwrp","mcwrp: Synchronization for import completed\n");
+                pwalletTxsMain->WRPWriteUnLock();
+
             }
             else
             {
@@ -1676,6 +1686,9 @@ void CWallet::ReacceptWalletTransactions()
                                 LogPrintf("Tx %s was not accepted to mempool, setting INVALID flag\n", wtxid.ToString());
                                 pwalletTxsMain->SaveTxFlag((unsigned char*)&wtxid,MC_TFL_INVALID,1);
                             }
+                            pwalletTxsMain->WRPWriteLock();        
+                            pwalletTxsMain->WRPSync(0);
+                            pwalletTxsMain->WRPWriteUnLock();                            
                         }
                         else
                         {
@@ -3187,6 +3200,11 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
             if(fDebug)LogPrint("mchn","mchn: Tx not committed (%s): %s\n",reject_reason.c_str(),EncodeHexTx(wtxNew));
             return false;
         }
+        
+        pwalletTxsMain->WRPWriteLock();        
+        pwalletTxsMain->WRPSync(0);
+        pwalletTxsMain->WRPWriteUnLock();
+        
 /*        
         else
         {

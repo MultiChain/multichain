@@ -27,6 +27,7 @@
 #define MC_OPT_DB_DATABASE_DELAYED_OPEN                     0x00000020
 #define MC_OPT_DB_DATABASE_NEXT_ON_READ                     0x00000040
 #define MC_OPT_DB_DATABASE_SYNC_ON_COMMIT                   0x00000080
+#define MC_OPT_DB_DATABASE_THREAD_SAFE                      0x00000100
 #define MC_OPT_DB_DATABASE_OPTION_MASK                      0x000FFFFF
 #define MC_OPT_DB_DATABASE_LEVELDB                          0x00100000
 #define MC_OPT_DB_DATABASE_FSR_UTXOC_BLOCKS                 0x00200000
@@ -137,6 +138,8 @@ typedef struct mc_Database
     char                   *m_LogBuffer;    
     int                     m_LogSize;    
     
+    mc_Buffer              *m_ThreadReadBuffers;
+    
     int LogWrite(int op,
                       char  *key,                                               /* key */
                       int key_len,                                              /* key length, -1 if strlen is should be used */
@@ -187,6 +190,7 @@ typedef struct mc_Database
     void Lock(int write_mode);
     void UnLock();
     int Synchronize();
+    char *GetReadBuffer();
     
     char *MoveNext(
         int *error

@@ -22,6 +22,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
 bool CBitcoinAddressFromTxEntity(CBitcoinAddress &address,mc_TxEntity *lpEntity);
 bool IsLicenseTokenIssuance(mc_Script *lpScript,uint256 hash);
 bool IsLicenseTokenTransfer(mc_Script *lpScript,mc_Buffer *amounts);
+void SetRPCWRPReadLockFlag(int lock);
 
 using namespace std;
 
@@ -387,6 +388,35 @@ int mc_WalletTxs::Destroy()
     
 }
 
+bool mc_WalletTxs::WRPFindEntity(mc_TxEntityStat *entity)
+{
+    int row;
+    if((m_Mode & MC_WMD_TXS) == 0)
+    {
+        return false;
+    }    
+    if(m_Database == NULL)
+    {
+        return false;
+    }
+    
+    int use_read=m_Database->WRPUsed();
+    
+    if(use_read == 0)
+    {
+        m_Database->Lock(0,0);
+    }
+    
+    row=m_Database->FindEntity(NULL,entity);
+    
+    if(use_read == 0)
+    {
+        m_Database->UnLock();
+    }
+    
+    return (row >= 0) ? true : false;
+}
+
 bool mc_WalletTxs::FindEntity(mc_TxEntityStat *entity)
 {
     int row;
@@ -415,7 +445,9 @@ int mc_WalletTxs::AddEntity(mc_TxEntity *entity,uint32_t flags)
         return MC_ERR_INTERNAL_ERROR;
     }
     m_Database->Lock(1,0);
+    WRPWriteLock();
     err=m_Database->AddEntity(entity,flags);    
+    WRPWriteUnLock();
     m_Database->UnLock();
     
     if(err == MC_ERR_NOERROR)
@@ -449,6 +481,7 @@ mc_Buffer* mc_WalletTxs::GetEntityList()
 
 void mc_WalletTxs::Lock()
 {
+//    LogPrintf("Lock %ld\n",__US_ThreadID());
     if(m_Database)
     {
         m_Database->Lock(0,0);
@@ -457,10 +490,68 @@ void mc_WalletTxs::Lock()
 
 void mc_WalletTxs::UnLock()
 {
+//    LogPrintf("UnLock %ld\n",__US_ThreadID());
     if(m_Database)
     {
         m_Database->UnLock();
     }    
+}
+
+void mc_WalletTxs::WRPReadLock()
+{
+//    LogPrintf("WRPLock %ld\n",__US_ThreadID());
+    if(m_Database)
+    {
+        m_Database->WRPReadLock();
+        SetRPCWRPReadLockFlag(1);
+    }
+}
+
+void mc_WalletTxs::WRPWriteLock()
+{
+//    LogPrintf("WRPLock %ld\n",__US_ThreadID());
+    if(m_Database)
+    {
+        m_Database->WRPWriteLock(1);
+    }
+}
+
+void mc_WalletTxs::WRPReadUnLock()
+{
+//    LogPrintf("WRPUnLock %ld\n",__US_ThreadID());
+    if(m_Database)
+    {
+        SetRPCWRPReadLockFlag(0);
+        m_Database->WRPReadUnLock();
+    }    
+}
+
+void mc_WalletTxs::WRPWriteUnLock()
+{
+//    LogPrintf("WRPUnLock %ld\n",__US_ThreadID());
+    if(m_Database)
+    {
+        m_Database->WRPWriteUnLock(1);
+    }    
+}
+
+int mc_WalletTxs::WRPSync(int for_block)
+{
+    if(m_Database)
+    {
+        if(for_block)
+        {
+            if(fDebug)LogPrint("mcwrp","mcwrp: Mempool synchronization for block started\n");
+        }
+        int ret=m_Database->WRPSync(for_block);
+        if(for_block)
+        {
+            if(fDebug)LogPrint("mcwrp","mcwrp: Mempool synchronization for block completed\n");
+        }
+        return ret;
+    }        
+    
+    return MC_ERR_NOERROR;
 }
 
 int mc_WalletTxs::GetBlock()
@@ -796,97 +887,100 @@ int mc_WalletTxs::RollBackSubKeys(mc_TxImport *import,int block,mc_TxEntityStat 
                 if(fInBlocks &&                                                 // Still in loop, no error
                   (entrow->m_Block > block))                                    // Block to delete, mempool rows will be deleted in db rollback
                 {
-                    uint256 hash;
-                    memcpy(&hash,entrow->m_TxId,MC_TDB_TXID_SIZE);
-                    CWalletTx wtx=GetInternalWalletTx(hash,NULL,&err);  // Tx to delete
-                    if(err)
+                    if((entrow->m_Flags & MC_TFL_IS_EXTENSION) == 0)            // Extension rows are ignored, tx will appear in normal row and decrement subkey several times                     
                     {
-                        LogPrintf("wtxs: RollBackSubKeys: Couldn't find tx %s, error: %d\n",hash.ToString().c_str(),err);        
-                        fInBlocks=false;                                                                
-                    }
-                    else
-                    {
-                        for(i=0;i<(int)wtx.vout.size();i++)             
+                        uint256 hash;
+                        memcpy(&hash,entrow->m_TxId,MC_TDB_TXID_SIZE);
+                        CWalletTx wtx=GetInternalWalletTx(hash,NULL,&err);  // Tx to delete
+                        if(err)
                         {
-                            const CTxOut txout=wtx.vout[i];
-                            const CScript& script1 = txout.scriptPubKey;        
-                            CScript::const_iterator pc1 = script1.begin();
-
-                            mc_gState->m_TmpScript->Clear();
-                            mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
-                            mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);
-                            if( (mc_gState->m_TmpScript->IsOpReturnScript() != 0 ) && (mc_gState->m_TmpScript->GetNumElements() >= 3) )
+                            LogPrintf("wtxs: RollBackSubKeys: Couldn't find tx %s, error: %d\n",hash.ToString().c_str(),err);        
+                            fInBlocks=false;                                                                
+                        }
+                        else
+                        {
+                            for(i=0;i<(int)wtx.vout.size();i++)             
                             {
-                                mc_gState->m_TmpScript->DeleteDuplicatesInRange(1,mc_gState->m_TmpScript->GetNumElements()-1);
-                                unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
-                                mc_gState->m_TmpScript->SetElement(0);
+                                const CTxOut txout=wtx.vout[i];
+                                const CScript& script1 = txout.scriptPubKey;        
+                                CScript::const_iterator pc1 = script1.begin();
 
-                                if( (mc_gState->m_TmpScript->GetEntity(short_txid) == 0) &&           
-                                    (memcmp(short_txid,parent_entity->m_Entity.m_EntityID,MC_AST_SHORT_TXID_SIZE) == 0) )    
+                                mc_gState->m_TmpScript->Clear();
+                                mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+                                mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(NULL);
+                                if( (mc_gState->m_TmpScript->IsOpReturnScript() != 0 ) && (mc_gState->m_TmpScript->GetNumElements() >= 3) )
                                 {
-                                    entity.Zero();
-                                    memcpy(entity.m_EntityID,short_txid,MC_AST_SHORT_TXID_SIZE);
-                                    entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_CHAINPOS;
-                                    
-                                    for(int e=mc_gState->m_TmpScript->GetNumElements()-2;e>=1;e--)
+                                    mc_gState->m_TmpScript->DeleteDuplicatesInRange(1,mc_gState->m_TmpScript->GetNumElements()-1);
+                                    unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
+                                    mc_gState->m_TmpScript->SetElement(0);
+
+                                    if( (mc_gState->m_TmpScript->GetEntity(short_txid) == 0) &&           
+                                        (memcmp(short_txid,parent_entity->m_Entity.m_EntityID,MC_AST_SHORT_TXID_SIZE) == 0) )    
                                     {
-                                        mc_gState->m_TmpScript->SetElement(e);
-                                        if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
-                                        {
-                                            err=MC_ERR_INTERNAL_ERROR;
-                                            goto exitlbl;                                                                                                                                        
-                                        }                    
+                                        entity.Zero();
+                                        memcpy(entity.m_EntityID,short_txid,MC_AST_SHORT_TXID_SIZE);
+                                        entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_CHAINPOS;
 
-                                        subkey_hash160=Hash160(item_key,item_key+item_key_size);
-                                        mc_GetCompoundHash160(&stream_subkey_hash160,parent_entity->m_Entity.m_EntityID,&subkey_hash160);
-
-                                        subkey_entity.Zero();
-                                        memcpy(subkey_entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
-                                        subkey_entity.m_EntityType=MC_TET_SUBKEY_STREAM_KEY | MC_TET_CHAINPOS;
-                                        err= m_Database->DecrementSubKey(imp,&entity,&subkey_entity);
-                                        if(err)
+                                        for(int e=mc_gState->m_TmpScript->GetNumElements()-2;e>=1;e--)
                                         {
-                                            goto exitlbl;
+                                            mc_gState->m_TmpScript->SetElement(e);
+                                            if(mc_gState->m_TmpScript->GetItemKey(item_key,&item_key_size))   // Item key
+                                            {
+                                                err=MC_ERR_INTERNAL_ERROR;
+                                                goto exitlbl;                                                                                                                                        
+                                            }                    
+
+                                            subkey_hash160=Hash160(item_key,item_key+item_key_size);
+                                            mc_GetCompoundHash160(&stream_subkey_hash160,parent_entity->m_Entity.m_EntityID,&subkey_hash160);
+
+                                            subkey_entity.Zero();
+                                            memcpy(subkey_entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+                                            subkey_entity.m_EntityType=MC_TET_SUBKEY_STREAM_KEY | MC_TET_CHAINPOS;
+                                            err= m_Database->DecrementSubKey(imp,&entity,&subkey_entity);
+                                            if(err)
+                                            {
+                                                goto exitlbl;
+                                            }
                                         }
-                                    }
-                                    
-                                    publishers_set.clear();
-                                    for (j = 0; j < (int)wtx.vin.size(); ++j)
-                                    {
-                                        int op_addr_offset,op_addr_size,is_redeem_script,sighash_type;
-                                        const unsigned char *ptr;
 
-                                        const CScript& script2 = wtx.vin[j].scriptSig;        
-                                        CScript::const_iterator pc2 = script2.begin();
-
-                                        ptr=mc_ExtractAddressFromInputScript((unsigned char*)(&pc2[0]),(int)(script2.end()-pc2),
-                                                &op_addr_offset,&op_addr_size,&is_redeem_script,&sighash_type,0);                                
-                                        if(ptr)
+                                        publishers_set.clear();
+                                        for (j = 0; j < (int)wtx.vin.size(); ++j)
                                         {
-                                            if( (sighash_type == SIGHASH_ALL) || ( (sighash_type == SIGHASH_SINGLE) && (j == i) ) )
-                                            {                                        
-                                                subkey_hash160=Hash160(ptr+op_addr_offset,ptr+op_addr_offset+op_addr_size);
-                                                if(publishers_set.count(subkey_hash160) == 0)
-                                                {
-                                                    publishers_set.insert(subkey_hash160);
-                                                    mc_GetCompoundHash160(&stream_subkey_hash160,parent_entity->m_Entity.m_EntityID,&subkey_hash160);
+                                            int op_addr_offset,op_addr_size,is_redeem_script,sighash_type;
+                                            const unsigned char *ptr;
 
-                                                    entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS;
-                                                    subkey_entity.Zero();
-                                                    memcpy(subkey_entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
-                                                    subkey_entity.m_EntityType=MC_TET_SUBKEY_STREAM_PUBLISHER | MC_TET_CHAINPOS;
-                                                    err= m_Database->DecrementSubKey(imp,&entity,&subkey_entity);
-                                                    if(err)
+                                            const CScript& script2 = wtx.vin[j].scriptSig;        
+                                            CScript::const_iterator pc2 = script2.begin();
+
+                                            ptr=mc_ExtractAddressFromInputScript((unsigned char*)(&pc2[0]),(int)(script2.end()-pc2),
+                                                    &op_addr_offset,&op_addr_size,&is_redeem_script,&sighash_type,0);                                
+                                            if(ptr)
+                                            {
+                                                if( (sighash_type == SIGHASH_ALL) || ( (sighash_type == SIGHASH_SINGLE) && (j == i) ) )
+                                                {                                        
+                                                    subkey_hash160=Hash160(ptr+op_addr_offset,ptr+op_addr_offset+op_addr_size);
+                                                    if(publishers_set.count(subkey_hash160) == 0)
                                                     {
-                                                        goto exitlbl;
+                                                        publishers_set.insert(subkey_hash160);
+                                                        mc_GetCompoundHash160(&stream_subkey_hash160,parent_entity->m_Entity.m_EntityID,&subkey_hash160);
+
+                                                        entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS;
+                                                        subkey_entity.Zero();
+                                                        memcpy(subkey_entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+                                                        subkey_entity.m_EntityType=MC_TET_SUBKEY_STREAM_PUBLISHER | MC_TET_CHAINPOS;
+                                                        err= m_Database->DecrementSubKey(imp,&entity,&subkey_entity);
+                                                        if(err)
+                                                        {
+                                                            goto exitlbl;
+                                                        }
                                                     }
                                                 }
-                                            }
+                                            }                            
                                         }                            
-                                    }                            
-                                }
-                            }                            
-                        }                        
+                                    }
+                                }                            
+                            }                        
+                        }
                     }
                 }
                 else
@@ -1284,6 +1378,32 @@ int mc_WalletTxs::GetRow(
     return err;                
 }
 
+int mc_WalletTxs::WRPGetRow(
+               mc_TxEntityRow *erow)
+{
+    int err;
+    if((m_Mode & MC_WMD_TXS) == 0)
+    {
+        return MC_ERR_NOT_SUPPORTED;
+    }    
+    if(m_Database == NULL)
+    {
+        return MC_ERR_INTERNAL_ERROR;
+    }
+    int use_read=m_Database->WRPUsed();
+    
+    if(use_read == 0)
+    {
+        m_Database->Lock(0,0);
+    }
+    err=m_Database->WRPGetRow(erow);
+    if(use_read == 0)
+    {
+        m_Database->UnLock();
+    }
+    return err;                
+}
+
 int mc_WalletTxs::GetList(mc_TxEntity *entity,int from,int count,mc_Buffer *txs)
 {
     int err;
@@ -1318,12 +1438,55 @@ int mc_WalletTxs::GetList(mc_TxEntity *entity,int generation,int from,int count,
     return err;            
 }
 
+int mc_WalletTxs::WRPGetList(mc_TxEntity *entity,int generation,int from,int count,mc_Buffer *txs)
+{
+    int err;
+    if((m_Mode & MC_WMD_TXS) == 0)
+    {
+        return MC_ERR_NOT_SUPPORTED;
+    }    
+    if(m_Database == NULL)
+    {
+        return MC_ERR_INTERNAL_ERROR;
+    }
+
+    int use_read=m_Database->WRPUsed();
+    
+    if(use_read == 0)
+    {
+        m_Database->Lock(0,0);
+    }
+    err=m_Database->WRPGetList(entity,generation,from,count,txs);
+    if(use_read == 0)
+    {
+        m_Database->UnLock();
+    }
+    return err;            
+}
+
 int mc_WalletTxs::GetBlockItemIndex(mc_TxEntity *entity, int block)
 {
     int res;
     m_Database->Lock(0,0);
     res=m_Database->GetBlockItemIndex(NULL,entity,block);
     m_Database->UnLock();
+    return res;            
+}
+
+int mc_WalletTxs::WRPGetBlockItemIndex(mc_TxEntity *entity, int block)
+{
+    int res;
+    int use_read=m_Database->WRPUsed();
+    
+    if(use_read == 0)
+    {
+        m_Database->Lock(0,0);
+    }
+    res=m_Database->WRPGetBlockItemIndex(NULL,entity,block);
+    if(use_read == 0)
+    {
+        m_Database->UnLock();
+    }
     return res;            
 }
 
@@ -1345,6 +1508,32 @@ int mc_WalletTxs::GetListSize(mc_TxEntity *entity,int *confirmed)
     return res;                
 }
 
+int mc_WalletTxs::WRPGetListSize(mc_TxEntity *entity,int *confirmed)
+{
+    int res;
+    if((m_Mode & MC_WMD_TXS) == 0)
+    {
+        return 0;
+    }    
+    if(m_Database == NULL)
+    {
+        return 0;
+    }
+    
+    int use_read=m_Database->WRPUsed();
+    
+    if(use_read == 0)
+    {
+        m_Database->Lock(0,0);
+    }
+    res=m_Database->WRPGetListSize(entity,confirmed);
+    if(use_read == 0)
+    {
+        m_Database->UnLock();
+    }
+    return res;                
+}
+
 int mc_WalletTxs::GetListSize(mc_TxEntity *entity,int generation,int *confirmed)
 {
     int res;
@@ -1362,6 +1551,31 @@ int mc_WalletTxs::GetListSize(mc_TxEntity *entity,int generation,int *confirmed)
     return res;                
 }
 
+int mc_WalletTxs::WRPGetListSize(mc_TxEntity *entity,int generation,int *confirmed)
+{
+    int res;
+    if((m_Mode & MC_WMD_TXS) == 0)
+    {
+        return 0;
+    }    
+    if(m_Database == NULL)
+    {
+        return 0;
+    }
+    int use_read=m_Database->WRPUsed();
+    
+    if(use_read == 0)
+    {
+        m_Database->Lock(0,0);
+    }
+    res=m_Database->WRPGetListSize(entity,generation,confirmed);
+    if(use_read == 0)
+    {
+        m_Database->UnLock();
+    }
+    return res;                
+}
+
 int mc_WalletTxs::Unsubscribe(mc_Buffer* lpEntities,bool purge)
 {
     int err,j;
@@ -1373,8 +1587,10 @@ int mc_WalletTxs::Unsubscribe(mc_Buffer* lpEntities,bool purge)
     {
         return MC_ERR_INTERNAL_ERROR;
     }
-    m_Database->Lock(1,0);    
+    m_Database->Lock(1,0);   
+    WRPWriteLock();
     err=m_Database->Unsubscribe(lpEntities);
+    WRPWriteUnLock();
     if(err==MC_ERR_NOERROR)
     {
         if(mc_gState->m_Features->Chunks())
@@ -2034,7 +2250,8 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     uint160 subkey_hash160;
     uint160 stream_subkey_hash160;
     set<uint160> publishers_set;
-    map<uint160,int> subkey_count_map;
+//    map<uint160,int> subkey_count_map;
+    map<uint160,mc_TxEntityRowExtension> subkey_extension_map;
     
     int import_pos;
     bool fFound;
@@ -2079,6 +2296,8 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     
     import_pos=imp-m_Database->m_Imports;
     hash=tx.GetHash();
+    
+    if(fDebug)LogPrint("dwtxs02","dwtxs02:    --> %s\n",hash.ToString().c_str());
     
     fullTx=&tx;
     storedTx=&tx;
@@ -2585,7 +2804,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                 }
 
                                 mc_GetCompoundHash160(&stream_subkey_hash160,entity.m_EntityID,&subkey_hash160);
-
+/*
                                 map<uint160,int>::iterator it = subkey_count_map.find(stream_subkey_hash160);
                                 if (it == subkey_count_map.end())
                                 {
@@ -2596,12 +2815,27 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                     it->second += 1;
                                     extension.m_Count=it->second;
                                 }
+ */ 
+                                map<uint160,mc_TxEntityRowExtension>::iterator it = subkey_extension_map.find(stream_subkey_hash160);
+                                if (it == subkey_extension_map.end())
+                                {
+                                    mc_TxEntityRowExtension new_extension;
+                                    new_extension.Zero();
+                                    new_extension.m_Output=i;
+                                    subkey_extension_map.insert(make_pair(stream_subkey_hash160,new_extension));
+                                    it = subkey_extension_map.find(stream_subkey_hash160);
+                                }                                
+                                else
+                                {
+                                    it->second.m_Count += 1;
+                                    it->second.m_Output=i;
+                                }
                                 
                                 entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_CHAINPOS;
                                 subkey_entity.Zero();
                                 memcpy(subkey_entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
                                 subkey_entity.m_EntityType=MC_TET_SUBKEY_STREAM_KEY | MC_TET_CHAINPOS;
-                                err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,&extension,block,0,fFound ? 0 : 1);
+                                err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,&(it->second),block,0,fFound ? 0 : 1);
                                 if(err)
                                 {
                                     goto exitlbl;
@@ -2609,7 +2843,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
 
                                 entity.m_EntityType=MC_TET_STREAM_KEY | MC_TET_TIMERECEIVED;
                                 subkey_entity.m_EntityType=MC_TET_SUBKEY_STREAM_KEY | MC_TET_TIMERECEIVED;
-                                err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,&extension,block,0,fFound ? 0 : 1);
+                                err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,&(it->second),block,0,fFound ? 0 : 1);
                                 if(err)
                                 {
                                     goto exitlbl;
@@ -2649,7 +2883,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                             }
                                             
                                             mc_GetCompoundHash160(&stream_subkey_hash160,entity.m_EntityID,&subkey_hash160);
-                            
+/*                            
                                             map<uint160,int>::iterator it = subkey_count_map.find(stream_subkey_hash160);
                                             if (it == subkey_count_map.end())
                                             {
@@ -2660,12 +2894,27 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                                 it->second += 1;
                                                 extension.m_Count=it->second;
                                             }
+ */ 
+                                            map<uint160,mc_TxEntityRowExtension>::iterator it = subkey_extension_map.find(stream_subkey_hash160);
+                                            if (it == subkey_extension_map.end())
+                                            {
+                                                mc_TxEntityRowExtension new_extension;
+                                                new_extension.Zero();
+                                                new_extension.m_Output=i;
+                                                subkey_extension_map.insert(make_pair(stream_subkey_hash160,new_extension));
+                                                it = subkey_extension_map.find(stream_subkey_hash160);
+                                            }                                
+                                            else
+                                            {
+                                                it->second.m_Count += 1;
+                                                it->second.m_Output=i;
+                                            }
                                             
                                             entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_CHAINPOS;
                                             subkey_entity.Zero();
                                             memcpy(subkey_entity.m_EntityID,&stream_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
                                             subkey_entity.m_EntityType=MC_TET_SUBKEY_STREAM_PUBLISHER | MC_TET_CHAINPOS;
-                                            err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,&extension,block,0,fFound ? 0 : 1);
+                                            err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,&(it->second),block,0,fFound ? 0 : 1);
                                             if(err)
                                             {
                                                 goto exitlbl;
@@ -2673,7 +2922,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                             
                                             entity.m_EntityType=MC_TET_STREAM_PUBLISHER | MC_TET_TIMERECEIVED;
                                             subkey_entity.m_EntityType=MC_TET_SUBKEY_STREAM_PUBLISHER | MC_TET_TIMERECEIVED;
-                                            err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,&extension,block,0,fFound ? 0 : 1);
+                                            err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,&(it->second),block,0,fFound ? 0 : 1);
                                             if(err)
                                             {
                                                 goto exitlbl;
@@ -3002,6 +3251,9 @@ exitlbl:
     {
         m_Database->UnLock();
     }
+
+    if(fDebug)LogPrint("dwtxs02","dwtxs02:    <-- %s\n",hash.ToString().c_str());
+    
     return err;
 }
 
@@ -3170,6 +3422,156 @@ exitlbl:
     }
 
     m_Database->UnLock();
+    return wtx;
+}
+
+
+CWalletTx mc_WalletTxs::WRPGetWalletTx(uint256 hash,mc_TxDefRow *txdef,int *errOut)
+{
+    int err;
+    CWalletTx wtx;
+    mc_TxDefRow StoredTxDef;
+    FILE* fHan;
+    char ShortName[65];                                     
+    char FileName[MC_DCT_DB_MAX_PATH];                      
+    
+    if(fDebug)LogPrint("dwtxs01","dwtxs01: %d: --> %s\n",GetRPCSlot(),hash.ToString().c_str());
+    
+    int use_read=m_Database->WRPUsed();
+    
+    if((m_Mode & MC_WMD_TXS) == 0)
+    {
+        err=MC_ERR_NOT_SUPPORTED;
+        goto exitlbl;
+    }    
+    err = MC_ERR_NOERROR;
+    
+    if(m_Database == NULL)
+    {
+        goto exitlbl;
+    }
+    
+    
+    if(use_read == 0)
+    {
+        m_Database->Lock(0,0);
+    }
+        
+    err=m_Database->WRPGetTx(&StoredTxDef,(unsigned char*)&hash,0);
+    if(err)
+    {
+        goto exitlbl;
+    }
+
+    if((StoredTxDef.m_Block >= 0) || (StoredTxDef.m_Size == StoredTxDef.m_FullSize))// We have full tx in wallet or in the block
+    {
+        sprintf(ShortName,"wallet/txs%05u",StoredTxDef.m_InternalFileID);
+
+        mc_GetFullFileName(m_Database->m_Name,ShortName,".dat",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,FileName);
+
+        fHan=fopen(FileName,"rb+");
+
+        if(fHan == NULL)
+        {
+            goto exitlbl;
+        }
+
+        CAutoFile filein(fHan, SER_DISK, CLIENT_VERSION);
+
+        fseek(filein.Get(), StoredTxDef.m_InternalFileOffset, SEEK_SET);
+        try 
+        {
+            filein >> wtx;                                                      // Extract wallet tx anyway - for metadata
+        } 
+        catch (std::exception &e) 
+        {           
+            err=MC_ERR_FILE_READ_ERROR;
+            goto exitlbl;
+        }
+        
+        if(StoredTxDef.m_Size != StoredTxDef.m_FullSize)                        // if tx is shortened, extract OP_RETURN metadata from block
+        {
+            CDiskTxPos postx(CDiskBlockPos(StoredTxDef.m_BlockFileID,StoredTxDef.m_BlockOffset),StoredTxDef.m_BlockTxOffset);
+            
+            CAutoFile file(OpenBlockFile(postx, true), SER_DISK, CLIENT_VERSION);
+            if (file.IsNull())
+            {
+                err=MC_ERR_FILE_READ_ERROR;
+                goto exitlbl;
+            }
+            CBlockHeader header;
+            CTransaction tx;
+            try 
+            {
+                file >> header;
+                fseek(file.Get(), postx.nTxOffset, SEEK_CUR);
+                file >> tx;
+            } 
+            catch (std::exception &e) 
+            {
+                err=MC_ERR_FILE_READ_ERROR;
+                goto exitlbl;
+            }
+
+            *static_cast<CTransaction*>(&wtx) = CTransaction(tx);           
+        }
+    }
+    else                                                                        // We have full tx only in unconfirmed sends
+    {
+        if(use_read)                                                            // Not locked yet
+        {
+            m_Database->Lock(0,0);
+        }
+        std::map<uint256,CWalletTx>::const_iterator it = m_UnconfirmedSends.find(hash);
+        if (it != m_UnconfirmedSends.end())
+        {
+            wtx=it->second;
+        }
+        else
+        {
+            err=MC_ERR_CORRUPTED;
+        }
+        if(use_read)
+        {
+            m_Database->UnLock();
+        }
+    }
+    
+    
+exitlbl:
+    
+    if(err == MC_ERR_NOERROR)
+    {
+        if(wtx.GetHash() != hash)
+        {
+            err=MC_ERR_CORRUPTED;            
+        }
+    }
+
+    if(err == MC_ERR_NOERROR)
+    {      
+        wtx.BindWallet(m_lpWallet);
+        wtx.nTimeReceived=StoredTxDef.m_TimeReceived;
+        wtx.nTimeSmart=StoredTxDef.m_TimeReceived;
+        memcpy(&wtx.txDef,&StoredTxDef,sizeof(mc_TxDefRow));
+        if(txdef)
+        {
+            memcpy(txdef,&StoredTxDef,sizeof(mc_TxDefRow));
+        }
+    }
+
+    if(errOut)
+    {
+        *errOut=err;
+    }
+
+    if(use_read == 0)
+    {
+        m_Database->UnLock();
+    }
+
+    if(fDebug)LogPrint("dwtxs01","dwtxs01: %d: <-- %s\n",GetRPCSlot(),hash.ToString().c_str());
+
     return wtx;
 }
 
@@ -3351,6 +3753,123 @@ exitlbl:
     {
         *errOut=err;
     }
+
+    return ret;    
+}
+
+string mc_WalletTxs::WRPGetSubKey(void *hash,mc_TxDefRow *txdef,int *errOut)
+{
+    int err;
+    string ret;
+    mc_TxDefRow StoredTxDef;
+    char ShortName[65];                                     
+    char FileName[MC_DCT_DB_MAX_PATH];                      
+    int  fHan=0;
+    uint160 subkey_hash;
+    
+    err = MC_ERR_NOERROR;
+
+    int use_read=m_Database->WRPUsed();
+        
+    if(use_read == 0)
+    {
+        m_Database->Lock(0,0);
+    }
+    
+    ret="";
+    
+    err=m_Database->WRPGetTx(&StoredTxDef,(unsigned char*)hash,0);
+    
+    if(err)
+    {
+        goto exitlbl;
+    }
+    else
+    {
+        if(StoredTxDef.m_Flags & MC_SFL_NODATA)
+        {
+            if(StoredTxDef.m_Flags & MC_SFL_IS_ADDRESS)
+            {
+                memcpy(&subkey_hash,StoredTxDef.m_TxId,MC_TDB_ENTITY_ID_SIZE);
+                if(StoredTxDef.m_Flags & MC_SFL_IS_SCRIPTHASH)
+                {
+                    ret=CBitcoinAddress((CScriptID)subkey_hash).ToString();
+                }
+                else
+                {
+                    ret=CBitcoinAddress((CKeyID)subkey_hash).ToString();                    
+                }
+            }
+        }
+        else
+        {
+            unsigned char buf[256];
+            int total_bytes_read,bytes_to_read;
+            
+            sprintf(ShortName,"wallet/txs%05u",StoredTxDef.m_InternalFileID);
+
+            mc_GetFullFileName(m_Database->m_Name,ShortName,".dat",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,FileName);
+            
+            fHan=open(FileName,_O_BINARY | O_RDONLY, S_IRUSR | S_IWUSR);
+
+            if(fHan <= 0)
+            {
+                err= MC_ERR_FILE_READ_ERROR;
+                goto exitlbl;
+                
+            }
+
+            if(lseek64(fHan,StoredTxDef.m_InternalFileOffset,SEEK_SET) != StoredTxDef.m_InternalFileOffset)
+            {
+                err= MC_ERR_FILE_READ_ERROR;
+                goto exitlbl;
+            }
+                        
+            total_bytes_read=0;
+            while(total_bytes_read < (int)StoredTxDef.m_Size)
+            {
+                bytes_to_read=StoredTxDef.m_Size-total_bytes_read;
+                if(bytes_to_read > 256)
+                {
+                    bytes_to_read=256;
+                }
+                if(read(fHan,buf,bytes_to_read) != bytes_to_read)
+                {
+                    err= MC_ERR_FILE_READ_ERROR;
+                    goto exitlbl;
+                }
+                total_bytes_read+=bytes_to_read;
+                ret += string((char*)buf,bytes_to_read);
+            }
+        }
+    }
+           
+exitlbl:
+    
+    if(fHan)
+    {
+        close(fHan);
+    }
+                                                
+
+    if(err == MC_ERR_NOERROR)
+    {
+        if(txdef)
+        {
+            memcpy(txdef,&StoredTxDef,sizeof(mc_TxDefRow));
+        }
+    }
+
+    if(errOut)
+    {
+        *errOut=err;
+    }
+
+    if(use_read == 0)
+    {
+        m_Database->UnLock();
+    }
+
 
     return ret;    
 }
