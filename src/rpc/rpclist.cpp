@@ -319,6 +319,11 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "getstreampublishersummary",&getstreampublishersummary,false,  true,      true },
     { "hidden",             "storechunk",             &storechunk,              false,     false,      true },
     
+    { "wallet",             "listexptxs",             &listexptxs,              false,      true,      false },
+    { "wallet",             "listexpaddresses",       &listexpaddresses,        false,      true,      false },
+    { "wallet",             "listexpaddresstxs",      &listexpaddresstxs,      false,      true,      false },
+    { "wallet",             "listexpblocktxs",        &listexpblocktxs,         false,      true,      false },
+    
 /* MCHN END */    
     { "wallet",             "setaccount",             &setaccount,             true,      false,      true },
     { "wallet",             "settxfee",               &settxfee,               true,      false,      true },

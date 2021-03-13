@@ -260,6 +260,10 @@ static const std::string vAPINames[] =
 "addlibraryupdate", 
 "addlibraryupdatefrom", 
 "getlibrarycode"
+"listexptxs",
+"listexpblocktxs",
+"listexpaddresstxs",
+"listexpaddresses",
 };
 
 static const CRPCConvertParam vRPCConvertParams[] =
@@ -573,6 +577,21 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "datareftobinarycache", 3 },
     { "setvariablevaluefrom", 2 },                                                            
     { "setvariablevalue", 1 },                                                            
+    { "listexptxs", 0 },
+    { "listexptxs", 1 },
+    { "listexptxs", 2 },
+    { "listexpaddresses", 0 },
+    { "listexpaddresses", 1 },
+    { "listexpaddresses", 2 },
+    { "listexpaddresses", 3 },
+    { "listexpaddresstxs", 0 },
+    { "listexpaddresstxs", 1 },
+    { "listexpaddresstxs", 2 },
+    { "listexpaddresstxs", 3 },
+    { "listexpblocktxs", 0 },
+    { "listexpblocktxs", 1 },
+    { "listexpblocktxs", 2 },
+    { "listexpblocktxs", 3 },
 };
 
 class CRPCConvertTable
@@ -687,6 +706,8 @@ static const CRPCConvertParamMayBeString vRPCConvertParamsMayBeString[] =
     { "listfeeds", 0 },
     { "setvariablevaluefrom", 2 },                                                            
     { "setvariablevalue", 1 },                                                                
+    { "listexpaddresses", 0 },
+    { "listexpaddressetxs", 0 },
 };
 
 class CRPCConvertTableMayBeString

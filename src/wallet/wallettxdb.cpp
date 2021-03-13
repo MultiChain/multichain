@@ -1656,6 +1656,265 @@ exitlbl:
 }
 
 /*
+ * Adds data to specific import
+ */
+
+int mc_TxDB::AddData(mc_TxImport *import,
+                     const unsigned char *hash,                                 // Data key (or tx ID)
+                     const unsigned char *data,                                 // Data (NULL if store instead of datadef)
+                     uint32_t datasize,                                         // Data size
+                     int block,                                                 // Block we are processing now, -1 for mempool
+                     uint32_t flags,                                            // Flags passed by the higher level (or vout)               
+                     uint32_t timestamp,                                        // timestamp to be stored as timereceived
+                     mc_Buffer *entities)
+{
+    int err;
+    char txhex[65];
+    char txtype[16];
+    char msg[256];
+    
+    int newtx,duplicate,isrelevant,ondisk,i,mprow,size,ext_flag;
+    uint32_t LastFileID,LastFileSize; 
+    mc_TxImport *imp;
+    mc_Buffer *mempool;
+    mc_Buffer *rawmempool;
+    mc_TxEntityStat *stat;
+    mc_TxEntityRow erow;
+    mc_TxDefRow txdef;
+    mc_TxDefRow *lptxdef;
+    mc_TxEntityRowExtension *extension;
+    
+    err=MC_ERR_NOERROR;
+
+    sprintf_hex(txhex,hash,MC_TDB_TXID_SIZE);    
+    
+    imp=m_Imports;
+    mempool=m_MemPools[0];
+    rawmempool=m_RawMemPools[0];
+    if(import)                                                                  // Find import
+    {
+        imp=import;
+        mempool=m_MemPools[import-m_Imports];
+        rawmempool=m_RawMemPools[import-m_Imports];
+    }
+    
+    isrelevant=0;
+    if(imp->m_ImportID)                                                         // Takes tx only if it has relevant entity for this import
+    {
+        for(i=0;i<entities->GetCount();i++)
+        {
+            if(isrelevant == 0)
+            {
+                if(imp->FindEntity((mc_TxEntity*)entities->GetRow(i)) >= 0)
+                {
+                    isrelevant=1;
+                }
+            }
+        }
+    }
+    else
+    {
+        isrelevant=1;                                                           // Chain import updates its entity list
+    }
+    
+    if(isrelevant == 0)
+    {
+        sprintf(msg,"Data %s ignored for import %d",txhex,imp->m_ImportID);
+        LogString(msg);
+        goto exitlbl;        
+    }
+
+    newtx=0;
+    ondisk=0;
+//    err=GetTx(&txdef,hash,IsCSkipped(MC_TET_GETDB_ADD_TX));
+    if(m_TxCachedFlags & MC_TCF_FOUND)
+    {
+        memcpy(&txdef,&(m_TxCachedDef),sizeof(mc_TxDefRow));
+    }
+    if(m_TxCachedFlags & MC_TCF_NOT_FOUND)
+    {
+        err=MC_ERR_NOT_FOUND;
+    }
+    if(m_TxCachedFlags & MC_TCF_ERROR)
+    {
+        err=MC_ERR_INTERNAL_ERROR;
+    }
+    
+    if(err == MC_ERR_NOT_FOUND)                                                 // Data is not found, neither on disk, nor in the mempool    
+    {
+        err=MC_ERR_NOERROR;
+        newtx=1;
+
+        if(data)
+        {
+            size=mc_AllocSize(datasize,m_Database->m_TotalSize,1);                    // Size data takes in the file (padded)
+            LastFileID=m_DBStat.m_LastFileID;
+            LastFileSize=m_DBStat.m_LastFileSize;
+
+            if(LastFileSize+size>MC_TDB_MAX_TXS_FILE_SIZE)                          // New file is needed
+            {
+                FlushDataFile(LastFileID);
+                LastFileID+=1;
+                LastFileSize=0;
+            }
+
+            err=AddToFile(data,datasize,LastFileID,LastFileSize);
+            if(err)
+            {
+                sprintf(msg,"Couldn't store data %s in file, error:  %d",txhex,err);
+                LogString(msg);
+                goto exitlbl;        
+            }
+
+            txdef.Zero();
+            memcpy(txdef.m_TxId,hash, MC_TDB_TXID_SIZE);
+            txdef.m_Size=datasize;
+            txdef.m_FullSize=datasize;
+            txdef.m_InternalFileID=LastFileID;
+            txdef.m_InternalFileOffset=LastFileSize;
+            txdef.m_Block=block;                                                        
+            txdef.m_BlockFileID=-1;            
+            txdef.m_TimeReceived=timestamp;
+            txdef.m_Flags=flags;
+            LastFileSize+=size;
+            m_DBStat.m_LastFileID=LastFileID;                                   // Even if commit is unsuccessful we'll lose some place. On restart we return to previous values
+            m_DBStat.m_LastFileSize=LastFileSize;
+            rawmempool->Add(&txdef,(unsigned char*)&txdef+MC_TDB_TXID_SIZE);        
+        }
+    }
+    else
+    {
+        if(err)
+        {
+            sprintf(msg,"Internal error while looking for tx %s in raw database, error: %d",txhex,err);
+            LogString(msg);
+            goto exitlbl;            
+        }
+        ondisk=1;
+        mprow=rawmempool->Seek((unsigned char*)hash);
+        if(mprow >= 0)                                                          // Found in mempool
+        {
+            ondisk=0;
+            lptxdef=(mc_TxDefRow *)rawmempool->GetRow(mprow);
+            lptxdef->m_Block=block;                                             // If on disk, block is not updated. In case in case of rollback, on-disk value will be higher 
+                                                                                // than chain height -considered as mempool.
+            lptxdef->m_Flags=flags;
+            lptxdef->m_BlockFileID=-1;            
+        }
+    }
+    
+    duplicate=1;
+    for(i=0;i<entities->GetCount();i++)                                         // Processing entities
+    {
+        isrelevant=0;
+        if(imp->FindEntity((mc_TxEntity*)entities->GetRow(i)) >= 0)
+        {
+            isrelevant=1;
+        }
+        
+        if(IsCSkipped(((mc_TxEntity*)entities->GetRow(i))->m_EntityType))
+        {
+            isrelevant=0;
+        }
+        if(pEF->STR_IsIndexSkipped(import,NULL,(mc_TxEntity*)entities->GetRow(i)))
+        {
+            isrelevant=0;
+        }
+    
+        
+        if(isrelevant)
+        {
+            stat=imp->GetEntity(imp->FindEntity((mc_TxEntity*)entities->GetRow(i)));
+            if(stat == NULL)
+            {
+                sprintf(msg,"Could not add data %s, entity not found",txhex);
+                LogString(msg);
+                err=MC_ERR_INTERNAL_ERROR;
+                goto exitlbl;
+            }
+            
+            erow.Zero();
+            memcpy(&erow.m_Entity,&stat->m_Entity,sizeof(mc_TxEntity));
+            erow.m_Generation=stat->m_Generation;
+            memcpy(erow.m_TxId,hash,MC_TDB_TXID_SIZE);
+            ext_flag=0;
+            extension=(mc_TxEntityRowExtension*)(entities->GetRow(i)+sizeof(mc_TxEntity));
+            if(extension->m_Count)
+            {
+                memcpy(erow.m_TxId+MC_TEE_OFFSET_IN_TXID,extension,MC_TEE_SIZE_IN_EXTENSION);                
+                ext_flag = MC_TFL_IS_EXTENSION;
+            }
+            
+            mprow=mempool->Seek(&erow);
+            if(mprow >= 0)                                                      // Update block and flags if found in mempool
+            {
+                ((mc_TxEntityRow*)(mempool->GetRow(mprow)))->m_Block=block;
+                ((mc_TxEntityRow*)(mempool->GetRow(mprow)))->m_Flags=flags | ext_flag;                
+            }
+            else
+            {
+                if((newtx != 0) ||                                              // Row is new - add always
+                   ( (imp->m_ImportID > 0) &&
+                     ( (stat->m_Flags & MC_EFL_NOT_IN_SYNC) != 0 ) ) ||         // All tx entities rows are new, except those in sync - like old addresses/wallet by timereceived
+                   ((erow.m_Entity.m_EntityType & MC_TET_ORDERMASK) != MC_TET_TIMERECEIVED)) // Ordered by chain position - add always   
+                {                        
+                    erow.m_Block=block;
+                    erow.m_Flags=flags | ext_flag;
+                    stat->m_LastPos+=1;
+                    erow.m_TempPos=stat->m_LastPos;                             // Will be copied to m_LastPos on commit. m_LastPos=0 to allow Seek() above
+                    mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);
+                    duplicate=0;
+                }
+            }            
+        }                
+    }
+
+    if(imp->m_ImportID == 0)                                                    // Update block and flags for txs already on disk
+    {    
+        if(newtx == 0)
+        {
+            if(ondisk)
+            {
+                txdef.m_Block=block;                                                        
+                txdef.m_Flags=flags;
+                mprow=m_RawUpdatePool->Seek((unsigned char*)hash);
+                if(mprow >= 0)
+                {
+                    memcpy((unsigned char*)m_RawUpdatePool->GetRow(mprow)+MC_TDB_TXID_SIZE,(unsigned char*)&txdef+MC_TDB_TXID_SIZE,m_Database->m_ValueSize);
+                }
+                else
+                {
+                    m_RawUpdatePool->Add((unsigned char *)&txdef,(unsigned char*)&txdef+MC_TDB_TXID_SIZE);
+                }
+            }
+        }
+    }
+    
+    if(newtx)
+    {
+        sprintf(txtype,"New");
+        sprintf(msg,"NewData %s, block %d, flags %08X, import %d",txhex,block,flags,imp->m_ImportID);
+    }
+    else
+    {
+        txhex[10]=0;
+        if(duplicate)
+        {
+            sprintf(txtype,"Duplicate");            
+        }
+        else
+        {
+            sprintf(txtype,"Update");            
+        }
+        sprintf(msg,"%sTx %s, block %d, flags %08X, import %d",txtype,txhex,block,flags,imp->m_ImportID);
+    }
+    
+    LogString(msg);
+exitlbl:
+    return err;
+}
+
+/*
  * Saves flag (normally "invalid") for specific transaction,
  * If invalid transaction becomes valid again this flag will be overwritten by AddTx
  */

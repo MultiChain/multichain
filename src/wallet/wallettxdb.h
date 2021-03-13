@@ -30,9 +30,21 @@
 #define MC_TET_STREAM_PUBLISHER                 0x00000007
 #define MC_TET_ASSET                            0x00000008
 #define MC_TET_AUTHOR                           0x00000009
+#define MC_TET_EXP_TX                           0x00000010 // global, key-block, publisher-address, item - txid, direct
+#define MC_TET_EXP_REDEEM                       0x00000011 // global, key-txid/vout, item - txid/vin, direct 
+#define MC_TET_EXP_ASSET_ADDRESS                0x00000012 // global, key-asset/address, item - asset balances
+#define MC_TET_EXP_ADDRESS_ASSETS               0x00000013 // global, key-address, item - asset, direct (no balances), no duplicate items on asset
+#define MC_TET_EXP_ASSET_BALANCE                0x00000014 // per-asset, publisher - address, item - asset balances
+#define MC_TET_EXP_REDEEM_KEY                   0x00000015 // global, txid/vout
+#define MC_TET_EXP_TX_KEY                       0x00000016 // global, block
+#define MC_TET_EXP_TX_PUBLISHER                 0x00000017 // global, address
+
+#define MC_TET_SUBKEY                           0x00000040
 #define MC_TET_SUBKEY_STREAM_KEY                0x00000046
 #define MC_TET_SUBKEY_STREAM_PUBLISHER          0x00000047
-#define MC_TET_SUBKEY                           0x00000040
+#define MC_TET_SUBKEY_REDEEM_KEY                0x00000055
+#define MC_TET_SUBKEY_EXP_TX_KEY                0x00000056
+#define MC_TET_SUBKEY_EXP_TX_PUBLISHER          0x00000057
 #define MC_TET_TYPE_MASK                        0x040000FF
 #define MC_TET_CHAINPOS                         0x00000100
 #define MC_TET_TIMERECEIVED                     0x00000200
@@ -332,6 +344,16 @@ typedef struct mc_TxDB
               uint32_t flags,                                                   // Flags passed by the higher level                
               uint32_t timestamp,                                               // timestamp to be stored as timereceived
               mc_Buffer *entities);                                             // List of relevant entities for this tx
+    
+    int AddData(                                                                // Adds data to mempool
+              mc_TxImport *import,                                              // Import object, if NULL - chain
+              const unsigned char *hash,                                        // Data key (or tx ID)
+              const unsigned char *data,                                        // Data (NULL if store instead of datadef)
+              uint32_t datasize,                                                // Data size
+              int block,                                                        // Block we are processing now, -1 for mempool
+              uint32_t flags,                                                   // Flags passed by the higher level (or vout)               
+              uint32_t timestamp,                                               // timestamp to be stored as timereceived
+              mc_Buffer *entities);                                             // List of relevant entities for this data
     
     int SetTxCache(                                                             // Returns tx definition if found, error if not found
               const unsigned char *hash);                                       // Input. Tx hash

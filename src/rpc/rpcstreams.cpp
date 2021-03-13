@@ -1973,7 +1973,9 @@ bool WRPSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity
     CBitcoinAddress address(str);
     if (!address.IsValid())
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");            
+        *errCode=RPC_INVALID_ADDRESS_OR_KEY;
+        *strError="Invalid address";
+        return false;
     }
     CTxDestination dest=address.Get();
     CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
@@ -1982,7 +1984,9 @@ bool WRPSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity
     
     if ((lpKeyID == NULL) && (lpScriptID == NULL) )
     {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");                    
+        *errCode=RPC_INVALID_ADDRESS_OR_KEY;
+        *strError="Invalid address";
+        return false;
     }
 
     if(lpKeyID)

@@ -352,6 +352,11 @@ extern json_spirit::Value addlibraryupdatefrom(const json_spirit::Array& params,
 extern json_spirit::Value getlibrarycode(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value testlibrary(const json_spirit::Array& params, bool fHelp);
 
+extern json_spirit::Value listexptxs(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listexpaddresses(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listexpaddresstxs(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listexpblocktxs(const json_spirit::Array& params, bool fHelp);
+
 
 
 extern json_spirit::Value purehelpitem(const json_spirit::Array& params, bool fHelp);

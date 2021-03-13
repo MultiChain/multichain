@@ -856,6 +856,8 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
                 entity.m_EntityType=MC_TET_WALLET_SPENDABLE | MC_TET_TIMERECEIVED;
                 pwalletTxsMain->AddEntity(&entity,0);
 
+                pwalletTxsMain->AddExplorerEntities(NULL);
+                
                 for(int e=0;e<(int)vSubscribedEntities.size();e++)
                 {
                     pwalletTxsMain->AddEntity(&(vSubscribedEntities[e]),MC_EFL_NOT_IN_SYNC);                    

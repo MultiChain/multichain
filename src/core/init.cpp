@@ -1913,16 +1913,39 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     mc_gState->m_WalletMode |= MC_WMD_AUTOSUBSCRIBE_ASSETS;
                 }                
 */
+                int explorer_mode=GetArg("-explorersupport",-1);
+                if(explorer_mode > 0)
+                {
+                    mc_gState->m_WalletMode |= MC_WMD_EXPLORER;
+                }
+
                 if(pwalletTxsMain->Initialize(mc_gState->m_NetworkParams->Name(),mc_gState->m_WalletMode))
                 {
                     return InitError("Wallet tx database corrupted. Please restart multichaind with -rescan\n");                        
                 }
 
+                if(explorer_mode >= 0)
+                {                    
+                    if( (pwalletTxsMain->m_Database->m_DBStat.m_InitMode & MC_WMD_EXPLORER) != (mc_gState->m_WalletMode & MC_WMD_EXPLORER) )
+                    {
+                        return InitError("Explorer database was initialized with different setting. To change it, please restart multichaind with -rescan\n");                                                    
+                    }
+                }
+                
+                
                 if(mc_gState->m_WalletMode & MC_WMD_AUTO)
                 {
                     mc_gState->m_WalletMode=pwalletTxsMain->m_Database->m_DBStat.m_InitMode;
                     wallet_mode=pwalletTxsMain->m_Database->m_DBStat.m_WalletVersion;
                 }
+                else
+                {
+                    if(pwalletTxsMain->m_Database->m_DBStat.m_InitMode & MC_WMD_EXPLORER)
+                    {
+                        mc_gState->m_WalletMode |= MC_WMD_EXPLORER;
+                    }
+                }
+                
                 if(wallet_mode == -1)
                 {
                     wallet_mode=pwalletTxsMain->m_Database->m_DBStat.m_WalletVersion;
@@ -1944,7 +1967,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     return InitError(strprintf("Wallet tx database was created with different wallet version (%d). Please restart multichaind with reindex=1 \n",pwalletTxsMain->m_Database->m_DBStat.m_WalletVersion));                        
                 }        
 
-                if((pwalletTxsMain->m_Database->m_DBStat.m_InitMode & MC_WMD_MODE_MASK) != (mc_gState->m_WalletMode & MC_WMD_MODE_MASK))
+                if((pwalletTxsMain->m_Database->m_DBStat.m_InitMode & (MC_WMD_MODE_MASK - MC_WMD_EXPLORER)) != (mc_gState->m_WalletMode & (MC_WMD_MODE_MASK - MC_WMD_EXPLORER)))
                 {
                     return InitError(strprintf("Wallet tx database was created in different mode (%08X). Please restart multichaind with reindex=1 \n",pwalletTxsMain->m_Database->m_DBStat.m_InitMode));                        
                 }        
@@ -2038,6 +2061,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 entity.m_EntityType=MC_TET_WALLET_SPENDABLE | MC_TET_TIMERECEIVED;
                 pwalletTxsMain->AddEntity(&entity,0);
 
+                pwalletTxsMain->AddExplorerEntities(NULL);
+                
                 for(int e=0;e<(int)vSubscribedEntities.size();e++)
                 {
                     pwalletTxsMain->AddEntity(&(vSubscribedEntities[e]),MC_EFL_NOT_IN_SYNC);                    

@@ -6,6 +6,7 @@
 #ifndef MULTICHAIN_WALLETTXS_H
 #define	MULTICHAIN_WALLETTXS_H
 
+#include "core/main.h"
 #include "utils/util.h"
 #include "structs/base58.h"
 #include "wallet/wallet.h"
@@ -163,6 +164,13 @@ typedef struct mc_WalletTxs
     mc_TxEntityStat *GetEntity(int row);
 
     std::string Summary();                                                      // Wallet summary
+    
+    int AddExplorerEntities(mc_Buffer *lpEntities);
+    int AddExplorerTx(                                                          
+              mc_TxImport *import,                                              // Import object, NULL if chain update
+              const CTransaction& tx,                                           // Tx to add
+              int block);                                                       // block height, -1 for mempool
+    
     
 // Internal functions
     

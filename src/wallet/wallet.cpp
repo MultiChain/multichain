@@ -1393,6 +1393,8 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, bool fOnlySubscri
         lpEntities->Add(&entity,NULL);
         entity.m_EntityType=MC_TET_WALLET_SPENDABLE | MC_TET_TIMERECEIVED;
         lpEntities->Add(&entity,NULL);
+            
+        pwalletTxsMain->AddExplorerEntities(lpEntities);
 
         for(unsigned int i=0;i<vAddressesToImport.size();i++)
         {
