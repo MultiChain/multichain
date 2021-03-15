@@ -657,3 +657,97 @@ Value listexpblocktxs(const json_spirit::Array& params, bool fHelp)
 {
     return Value::null;    
 }
+
+Value listexpredeemtxs(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 2)
+        throw runtime_error("Help message not found\n");
+
+    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER) == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
+    }   
+           
+    mc_TxEntityStat entStat;
+    mc_TxEntity entity;
+    int errCode;
+    string strError;
+    vector <mc_QueryCondition> conditions;
+    Array retArray;
+    mc_Buffer *entity_rows=NULL;
+    
+    uint256 hash = ParseHashV(params[0], "txid");
+    int n=params[1].get_int();
+    
+    entStat.Zero();
+    entStat.m_Entity.m_EntityType=MC_TET_EXP_REDEEM_KEY;
+    entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
+    
+    bool fWRPLocked=false;
+    int chain_height; 
+    int rpc_slot=GetRPCSlot();
+    if(rpc_slot < 0)
+    {
+        errCode=RPC_INTERNAL_ERROR;
+        strError="Couldn't find RPC Slot";
+        goto exitlbl;
+    }
+    
+    fWRPLocked=true;
+    pwalletTxsMain->WRPReadLock();
+    if(!pwalletTxsMain->WRPFindEntity(&entStat))
+    {
+        errCode=RPC_NOT_SUBSCRIBED;
+        strError="Not subscribed to this stream";
+        goto exitlbl;
+    }
+
+    for(int i=0;i<n;i++)
+    {
+        COutPoint txout=COutPoint(hash,i);
+        const unsigned char *ptr;
+        uint160 subkey_hash160;
+
+        ptr=(unsigned char*)&txout;
+        subkey_hash160=Hash160(ptr,ptr+sizeof(COutPoint));
+        memcpy(entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+        entity.m_EntityType=entStat.m_Entity.m_EntityType | MC_TET_SUBKEY;    
+        entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
+        entity_rows->Clear();
+        WRPCheckWalletError(pwalletTxsMain->WRPGetList(&entity,entStat.m_Generation,1,1,entity_rows),entity.m_EntityType,"",&errCode,&strError);
+        if(entity_rows->GetCount())
+        {
+            Object entry;
+
+            mc_TxEntityRow *lpEntTx;
+            lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(0);
+            uint256 hash;
+
+            memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);                
+            entry.push_back(Pair("txid", hash.ToString()));
+            entry.push_back(Pair("vout", (int)lpEntTx->m_Flags));            
+            retArray.push_back(entry);                                
+        }
+        else
+        {
+            retArray.push_back(Value::null);                                
+        }
+    }
+    
+exitlbl:
+                
+    if(fWRPLocked)
+    {
+        pwalletTxsMain->WRPReadUnLock();
+    }
+
+    if(strError.size())
+    {
+        throw JSONRPCError(errCode, strError);            
+    }
+    
+    
+    return retArray;
+}
+
+

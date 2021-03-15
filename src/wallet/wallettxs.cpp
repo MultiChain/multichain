@@ -3528,6 +3528,8 @@ int mc_WalletTxs::AddExplorerEntities(mc_Buffer *lpEntities)
     if(lpEntities) lpEntities->Add(&entity,NULL); else pwalletTxsMain->AddEntity(&entity,0);
     entity.m_EntityType=MC_TET_EXP_REDEEM | MC_TET_CHAINPOS;
     if(lpEntities) lpEntities->Add(&entity,NULL); else pwalletTxsMain->AddEntity(&entity,0);
+    entity.m_EntityType=MC_TET_EXP_REDEEM_KEY | MC_TET_CHAINPOS;
+    if(lpEntities) lpEntities->Add(&entity,NULL); else pwalletTxsMain->AddEntity(&entity,0);
     entity.m_EntityType=MC_TET_EXP_ASSET_ADDRESS | MC_TET_CHAINPOS;
     if(lpEntities) lpEntities->Add(&entity,NULL); else pwalletTxsMain->AddEntity(&entity,0);
     entity.m_EntityType=MC_TET_EXP_ADDRESS_ASSETS | MC_TET_CHAINPOS;
@@ -3619,6 +3621,7 @@ int mc_WalletTxs::AddExplorerTx(
     
     import_pos=imp-m_Database->m_Imports;
     hash=tx.GetHash();
+    tx_tag=mc_GetExplorerTxDetails(-1,tx,OutputAssetQuantities,InputScriptTags,OutputScriptTags);
     
     fFound=false;
     txdef.Zero();
@@ -3652,7 +3655,7 @@ int mc_WalletTxs::AddExplorerTx(
     subkey_entity.Zero();
     memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
     subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_TX_KEY | MC_TET_CHAINPOS;
-    err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,0,fFound ? 0 : 1);
+    err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,tx_tag,fFound ? 0 : 1);
     if(err)
     {
         goto exitlbl;
@@ -3663,9 +3666,23 @@ int mc_WalletTxs::AddExplorerTx(
     {
         for (j = 0; j < (int)tx.vin.size(); ++j)
         {
+            COutPoint txout=tx.vin[j].prevout;
+            
             int op_addr_offset,op_addr_size,is_redeem_script,sighash_type;
             uint32_t publisher_flags;
             const unsigned char *ptr;
+            
+            ptr=(unsigned char*)&txout;
+            subkey_hash160=Hash160(ptr,ptr+sizeof(COutPoint));
+            entity.m_EntityType=MC_TET_EXP_REDEEM_KEY | MC_TET_CHAINPOS;
+            subkey_entity.Zero();
+            memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+            subkey_entity.m_EntityType=MC_TET_SUBKEY_REDEEM_KEY | MC_TET_CHAINPOS;
+            err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,(uint32_t)j,1);
+            if(err)
+            {
+                goto exitlbl;
+            }                            
 
             const CScript& script2 = tx.vin[j].scriptSig;        
             CScript::const_iterator pc2 = script2.begin();
@@ -3694,7 +3711,7 @@ int mc_WalletTxs::AddExplorerTx(
                     subkey_entity.Zero();
                     memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
                     subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_TX_PUBLISHER | MC_TET_CHAINPOS;
-                    err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,0,fFound ? 0 : 1);
+                    err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,tx_tag,fFound ? 0 : 1);
                     if(err)
                     {
                         goto exitlbl;
@@ -3771,7 +3788,7 @@ int mc_WalletTxs::AddExplorerTx(
                     subkey_entity.Zero();
                     memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
                     subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_TX_PUBLISHER | MC_TET_CHAINPOS;
-                    err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,0,fFound ? 0 : 1);
+                    err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,tx_tag,fFound ? 0 : 1);
                     if(err)
                     {
                         goto exitlbl;
@@ -3784,7 +3801,6 @@ int mc_WalletTxs::AddExplorerTx(
     
     timestamp=mc_TimeNowAsUInt();
     
-    tx_tag=mc_GetExplorerTxDetails(-1,tx,OutputAssetQuantities,InputScriptTags,OutputScriptTags);
 /*    
     mc_Script *tmpscript;
     tmpscript=mc_gState->m_TmpBuffers->m_ExplorerTxScript;
@@ -3799,11 +3815,10 @@ int mc_WalletTxs::AddExplorerTx(
 */    
         
     imp->m_TmpEntities->Clear();
-    flags=tx_tag;
     entity.Zero();
     entity.m_EntityType=MC_TET_EXP_TX | MC_TET_CHAINPOS;
     imp->m_TmpEntities->Add(&entity,NULL);
-    err=m_Database->AddData(imp,(unsigned char*)&hash,NULL,0,block,flags,timestamp,imp->m_TmpEntities);
+    err=m_Database->AddData(imp,(unsigned char*)&hash,NULL,0,block,tx_tag,timestamp,imp->m_TmpEntities);
     
 exitlbl:    
                 
