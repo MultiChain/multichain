@@ -205,6 +205,7 @@ typedef struct mc_TmpBuffers
     mc_Buffer               *m_RpcEntityRowsFull;
     mc_SHA256               *m_RpcHasher1;
     mc_Script               *m_RpcChunkScript1;
+    mc_Script               *m_ExplorerTxScript;
     mc_Script               *m_RelayTmpBuffer;
     mc_Script               *m_LicenseTmpBuffer;
     mc_Script               *m_LicenseTmpBufferForHash;
@@ -236,6 +237,7 @@ typedef struct mc_TmpBuffers
         m_RelayTmpBuffer=new mc_Script();
         m_LicenseTmpBuffer=new mc_Script();
         m_LicenseTmpBufferForHash=new mc_Script();
+        m_ExplorerTxScript=new mc_Script();
     }    
 
     void  Destroy()
@@ -257,6 +259,7 @@ typedef struct mc_TmpBuffers
         delete m_RelayTmpBuffer;
         delete m_LicenseTmpBuffer;
         delete m_LicenseTmpBufferForHash;
+        delete m_ExplorerTxScript;
     }
     
 } mc_TmpBuffers;

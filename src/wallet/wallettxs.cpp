@@ -3259,6 +3259,263 @@ exitlbl:
     return err;
 }
 
+uint32_t mc_GetExplorerTxDetails(int rpc_slot,
+                                 const CTransaction& tx,
+                                 std::vector< std::map<uint160,int64_t> >& OutputAssetQuantities,
+                                 std::vector<uint64_t>& InputScriptTags,
+                                 std::vector<uint64_t>& OutputScriptTags)
+{
+    uint32_t tx_tag=MC_MTX_TAG_NONE;
+    
+    InputScriptTags.resize(tx.vin.size());
+    OutputScriptTags.resize(tx.vout.size());
+    OutputAssetQuantities.resize(tx.vout.size());
+    
+    uint256 hash=tx.GetHash();
+    
+    for (int j = 0; j < (int)tx.vin.size(); ++j)
+    {
+        if(tx.IsCoinBase())
+        {
+            InputScriptTags[j]=MC_MTX_TAG_COINBASE;
+        }
+        else
+        {
+            InputScriptTags[j]=MC_MTX_TAG_NONE;
+            int op_addr_offset,op_addr_size,is_redeem_script,sighash_type;
+            const unsigned char *ptr;
+
+            const CScript& script2 = tx.vin[j].scriptSig;        
+            CScript::const_iterator pc2 = script2.begin();
+
+            
+            ptr=mc_ExtractAddressFromInputScript((unsigned char*)(&pc2[0]),(int)(script2.end()-pc2),&op_addr_offset,&op_addr_size,&is_redeem_script,&sighash_type,0);                                
+            if(ptr)
+            {
+                if(is_redeem_script)
+                {
+                    InputScriptTags[j] |= MC_MTX_TAG_P2SH;
+                }
+            }
+            else
+            {
+                InputScriptTags[j] |= MC_MTX_TAG_NO_KEY_SCRIPT_ID;              // Either non-standard or P2PK or bare multisig
+            }
+        }
+        tx_tag |= InputScriptTags[j];
+    }    
+
+    for(int i=0;i<(int)tx.vout.size();i++)                                          // Checking outputs
+    {        
+        const CTxOut txout=tx.vout[i];
+        const CScript& script1 = txout.scriptPubKey;        
+        CScript::const_iterator pc1 = script1.begin();
+
+        OutputScriptTags[i]=MC_MTX_TAG_NONE;
+        txnouttype typeRet;
+        int nRequiredRet;
+        int err;
+        std::vector<CTxDestination> addressRets;
+        int64_t quantity,issue_quantity;
+        std::map<uint160,int64_t> assets;
+        issue_quantity=0;
+        mc_EntityDetails entity;
+        uint32_t type,from,to,timestamp,flags;
+        
+        mc_gState->m_TmpScript->Clear();
+        mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+        if(mc_gState->m_TmpScript->IsOpReturnScript() == 0)
+        {                
+            ExtractDestinations(script1,typeRet,addressRets,nRequiredRet);
+            if(typeRet == TX_SCRIPTHASH)
+            {
+                OutputScriptTags[i] |= MC_MTX_TAG_P2SH;
+            }
+
+            for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
+            {
+                uint160 asset=0;
+                mc_gState->m_TmpScript->SetElement(e);
+                mc_gState->m_TmpAssetsOut->Clear();                    
+                err=mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);
+                if(err == MC_ERR_NOERROR)
+                {
+                    OutputScriptTags[i] |= MC_MTX_TAG_ASSET_TRANSFER;
+                }
+                err=mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
+                if(err == MC_ERR_NOERROR)
+                {
+                    OutputScriptTags[i] |= MC_MTX_TAG_ASSET_FOLLOWON;
+                }
+                int n=mc_gState->m_TmpAssetsOut->GetCount();
+                quantity=0;
+                if(n)
+                {
+                    unsigned char *ptrOut;
+                    for(int k=0;k<n;k++)
+                    {
+                        ptrOut=mc_gState->m_TmpAssetsOut->GetRow(k);
+                        asset=0;
+                        memcpy(&asset,ptrOut+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);                        
+                        quantity=mc_GetABQuantity(ptrOut);
+                        assets.insert(make_pair(asset,quantity));
+                        if( (n == 1) && (quantity == 1) )
+                        {
+                            if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptrOut))
+                            {
+                                if(entity.GetEntityType() == MC_ENT_TYPE_LICENSE_TOKEN)
+                                {
+                                    OutputScriptTags[i] |= MC_MTX_TAG_LICENSE_TOKEN;
+                                }   
+                            }
+                        }
+                    }                    
+                }
+                if(mc_gState->m_TmpScript->GetAssetGenesis(&quantity) == 0)
+                {
+                    OutputScriptTags[i] |= MC_MTX_TAG_ASSET_GENESIS;
+                    issue_quantity+=quantity;
+                    asset=0;
+                    memcpy(&asset,(unsigned char*)&hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+                    std::map<uint160,int64_t>::iterator it = assets.find(asset);
+                    if(it == assets.end())
+                    {
+                        assets.insert(make_pair(asset,quantity));                        
+                    }
+                    else
+                    {
+                        it->second += quantity;
+                    }
+                    if(quantity == 1)
+                    {
+                        if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,(const unsigned char*)&asset))
+                        {
+                            if(entity.GetEntityType() == MC_ENT_TYPE_LICENSE_TOKEN)
+                            {
+                                OutputScriptTags[i] |= MC_MTX_TAG_LICENSE_TOKEN;
+                            }                               
+                        }
+                    }
+                }        
+                if(mc_gState->m_TmpScript->GetPermission(&type,&from,&to,&timestamp) == 0) // Grant script
+                {
+                    if( type & ( MC_PTP_CREATE | MC_PTP_ISSUE | MC_PTP_ACTIVATE | MC_PTP_FILTER ) )
+                    {
+                        OutputScriptTags[i] |= MC_MTX_TAG_PERMISSION_HIGH;
+                    }                    
+                    if(type & mc_gState->m_Permissions->GetCustomHighPermissionTypes())
+                    {
+                        OutputScriptTags[i] |= MC_MTX_TAG_PERMISSION_HIGH;
+                    }
+                    if( type & MC_PTP_FILTER )
+                    {
+                        OutputScriptTags[i] |= MC_MTX_TAG_FILTER_APPROVAL;
+                    }
+                    if( type != MC_PTP_FILTER)
+                    {
+                        OutputScriptTags[i] |= MC_MTX_TAG_PERMISSION;
+                    }
+                    if( type & ( MC_PTP_MINE | MC_PTP_ADMIN ) )
+                    {
+                        OutputScriptTags[i] |= MC_MTX_TAG_PERMISSION_ADMIN_MINE;
+                    }                    
+                }
+                unsigned char *ptr;
+                int size;
+                if(mc_gState->m_TmpScript->GetRawData(&ptr,&size) == 0)      
+                {
+                    OutputScriptTags[i] |= MC_MTX_TAG_INLINE_DATA;
+                }                
+            }      
+            OutputAssetQuantities[i]=assets;
+        }
+        else
+        {
+            OutputScriptTags[i] |= MC_MTX_TAG_OP_RETURN;
+            bool fDataTypeFound=false;
+            int cs_offset,cs_new_offset,cs_size,cs_vin;
+            unsigned char *cs_script;
+
+            mc_gState->m_TmpScript->SetElement(0);
+            cs_offset=0;
+            if(mc_gState->m_TmpScript->GetCachedScript(cs_offset,&cs_new_offset,&cs_vin,&cs_script,&cs_size) == 0)
+            {
+                OutputScriptTags[i] |= MC_MTX_TAG_CACHED_SCRIPT;
+                fDataTypeFound=true;
+            }
+            
+            int entity_update;
+            int details_script_size;                                            
+            uint32_t new_entity_type;                                           
+            unsigned char details_script[MC_ENT_MAX_SCRIPT_SIZE];               
+
+            for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
+            {
+                mc_gState->m_TmpScript->SetElement(e);
+                if(mc_gState->m_TmpScript->GetNewEntityType(&new_entity_type,&entity_update,details_script,&details_script_size) == 0)
+                {
+                    fDataTypeFound=true;
+                    OutputScriptTags[i] |= new_entity_type << MC_MTX_TAG_ENTITY_MASK_SHIFT;
+                    if(entity_update)
+                    {
+                        OutputScriptTags[i] |= MC_MTX_TAG_ENTITY_UPDATE;        
+                    }
+                    else
+                    {
+                        OutputScriptTags[i] |= MC_MTX_TAG_ENTITY_CREATE;                        
+                    }                    
+                }
+            }
+            if(mc_gState->m_TmpScript->GetNumElements() >= 3 )        
+            {
+                unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
+                mc_EntityDetails entity;
+                uint32_t salt_size=0;
+                mc_gState->m_TmpScript->SetElement(0);
+                                                                      
+                if( (mc_gState->m_TmpScript->GetEntity(short_txid) == 0) && (mc_gState->m_Assets->FindEntityByShortTxID(&entity,short_txid) != 0) )
+                {
+                    fDataTypeFound=true;
+                    if(entity.GetEntityType() == MC_ENT_TYPE_UPGRADE)                     
+                    {
+                        OutputScriptTags[i] |= MC_MTX_TAG_UPGRADE_APPROVAL;
+                    }
+                    if(entity.GetEntityType() <= MC_ENT_TYPE_STREAM_MAX)
+                    {
+                        OutputScriptTags[i] |= MC_MTX_TAG_STREAM_ITEM;// | (entity.GetEntityType() << MC_MTX_TAG_ENTITY_MASK_SHIFT);                        
+                        uint32_t format;
+                        unsigned char *chunk_hashes;
+                        int chunk_count;   
+                        int64_t total_chunk_size;
+                        mc_gState->m_TmpScript->ExtractAndDeleteDataFormat(&format,&chunk_hashes,&chunk_count,&total_chunk_size);
+                        if(chunk_hashes)                            
+                        {
+                            OutputScriptTags[i] |= MC_MTX_TAG_OFFCHAIN;
+                        }
+                    }
+                }                               
+            }      
+            if(!fDataTypeFound)
+            {
+                OutputScriptTags[i] |= MC_MTX_TAG_RAW_DATA;
+            }
+        }
+        
+        if( ((OutputScriptTags[i] & MC_MTX_TAG_ENTITY_MASK) != 0) && 
+            ((tx_tag & MC_MTX_TAG_ENTITY_MASK) != 0) &&               
+            ((OutputScriptTags[i] & MC_MTX_TAG_ENTITY_MASK) != (tx_tag & MC_MTX_TAG_ENTITY_MASK)) )            
+        {
+            tx_tag |= MC_MTX_TAG_NO_SINGLE_TX_TAG;
+        }
+        else
+        {
+            tx_tag |= OutputScriptTags[i];            
+        }
+    }    
+    
+    return tx_tag;
+}
+
 int mc_WalletTxs::AddExplorerEntities(mc_Buffer *lpEntities)
 {
     mc_TxEntity entity;
@@ -3341,6 +3598,11 @@ int mc_WalletTxs::AddExplorerTx(
     uint32_t flags;
     uint32_t timestamp;
     CDataStream ss(SER_DISK, CLIENT_VERSION);
+    
+    std::vector< std::map<uint160,int64_t> >OutputAssetQuantities;
+    std::vector<uint64_t>InputScriptTags;
+    std::vector<uint64_t>OutputScriptTags;
+    uint32_t tx_tag;
     
     if((m_Mode & MC_WMD_TXS) == 0)
     {
@@ -3462,7 +3724,6 @@ int mc_WalletTxs::AddExplorerTx(
             for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
             {
                 mc_gState->m_TmpScript->SetElement(e);
-                mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER | MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
                 if(mc_gState->m_TmpScript->GetAssetGenesis(&quantity) == 0)
                 {
                     if(imp->m_ImportID == 0)
@@ -3474,56 +3735,71 @@ int mc_WalletTxs::AddExplorerTx(
                         imp->m_TmpEntities->Add(&entity,NULL);
                     }
                 }
+            }
             
-            
-                BOOST_FOREACH(const CTxDestination& dest, addressRets)
-                {
-                    uint32_t publisher_flags;
-                    entity.Zero();
-                    const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
-                    const CScriptID *lpScriptID=boost::get<CScriptID> (&dest);
-                    publisher_flags=MC_SFL_SUBKEY | MC_SFL_IS_ADDRESS;
-                    subkey_hash160=0;
-                    
-                    if(lpKeyID)
-                    {
-                        memcpy(&subkey_hash160,lpKeyID,MC_TDB_ENTITY_ID_SIZE);
-                    }
-                    if(lpScriptID)
-                    {
-                        memcpy(&subkey_hash160,lpScriptID,MC_TDB_ENTITY_ID_SIZE);
-                        publisher_flags |= MC_SFL_IS_SCRIPTHASH;
-                    }
-                    if((subkey_hash160 != 0) && (publishers_set.count(subkey_hash160) == 0))
-                    {
-                        publishers_set.insert(subkey_hash160);
-                        subkey_hash256=0;
-                        memcpy(&subkey_hash256,&subkey_hash160,sizeof(subkey_hash160));
-                        publisher_flags=MC_SFL_SUBKEY | MC_SFL_IS_ADDRESS;
-                        err=m_Database->AddSubKeyDef(imp,(unsigned char*)&subkey_hash256,NULL,0,publisher_flags);
-                        if(err)
-                        {
-                            goto exitlbl;
-                        }
+            BOOST_FOREACH(const CTxDestination& dest, addressRets)
+            {
+                uint32_t publisher_flags;
+                entity.Zero();
+                const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
+                const CScriptID *lpScriptID=boost::get<CScriptID> (&dest);
+                publisher_flags=MC_SFL_SUBKEY | MC_SFL_IS_ADDRESS;
+                subkey_hash160=0;
 
-                        entity.m_EntityType=MC_TET_EXP_TX_PUBLISHER | MC_TET_CHAINPOS;
-                        subkey_entity.Zero();
-                        memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
-                        subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_TX_PUBLISHER | MC_TET_CHAINPOS;
-                        err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,0,fFound ? 0 : 1);
-                        if(err)
-                        {
-                            goto exitlbl;
-                        }                            
-                    }     
+                if(lpKeyID)
+                {
+                    memcpy(&subkey_hash160,lpKeyID,MC_TDB_ENTITY_ID_SIZE);
                 }
+                if(lpScriptID)
+                {
+                    memcpy(&subkey_hash160,lpScriptID,MC_TDB_ENTITY_ID_SIZE);
+                    publisher_flags |= MC_SFL_IS_SCRIPTHASH;
+                }
+                if((subkey_hash160 != 0) && (publishers_set.count(subkey_hash160) == 0))
+                {
+                    publishers_set.insert(subkey_hash160);
+                    subkey_hash256=0;
+                    memcpy(&subkey_hash256,&subkey_hash160,sizeof(subkey_hash160));
+                    publisher_flags=MC_SFL_SUBKEY | MC_SFL_IS_ADDRESS;
+                    err=m_Database->AddSubKeyDef(imp,(unsigned char*)&subkey_hash256,NULL,0,publisher_flags);
+                    if(err)
+                    {
+                        goto exitlbl;
+                    }
+
+                    entity.m_EntityType=MC_TET_EXP_TX_PUBLISHER | MC_TET_CHAINPOS;
+                    subkey_entity.Zero();
+                    memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+                    subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_TX_PUBLISHER | MC_TET_CHAINPOS;
+                    err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,0,fFound ? 0 : 1);
+                    if(err)
+                    {
+                        goto exitlbl;
+                    }                            
+                }     
             }
         }
     }
     
+    
     timestamp=mc_TimeNowAsUInt();
+    
+    tx_tag=mc_GetExplorerTxDetails(-1,tx,OutputAssetQuantities,InputScriptTags,OutputScriptTags);
+/*    
+    mc_Script *tmpscript;
+    tmpscript=mc_gState->m_TmpBuffers->m_ExplorerTxScript;
+    if(rpc_slot >= 0)
+    {
+        tmpscript=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_ExplorerTxScript;
+    }
+    
+    
+    tmpscript->Clear();
+    tmpscript->AddElement();
+*/    
+        
     imp->m_TmpEntities->Clear();
-    flags=0;
+    flags=tx_tag;
     entity.Zero();
     entity.m_EntityType=MC_TET_EXP_TX | MC_TET_CHAINPOS;
     imp->m_TmpEntities->Add(&entity,NULL);

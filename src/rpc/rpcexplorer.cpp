@@ -53,6 +53,134 @@ bool WRPSubKeyEntityFromExpAddress(string str,mc_TxEntityStat entStat,mc_TxEntit
     return true;
 }
 
+Value TagEntry(uint64_t tag) 
+{
+    if(tag & 0x0000000000000001)
+    {
+        return Value::null;
+    }
+    Array tags;
+    if(tag & MC_MTX_TAG_P2SH)
+    {
+        tags.push_back("pay-to-script-hash");
+    }
+    if(tag & MC_MTX_TAG_NO_KEY_SCRIPT_ID)
+    {
+        tags.push_back("not-p2pkh-p2sh");
+    }
+    if(tag & MC_MTX_TAG_COINBASE)
+    {
+        tags.push_back("coinbase");
+    }
+    if(tag & MC_MTX_TAG_CACHED_SCRIPT)
+    {
+        tags.push_back("cached-script");
+    }
+    if(tag & MC_MTX_TAG_PERMISSION)
+    {
+        if(tag & MC_MTX_TAG_PERMISSION_ADMIN_MINE)
+        {
+            tags.push_back("permission-admin-mine");                        
+        }
+        else
+        {
+            if(tag & MC_MTX_TAG_PERMISSION_HIGH)
+            {
+                tags.push_back("permission-high");            
+            }
+            else
+            {
+                tags.push_back("permission-low");
+            }
+        }
+    }
+    if(tag & MC_MTX_TAG_ASSET_GENESIS)
+    {
+        if(tag & MC_MTX_TAG_LICENSE_TOKEN)
+        {
+            tags.push_back("new-license-token-unit");            
+        }
+        else
+        {
+            tags.push_back("new-asset-units");            
+        }
+    }
+    if(tag & MC_MTX_TAG_ASSET_TRANSFER)
+    {
+        if(tag & MC_MTX_TAG_LICENSE_TOKEN)
+        {
+            tags.push_back("license-transfer");            
+        }
+        else
+        {
+            tags.push_back("asset-transfer");            
+        }
+    }
+    if(tag & MC_MTX_TAG_ASSET_FOLLOWON)
+    {
+        tags.push_back("more-asset-units");            
+    }
+    string entity="entity";
+    if(tag & MC_MTX_TAG_ENTITY_MASK)
+    {
+        int ent=(tag & MC_MTX_TAG_ENTITY_MASK) >> MC_MTX_TAG_ENTITY_MASK_SHIFT;
+        switch(ent)
+        {
+            case MC_ENT_TYPE_ASSET: entity="asset"; break;
+            case MC_ENT_TYPE_STREAM: entity="stream"; break;
+            case MC_ENT_TYPE_UPGRADE: entity="upgrade"; break;
+            case MC_ENT_TYPE_FILTER: entity="filter"; break;
+            case MC_ENT_TYPE_LICENSE_TOKEN: entity="license"; break;
+            case MC_ENT_TYPE_VARIABLE: entity="variable"; break;
+            case MC_ENT_TYPE_LIBRARY: entity="library"; break;
+            default:entity="pseudo-stream"; break;                
+        }
+    }
+    
+    if(tag & MC_MTX_TAG_ENTITY_CREATE)
+    {
+        tags.push_back("create-" + entity);
+    }
+    if(tag & MC_MTX_TAG_ENTITY_UPDATE)
+    {
+        tags.push_back("update-" + entity);
+    }
+    if(tag & MC_MTX_TAG_FILTER_APPROVAL)
+    {
+        tags.push_back("filter-or-library-approval");
+    }
+    if(tag & MC_MTX_TAG_UPGRADE_APPROVAL)
+    {
+        tags.push_back("upgrade-approval");
+    }
+    
+    if(tag & MC_MTX_TAG_STREAM_ITEM)
+    {
+        if(tag & MC_MTX_TAG_OFFCHAIN)
+        {
+            tags.push_back("offchain-stream-item");                
+        }
+        else
+        {
+            tags.push_back("onchain-stream-item");                                
+        }
+    }
+    if(tag & MC_MTX_TAG_INLINE_DATA)
+    {
+        tags.push_back("inline-data");                                            
+    }
+    if(tag & MC_MTX_TAG_RAW_DATA)
+    {
+        if( (tag & MC_MTX_TAG_COINBASE) == 0 )
+        {
+            tags.push_back("raw-data");                                            
+        }
+    }        
+    
+    return tags;
+}
+
+
 Value listexpmap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& inputEntities,vector<string>& inputStrings,int count, int start, string mode,int *errCode,string *strError)
 {
     mc_TxEntity entity;
@@ -268,6 +396,8 @@ Value listexptxs(const json_spirit::Array& params, bool fHelp)
         
         entry.push_back(Pair("txid", hash.ToString()));
         int block=lpEntTx->m_Block;
+        uint32_t tag=lpEntTx->m_Flags;
+        entry.push_back(Pair("tags", TagEntry(tag)));
         if( (block < 0) || (block > chain_height))
         {
             entry.push_back(Pair("block", Value::null));
