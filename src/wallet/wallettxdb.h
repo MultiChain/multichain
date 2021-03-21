@@ -32,12 +32,17 @@
 #define MC_TET_AUTHOR                           0x00000009
 #define MC_TET_EXP_TX                           0x00000010 // global, key-block, publisher-address, item - txid, direct
 #define MC_TET_EXP_REDEEM                       0x00000011 // global, key-txid/vout, item - txid/vin, direct 
-#define MC_TET_EXP_ASSET_ADDRESS                0x00000012 // global, key-asset/address, item - asset balances
-#define MC_TET_EXP_ADDRESS_ASSETS               0x00000013 // global, key-address, item - asset, direct (no balances), no duplicate items on asset
-#define MC_TET_EXP_ASSET_BALANCE                0x00000014 // per-asset, publisher - address, item - asset balances
+#define MC_TET_EXP_TXOUT_ASSETS                 0x00000012 // global, key-txid/vout, item - asset quantities (direct if single asset)
+#define MC_TET_EXP_BALANCE_DETAILS              0x00000013 // global, key-asset/address, item - asset balances
+#define MC_TET_EXP_BALANCE_DETAILS_KEY          0x00000014 // global, asset/address
 #define MC_TET_EXP_REDEEM_KEY                   0x00000015 // global, txid/vout
 #define MC_TET_EXP_TX_KEY                       0x00000016 // global, block
 #define MC_TET_EXP_TX_PUBLISHER                 0x00000017 // global, address
+#define MC_TET_EXP_TXOUT_ASSETS_KEY             0x00000018 // global, txid/vout
+#define MC_TET_EXP_ADDRESS_ASSETS               0x0000001A // global, key-address, item - asset, direct (no balances), no duplicate items on asset
+#define MC_TET_EXP_ADDRESS_ASSETS_KEY           0x0000001B // global, address
+#define MC_TET_EXP_ASSET_ADDRESSES              0x0000001C // global, key-asset, item - address, direct (no balances), no duplicate items on address
+#define MC_TET_EXP_ASSET_ADDRESSES_KEY          0x0000001D // global, asset
 
 #define MC_TET_SUBKEY                           0x00000040
 #define MC_TET_SUBKEY_STREAM_KEY                0x00000046
@@ -45,6 +50,10 @@
 #define MC_TET_SUBKEY_REDEEM_KEY                0x00000055
 #define MC_TET_SUBKEY_EXP_TX_KEY                0x00000056
 #define MC_TET_SUBKEY_EXP_TX_PUBLISHER          0x00000057
+#define MC_TET_SUBKEY_EXP_TXOUT_ASSETS_KEY      0x00000058 
+#define MC_TET_SUBKEY_EXP_BALANCE_DETAILS_KEY   0x00000059 // global, asset/address
+#define MC_TET_SUBKEY_EXP_ADDRESS_ASSETS_KEY    0x0000005B
+#define MC_TET_SUBKEY_EXP_ASSET_ADDRESSES_KEY   0x0000005D 
 #define MC_TET_TYPE_MASK                        0x040000FF
 #define MC_TET_CHAINPOS                         0x00000100
 #define MC_TET_TIMERECEIVED                     0x00000200
@@ -405,6 +414,12 @@ typedef struct mc_TxDB
                     int generation,                                             // Entity generation
                     int *confirmed);                                            // Out: number of confirmed items    
     
+    int GetLastItem(
+                    mc_TxImport *import,
+                    mc_TxEntity *entity,                                        // Entity to return info for
+                    int generation,                                             // Entity generation
+                    mc_TxEntityRow *erow);
+    
     int GetBlockItemIndex(                                                      // Returns item id for the last item confirmed in this block or before
                     mc_TxImport *import,                                        // Import object, if NULL - chain
                     mc_TxEntity *entity,                                        // Entity to return info for
@@ -465,6 +480,7 @@ typedef struct mc_TxDB
     
     int WRPGetListSize(mc_TxEntity *entity,int *confirmed);    
     int WRPGetListSize(mc_TxEntity *entity,int generation,int *confirmed);
+    int WRPGetLastItem(mc_TxEntity *entity,int generation,mc_TxEntityRow *erow);    
     
     int WRPGetList(mc_TxEntity *entity,
                     int generation,

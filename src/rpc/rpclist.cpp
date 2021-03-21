@@ -324,6 +324,8 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "listexpaddresstxs",      &listexpaddresstxs,       false,      true,      false },
     { "wallet",             "listexpblocktxs",        &listexpblocktxs,         false,      true,      false },
     { "wallet",             "listexpredeemtxs",       &listexpredeemtxs,        false,      true,      false },
+    { "wallet",             "listexpaddressassets",   &listexpaddressassets,    false,      true,      false },
+    { "wallet",             "listexpassetaddresses",  &listexpassetaddresses,   false,      true,      false },
     
 /* MCHN END */    
     { "wallet",             "setaccount",             &setaccount,             true,      false,      true },

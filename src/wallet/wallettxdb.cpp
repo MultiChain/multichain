@@ -2610,6 +2610,128 @@ exitlbl:
     return err;
 }
 
+int mc_TxDB::GetLastItem(
+                    mc_TxImport *import,
+                    mc_TxEntity *entity,                                        
+                    int generation,    
+                    mc_TxEntityRow *erow)
+{
+    mc_TxImport *imp;
+    mc_Buffer *mempool;
+    mc_TxEntityStat *stat;
+    int last_pos,mprow,err,i;
+    unsigned char*ptr;
+    int value_len; 
+    int in_mempool=0;
+    
+    imp=m_Imports;
+    mempool=m_MemPools[0];
+    if(import)                                                                  // Find import
+    {
+        imp=import;
+        mempool=m_MemPools[import-m_Imports];
+    }
+    
+    erow->Zero();                                                                // Anchor row in mempool, will not be stored in database
+    memcpy(&erow->m_Entity,entity,sizeof(mc_TxEntity));
+    erow->m_Generation=generation;
+
+    last_pos=0;
+    mprow=mempool->Seek(erow);
+    if(mprow >= 0)                                                     
+    {
+        mprow+=1;                                                               // Anchor doesn't carry info except key, but the next row is the first for this entity
+        last_pos=((mc_TxEntityRow*)(mempool->GetRow(mprow)))->m_LastSubKeyPos;
+        in_mempool=1;
+    }
+    else
+    {
+        erow->Zero();
+        memcpy(&erow->m_Entity,entity,sizeof(mc_TxEntity));
+        erow->m_Generation=generation;
+        erow->m_Pos=1;
+        erow->SwapPosBytes();
+        ptr=(unsigned char*)m_Database->m_DB->Read((char*)erow+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err);
+        erow->SwapPosBytes();
+        if(ptr)
+        {
+            memcpy((char*)erow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
+            last_pos=erow->m_LastSubKeyPos;
+        }
+    }    
+    
+    if(last_pos == 0)
+    {
+        return MC_ERR_NOT_FOUND;
+    }
+    
+    erow->Zero();
+    memcpy(&(erow->m_Entity),entity,sizeof(mc_TxEntity));
+    erow->m_Generation=generation;
+    erow->m_Pos=last_pos;
+    
+    mc_TxEntityRow *lpEnt;
+
+    err=MC_ERR_NOERROR;
+    ptr=NULL;
+    if(in_mempool == 0)
+    {
+        erow->SwapPosBytes();
+        ptr=(unsigned char*)m_Database->m_DB->Read((char*)erow+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err);
+        erow->SwapPosBytes();
+        if(err)
+        {
+            return err;
+        }
+    }
+    if(ptr)
+    {
+        memcpy((char*)erow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
+        return MC_ERR_NOERROR;
+    }
+    else
+    {
+        for(i=0;i<mempool->GetCount();i++)
+        {
+            lpEnt=(mc_TxEntityRow *)mempool->GetRow(i);
+            if( (lpEnt->m_TempPos == erow->m_Pos) && 
+                (memcmp(&(lpEnt->m_Entity),&(erow->m_Entity),sizeof(mc_TxEntity)) == 0))
+            {
+                memcpy(erow,lpEnt,MC_TDB_ROW_SIZE);
+                erow->m_Pos=lpEnt->m_TempPos;
+                return MC_ERR_NOERROR;
+            }            
+        }
+    }
+    
+    return MC_ERR_NOT_FOUND;
+    
+}
+    
+
+
+int mc_TxDB::WRPGetLastItem(
+                    mc_TxEntity *entity,                                        
+                    int generation,    
+                    mc_TxEntityRow *erow)
+{
+    int last;
+        
+    last=WRPGetListSize(entity,generation,NULL);
+    if(last == 0)
+    {
+        return MC_ERR_NOT_FOUND;
+    }
+    erow->Zero();
+    memcpy(&(erow->m_Entity),entity,sizeof(mc_TxEntity));
+    erow->m_Generation=generation;
+    erow->m_Pos=last;
+    
+    return WRPGetRow(erow);    
+}
+    
+
+
 int mc_TxDB::GetRow(
                mc_TxEntityRow *erow)
 {

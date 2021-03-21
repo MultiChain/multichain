@@ -1789,6 +1789,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         }
 
         vector <mc_TxEntity> vSubscribedEntities;
+        int explorer_support=-1;
         if(GetBoolArg("-reindex", false) || GetBoolArg("-rescan", false))
         {
             pwalletTxsMain=new mc_WalletTxs;
@@ -1809,6 +1810,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                         case MC_TET_STREAM_PUBLISHER:
                         case MC_TET_ASSET:
                             vSubscribedEntities.push_back(stat->m_Entity);
+                            break;
+                        case MC_TET_EXP_TX:
+                            explorer_support=1;
                             break;
                     }
                 }
@@ -1913,7 +1917,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     mc_gState->m_WalletMode |= MC_WMD_AUTOSUBSCRIBE_ASSETS;
                 }                
 */
-                int explorer_mode=GetArg("-explorersupport",-1);
+                int explorer_mode=GetArg("-explorersupport",explorer_support);
                 if(explorer_mode > 0)
                 {
                     mc_gState->m_WalletMode |= MC_WMD_EXPLORER;

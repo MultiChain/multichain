@@ -357,6 +357,8 @@ extern json_spirit::Value listexpaddresses(const json_spirit::Array& params, boo
 extern json_spirit::Value listexpaddresstxs(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listexpblocktxs(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listexpredeemtxs(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listexpaddressassets(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listexpassetaddresses(const json_spirit::Array& params, bool fHelp);
 
 
 

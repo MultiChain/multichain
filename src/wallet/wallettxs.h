@@ -47,6 +47,21 @@
 #define MC_MTX_TAG_OFFCHAIN                              0x0000000040000000
 #define MC_MTX_TAG_UPGRADE_APPROVAL                      0x0000000080000000
 
+#define MC_MTX_TFL_MULTIPLE_TXOUT_ASSETS                 0x0000000000000001
+#define MC_MTX_TFL_IS_INPUT                              0x0000000000000001
+
+struct mc_AssetBalanceDetails
+{
+    uint256 m_TxID;
+    uint32_t m_Vinout;
+    uint32_t m_Flags;
+    uint32_t m_AssetCount;
+    uint32_t m_Reserved;
+    int64_t m_Amount;
+    int64_t m_Balance;    
+};
+
+
 typedef struct mc_WalletCachedSubKey
 {
     mc_TxEntity m_Entity;
@@ -239,6 +254,8 @@ typedef struct mc_WalletTxs
     
     int WRPGetListSize(mc_TxEntity *entity,int generation,int *confirmed);
     int WRPGetList(mc_TxEntity *entity,int generation,int from,int count,mc_Buffer *txs);    
+    int WRPGetLastItem(mc_TxEntity *entity,int generation,mc_TxEntityRow *erow);    
+    
     CWalletTx WRPGetWalletTx(uint256 hash,mc_TxDefRow *txdef,int *errOut);
     std::string WRPGetSubKey(void *hash,mc_TxDefRow *txdef,int *errOut);         
     int WRPGetRow(mc_TxEntityRow *erow);
