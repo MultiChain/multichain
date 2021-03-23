@@ -53,6 +53,17 @@ bool WRPSubKeyEntityFromExpAddress(string str,mc_TxEntityStat entStat,mc_TxEntit
     return true;
 }
 
+bool WRPSubKeyEntityFromExpAsset(mc_EntityDetails *entity_details,mc_TxEntityStat entStat,mc_TxEntity *entity,bool ignore_unsubscribed,int *errCode,string *strError)
+{
+    uint160 subkey_hash=0;
+    memcpy(&subkey_hash, entity_details->GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+
+    memcpy(entity->m_EntityID,&subkey_hash,MC_TDB_ENTITY_ID_SIZE);
+    entity->m_EntityType=entStat.m_Entity.m_EntityType | MC_TET_SUBKEY;    
+        
+    return true;
+}
+
 Value TagEntry(uint64_t tag) 
 {
     if(tag & 0x0000000000000001)
@@ -899,5 +910,147 @@ exitlbl:
 
 Value listexpassetaddresses(const json_spirit::Array& params, bool fHelp)
 {
-    return Value::null;
+    if (fHelp || params.size() < 1 || params.size() > 5)
+        throw runtime_error("Help message not found\n");
+
+    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER) == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
+    }   
+           
+    mc_TxEntityStat entStat;
+    mc_TxEntity entity;
+    int errCode;
+    string strError;
+    vector <mc_QueryCondition> conditions;
+    Array retArray;
+    mc_Buffer *entity_rows=NULL;
+    
+    mc_EntityDetails entity_details;
+    
+    if (params[0].type() != null_type && !params[0].get_str().empty())
+    {        
+        ParseEntityIdentifier(params[0],&entity_details, MC_ENT_TYPE_ASSET);           
+    }
+    else
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset identifier");        
+    }
+
+    int count,start;
+    bool verbose=false;
+    
+    if (params.size() > 1)    
+    {
+        verbose=paramtobool(params[1]);
+    }
+
+    count=10;
+    if (params.size() > 2)    
+    {
+        count=paramtoint(params[2],true,0,"Invalid count");
+    }
+    start=-count;
+    if (params.size() > 3)    
+    {
+        start=paramtoint(params[3],false,0,"Invalid start");
+    }
+
+    entStat.Zero();
+    entStat.m_Entity.m_EntityType=MC_TET_EXP_ASSET_ADDRESSES_KEY;
+    entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
+    
+    bool fWRPLocked=false;
+    int chain_height; 
+    int rpc_slot=GetRPCSlot();
+    if(rpc_slot < 0)
+    {
+        errCode=RPC_INTERNAL_ERROR;
+        strError="Couldn't find RPC Slot";
+        goto exitlbl;
+    }
+    
+    fWRPLocked=true;
+    pwalletTxsMain->WRPReadLock();
+    if(!pwalletTxsMain->WRPFindEntity(&entStat))
+    {
+        errCode=RPC_NOT_SUBSCRIBED;
+        strError="Not subscribed to this stream";
+        goto exitlbl;
+    }
+
+    WRPSubKeyEntityFromExpAsset(&entity_details,entStat,&entity,false,&errCode,&strError);
+    if(strError.size())
+    {
+        goto exitlbl;
+    }
+    entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
+    entity_rows->Clear();
+    
+    mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL));
+    WRPCheckWalletError(pwalletTxsMain->WRPGetList(&entity,entStat.m_Generation,start+1,count,entity_rows),entity.m_EntityType,"",&errCode,&strError);
+    if(strError.size())
+    {
+        goto exitlbl;
+    }
+    
+    chain_height=chainActive.Height();
+    for(int i=0;i<entity_rows->GetCount();i++)
+    {
+        mc_TxEntityRow *lpEntTx;
+        mc_TxEntityRow erow;
+        lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
+        uint256 hash;
+
+        CKeyID KeyID;
+        CScriptID ScriptID;
+        
+        memcpy(&KeyID,lpEntTx->m_TxId,sizeof(uint160));
+        string address=CBitcoinAddress(KeyID).ToString();
+        uint160 asset_hash=0;
+        memcpy(&asset_hash, entity_details.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+        
+        erow.Zero();
+        int64_t quantity=0;
+        mc_TxEntity subkey_entity;
+        uint160 balance_subkey_hash160;
+        mc_GetCompoundHash160(&balance_subkey_hash160,lpEntTx->m_TxId,&asset_hash);
+        subkey_entity.Zero();
+        memcpy(subkey_entity.m_EntityID,&balance_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+        subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_BALANCE_DETAILS_KEY | MC_TET_CHAINPOS;
+        
+        if(pwalletTxsMain->WRPGetLastItem(&subkey_entity,entStat.m_Generation,&erow) == 0)
+        {
+            int err;
+            mc_AssetBalanceDetails balance_details;
+            string assets_str=pwalletTxsMain->GetSubKey(erow.m_TxId,NULL,&err);
+            if(assets_str.size() == sizeof(mc_AssetBalanceDetails))
+            {
+                memcpy(&balance_details,assets_str.c_str(),assets_str.size());
+                quantity=balance_details.m_Balance;                
+            }            
+        }
+        
+        Object entry;
+        
+        entry.push_back(Pair("address", address));
+        entry.push_back(Pair("qty", quantity));
+        
+        retArray.push_back(entry);                                
+    }
+    
+exitlbl:
+                
+    if(fWRPLocked)
+    {
+        pwalletTxsMain->WRPReadUnLock();
+    }
+
+    if(strError.size())
+    {
+        throw JSONRPCError(errCode, strError);            
+    }
+    
+    
+    return retArray;
 }

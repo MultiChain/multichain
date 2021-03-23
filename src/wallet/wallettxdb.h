@@ -376,6 +376,12 @@ typedef struct mc_TxDB
               const unsigned char *hash,                                        // Input. Tx hash
               int skip_db);                                       
     
+    int GetTx(                                                                  // Returns tx definition if found, error if not found
+              mc_TxImport *import,                                              // Import object, if NULL - chain
+              mc_TxDefRow *txdef,                                               // Output. Tx def
+              const unsigned char *hash,                                        // Input. Tx hash
+              int skip_db);
+    
     int GetList(
                 mc_TxImport *import,                                            // Import object, if NULL - chain
                 mc_TxEntity *entity,                                            // Returns Txs in range for specific entity

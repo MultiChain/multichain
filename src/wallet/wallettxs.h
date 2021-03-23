@@ -204,6 +204,7 @@ typedef struct mc_WalletTxs
     int DropImport(mc_TxImport *import);                                        // Drops uncompleted import
 
     std::string GetSubKey(void *hash,mc_TxDefRow *txdef,int *errOut);         
+    std::string GetSubKey(mc_TxImport *import,void *hash,mc_TxDefRow *txdef,int *errOut);         
     
     int GetEntityListCount();
     mc_TxEntityStat *GetEntity(int row);

@@ -2081,6 +2081,81 @@ int mc_TxDB::GetTx(mc_TxDefRow *txdef,
     
 }
 
+int mc_TxDB::GetTx(
+              mc_TxImport *import,
+              mc_TxDefRow *txdef,
+              const unsigned char *hash,
+              int skip_db)
+{
+    mc_TxImport *imp;
+    int err,value_len,mprow; 
+    unsigned char *ptr;
+    mc_Buffer *rawmempool;
+    
+    rawmempool=m_RawMemPools[0];
+    if(import)                                                                  // Find import
+    {
+        rawmempool=m_RawMemPools[import-m_Imports];
+    }
+    txdef->Zero();
+    
+    err=MC_ERR_NOERROR;
+
+    mprow=rawmempool->Seek((unsigned char*)hash);
+    if(mprow >= 0)
+    {
+        memcpy(txdef,(mc_TxDefRow *)rawmempool->GetRow(mprow),sizeof(mc_TxDefRow));
+        if(txdef->m_Block > m_DBStat.m_Block)                                   
+        {
+            txdef->m_Block=-1;
+        }
+        return MC_ERR_NOERROR;
+    }
+
+    if(rawmempool == m_RawMemPools[0])
+    {
+        mprow=m_RawUpdatePool->Seek((unsigned char*)hash);
+        if(mprow >= 0)
+        {
+            memcpy(txdef,(mc_TxDefRow *)m_RawUpdatePool->GetRow(mprow),sizeof(mc_TxDefRow));
+            if(txdef->m_Block > m_DBStat.m_Block)                   
+            {
+                txdef->m_Block=-1;
+            }
+            return MC_ERR_NOERROR;
+        }
+    }
+    
+    if(skip_db)
+    {
+        return MC_ERR_NOT_FOUND;
+    }
+    
+    memcpy(txdef->m_TxId,hash, MC_TDB_TXID_SIZE);
+    ptr=(unsigned char*)m_Database->m_DB->Read((char*)txdef+m_Database->m_KeyOffset,m_Database->m_KeySize,&value_len,0,&err);
+    if(err)
+    {
+        return err;
+    }
+    
+    if(ptr)                                                                     
+    {
+        memcpy((char*)txdef+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);        
+        if(txdef->m_Block > m_DBStat.m_Block)                                   // On-disk records are not updated on rollback
+        {
+            txdef->m_Block=-1;
+        }
+    }
+    else
+    {
+        err=MC_ERR_NOT_FOUND;
+    }
+    
+    
+    return err;
+    
+}
+
 int mc_TxDB::WRPGetTx(mc_TxDefRow *txdef,
               const unsigned char *hash,
               int skip_db)
