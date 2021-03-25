@@ -266,7 +266,8 @@ static const std::string vAPINames[] =
 "listexpaddresses",
 "listexpredeemtxs",
 "listexpaddressassets",
-"listexpaddressassets",
+"listexpassetaddresses",
+"listexpaddressassettxs",
 };
 
 static const CRPCConvertParam vRPCConvertParams[] =
@@ -601,6 +602,9 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "listexpblocktxs", 2 },
     { "listexpblocktxs", 3 },
     { "listexpredeemtxs", 1 },
+    { "listexpaddressassettxs", 2 },
+    { "listexpaddressassettxs", 3 },
+    { "listexpaddressassettxs", 4 },
 };
 
 class CRPCConvertTable
