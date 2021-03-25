@@ -100,6 +100,46 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("reindex",       fReindex));    
 /* MCHN END */    
     obj.push_back(Pair("blocks",        (int)chainActive.Height()));
+    
+    mc_EntityDetails entitylist_entity;
+    int32_t entity_count; 
+    if(mc_gState->m_Assets->FindEntityList(&entitylist_entity,MC_ENT_TYPE_ASSET))
+    {
+        mc_gState->m_Assets->GetTotalQuantity(&entitylist_entity,&entity_count);
+        obj.push_back(Pair("assets",        (int)entity_count));        
+    }
+    if(mc_gState->m_Assets->FindEntityList(&entitylist_entity,MC_ENT_TYPE_STREAM))
+    {
+        mc_gState->m_Assets->GetTotalQuantity(&entitylist_entity,&entity_count);
+        obj.push_back(Pair("streams",       (int)entity_count));        
+    }
+
+    if(mc_gState->m_WalletMode & MC_WMD_EXPLORER)
+    {
+        mc_TxEntity entity;
+
+        entity.Zero();
+        entity.m_EntityType=MC_TET_EXP_TX_PUBLISHER;                
+        entity.m_EntityType |= MC_TET_CHAINPOS;
+        entity_count=pwalletTxsMain->GetListSize(&entity,NULL);
+
+        obj.push_back(Pair("addresses",       (int)entity_count));        
+
+        entity.Zero();
+        entity.m_EntityType=MC_TET_EXP_TX;                
+        entity.m_EntityType |= MC_TET_CHAINPOS;
+        entity_count=pwalletTxsMain->GetListSize(&entity,NULL);
+
+        obj.push_back(Pair("transactions",       (int)entity_count));        
+
+        {
+            LOCK(cs_vNodes);
+            obj.push_back(Pair("peers",       (int)vNodes.size()));        
+        }        
+    }
+    
+    
+    
     obj.push_back(Pair("timeoffset",    GetTimeOffset()));
     obj.push_back(Pair("connections",   (int)vNodes.size()));
     obj.push_back(Pair("proxy",         (proxy.IsValid() ? proxy.ToStringIPPort() : string())));
