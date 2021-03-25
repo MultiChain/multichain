@@ -540,22 +540,6 @@ Value listexpaddresstxs(const json_spirit::Array& params, bool fHelp)
         throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
     }   
            
-    if(params[0].get_str() == "*")
-    {
-        int count=0;
-        Array ext_params;
-        BOOST_FOREACH(const Value& value, params)
-        {
-            if(count != 1)
-            {
-                ext_params.push_back(value);
-            }
-            count++;
-        }
-    
-        return listexptxs(ext_params,fHelp);            
-    }
-    
     mc_TxEntityStat entStat;
     mc_TxEntity entity;
     int errCode;
@@ -636,6 +620,8 @@ Value listexpaddresstxs(const json_spirit::Array& params, bool fHelp)
         Object entry;
         
         entry.push_back(Pair("txid", hash.ToString()));
+        uint32_t tag=lpEntTx->m_Flags;
+        entry.push_back(Pair("tags", TagEntry(tag)));
         int block=lpEntTx->m_Block;
         if( (block < 0) || (block > chain_height))
         {
@@ -666,7 +652,125 @@ exitlbl:
 
 Value listexpblocktxs(const json_spirit::Array& params, bool fHelp)
 {
-    return Value::null;    
+    if (fHelp || params.size() < 1 || params.size() > 4)
+        throw runtime_error("Help message not found\n");
+
+    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER) == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
+    }   
+               
+    mc_TxEntityStat entStat;
+    mc_TxEntity entity;
+    int errCode;
+    string strError;
+    vector <mc_QueryCondition> conditions;
+    Array retArray;
+    mc_Buffer *entity_rows=NULL;
+    
+    uint160 subkey_hash=0;
+    uint32_t block_key=params[0].get_int();
+    
+    
+    memcpy(&subkey_hash, &block_key,sizeof(uint32_t));
+
+
+    int count,start;
+    bool verbose=false;
+    
+    if (params.size() > 1)    
+    {
+        verbose=paramtobool(params[1]);
+    }
+
+    count=10;
+    if (params.size() > 2)    
+    {
+        count=paramtoint(params[2],true,0,"Invalid count");
+    }
+    start=-count;
+    if (params.size() > 3)    
+    {
+        start=paramtoint(params[3],false,0,"Invalid start");
+    }
+
+    entStat.Zero();
+    entStat.m_Entity.m_EntityType=MC_TET_EXP_TX_KEY;
+    entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
+    entity.Zero();
+    memcpy(entity.m_EntityID,&subkey_hash,MC_TDB_ENTITY_ID_SIZE);
+    entity.m_EntityType=entStat.m_Entity.m_EntityType | MC_TET_SUBKEY;    
+    
+    bool fWRPLocked=false;
+    int chain_height; 
+    int rpc_slot=GetRPCSlot();
+    if(rpc_slot < 0)
+    {
+        errCode=RPC_INTERNAL_ERROR;
+        strError="Couldn't find RPC Slot";
+        goto exitlbl;
+    }
+    
+    fWRPLocked=true;
+    pwalletTxsMain->WRPReadLock();
+    if(!pwalletTxsMain->WRPFindEntity(&entStat))
+    {
+        errCode=RPC_NOT_SUBSCRIBED;
+        strError="Not subscribed to this stream";
+        goto exitlbl;
+    }
+    
+    entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
+    entity_rows->Clear();
+    
+    mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL));
+    
+    WRPCheckWalletError(pwalletTxsMain->WRPGetList(&entity,entStat.m_Generation,start+1,count,entity_rows),entity.m_EntityType,"",&errCode,&strError);
+    if(strError.size())
+    {
+        goto exitlbl;
+    }
+    
+    chain_height=chainActive.Height();
+    for(int i=0;i<entity_rows->GetCount();i++)
+    {
+        mc_TxEntityRow *lpEntTx;
+        lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
+        uint256 hash;
+        
+        memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);                
+
+        Object entry;
+        
+        entry.push_back(Pair("txid", hash.ToString()));
+        uint32_t tag=lpEntTx->m_Flags;
+        entry.push_back(Pair("tags", TagEntry(tag)));
+        int block=lpEntTx->m_Block;
+        if( (block < 0) || (block > chain_height))
+        {
+            entry.push_back(Pair("block", Value::null));
+        }
+        else
+        {
+            entry.push_back(Pair("block", block));            
+        }
+        retArray.push_back(entry);                                
+    }
+    
+exitlbl:
+                
+    if(fWRPLocked)
+    {
+        pwalletTxsMain->WRPReadUnLock();
+    }
+
+    if(strError.size())
+    {
+        throw JSONRPCError(errCode, strError);            
+    }
+    
+    
+    return retArray;
 }
 
 Value listexpredeemtxs(const json_spirit::Array& params, bool fHelp)

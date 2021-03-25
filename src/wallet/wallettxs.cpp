@@ -3999,7 +3999,7 @@ int mc_WalletTxs::AddExplorerTx(
                         {
                             goto exitlbl;
                         }
-                        err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&balance_subkey_hash160,(unsigned char*)&subkey_hash256,NULL,block,flags,1);
+                        err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&balance_subkey_hash160,(unsigned char*)&subkey_hash256,NULL,block,publisher_flags,1);
                         if(err)
                         {
                             goto exitlbl;
