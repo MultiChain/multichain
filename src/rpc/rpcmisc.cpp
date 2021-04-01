@@ -164,6 +164,144 @@ Value getinfo(const Array& params, bool fHelp)
     return obj;
 }
 
+Value getentitycounts(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error("Help message not found\n");
+
+    Object obj;
+    mc_TxEntityStat entStat;
+    mc_Buffer *entity_rows=NULL;
+    Array retArray;
+    int errCode=0;
+    int32_t entity_count;
+    string strError;
+    
+    bool fWRPLocked=false;
+    int chain_height; 
+  
+    int rpc_slot=GetRPCSlot();
+
+    pwalletTxsMain->WRPReadLock();
+    
+    obj.push_back(Pair("blocks",       (int)chainActive.Height()));        
+
+    if(mc_gState->m_WalletMode & MC_WMD_EXPLORER)
+    {
+        mc_TxEntity entity;
+
+        entity.Zero();
+        entity.m_EntityType=MC_TET_EXP_TX_PUBLISHER;                
+        entity.m_EntityType |= MC_TET_CHAINPOS;
+        entity_count=pwalletTxsMain->WRPGetListSize(&entity,NULL);
+
+        obj.push_back(Pair("addresses",       (int)entity_count));        
+
+        entity.Zero();
+        entity.m_EntityType=MC_TET_EXP_TX;                
+        entity.m_EntityType |= MC_TET_CHAINPOS;
+        entity_count=pwalletTxsMain->WRPGetListSize(&entity,NULL);
+
+        obj.push_back(Pair("transactions",       (int)entity_count));        
+    }
+    
+    entStat.Zero();
+    entStat.m_Entity.m_EntityType=MC_TET_ENTITY_KEY | MC_TET_CHAINPOS;
+    
+    if(!pwalletTxsMain->WRPFindEntity(&entStat))
+    {
+        pwalletTxsMain->WRPReadUnLock();
+        
+        mc_EntityDetails entitylist_entity;
+        LOCK(cs_main);
+        entity_count=0;
+        if(mc_gState->m_Assets->FindEntityList(&entitylist_entity,MC_ENT_TYPE_ASSET))
+        {
+            mc_gState->m_Assets->GetTotalQuantity(&entitylist_entity,&entity_count);
+        }
+        obj.push_back(Pair("assets",        (int)entity_count));        
+        entity_count=0;
+        if(mc_gState->m_Assets->FindEntityList(&entitylist_entity,MC_ENT_TYPE_STREAM))
+        {
+            mc_gState->m_Assets->GetTotalQuantity(&entitylist_entity,&entity_count);
+        }
+        obj.push_back(Pair("streams",       (int)entity_count));        
+        entity_count=0;
+        if(mc_gState->m_Assets->FindEntityList(&entitylist_entity,MC_ENT_TYPE_FILTER))
+        {
+            mc_gState->m_Assets->GetTotalQuantity(&entitylist_entity,&entity_count);
+        }
+        obj.push_back(Pair("filters",       (int)entity_count));        
+        entity_count=0;
+        if(mc_gState->m_Assets->FindEntityList(&entitylist_entity,MC_ENT_TYPE_VARIABLE))
+        {
+            mc_gState->m_Assets->GetTotalQuantity(&entitylist_entity,&entity_count);
+        }
+        obj.push_back(Pair("variables",       (int)entity_count));        
+        entity_count=0;
+        if(mc_gState->m_Assets->FindEntityList(&entitylist_entity,MC_ENT_TYPE_LIBRARY))
+        {
+            mc_gState->m_Assets->GetTotalQuantity(&entitylist_entity,&entity_count);
+        }
+        obj.push_back(Pair("libraries",       (int)entity_count));        
+        entity_count=0;
+        if(mc_gState->m_Assets->FindEntityList(&entitylist_entity,MC_ENT_TYPE_UPGRADE))
+        {
+            mc_gState->m_Assets->GetTotalQuantity(&entitylist_entity,&entity_count);
+        }
+        obj.push_back(Pair("upgrades",       (int)entity_count));        
+        entity_count=0;
+        if(mc_gState->m_Assets->FindEntityList(&entitylist_entity,MC_ENT_TYPE_LICENSE_TOKEN))
+        {
+            mc_gState->m_Assets->GetTotalQuantity(&entitylist_entity,&entity_count);
+        }
+        obj.push_back(Pair("licenses",       (int)entity_count));        
+    }
+    else
+    {
+        mc_TxEntity entity;
+
+        uint32_t entity_key;
+
+
+        entity.Zero();
+        entity.m_EntityType=entStat.m_Entity.m_EntityType | MC_TET_SUBKEY;    
+        
+        entity_key=MC_ENT_TYPE_ASSET;
+        memcpy(entity.m_EntityID,&entity_key,sizeof(uint32_t));
+        obj.push_back(Pair("assets",(int)pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL)));
+        
+        entity_key=MC_ENT_TYPE_STREAM;
+        memcpy(entity.m_EntityID,&entity_key,sizeof(uint32_t));
+        obj.push_back(Pair("streams",(int)pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL)));
+        
+        entity_key=MC_ENT_TYPE_FILTER;
+        memcpy(entity.m_EntityID,&entity_key,sizeof(uint32_t));
+        obj.push_back(Pair("filters",(int)pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL)));
+        
+        entity_key=MC_ENT_TYPE_VARIABLE;
+        memcpy(entity.m_EntityID,&entity_key,sizeof(uint32_t));
+        obj.push_back(Pair("variables",(int)pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL)));
+        
+        entity_key=MC_ENT_TYPE_LIBRARY;
+        memcpy(entity.m_EntityID,&entity_key,sizeof(uint32_t));
+        obj.push_back(Pair("libraries",(int)pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL)));
+        
+        entity_key=MC_ENT_TYPE_UPGRADE;
+        memcpy(entity.m_EntityID,&entity_key,sizeof(uint32_t));
+        obj.push_back(Pair("upgrades",(int)pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL)));
+        
+        entity_key=MC_ENT_TYPE_LICENSE_TOKEN;
+        memcpy(entity.m_EntityID,&entity_key,sizeof(uint32_t));
+        obj.push_back(Pair("licenses",(int)pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL)));
+        
+        pwalletTxsMain->WRPReadUnLock();
+    }
+    
+    
+    return obj;    
+}
+
 Value getinitstatus(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)  

@@ -95,6 +95,7 @@ static const std::string vAPINames[] =
 "gethashespersec",
 "gethealthcheck",
 "getinfo",
+"getentitycount",
 "getinitstatus",
 "getlastblockinfo",
 "getmempoolinfo",

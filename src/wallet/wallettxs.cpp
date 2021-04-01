@@ -3583,10 +3583,6 @@ int mc_WalletTxs::AddExplorerTx(
               const CTransaction& tx,                                           // Tx to add
               int block)                                                        // block height, -1 for mempool
 {
-    if( (m_Mode & MC_WMD_EXPLORER) == 0 )
-    {
-        return MC_ERR_NOERROR;
-    }
     
     int err,i,j,entcount,lockres,entpos,base_row;
     mc_TxImport *imp;
@@ -3658,7 +3654,7 @@ int mc_WalletTxs::AddExplorerTx(
     }    
     
     err=MC_ERR_NOERROR;
-    lockres=m_Database->Lock(1,1);
+
     imp=import;
     if(imp == NULL)
     {
@@ -3677,6 +3673,56 @@ int mc_WalletTxs::AddExplorerTx(
     {
         fFound=true;
         memcpy(&txdef,&(m_Database->m_TxCachedDef),sizeof(mc_TxDefRow));
+    }
+    if(tx_tag & (MC_MTX_TAG_ENTITY_CREATE | MC_MTX_TAG_ASSET_GENESIS))
+    {
+        uint32_t entity_key=(tx_tag & MC_MTX_TAG_ENTITY_MASK) >> MC_MTX_TAG_ENTITY_MASK_SHIFT;
+        if(entity_key == 0)
+        {
+            for(i=0;i<(int)tx.vout.size();i++)                                  
+            {        
+                if(OutputScriptTags[i] & MC_MTX_TAG_ASSET_GENESIS)
+                {
+                    if(OutputScriptTags[i] & MC_MTX_TAG_LICENSE_TOKEN)
+                    {
+                        entity_key=MC_ENT_TYPE_LICENSE_TOKEN;
+                    }
+                    else
+                    {
+                        entity_key=MC_ENT_TYPE_ASSET;                        
+                    }
+                }
+            }            
+        }
+
+        if(entity_key)
+        {            
+            memcpy(&subkey_hash160,&entity_key,sizeof(uint32_t));
+            subkey_hash256=0;
+            memcpy(&subkey_hash256,&subkey_hash160,sizeof(subkey_hash160));
+
+            err=m_Database->AddSubKeyDef(imp,(unsigned char*)&subkey_hash256,NULL,0,MC_SFL_SUBKEY);
+            if(err)
+            {
+                goto exitlbl;
+            }
+
+            entity.Zero();
+            entity.m_EntityType=MC_TET_ENTITY_KEY | MC_TET_CHAINPOS;
+            subkey_entity.Zero();
+            memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+            subkey_entity.m_EntityType=MC_TET_SUBKEY_ENTITY_KEY | MC_TET_CHAINPOS;
+            err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,tx_tag,fFound ? 0 : 1);
+            if(err)
+            {
+                goto exitlbl;
+            }                            
+        }
+    }
+    
+    if( (m_Mode & MC_WMD_EXPLORER) == 0 )
+    {
+        return MC_ERR_NOERROR;
     }
     
     block_key=chainActive.Height()+1;
@@ -4093,10 +4139,6 @@ exitlbl:
     if(err)
     {
         LogPrintf("wtxs: AddExplorerTx  Error: %d\n",err);        
-    }
-    if(lockres == 0)
-    {
-        m_Database->UnLock();
     }
 
     

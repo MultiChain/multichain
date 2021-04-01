@@ -855,6 +855,10 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
                 pwalletTxsMain->AddEntity(&entity,0);
                 entity.m_EntityType=MC_TET_WALLET_SPENDABLE | MC_TET_TIMERECEIVED;
                 pwalletTxsMain->AddEntity(&entity,0);
+                entity.m_EntityType=MC_TET_ENTITY | MC_TET_CHAINPOS;
+                pwalletTxsMain->AddEntity(&entity,0);
+                entity.m_EntityType=MC_TET_ENTITY_KEY | MC_TET_CHAINPOS;
+                pwalletTxsMain->AddEntity(&entity,0);
 
                 pwalletTxsMain->AddExplorerEntities(NULL);
                 

@@ -30,6 +30,8 @@
 #define MC_TET_STREAM_PUBLISHER                 0x00000007
 #define MC_TET_ASSET                            0x00000008
 #define MC_TET_AUTHOR                           0x00000009
+#define MC_TET_ENTITY                           0x0000000A
+#define MC_TET_ENTITY_KEY                       0x0000000B
 #define MC_TET_EXP_TX                           0x00000010 // global, key-block, publisher-address, item - txid, direct
 #define MC_TET_EXP_REDEEM                       0x00000011 // global, key-txid/vout, item - txid/vin, direct 
 #define MC_TET_EXP_TXOUT_ASSETS                 0x00000012 // global, key-txid/vout, item - asset quantities (direct if single asset)
@@ -47,6 +49,7 @@
 #define MC_TET_SUBKEY                           0x00000040
 #define MC_TET_SUBKEY_STREAM_KEY                0x00000046
 #define MC_TET_SUBKEY_STREAM_PUBLISHER          0x00000047
+#define MC_TET_SUBKEY_ENTITY_KEY                0x0000004B
 #define MC_TET_SUBKEY_REDEEM_KEY                0x00000055
 #define MC_TET_SUBKEY_EXP_TX_KEY                0x00000056
 #define MC_TET_SUBKEY_EXP_TX_PUBLISHER          0x00000057
