@@ -3953,7 +3953,6 @@ int mc_WalletTxs::AddExplorerTx(
                     publishers_set.insert(subkey_hash160);
                     subkey_hash256=0;
                     memcpy(&subkey_hash256,&subkey_hash160,sizeof(subkey_hash160));
-                    publisher_flags=MC_SFL_SUBKEY | MC_SFL_IS_ADDRESS;
                     err=m_Database->AddSubKeyDef(imp,(unsigned char*)&subkey_hash256,NULL,0,publisher_flags);
                     if(err)
                     {

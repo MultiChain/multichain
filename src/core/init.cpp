@@ -1949,6 +1949,14 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                         mc_gState->m_WalletMode |= MC_WMD_EXPLORER;
                     }
                 }
+
+                if(mc_gState->m_WalletMode & MC_WMD_EXPLORER)
+                {
+                    if (mapArgs.count("-autosubscribe") == 0)
+                    {
+                        mc_gState->m_WalletMode |= MC_WMD_AUTOSUBSCRIBE_ASSETS | MC_WMD_AUTOSUBSCRIBE_STREAMS;
+                    }
+                }
                 
                 if(wallet_mode == -1)
                 {
