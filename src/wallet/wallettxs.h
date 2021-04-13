@@ -19,20 +19,23 @@
 
 #define MC_MTX_TAG_NONE                                  0x0000000000000000
 #define MC_MTX_TAG_NO_SINGLE_TX_TAG                      0x0000000000000001
-#define MC_MTX_TAG_EXTENDED_TAGS                         0x0000000080000002
+#define MC_MTX_TAG_EXTENDED_TAGS                         0x0000000000000002
 #define MC_MTX_TAG_P2SH                                  0x0000000000000004
 #define MC_MTX_TAG_NO_KEY_SCRIPT_ID                      0x0000000000000008
 #define MC_MTX_TAG_COINBASE                              0x0000000000000010
 #define MC_MTX_TAG_OP_RETURN                             0x0000000000000020
-#define MC_MTX_TAG_CACHED_SCRIPT                         0x0000000000000040
-#define MC_MTX_TAG_INLINE_DATA                           0x0000000000000080
+#define MC_MTX_TAG_INLINE_DATA                           0x0000000000000040
+#define MC_MTX_TAG_FILTER_APPROVAL                       0x0000000000000080
+
 #define MC_MTX_TAG_ENTITY_CREATE                         0x0000000000000100
 #define MC_MTX_TAG_ENTITY_UPDATE                         0x0000000000000200
 
-#define MC_MTX_TAG_PERMISSION                            0x0000000000001000
-#define MC_MTX_TAG_PERMISSION_HIGH                       0x0000000000002000
-#define MC_MTX_TAG_PERMISSION_ADMIN_MINE                 0x0000000000004000
-#define MC_MTX_TAG_FILTER_APPROVAL                       0x0000000000008000
+#define MC_MTX_TAG_GRANT_ENTITY                          0x0000000000000400
+#define MC_MTX_TAG_REVOKE_ENTITY                         0x0000000000000800
+#define MC_MTX_TAG_GRANT_LOW                             0x0000000000001000
+#define MC_MTX_TAG_REVOKE_LOW                            0x0000000000002000
+#define MC_MTX_TAG_GRANT_HIGH                            0x0000000000004000
+#define MC_MTX_TAG_REVOKE_HIGH                           0x0000000000008000
 
 #define MC_MTX_TAG_ENTITY_MASK                           0x0000000000FF0000     
 #define MC_MTX_TAG_ENTITY_MASK_SHIFT                                     16
@@ -49,7 +52,7 @@
 
 #define MC_MTX_TFL_MULTIPLE_TXOUT_ASSETS                 0x0000000000000001
 #define MC_MTX_TFL_IS_INPUT                              0x0000000000000001
-
+/*
 struct mc_AssetBalanceDetails
 {
     uint256 m_TxID;
@@ -57,6 +60,13 @@ struct mc_AssetBalanceDetails
     uint32_t m_Flags;
     uint32_t m_AssetCount;
     uint32_t m_Reserved;
+    int64_t m_Amount;
+    int64_t m_Balance;    
+};
+*/
+struct mc_TxAssetBalanceDetails
+{
+    uint256 m_TxID;
     int64_t m_Amount;
     int64_t m_Balance;    
 };

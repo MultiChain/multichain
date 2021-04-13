@@ -3347,6 +3347,7 @@ uint32_t mc_GetExplorerTxDetails(int rpc_slot,
         issue_quantity=0;
         mc_EntityDetails entity;
         uint32_t type,from,to,timestamp,flags;
+        unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
         
         mc_gState->m_TmpScript->Clear();
         mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
@@ -3358,6 +3359,7 @@ uint32_t mc_GetExplorerTxDetails(int rpc_slot,
                 OutputScriptTags[i] |= MC_MTX_TAG_P2SH;
             }
 
+            bool prev_element_is_entity=false;
             for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
             {
                 uint160 asset=0;
@@ -3384,15 +3386,18 @@ uint32_t mc_GetExplorerTxDetails(int rpc_slot,
                         asset=0;
                         memcpy(&asset,ptrOut+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);                        
                         quantity=mc_GetABQuantity(ptrOut);
-                        assets.insert(make_pair(asset,quantity));
-                        if( (n == 1) && (quantity == 1) )
+                        if(quantity > 0)
                         {
-                            if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptrOut))
+                            assets.insert(make_pair(asset,quantity));
+                            if( (n == 1) && (quantity == 1) )
                             {
-                                if(entity.GetEntityType() == MC_ENT_TYPE_LICENSE_TOKEN)
+                                if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptrOut))
                                 {
-                                    OutputScriptTags[i] |= MC_MTX_TAG_LICENSE_TOKEN;
-                                }   
+                                    if(entity.GetEntityType() == MC_ENT_TYPE_LICENSE_TOKEN)
+                                    {
+                                        OutputScriptTags[i] |= MC_MTX_TAG_LICENSE_TOKEN;
+                                    }   
+                                }
                             }
                         }
                     }                    
@@ -3403,49 +3408,65 @@ uint32_t mc_GetExplorerTxDetails(int rpc_slot,
                     issue_quantity+=quantity;
                     asset=0;
                     memcpy(&asset,(unsigned char*)&hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-                    std::map<uint160,int64_t>::iterator it = assets.find(asset);
-                    if(it == assets.end())
+                    if(quantity > 0)
                     {
-                        assets.insert(make_pair(asset,quantity));                        
-                    }
-                    else
-                    {
-                        it->second += quantity;
-                    }
-                    if(quantity == 1)
-                    {
-                        if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,(const unsigned char*)&asset))
+                        std::map<uint160,int64_t>::iterator it = assets.find(asset);
+                        if(it == assets.end())
                         {
-                            if(entity.GetEntityType() == MC_ENT_TYPE_LICENSE_TOKEN)
+                            assets.insert(make_pair(asset,quantity));                        
+                        }
+                        else
+                        {
+                            it->second += quantity;
+                        }
+                        if(quantity == 1)
+                        {
+                            if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,(const unsigned char*)&asset))
                             {
-                                OutputScriptTags[i] |= MC_MTX_TAG_LICENSE_TOKEN;
-                            }                               
+                                if(entity.GetEntityType() == MC_ENT_TYPE_LICENSE_TOKEN)
+                                {
+                                    OutputScriptTags[i] |= MC_MTX_TAG_LICENSE_TOKEN;
+                                }                               
+                            }
                         }
                     }
                 }        
                 if(mc_gState->m_TmpScript->GetPermission(&type,&from,&to,&timestamp) == 0) // Grant script
                 {
-                    if( type & ( MC_PTP_CREATE | MC_PTP_ISSUE | MC_PTP_ACTIVATE | MC_PTP_FILTER ) )
+                    if( type != MC_PTP_FILTER )
                     {
-                        OutputScriptTags[i] |= MC_MTX_TAG_PERMISSION_HIGH;
-                    }                    
-                    if(type & mc_gState->m_Permissions->GetCustomHighPermissionTypes())
-                    {
-                        OutputScriptTags[i] |= MC_MTX_TAG_PERMISSION_HIGH;
+                        if(prev_element_is_entity)
+                        {
+                            OutputScriptTags[i] = (from < to) ? MC_MTX_TAG_GRANT_ENTITY : MC_MTX_TAG_REVOKE_ENTITY;
+                        }
+                        else
+                        {
+                            if( type & ( MC_PTP_CREATE | MC_PTP_ISSUE | MC_PTP_ACTIVATE | MC_PTP_MINE | MC_PTP_ADMIN | 
+                                         mc_gState->m_Permissions->GetCustomHighPermissionTypes()) )
+                            {
+                                OutputScriptTags[i] = (from < to) ? MC_MTX_TAG_GRANT_HIGH : MC_MTX_TAG_REVOKE_HIGH;
+                            }                    
+                            if( type & ( MC_PTP_CONNECT | MC_PTP_SEND | MC_PTP_RECEIVE | MC_PTP_READ | MC_PTP_WRITE | 
+                                         mc_gState->m_Permissions->GetCustomLowPermissionTypes()) )
+                            {
+                                OutputScriptTags[i] = (from < to) ? MC_MTX_TAG_GRANT_LOW : MC_MTX_TAG_REVOKE_LOW;                                
+                            }                    
+                        }
                     }
                     if( type & MC_PTP_FILTER )
                     {
                         OutputScriptTags[i] |= MC_MTX_TAG_FILTER_APPROVAL;
                     }
-                    if( type != MC_PTP_FILTER)
-                    {
-                        OutputScriptTags[i] |= MC_MTX_TAG_PERMISSION;
-                    }
-                    if( type & ( MC_PTP_MINE | MC_PTP_ADMIN ) )
-                    {
-                        OutputScriptTags[i] |= MC_MTX_TAG_PERMISSION_ADMIN_MINE;
-                    }                    
                 }
+                if(mc_gState->m_TmpScript->GetEntity(short_txid) == 0)          
+                {
+                    prev_element_is_entity=true;
+                }                
+                else
+                {
+                    prev_element_is_entity=false;                    
+                }
+                
                 unsigned char *ptr;
                 int size;
                 if(mc_gState->m_TmpScript->GetRawData(&ptr,&size) == 0)      
@@ -3466,7 +3487,7 @@ uint32_t mc_GetExplorerTxDetails(int rpc_slot,
             cs_offset=0;
             if(mc_gState->m_TmpScript->GetCachedScript(cs_offset,&cs_new_offset,&cs_vin,&cs_script,&cs_size) == 0)
             {
-                OutputScriptTags[i] |= MC_MTX_TAG_CACHED_SCRIPT;
+//                OutputScriptTags[i] |= MC_MTX_TAG_CACHED_SCRIPT;
                 fDataTypeFound=true;
             }
             
@@ -3578,6 +3599,13 @@ int mc_WalletTxs::AddExplorerEntities(mc_Buffer *lpEntities)
     return MC_ERR_NOERROR;
 }
 
+struct mc_TxAddressAssetQuantity
+{
+    uint160 m_Address;
+    uint160 m_Asset;
+    int64_t m_Amount;
+};
+
 int mc_WalletTxs::AddExplorerTx(                                                          
               mc_TxImport *import,                                              // Import object, NULL if chain update
               const CTransaction& tx,                                           // Tx to add
@@ -3630,8 +3658,7 @@ int mc_WalletTxs::AddExplorerTx(
     bool fAlreadyInTheWalletForNotify;   
     uint32_t block_key;
     int generation;
-    mc_AssetBalanceDetails balance_details;
-    mc_AssetBalanceDetails balance_details_prev;
+    mc_TxAssetBalanceDetails tx_balance_details;
     
     uint32_t txsize;
     uint32_t txfullsize;
@@ -3644,9 +3671,13 @@ int mc_WalletTxs::AddExplorerTx(
     
     std::vector< std::map<uint160,int64_t> >OutputAssetQuantities;
     std::vector< std::map<uint160,int64_t> >InputAssetQuantities;
+    std::vector< std::map<uint160,uint32_t> >InputAddresses;
+    std::vector< std::map<uint160,uint32_t> >OutputAddresses;
+    std::map<uint160,mc_TxAddressAssetQuantity> AddressAssetQuantities;
     std::vector<uint64_t>InputScriptTags;
     std::vector<uint64_t>OutputScriptTags;
     uint32_t tx_tag;
+    bool real_transfer=false;
     
     if((m_Mode & MC_WMD_TXS) == 0)
     {
@@ -3674,6 +3705,7 @@ int mc_WalletTxs::AddExplorerTx(
         fFound=true;
         memcpy(&txdef,&(m_Database->m_TxCachedDef),sizeof(mc_TxDefRow));
     }
+    
     if(tx_tag & (MC_MTX_TAG_ENTITY_CREATE | MC_MTX_TAG_ASSET_GENESIS))
     {
         uint32_t entity_key=(tx_tag & MC_MTX_TAG_ENTITY_MASK) >> MC_MTX_TAG_ENTITY_MASK_SHIFT;
@@ -3758,31 +3790,37 @@ int mc_WalletTxs::AddExplorerTx(
     generation=stat->m_Generation;
     
     InputAssetQuantities.resize(tx.vin.size());
-    publishers_set.clear();
+    InputAddresses.resize(tx.vin.size());
+    
     if(!tx.IsCoinBase())
     {
         for (j = 0; j < (int)tx.vin.size(); ++j)
         {
             COutPoint txout=tx.vin[j].prevout;
-            
             int op_addr_offset,op_addr_size,is_redeem_script,sighash_type;
             uint32_t publisher_flags;
             const unsigned char *ptr;
+
+            const CScript& script2 = tx.vin[j].scriptSig;        
+            CScript::const_iterator pc2 = script2.begin();
+            
+            ptr=mc_ExtractAddressFromInputScript((unsigned char*)(&pc2[0]),(int)(script2.end()-pc2),&op_addr_offset,&op_addr_size,&is_redeem_script,&sighash_type,0);                                
+            if(ptr)
+            {
+                subkey_hash160=Hash160(ptr+op_addr_offset,ptr+op_addr_offset+op_addr_size);
+                publisher_flags=MC_SFL_NONE;
+                if(is_redeem_script)
+                {
+                    publisher_flags |= MC_SFL_IS_SCRIPTHASH;
+                }                
+                InputAddresses[j].insert(make_pair(subkey_hash160,publisher_flags));
+            }
+            
+            InputAssetQuantities[j].clear();
             
             ptr=(unsigned char*)&txout;
             subkey_hash160=Hash160(ptr,ptr+sizeof(COutPoint));
-            entity.m_EntityType=MC_TET_EXP_REDEEM_KEY | MC_TET_CHAINPOS;
-            subkey_entity.Zero();
-            memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
-            subkey_entity.m_EntityType=MC_TET_SUBKEY_REDEEM_KEY | MC_TET_CHAINPOS;
-            err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,(uint32_t)j,1);
-            if(err)
-            {
-                goto exitlbl;
-            }                            
-
-            std::map<uint160,int64_t> assets;
-            assets.clear();
+            
             erow.Zero();
             subkey_entity.Zero();
             memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
@@ -3804,99 +3842,40 @@ int mc_WalletTxs::AddExplorerTx(
                     const unsigned char *ptrEnd=ptr+assets_str.size();
                     while(ptr < ptrEnd)
                     {
-                        assets.insert(make_pair(*(uint160*)ptr,*(int64_t*)(ptr+sizeof(uint160))));
+                        InputAssetQuantities[j].insert(make_pair(*(uint160*)ptr,*(int64_t*)(ptr+sizeof(uint160))));
                         ptr+=sizeof(uint160) + sizeof(int64_t);
                     }
                 }   
                 else
                 {
-                    assets.insert(make_pair(*(uint160*)(erow.m_TxId),*(int64_t*)(erow.m_TxId+sizeof(uint160))));
+                    InputAssetQuantities[j].insert(make_pair(*(uint160*)(erow.m_TxId),*(int64_t*)(erow.m_TxId+sizeof(uint160))));
                 }
-                InputAssetQuantities[j]=assets;
             }
             
-            const CScript& script2 = tx.vin[j].scriptSig;        
-            CScript::const_iterator pc2 = script2.begin();
-
-            ptr=mc_ExtractAddressFromInputScript((unsigned char*)(&pc2[0]),(int)(script2.end()-pc2),&op_addr_offset,&op_addr_size,&is_redeem_script,&sighash_type,0);                                
-            if(ptr)
+            for (map<uint160,int64_t>::const_iterator it_asset = InputAssetQuantities[j].begin(); it_asset != InputAssetQuantities[j].end(); ++it_asset) 
             {
-                subkey_hash160=Hash160(ptr+op_addr_offset,ptr+op_addr_offset+op_addr_size);
-                if(publishers_set.count(subkey_hash160) == 0)
+                for (map<uint160,uint32_t>::const_iterator it_address = InputAddresses[j].begin(); it_address != InputAddresses[j].end(); ++it_address) 
                 {
-                    publishers_set.insert(subkey_hash160);
-                    subkey_hash256=0;
-                    memcpy(&subkey_hash256,&subkey_hash160,sizeof(subkey_hash160));
-                    publisher_flags=MC_SFL_SUBKEY | MC_SFL_IS_ADDRESS;
-                    if(is_redeem_script)
+                    mc_GetCompoundHash160(&balance_subkey_hash160,&(it_address->first),&(it_asset->first));
+                    std::map<uint160,mc_TxAddressAssetQuantity>::iterator it_balance=AddressAssetQuantities.find(balance_subkey_hash160);
+                    if(it_balance != AddressAssetQuantities.end())
                     {
-                        publisher_flags |= MC_SFL_IS_SCRIPTHASH;
+                        it_balance->second.m_Amount -= it_asset->second;
                     }
-                    err=m_Database->AddSubKeyDef(imp,(unsigned char*)&subkey_hash256,NULL,0,publisher_flags);
-                    if(err)
+                    else
                     {
-                        goto exitlbl;
+                        mc_TxAddressAssetQuantity aa_qty;
+                        aa_qty.m_Address=it_address->first;
+                        aa_qty.m_Asset=it_asset->first;
+                        aa_qty.m_Amount=-it_asset->second;
+                        AddressAssetQuantities.insert(make_pair(balance_subkey_hash160,aa_qty));
                     }
-
-                    entity.m_EntityType=MC_TET_EXP_TX_PUBLISHER | MC_TET_CHAINPOS;
-                    subkey_entity.Zero();
-                    memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
-                    subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_TX_PUBLISHER | MC_TET_CHAINPOS;
-                    err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,tx_tag,fFound ? 0 : 1);
-                    if(err)
-                    {
-                        goto exitlbl;
-                    }      
-                    int asset_count=0;
-                    for (map<uint160,int64_t>::const_iterator it = assets.begin(); it != assets.end(); ++it) 
-                    {
-                        mc_GetCompoundHash160(&balance_subkey_hash160,&subkey_hash160,&(it->first));
-                        subkey_entity.Zero();
-                        memcpy(subkey_entity.m_EntityID,&balance_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
-                        subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_BALANCE_DETAILS_KEY | MC_TET_CHAINPOS;
-                        if(m_Database->GetLastItem(imp,&subkey_entity,generation,&erow) != MC_ERR_NOERROR)
-                        {
-                            goto exitlbl;
-                        }
-                        string assets_str=GetSubKey(imp,erow.m_TxId,NULL,&err);
-                        if(err)
-                        {
-                            goto exitlbl;                        
-                        }
-                        if(assets_str.size() != sizeof(mc_AssetBalanceDetails))
-                        {
-                            goto exitlbl;                                                    
-                        }
-                        memcpy(&balance_details,assets_str.c_str(),assets_str.size());
-                        balance_details.m_TxID=hash;
-                        balance_details.m_Vinout=j;
-                        balance_details.m_Amount=it->second;
-                        balance_details.m_Balance-=it->second;
-                        balance_details.m_Flags=MC_MTX_TFL_IS_INPUT;
-                        balance_details.m_AssetCount=asset_count;
-                        balance_details.m_Reserved=0;
-                        flags=0;
-                        
-                        subkey_hash256=Hash((unsigned char*)&balance_details,(unsigned char*)&balance_details+sizeof(mc_AssetBalanceDetails));
-                        err=m_Database->AddSubKeyDef(imp,(unsigned char*)&subkey_hash256,(unsigned char*)&balance_details,sizeof(mc_AssetBalanceDetails),0);
-                        if(err)
-                        {
-                            goto exitlbl;
-                        }
-                        err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&balance_subkey_hash160,(unsigned char*)&subkey_hash256,NULL,block,flags,1);
-                        if(err)
-                        {
-                            goto exitlbl;
-                        }                            
-                        asset_count++;
-                        err=m_Database->GetLastItem(imp,&subkey_entity,generation,&erow);
-                        memcpy(&balance_details,assets_str.c_str(),assets_str.size());
-                    }
-                }     
-            }
+                }                            
+            }            
         }
     }
     
+    OutputAddresses.resize(tx.vout.size());
     for(i=0;i<(int)tx.vout.size();i++)                                          // Checking outputs
     {        
         const CTxOut txout=tx.vout[i];
@@ -3913,42 +3892,214 @@ int mc_WalletTxs::AddExplorerTx(
         if(mc_gState->m_TmpScript->IsOpReturnScript() == 0)
         {                
             ExtractDestinations(script1,typeRet,addressRets,nRequiredRet);
-/*
-            for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
+            if(addressRets.size() == 1)
             {
-                mc_gState->m_TmpScript->SetElement(e);
-                if(mc_gState->m_TmpScript->GetAssetGenesis(&quantity) == 0)
+                BOOST_FOREACH(const CTxDestination& dest, addressRets)
                 {
-                    if(imp->m_ImportID == 0)
+                    uint32_t publisher_flags;
+                    entity.Zero();
+                    const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
+                    const CScriptID *lpScriptID=boost::get<CScriptID> (&dest);
+                    publisher_flags=MC_SFL_SUBKEY | MC_SFL_IS_ADDRESS;
+                    subkey_hash160=0;
+
+                    if( (lpKeyID !=NULL) && (typeRet == TX_PUBKEYHASH) )        
                     {
-                        entity.Zero();
-                        entity.m_EntityType=MC_TET_EXP_ASSET_BALANCE | MC_TET_CHAINPOS;
-                        memcpy(entity.m_EntityID,(unsigned char*)&hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-                        m_Database->AddEntity(imp,&entity,0);
-                        imp->m_TmpEntities->Add(&entity,NULL);
+                        memcpy(&subkey_hash160,lpKeyID,MC_TDB_ENTITY_ID_SIZE);
+                    }
+                    if(lpScriptID)
+                    {
+                        memcpy(&subkey_hash160,lpScriptID,MC_TDB_ENTITY_ID_SIZE);
+                        publisher_flags |= MC_SFL_IS_SCRIPTHASH;
+                    }
+                    if(subkey_hash160 != 0)
+                    {
+                        OutputAddresses[i].insert(make_pair(subkey_hash160,publisher_flags));                    
                     }
                 }
+                for (map<uint160,int64_t>::const_iterator it_asset = OutputAssetQuantities[i].begin(); it_asset != OutputAssetQuantities[i].end(); ++it_asset) 
+                {
+                    for (map<uint160,uint32_t>::const_iterator it_address = OutputAddresses[i].begin(); it_address != OutputAddresses[i].end(); ++it_address) 
+                    {
+                        mc_GetCompoundHash160(&balance_subkey_hash160,&(it_address->first),&(it_asset->first));
+                        std::map<uint160,mc_TxAddressAssetQuantity>::iterator it_balance=AddressAssetQuantities.find(balance_subkey_hash160);
+                        if(it_balance != AddressAssetQuantities.end())
+                        {
+                            it_balance->second.m_Amount += it_asset->second;
+                        }
+                        else
+                        {
+                            mc_TxAddressAssetQuantity aa_qty;
+                            aa_qty.m_Address=it_address->first;
+                            aa_qty.m_Asset=it_asset->first;
+                            aa_qty.m_Amount=it_asset->second;
+                            AddressAssetQuantities.insert(make_pair(balance_subkey_hash160,aa_qty));
+                        }
+                    }                            
+                }            
             }
-*/            
-            BOOST_FOREACH(const CTxDestination& dest, addressRets)
+        }
+    }
+    
+    for (map<uint160,mc_TxAddressAssetQuantity>::const_iterator it_balance = AddressAssetQuantities.begin(); it_balance != AddressAssetQuantities.end(); ++it_balance) 
+    {
+        if(it_balance->second.m_Amount != 0)
+        {
+            real_transfer=true;
+            erow.Zero();
+            subkey_entity.Zero();
+            memcpy(subkey_entity.m_EntityID,&(it_balance->first),MC_TDB_ENTITY_ID_SIZE);
+            subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_BALANCE_DETAILS_KEY | MC_TET_CHAINPOS;
+            tx_balance_details.m_Balance=0;
+            if(m_Database->GetLastItem(imp,&subkey_entity,generation,&erow) == MC_ERR_NOERROR)
+            {
+                string assets_str=GetSubKey(imp,erow.m_TxId,NULL,&err);
+                if(err)
+                {
+                    goto exitlbl;                        
+                }
+                if(assets_str.size() != sizeof(mc_TxAssetBalanceDetails))
+                {
+                    goto exitlbl;                                                    
+                }
+                memcpy(&tx_balance_details,assets_str.c_str(),assets_str.size());
+            }
+            else
+            {
+                entity.Zero();
+                entity.m_EntityType=MC_TET_EXP_ADDRESS_ASSETS_KEY | MC_TET_CHAINPOS;
+                subkey_aa_entity.Zero();
+                memcpy(subkey_aa_entity.m_EntityID,&(it_balance->second.m_Address),MC_TDB_ENTITY_ID_SIZE);
+                subkey_aa_entity.m_EntityType=MC_TET_SUBKEY_EXP_ADDRESS_ASSETS_KEY | MC_TET_CHAINPOS;
+                subkey_hash256=0;
+                memcpy(&subkey_hash256,&(it_balance->second.m_Asset),sizeof(uint160));
+                err= m_Database->IncrementSubKey(imp,&entity,&subkey_aa_entity,(unsigned char*)&(it_balance->second.m_Address),(unsigned char*)&subkey_hash256,NULL,block,0,1);
+                if(err)
+                {
+                    goto exitlbl;
+                }             
+
+                entity.Zero();
+                entity.m_EntityType=MC_TET_EXP_ASSET_ADDRESSES_KEY | MC_TET_CHAINPOS;
+                subkey_aa_entity.Zero();
+                memcpy(subkey_aa_entity.m_EntityID,&(it_balance->second.m_Asset),MC_TDB_ENTITY_ID_SIZE);
+                subkey_aa_entity.m_EntityType=MC_TET_SUBKEY_EXP_ASSET_ADDRESSES_KEY | MC_TET_CHAINPOS;
+                flags=0;
+                subkey_hash256=0;
+                memcpy(&subkey_hash256,&(it_balance->second.m_Address),sizeof(uint160));
+                err= m_Database->IncrementSubKey(imp,&entity,&subkey_aa_entity,(unsigned char*)&(it_balance->second.m_Asset),(unsigned char*)&subkey_hash256,NULL,block,flags,1);
+                if(err)
+                {
+                    goto exitlbl;
+                }                                            
+            }
+            
+            tx_balance_details.m_TxID=hash;
+            tx_balance_details.m_Balance+=it_balance->second.m_Amount;
+            tx_balance_details.m_Amount=it_balance->second.m_Amount;
+            
+            entity.Zero();
+            entity.m_EntityType=MC_TET_EXP_BALANCE_DETAILS_KEY | MC_TET_CHAINPOS;            
+            
+            subkey_hash256=Hash((unsigned char*)&tx_balance_details,(unsigned char*)&tx_balance_details+sizeof(mc_TxAssetBalanceDetails));
+            err=m_Database->AddSubKeyDef(imp,(unsigned char*)&subkey_hash256,(unsigned char*)&tx_balance_details,sizeof(mc_TxAssetBalanceDetails),0);
+            if(err)
+            {
+                goto exitlbl;
+            }
+            err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&(it_balance->first),(unsigned char*)&subkey_hash256,NULL,block,flags,1);
+            if(err)
+            {
+                goto exitlbl;
+            }                            
+        }
+    }
+    
+    if(tx_tag & MC_MTX_TAG_ASSET_TRANSFER)
+    {
+        if(!real_transfer)
+        {
+            tx_tag -= MC_MTX_TAG_ASSET_TRANSFER;
+        }
+    }
+    
+    publishers_set.clear();
+    if(!tx.IsCoinBase())
+    {
+        for (j = 0; j < (int)tx.vin.size(); ++j)
+        {
+            COutPoint txout=tx.vin[j].prevout;
+            
+            const unsigned char *ptr;
+            
+            ptr=(unsigned char*)&txout;
+            subkey_hash160=Hash160(ptr,ptr+sizeof(COutPoint));
+            entity.m_EntityType=MC_TET_EXP_REDEEM_KEY | MC_TET_CHAINPOS;
+            subkey_entity.Zero();
+            memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+            subkey_entity.m_EntityType=MC_TET_SUBKEY_REDEEM_KEY | MC_TET_CHAINPOS;
+            err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,(uint32_t)j,1);
+            if(err)
+            {
+                goto exitlbl;
+            }                            
+
+            const CScript& script2 = tx.vin[j].scriptSig;        
+            CScript::const_iterator pc2 = script2.begin();
+
+            if(InputAddresses[j].size() == 1)
+            {
+                uint32_t publisher_flags;
+                subkey_hash160=InputAddresses[j].begin()->first;
+                if(publishers_set.count(subkey_hash160) == 0)
+                {
+                    publishers_set.insert(subkey_hash160);
+                    subkey_hash256=0;
+                    memcpy(&subkey_hash256,&subkey_hash160,sizeof(subkey_hash160));
+                    publisher_flags=MC_SFL_SUBKEY | MC_SFL_IS_ADDRESS | InputAddresses[j].begin()->second;
+                    err=m_Database->AddSubKeyDef(imp,(unsigned char*)&subkey_hash256,NULL,0,publisher_flags);
+                    if(err)
+                    {
+                        goto exitlbl;
+                    }
+
+                    entity.m_EntityType=MC_TET_EXP_TX_PUBLISHER | MC_TET_CHAINPOS;
+                    subkey_entity.Zero();
+                    memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+                    subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_TX_PUBLISHER | MC_TET_CHAINPOS;
+                    err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,tx_tag,fFound ? 0 : 1);
+                    if(err)
+                    {
+                        goto exitlbl;
+                    }      
+                }     
+            }
+        }
+    }
+    
+    for(i=0;i<(int)tx.vout.size();i++)                     
+    {        
+        const CTxOut txout=tx.vout[i];
+        const CScript& script1 = txout.scriptPubKey;        
+        CScript::const_iterator pc1 = script1.begin();
+
+        txnouttype typeRet;
+        int nRequiredRet;
+        std::vector<CTxDestination> addressRets;
+        int64_t quantity;
+        
+        mc_gState->m_TmpScript->Clear();
+        mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+        if(mc_gState->m_TmpScript->IsOpReturnScript() == 0)
+        {                
+            if(OutputAddresses[i].size() == 1)
             {
                 uint32_t publisher_flags;
                 entity.Zero();
-                const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
-                const CScriptID *lpScriptID=boost::get<CScriptID> (&dest);
-                publisher_flags=MC_SFL_SUBKEY | MC_SFL_IS_ADDRESS;
-                subkey_hash160=0;
+                subkey_hash160=OutputAddresses[i].begin()->first;
+                publisher_flags=MC_SFL_SUBKEY | MC_SFL_IS_ADDRESS | OutputAddresses[i].begin()->second;
 
-                if( (lpKeyID !=NULL) && (typeRet == TX_PUBKEYHASH) )            // No support for P2PK, because we cannot calculate balances properly when it is spent
-                {
-                    memcpy(&subkey_hash160,lpKeyID,MC_TDB_ENTITY_ID_SIZE);
-                }
-                if(lpScriptID)
-                {
-                    memcpy(&subkey_hash160,lpScriptID,MC_TDB_ENTITY_ID_SIZE);
-                    publisher_flags |= MC_SFL_IS_SCRIPTHASH;
-                }
-                if((subkey_hash160 != 0) && (publishers_set.count(subkey_hash160) == 0))
+                if(publishers_set.count(subkey_hash160) == 0)
                 {
                     publishers_set.insert(subkey_hash160);
                     subkey_hash256=0;
@@ -3969,93 +4120,9 @@ int mc_WalletTxs::AddExplorerTx(
                         goto exitlbl;
                     }             
                 }
-                if(subkey_hash160 != 0)
-                {
-                    int asset_count=0;
-                    
-                    for (map<uint160,int64_t>::const_iterator it = OutputAssetQuantities[i].begin(); it != OutputAssetQuantities[i].end(); ++it) 
-                    {
-                        mc_GetCompoundHash160(&balance_subkey_hash160,&subkey_hash160,&(it->first));
-                        subkey_entity.Zero();
-                        memcpy(subkey_entity.m_EntityID,&balance_subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
-                        subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_BALANCE_DETAILS_KEY | MC_TET_CHAINPOS;
-                        err=m_Database->GetLastItem(imp,&subkey_entity,generation,&erow);
-                        if(err)
-                        {
-                            if(err != MC_ERR_NOT_FOUND)
-                            {
-                                goto exitlbl;
-                            }
-                            balance_details.m_Balance=0;
-                            
-                            entity.Zero();
-                            entity.m_EntityType=MC_TET_EXP_ADDRESS_ASSETS_KEY | MC_TET_CHAINPOS;
-                            subkey_aa_entity.Zero();
-                            memcpy(subkey_aa_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
-                            subkey_aa_entity.m_EntityType=MC_TET_SUBKEY_EXP_ADDRESS_ASSETS_KEY | MC_TET_CHAINPOS;
-                            subkey_hash256=0;
-                            memcpy(&subkey_hash256,&(it->first),sizeof(subkey_hash160));
-                            err= m_Database->IncrementSubKey(imp,&entity,&subkey_aa_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&subkey_hash256,NULL,block,0,1);
-                            if(err)
-                            {
-                                goto exitlbl;
-                            }             
-                    
-                            entity.Zero();
-                            entity.m_EntityType=MC_TET_EXP_ASSET_ADDRESSES_KEY | MC_TET_CHAINPOS;
-                            subkey_aa_entity.Zero();
-                            memcpy(subkey_aa_entity.m_EntityID,&(it->first),MC_TDB_ENTITY_ID_SIZE);
-                            subkey_aa_entity.m_EntityType=MC_TET_SUBKEY_EXP_ASSET_ADDRESSES_KEY | MC_TET_CHAINPOS;
-                            subkey_hash256=0;
-                            memcpy(&subkey_hash256,&subkey_hash160,sizeof(subkey_hash160));
-                            err= m_Database->IncrementSubKey(imp,&entity,&subkey_aa_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&subkey_hash256,NULL,block,flags,1);
-                            if(err)
-                            {
-                                goto exitlbl;
-                            }                            
-                            
-                        }
-                        else
-                        {
-                            string assets_str=GetSubKey(imp,erow.m_TxId,NULL,&err);
-                            if(err)
-                            {
-                                goto exitlbl;                        
-                            }
-                            if(assets_str.size() != sizeof(mc_AssetBalanceDetails))
-                            {
-                                goto exitlbl;                                                    
-                            }
-                            memcpy(&balance_details,assets_str.c_str(),assets_str.size());
-                        }
-                        balance_details.m_TxID=hash;
-                        balance_details.m_Vinout=i;
-                        balance_details.m_Amount=it->second;
-                        balance_details.m_Balance+=it->second;
-                        balance_details.m_Flags=0;
-                        balance_details.m_AssetCount=asset_count;
-                        balance_details.m_Reserved=0;
-                        
-                        entity.Zero();
-                        entity.m_EntityType=MC_TET_EXP_BALANCE_DETAILS_KEY | MC_TET_CHAINPOS;
-                        subkey_hash256=Hash((unsigned char*)&balance_details,(unsigned char*)&balance_details+sizeof(mc_AssetBalanceDetails));
-                        err=m_Database->AddSubKeyDef(imp,(unsigned char*)&subkey_hash256,(unsigned char*)&balance_details,sizeof(mc_AssetBalanceDetails),0);
-                        if(err)
-                        {
-                            goto exitlbl;
-                        }
-                        err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&balance_subkey_hash160,(unsigned char*)&subkey_hash256,NULL,block,publisher_flags,1);
-                        if(err)
-                        {
-                            goto exitlbl;
-                        }                            
-                        err=m_Database->GetLastItem(imp,&subkey_entity,generation,&erow);
-                        asset_count++;
-                    }
-                    
-                }     
             }
         }
+        
         if(OutputAssetQuantities[i].size())
         {
             COutPoint txout=COutPoint(hash,i);
