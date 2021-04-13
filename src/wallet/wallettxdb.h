@@ -45,6 +45,8 @@
 #define MC_TET_EXP_ADDRESS_ASSETS_KEY           0x0000001B // global, address
 #define MC_TET_EXP_ASSET_ADDRESSES              0x0000001C // global, key-asset, item - address, direct (no balances), no duplicate items on address
 #define MC_TET_EXP_ASSET_ADDRESSES_KEY          0x0000001D // global, asset
+#define MC_TET_EXP_ADDRESS_STREAMS_PAIRS        0x0000001E // global, key-address/stream
+#define MC_TET_EXP_ADDRESS_STREAMS_KEY          0x0000001F // global, address
 
 #define MC_TET_SUBKEY                           0x00000040
 #define MC_TET_SUBKEY_STREAM_KEY                0x00000046
@@ -57,6 +59,7 @@
 #define MC_TET_SUBKEY_EXP_BALANCE_DETAILS_KEY   0x00000059 // global, asset/address
 #define MC_TET_SUBKEY_EXP_ADDRESS_ASSETS_KEY    0x0000005B
 #define MC_TET_SUBKEY_EXP_ASSET_ADDRESSES_KEY   0x0000005D 
+#define MC_TET_SUBKEY_EXP_ADDRESS_STREAMS_KEY   0x0000005F // global, address
 #define MC_TET_TYPE_MASK                        0x040000FF
 #define MC_TET_CHAINPOS                         0x00000100
 #define MC_TET_TIMERECEIVED                     0x00000200

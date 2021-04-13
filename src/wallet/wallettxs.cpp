@@ -3288,6 +3288,7 @@ exitlbl:
 uint32_t mc_GetExplorerTxDetails(int rpc_slot,
                                  const CTransaction& tx,
                                  std::vector< std::map<uint160,int64_t> >& OutputAssetQuantities,
+                                 std::vector< uint160 >&OutputStreams,
                                  std::vector<uint64_t>& InputScriptTags,
                                  std::vector<uint64_t>& OutputScriptTags)
 {
@@ -3296,6 +3297,7 @@ uint32_t mc_GetExplorerTxDetails(int rpc_slot,
     InputScriptTags.resize(tx.vin.size());
     OutputScriptTags.resize(tx.vout.size());
     OutputAssetQuantities.resize(tx.vout.size());
+    OutputStreams.resize(tx.vout.size());
     
     uint256 hash=tx.GetHash();
     
@@ -3338,6 +3340,7 @@ uint32_t mc_GetExplorerTxDetails(int rpc_slot,
         CScript::const_iterator pc1 = script1.begin();
 
         OutputScriptTags[i]=MC_MTX_TAG_NONE;
+        OutputStreams[i]=0;
         txnouttype typeRet;
         int nRequiredRet;
         int err;
@@ -3346,7 +3349,7 @@ uint32_t mc_GetExplorerTxDetails(int rpc_slot,
         std::map<uint160,int64_t> assets;
         issue_quantity=0;
         mc_EntityDetails entity;
-        uint32_t type,from,to,timestamp,flags;
+        uint32_t type,from,to,timestamp;
         unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
         
         mc_gState->m_TmpScript->Clear();
@@ -3517,7 +3520,6 @@ uint32_t mc_GetExplorerTxDetails(int rpc_slot,
             {
                 unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
                 mc_EntityDetails entity;
-                uint32_t salt_size=0;
                 mc_gState->m_TmpScript->SetElement(0);
                                                                       
                 if( (mc_gState->m_TmpScript->GetEntity(short_txid) == 0) && (mc_gState->m_Assets->FindEntityByShortTxID(&entity,short_txid) != 0) )
@@ -3529,6 +3531,9 @@ uint32_t mc_GetExplorerTxDetails(int rpc_slot,
                     }
                     if(entity.GetEntityType() <= MC_ENT_TYPE_STREAM_MAX)
                     {
+                        uint160 stream=0;
+                        memcpy(&stream,short_txid,MC_AST_SHORT_TXID_SIZE);     
+                        OutputStreams[i]=stream;
                         OutputScriptTags[i] |= MC_MTX_TAG_STREAM_ITEM;// | (entity.GetEntityType() << MC_MTX_TAG_ENTITY_MASK_SHIFT);                        
                         uint32_t format;
                         unsigned char *chunk_hashes;
@@ -3594,6 +3599,11 @@ int mc_WalletTxs::AddExplorerEntities(mc_Buffer *lpEntities)
     if(lpEntities) lpEntities->Add(&entity,NULL); else pwalletTxsMain->AddEntity(&entity,0);
     entity.m_EntityType=MC_TET_EXP_ASSET_ADDRESSES_KEY | MC_TET_CHAINPOS;
     if(lpEntities) lpEntities->Add(&entity,NULL); else pwalletTxsMain->AddEntity(&entity,0);
+
+    entity.m_EntityType=MC_TET_EXP_ADDRESS_STREAMS_PAIRS | MC_TET_CHAINPOS;
+    if(lpEntities) lpEntities->Add(&entity,NULL); else pwalletTxsMain->AddEntity(&entity,0);
+    entity.m_EntityType=MC_TET_EXP_ADDRESS_STREAMS_KEY | MC_TET_CHAINPOS;
+    if(lpEntities) lpEntities->Add(&entity,NULL); else pwalletTxsMain->AddEntity(&entity,0);
     
     
     return MC_ERR_NOERROR;
@@ -3612,68 +3622,37 @@ int mc_WalletTxs::AddExplorerTx(
               int block)                                                        // block height, -1 for mempool
 {
     
-    int err,i,j,entcount,lockres,entpos,base_row;
+    int err,i,j;
     mc_TxImport *imp;
     mc_TxEntity entity;
     mc_TxEntity subkey_entity;
     mc_TxEntity subkey_aa_entity;
-    mc_TxEntityStat* lpentstat;
-    mc_TxEntity input_entity;
-    mc_TxEntity *lpent;
     mc_TxDefRow txdef;
-    mc_TxEntityRowExtension extension;
-    mc_TxEntityRowExtension *lpext;
     mc_TxEntityStat *stat;
     mc_TxEntityRow erow;
     
-    const CWalletTx *fullTx;
-    const CWalletTx *storedTx;
-    CWalletTx stx;
-    unsigned char item_key[MC_ENT_MAX_ITEM_KEY_SIZE];
-    int item_key_size;
     uint256 subkey_hash256;
     uint160 subkey_hash160;
     uint160 balance_subkey_hash160;
     set<uint160> publishers_set;
-//    map<uint160,int> subkey_count_map;
-    map<uint160,mc_TxEntityRowExtension> subkey_extension_map;
     
-    int import_pos;
     bool fFound;
-    bool fIsFromMe;
-    bool fIsToMe;
-    bool fIsSpendable;
-    bool fAllInputsFromMe;
-    bool fAllInputsAreFinal;
-    bool fSingleInputEntity;
-    bool fRelevantEntity;
-    bool fOutputIsSpendable;
-    bool fNewStream;
-    bool fNewAsset;
-    bool fLicenseTokenTransfer;
-    std::vector<mc_Coin> txoutsIn;
-    std::vector<mc_Coin> txoutsOut;
     uint256 hash;
-    unsigned char *ptrOut;
-    bool fAlreadyInTheWalletForNotify;   
     uint32_t block_key;
     int generation;
     mc_TxAssetBalanceDetails tx_balance_details;
     
-    uint32_t txsize;
-    uint32_t txfullsize;
-    int block_file;
-    uint32_t block_offset;
-    uint32_t block_tx_offset;
     uint32_t flags;
     uint32_t timestamp;
-    CDataStream ss(SER_DISK, CLIENT_VERSION);
     
     std::vector< std::map<uint160,int64_t> >OutputAssetQuantities;
+    std::vector< uint160 >OutputStreams;
     std::vector< std::map<uint160,int64_t> >InputAssetQuantities;
     std::vector< std::map<uint160,uint32_t> >InputAddresses;
+    std::vector< int > InputSigHashTypes;
     std::vector< std::map<uint160,uint32_t> >OutputAddresses;
     std::map<uint160,mc_TxAddressAssetQuantity> AddressAssetQuantities;
+    std::map<uint160,mc_TxAddressAssetQuantity> AddressStreams;
     std::vector<uint64_t>InputScriptTags;
     std::vector<uint64_t>OutputScriptTags;
     uint32_t tx_tag;
@@ -3692,9 +3671,9 @@ int mc_WalletTxs::AddExplorerTx(
         imp=m_Database->FindImport(0);
     }
     
-    import_pos=imp-m_Database->m_Imports;
     hash=tx.GetHash();
-    tx_tag=mc_GetExplorerTxDetails(-1,tx,OutputAssetQuantities,InputScriptTags,OutputScriptTags);
+    
+    tx_tag=mc_GetExplorerTxDetails(-1,tx,OutputAssetQuantities,OutputStreams,InputScriptTags,OutputScriptTags);
     
     fFound=false;
     txdef.Zero();
@@ -3776,21 +3755,14 @@ int mc_WalletTxs::AddExplorerTx(
     }
 
     entity.m_EntityType=MC_TET_EXP_TX_KEY | MC_TET_CHAINPOS;
-    subkey_entity.Zero();
-    memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
-    subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_TX_KEY | MC_TET_CHAINPOS;
-    err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,tx_tag,fFound ? 0 : 1);
-    if(err)
-    {
-        goto exitlbl;
-    }                            
-    
+
     stat=imp->GetEntity(imp->FindEntity(&entity));
     
     generation=stat->m_Generation;
     
     InputAssetQuantities.resize(tx.vin.size());
     InputAddresses.resize(tx.vin.size());
+    InputSigHashTypes.resize(tx.vin.size());
     
     if(!tx.IsCoinBase())
     {
@@ -3813,6 +3785,7 @@ int mc_WalletTxs::AddExplorerTx(
                 {
                     publisher_flags |= MC_SFL_IS_SCRIPTHASH;
                 }                
+                InputSigHashTypes[j]=sighash_type;
                 InputAddresses[j].insert(make_pair(subkey_hash160,publisher_flags));
             }
             
@@ -3885,7 +3858,6 @@ int mc_WalletTxs::AddExplorerTx(
         txnouttype typeRet;
         int nRequiredRet;
         std::vector<CTxDestination> addressRets;
-        int64_t quantity;
         
         mc_gState->m_TmpScript->Clear();
         mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
@@ -3940,6 +3912,64 @@ int mc_WalletTxs::AddExplorerTx(
             }
         }
     }
+    
+    for(i=0;i<(int)tx.vout.size();i++)                                          
+    {        
+        if(OutputStreams[i] != 0)
+        {
+            for (j = 0; j < (int)tx.vin.size(); ++j)
+            {
+                if( (InputSigHashTypes[j] == SIGHASH_ALL) || ( (InputSigHashTypes[j] == SIGHASH_SINGLE) && ((j == i) ) ) )                    
+                {
+                    mc_GetCompoundHash160(&balance_subkey_hash160,&(InputAddresses[j].begin()->first),&(OutputStreams[i]));
+                    std::map<uint160,mc_TxAddressAssetQuantity>::iterator it_balance=AddressStreams.find(balance_subkey_hash160);
+                    if(it_balance == AddressStreams.end())
+                    {
+                        mc_TxAddressAssetQuantity aa_qty;
+                        aa_qty.m_Address=InputAddresses[j].begin()->first;
+                        aa_qty.m_Asset=OutputStreams[i];
+                        aa_qty.m_Amount=1;
+                        AddressStreams.insert(make_pair(balance_subkey_hash160,aa_qty));
+                    }                    
+                }                
+            }            
+        }
+    }    
+
+    for (map<uint160,mc_TxAddressAssetQuantity>::const_iterator it_balance = AddressStreams.begin(); it_balance != AddressStreams.end(); ++it_balance) 
+    {
+        flags=0;
+        erow.Zero();
+        subkey_entity.Zero();
+        memcpy(subkey_entity.m_EntityID,&(it_balance->first),MC_TDB_ENTITY_ID_SIZE);
+        subkey_entity.m_EntityType=MC_TET_EXP_ADDRESS_STREAMS_PAIRS | MC_TET_CHAINPOS;
+        if(m_Database->GetLastItem(imp,&subkey_entity,generation,&erow) == MC_ERR_NOT_FOUND)
+        {
+            entity.Zero();
+            entity.m_EntityType=MC_TET_EXP_ADDRESS_STREAMS_KEY | MC_TET_CHAINPOS;
+            subkey_aa_entity.Zero();
+            memcpy(subkey_aa_entity.m_EntityID,&(it_balance->second.m_Address),MC_TDB_ENTITY_ID_SIZE);
+            subkey_aa_entity.m_EntityType=MC_TET_SUBKEY_EXP_ADDRESS_STREAMS_KEY | MC_TET_CHAINPOS;
+            subkey_hash256=0;
+            memcpy(&subkey_hash256,&(it_balance->second.m_Asset),sizeof(uint160));
+            err= m_Database->IncrementSubKey(imp,&entity,&subkey_aa_entity,(unsigned char*)&(it_balance->second.m_Address),(unsigned char*)&subkey_hash256,NULL,block,0,1);
+            if(err)
+            {
+                goto exitlbl;
+            }             
+
+            entity.Zero();
+            entity.m_EntityType=MC_TET_EXP_ADDRESS_STREAMS_PAIRS | MC_TET_CHAINPOS;            
+
+            subkey_hash256=hash;
+            err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&(it_balance->first),(unsigned char*)&subkey_hash256,NULL,block,flags,1);
+            if(err)
+            {
+                goto exitlbl;
+            }        
+        }
+    }
+
     
     for (map<uint160,mc_TxAddressAssetQuantity>::const_iterator it_balance = AddressAssetQuantities.begin(); it_balance != AddressAssetQuantities.end(); ++it_balance) 
     {
@@ -4023,6 +4053,19 @@ int mc_WalletTxs::AddExplorerTx(
         }
     }
     
+    entity.Zero();
+    entity.m_EntityType=MC_TET_EXP_TX_KEY | MC_TET_CHAINPOS;
+    subkey_hash160=0;
+    memcpy(&subkey_hash160,&block_key,sizeof(uint32_t));
+    subkey_entity.Zero();
+    memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+    subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_TX_KEY | MC_TET_CHAINPOS;
+    err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,tx_tag,fFound ? 0 : 1);
+    if(err)
+    {
+        goto exitlbl;
+    }                            
+    
     publishers_set.clear();
     if(!tx.IsCoinBase())
     {
@@ -4082,11 +4125,6 @@ int mc_WalletTxs::AddExplorerTx(
         const CTxOut txout=tx.vout[i];
         const CScript& script1 = txout.scriptPubKey;        
         CScript::const_iterator pc1 = script1.begin();
-
-        txnouttype typeRet;
-        int nRequiredRet;
-        std::vector<CTxDestination> addressRets;
-        int64_t quantity;
         
         mc_gState->m_TmpScript->Clear();
         mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
@@ -4181,19 +4219,6 @@ int mc_WalletTxs::AddExplorerTx(
     
     timestamp=mc_TimeNowAsUInt();
     
-/*    
-    mc_Script *tmpscript;
-    tmpscript=mc_gState->m_TmpBuffers->m_ExplorerTxScript;
-    if(rpc_slot >= 0)
-    {
-        tmpscript=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_ExplorerTxScript;
-    }
-    
-    
-    tmpscript->Clear();
-    tmpscript->AddElement();
-*/    
-        
     imp->m_TmpEntities->Clear();
     entity.Zero();
     entity.m_EntityType=MC_TET_EXP_TX | MC_TET_CHAINPOS;

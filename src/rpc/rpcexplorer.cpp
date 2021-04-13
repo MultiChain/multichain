@@ -11,6 +11,18 @@
 #include "json/json_spirit_writer_template.h"
 #include "community/community.h"
 
+bool WRPSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity *entity,bool ignore_unsubscribed,int *errCode,string *strError);
+
+bool paramtobool_or_flag(Value param,int *flag)
+{
+    if(param.type() == int_type)
+    {
+        *flag=param.get_int();
+        return false;
+    }
+    return paramtobool(param);
+}
+
 bool WRPSubKeyEntityFromExpAddress(string str,mc_TxEntityStat entStat,mc_TxEntity *entity,bool ignore_unsubscribed,int *errCode,string *strError)
 {
     if(str == "*")
@@ -83,27 +95,35 @@ Value TagEntry(uint64_t tag)
     {
         tags.push_back("coinbase");
     }
+/*    
     if(tag & MC_MTX_TAG_CACHED_SCRIPT)
     {
         tags.push_back("cached-script");
     }
-    if(tag & MC_MTX_TAG_PERMISSION)
+ */ 
+    if(tag & MC_MTX_TAG_GRANT_ENTITY)
     {
-        if(tag & MC_MTX_TAG_PERMISSION_ADMIN_MINE)
-        {
-            tags.push_back("permission-admin-mine");                        
-        }
-        else
-        {
-            if(tag & MC_MTX_TAG_PERMISSION_HIGH)
-            {
-                tags.push_back("permission-high");            
-            }
-            else
-            {
-                tags.push_back("permission-low");
-            }
-        }
+        tags.push_back("grant-per-entity");                        
+    }
+    if(tag & MC_MTX_TAG_REVOKE_ENTITY)
+    {
+        tags.push_back("revoke-per-entity");                        
+    }
+    if(tag & MC_MTX_TAG_GRANT_HIGH)
+    {
+        tags.push_back("grant-high");                        
+    }
+    if(tag & MC_MTX_TAG_REVOKE_HIGH)
+    {
+        tags.push_back("revoke-high");                        
+    }
+    if(tag & MC_MTX_TAG_GRANT_LOW)
+    {
+        tags.push_back("grant-low");                        
+    }
+    if(tag & MC_MTX_TAG_REVOKE_LOW)
+    {
+        tags.push_back("revoke-low");                        
     }
     if(tag & MC_MTX_TAG_ASSET_GENESIS)
     {
@@ -345,10 +365,11 @@ Value listexptxs(const json_spirit::Array& params, bool fHelp)
 
     int count,start;
     bool verbose=false;
+    int flag=0;
     
     if (params.size() > 0)    
     {
-        verbose=paramtobool(params[0]);
+        verbose=paramtobool_or_flag(params[0],&flag);
     }
     
     count=10;
@@ -388,6 +409,12 @@ Value listexptxs(const json_spirit::Array& params, bool fHelp)
     
     entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
     entity_rows->Clear();
+    
+    if(flag == 2)
+    {
+        pwalletTxsMain->WRPReadUnLock();
+        return pwalletTxsMain->WRPGetListSize(&entStat.m_Entity,entStat.m_Generation,NULL);
+    }
     
     mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->WRPGetListSize(&entStat.m_Entity,entStat.m_Generation,NULL));
     
@@ -454,10 +481,12 @@ Value listexpaddresses(const json_spirit::Array& params, bool fHelp)
     
 
     string mode="list";
-    
+
+    int flag=0;
+        
     if (params.size() > 1)    
     {
-        if(paramtobool(params[1]))
+        if(paramtobool_or_flag(params[1],&flag))
         {
             mode="all";            
         }
@@ -515,6 +544,18 @@ Value listexpaddresses(const json_spirit::Array& params, bool fHelp)
         }        
     }
     
+    if(flag == 2)
+    {
+        pwalletTxsMain->WRPReadUnLock();
+        
+        if(inputStrings.size())
+        {
+            return inputStrings.size();
+        }
+        
+        return pwalletTxsMain->WRPGetListSize(&entStat.m_Entity,entStat.m_Generation,NULL);
+    }
+    
     
     retArray=listexpmap_operation(&(entStat.m_Entity),inputEntities,inputStrings,count,start,mode,&errCode,&strError);        
 
@@ -552,9 +593,11 @@ Value listexpaddresstxs(const json_spirit::Array& params, bool fHelp)
     int count,start;
     bool verbose=false;
     
+    int flag=0;
+    
     if (params.size() > 1)    
     {
-        verbose=paramtobool(params[1]);
+        verbose=paramtobool_or_flag(params[1],&flag);
     }
 
     count=10;
@@ -600,6 +643,12 @@ Value listexpaddresstxs(const json_spirit::Array& params, bool fHelp)
     entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
     entity_rows->Clear();
     
+    if(flag == 2)
+    {
+        pwalletTxsMain->WRPReadUnLock();
+        return pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL);
+    }
+        
     mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL));
     
     WRPCheckWalletError(pwalletTxsMain->WRPGetList(&entity,entStat.m_Generation,start+1,count,entity_rows),entity.m_EntityType,"",&errCode,&strError);
@@ -865,6 +914,148 @@ exitlbl:
     return retArray;
 }
 
+Value listexpaddressstreams(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 4)
+        throw runtime_error("Help message not found\n");
+
+    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER) == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
+    }   
+           
+    mc_TxEntityStat entStat;
+    mc_TxEntity entity;
+    int errCode;
+    string strError;
+    vector <mc_QueryCondition> conditions;
+    Array retArray;
+    mc_Buffer *entity_rows=NULL;
+    
+
+    int count,start;
+    bool verbose=false;
+    
+    int flag=0;
+    
+    if (params.size() > 1)    
+    {
+        verbose=paramtobool_or_flag(params[1],&flag);
+    }
+
+    count=10;
+    if (params.size() > 2)    
+    {
+        count=paramtoint(params[2],true,0,"Invalid count");
+    }
+    start=-count;
+    if (params.size() > 3)    
+    {
+        start=paramtoint(params[3],false,0,"Invalid start");
+    }
+
+    entStat.Zero();
+    entStat.m_Entity.m_EntityType=MC_TET_EXP_ADDRESS_STREAMS_KEY;
+    entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
+    
+    bool fWRPLocked=false;
+    int chain_height; 
+    int rpc_slot=GetRPCSlot();
+    if(rpc_slot < 0)
+    {
+        errCode=RPC_INTERNAL_ERROR;
+        strError="Couldn't find RPC Slot";
+        goto exitlbl;
+    }
+    
+    fWRPLocked=true;
+    pwalletTxsMain->WRPReadLock();
+    if(!pwalletTxsMain->WRPFindEntity(&entStat))
+    {
+        errCode=RPC_NOT_SUBSCRIBED;
+        strError="Not subscribed to this service";
+        goto exitlbl;
+    }
+
+    WRPSubKeyEntityFromExpAddress(params[0].get_str(),entStat,&entity,false,&errCode,&strError);
+    if(strError.size())
+    {
+        goto exitlbl;
+    }
+    
+    entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
+    entity_rows->Clear();
+    
+    if(flag == 2)
+    {
+        pwalletTxsMain->WRPReadUnLock();
+        return pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL);
+    }
+    
+    mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL));
+    
+    WRPCheckWalletError(pwalletTxsMain->WRPGetList(&entity,entStat.m_Generation,start+1,count,entity_rows),entity.m_EntityType,"",&errCode,&strError);
+    if(strError.size())
+    {
+        goto exitlbl;
+    }
+    
+    chain_height=chainActive.Height();
+    for(int i=0;i<entity_rows->GetCount();i++)
+    {
+        mc_TxEntityRow *lpEntTx;
+        lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
+        uint256 hash;
+
+        mc_EntityDetails entity_details;
+        mc_gState->m_Assets->FindEntityByShortTxID(&entity_details,lpEntTx->m_TxId);
+        
+        
+        Object entry;
+        
+        entry=StreamEntry(entity_details.GetTxID(),0x1800);
+        if(verbose)
+        {
+            entStat.Zero();
+            memcpy(&entStat,entity_details.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+            entStat.m_Entity.m_EntityType=MC_TET_STREAM_PUBLISHER;                
+            entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
+            if(!pwalletTxsMain->WRPFindEntity(&entStat))
+            {
+                entry.push_back(Pair("items", Value::null));
+                entry.push_back(Pair("confirmed", Value::null));
+            }
+            else
+            {
+                entity.Zero();
+
+                WRPSubKeyEntityFromPublisher(params[0].get_str(),entStat,&entity,false,&errCode,&strError);
+                int total,confirmed;
+                total=pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,&confirmed);
+                entry.push_back(Pair("items", total));
+                entry.push_back(Pair("confirmed", confirmed));                
+            }            
+        }
+        retArray.push_back(entry);                                
+    }
+    
+exitlbl:
+                
+    if(fWRPLocked)
+    {
+        pwalletTxsMain->WRPReadUnLock();
+    }
+
+    if(strError.size())
+    {
+        throw JSONRPCError(errCode, strError);            
+    }
+    
+    
+    return retArray;
+}
+
+
 
 Value listexpaddressassets(const json_spirit::Array& params, bool fHelp)
 {
@@ -888,9 +1079,11 @@ Value listexpaddressassets(const json_spirit::Array& params, bool fHelp)
     int count,start;
     bool verbose=false;
     
+    int flag=0;
+    
     if (params.size() > 1)    
     {
-        verbose=paramtobool(params[1]);
+        verbose=paramtobool_or_flag(params[1],&flag);
     }
 
     count=10;
@@ -936,6 +1129,12 @@ Value listexpaddressassets(const json_spirit::Array& params, bool fHelp)
     entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
     entity_rows->Clear();
     
+    if(flag == 2)
+    {
+        pwalletTxsMain->WRPReadUnLock();
+        return pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL);
+    }
+    
     mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL));
     
     WRPCheckWalletError(pwalletTxsMain->WRPGetList(&entity,entStat.m_Generation,start+1,count,entity_rows),entity.m_EntityType,"",&errCode,&strError);
@@ -969,9 +1168,9 @@ Value listexpaddressassets(const json_spirit::Array& params, bool fHelp)
         if(pwalletTxsMain->WRPGetLastItem(&subkey_entity,entStat.m_Generation,&erow) == 0)
         {
             int err;
-            mc_AssetBalanceDetails balance_details;
+            mc_TxAssetBalanceDetails balance_details;
             string assets_str=pwalletTxsMain->GetSubKey(erow.m_TxId,NULL,&err);
-            if(assets_str.size() == sizeof(mc_AssetBalanceDetails))
+            if(assets_str.size() == sizeof(mc_TxAssetBalanceDetails))
             {
                 memcpy(&balance_details,assets_str.c_str(),assets_str.size());
                 quantity=balance_details.m_Balance;                
@@ -980,7 +1179,7 @@ Value listexpaddressassets(const json_spirit::Array& params, bool fHelp)
         
         Object entry;
         
-        entry=AssetEntry(entity_details.GetTxID(),quantity,0);
+        entry=AssetEntry(entity_details.GetTxID(),quantity,0x04);
 /*        
         entry.push_back(Pair("txid", hash.ToString()));
         int block=lpEntTx->m_Block;
@@ -1044,9 +1243,11 @@ Value listexpassetaddresses(const json_spirit::Array& params, bool fHelp)
     int count,start;
     bool verbose=false;
     
+    int flag=0;
+    
     if (params.size() > 1)    
     {
-        verbose=paramtobool(params[1]);
+        verbose=paramtobool_or_flag(params[1],&flag);
     }
 
     count=10;
@@ -1090,6 +1291,12 @@ Value listexpassetaddresses(const json_spirit::Array& params, bool fHelp)
     }
     entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
     entity_rows->Clear();
+    
+    if(flag == 2)
+    {
+        pwalletTxsMain->WRPReadUnLock();
+        return pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL);
+    }
     
     mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL));
     WRPCheckWalletError(pwalletTxsMain->WRPGetList(&entity,entStat.m_Generation,start+1,count,entity_rows),entity.m_EntityType,"",&errCode,&strError);
@@ -1135,9 +1342,9 @@ Value listexpassetaddresses(const json_spirit::Array& params, bool fHelp)
         if(pwalletTxsMain->WRPGetLastItem(&subkey_entity,entStat.m_Generation,&erow) == 0)
         {
             int err;
-            mc_AssetBalanceDetails balance_details;
+            mc_TxAssetBalanceDetails balance_details;
             string assets_str=pwalletTxsMain->GetSubKey(erow.m_TxId,NULL,&err);
-            if(assets_str.size() == sizeof(mc_AssetBalanceDetails))
+            if(assets_str.size() == sizeof(mc_TxAssetBalanceDetails))
             {
                 memcpy(&balance_details,assets_str.c_str(),assets_str.size());
                 quantity=balance_details.m_Balance;                
@@ -1229,11 +1436,14 @@ Value listexpaddressassettxs(const json_spirit::Array& params, bool fHelp)
     int count,start;
     bool verbose=false;
     
+    int flag=0;
+    
     if (params.size() > 2)    
     {
-        verbose=paramtobool(params[2]);
+        verbose=paramtobool_or_flag(params[2],&flag);
     }
 
+ 
     count=10;
     if (params.size() > 3)    
     {
@@ -1283,6 +1493,12 @@ Value listexpaddressassettxs(const json_spirit::Array& params, bool fHelp)
     entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
     entity_rows->Clear();
     
+    if(flag == 2)
+    {
+        pwalletTxsMain->WRPReadUnLock();
+        return pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL);
+    }
+    
     mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL));
     
     WRPCheckWalletError(pwalletTxsMain->WRPGetList(&entity,entStat.m_Generation,start+1,count,entity_rows),entity.m_EntityType,"",&errCode,&strError);
@@ -1299,12 +1515,14 @@ Value listexpaddressassettxs(const json_spirit::Array& params, bool fHelp)
         
         Object entry;
         int err;
-        mc_AssetBalanceDetails balance_details;
+        mc_TxAssetBalanceDetails balance_details;
         string assets_str=pwalletTxsMain->GetSubKey(lpEntTx->m_TxId,NULL,&err);
-        if(assets_str.size() == sizeof(mc_AssetBalanceDetails))
+        if(assets_str.size() == sizeof(mc_TxAssetBalanceDetails))
         {
             memcpy(&balance_details,assets_str.c_str(),assets_str.size());
             entry.push_back(Pair("txid",balance_details.m_TxID.ToString()));
+            entry.push_back(Pair("amount",balance_details.m_Amount));                                
+/*            
             if(balance_details.m_Flags & MC_MTX_TFL_IS_INPUT)
             {
                 entry.push_back(Pair("isinput",true));
@@ -1317,6 +1535,7 @@ Value listexpaddressassettxs(const json_spirit::Array& params, bool fHelp)
                 entry.push_back(Pair("vout",(int)balance_details.m_Vinout));
                 entry.push_back(Pair("amount",balance_details.m_Amount));                                
             }
+ */ 
             entry.push_back(Pair("balance",balance_details.m_Balance));                                
         }            
         
