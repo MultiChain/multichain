@@ -510,7 +510,7 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
     if(ptr)                                                                     
     {        
         memcpy((char*)&m_DBStat+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
-        
+        m_Mode |= m_DBStat.m_InitMode & MC_WMD_MODE_MASK; 
         edbImport.Zero();
         edbImport.m_ImportID=0;
         edbImport.m_Pos=0;

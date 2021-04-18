@@ -1955,6 +1955,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     if (mapArgs.count("-autosubscribe") == 0)
                     {
                         mc_gState->m_WalletMode |= MC_WMD_AUTOSUBSCRIBE_ASSETS | MC_WMD_AUTOSUBSCRIBE_STREAMS;
+                        pwalletTxsMain->UpdateMode(MC_WMD_AUTOSUBSCRIBE_ASSETS | MC_WMD_AUTOSUBSCRIBE_STREAMS);
+                        SoftSetArg("-autosubscribe","assets,streams");
                     }
                 }
                 
@@ -2897,7 +2899,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             uiInterface.InitMessage(_("Rescanning..."));
             LogPrintf("Rescanning last %i blocks (from block %i)...\n", chainActive.Height() - pindexRescan->nHeight, pindexRescan->nHeight);
             nStart = GetTimeMillis();
+            fRescan=true;
             pwalletMain->ScanForWalletTransactions(pindexRescan, true, false);
+            fRescan=false;
             LogPrintf(" rescan      %15dms\n", GetTimeMillis() - nStart);
             pwalletMain->SetBestChain(chainActive.GetLocator());
             nWalletDBUpdated++;

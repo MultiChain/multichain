@@ -2962,7 +2962,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                         }                            
                     }                    
                 }
-            }     
+            }
             if(m_Mode & MC_WMD_AUTOSUBSCRIBE_STREAMS)
             {
                 if(mc_gState->m_TmpScript->GetNumElements() == 2) 
@@ -2979,7 +2979,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                             entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
                             if(imp->FindEntity(&entity) < 0)    
                             {
-                                if(imp->m_ImportID == 0)
+                                if((imp->m_ImportID == 0) || fRescan)
                                 {
                                     if(mc_AutosubscribeWalletMode(GetArg("-autosubscribe","none"),true) & MC_WMD_AUTOSUBSCRIBE_STREAMS)
                                     {
@@ -3030,7 +3030,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                 if(m_Mode & MC_WMD_AUTOSUBSCRIBE_ASSETS)
                 {
                     fNewAsset=false;
-                    if(imp->m_ImportID == 0)
+                    if((imp->m_ImportID == 0) || fRescan)
                     {
                         fNewAsset=true;
                     }

@@ -1354,7 +1354,8 @@ Value listexpassetaddresses(const json_spirit::Array& params, bool fHelp)
         Object entry;
         
         entry.push_back(Pair("address", address));
-        entry.push_back(Pair("qty", quantity));
+        entry.push_back(Pair("qty", (double)quantity/entity_details.GetAssetMultiple()));
+        entry.push_back(Pair("raw", quantity));                                    
         
         retArray.push_back(entry);                                
     }
@@ -1521,7 +1522,9 @@ Value listexpaddressassettxs(const json_spirit::Array& params, bool fHelp)
         {
             memcpy(&balance_details,assets_str.c_str(),assets_str.size());
             entry.push_back(Pair("txid",balance_details.m_TxID.ToString()));
-            entry.push_back(Pair("amount",balance_details.m_Amount));                                
+            entry.push_back(Pair("amount", (double)balance_details.m_Amount/entity_details.GetAssetMultiple()));
+//            entry.push_back(Pair("raw", quantity));                                    
+            //entry.push_back(Pair("amount",balance_details.m_Amount));                                
 /*            
             if(balance_details.m_Flags & MC_MTX_TFL_IS_INPUT)
             {
@@ -1536,7 +1539,8 @@ Value listexpaddressassettxs(const json_spirit::Array& params, bool fHelp)
                 entry.push_back(Pair("amount",balance_details.m_Amount));                                
             }
  */ 
-            entry.push_back(Pair("balance",balance_details.m_Balance));                                
+            entry.push_back(Pair("balance", (double)balance_details.m_Balance/entity_details.GetAssetMultiple()));
+//            entry.push_back(Pair("balance",balance_details.m_Balance));                                
         }            
         
         int block=lpEntTx->m_Block;
