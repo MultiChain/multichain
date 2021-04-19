@@ -3570,6 +3570,11 @@ uint32_t mc_GetExplorerTxDetails(int rpc_slot,
 
 int mc_WalletTxs::AddExplorerEntities(mc_Buffer *lpEntities)
 {
+    if( (m_Mode & MC_WMD_EXPLORER) == 0 )
+    {
+        return MC_ERR_NOERROR;
+    }
+    
     mc_TxEntity entity;
     entity.Zero();
     entity.m_EntityType=MC_TET_EXP_TX | MC_TET_CHAINPOS;

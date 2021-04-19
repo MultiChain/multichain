@@ -204,6 +204,11 @@ Value getentitycounts(const json_spirit::Array& params, bool fHelp)
 
         obj.push_back(Pair("transactions",       (int)entity_count));        
     }
+    else
+    {
+        obj.push_back(Pair("addresses",       Value::null));        
+        obj.push_back(Pair("transactions",       Value::null));                
+    }
     
     entStat.Zero();
     entStat.m_Entity.m_EntityType=MC_TET_ENTITY_KEY | MC_TET_CHAINPOS;

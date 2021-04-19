@@ -1013,7 +1013,7 @@ Value listexpaddressstreams(const json_spirit::Array& params, bool fHelp)
         
         Object entry;
         
-        entry=StreamEntry(entity_details.GetTxID(),0x1800);
+        entry=StreamEntry(entity_details.GetTxID(),0x02);
         if(verbose)
         {
             entStat.Zero();
@@ -1399,7 +1399,7 @@ Value listexpaddressassettxs(const json_spirit::Array& params, bool fHelp)
     uint160 asset_subkey_hash=0;
     uint160 balance_subkey_hash160=0;
     uint160 address_subkey_hash=0;
-    CBitcoinAddress address(params[0].get_str());
+    CBitcoinAddress address(params[1].get_str());
     if (!address.IsValid())
     {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");        
@@ -1425,7 +1425,7 @@ Value listexpaddressassettxs(const json_spirit::Array& params, bool fHelp)
 
     if (params[1].type() != null_type && !params[1].get_str().empty())
     {        
-        ParseEntityIdentifier(params[1],&entity_details, MC_ENT_TYPE_ASSET);           
+        ParseEntityIdentifier(params[0],&entity_details, MC_ENT_TYPE_ASSET);           
     }
     else
     {
