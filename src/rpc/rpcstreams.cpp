@@ -26,7 +26,7 @@ Value createfilterfromcmd(const Array& params, bool fHelp);
 Value createvariablefromcmd(const Array& params, bool fHelp);
 Value createlibraryfromcmd(const Array& params, bool fHelp);
 
-void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
+void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity,int *errCode,string *strError)
 {
     unsigned char buf[32];
     unsigned char buf_a[MC_AST_ASSET_REF_SIZE];
@@ -97,6 +97,19 @@ void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
             }
         }    
     }    
+}
+
+void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity)
+{
+   int errCode;
+   string strError;
+   
+   parseStreamIdentifier(stream_identifier,entity,&errCode,&strError);
+   
+    if(strError.size())
+    {
+        throw JSONRPCError(errCode, strError);            
+    }
 }
 
 Value getstreaminfo(const Array& params, bool fHelp)
@@ -1426,7 +1439,6 @@ Value liststreamtxitems(const Array& params, bool fHelp)
     }   
            
     mc_EntityDetails stream_entity;
-    parseStreamIdentifier(params[0],&stream_entity);           
     
 /*    
     mc_TxEntityStat entStat;
@@ -1449,6 +1461,8 @@ Value liststreamtxitems(const Array& params, bool fHelp)
     }
     
     Array output_array;
+    int errCode=0;
+    string strError;
     
     vector<string> inputStrings;
     vector<uint256> inputTxIDs;
@@ -1470,6 +1484,12 @@ Value liststreamtxitems(const Array& params, bool fHelp)
     
     fWRPLocked=true;
     pwalletTxsMain->WRPReadLock();
+    
+    parseStreamIdentifier(params[0],&stream_entity,&errCode,&strError);           
+    if(strError.size())
+    {
+        goto exitlbl;
+    }
     
     chain_height=chainActive.Height();
     
@@ -1493,11 +1513,18 @@ Value liststreamtxitems(const Array& params, bool fHelp)
         }
     }   
     
+exitlbl:
+                
     if(fWRPLocked)
     {
         pwalletTxsMain->WRPReadUnLock();
     }
 
+    if(strError.size())
+    {
+        throw JSONRPCError(errCode, strError);            
+    }
+    
     return output_array;    
 }
 
@@ -1595,8 +1622,6 @@ Value liststreamitems(const Array& params, bool fHelp)
     int errCode=0;
     string strError;
     
-    parseStreamIdentifier(params[0],&stream_entity);           
-
     int count,start;
     bool verbose=false;
     
@@ -1620,17 +1645,6 @@ Value liststreamitems(const Array& params, bool fHelp)
     if (params.size() > 4)
         fLocalOrdering = params[4].get_bool();
     
-    entStat.Zero();
-    memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-    entStat.m_Entity.m_EntityType=MC_TET_STREAM;
-    if(fLocalOrdering)
-    {
-        entStat.m_Entity.m_EntityType |= MC_TET_TIMERECEIVED;
-    }
-    else
-    {
-        entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
-    }
     
     bool fWRPLocked=false;
     int chain_height; 
@@ -1645,6 +1659,24 @@ Value liststreamitems(const Array& params, bool fHelp)
     
     fWRPLocked=true;    
     pwalletTxsMain->WRPReadLock();
+    
+    parseStreamIdentifier(params[0],&stream_entity,&errCode,&strError);           
+    if(strError.size())
+    {
+        goto exitlbl;
+    }
+
+    entStat.Zero();
+    memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+    entStat.m_Entity.m_EntityType=MC_TET_STREAM;
+    if(fLocalOrdering)
+    {
+        entStat.m_Entity.m_EntityType |= MC_TET_TIMERECEIVED;
+    }
+    else
+    {
+        entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
+    }
     
     if(!pwalletTxsMain->WRPFindEntity(&entStat))
     {
@@ -1751,8 +1783,6 @@ Value liststreamblockitems(const Array& params, bool fHelp)
     
     mc_EntityDetails stream_entity;
     
-    parseStreamIdentifier(params[0],&stream_entity);           
-    
     int rpc_slot=GetRPCSlot();
     if(rpc_slot < 0)
     {
@@ -1764,7 +1794,11 @@ Value liststreamblockitems(const Array& params, bool fHelp)
     fWRPLocked=true;
     pwalletTxsMain->WRPReadLock();
     
-
+    parseStreamIdentifier(params[0],&stream_entity,&errCode,&strError);           
+    if(strError.size())
+    {
+        goto exitlbl;
+    }
     
     if (params.size() > 2)    
     {
@@ -2028,7 +2062,6 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     mc_TxEntity entity;
     
     mc_EntityDetails stream_entity;
-    parseStreamIdentifier(params[0],&stream_entity);           
     int errCode=0;
     string strError;
 
@@ -2120,15 +2153,6 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     
     mc_Buffer *entity_rows=NULL;
     
-    entStat.Zero();
-    memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-    entStat.m_Entity.m_EntityType=MC_TET_STREAM_KEY;
-    if(fPublisher)
-    {
-        entStat.m_Entity.m_EntityType=MC_TET_STREAM_PUBLISHER;        
-    }
-    entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
-
     int rpc_slot=GetRPCSlot();
     if(rpc_slot < 0)
     {
@@ -2139,13 +2163,27 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     
     fWRPLocked=true;
     pwalletTxsMain->WRPReadLock();
+
+    parseStreamIdentifier(params[0],&stream_entity,&errCode,&strError);           
+    if(strError.size())
+    {
+        goto exitlbl;
+    }
+    entStat.Zero();
+    memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+    entStat.m_Entity.m_EntityType=MC_TET_STREAM_KEY;
+    if(fPublisher)
+    {
+        entStat.m_Entity.m_EntityType=MC_TET_STREAM_PUBLISHER;        
+    }
+    entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
+
     if(!pwalletTxsMain->WRPFindEntity(&entStat))
     {
         errCode=RPC_NOT_SUBSCRIBED;
         strError="Not subscribed to this stream";
         goto exitlbl;
     }
-
 
     if(fPublisher)
     {
@@ -2416,7 +2454,6 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
     string strError;
     
     mc_EntityDetails stream_entity;
-    parseStreamIdentifier(params[0],&stream_entity);           
 
     int count,start;
     bool verbose=false;
@@ -2441,18 +2478,6 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
     if (params.size() > 5)
         fLocalOrdering = params[5].get_bool();
     
-    entStat.Zero();
-    memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-    entStat.m_Entity.m_EntityType=MC_TET_STREAM_KEY;
-    if(fLocalOrdering)
-    {
-        entStat.m_Entity.m_EntityType |= MC_TET_TIMERECEIVED;
-    }
-    else
-    {
-        entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
-    }
-    
     bool entity_found=false;
     string key_string=params[1].get_str();
     vector <mc_QueryCondition> conditions;
@@ -2472,6 +2497,25 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
     
     fWRPLocked=true;
     pwalletTxsMain->WRPReadLock();
+    
+    parseStreamIdentifier(params[0],&stream_entity,&errCode,&strError);           
+    if(strError.size())
+    {
+        goto exitlbl;
+    }
+    
+    entStat.Zero();
+    memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+    entStat.m_Entity.m_EntityType=MC_TET_STREAM_KEY;
+    if(fLocalOrdering)
+    {
+        entStat.m_Entity.m_EntityType |= MC_TET_TIMERECEIVED;
+    }
+    else
+    {
+        entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
+    }
+    
     entity_found=pwalletTxsMain->WRPFindEntity(&entStat);
     
     if(!entity_found)
@@ -2568,7 +2612,6 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
     mc_Buffer *entity_rows=NULL;
     
     mc_EntityDetails stream_entity;
-    parseStreamIdentifier(params[0],&stream_entity);           
 
     int count,start;
     bool verbose=false;
@@ -2593,18 +2636,6 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
     if (params.size() > 5)
         fLocalOrdering = params[5].get_bool();
     
-    entStat.Zero();
-    memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-    entStat.m_Entity.m_EntityType=MC_TET_STREAM_PUBLISHER;
-    if(fLocalOrdering)
-    {
-        entStat.m_Entity.m_EntityType |= MC_TET_TIMERECEIVED;
-    }
-    else
-    {
-        entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
-    }
-    
     bool fWRPLocked=false;
     int chain_height; 
     int rpc_slot=GetRPCSlot();
@@ -2617,6 +2648,25 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
     
     fWRPLocked=true;
     pwalletTxsMain->WRPReadLock();
+
+    parseStreamIdentifier(params[0],&stream_entity,&errCode,&strError);           
+    if(strError.size())
+    {
+        goto exitlbl;
+    }
+    
+    entStat.Zero();
+    memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+    entStat.m_Entity.m_EntityType=MC_TET_STREAM_PUBLISHER;
+    if(fLocalOrdering)
+    {
+        entStat.m_Entity.m_EntityType |= MC_TET_TIMERECEIVED;
+    }
+    else
+    {
+        entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
+    }
+    
     if(!pwalletTxsMain->WRPFindEntity(&entStat))
     {
         errCode=RPC_NOT_SUBSCRIBED;
@@ -2822,8 +2872,6 @@ Value liststreamkeys_or_publishers(const Array& params,bool is_publishers)
     
     mc_EntityDetails stream_entity;
     
-    parseStreamIdentifier(params[0],&stream_entity);           
-
     string mode="list";
     
     if (params.size() > 2)    
@@ -2850,25 +2898,6 @@ Value liststreamkeys_or_publishers(const Array& params,bool is_publishers)
     if (params.size() > 5)
         fLocalOrdering = params[5].get_bool();
     
-    entStat.Zero();
-    memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-    if(is_publishers)
-    {
-        entStat.m_Entity.m_EntityType=MC_TET_STREAM_PUBLISHER;                
-    }
-    else
-    {
-        entStat.m_Entity.m_EntityType=MC_TET_STREAM_KEY;        
-    }
-    if(fLocalOrdering)
-    {
-        entStat.m_Entity.m_EntityType |= MC_TET_TIMERECEIVED;
-    }
-    else
-    {
-        entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
-    }
-    
     vector<string> inputStrings;
     vector<mc_TxEntity> inputEntities;
     
@@ -2889,6 +2918,31 @@ Value liststreamkeys_or_publishers(const Array& params,bool is_publishers)
     }
     
     pwalletTxsMain->WRPReadLock();
+    parseStreamIdentifier(params[0],&stream_entity,&errCode,&strError);           
+    if(strError.size())
+    {
+        goto exitlbl;
+    }
+    
+    entStat.Zero();
+    memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+    if(is_publishers)
+    {
+        entStat.m_Entity.m_EntityType=MC_TET_STREAM_PUBLISHER;                
+    }
+    else
+    {
+        entStat.m_Entity.m_EntityType=MC_TET_STREAM_KEY;        
+    }
+    if(fLocalOrdering)
+    {
+        entStat.m_Entity.m_EntityType |= MC_TET_TIMERECEIVED;
+    }
+    else
+    {
+        entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
+    }
+    
     if(!pwalletTxsMain->WRPFindEntity(&entStat))
     {
         errCode=RPC_NOT_SUBSCRIBED;
@@ -3382,7 +3436,6 @@ Value liststreamqueryitems(const Array& params, bool fHelp)
     string strError;
     
     mc_EntityDetails stream_entity;
-    parseStreamIdentifier(params[0],&stream_entity);           
 
     bool verbose=false;
     int dirty_count,max_count;
@@ -3415,6 +3468,12 @@ Value liststreamqueryitems(const Array& params, bool fHelp)
     fWRPLocked=true;
     pwalletTxsMain->WRPReadLock();
 
+    parseStreamIdentifier(params[0],&stream_entity,&errCode,&strError);           
+    if(strError.size())
+    {
+        goto exitlbl;
+    }
+    
     entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
     entity_rows->Clear();
     
