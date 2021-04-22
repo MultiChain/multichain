@@ -270,6 +270,7 @@ static const std::string vAPINames[] =
 "listexpaddressstreams",
 "listexpassetaddresses",
 "listexpaddressassettxs",
+"getexptx",
 };
 
 static const CRPCConvertParam vRPCConvertParams[] =

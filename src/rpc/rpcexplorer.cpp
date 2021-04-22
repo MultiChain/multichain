@@ -12,6 +12,13 @@
 #include "community/community.h"
 
 bool WRPSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity *entity,bool ignore_unsubscribed,int *errCode,string *strError);
+void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
+uint32_t mc_GetExplorerTxDetails(int rpc_slot,
+                                 const CTransaction& tx,
+                                 std::vector< std::map<uint160,int64_t> >& OutputAssetQuantities,
+                                 std::vector< uint160 >&OutputStreams,
+                                 std::vector<uint64_t>& InputScriptTags,
+                                 std::vector<uint64_t>& OutputScriptTags);
 
 bool paramtobool_or_flag(Value param,int *flag)
 {
@@ -461,6 +468,152 @@ exitlbl:
     }
     
     return retArray;    
+}
+
+Value getexptx(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)                        // MCHN
+        throw runtime_error("Help message not found\n");
+
+    uint256 hash = ParseHashV(params[0], "parameter 1");
+
+    bool fVerbose = false;
+    if (params.size() > 1)
+        fVerbose=paramtobool(params[1],false);
+//        fVerbose = (params[1].get_int() != 0);
+
+    CTransaction tx;
+    uint256 hashBlock = 0;
+    Object result;
+    Value block_entry;
+    
+    {
+        LOCK(cs_main);
+        if (!GetTransaction(hash, tx, hashBlock, true))
+            throw JSONRPCError(RPC_TX_NOT_FOUND, "No information available about transaction");
+
+
+        string strHex = EncodeHexTx(tx);
+
+        if (!fVerbose)        
+            return strHex;
+
+        result.push_back(Pair("hex", strHex));
+        TxToJSON(tx, hashBlock, result);
+        
+        BOOST_FOREACH(Pair& a, result) 
+        {
+            if(a.name_ == "confirmations")
+            {            
+                if(a.value_.get_int() > 0)
+                {
+                    block_entry=chainActive.Height()-a.value_.get_int()+1;
+                }
+            }
+        }
+    }
+
+    mc_TxEntityStat entStat;
+    mc_TxEntity entity;
+    int errCode;
+    string strError;
+    vector <mc_QueryCondition> conditions;
+    Array retArray;
+    mc_Buffer *entity_rows=NULL;
+    std::vector< std::map<uint160,int64_t> > OutputAssetQuantities;
+    std::vector< uint160 >OutputStreams;
+    std::vector<uint64_t>InputScriptTags;
+    std::vector<uint64_t>OutputScriptTags;
+    uint32_t tx_tag;
+    
+    entStat.Zero();
+    entStat.m_Entity.m_EntityType=MC_TET_EXP_REDEEM_KEY;
+    entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
+    
+    bool fWRPLocked=false;
+    int rpc_slot=GetRPCSlot();
+    if(rpc_slot < 0)
+    {
+        errCode=RPC_INTERNAL_ERROR;
+        strError="Couldn't find RPC Slot";
+        goto exitlbl;
+    }
+    
+    fWRPLocked=true;
+    pwalletTxsMain->WRPReadLock();
+    if(!pwalletTxsMain->WRPFindEntity(&entStat))
+    {
+        errCode=RPC_NOT_SUBSCRIBED;
+        strError="Not subscribed to this stream";
+        goto exitlbl;
+    }
+    
+    
+    tx_tag=mc_GetExplorerTxDetails(rpc_slot,tx,OutputAssetQuantities,OutputStreams,InputScriptTags,OutputScriptTags);
+    
+    result.push_back(Pair("block", block_entry));
+    result.push_back(Pair("tags", TagEntry(tx_tag)));
+    
+    BOOST_FOREACH(Pair& a, result) 
+    {
+        if(a.name_ == "vin")
+        {            
+            
+            for(int j=0;j<(int)a.value_.get_array().size();j++)
+            {
+                a.value_.get_array()[j].get_obj().push_back(Pair("tags", TagEntry(InputScriptTags[j])));
+            }
+        }
+        if(a.name_ == "vout")
+        {                        
+            for(int i=0;i<(int)a.value_.get_array().size();i++)
+            {
+                a.value_.get_array()[i].get_obj().push_back(Pair("tags", TagEntry(OutputScriptTags[i])));
+                
+                COutPoint txout=COutPoint(hash,i);
+                const unsigned char *ptr;
+                uint160 subkey_hash160;
+
+                ptr=(unsigned char*)&txout;
+                subkey_hash160=Hash160(ptr,ptr+sizeof(COutPoint));
+                memcpy(entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+                entity.m_EntityType=entStat.m_Entity.m_EntityType | MC_TET_SUBKEY;    
+                entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
+                entity_rows->Clear();
+                WRPCheckWalletError(pwalletTxsMain->WRPGetList(&entity,entStat.m_Generation,1,1,entity_rows),entity.m_EntityType,"",&errCode,&strError);
+                Value redeem_entry=Value::null;
+                if(entity_rows->GetCount())
+                {
+                    Object entry;
+
+                    mc_TxEntityRow *lpEntTx;
+                    lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(0);
+                    uint256 hash;
+
+                    memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);                
+                    entry.push_back(Pair("txid", hash.ToString()));
+                    entry.push_back(Pair("vin", (int)lpEntTx->m_Flags));   
+                    
+                    redeem_entry=entry;                    
+                }
+                a.value_.get_array()[i].get_obj().push_back(Pair("redeem", redeem_entry));
+            }
+        }
+    }
+
+exitlbl:
+                
+    if(fWRPLocked)
+    {
+        pwalletTxsMain->WRPReadUnLock();
+    }
+
+    if(strError.size())
+    {
+        throw JSONRPCError(errCode, strError);            
+    }
+                
+    return result;
 }
 
 Value listexpaddresses(const json_spirit::Array& params, bool fHelp)
