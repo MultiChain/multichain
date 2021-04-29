@@ -7,6 +7,8 @@
 
 #define MC_TDB_MAX_TXS_FILE_SIZE             0x8000000                          // Maximal data file size, 128MB
 
+unsigned char null_txentityid[MC_TDB_ENTITY_ID_SIZE];
+
 int IsCSkipped(int type)
 {
     return 0;
@@ -105,8 +107,10 @@ int mc_TxImport::Init(int generation,int block)
     m_Block=block;
     m_Entities=new mc_Buffer;
     m_TmpEntities=new mc_Buffer;
+    m_TmpGlobalSubKeyEntities=new mc_Buffer;
     
     m_TmpEntities->Initialize(sizeof(mc_TxEntity),sizeof(mc_TxEntity)+sizeof(mc_TxEntityRowExtension),MC_BUF_MODE_MAP);    
+    m_TmpGlobalSubKeyEntities->Initialize(sizeof(mc_TxEntity),sizeof(mc_TxEntity)+sizeof(mc_TxEntityRowExtension),MC_BUF_MODE_MAP);    
     return m_Entities->Initialize(sizeof(mc_TxEntity),sizeof(mc_TxEntityStat),MC_BUF_MODE_MAP);    
 }
 
@@ -691,6 +695,8 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
         }
     }
    
+    memset(null_txentityid,0,MC_TDB_ENTITY_ID_SIZE);    
+
     WRPSync(1);
     
     return err;
@@ -1327,6 +1333,18 @@ int mc_TxDB::IncrementSubKey(
         }
     }
 
+    if(memcmp(parent_entity->m_EntityID,null_txentityid,MC_TDB_ENTITY_ID_SIZE) == 0)
+    {
+        mc_TxEntity global_subkeys_entity;        
+        unsigned char subkey_data[MC_TDB_ENTITY_KEY_SIZE];
+        imp->m_TmpGlobalSubKeyEntities->Clear();
+        global_subkeys_entity.Zero();
+        global_subkeys_entity.m_EntityType=MC_TET_GLOBAL_SUBKEY_LIST | MC_TET_CHAINPOS;
+        imp->m_TmpGlobalSubKeyEntities->Add(&global_subkeys_entity,NULL);
+        memset(subkey_data,0,MC_TDB_ENTITY_KEY_SIZE);
+        memcpy(subkey_data,entity,sizeof(mc_TxEntity));
+        err=AddData(imp,subkey_data,NULL,0,block,0,0,imp->m_TmpGlobalSubKeyEntities);        
+    }
 
 exitlbl:
 
@@ -2484,16 +2502,19 @@ int mc_TxDB::RollBack(mc_TxImport *import,int block)
     unsigned char *ptr;
     int err;
     char msg[256];
-    
-    int i,j;
+
+    int i,j,r,from,count,fInBlocks;
     mc_TxImport *imp;
     mc_Buffer *mempool;
+    mc_Buffer *lpEntRowBuffer; 
     mc_TxEntityStat *stat;
     mc_TxEntityRow *lperow;
     mc_TxImportRow edbImport;
     mc_TxEntityRow erow;
     uint32_t pos;
-    
+    mc_TxEntity global_subkeys_entity;
+    mc_TxEntity subkey_entity;
+            
     err=MC_ERR_NOERROR;
    
     Dump("Before RollBack");
@@ -2505,6 +2526,50 @@ int mc_TxDB::RollBack(mc_TxImport *import,int block)
         mempool=m_MemPools[import-m_Imports];
     }
 
+    
+    global_subkeys_entity.Zero();                                               // Decrementing subkeys of global subscriptions
+    global_subkeys_entity.m_EntityType=MC_TET_GLOBAL_SUBKEY_LIST | MC_TET_CHAINPOS;
+    if(imp->FindEntity(&global_subkeys_entity) >= 0)                            
+    {
+        lpEntRowBuffer=new mc_Buffer;
+        lpEntRowBuffer->Initialize(MC_TDB_ENTITY_KEY_SIZE,sizeof(mc_TxEntityRow),MC_BUF_MODE_DEFAULT);
+        fInBlocks=1;
+        from=0;
+        count=10;
+        while(fInBlocks)                                                        // While in relevant block range        
+        {
+            err=GetList(&global_subkeys_entity,from,count,lpEntRowBuffer);
+            if( (err == MC_ERR_NOERROR) && (lpEntRowBuffer->GetCount() > 0) )
+            {
+                for(r=lpEntRowBuffer->GetCount()-1;r >= 0;r--)                  // Processing  rows in reverse order
+                {
+                    lperow=(mc_TxEntityRow *)(lpEntRowBuffer->GetRow(r));
+                    if(fInBlocks &&                                             // Still in loop, no error
+                      ((lperow->m_Block > block) ||                             // Block to delete
+                       (lperow->m_Block < 0)))                                  // In mempool
+                    {
+                        subkey_entity.Zero();
+                        memcpy(&subkey_entity,lperow->m_TxId,sizeof(mc_TxEntity));
+                        err=DecrementSubKey(imp,&global_subkeys_entity,&subkey_entity);
+                        if(err)
+                        {
+                            goto exitlbl;
+                        }
+                    }
+                    else
+                    {
+                        if(lperow->m_Block >= 0)
+                        {
+                            fInBlocks=false;                                
+                        }
+                    }                    
+                }
+            }
+            from -= count;
+        }
+    }
+    
+    
     for(i=0;i<mempool->GetCount();i++)                                          // removing decremented subkey rows
     {
         lperow=(mc_TxEntityRow *)mempool->GetRow(i);        

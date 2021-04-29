@@ -2083,6 +2083,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 pwalletTxsMain->AddEntity(&entity,0);
                 entity.m_EntityType=MC_TET_ENTITY_KEY | MC_TET_CHAINPOS;
                 pwalletTxsMain->AddEntity(&entity,0);
+                entity.m_EntityType=MC_TET_GLOBAL_SUBKEY_LIST | MC_TET_CHAINPOS;
+                pwalletTxsMain->AddEntity(&entity,0);
 
                 pwalletTxsMain->AddExplorerEntities(NULL);
                 
@@ -2669,6 +2671,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
                 CBlock &genesis_block = const_cast<CBlock&>(Params().GenesisBlock());
                 GenesisBlockSize=::GetSerializeSize(genesis_block, SER_DISK, CLIENT_VERSION);
+                GenesisCoinBaseTx=genesis_block.vtx[0];
+                GenesisCoinBaseTxID=GenesisCoinBaseTx.GetHash();
+                
                 
                 // Check for changed -txindex state
 /* MCHN START */    

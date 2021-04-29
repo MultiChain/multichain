@@ -32,6 +32,7 @@
 #define MC_TET_AUTHOR                           0x00000009
 #define MC_TET_ENTITY                           0x0000000A
 #define MC_TET_ENTITY_KEY                       0x0000000B
+#define MC_TET_GLOBAL_SUBKEY_LIST               0x0000000F // List of subkeys of global subscription to be decremented on rollback
 #define MC_TET_EXP_TX                           0x00000010 // global, key-block, publisher-address, item - txid, direct
 #define MC_TET_EXP_REDEEM                       0x00000011 // global, key-txid/vout, item - txid/vin, direct 
 #define MC_TET_EXP_TXOUT_ASSETS                 0x00000012 // global, key-txid/vout, item - asset quantities (direct if single asset)
@@ -199,6 +200,7 @@ typedef struct mc_TxImport
     int m_Block;                                                                // last block index
     mc_Buffer *m_Entities;                                                     // List of import entities (mc_TxEntityStat)
     mc_Buffer *m_TmpEntities;                                                  // Temporary list of entities (mc_TxEntity)
+    mc_Buffer *m_TmpGlobalSubKeyEntities;                                      
     mc_TxImport()
     {
         Zero();

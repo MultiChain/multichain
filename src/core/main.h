@@ -570,6 +570,8 @@ bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex);
 /** The currently-connected chain of blocks. */
 extern CChain chainActive;
 extern int GenesisBlockSize;
+extern uint256 GenesisCoinBaseTxID;
+extern CTransaction GenesisCoinBaseTx;
 
 /** Global variable that points to the active CCoinsView (protected by cs_main) */
 extern CCoinsViewCache *pcoinsTip;

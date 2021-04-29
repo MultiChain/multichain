@@ -104,6 +104,9 @@ bool fIsBareMultisigStd = true;
 unsigned int nCoinCacheSize = 5000;
 int GenesisBlockSize=0;
 int nLastForkedHeight=0;
+uint256 GenesisCoinBaseTxID=0;
+CTransaction GenesisCoinBaseTx;
+
 vector<CBlockIndex*> vFirstOnThisHeight;
 
 /** Fees smaller than this (in satoshi) are considered zero fee (for relaying and mining) */
@@ -1736,6 +1739,13 @@ bool GetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock
         }
     }
 
+    if (hash == GenesisCoinBaseTxID)
+    {
+        txOut = GenesisCoinBaseTx;
+        hashBlock=chainActive.Genesis()->GetBlockHash();
+        return true;
+    }
+    
     return false;
 }
 

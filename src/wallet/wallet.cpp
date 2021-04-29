@@ -1397,6 +1397,8 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, bool fOnlySubscri
         lpEntities->Add(&entity,NULL);
         entity.m_EntityType=MC_TET_ENTITY_KEY | MC_TET_CHAINPOS;
         lpEntities->Add(&entity,NULL);
+        entity.m_EntityType=MC_TET_GLOBAL_SUBKEY_LIST | MC_TET_CHAINPOS;
+        lpEntities->Add(&entity,NULL);
             
         pwalletTxsMain->AddExplorerEntities(lpEntities);
 
@@ -1590,7 +1592,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
 /* MCHN END */            
             if(!fOnlyUnsynced)
             {
-                if((pindex->nHeight % 1000) == 0)
+                if(((pindex->nHeight % 1000) == 0) || (pindex->nHeight == chainActive.Height()) ) 
                 {
                     printf("%d of %d blocks rescanned\n",pindex->nHeight,chainActive.Height());
                 }
@@ -1653,6 +1655,10 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
         }
         else
         {
+            if(!fOnlyUnsynced)
+            {
+                printf("Rescan complete\n");                
+            }
             LogPrint("wallet","Rescan completed successfully\n");            
         }
     }

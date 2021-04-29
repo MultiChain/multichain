@@ -13,12 +13,35 @@
 
 bool WRPSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity *entity,bool ignore_unsubscribed,int *errCode,string *strError);
 void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
+uint32_t mc_GetExplorerTxOutputDetails(int rpc_slot,
+                                 const CTransaction& tx,
+                                 std::vector< std::map<uint160,uint32_t> >& OutputAddresses,
+                                 std::vector< std::map<uint160,int64_t> >& OutputAssetQuantities,
+                                 std::vector< uint160 >&OutputStreams,
+//                                 std::vector<uint64_t>& InputScriptTags,
+                                 std::vector<uint64_t>& OutputScriptTags);
+uint32_t mc_GetExplorerTxInputDetails(int rpc_slot,
+                                 mc_TxImport *import,                   
+                                 const CTransaction& tx,
+                                 std::vector< std::map<uint160,uint32_t> >& InputAddresses,
+                                 std::vector< std::map<uint160,int64_t> >& InputAssetQuantities,
+                                 std::vector< int >& InputSigHashTypes,
+                                 std::vector<uint64_t>& InputScriptTags);
+uint32_t mc_CheckExplorerAssetTransfers(
+                                 std::vector< std::map<uint160,uint32_t> >& InputAddresses,
+                                 std::vector< std::map<uint160,int64_t> >& InputAssetQuantities,
+                                 std::vector< std::map<uint160,uint32_t> >& OutputAddresses,
+                                 std::vector< std::map<uint160,int64_t> >& OutputAssetQuantities,
+                                 void *lpAssetsAddressQuantitiesOut);
+
+/*
 uint32_t mc_GetExplorerTxDetails(int rpc_slot,
                                  const CTransaction& tx,
                                  std::vector< std::map<uint160,int64_t> >& OutputAssetQuantities,
                                  std::vector< uint160 >&OutputStreams,
                                  std::vector<uint64_t>& InputScriptTags,
                                  std::vector<uint64_t>& OutputScriptTags);
+*/
 
 bool paramtobool_or_flag(Value param,int *flag)
 {
@@ -520,11 +543,15 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
     vector <mc_QueryCondition> conditions;
     Array retArray;
     mc_Buffer *entity_rows=NULL;
-    std::vector< std::map<uint160,int64_t> > OutputAssetQuantities;
+    std::vector< std::map<uint160,int64_t> >OutputAssetQuantities;
     std::vector< uint160 >OutputStreams;
+    std::vector< std::map<uint160,int64_t> >InputAssetQuantities;
+    std::vector< std::map<uint160,uint32_t> >InputAddresses;
+    std::vector< int > InputSigHashTypes;
+    std::vector< std::map<uint160,uint32_t> >OutputAddresses;
     std::vector<uint64_t>InputScriptTags;
     std::vector<uint64_t>OutputScriptTags;
-    uint32_t tx_tag;
+    uint32_t tx_tag,real_tx_asset_tag;
     
     entStat.Zero();
     entStat.m_Entity.m_EntityType=MC_TET_EXP_REDEEM_KEY;
@@ -549,7 +576,19 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
     }
     
     
-    tx_tag=mc_GetExplorerTxDetails(rpc_slot,tx,OutputAssetQuantities,OutputStreams,InputScriptTags,OutputScriptTags);
+    tx_tag=mc_GetExplorerTxOutputDetails(rpc_slot,tx,OutputAddresses,OutputAssetQuantities,OutputStreams,OutputScriptTags);
+    tx_tag |= mc_GetExplorerTxInputDetails(rpc_slot,NULL,tx,InputAddresses,InputAssetQuantities,InputSigHashTypes,InputScriptTags);
+    
+    real_tx_asset_tag=mc_CheckExplorerAssetTransfers(InputAddresses,InputAssetQuantities,OutputAddresses,OutputAssetQuantities,NULL);
+    
+    if(tx_tag & MC_MTX_TAG_ASSET_TRANSFER)
+    {
+        if( (real_tx_asset_tag & MC_MTX_TAG_ASSET_TRANSFER) == 0)
+        {
+            tx_tag -= MC_MTX_TAG_ASSET_TRANSFER;
+        }
+    }
+    
     
     result.push_back(Pair("block", block_entry));
     result.push_back(Pair("tags", TagEntry(tx_tag)));
@@ -562,6 +601,35 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
             for(int j=0;j<(int)a.value_.get_array().size();j++)
             {
                 a.value_.get_array()[j].get_obj().push_back(Pair("tags", TagEntry(InputScriptTags[j])));
+                Array assets;
+                for (map<uint160,int64_t>::const_iterator it_asset = InputAssetQuantities[j].begin(); it_asset != InputAssetQuantities[j].end(); ++it_asset) 
+                {
+                    mc_EntityDetails entity_details;
+                    Object asset_entry;
+                    mc_gState->m_Assets->FindEntityByShortTxID(&entity_details,(unsigned char*)&(it_asset->first));
+                    asset_entry=AssetEntry(entity_details.GetTxID(),it_asset->second,0x05);
+                    assets.push_back(asset_entry);
+                }
+                if(assets.size())
+                {
+                    a.value_.get_array()[j].get_obj().push_back(Pair("assets", assets));
+                }
+                Array addresses;
+                for (map<uint160,uint32_t>::const_iterator it_address = InputAddresses[j].begin(); it_address != InputAddresses[j].end(); ++it_address) 
+                {
+                    if(it_address->second & MC_SFL_IS_SCRIPTHASH)
+                    {
+                        addresses.push_back(CBitcoinAddress(CScriptID(it_address->first)).ToString());
+                    }
+                    else
+                    {
+                        addresses.push_back(CBitcoinAddress(CKeyID(it_address->first)).ToString());                        
+                    }
+                }                
+                if(addresses.size())
+                {
+                    a.value_.get_array()[j].get_obj().push_back(Pair("addresses", addresses));
+                }
             }
         }
         if(a.name_ == "vout")
