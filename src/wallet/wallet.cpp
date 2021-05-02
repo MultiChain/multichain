@@ -1447,7 +1447,7 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, bool fOnlySubscri
                     b=(int)mc_GetLE(ptr,4)-1;
                 }
                 
-                if(b > block)
+                if(b >= block)
                 {
                     if(b < block_to_start_from)
                     {
@@ -1557,6 +1557,10 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
                         if(pindex->nHeight)                                     // Skip 0-block coinbase
                         {
                             err=pwalletTxsMain->AddTx(imp,tx,pindex->nHeight,&pos,block_tx_index,pindex->GetBlockHash());
+                        }
+                        else
+                        {
+                            pwalletTxsMain->AddExplorerTx(imp,tx,pindex->nHeight);
                         }
                     }
                 }
