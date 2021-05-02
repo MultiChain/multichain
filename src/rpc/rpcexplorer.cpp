@@ -246,11 +246,13 @@ Value listexpmap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& input
 {
     mc_TxEntity entity;
     mc_TxEntityStat entStat;
+    mc_TxEntity sec_entity;
+    mc_TxEntityStat sec_entStat;
     Array retArray;
     mc_Buffer *entity_rows;
     mc_TxEntityRow erow;
     uint160 subkey_hash;    
-    int row,enitity_count;
+    int row,enitity_count,sec_entity_count;
     
     int rpc_slot=GetRPCSlot();
     if(rpc_slot < 0)
@@ -326,6 +328,31 @@ Value listexpmap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& input
         all_entry.push_back(Pair("txs", total));                                                                        
         all_entry.push_back(Pair("confirmed", confirmed));                                                                        
         
+        if((parent_entity->m_EntityType & MC_TET_TYPE_MASK) == MC_TET_EXP_TX_PUBLISHER)
+        {        
+            sec_entStat.Zero();
+            sec_entStat.m_Entity.m_EntityType=MC_TET_EXP_ADDRESS_ASSETS_KEY;
+            sec_entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
+            sec_entity.Zero();
+            WRPSubKeyEntityFromExpAddress(key_string,sec_entStat,&sec_entity,false,errCode,strError);
+            if(strError->size())
+            {
+                return Value::null;
+            }
+            sec_entity_count=pwalletTxsMain->WRPGetListSize(&sec_entity,entStat.m_Generation,NULL);
+            all_entry.push_back(Pair("assets", sec_entity_count));                                                                        
+            sec_entStat.Zero();
+            sec_entStat.m_Entity.m_EntityType=MC_TET_EXP_ADDRESS_STREAMS_KEY;
+            sec_entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
+            sec_entity.Zero();
+            WRPSubKeyEntityFromExpAddress(key_string,sec_entStat,&sec_entity,false,errCode,strError);
+            if(strError->size())
+            {
+                return Value::null;
+            }
+            sec_entity_count=pwalletTxsMain->WRPGetListSize(&sec_entity,entStat.m_Generation,NULL);
+            all_entry.push_back(Pair("streams", sec_entity_count));                                                                        
+        }
         if(mode == "all")
         {
             int chain_height=chainActive.Height();

@@ -3873,7 +3873,7 @@ int mc_WalletTxs::AddExplorerTx(
     uint160 subkey_hash160;
     uint160 balance_subkey_hash160;
     set<uint160> publishers_set;
-    
+
     bool fFound;
     uint256 hash;
     uint32_t block_key;
@@ -3906,6 +3906,16 @@ int mc_WalletTxs::AddExplorerTx(
     {
         imp=m_Database->FindImport(0);
     }
+    
+    entity.Zero();    
+    entity.m_EntityType=MC_TET_EXP_TX_KEY | MC_TET_CHAINPOS;
+
+    stat=imp->GetEntity(imp->FindEntity(&entity));
+    if(stat == NULL)
+    {
+        goto exitlbl;        
+    }
+    generation=stat->m_Generation;
     
     hash=tx.GetHash();
     
@@ -3992,8 +4002,6 @@ int mc_WalletTxs::AddExplorerTx(
         block_key=(uint32_t)block;
     }
     
-    entity.Zero();
-    
     memcpy(&subkey_hash160,&block_key,sizeof(uint32_t));
     subkey_hash256=0;
     memcpy(&subkey_hash256,&subkey_hash160,sizeof(subkey_hash160));
@@ -4004,11 +4012,7 @@ int mc_WalletTxs::AddExplorerTx(
         goto exitlbl;
     }
 
-    entity.m_EntityType=MC_TET_EXP_TX_KEY | MC_TET_CHAINPOS;
-
-    stat=imp->GetEntity(imp->FindEntity(&entity));
     
-    generation=stat->m_Generation;
 /*    
     InputAssetQuantities.resize(tx.vin.size());
     InputAddresses.resize(tx.vin.size());
@@ -4370,102 +4374,104 @@ int mc_WalletTxs::AddExplorerTx(
         }
     }
     
-    for(i=0;i<(int)tx.vout.size();i++)                     
-    {        
-        const CTxOut txout=tx.vout[i];
-        const CScript& script1 = txout.scriptPubKey;        
-        CScript::const_iterator pc1 = script1.begin();
-        
-        mc_gState->m_TmpScript->Clear();
-        mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
-        if(mc_gState->m_TmpScript->IsOpReturnScript() == 0)
-        {                
-            if(OutputAddresses[i].size() == 1)
-            {
-                uint32_t publisher_flags;
-                entity.Zero();
-                subkey_hash160=OutputAddresses[i].begin()->first;
-                publisher_flags=MC_SFL_SUBKEY | MC_SFL_IS_ADDRESS | OutputAddresses[i].begin()->second;
+    if(block != 0)
+    {
+        for(i=0;i<(int)tx.vout.size();i++)                     
+        {        
+            const CTxOut txout=tx.vout[i];
+            const CScript& script1 = txout.scriptPubKey;        
+            CScript::const_iterator pc1 = script1.begin();
 
-                if(publishers_set.count(subkey_hash160) == 0)
+            mc_gState->m_TmpScript->Clear();
+            mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+            if(mc_gState->m_TmpScript->IsOpReturnScript() == 0)
+            {                
+                if(OutputAddresses[i].size() == 1)
                 {
-                    publishers_set.insert(subkey_hash160);
+                    uint32_t publisher_flags;
+                    entity.Zero();
+                    subkey_hash160=OutputAddresses[i].begin()->first;
+                    publisher_flags=MC_SFL_SUBKEY | MC_SFL_IS_ADDRESS | OutputAddresses[i].begin()->second;
+
+                    if(publishers_set.count(subkey_hash160) == 0)
+                    {
+                        publishers_set.insert(subkey_hash160);
+                        subkey_hash256=0;
+                        memcpy(&subkey_hash256,&subkey_hash160,sizeof(subkey_hash160));
+                        err=m_Database->AddSubKeyDef(imp,(unsigned char*)&subkey_hash256,NULL,0,publisher_flags);
+                        if(err)
+                        {
+                            goto exitlbl;
+                        }
+
+                        entity.m_EntityType=MC_TET_EXP_TX_PUBLISHER | MC_TET_CHAINPOS;
+                        subkey_entity.Zero();
+                        memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+                        subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_TX_PUBLISHER | MC_TET_CHAINPOS;
+                        err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,tx_tag,fFound ? 0 : 1);
+                        if(err)
+                        {
+                            goto exitlbl;
+                        }             
+                    }
+                }
+            }
+
+            if(OutputAssetQuantities[i].size())
+            {
+                COutPoint txout=COutPoint(hash,i);
+
+                const unsigned char *ptr;
+
+                ptr=(unsigned char*)&txout;
+                subkey_hash160=Hash160(ptr,ptr+sizeof(COutPoint));
+                entity.m_EntityType=MC_TET_EXP_TXOUT_ASSETS_KEY | MC_TET_CHAINPOS;
+                subkey_entity.Zero();
+                memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+                subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_TXOUT_ASSETS_KEY | MC_TET_CHAINPOS;
+                flags=0;
+                if(OutputAssetQuantities[i].size() > 1)
+                {
+                    flags=MC_MTX_TFL_MULTIPLE_TXOUT_ASSETS;
+                    mc_gState->m_TmpBuffers->m_ExplorerTxScript->Clear();
+                    mc_gState->m_TmpBuffers->m_ExplorerTxScript->AddElement();
+                    for (map<uint160,int64_t>::const_iterator it = OutputAssetQuantities[i].begin(); it != OutputAssetQuantities[i].end(); ++it) 
+                    {
+                        mc_gState->m_TmpBuffers->m_ExplorerTxScript->SetData((unsigned char*)&(it->first),sizeof(uint160));
+                        mc_gState->m_TmpBuffers->m_ExplorerTxScript->SetData((unsigned char*)&(it->second),sizeof(int64_t));
+                    }
                     subkey_hash256=0;
                     memcpy(&subkey_hash256,&subkey_hash160,sizeof(subkey_hash160));
-                    err=m_Database->AddSubKeyDef(imp,(unsigned char*)&subkey_hash256,NULL,0,publisher_flags);
+                    memcpy((unsigned char*)&subkey_hash256+sizeof(subkey_hash160),(unsigned char*)&(subkey_entity.m_EntityType),sizeof(uint32_t));// To distinguish from other possible stuff for this txout 
+                    subkey_hash256=Hash(mc_gState->m_TmpBuffers->m_ExplorerTxScript->m_lpData,
+                                        mc_gState->m_TmpBuffers->m_ExplorerTxScript->m_lpData+mc_gState->m_TmpBuffers->m_ExplorerTxScript->GetSize());
+                    err=m_Database->AddSubKeyDef(imp,(unsigned char*)&subkey_hash256,mc_gState->m_TmpBuffers->m_ExplorerTxScript->m_lpData,
+                                                                                     mc_gState->m_TmpBuffers->m_ExplorerTxScript->GetSize(),0);
                     if(err)
                     {
                         goto exitlbl;
                     }
-
-                    entity.m_EntityType=MC_TET_EXP_TX_PUBLISHER | MC_TET_CHAINPOS;
-                    subkey_entity.Zero();
-                    memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
-                    subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_TX_PUBLISHER | MC_TET_CHAINPOS;
-                    err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,tx_tag,fFound ? 0 : 1);
+                    err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&subkey_hash256,NULL,block,flags,1);
                     if(err)
                     {
                         goto exitlbl;
-                    }             
+                    }                            
+                }
+                else
+                {
+                    map<uint160,int64_t>::const_iterator it = OutputAssetQuantities[i].begin();
+                    subkey_hash256=0;
+                    memcpy(&subkey_hash256,&(it->first),sizeof(uint160));
+                    memcpy((unsigned char*)&subkey_hash256+sizeof(subkey_hash160),&(it->second),sizeof(int64_t));
+                    err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&subkey_hash256,NULL,block,flags,1);
+                    if(err)
+                    {
+                        goto exitlbl;
+                    }                                            
                 }
             }
         }
-        
-        if(OutputAssetQuantities[i].size())
-        {
-            COutPoint txout=COutPoint(hash,i);
-            
-            const unsigned char *ptr;
-            
-            ptr=(unsigned char*)&txout;
-            subkey_hash160=Hash160(ptr,ptr+sizeof(COutPoint));
-            entity.m_EntityType=MC_TET_EXP_TXOUT_ASSETS_KEY | MC_TET_CHAINPOS;
-            subkey_entity.Zero();
-            memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
-            subkey_entity.m_EntityType=MC_TET_SUBKEY_EXP_TXOUT_ASSETS_KEY | MC_TET_CHAINPOS;
-            flags=0;
-            if(OutputAssetQuantities[i].size() > 1)
-            {
-                flags=MC_MTX_TFL_MULTIPLE_TXOUT_ASSETS;
-                mc_gState->m_TmpBuffers->m_ExplorerTxScript->Clear();
-                mc_gState->m_TmpBuffers->m_ExplorerTxScript->AddElement();
-                for (map<uint160,int64_t>::const_iterator it = OutputAssetQuantities[i].begin(); it != OutputAssetQuantities[i].end(); ++it) 
-                {
-                    mc_gState->m_TmpBuffers->m_ExplorerTxScript->SetData((unsigned char*)&(it->first),sizeof(uint160));
-                    mc_gState->m_TmpBuffers->m_ExplorerTxScript->SetData((unsigned char*)&(it->second),sizeof(int64_t));
-                }
-                subkey_hash256=0;
-                memcpy(&subkey_hash256,&subkey_hash160,sizeof(subkey_hash160));
-                memcpy((unsigned char*)&subkey_hash256+sizeof(subkey_hash160),(unsigned char*)&(subkey_entity.m_EntityType),sizeof(uint32_t));// To distinguish from other possible stuff for this txout 
-                subkey_hash256=Hash(mc_gState->m_TmpBuffers->m_ExplorerTxScript->m_lpData,
-                                    mc_gState->m_TmpBuffers->m_ExplorerTxScript->m_lpData+mc_gState->m_TmpBuffers->m_ExplorerTxScript->GetSize());
-                err=m_Database->AddSubKeyDef(imp,(unsigned char*)&subkey_hash256,mc_gState->m_TmpBuffers->m_ExplorerTxScript->m_lpData,
-                                                                                 mc_gState->m_TmpBuffers->m_ExplorerTxScript->GetSize(),0);
-                if(err)
-                {
-                    goto exitlbl;
-                }
-                err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&subkey_hash256,NULL,block,flags,1);
-                if(err)
-                {
-                    goto exitlbl;
-                }                            
-            }
-            else
-            {
-                map<uint160,int64_t>::const_iterator it = OutputAssetQuantities[i].begin();
-                subkey_hash256=0;
-                memcpy(&subkey_hash256,&(it->first),sizeof(uint160));
-                memcpy((unsigned char*)&subkey_hash256+sizeof(subkey_hash160),&(it->second),sizeof(int64_t));
-                err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&subkey_hash256,NULL,block,flags,1);
-                if(err)
-                {
-                    goto exitlbl;
-                }                                            
-            }
-        }
-    }
-    
+    }    
     
     timestamp=mc_TimeNowAsUInt();
     
