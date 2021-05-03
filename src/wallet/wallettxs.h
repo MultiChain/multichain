@@ -71,7 +71,14 @@ struct mc_TxAssetBalanceDetails
     int64_t m_Balance;    
 };
 
+struct mc_TxAddressAssetQuantity
+{
+    uint160 m_Address;
+    uint160 m_Asset;
+    int64_t m_Amount;
+};
 
+        
 typedef struct mc_WalletCachedSubKey
 {
     mc_TxEntity m_Entity;

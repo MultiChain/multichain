@@ -32,7 +32,7 @@ uint32_t mc_CheckExplorerAssetTransfers(
                                  std::vector< std::map<uint160,int64_t> >& InputAssetQuantities,
                                  std::vector< std::map<uint160,uint32_t> >& OutputAddresses,
                                  std::vector< std::map<uint160,int64_t> >& OutputAssetQuantities,
-                                 void *lpAssetsAddressQuantitiesOut);
+                                 std::map<uint160,mc_TxAddressAssetQuantity>& AssetsAddressQuantities);
 
 /*
 uint32_t mc_GetExplorerTxDetails(int rpc_slot,
@@ -578,7 +578,11 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
     std::vector< std::map<uint160,uint32_t> >OutputAddresses;
     std::vector<uint64_t>InputScriptTags;
     std::vector<uint64_t>OutputScriptTags;
+    std::map<uint160,mc_TxAddressAssetQuantity> AddressAssetQuantities;
     uint32_t tx_tag,real_tx_asset_tag;
+    bool flags_found=false;
+    uint32_t address_flags=0;
+    Array assets;
     
     entStat.Zero();
     entStat.m_Entity.m_EntityType=MC_TET_EXP_REDEEM_KEY;
@@ -606,7 +610,7 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
     tx_tag=mc_GetExplorerTxOutputDetails(rpc_slot,tx,OutputAddresses,OutputAssetQuantities,OutputStreams,OutputScriptTags);
     tx_tag |= mc_GetExplorerTxInputDetails(rpc_slot,NULL,tx,InputAddresses,InputAssetQuantities,InputSigHashTypes,InputScriptTags);
     
-    real_tx_asset_tag=mc_CheckExplorerAssetTransfers(InputAddresses,InputAssetQuantities,OutputAddresses,OutputAssetQuantities,NULL);
+    real_tx_asset_tag=mc_CheckExplorerAssetTransfers(InputAddresses,InputAssetQuantities,OutputAddresses,OutputAssetQuantities,AddressAssetQuantities);
     
     if(tx_tag & MC_MTX_TAG_ASSET_TRANSFER)
     {
@@ -616,8 +620,41 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
         }
     }
     
+    for (map<uint160,mc_TxAddressAssetQuantity>::const_iterator it_balance = AddressAssetQuantities.begin(); it_balance != AddressAssetQuantities.end(); ++it_balance) 
+    {
+        mc_EntityDetails entity_details;
+        if(it_balance->second.m_Amount != 0)
+        {
+            if(mc_gState->m_Assets->FindEntityByShortTxID(&entity_details,(unsigned  char*)&(it_balance->second.m_Asset)))
+            {
+                for(int i=0;i<(int)tx.vout.size();i++)
+                {
+                    for (map<uint160,uint32_t>::const_iterator it_address = OutputAddresses[i].begin(); it_address != OutputAddresses[i].end(); ++it_address) 
+                    {
+                        if(it_address->first == it_balance->second.m_Address)
+                        {
+                            address_flags=it_address->second;
+                            flags_found=true;
+                        }
+                    }                
+                }            
+                Object asset_entry;
+                asset_entry=AssetEntry(entity_details.GetTxID(),it_balance->second.m_Amount,0x44);
+                if(address_flags & MC_SFL_IS_SCRIPTHASH)
+                {
+                    asset_entry.push_back(Pair("address", CBitcoinAddress(CScriptID(it_balance->second.m_Address)).ToString()));
+                }
+                else
+                {
+                    asset_entry.push_back(Pair("address", CBitcoinAddress(CKeyID(it_balance->second.m_Address)).ToString()));
+                }
+                assets.push_back(asset_entry);            
+            }
+        }
+    }    
     
     result.push_back(Pair("block", block_entry));
+    result.push_back(Pair("assets", assets));
     result.push_back(Pair("tags", TagEntry(tx_tag)));
     
     BOOST_FOREACH(Pair& a, result) 
