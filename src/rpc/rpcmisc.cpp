@@ -28,6 +28,7 @@ std::string BurnAddress(const std::vector<unsigned char>& vchVersion);
 std::string SetBannedTxs(std::string txlist);
 std::string SetLockedBlock(std::string hash);
 int mc_StoreSetRuntimeParam(std::string param_name);
+double mc_GetChainRewards(int chain_height,int64_t *raw_value);
 
 /* MCHN END */
 
@@ -100,6 +101,11 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("reindex",       fReindex));    
 /* MCHN END */    
     obj.push_back(Pair("blocks",        (int)chainActive.Height()));
+
+    double chain_balance=0.;
+    int64_t total_value=0;
+    chain_balance=mc_GetChainRewards((int)chainActive.Height(),&total_value);
+    obj.push_back(Pair("chainrewards",        chain_balance));
     
     mc_EntityDetails entitylist_entity;
     int32_t entity_count; 
@@ -164,7 +170,7 @@ Value getinfo(const Array& params, bool fHelp)
     return obj;
 }
 
-Value getentitycounts(const json_spirit::Array& params, bool fHelp)
+Value getchaintotals(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error("Help message not found\n");
@@ -185,6 +191,12 @@ Value getentitycounts(const json_spirit::Array& params, bool fHelp)
     pwalletTxsMain->WRPReadLock();
     
     obj.push_back(Pair("blocks",       (int)chainActive.Height()));        
+
+    double chain_balance=0.;
+    int64_t total_value=0;
+    chain_balance=mc_GetChainRewards((int)chainActive.Height(),&total_value);
+    obj.push_back(Pair("rewards",        chain_balance));
+    
 
     if(mc_gState->m_WalletMode & MC_WMD_EXPLORER)
     {

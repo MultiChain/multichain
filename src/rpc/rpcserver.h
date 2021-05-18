@@ -339,7 +339,7 @@ extern json_spirit::Value listlicenses(const json_spirit::Array& params, bool fH
 extern json_spirit::Value getlicenseconfirmation(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value importlicenserequest(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getinitstatus(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value getentitycounts(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getchaintotals(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value gethealthcheck(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listvariables(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getvariableinfo(const json_spirit::Array& params, bool fHelp);

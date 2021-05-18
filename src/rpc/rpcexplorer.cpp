@@ -13,14 +13,14 @@
 
 bool WRPSubKeyEntityFromPublisher(string str,mc_TxEntityStat entStat,mc_TxEntity *entity,bool ignore_unsubscribed,int *errCode,string *strError);
 void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
-uint32_t mc_GetExplorerTxOutputDetails(int rpc_slot,
+uint64_t mc_GetExplorerTxOutputDetails(int rpc_slot,
                                  const CTransaction& tx,
                                  std::vector< std::map<uint160,uint32_t> >& OutputAddresses,
                                  std::vector< std::map<uint160,int64_t> >& OutputAssetQuantities,
                                  std::vector< uint160 >&OutputStreams,
 //                                 std::vector<uint64_t>& InputScriptTags,
                                  std::vector<uint64_t>& OutputScriptTags);
-uint32_t mc_GetExplorerTxInputDetails(int rpc_slot,
+uint64_t mc_GetExplorerTxInputDetails(int rpc_slot,
                                  mc_TxImport *import,                   
                                  const CTransaction& tx,
                                  std::vector< std::map<uint160,uint32_t> >& InputAddresses,
@@ -33,6 +33,7 @@ uint32_t mc_CheckExplorerAssetTransfers(
                                  std::vector< std::map<uint160,uint32_t> >& OutputAddresses,
                                  std::vector< std::map<uint160,int64_t> >& OutputAssetQuantities,
                                  std::map<uint160,mc_TxAddressAssetQuantity>& AssetsAddressQuantities);
+int mc_EntityExplorerCodeToType(int entity_explorer_code);
 
 /*
 uint32_t mc_GetExplorerTxDetails(int rpc_slot,
@@ -177,6 +178,14 @@ Value TagEntry(uint64_t tag)
             tags.push_back("asset-transfer");            
         }
     }
+    if(tag & MC_MTX_TAG_MULTIPLE_ASSETS)
+    {
+        tags.push_back("multiple-assets");                            
+    }
+    if(tag & MC_MTX_TAG_NATIVE_TRANSFER)
+    {
+        tags.push_back("native-transfer");                    
+    }
     if(tag & MC_MTX_TAG_ASSET_FOLLOWON)
     {
         tags.push_back("more-asset-units");            
@@ -184,7 +193,7 @@ Value TagEntry(uint64_t tag)
     string entity="entity";
     if(tag & MC_MTX_TAG_ENTITY_MASK)
     {
-        int ent=(tag & MC_MTX_TAG_ENTITY_MASK) >> MC_MTX_TAG_ENTITY_MASK_SHIFT;
+        int ent=mc_EntityExplorerCodeToType((tag & MC_MTX_TAG_ENTITY_MASK) >> MC_MTX_TAG_ENTITY_MASK_SHIFT);
         switch(ent)
         {
             case MC_ENT_TYPE_ASSET: entity="asset"; break;
@@ -226,6 +235,14 @@ Value TagEntry(uint64_t tag)
             tags.push_back("onchain-stream-item");                                
         }
     }
+    if(tag & MC_MTX_TAG_MULTIPLE_STREAM_ITEMS)
+    {
+        tags.push_back("multiple-stream-items");                            
+    }
+    if(tag & MC_MTX_TAG_COMBINE)
+    {
+        tags.push_back("combine");                            
+    }
     if(tag & MC_MTX_TAG_INLINE_DATA)
     {
         tags.push_back("inline-data");                                            
@@ -237,6 +254,10 @@ Value TagEntry(uint64_t tag)
             tags.push_back("raw-data");                                            
         }
     }        
+    if(tag & MC_MTX_TAG_OP_RETURN)
+    {
+        tags.push_back("unspendable");                                                    
+    }
     
     return tags;
 }
@@ -484,14 +505,27 @@ Value listexptxs(const json_spirit::Array& params, bool fHelp)
         mc_TxEntityRow *lpEntTx;
         lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
         uint256 hash;
+        uint64_t tag=lpEntTx->m_Flags;
         
-        memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);                
+        if(tag & MC_MTX_TAG_EXTENDED_TAGS)
+        {
+            int err;
+            string tag_str=pwalletTxsMain->WRPGetSubKey(lpEntTx->m_TxId,NULL,&err);
+            if(tag_str.size() == MC_MTX_TAG_EXTENSION_TOTAL_SIZE)
+            {
+                memcpy(&hash,tag_str.c_str(),sizeof(uint256));
+                tag=mc_GetLE((unsigned char *)tag_str.c_str()+sizeof(uint256),sizeof(uint64_t));
+            }                        
+        }
+        else
+        {
+            memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);                
+        }
 
         Object entry;
         
         entry.push_back(Pair("txid", hash.ToString()));
         int block=lpEntTx->m_Block;
-        uint32_t tag=lpEntTx->m_Flags;
         entry.push_back(Pair("tags", TagEntry(tag)));
         if( (block < 0) || (block > chain_height))
         {
@@ -579,7 +613,7 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
     std::vector<uint64_t>InputScriptTags;
     std::vector<uint64_t>OutputScriptTags;
     std::map<uint160,mc_TxAddressAssetQuantity> AddressAssetQuantities;
-    uint32_t tx_tag,real_tx_asset_tag;
+    uint64_t tx_tag,real_tx_asset_tag;
     bool flags_found=false;
     uint32_t address_flags=0;
     Array assets;
@@ -612,11 +646,19 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
     
     real_tx_asset_tag=mc_CheckExplorerAssetTransfers(InputAddresses,InputAssetQuantities,OutputAddresses,OutputAssetQuantities,AddressAssetQuantities);
     
+    tx_tag |= real_tx_asset_tag & (MC_MTX_TAG_MULTIPLE_ASSETS | MC_MTX_TAG_COMBINE);
     if(tx_tag & MC_MTX_TAG_ASSET_TRANSFER)
     {
         if( (real_tx_asset_tag & MC_MTX_TAG_ASSET_TRANSFER) == 0)
         {
             tx_tag -= MC_MTX_TAG_ASSET_TRANSFER;
+        }
+    }
+    if(tx_tag & MC_MTX_TAG_NATIVE_TRANSFER)
+    {
+        if( (real_tx_asset_tag & MC_MTX_TAG_NATIVE_TRANSFER) == 0)
+        {
+            tx_tag -= MC_MTX_TAG_NATIVE_TRANSFER;
         }
     }
     
@@ -670,8 +712,23 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
                 {
                     mc_EntityDetails entity_details;
                     Object asset_entry;
-                    mc_gState->m_Assets->FindEntityByShortTxID(&entity_details,(unsigned char*)&(it_asset->first));
-                    asset_entry=AssetEntry(entity_details.GetTxID(),it_asset->second,0x05);
+                    if(it_asset->first != 0)
+                    {
+                        mc_gState->m_Assets->FindEntityByShortTxID(&entity_details,(unsigned char*)&(it_asset->first));
+                        asset_entry=AssetEntry(entity_details.GetTxID(),it_asset->second,0x05);
+                    }
+                    else
+                    {
+                        int64_t multiple=COIN;
+                        if(multiple <= 0)
+                        {
+                            multiple=1;
+                        }
+                        asset_entry.push_back(Pair("name", Value::null));
+                        asset_entry.push_back(Pair("issuetxid", Value::null));
+                        asset_entry.push_back(Pair("assetref", Value::null));
+                        asset_entry.push_back(Pair("qty", (double)it_asset->second/(double)multiple));                        
+                    }
                     assets.push_back(asset_entry);
                 }
                 if(assets.size())
@@ -697,9 +754,38 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
             }
         }
         if(a.name_ == "vout")
-        {                        
+        {          
             for(int i=0;i<(int)a.value_.get_array().size();i++)
             {
+                if(tx.vout[i].nValue > 0)
+                {
+                    Object asset_entry;
+                    bool found=false;
+                    int64_t multiple=COIN;
+                    if(multiple <= 0)
+                    {
+                        multiple=1;
+                    }
+                    asset_entry.push_back(Pair("name", Value::null));
+                    asset_entry.push_back(Pair("issuetxid", Value::null));
+                    asset_entry.push_back(Pair("assetref", Value::null));
+                    asset_entry.push_back(Pair("qty", (double)tx.vout[i].nValue/(double)multiple));                        
+                    BOOST_FOREACH(Pair& b, a.value_.get_array()[i].get_obj()) 
+                    {
+                        if(b.name_ == "assets")
+                        {            
+                            b.value_.get_array().push_back(asset_entry);
+                            found=true;
+                        }
+                    }
+                    if(!found)
+                    {
+                        Array assets;
+                        assets.push_back(asset_entry);
+                        a.value_.get_array()[i].get_obj().push_back(Pair("assets", assets));
+                    }
+                }
+            
                 a.value_.get_array()[i].get_obj().push_back(Pair("tags", TagEntry(OutputScriptTags[i])));
                 
                 COutPoint txout=COutPoint(hash,i);
@@ -948,13 +1034,26 @@ Value listexpaddresstxs(const json_spirit::Array& params, bool fHelp)
         mc_TxEntityRow *lpEntTx;
         lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
         uint256 hash;
+        uint64_t tag=lpEntTx->m_Flags;
         
-        memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);                
+        if(tag & MC_MTX_TAG_EXTENDED_TAGS)
+        {
+            int err;
+            string tag_str=pwalletTxsMain->WRPGetSubKey(lpEntTx->m_TxId,NULL,&err);
+            if(tag_str.size() == MC_MTX_TAG_EXTENSION_TOTAL_SIZE)
+            {
+                memcpy(&hash,tag_str.c_str(),sizeof(uint256));
+                tag=mc_GetLE((unsigned char *)tag_str.c_str()+sizeof(uint256),sizeof(uint64_t));
+            }                        
+        }
+        else
+        {
+            memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);                
+        }
 
         Object entry;
         
         entry.push_back(Pair("txid", hash.ToString()));
-        uint32_t tag=lpEntTx->m_Flags;
         entry.push_back(Pair("tags", TagEntry(tag)));
         int block=lpEntTx->m_Block;
         if( (block < 0) || (block > chain_height))
@@ -1071,13 +1170,26 @@ Value listexpblocktxs(const json_spirit::Array& params, bool fHelp)
         mc_TxEntityRow *lpEntTx;
         lpEntTx=(mc_TxEntityRow*)entity_rows->GetRow(i);
         uint256 hash;
+        uint64_t tag=lpEntTx->m_Flags;
         
-        memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);                
+        if(tag & MC_MTX_TAG_EXTENDED_TAGS)
+        {
+            int err;
+            string tag_str=pwalletTxsMain->WRPGetSubKey(lpEntTx->m_TxId,NULL,&err);
+            if(tag_str.size() == MC_MTX_TAG_EXTENSION_TOTAL_SIZE)
+            {
+                memcpy(&hash,tag_str.c_str(),sizeof(uint256));
+                tag=mc_GetLE((unsigned char *)tag_str.c_str()+sizeof(uint256),sizeof(uint64_t));
+            }                        
+        }
+        else
+        {
+            memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);                
+        }
 
         Object entry;
         
         entry.push_back(Pair("txid", hash.ToString()));
-        uint32_t tag=lpEntTx->m_Flags;
         entry.push_back(Pair("tags", TagEntry(tag)));
         int block=lpEntTx->m_Block;
         if( (block < 0) || (block > chain_height))
@@ -1437,7 +1549,7 @@ Value listexpaddressassets(const json_spirit::Array& params, bool fHelp)
         uint256 hash;
 
         mc_EntityDetails entity_details;
-        mc_gState->m_Assets->FindEntityByShortTxID(&entity_details,lpEntTx->m_TxId);
+        entity_details.Zero();
         
 //        memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);                
         
@@ -1454,7 +1566,7 @@ Value listexpaddressassets(const json_spirit::Array& params, bool fHelp)
         {
             int err;
             mc_TxAssetBalanceDetails balance_details;
-            string assets_str=pwalletTxsMain->GetSubKey(erow.m_TxId,NULL,&err);
+            string assets_str=pwalletTxsMain->WRPGetSubKey(erow.m_TxId,NULL,&err);
             if(assets_str.size() == sizeof(mc_TxAssetBalanceDetails))
             {
                 memcpy(&balance_details,assets_str.c_str(),assets_str.size());
@@ -1464,7 +1576,24 @@ Value listexpaddressassets(const json_spirit::Array& params, bool fHelp)
         
         Object entry;
         
-        entry=AssetEntry(entity_details.GetTxID(),quantity,0x04);
+        if(*(uint160*)(lpEntTx->m_TxId) != 0)
+        {
+            mc_gState->m_Assets->FindEntityByShortTxID(&entity_details,lpEntTx->m_TxId);
+            entry=AssetEntry(entity_details.GetTxID(),quantity,0x04);
+        }
+        else
+        {
+            int64_t multiple=COIN;
+            if(multiple <= 0)
+            {
+                multiple=1;
+            }
+            entry.push_back(Pair("name", Value::null));
+            entry.push_back(Pair("issuetxid", Value::null));
+            entry.push_back(Pair("assetref", Value::null));
+            entry.push_back(Pair("qty", (double)quantity/(double)multiple));
+//            entry.push_back(Pair("raw", quantity));
+        }
 /*        
         entry.push_back(Pair("txid", hash.ToString()));
         int block=lpEntTx->m_Block;
@@ -1513,12 +1642,21 @@ Value listexpassetaddresses(const json_spirit::Array& params, bool fHelp)
     vector <mc_QueryCondition> conditions;
     Array retArray;
     mc_Buffer *entity_rows=NULL;
-    
+    int64_t multiple=COIN;
+    if(multiple <= 0)
+    {
+        multiple=1;
+    }
     mc_EntityDetails entity_details;
     
-    if (params[0].type() != null_type && !params[0].get_str().empty())
+    entity_details.Zero();
+    if(params[0].type() == str_type)
     {        
-        ParseEntityIdentifier(params[0],&entity_details, MC_ENT_TYPE_ASSET);           
+        if(params[0].get_str().size())
+        {
+            ParseEntityIdentifier(params[0],&entity_details, MC_ENT_TYPE_ASSET);           
+            multiple=entity_details.GetAssetMultiple();
+        }
     }
     else
     {
@@ -1628,7 +1766,7 @@ Value listexpassetaddresses(const json_spirit::Array& params, bool fHelp)
         {
             int err;
             mc_TxAssetBalanceDetails balance_details;
-            string assets_str=pwalletTxsMain->GetSubKey(erow.m_TxId,NULL,&err);
+            string assets_str=pwalletTxsMain->WRPGetSubKey(erow.m_TxId,NULL,&err);
             if(assets_str.size() == sizeof(mc_TxAssetBalanceDetails))
             {
                 memcpy(&balance_details,assets_str.c_str(),assets_str.size());
@@ -1639,7 +1777,7 @@ Value listexpassetaddresses(const json_spirit::Array& params, bool fHelp)
         Object entry;
         
         entry.push_back(Pair("address", address));
-        entry.push_back(Pair("qty", (double)quantity/entity_details.GetAssetMultiple()));
+        entry.push_back(Pair("qty", (double)quantity/multiple));
         entry.push_back(Pair("raw", quantity));                                    
         
         retArray.push_back(entry);                                
@@ -1679,8 +1817,6 @@ Value listexpaddressassettxs(const json_spirit::Array& params, bool fHelp)
     Array retArray;
     mc_Buffer *entity_rows=NULL;
     
-    mc_EntityDetails entity_details;
-    
     uint160 asset_subkey_hash=0;
     uint160 balance_subkey_hash160=0;
     uint160 address_subkey_hash=0;
@@ -1708,15 +1844,27 @@ Value listexpaddressassettxs(const json_spirit::Array& params, bool fHelp)
         memcpy(&address_subkey_hash,lpScriptID,MC_TDB_ENTITY_ID_SIZE);
     }
 
-    if (params[1].type() != null_type && !params[1].get_str().empty())
+    int64_t multiple=COIN;
+    if(multiple <= 0)
+    {
+        multiple=1;
+    }
+    mc_EntityDetails entity_details;
+    
+    entity_details.Zero();
+    if(params[0].type() == str_type)
     {        
-        ParseEntityIdentifier(params[0],&entity_details, MC_ENT_TYPE_ASSET);           
+        if(params[0].get_str().size())
+        {
+            ParseEntityIdentifier(params[0],&entity_details, MC_ENT_TYPE_ASSET);           
+            multiple=entity_details.GetAssetMultiple();
+        }
     }
     else
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset identifier");        
     }
-
+    
     memcpy(&asset_subkey_hash, entity_details.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
     
     int count,start;
@@ -1802,12 +1950,12 @@ Value listexpaddressassettxs(const json_spirit::Array& params, bool fHelp)
         Object entry;
         int err;
         mc_TxAssetBalanceDetails balance_details;
-        string assets_str=pwalletTxsMain->GetSubKey(lpEntTx->m_TxId,NULL,&err);
+        string assets_str=pwalletTxsMain->WRPGetSubKey(lpEntTx->m_TxId,NULL,&err);
         if(assets_str.size() == sizeof(mc_TxAssetBalanceDetails))
         {
             memcpy(&balance_details,assets_str.c_str(),assets_str.size());
             entry.push_back(Pair("txid",balance_details.m_TxID.ToString()));
-            entry.push_back(Pair("amount", (double)balance_details.m_Amount/entity_details.GetAssetMultiple()));
+            entry.push_back(Pair("amount", (double)balance_details.m_Amount/multiple));
 //            entry.push_back(Pair("raw", quantity));                                    
             //entry.push_back(Pair("amount",balance_details.m_Amount));                                
 /*            
@@ -1824,7 +1972,7 @@ Value listexpaddressassettxs(const json_spirit::Array& params, bool fHelp)
                 entry.push_back(Pair("amount",balance_details.m_Amount));                                
             }
  */ 
-            entry.push_back(Pair("balance", (double)balance_details.m_Balance/entity_details.GetAssetMultiple()));
+            entry.push_back(Pair("balance", (double)balance_details.m_Balance/multiple));
 //            entry.push_back(Pair("balance",balance_details.m_Balance));                                
         }            
         

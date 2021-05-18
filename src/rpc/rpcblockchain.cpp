@@ -702,6 +702,42 @@ Value verifychain(const Array& params, bool fHelp)
     return CVerifyDB().VerifyDB(pcoinsTip, nCheckLevel, nCheckDepth);
 }
 
+double mc_GetChainRewards(int chain_height,int64_t *raw_value)
+{
+    double chain_balance=0.;
+    int64_t total_value=0;
+    if(COIN)
+    {
+        int64_t epoch_size=Params().SubsidyHalvingInterval();
+        int complete_epochs=chain_height / epoch_size;
+        int blocks_in_this_epoch=chain_height%epoch_size+1;
+        int64_t epoch_value=MCP_INITIAL_BLOCK_REWARD;
+        for(int epoch=0;epoch<complete_epochs;epoch++)
+        {
+            total_value+=epoch_value*epoch_size;
+            epoch_value >>= 1;
+        }
+        total_value+=epoch_value*(int64_t)blocks_in_this_epoch;
+        if(chain_height >= 0)
+        {
+            total_value-=MCP_INITIAL_BLOCK_REWARD;                                      // Genesis block reward is unspendable
+        }
+        if(MCP_FIRST_BLOCK_REWARD >= 0)
+        {
+            if(chain_height >= 1)
+            {
+                total_value+=MCP_FIRST_BLOCK_REWARD-MCP_INITIAL_BLOCK_REWARD;
+            }
+        }
+        chain_balance=(double)total_value/(double)COIN;
+    }    
+    if(raw_value)
+    {
+        *raw_value=total_value;
+    }
+    return chain_balance;
+}
+
 Value getblockchaininfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -723,9 +759,10 @@ Value getblockchaininfo(const Array& params, bool fHelp)
     obj.push_back(Pair("difficulty",            (double)GetDifficulty()));
     obj.push_back(Pair("verificationprogress",  Checkpoints::GuessVerificationProgress(chainActive.Tip())));
     obj.push_back(Pair("chainwork",             chainActive.Tip()->nChainWork.GetHex()));
-        
+       
     
     double chain_balance=0.;
+/*    
     if(COIN)
     {
         int chain_height=(int)chainActive.Height();
@@ -753,6 +790,8 @@ Value getblockchaininfo(const Array& params, bool fHelp)
         }
         chain_balance=(double)total_value/(double)COIN;
     }
+ */ 
+    chain_balance=mc_GetChainRewards((int)chainActive.Height(),NULL);
     obj.push_back(Pair("chainrewards",             chain_balance));
     
     return obj;
