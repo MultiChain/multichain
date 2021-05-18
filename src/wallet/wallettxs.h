@@ -17,38 +17,43 @@
 
 #define MC_TDB_MAX_OP_RETURN_SIZE             256
 
+#define MC_MTX_TAG_DIRECT_MASK                           0x00000000FFFFFFFF   
+#define MC_MTX_TAG_EXTENSION_MASK                        0xFFFFFFFF00000000
+#define MC_MTX_TAG_EXTENSION_TOTAL_SIZE                                  40
+
 #define MC_MTX_TAG_NONE                                  0x0000000000000000
-#define MC_MTX_TAG_NO_SINGLE_TX_TAG                      0x0000000000000001
-#define MC_MTX_TAG_EXTENDED_TAGS                         0x0000000000000002
-#define MC_MTX_TAG_P2SH                                  0x0000000000000004
-#define MC_MTX_TAG_NO_KEY_SCRIPT_ID                      0x0000000000000008
-#define MC_MTX_TAG_COINBASE                              0x0000000000000010
-#define MC_MTX_TAG_OP_RETURN                             0x0000000000000020
-#define MC_MTX_TAG_INLINE_DATA                           0x0000000000000040
-#define MC_MTX_TAG_FILTER_APPROVAL                       0x0000000000000080
-
-#define MC_MTX_TAG_ENTITY_CREATE                         0x0000000000000100
-#define MC_MTX_TAG_ENTITY_UPDATE                         0x0000000000000200
-
+#define MC_MTX_TAG_EXTENDED_TAGS                         0x0000000000000001
+#define MC_MTX_TAG_P2SH                                  0x0000000000000002
+#define MC_MTX_TAG_COINBASE                              0x0000000000000004
+#define MC_MTX_TAG_OP_RETURN                             0x0000000000000008
+#define MC_MTX_TAG_NATIVE_TRANSFER                       0x0000000000000010
+#define MC_MTX_TAG_ENTITY_CREATE                         0x0000000000000020
+#define MC_MTX_TAG_ENTITY_UPDATE                         0x0000000000000040
+#define MC_MTX_TAG_ASSET_GENESIS                         0x0000000000000080
+#define MC_MTX_TAG_ASSET_FOLLOWON                        0x0000000000000100
+#define MC_MTX_TAG_ASSET_TRANSFER                        0x0000000000000200
 #define MC_MTX_TAG_GRANT_ENTITY                          0x0000000000000400
 #define MC_MTX_TAG_REVOKE_ENTITY                         0x0000000000000800
 #define MC_MTX_TAG_GRANT_LOW                             0x0000000000001000
 #define MC_MTX_TAG_REVOKE_LOW                            0x0000000000002000
 #define MC_MTX_TAG_GRANT_HIGH                            0x0000000000004000
 #define MC_MTX_TAG_REVOKE_HIGH                           0x0000000000008000
+#define MC_MTX_TAG_INLINE_DATA                           0x0000000000010000 
+#define MC_MTX_TAG_RAW_DATA                              0x0000000000020000 
+#define MC_MTX_TAG_STREAM_ITEM                           0x0000000000040000 
+#define MC_MTX_TAG_OFFCHAIN                              0x0000000000080000 
+#define MC_MTX_TAG_MULTIPLE_ASSETS                       0x0000000000100000 
+#define MC_MTX_TAG_MULTIPLE_STREAM_ITEMS                 0x0000000000200000 
+#define MC_MTX_TAG_FILTER_APPROVAL                       0x0000000000400000
+#define MC_MTX_TAG_COMBINE                               0x0000000000800000
 
-#define MC_MTX_TAG_ENTITY_MASK                           0x0000000000FF0000     
-#define MC_MTX_TAG_ENTITY_MASK_SHIFT                                     16
+#define MC_MTX_TAG_ENTITY_MASK                           0x00000000FF000000     
+#define MC_MTX_TAG_ENTITY_MASK_SHIFT                                     24
 
-#define MC_MTX_TAG_ASSET_GENESIS                         0x0000000001000000
-#define MC_MTX_TAG_ASSET_FOLLOWON                        0x0000000002000000
-#define MC_MTX_TAG_ASSET_TRANSFER                        0x0000000004000000
-#define MC_MTX_TAG_LICENSE_TOKEN                         0x0000000008000000
-
-#define MC_MTX_TAG_RAW_DATA                              0x0000000010000000
-#define MC_MTX_TAG_STREAM_ITEM                           0x0000000020000000
-#define MC_MTX_TAG_OFFCHAIN                              0x0000000040000000
-#define MC_MTX_TAG_UPGRADE_APPROVAL                      0x0000000080000000
+#define MC_MTX_TAG_NO_SINGLE_TX_TAG                      0x0000000100000000
+#define MC_MTX_TAG_NO_KEY_SCRIPT_ID                      0x0000001000000000
+#define MC_MTX_TAG_LICENSE_TOKEN                         0x0000002000000000
+#define MC_MTX_TAG_UPGRADE_APPROVAL                      0x0000004000000000
 
 #define MC_MTX_TFL_MULTIPLE_TXOUT_ASSETS                 0x0000000000000001
 #define MC_MTX_TFL_IS_INPUT                              0x0000000000000001
