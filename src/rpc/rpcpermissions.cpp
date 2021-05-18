@@ -1025,7 +1025,7 @@ Value listminers(const Array& params, bool fHelp)
     
     for(int i=0;i<(int)miners.size();i++)
     {
-        bool is_mine=IsMine(*pwalletMain, (CKeyID)(miners[i].m_Address));
+        bool is_mine=(IsMine(*pwalletMain, (CKeyID)(miners[i].m_Address))  == ISMINE_SPENDABLE);
         Object entry;
         entry.push_back(Pair("address",CBitcoinAddress((CKeyID)(miners[i].m_Address)).ToString()));
         entry.push_back(Pair("islocal",is_mine));
@@ -1088,6 +1088,10 @@ Value listminers(const Array& params, bool fHelp)
             if(miners[i].m_Active && (miners[i].m_WaitBlocks == 0))            
             {
                 node_state="";
+                if(miner_hash == 0)                                             
+                {
+                    node_state="selecting-local-address";
+                }
                 if(node_state.size() == 0)if( (status & MC_MST_MINER_READY) == 0 )  node_state="disabled-by-gen-parameter";
                 if(node_state.size() == 0)if( status & MC_MST_PAUSED )              node_state="mining-paused";
                 if(node_state.size() == 0)if( status & MC_MST_NO_PEERS )            node_state="mining-requires-peers";
