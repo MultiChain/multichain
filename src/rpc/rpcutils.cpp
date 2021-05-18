@@ -2207,7 +2207,8 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
 
         Array issues;
         int64_t total=0;
-
+        int32_t issue_count=1;
+        
         if(( (output_level & 0x0020) !=0 ) )// ||                                   // issuers
                                                                                 // For listassets with followons
 //             ( (mc_gState->m_Assets->HasFollowOns(txid) != 0) && (quantity < 0) && ( (output_level & 0x00C0) == 0) ))
@@ -2216,6 +2217,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
             int64_t qty;
             mc_Buffer *followons;
             followons=mc_gState->m_Assets->GetFollowOns(txid);
+            issue_count=followons->GetCount();
             for(int i=followons->GetCount()-1;i>=0;i--)
             {
                 Object issue;
@@ -2295,7 +2297,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
             total=entity.GetQuantity();
             if( (mc_gState->m_Assets->HasFollowOns(txid) != 0) && (quantity < 0) && ( (output_level & 0x00C0) == 0) )
             {
-                total=mc_gState->m_Assets->GetTotalQuantity(genesis_entity);
+                total=mc_gState->m_Assets->GetTotalQuantity(genesis_entity,&issue_count);
             }
         }
 
@@ -2313,6 +2315,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                 if( (raw_output < 0) && ( (output_level & 0x0040) == 0) )
                 {
                     raw_output=total;
+                    entry.push_back(Pair("issuecount", issue_count));
                     entry.push_back(Pair("issueqty", (double)raw_output*units));
                     entry.push_back(Pair("issueraw", raw_output));                                    
                 }
