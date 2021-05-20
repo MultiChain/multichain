@@ -2565,6 +2565,15 @@ int mc_TxDB::RollBack(mc_TxImport *import,int block)
                     }                    
                 }
             }
+            else
+            {
+                if(err)
+                {
+                    sprintf(msg,"Could not roll back global subkey list to block %d, error: %d",block,err);        
+                    LogString(msg);
+                }
+                fInBlocks=false;                                
+            }
             from -= count;
         }
     }
