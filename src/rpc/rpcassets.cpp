@@ -7,6 +7,8 @@
 
 #include "rpc/rpcwallet.h"
 
+Array AssetHistory(mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level);
+
 void mergeGenesisWithAssets(mc_Buffer *genesis_amounts, mc_Buffer *asset_amounts)
 {
     unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
@@ -2356,3 +2358,86 @@ Value listassettransactions(const Array& params, bool fHelp)
     
     return retArray;
 }
+
+Value listassetissues(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 4)
+        mc_ThrowHelpMessage("listassetissues");        
+
+    uint32_t output_level;
+    
+    int count,start;
+    int issue_items;
+    
+    count=2147483647;
+    if (params.size() > 2)    
+    {
+        count=paramtoint(params[2],true,0,"Invalid count");
+    }
+    start=-count;
+    if (params.size() > 3)    
+    {
+        start=paramtoint(params[3],false,0,"Invalid start");
+    }
+    
+    mc_EntityDetails asset_entity;
+    mc_EntityDetails last_entity;
+    uint64_t multiple;
+    ParseEntityIdentifier(params[0],&asset_entity,MC_ENT_TYPE_ASSET);
+
+    if(asset_entity.IsFollowOn())
+    {
+        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Asset with this issue txid not found");                                                                
+    }
+
+    if(mc_gState->m_Assets->FindLastEntity(&last_entity,&asset_entity) == 0)
+    {
+        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Asset not found");                
+    }
+    multiple=asset_entity.GetAssetMultiple();
+    
+    issue_items=mc_GetEntityIndex(&last_entity)+1;
+    if(issue_items <= 0)                                                        // No followon index
+    {
+        output_level=0x22F;
+
+        if (params.size() > 1)    
+        {
+            if(paramtobool(params[1]))
+            {
+                output_level-=0x200;
+            }
+        }
+        
+        Array result;
+        Object asset_info=AssetEntry(asset_entity.GetTxID(),-1,output_level);
+        
+        BOOST_FOREACH(Pair& a, asset_info) 
+        {
+            if(a.name_ == "issues")
+            {            
+                mc_AdjustStartAndCount(&count,&start,(int)a.value_.get_array().size());
+                for(int i=start;i<start+count;i++)
+                {
+                    result.push_back(a.value_.get_array()[i]);
+                }
+            }
+        }
+        return result;
+    }
+    
+    output_level=0x400;
+    
+    if (params.size() > 1)    
+    {
+        if(paramtobool(params[1]))
+        {
+            output_level|=0x40;
+        }
+    }
+    
+    mc_AdjustStartAndCount(&count,&start,issue_items);
+    
+    return AssetHistory(&last_entity,multiple,count,start,output_level);
+}
+

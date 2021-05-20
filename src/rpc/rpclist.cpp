@@ -117,6 +117,7 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "setvariablevaluefrom",   &setvariablevaluefrom,   true,      false,      false },
     { "blockchain",         "getvariablevalue",       &getvariablevalue,       true,      false,      false },
     { "blockchain",         "getvariablehistory",     &getvariablehistory,     true,      false,      false },
+    { "blockchain",         "listassetissues",        &listassetissues,     true,      false,      false },
 
     { "blockchain",         "listlibraries",          &listlibraries,          true,      false,      false },
     { "blockchain",         "addlibraryupdate",       &addlibraryupdate,       true,      false,      false },
