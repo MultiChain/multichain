@@ -1111,9 +1111,11 @@ Value listexpblocktxs(const json_spirit::Array& params, bool fHelp)
     int count,start;
     bool verbose=false;
     
+    int flag=0;
+    
     if (params.size() > 1)    
     {
-        verbose=paramtobool(params[1]);
+        verbose=paramtobool_or_flag(params[1],&flag);
     }
 
     count=10;
@@ -1155,6 +1157,12 @@ Value listexpblocktxs(const json_spirit::Array& params, bool fHelp)
     
     entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
     entity_rows->Clear();
+    
+    if(flag == 2)
+    {
+        pwalletTxsMain->WRPReadUnLock();
+        return pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL);
+    }
     
     mc_AdjustStartAndCount(&count,&start,pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL));
     
