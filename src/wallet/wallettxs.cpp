@@ -361,6 +361,15 @@ int mc_WalletTxs::SetMode(uint32_t mode, uint32_t mask)
 
 int mc_WalletTxs::Destroy()
 {
+    if(m_ChunkCollector)
+    {
+        m_ChunkCollector->Commit();
+    }
+    
+    if(m_ChunkDB)
+    {
+        m_ChunkDB->Commit(-1);
+    }
     
     if(m_Database)
     {
@@ -369,13 +378,13 @@ int mc_WalletTxs::Destroy()
 
     if(m_ChunkCollector)
     {
-        m_ChunkCollector->Commit();
+//        m_ChunkCollector->Commit();
         delete m_ChunkCollector;
     }    
     
     if(m_ChunkDB)
     {
-        m_ChunkDB->Commit(-1);
+//        m_ChunkDB->Commit(-1);
         delete m_ChunkDB;
     }
 
