@@ -107,12 +107,8 @@ bool WRPSubKeyEntityFromExpAsset(mc_EntityDetails *entity_details,mc_TxEntitySta
     return true;
 }
 
-Value TagEntry(uint64_t tag) 
+Value TagEntry(uint64_t tag,bool tx) 
 {
-    if(tag & 0x0000000000000001)
-    {
-        return Value::null;
-    }
     Array tags;
     if(tag & MC_MTX_TAG_P2SH)
     {
@@ -170,12 +166,12 @@ Value TagEntry(uint64_t tag)
     if(tag & MC_MTX_TAG_ASSET_TRANSFER)
     {
         if(tag & MC_MTX_TAG_LICENSE_TOKEN)
-        {
-            tags.push_back("license-transfer");            
+        {            
+            tags.push_back(tx ? "license-transfer" : "license");            
         }
         else
-        {
-            tags.push_back("asset-transfer");            
+        {            
+            tags.push_back(tx ? "asset-transfer" : "asset");            
         }
     }
     if(tag & MC_MTX_TAG_MULTIPLE_ASSETS)
@@ -184,7 +180,7 @@ Value TagEntry(uint64_t tag)
     }
     if(tag & MC_MTX_TAG_NATIVE_TRANSFER)
     {
-        tags.push_back("native-transfer");                    
+        tags.push_back(tx ? "native-transfer" : "native");                    
     }
     if(tag & MC_MTX_TAG_ASSET_FOLLOWON)
     {
@@ -253,10 +249,13 @@ Value TagEntry(uint64_t tag)
         {
             tags.push_back("raw-data");                                            
         }
-    }        
-    if(tag & MC_MTX_TAG_OP_RETURN)
+    }
+    if(!tx)
     {
-        tags.push_back("unspendable");                                                    
+        if(tag & MC_MTX_TAG_OP_RETURN)
+        {
+            tags.push_back("unspendable");                                                    
+        }
     }
     
     return tags;
@@ -526,7 +525,7 @@ Value listexptxs(const json_spirit::Array& params, bool fHelp)
         
         entry.push_back(Pair("txid", hash.ToString()));
         int block=lpEntTx->m_Block;
-        entry.push_back(Pair("tags", TagEntry(tag)));
+        entry.push_back(Pair("tags", TagEntry(tag,true)));
         if( (block < 0) || (block > chain_height))
         {
             entry.push_back(Pair("block", Value::null));
@@ -662,6 +661,14 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
         }
     }
     
+    if(OutputScriptTags.size() == 1)
+    {
+        if(OutputScriptTags[0] & MC_MTX_TAG_LICENSE_TOKEN)
+        {
+            InputScriptTags[0] |= MC_MTX_TAG_LICENSE_TOKEN | MC_MTX_TAG_ASSET_TRANSFER;
+        }
+    }
+    
     for (map<uint160,mc_TxAddressAssetQuantity>::const_iterator it_balance = AddressAssetQuantities.begin(); it_balance != AddressAssetQuantities.end(); ++it_balance) 
     {
         mc_EntityDetails entity_details;
@@ -697,7 +704,7 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
     
     result.push_back(Pair("block", block_entry));
     result.push_back(Pair("assets", assets));
-    result.push_back(Pair("tags", TagEntry(tx_tag)));
+    result.push_back(Pair("tags", TagEntry(tx_tag,true)));
     
     BOOST_FOREACH(Pair& a, result) 
     {
@@ -706,7 +713,7 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
             
             for(int j=0;j<(int)a.value_.get_array().size();j++)
             {
-                a.value_.get_array()[j].get_obj().push_back(Pair("tags", TagEntry(InputScriptTags[j])));
+                a.value_.get_array()[j].get_obj().push_back(Pair("tags", TagEntry(InputScriptTags[j],false)));
                 Array assets;
                 for (map<uint160,int64_t>::const_iterator it_asset = InputAssetQuantities[j].begin(); it_asset != InputAssetQuantities[j].end(); ++it_asset) 
                 {
@@ -786,7 +793,7 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
                     }
                 }
             
-                a.value_.get_array()[i].get_obj().push_back(Pair("tags", TagEntry(OutputScriptTags[i])));
+                a.value_.get_array()[i].get_obj().push_back(Pair("tags", TagEntry(OutputScriptTags[i],false)));
                 
                 COutPoint txout=COutPoint(hash,i);
                 const unsigned char *ptr;
@@ -1054,7 +1061,7 @@ Value listexpaddresstxs(const json_spirit::Array& params, bool fHelp)
         Object entry;
         
         entry.push_back(Pair("txid", hash.ToString()));
-        entry.push_back(Pair("tags", TagEntry(tag)));
+        entry.push_back(Pair("tags", TagEntry(tag,true)));
         int block=lpEntTx->m_Block;
         if( (block < 0) || (block > chain_height))
         {
@@ -1198,7 +1205,7 @@ Value listexpblocktxs(const json_spirit::Array& params, bool fHelp)
         Object entry;
         
         entry.push_back(Pair("txid", hash.ToString()));
-        entry.push_back(Pair("tags", TagEntry(tag)));
+        entry.push_back(Pair("tags", TagEntry(tag,true)));
         int block=lpEntTx->m_Block;
         if( (block < 0) || (block > chain_height))
         {

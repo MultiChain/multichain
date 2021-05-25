@@ -1078,7 +1078,7 @@ int mc_TxDB::AddSubKeyDef(
         rawmempool=m_RawMemPools[import-m_Imports];
     }
 
-    err=GetTx(&txdef,hash);
+    err=GetTx(import,&txdef,hash,0);
     
     if(err == MC_ERR_NOT_FOUND)                                                 // SubKey is not found, neither on disk, nor in the mempool    
     {
@@ -1116,7 +1116,7 @@ int mc_TxDB::AddSubKeyDef(
         txdef.m_BlockFileID=-1;            
         txdef.m_TimeReceived=mc_TimeNowAsUInt();
         txdef.m_Flags=flags | ( (subkey != NULL) ? MC_SFL_NONE : MC_SFL_NODATA );
-        LastFileSize+=size;
+        LastFileSize+=size;        
         m_DBStat.m_LastFileID=LastFileID;                                       // Even if commit is unsuccessful we'll lose some place. On restart we return to previous values
         m_DBStat.m_LastFileSize=LastFileSize;
         rawmempool->Add(&txdef,(unsigned char*)&txdef+MC_TDB_TXID_SIZE);                
