@@ -5548,15 +5548,23 @@ void mc_InitRPCHelpMap24()
             "listassetissues \"asset-identifier\" ( verbose count start )\n"
             "\nReturns asset issues history\n"
             "\nArguments:\n"
-            "1. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, variable reference, variable name.\n"
+            "1. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             "2. verbose                          (boolean, optional, default=false) If true, returns txid, vout and confirmation information\n"
             "3. count                            (number, optional, default=INT_MAX - all) The number of asset issues to display\n"
-            "4. start                            (number, optional, default=-count - last) Start from specific asset issues, 0 based, if negative - from the end\n"
+            "4. start                            (number, optional, default=-count - last) Start from specific asset issue, 0 based, if negative - from the end\n"
             "\nResult:\n"
-            "An array containing variable value changes history\n"            
+            "An array containing information about asset issues\n"            
             "\nExamples:\n"
             + HelpExampleCli("listassetissues", "\"asset1\"")
             + HelpExampleRpc("listassetissues", "\"asset1\"")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("getchaintotals",
+            "getchaintotals\n"
+            "\nReturns blockchain statistics.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getchaintotals", "")
+            + HelpExampleRpc("getchaintotals", "")
         ));
     
     mapHelpStrings.insert(std::make_pair("AAAAAAA",

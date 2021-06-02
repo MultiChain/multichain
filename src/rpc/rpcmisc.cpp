@@ -177,14 +177,8 @@ Value getchaintotals(const json_spirit::Array& params, bool fHelp)
 
     Object obj;
     mc_TxEntityStat entStat;
-    mc_Buffer *entity_rows=NULL;
-    Array retArray;
-    int errCode=0;
     int32_t entity_count;
-    string strError;
     
-    bool fWRPLocked=false;
-    int chain_height; 
   
     int rpc_slot=GetRPCSlot();
 

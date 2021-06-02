@@ -2105,7 +2105,6 @@ int mc_TxDB::GetTx(
               const unsigned char *hash,
               int skip_db)
 {
-    mc_TxImport *imp;
     int err,value_len,mprow; 
     unsigned char *ptr;
     mc_Buffer *rawmempool;
@@ -2765,19 +2764,15 @@ int mc_TxDB::GetLastItem(
                     int generation,    
                     mc_TxEntityRow *erow)
 {
-    mc_TxImport *imp;
     mc_Buffer *mempool;
-    mc_TxEntityStat *stat;
     int last_pos,mprow,err,i;
     unsigned char*ptr;
     int value_len; 
     int in_mempool=0;
     
-    imp=m_Imports;
     mempool=m_MemPools[0];
     if(import)                                                                  // Find import
     {
-        imp=import;
         mempool=m_MemPools[import-m_Imports];
     }
     

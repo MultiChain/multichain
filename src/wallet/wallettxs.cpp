@@ -4027,16 +4027,6 @@ int mc_WalletTxs::AddExplorerTx(
         imp=m_Database->FindImport(0);
     }
     
-    entity.Zero();    
-    entity.m_EntityType=MC_TET_EXP_TX_KEY | MC_TET_CHAINPOS;
-
-    stat=imp->GetEntity(imp->FindEntity(&entity));
-    if(stat == NULL)
-    {
-        goto exitlbl;        
-    }
-    generation=stat->m_Generation;
-    
     hash=tx.GetHash();
     
 //    tx_tag=mc_GetExplorerTxDetails(-1,tx,OutputAssetQuantities,OutputStreams,InputScriptTags,OutputScriptTags);
@@ -4112,6 +4102,16 @@ int mc_WalletTxs::AddExplorerTx(
     {
         return MC_ERR_NOERROR;
     }
+    
+    entity.Zero();    
+    entity.m_EntityType=MC_TET_EXP_TX_KEY | MC_TET_CHAINPOS;
+
+    stat=imp->GetEntity(imp->FindEntity(&entity));
+    if(stat == NULL)
+    {
+        goto exitlbl;        
+    }
+    generation=stat->m_Generation;
     
     tx_tag |= mc_GetExplorerTxInputDetails(-1,imp,tx,InputAddresses,InputAssetQuantities,InputSigHashTypes,InputScriptTags);
         

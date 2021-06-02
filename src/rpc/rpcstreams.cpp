@@ -2152,6 +2152,7 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     set<string> setFirstPublishers;
     
     mc_Buffer *entity_rows=NULL;
+    err=MC_ERR_NOERROR;
     
     int rpc_slot=GetRPCSlot();
     if(rpc_slot < 0)
@@ -2205,7 +2206,6 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     entity_rows=mc_gState->m_TmpRPCBuffers[rpc_slot]->m_RpcEntityRows;
     entity_rows->Clear();
         
-    err=MC_ERR_NOERROR;
     n=pwalletTxsMain->WRPGetListSize(&entity,entStat.m_Generation,NULL);
     i=0;
     m=10;

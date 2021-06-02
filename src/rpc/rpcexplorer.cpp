@@ -46,10 +46,14 @@ uint32_t mc_GetExplorerTxDetails(int rpc_slot,
 
 bool paramtobool_or_flag(Value param,int *flag)
 {
-    if(param.type() == int_type)
+    if(param.type() == str_type)
     {
-        *flag=param.get_int();
-        return false;
+        if(param.get_str() == "-")
+        {
+            *flag=2;
+            return false;
+        }
+        return false;        
     }
     return paramtobool(param);
 }
@@ -261,8 +265,36 @@ Value TagEntry(uint64_t tag,bool tx)
     return tags;
 }
 
+void AddBlockInfo(Object& entry,int block,int chain_height)
+{
+    if( (block<0) || (block>chain_height) )
+    {
+        entry.push_back(Pair("confirmations",0));
+        entry.push_back(Pair("blockindex",Value::null));
+    }
+    else
+    {
+        mc_gState->ChainLock();
+        int cur_height=chainActive.Height();
+        if(cur_height >= block)
+        {
+            uint256 blockHash=chainActive[block]->GetBlockHash();
+            entry.push_back(Pair("confirmations",chain_height-block+1));
+            entry.push_back(Pair("blockhash", chainActive[block]->GetBlockHash().GetHex()));
+            entry.push_back(Pair("blockindex", block));
+            entry.push_back(Pair("blocktime", mapBlockIndex[blockHash]->GetBlockTime()));            
+        }
+        else
+        {
+            entry.push_back(Pair("confirmations",0));
+            entry.push_back(Pair("blockindex",Value::null));            
+        }
+        mc_gState->ChainUnLock();
+    }
+}
 
-Value listexpmap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& inputEntities,vector<string>& inputStrings,int count, int start, string mode,int *errCode,string *strError)
+
+Value explorerlistmap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& inputEntities,vector<string>& inputStrings,int count, int start, string mode,int *errCode,string *strError)
 {
     mc_TxEntity entity;
     mc_TxEntityStat entStat;
@@ -395,14 +427,7 @@ Value listexpmap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& input
 
                         entry.push_back(Pair("txid", hash.ToString()));
                         int block=erow.m_Block;
-                        if( (block < 0) || (block > chain_height))
-                        {
-                            entry.push_back(Pair("block", Value::null));
-                        }
-                        else
-                        {
-                            entry.push_back(Pair("block", block));            
-                        }
+                        AddBlockInfo(entry,block,chain_height);                        
                         if(row == 1)
                         {
                             all_entry.push_back(Pair("first", entry));                                                                        
@@ -421,7 +446,7 @@ Value listexpmap_operation(mc_TxEntity *parent_entity,vector<mc_TxEntity>& input
     return retArray;
 }
 
-Value listexptxs(const json_spirit::Array& params, bool fHelp)
+Value explorerlisttransactions(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 3)
         throw runtime_error("Help message not found\n");
@@ -526,14 +551,7 @@ Value listexptxs(const json_spirit::Array& params, bool fHelp)
         entry.push_back(Pair("txid", hash.ToString()));
         int block=lpEntTx->m_Block;
         entry.push_back(Pair("tags", TagEntry(tag,true)));
-        if( (block < 0) || (block > chain_height))
-        {
-            entry.push_back(Pair("block", Value::null));
-        }
-        else
-        {
-            entry.push_back(Pair("block", block));            
-        }
+        AddBlockInfo(entry,block,chain_height);                        
         
         retArray.push_back(entry);                                
     }
@@ -553,11 +571,16 @@ exitlbl:
     return retArray;    
 }
 
-Value getexptx(const json_spirit::Array& params, bool fHelp)
+Value explorergetrawtransaction(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)                        // MCHN
         throw runtime_error("Help message not found\n");
 
+    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER) == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
+    }   
+    
     uint256 hash = ParseHashV(params[0], "parameter 1");
 
     bool fVerbose = false;
@@ -569,7 +592,10 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
     uint256 hashBlock = 0;
     Object result;
     Value block_entry;
+    int block,chain_height;
     
+    block=-1;
+    chain_height=0;
     {
         LOCK(cs_main);
         if (!GetTransaction(hash, tx, hashBlock, true))
@@ -590,12 +616,15 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
             {            
                 if(a.value_.get_int() > 0)
                 {
-                    block_entry=chainActive.Height()-a.value_.get_int()+1;
+                    block=chainActive.Height()-a.value_.get_int()+1;;
+                    chain_height=chainActive.Height();
+//                    block_entry=chainActive.Height()-a.value_.get_int()+1;
+                    
                 }
             }
         }
     }
-
+    
     mc_TxEntityStat entStat;
     mc_TxEntity entity;
     int errCode;
@@ -635,7 +664,7 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
     if(!pwalletTxsMain->WRPFindEntity(&entStat))
     {
         errCode=RPC_NOT_SUBSCRIBED;
-        strError="Not subscribed to this stream";
+        strError="Not subscribed to this service";
         goto exitlbl;
     }
     
@@ -702,7 +731,8 @@ Value getexptx(const json_spirit::Array& params, bool fHelp)
         }
     }    
     
-    result.push_back(Pair("block", block_entry));
+    AddBlockInfo(result,block,chain_height);                        
+//    result.push_back(Pair("block", block_entry));
     result.push_back(Pair("assets", assets));
     result.push_back(Pair("tags", TagEntry(tx_tag,true)));
     
@@ -841,7 +871,7 @@ exitlbl:
     return result;
 }
 
-Value listexpaddresses(const json_spirit::Array& params, bool fHelp)
+Value explorerlistaddresses(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 4)
         throw runtime_error("Help message not found\n");
@@ -902,7 +932,7 @@ Value listexpaddresses(const json_spirit::Array& params, bool fHelp)
     if(!pwalletTxsMain->WRPFindEntity(&entStat))
     {
         errCode=RPC_NOT_SUBSCRIBED;
-        strError="Not subscribed to this stream";
+        strError="Not subscribed to this service";
         goto exitlbl;
     }
 
@@ -935,7 +965,7 @@ Value listexpaddresses(const json_spirit::Array& params, bool fHelp)
     }
     
     
-    retArray=listexpmap_operation(&(entStat.m_Entity),inputEntities,inputStrings,count,start,mode,&errCode,&strError);        
+    retArray=explorerlistmap_operation(&(entStat.m_Entity),inputEntities,inputStrings,count,start,mode,&errCode,&strError);        
 
 exitlbl:
                 
@@ -949,7 +979,7 @@ exitlbl:
     return retArray;
 }
 
-Value listexpaddresstxs(const json_spirit::Array& params, bool fHelp)
+Value explorerlistaddresstransactions(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 4)
         throw runtime_error("Help message not found\n");
@@ -1008,7 +1038,7 @@ Value listexpaddresstxs(const json_spirit::Array& params, bool fHelp)
     if(!pwalletTxsMain->WRPFindEntity(&entStat))
     {
         errCode=RPC_NOT_SUBSCRIBED;
-        strError="Not subscribed to this stream";
+        strError="Not subscribed to this service";
         goto exitlbl;
     }
 
@@ -1063,14 +1093,7 @@ Value listexpaddresstxs(const json_spirit::Array& params, bool fHelp)
         entry.push_back(Pair("txid", hash.ToString()));
         entry.push_back(Pair("tags", TagEntry(tag,true)));
         int block=lpEntTx->m_Block;
-        if( (block < 0) || (block > chain_height))
-        {
-            entry.push_back(Pair("block", Value::null));
-        }
-        else
-        {
-            entry.push_back(Pair("block", block));            
-        }
+        AddBlockInfo(entry,block,chain_height);                        
         retArray.push_back(entry);                                
     }
     
@@ -1090,7 +1113,7 @@ exitlbl:
     return retArray;
 }
 
-Value listexpblocktxs(const json_spirit::Array& params, bool fHelp)
+Value explorerlistblocktransactions(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 4)
         throw runtime_error("Help message not found\n");
@@ -1158,7 +1181,7 @@ Value listexpblocktxs(const json_spirit::Array& params, bool fHelp)
     if(!pwalletTxsMain->WRPFindEntity(&entStat))
     {
         errCode=RPC_NOT_SUBSCRIBED;
-        strError="Not subscribed to this stream";
+        strError="Not subscribed to this service";
         goto exitlbl;
     }
     
@@ -1207,14 +1230,7 @@ Value listexpblocktxs(const json_spirit::Array& params, bool fHelp)
         entry.push_back(Pair("txid", hash.ToString()));
         entry.push_back(Pair("tags", TagEntry(tag,true)));
         int block=lpEntTx->m_Block;
-        if( (block < 0) || (block > chain_height))
-        {
-            entry.push_back(Pair("block", Value::null));
-        }
-        else
-        {
-            entry.push_back(Pair("block", block));            
-        }
+        AddBlockInfo(entry,block,chain_height);                        
         retArray.push_back(entry);                                
     }
     
@@ -1234,7 +1250,7 @@ exitlbl:
     return retArray;
 }
 
-Value listexpredeemtxs(const json_spirit::Array& params, bool fHelp)
+Value explorerlistredeemtransactions(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 2)
         throw runtime_error("Help message not found\n");
@@ -1260,7 +1276,6 @@ Value listexpredeemtxs(const json_spirit::Array& params, bool fHelp)
     entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
     
     bool fWRPLocked=false;
-    int chain_height; 
     int rpc_slot=GetRPCSlot();
     if(rpc_slot < 0)
     {
@@ -1274,7 +1289,7 @@ Value listexpredeemtxs(const json_spirit::Array& params, bool fHelp)
     if(!pwalletTxsMain->WRPFindEntity(&entStat))
     {
         errCode=RPC_NOT_SUBSCRIBED;
-        strError="Not subscribed to this stream";
+        strError="Not subscribed to this service";
         goto exitlbl;
     }
 
@@ -1326,7 +1341,7 @@ exitlbl:
     return retArray;
 }
 
-Value listexpaddressstreams(const json_spirit::Array& params, bool fHelp)
+Value explorerlistaddressstreams(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 4)
         throw runtime_error("Help message not found\n");
@@ -1371,7 +1386,6 @@ Value listexpaddressstreams(const json_spirit::Array& params, bool fHelp)
     entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
     
     bool fWRPLocked=false;
-    int chain_height; 
     int rpc_slot=GetRPCSlot();
     if(rpc_slot < 0)
     {
@@ -1412,7 +1426,6 @@ Value listexpaddressstreams(const json_spirit::Array& params, bool fHelp)
         goto exitlbl;
     }
     
-    chain_height=chainActive.Height();
     for(int i=0;i<entity_rows->GetCount();i++)
     {
         mc_TxEntityRow *lpEntTx;
@@ -1469,7 +1482,7 @@ exitlbl:
 
 
 
-Value listexpaddressassets(const json_spirit::Array& params, bool fHelp)
+Value explorerlistaddressassets(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 4)
         throw runtime_error("Help message not found\n");
@@ -1528,7 +1541,7 @@ Value listexpaddressassets(const json_spirit::Array& params, bool fHelp)
     if(!pwalletTxsMain->WRPFindEntity(&entStat))
     {
         errCode=RPC_NOT_SUBSCRIBED;
-        strError="Not subscribed to this stream";
+        strError="Not subscribed to this service";
         goto exitlbl;
     }
 
@@ -1640,7 +1653,7 @@ exitlbl:
     return retArray;
 }
 
-Value listexpassetaddresses(const json_spirit::Array& params, bool fHelp)
+Value explorerlistassetaddresses(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 4)
         throw runtime_error("Help message not found\n");
@@ -1704,7 +1717,6 @@ Value listexpassetaddresses(const json_spirit::Array& params, bool fHelp)
     entStat.m_Entity.m_EntityType |= MC_TET_CHAINPOS;
     
     bool fWRPLocked=false;
-    int chain_height; 
     int rpc_slot=GetRPCSlot();
     if(rpc_slot < 0)
     {
@@ -1718,7 +1730,7 @@ Value listexpassetaddresses(const json_spirit::Array& params, bool fHelp)
     if(!pwalletTxsMain->WRPFindEntity(&entStat))
     {
         errCode=RPC_NOT_SUBSCRIBED;
-        strError="Not subscribed to this stream";
+        strError="Not subscribed to this service";
         goto exitlbl;
     }
 
@@ -1743,7 +1755,6 @@ Value listexpassetaddresses(const json_spirit::Array& params, bool fHelp)
         goto exitlbl;
     }
     
-    chain_height=chainActive.Height();
     for(int i=0;i<entity_rows->GetCount();i++)
     {
         mc_TxEntityRow *lpEntTx;
@@ -1814,7 +1825,7 @@ exitlbl:
     return retArray;
 }
 
-Value listexpaddressassettxs(const json_spirit::Array& params, bool fHelp)
+Value explorerlistaddressassettransactions(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 5)
         throw runtime_error("Help message not found\n");
@@ -1923,7 +1934,7 @@ Value listexpaddressassettxs(const json_spirit::Array& params, bool fHelp)
     if(!pwalletTxsMain->WRPFindEntity(&entStat))
     {
         errCode=RPC_NOT_SUBSCRIBED;
-        strError="Not subscribed to this stream";
+        strError="Not subscribed to this service";
         goto exitlbl;
     }
 
@@ -1992,14 +2003,7 @@ Value listexpaddressassettxs(const json_spirit::Array& params, bool fHelp)
         }            
         
         int block=lpEntTx->m_Block;
-        if( (block < 0) || (block > chain_height))
-        {
-            entry.push_back(Pair("block", Value::null));
-        }
-        else
-        {
-            entry.push_back(Pair("block", block));            
-        }
+        AddBlockInfo(entry,block,chain_height);                        
         retArray.push_back(entry);                                
     }
     

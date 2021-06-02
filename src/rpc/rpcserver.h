@@ -354,16 +354,16 @@ extern json_spirit::Value addlibraryupdatefrom(const json_spirit::Array& params,
 extern json_spirit::Value getlibrarycode(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value testlibrary(const json_spirit::Array& params, bool fHelp);
 
-extern json_spirit::Value listexptxs(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value listexpaddresses(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value listexpaddresstxs(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value listexpblocktxs(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value listexpredeemtxs(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value listexpaddressassets(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value listexpaddressstreams(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value listexpassetaddresses(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value listexpaddressassettxs(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value getexptx(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlisttransactions(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlistaddresses(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlistaddresstransactions(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlistblocktransactions(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlistredeemtransactions(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlistaddressassets(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlistaddressstreams(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlistassetaddresses(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlistaddressassettransactions(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorergetrawtransaction(const json_spirit::Array& params, bool fHelp);
 
 
 
