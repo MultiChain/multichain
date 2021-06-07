@@ -104,6 +104,7 @@ void WalletTxToJSON(const CWalletTx& wtx, Object& entry,bool skipWalletConflicts
         {
             blockHash=chainActive[block]->GetBlockHash();
             entry.push_back(Pair("blockhash", chainActive[block]->GetBlockHash().GetHex()));
+            entry.push_back(Pair("blockheight", block));
             entry.push_back(Pair("blockindex", (int64_t)wtx.txDef.m_BlockIndex));
             entry.push_back(Pair("blocktime", mapBlockIndex[blockHash]->GetBlockTime()));
             if(mapBlockIndex[blockHash]->GetBlockTime()<nTimeSmart)

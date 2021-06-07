@@ -2537,7 +2537,7 @@ Array AssetHistory(mc_EntityDetails *last_entity,uint64_t multiple,int count,int
                         {
                             uint256 blockHash=chainActive[block]->GetBlockHash();
                             issue.push_back(Pair("blockhash", blockHash.GetHex()));
-                            issue.push_back(Pair("blockindex", block));                            
+                            issue.push_back(Pair("blockheight", block));                            
                             issue.push_back(Pair("blocktime", mapBlockIndex[blockHash]->GetBlockTime()));                            
                         }                        
                         mc_gState->ChainUnLock();
@@ -2655,7 +2655,7 @@ Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t
                         {
                             uint256 blockHash=chainActive[block]->GetBlockHash();
                             issue.push_back(Pair("blockhash", blockHash.GetHex()));
-                            issue.push_back(Pair("blockindex", block));                            
+                            issue.push_back(Pair("blockindex", block));         // To be changed to blockheight in next protocol version                   
                             issue.push_back(Pair("blocktime", mapBlockIndex[blockHash]->GetBlockTime()));                            
                         }                        
                         mc_gState->ChainUnLock();

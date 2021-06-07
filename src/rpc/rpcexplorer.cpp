@@ -270,7 +270,7 @@ void AddBlockInfo(Object& entry,int block,int chain_height)
     if( (block<0) || (block>chain_height) )
     {
         entry.push_back(Pair("confirmations",0));
-        entry.push_back(Pair("blockindex",Value::null));
+        entry.push_back(Pair("blockheight",Value::null));
     }
     else
     {
@@ -281,13 +281,13 @@ void AddBlockInfo(Object& entry,int block,int chain_height)
             uint256 blockHash=chainActive[block]->GetBlockHash();
             entry.push_back(Pair("confirmations",chain_height-block+1));
             entry.push_back(Pair("blockhash", chainActive[block]->GetBlockHash().GetHex()));
-            entry.push_back(Pair("blockindex", block));
+            entry.push_back(Pair("blockheight", block));
             entry.push_back(Pair("blocktime", mapBlockIndex[blockHash]->GetBlockTime()));            
         }
         else
         {
             entry.push_back(Pair("confirmations",0));
-            entry.push_back(Pair("blockindex",Value::null));            
+            entry.push_back(Pair("blockheight",Value::null));            
         }
         mc_gState->ChainUnLock();
     }
@@ -687,6 +687,14 @@ Value explorergetrawtransaction(const json_spirit::Array& params, bool fHelp)
         if( (real_tx_asset_tag & MC_MTX_TAG_NATIVE_TRANSFER) == 0)
         {
             tx_tag -= MC_MTX_TAG_NATIVE_TRANSFER;
+        }
+    }
+    
+    if(tx_tag & MC_MTX_TAG_NO_KEY_SCRIPT_ID)
+    {
+        if(tx_tag & MC_MTX_TAG_COMBINE)
+        {
+            tx_tag -= MC_MTX_TAG_COMBINE;
         }
     }
     

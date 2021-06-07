@@ -3449,6 +3449,10 @@ uint64_t mc_GetExplorerTxOutputDetails(int rpc_slot,
                     {
                         OutputAddresses[i].insert(make_pair(subkey_hash160,publisher_flags));                    
                     }
+                    else
+                    {
+                        OutputScriptTags[i] |= MC_MTX_TAG_NO_KEY_SCRIPT_ID;
+                    }
                 }
             }
             else
@@ -3864,6 +3868,7 @@ uint32_t mc_CheckExplorerAssetTransfers(
     uint160 balance_subkey_hash160;
     int asset_count=0;
     bool same_address=true;
+    int output_count=0;
     uint160 first_address=0;
     int inputs_outputs_shift=0;
     
@@ -3911,6 +3916,7 @@ uint32_t mc_CheckExplorerAssetTransfers(
         if(OutputAddresses[i].size())
         {
             inputs_outputs_shift--;
+            output_count++;
             if(first_address != OutputAddresses[i].begin()->first)
             {
                 same_address=false;
@@ -3961,7 +3967,7 @@ uint32_t mc_CheckExplorerAssetTransfers(
         tx_tag |= MC_MTX_TAG_MULTIPLE_ASSETS;
     }
     
-    if(same_address && (inputs_outputs_shift > 0))
+    if(same_address && (inputs_outputs_shift > 0) && (output_count > 0))
     {        
         tx_tag |= MC_MTX_TAG_COMBINE;        
     }
@@ -4133,6 +4139,14 @@ int mc_WalletTxs::AddExplorerTx(
             tx_tag -= MC_MTX_TAG_NATIVE_TRANSFER;
         }
     }
+
+    if(tx_tag & MC_MTX_TAG_NO_KEY_SCRIPT_ID)
+    {
+        if(tx_tag & MC_MTX_TAG_COMBINE)
+        {
+            tx_tag -= MC_MTX_TAG_COMBINE;
+        }
+    }   
     
     direct_tx_tag=(uint32_t)(tx_tag & MC_MTX_TAG_DIRECT_MASK);
     tag_hash=hash;
