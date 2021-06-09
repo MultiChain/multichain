@@ -126,12 +126,6 @@ Value TagEntry(uint64_t tag,bool tx)
     {
         tags.push_back("coinbase");
     }
-/*    
-    if(tag & MC_MTX_TAG_CACHED_SCRIPT)
-    {
-        tags.push_back("cached-script");
-    }
- */ 
     if(tag & MC_MTX_TAG_GRANT_ENTITY)
     {
         tags.push_back("grant-per-entity");                        
@@ -160,22 +154,22 @@ Value TagEntry(uint64_t tag,bool tx)
     {
         if(tag & MC_MTX_TAG_LICENSE_TOKEN)
         {
-            tags.push_back("new-license-token-unit");            
+            tags.push_back("issue-license-unit");            
         }
         else
         {
-            tags.push_back("new-asset-units");            
+            tags.push_back("issue-asset-units");            
         }
     }
     if(tag & MC_MTX_TAG_ASSET_TRANSFER)
     {
         if(tag & MC_MTX_TAG_LICENSE_TOKEN)
         {            
-            tags.push_back(tx ? "license-transfer" : "license");            
+            tags.push_back(tx ? "transfer-license" : "license");            
         }
         else
         {            
-            tags.push_back(tx ? "asset-transfer" : "asset");            
+            tags.push_back(tx ? "transfer-asset" : "asset");            
         }
     }
     if(tag & MC_MTX_TAG_MULTIPLE_ASSETS)
@@ -184,11 +178,11 @@ Value TagEntry(uint64_t tag,bool tx)
     }
     if(tag & MC_MTX_TAG_NATIVE_TRANSFER)
     {
-        tags.push_back(tx ? "native-transfer" : "native");                    
+        tags.push_back(tx ? "transfer-native" : "native");                    
     }
     if(tag & MC_MTX_TAG_ASSET_FOLLOWON)
     {
-        tags.push_back("more-asset-units");            
+        tags.push_back("issuemore-asset-units");            
     }
     string entity="entity";
     if(tag & MC_MTX_TAG_ENTITY_MASK)
@@ -209,19 +203,33 @@ Value TagEntry(uint64_t tag,bool tx)
     
     if(tag & MC_MTX_TAG_ENTITY_CREATE)
     {
-        tags.push_back("create-" + entity);
+        if(entity=="asset")
+        {
+            tags.push_back("issue-asset-details");
+        }
+        else
+        {
+            tags.push_back("create-" + entity);
+        }
     }
     if(tag & MC_MTX_TAG_ENTITY_UPDATE)
     {
-        tags.push_back("update-" + entity);
+        if(entity=="asset")
+        {
+            tags.push_back("issuemore-asset-details");
+        }
+        else
+        {
+            tags.push_back("update-" + entity);
+        }
     }
     if(tag & MC_MTX_TAG_FILTER_APPROVAL)
     {
-        tags.push_back("filter-or-library-approval");
+        tags.push_back("approve-filter-library");
     }
     if(tag & MC_MTX_TAG_UPGRADE_APPROVAL)
     {
-        tags.push_back("upgrade-approval");
+        tags.push_back("approve-upgrade");
     }
     
     if(tag & MC_MTX_TAG_STREAM_ITEM)
@@ -241,7 +249,7 @@ Value TagEntry(uint64_t tag,bool tx)
     }
     if(tag & MC_MTX_TAG_COMBINE)
     {
-        tags.push_back("combine");                            
+        tags.push_back("combine-utxos");                            
     }
     if(tag & MC_MTX_TAG_INLINE_DATA)
     {
