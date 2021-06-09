@@ -950,7 +950,7 @@ int mc_TxDB::AddEntity(mc_TxImport *import,mc_TxEntity *entity,uint32_t flags)
     {
         stat.Zero();
         memcpy(&(stat.m_Entity), entity,sizeof(mc_TxEntity));
-        stat.m_Generation=0;
+        stat.m_Generation=import->m_ImportID;
         stat.m_LastPos=0;
         stat.m_LastClearedPos=0;
         stat.m_PosInImport=1;
