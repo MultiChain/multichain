@@ -2065,6 +2065,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
 // 0x0080 put issueqty into qty field
 // 0x0100 skip all quantities and add "type":"asset|
 // 0x0200 skip list of issuers in issues list
+// 0x0400 skip details in issues list
     Object entry;
     mc_EntityDetails entity;
     mc_EntityDetails sec_entity;
@@ -2285,7 +2286,10 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                         {                        
                             vfields=followon_fields;
                         }
-                        issue.push_back(Pair("details",vfields));                    
+                        if( (output_level & 0x0400) == 0)
+                        {
+                            issue.push_back(Pair("details",vfields));                    
+                        }
                         if( (output_level & 0x0200) == 0)
                         {
                             issue.push_back(Pair("issuers",followon_issuers));                    
@@ -2521,9 +2525,9 @@ Array AssetHistory(mc_EntityDetails *last_entity,uint64_t multiple,int count,int
                     {                        
                         vfields=followon_fields;
                     }
-                    issue.push_back(Pair("details",vfields)); 
                     if(output_level & 0x0040)
                     {
+                        issue.push_back(Pair("details",vfields)); 
                         issue.push_back(Pair("issuers",followon_issuers));                    
                     }
                     qty=followon->GetQuantity();

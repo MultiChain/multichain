@@ -2399,13 +2399,13 @@ Value listassetissues(const Array& params, bool fHelp)
     issue_items=mc_GetEntityIndex(&last_entity)+1;
     if(issue_items <= 0)                                                        // No followon index
     {
-        output_level=0x22F;
+        output_level=0x62F;
 
         if (params.size() > 1)    
         {
             if(paramtobool(params[1]))
             {
-                output_level-=0x200;
+                output_level-=0x600;
             }
         }
         

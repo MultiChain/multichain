@@ -5549,7 +5549,7 @@ void mc_InitRPCHelpMap24()
             "\nReturns asset issues history\n"
             "\nArguments:\n"
             "1. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
-            "2. verbose                          (boolean, optional, default=false) If true, returns txid, vout and confirmation information\n"
+            "2. verbose                          (boolean, optional, default=false) If true, returns details and list of issuers\n"
             "3. count                            (number, optional, default=INT_MAX - all) The number of asset issues to display\n"
             "4. start                            (number, optional, default=-count - last) Start from specific asset issue, 0 based, if negative - from the end\n"
             "\nResult:\n"
