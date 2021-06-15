@@ -974,7 +974,7 @@ Value explorerlistaddresses(const json_spirit::Array& params, bool fHelp)
         
         if(inputStrings.size())
         {
-            return inputStrings.size();
+            return (int)inputStrings.size();
         }
         
         return pwalletTxsMain->WRPGetListSize(&entStat.m_Entity,entStat.m_Generation,NULL);
