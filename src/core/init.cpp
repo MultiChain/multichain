@@ -565,6 +565,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -lockinlinemetadata=0|1                  " + _("Outputs with inline metadata can be sent only using create/appendrawtransaction, default 1") + "\n";
     strUsage += "  -purgemethod=<method>                    " + _("Overwrite data before purging. Available modes: unlink, simple(=zero, default), one, zeroone, random1-random4, dod, doe, rcmp, gutmann.") + "\n";
     strUsage += "                                           " + _("Can be followed by '-pattern' (up to 6 characters), i.e. random2-mchn makes two random pattern passes followed by 'mchn'. Enterprise Edition only.") + "\n";
+    strUsage += "  -explorersupport=0|1                     " + _("Provide support for MultiChain Explorer 2, default 0") + "\n";
 
     strUsage += "\n" + _("MultiChain API response parameters") + "\n";        
     strUsage += "  -hideknownopdrops      " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON-RPC calls (default: %u)"), 0) + "\n";
@@ -1789,6 +1790,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         }
 
         vector <mc_TxEntity> vSubscribedEntities;
+        int explorer_support=-1;
         if(GetBoolArg("-reindex", false) || GetBoolArg("-rescan", false))
         {
             pwalletTxsMain=new mc_WalletTxs;
@@ -1804,11 +1806,19 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     {
                         case MC_TET_PUBKEY_ADDRESS:
                         case MC_TET_SCRIPT_ADDRESS:
+                            vSubscribedEntities.push_back(stat->m_Entity);
+                            break;
                         case MC_TET_STREAM:
                         case MC_TET_STREAM_KEY:
                         case MC_TET_STREAM_PUBLISHER:
                         case MC_TET_ASSET:
-                            vSubscribedEntities.push_back(stat->m_Entity);
+                            if(!GetBoolArg("-dropallsubscriptions",false))
+                            {
+                                vSubscribedEntities.push_back(stat->m_Entity);
+                            }
+                            break;
+                        case MC_TET_EXP_TX:
+                            explorer_support=1;
                             break;
                     }
                 }
@@ -1913,16 +1923,49 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     mc_gState->m_WalletMode |= MC_WMD_AUTOSUBSCRIBE_ASSETS;
                 }                
 */
+                int explorer_mode=GetArg("-explorersupport",explorer_support);
+                if(explorer_mode > 0)
+                {
+                    mc_gState->m_WalletMode |= MC_WMD_EXPLORER;
+                }
+
                 if(pwalletTxsMain->Initialize(mc_gState->m_NetworkParams->Name(),mc_gState->m_WalletMode))
                 {
                     return InitError("Wallet tx database corrupted. Please restart multichaind with -rescan\n");                        
                 }
 
+                if(explorer_mode >= 0)
+                {                    
+                    if( (pwalletTxsMain->m_Database->m_DBStat.m_InitMode & MC_WMD_EXPLORER) != (mc_gState->m_WalletMode & MC_WMD_EXPLORER) )
+                    {
+                        return InitError("Explorer database was initialized with different setting. To change it, please restart multichaind with -rescan\n");                                                    
+                    }
+                }
+                
+                
                 if(mc_gState->m_WalletMode & MC_WMD_AUTO)
                 {
                     mc_gState->m_WalletMode=pwalletTxsMain->m_Database->m_DBStat.m_InitMode;
                     wallet_mode=pwalletTxsMain->m_Database->m_DBStat.m_WalletVersion;
                 }
+                else
+                {
+                    if(pwalletTxsMain->m_Database->m_DBStat.m_InitMode & MC_WMD_EXPLORER)
+                    {
+                        mc_gState->m_WalletMode |= MC_WMD_EXPLORER;
+                    }
+                }
+
+                if(mc_gState->m_WalletMode & MC_WMD_EXPLORER)
+                {
+                    if (mapArgs.count("-autosubscribe") == 0)
+                    {
+                        mc_gState->m_WalletMode |= MC_WMD_AUTOSUBSCRIBE_ASSETS | MC_WMD_AUTOSUBSCRIBE_STREAMS;
+                        pwalletTxsMain->UpdateMode(MC_WMD_AUTOSUBSCRIBE_ASSETS | MC_WMD_AUTOSUBSCRIBE_STREAMS);
+                        SoftSetArg("-autosubscribe","assets,streams");
+                    }
+                }
+                
                 if(wallet_mode == -1)
                 {
                     wallet_mode=pwalletTxsMain->m_Database->m_DBStat.m_WalletVersion;
@@ -1944,7 +1987,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     return InitError(strprintf("Wallet tx database was created with different wallet version (%d). Please restart multichaind with reindex=1 \n",pwalletTxsMain->m_Database->m_DBStat.m_WalletVersion));                        
                 }        
 
-                if((pwalletTxsMain->m_Database->m_DBStat.m_InitMode & MC_WMD_MODE_MASK) != (mc_gState->m_WalletMode & MC_WMD_MODE_MASK))
+                if((pwalletTxsMain->m_Database->m_DBStat.m_InitMode & (MC_WMD_MODE_MASK - MC_WMD_EXPLORER)) != (mc_gState->m_WalletMode & (MC_WMD_MODE_MASK - MC_WMD_EXPLORER)))
                 {
                     return InitError(strprintf("Wallet tx database was created in different mode (%08X). Please restart multichaind with reindex=1 \n",pwalletTxsMain->m_Database->m_DBStat.m_InitMode));                        
                 }        
@@ -2037,7 +2080,15 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 pwalletTxsMain->AddEntity(&entity,0);
                 entity.m_EntityType=MC_TET_WALLET_SPENDABLE | MC_TET_TIMERECEIVED;
                 pwalletTxsMain->AddEntity(&entity,0);
+                entity.m_EntityType=MC_TET_ENTITY | MC_TET_CHAINPOS;
+                pwalletTxsMain->AddEntity(&entity,0);
+                entity.m_EntityType=MC_TET_ENTITY_KEY | MC_TET_CHAINPOS;
+                pwalletTxsMain->AddEntity(&entity,0);
+                entity.m_EntityType=MC_TET_GLOBAL_SUBKEY_LIST | MC_TET_CHAINPOS;
+                pwalletTxsMain->AddEntity(&entity,0);
 
+                pwalletTxsMain->AddExplorerEntities(NULL);
+                
                 for(int e=0;e<(int)vSubscribedEntities.size();e++)
                 {
                     pwalletTxsMain->AddEntity(&(vSubscribedEntities[e]),MC_EFL_NOT_IN_SYNC);                    
@@ -2621,6 +2672,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
                 CBlock &genesis_block = const_cast<CBlock&>(Params().GenesisBlock());
                 GenesisBlockSize=::GetSerializeSize(genesis_block, SER_DISK, CLIENT_VERSION);
+                GenesisCoinBaseTx=genesis_block.vtx[0];
+                GenesisCoinBaseTxID=GenesisCoinBaseTx.GetHash();
+                
                 
                 // Check for changed -txindex state
 /* MCHN START */    
@@ -2856,7 +2910,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             uiInterface.InitMessage(_("Rescanning..."));
             LogPrintf("Rescanning last %i blocks (from block %i)...\n", chainActive.Height() - pindexRescan->nHeight, pindexRescan->nHeight);
             nStart = GetTimeMillis();
+            fRescan=true;
             pwalletMain->ScanForWalletTransactions(pindexRescan, true, false);
+            fRescan=false;
             LogPrintf(" rescan      %15dms\n", GetTimeMillis() - nStart);
             pwalletMain->SetBestChain(chainActive.GetLocator());
             nWalletDBUpdated++;

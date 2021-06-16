@@ -339,6 +339,7 @@ extern json_spirit::Value listlicenses(const json_spirit::Array& params, bool fH
 extern json_spirit::Value getlicenseconfirmation(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value importlicenserequest(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getinitstatus(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getchaintotals(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value gethealthcheck(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listvariables(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getvariableinfo(const json_spirit::Array& params, bool fHelp);
@@ -346,11 +347,23 @@ extern json_spirit::Value setvariablevalue(const json_spirit::Array& params, boo
 extern json_spirit::Value setvariablevaluefrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getvariablevalue(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getvariablehistory(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listassetissues(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listlibraries(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value addlibraryupdate(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value addlibraryupdatefrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getlibrarycode(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value testlibrary(const json_spirit::Array& params, bool fHelp);
+
+extern json_spirit::Value explorerlisttransactions(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlistaddresses(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlistaddresstransactions(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlistblocktransactions(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlistredeemtransactions(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlistaddressassets(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlistaddressstreams(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlistassetaddresses(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorerlistaddressassettransactions(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value explorergetrawtransaction(const json_spirit::Array& params, bool fHelp);
 
 
 

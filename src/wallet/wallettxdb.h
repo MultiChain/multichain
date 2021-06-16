@@ -30,9 +30,37 @@
 #define MC_TET_STREAM_PUBLISHER                 0x00000007
 #define MC_TET_ASSET                            0x00000008
 #define MC_TET_AUTHOR                           0x00000009
+#define MC_TET_ENTITY                           0x0000000A
+#define MC_TET_ENTITY_KEY                       0x0000000B
+#define MC_TET_GLOBAL_SUBKEY_LIST               0x0000000F // List of subkeys of global subscription to be decremented on rollback
+#define MC_TET_EXP_TX                           0x00000010 // global, key-block, publisher-address, item - txid, direct
+#define MC_TET_EXP_REDEEM                       0x00000011 // global, key-txid/vout, item - txid/vin, direct 
+#define MC_TET_EXP_TXOUT_ASSETS                 0x00000012 // global, key-txid/vout, item - asset quantities (direct if single asset)
+#define MC_TET_EXP_BALANCE_DETAILS              0x00000013 // global, key-asset/address, item - asset balances
+#define MC_TET_EXP_BALANCE_DETAILS_KEY          0x00000014 // global, asset/address
+#define MC_TET_EXP_REDEEM_KEY                   0x00000015 // global, txid/vout
+#define MC_TET_EXP_TX_KEY                       0x00000016 // global, block
+#define MC_TET_EXP_TX_PUBLISHER                 0x00000017 // global, address
+#define MC_TET_EXP_TXOUT_ASSETS_KEY             0x00000018 // global, txid/vout
+#define MC_TET_EXP_ADDRESS_ASSETS               0x0000001A // global, key-address, item - asset, direct (no balances), no duplicate items on asset
+#define MC_TET_EXP_ADDRESS_ASSETS_KEY           0x0000001B // global, address
+#define MC_TET_EXP_ASSET_ADDRESSES              0x0000001C // global, key-asset, item - address, direct (no balances), no duplicate items on address
+#define MC_TET_EXP_ASSET_ADDRESSES_KEY          0x0000001D // global, asset
+#define MC_TET_EXP_ADDRESS_STREAMS_PAIRS        0x0000001E // global, key-address/stream
+#define MC_TET_EXP_ADDRESS_STREAMS_KEY          0x0000001F // global, address
+
+#define MC_TET_SUBKEY                           0x00000040
 #define MC_TET_SUBKEY_STREAM_KEY                0x00000046
 #define MC_TET_SUBKEY_STREAM_PUBLISHER          0x00000047
-#define MC_TET_SUBKEY                           0x00000040
+#define MC_TET_SUBKEY_ENTITY_KEY                0x0000004B
+#define MC_TET_SUBKEY_REDEEM_KEY                0x00000055
+#define MC_TET_SUBKEY_EXP_TX_KEY                0x00000056
+#define MC_TET_SUBKEY_EXP_TX_PUBLISHER          0x00000057
+#define MC_TET_SUBKEY_EXP_TXOUT_ASSETS_KEY      0x00000058 
+#define MC_TET_SUBKEY_EXP_BALANCE_DETAILS_KEY   0x00000059 // global, asset/address
+#define MC_TET_SUBKEY_EXP_ADDRESS_ASSETS_KEY    0x0000005B
+#define MC_TET_SUBKEY_EXP_ASSET_ADDRESSES_KEY   0x0000005D 
+#define MC_TET_SUBKEY_EXP_ADDRESS_STREAMS_KEY   0x0000005F // global, address
 #define MC_TET_TYPE_MASK                        0x040000FF
 #define MC_TET_CHAINPOS                         0x00000100
 #define MC_TET_TIMERECEIVED                     0x00000200
@@ -172,6 +200,7 @@ typedef struct mc_TxImport
     int m_Block;                                                                // last block index
     mc_Buffer *m_Entities;                                                     // List of import entities (mc_TxEntityStat)
     mc_Buffer *m_TmpEntities;                                                  // Temporary list of entities (mc_TxEntity)
+    mc_Buffer *m_TmpGlobalSubKeyEntities;                                      
     mc_TxImport()
     {
         Zero();
@@ -333,6 +362,16 @@ typedef struct mc_TxDB
               uint32_t timestamp,                                               // timestamp to be stored as timereceived
               mc_Buffer *entities);                                             // List of relevant entities for this tx
     
+    int AddData(                                                                // Adds data to mempool
+              mc_TxImport *import,                                              // Import object, if NULL - chain
+              const unsigned char *hash,                                        // Data key (or tx ID)
+              const unsigned char *data,                                        // Data (NULL if store instead of datadef)
+              uint32_t datasize,                                                // Data size
+              int block,                                                        // Block we are processing now, -1 for mempool
+              uint32_t flags,                                                   // Flags passed by the higher level (or vout)               
+              uint32_t timestamp,                                               // timestamp to be stored as timereceived
+              mc_Buffer *entities);                                             // List of relevant entities for this data
+    
     int SetTxCache(                                                             // Returns tx definition if found, error if not found
               const unsigned char *hash);                                       // Input. Tx hash
     
@@ -344,6 +383,12 @@ typedef struct mc_TxDB
               mc_TxDefRow *txdef,                                               // Output. Tx def
               const unsigned char *hash,                                        // Input. Tx hash
               int skip_db);                                       
+    
+    int GetTx(                                                                  // Returns tx definition if found, error if not found
+              mc_TxImport *import,                                              // Import object, if NULL - chain
+              mc_TxDefRow *txdef,                                               // Output. Tx def
+              const unsigned char *hash,                                        // Input. Tx hash
+              int skip_db);
     
     int GetList(
                 mc_TxImport *import,                                            // Import object, if NULL - chain
@@ -382,6 +427,12 @@ typedef struct mc_TxDB
                     mc_TxEntity *entity,                                        // Entity to return info for
                     int generation,                                             // Entity generation
                     int *confirmed);                                            // Out: number of confirmed items    
+    
+    int GetLastItem(
+                    mc_TxImport *import,
+                    mc_TxEntity *entity,                                        // Entity to return info for
+                    int generation,                                             // Entity generation
+                    mc_TxEntityRow *erow);
     
     int GetBlockItemIndex(                                                      // Returns item id for the last item confirmed in this block or before
                     mc_TxImport *import,                                        // Import object, if NULL - chain
@@ -443,6 +494,7 @@ typedef struct mc_TxDB
     
     int WRPGetListSize(mc_TxEntity *entity,int *confirmed);    
     int WRPGetListSize(mc_TxEntity *entity,int generation,int *confirmed);
+    int WRPGetLastItem(mc_TxEntity *entity,int generation,mc_TxEntityRow *erow);    
     
     int WRPGetList(mc_TxEntity *entity,
                     int generation,
