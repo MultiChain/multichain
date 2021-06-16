@@ -50,6 +50,7 @@ static const CRPCCommand vRPCCommands[] =
   //  --------------------- ------------------------  -----------------------  ---------- ---------- ---------
     /* Overall control/query calls */
     { "control",            "getinfo",                &getinfo,                true,      false,      false }, /* uses wallet if enabled */
+    { "control",            "getchaintotals",         &getchaintotals,        true,      true,       false },
     { "control",            "getinitstatus",          &getinitstatus,          true,      true,       false },
     { "control",            "gethealthcheck",         &gethealthcheck,         true,      true,       false },
     { "control",            "help",                   &help,                   true,      true,       false },
@@ -116,6 +117,7 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "setvariablevaluefrom",   &setvariablevaluefrom,   true,      false,      false },
     { "blockchain",         "getvariablevalue",       &getvariablevalue,       true,      false,      false },
     { "blockchain",         "getvariablehistory",     &getvariablehistory,     true,      false,      false },
+    { "blockchain",         "listassetissues",        &listassetissues,     true,      false,      false },
 
     { "blockchain",         "listlibraries",          &listlibraries,          true,      false,      false },
     { "blockchain",         "addlibraryupdate",       &addlibraryupdate,       true,      false,      false },
@@ -318,6 +320,17 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "getstreamkeysummary",    &getstreamkeysummary,     false,     true,      true },
     { "wallet",             "getstreampublishersummary",&getstreampublishersummary,false,  true,      true },
     { "hidden",             "storechunk",             &storechunk,              false,     false,      true },
+    
+    { "wallet",             "explorerlisttransactions",             &explorerlisttransactions,              false,      true,      false },
+    { "wallet",             "explorerlistaddresses",       &explorerlistaddresses,        false,      true,      false },
+    { "wallet",             "explorerlistaddresstransactions",      &explorerlistaddresstransactions,       false,      true,      false },
+    { "wallet",             "explorerlistblocktransactions",        &explorerlistblocktransactions,         false,      true,      false },
+    { "wallet",             "explorerlistredeemtransactions",       &explorerlistredeemtransactions,        false,      true,      false },
+    { "wallet",             "explorerlistaddressassets",   &explorerlistaddressassets,    false,      true,      false },
+    { "wallet",             "explorerlistaddressstreams",  &explorerlistaddressstreams,   false,      true,      false },
+    { "wallet",             "explorerlistassetaddresses",  &explorerlistassetaddresses,   false,      true,      false },
+    { "wallet",             "explorerlistaddressassettransactions", &explorerlistaddressassettransactions,  false,      true,      false },
+    { "wallet",             "explorergetrawtransaction", &explorergetrawtransaction,                false,      false,     false },
     
 /* MCHN END */    
     { "wallet",             "setaccount",             &setaccount,             true,      false,      true },

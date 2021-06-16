@@ -1393,6 +1393,14 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, bool fOnlySubscri
         lpEntities->Add(&entity,NULL);
         entity.m_EntityType=MC_TET_WALLET_SPENDABLE | MC_TET_TIMERECEIVED;
         lpEntities->Add(&entity,NULL);
+        entity.m_EntityType=MC_TET_ENTITY | MC_TET_CHAINPOS;
+        lpEntities->Add(&entity,NULL);
+        entity.m_EntityType=MC_TET_ENTITY_KEY | MC_TET_CHAINPOS;
+        lpEntities->Add(&entity,NULL);
+        entity.m_EntityType=MC_TET_GLOBAL_SUBKEY_LIST | MC_TET_CHAINPOS;
+        lpEntities->Add(&entity,NULL);
+            
+        pwalletTxsMain->AddExplorerEntities(lpEntities);
 
         for(unsigned int i=0;i<vAddressesToImport.size();i++)
         {
@@ -1439,7 +1447,7 @@ mc_TxImport *StartImport(CWallet *lpWallet,bool fOnlyUnsynced, bool fOnlySubscri
                     b=(int)mc_GetLE(ptr,4)-1;
                 }
                 
-                if(b > block)
+                if(b >= block)
                 {
                     if(b < block_to_start_from)
                     {
@@ -1550,6 +1558,10 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
                         {
                             err=pwalletTxsMain->AddTx(imp,tx,pindex->nHeight,&pos,block_tx_index,pindex->GetBlockHash());
                         }
+                        else
+                        {
+                            pwalletTxsMain->AddExplorerTx(imp,tx,pindex->nHeight);
+                        }
                     }
                 }
                 if(((mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS) == 0) || (mc_gState->m_WalletMode & MC_WMD_MAP_TXS))
@@ -1584,7 +1596,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
 /* MCHN END */            
             if(!fOnlyUnsynced)
             {
-                if((pindex->nHeight % 1000) == 0)
+                if(((pindex->nHeight % 1000) == 0) || (pindex->nHeight == chainActive.Height()) ) 
                 {
                     printf("%d of %d blocks rescanned\n",pindex->nHeight,chainActive.Height());
                 }
@@ -1647,6 +1659,10 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
         }
         else
         {
+            if(!fOnlyUnsynced)
+            {
+                printf("Rescan complete\n");                
+            }
             LogPrint("wallet","Rescan completed successfully\n");            
         }
     }

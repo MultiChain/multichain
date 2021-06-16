@@ -41,6 +41,7 @@
 #define MC_WMD_NONE                  0x00000000
 #define MC_WMD_TXS                   0x00000001
 #define MC_WMD_ADDRESS_TXS           0x00000002
+#define MC_WMD_EXPLORER              0x00000004
 #define MC_WMD_FLAT_DAT_FILE         0x00000100
 #define MC_WMD_MAP_TXS               0x00010000
 #define MC_WMD_MODE_MASK             0x00FFFFFF
@@ -204,6 +205,7 @@ typedef struct mc_TmpBuffers
     mc_Buffer               *m_RpcEntityRowsFull;
     mc_SHA256               *m_RpcHasher1;
     mc_Script               *m_RpcChunkScript1;
+    mc_Script               *m_ExplorerTxScript;
     mc_Script               *m_RelayTmpBuffer;
     mc_Script               *m_LicenseTmpBuffer;
     mc_Script               *m_LicenseTmpBufferForHash;
@@ -235,6 +237,7 @@ typedef struct mc_TmpBuffers
         m_RelayTmpBuffer=new mc_Script();
         m_LicenseTmpBuffer=new mc_Script();
         m_LicenseTmpBufferForHash=new mc_Script();
+        m_ExplorerTxScript=new mc_Script();
     }    
 
     void  Destroy()
@@ -256,6 +259,7 @@ typedef struct mc_TmpBuffers
         delete m_RelayTmpBuffer;
         delete m_LicenseTmpBuffer;
         delete m_LicenseTmpBufferForHash;
+        delete m_ExplorerTxScript;
     }
     
 } mc_TmpBuffers;
