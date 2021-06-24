@@ -168,6 +168,7 @@ typedef struct mc_Features
     int Variables();
     int AnyoneCanIssueMore();
     int Libraries();
+    int NFTokens();
 } mc_Features;
 
 typedef struct mc_BlockHeaderInfo

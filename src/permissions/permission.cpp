@@ -1510,6 +1510,50 @@ int mc_Permissions::FilterApproved(const void* lpEntity,const void* lpAddress)
     return result;
 }
 
+/** Returns pseudo-address connected to details flag */
+
+void mc_Permissions::DetailsAddress(void* address,uint32_t flag)
+{
+    uint32_t address_salt;
+    address_salt=MC_PTP_DETAILS;
+    memset(address,0,MC_PLS_SIZE_ADDRESS);
+    mc_PutLE(address,&flag,sizeof(uint32_t));
+    mc_PutLE(address,&address_salt,sizeof(uint32_t));    
+}
+
+/** Returns non-zero value if flag is set */
+
+int mc_Permissions::DetailsFlag(const void* lpEntity,uint32_t flag)
+{
+    int result;
+    unsigned char address[MC_PLS_SIZE_ADDRESS];
+
+    if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
+    {
+        return 0;
+    }
+    
+    if(mc_gState->m_Features->NFTokens() == 0)
+    {
+        return 0;
+    }
+    
+    Lock(0);
+    
+    DetailsAddress(address,flag);
+
+    result = GetPermission(lpEntity,address,MC_PTP_DETAILS);    
+    
+    if(result)
+    {
+        result = MC_PTP_DETAILS; 
+    }
+    
+    UnLock();
+    
+    return result;
+}
+
 /** Returns non-zero value if (entity,address) can write */
 
 int mc_Permissions::CanCreate(const void* lpEntity,const void* lpAddress)
@@ -3389,6 +3433,7 @@ int mc_Permissions::SetPermissionInternal(const void* lpEntity,const void* lpAdd
     types[num_types]=MC_PTP_CUSTOM4;num_types++;                        
     types[num_types]=MC_PTP_CUSTOM5;num_types++;                        
     types[num_types]=MC_PTP_CUSTOM6;num_types++;                        
+    types[num_types]=MC_PTP_DETAILS;num_types++;                        
     
     err=MC_ERR_NOERROR;
 

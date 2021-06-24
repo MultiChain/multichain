@@ -58,6 +58,25 @@ bool mc_VerifyAssetPermissions(mc_Buffer *assets, vector<CTxDestination> address
     {
         if(mc_gState->m_Assets->FindEntityByFullRef(&entity,assets->GetRow(i)))
         {
+            if(mc_gState->m_Features->NFTokens())
+            {
+                if(entity.GetEntityType() == MC_ENT_TYPE_TOKEN)
+                {                    
+                    const unsigned char *ptr; 
+                    size_t bytes;
+                    ptr=(const unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_PARENT_ENTITY,&bytes);
+                    if( (ptr != NULL) || (bytes != sizeof(uint256)))
+                    {
+                        reason="Asset issue TxID not found in token script";
+                        return false;                                                                            
+                    }
+                    if(mc_gState->m_Assets->FindEntityByTxID(&entity,ptr))
+                    {
+                        reason="Token asset not found";
+                        return false;                                                                                                    
+                    }                    
+                }
+            }
             if( entity.Permissions() & (MC_PTP_SEND | MC_PTP_RECEIVE) )
             {
                 if( (addressRets.size() != 1) || (required_permissions > 1) )

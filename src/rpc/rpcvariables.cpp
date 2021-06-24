@@ -135,7 +135,7 @@ Value createvariablefromcmd(const Array& params, bool fHelp)
     {        
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_NAME,(unsigned char*)(variable_name.c_str()),variable_name.size());
     }
-    unsigned char b=1;        
+    unsigned char b=MC_ENT_FOMD_ALLOWED_INSTANT;        
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);
     
     

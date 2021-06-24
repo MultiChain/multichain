@@ -243,10 +243,10 @@ Value issuefromcmd(const Array& params, bool fHelp)
     
     if(is_open)
     {
-        unsigned char b=1;        
+        unsigned char b=MC_ENT_FOMD_ALLOWED_INSTANT;        
         if(is_anyone_can_issuemore)
         {
-            b |= 0x02;
+            b |= MC_ENT_FOMD_ANYONE_CAN_ISSUEMORE;
         }
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);
     }

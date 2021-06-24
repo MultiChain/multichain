@@ -4682,7 +4682,7 @@ void mc_InitRPCHelpMap19()
      
      mapHelpStrings.insert(std::make_pair("getfilterassetbalances",
             "getfilterassetbalances \"asset-identifier\" ( raw )\n"
-            "\nReturns information about the last or recent blocks in the active chain.\n"
+            "\nReturns information about balances for every address involved in transaction for specific asset.\n"
             "\nArguments:\n"
             "1. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name. \"\" for native currency.\n"
             "2. raw                              (boolean, optional, default false) Return raw value\n"

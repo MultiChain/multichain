@@ -4782,6 +4782,7 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
                 {
                     if(is_open)
                     {
+                        is_open=MC_ENT_FOMD_ALLOWED_INSTANT;
                         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,(unsigned char*)&is_open,1);                
                     }            
                     if(multiple_is_set)

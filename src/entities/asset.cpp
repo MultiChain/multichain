@@ -1611,7 +1611,7 @@ int mc_AssetDB::UpdateEntityLists(const void* txid,int offset,int entity_type)
         lpDetails=new mc_Script;
         lpDetails->AddElement();
 
-        unsigned char b=1;        
+        unsigned char b=MC_ENT_FOMD_ALLOWED_INSTANT;        
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);
         
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ENTITY_TXID,(unsigned char*)txid,MC_ENT_KEY_SIZE);    
@@ -2651,7 +2651,22 @@ int mc_EntityDetails::IsFollowOn()
     return 0;
 }
 
-int mc_EntityDetails::UpdateMode()
+int64_t mc_EntityDetails::MaxTotalIssuance()
+{
+    unsigned char *ptr;
+    size_t bytes;
+    ptr=(unsigned char *)GetSpecialParam(MC_ENT_SPRM_ASSET_MAX_TOTAL,&bytes);
+    if(ptr)
+    {
+        if((bytes>0) && (bytes<=8))
+        {
+            return mc_GetLE(ptr,bytes);
+        }
+    }
+    return MC_ENT_DEFAULT_MAX_ASSET_TOTAL;    
+}
+
+int mc_EntityDetails::FollowonMode()
 {
     unsigned char *ptr;
     size_t bytes;
@@ -2668,25 +2683,41 @@ int mc_EntityDetails::UpdateMode()
 
 int mc_EntityDetails::AllowedFollowOns()
 {
-    return UpdateMode() & 0x05;
-/*    
-    unsigned char *ptr;
-    size_t bytes;
-    ptr=(unsigned char *)GetSpecialParam(MC_ENT_SPRM_FOLLOW_ONS,&bytes);
-    if(ptr)
+    int mode=FollowonMode();
+    int result=mode & (MC_ENT_FOMD_ALLOWED_INSTANT | MC_ENT_FOMD_ALLOWED_WITH_APPROVAL);
+    
+    if(mc_gState->m_Features->NFTokens())
     {
-        if((bytes>0) && (bytes<=4))
+        if(mode & (MC_ENT_FOMD_CAN_OPEN | MC_ENT_FOMD_CAN_CLOSE))
         {
-            return (int)mc_GetLE(ptr,bytes) & 0x01;
+            int open=mc_gState->m_Permissions->DetailsFlag(GetTxID(),MC_PDF_ASSET_OPEN);
+            if(mode & MC_ENT_FOMD_CAN_OPEN)
+            {
+                if(open)
+                {
+                    if(result == 0)
+                    {
+                        result=MC_ENT_FOMD_ALLOWED_INSTANT;
+                    }
+                    return result;
+                }
+            }
+            if(mode & MC_ENT_FOMD_CAN_CLOSE)
+            {
+                if(open == 0)
+                {
+                    return 0;
+                }
+            }            
         }
     }
-    return 0;
- */ 
+    
+    return result;
 }
 
 int mc_EntityDetails::ApproveRequired()
 {
-    return UpdateMode() & 0x04;    
+    return FollowonMode() & MC_ENT_FOMD_ALLOWED_WITH_APPROVAL;    
 }
 
 int mc_EntityDetails::AnyoneCanIssueMore()
@@ -2695,20 +2726,43 @@ int mc_EntityDetails::AnyoneCanIssueMore()
     {
         return 0;
     }
-    return UpdateMode() & 0x02;
-/*    
-    unsigned char *ptr;
-    size_t bytes;
-    ptr=(unsigned char *)GetSpecialParam(MC_ENT_SPRM_FOLLOW_ONS,&bytes);
-    if(ptr)
+    return FollowonMode() & MC_ENT_FOMD_ANYONE_CAN_ISSUEMORE;
+}
+
+int mc_EntityDetails::IsNFTAsset()
+{
+    if(mc_gState->m_Features->NFTokens() == 0)
     {
-        if((bytes>0) && (bytes<=4))
-        {
-            return (int)mc_GetLE(ptr,bytes) & 0x02;
-        }
+        return 0;
     }
-    return 0;
- */ 
+    return FollowonMode() & MC_ENT_FOMD_NON_FUNGIBLE_TOKENS;    
+}
+
+int mc_EntityDetails::SingleUnitAsset()
+{
+    if(mc_gState->m_Features->NFTokens() == 0)
+    {
+        return 0;
+    }
+    return FollowonMode() & MC_ENT_FOMD_SINGLE_UNIT;    
+}
+
+int mc_EntityDetails::AdminCanOpen()
+{
+    if(mc_gState->m_Features->NFTokens() == 0)
+    {
+        return 0;
+    }
+    return FollowonMode() & MC_ENT_FOMD_CAN_OPEN;    
+}
+
+int mc_EntityDetails::AdminCanClose()
+{
+    if(mc_gState->m_Features->NFTokens() == 0)
+    {
+        return 0;
+    }
+    return FollowonMode() & MC_ENT_FOMD_CAN_CLOSE;    
 }
 
 uint32_t mc_EntityDetails::Permissions()
@@ -2985,6 +3039,10 @@ uint32_t mc_AssetDB::MaxEntityType()
         {
             return MC_ENT_TYPE_VARIABLE;
         }        
+    }
+    if(mc_gState->m_Features->NFTokens() == 0)
+    {
+        return MC_ENT_TYPE_LIBRARY;
     }
     return MC_ENT_TYPE_MAX; 
 }

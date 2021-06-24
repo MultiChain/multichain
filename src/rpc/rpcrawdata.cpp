@@ -705,7 +705,6 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             {
                 *strError=string("Invalid open");                                            
             }
-//            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,(unsigned char*)&is_open,1);                
             missing_open=false;
             field_parsed=true;
         }
@@ -784,9 +783,10 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
     
     if(is_open)
     {
+        is_open=MC_ENT_FOMD_ALLOWED_INSTANT;
         if(is_anyone_can_issuemore)
         {
-            is_open |= 0x02;
+            is_open |= MC_ENT_FOMD_ANYONE_CAN_ISSUEMORE;
         }
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,(unsigned char*)&is_open,1);                        
     }
@@ -1649,7 +1649,7 @@ CScript RawDataScriptCreateVariable(Value *param,mc_Script *lpDetails,mc_Script 
     lpDetailsScript->Clear();
     lpDetailsScript->AddElement();                   
         
-    unsigned char b=1;        
+    unsigned char b=MC_ENT_FOMD_ALLOWED_INSTANT;        
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);
     
     BOOST_FOREACH(const Pair& d, param->get_obj()) 
@@ -1878,9 +1878,9 @@ CScript RawDataScriptCreateLibrary(Value *param,mc_Script *lpDetails,mc_Script *
             if(d.value_.type() == str_type)
             {
                 unsigned char b=255;        
-                if(d.value_.get_str() == "none")b=0x00;
-                if(d.value_.get_str() == "instant")b=0x01;
-                if(d.value_.get_str() == "approve")b=0x04;
+                if(d.value_.get_str() == "none")b=MC_ENT_FOMD_NONE;
+                if(d.value_.get_str() == "instant")b=MC_ENT_FOMD_ALLOWED_INSTANT;
+                if(d.value_.get_str() == "approve")b=MC_ENT_FOMD_ALLOWED_WITH_APPROVAL;
                 entity_name=d.value_.get_str();
                 if(b == 255)
                 {
