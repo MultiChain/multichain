@@ -1518,7 +1518,7 @@ void mc_Permissions::DetailsAddress(void* address,uint32_t flag)
     address_salt=MC_PTP_DETAILS;
     memset(address,0,MC_PLS_SIZE_ADDRESS);
     mc_PutLE(address,&flag,sizeof(uint32_t));
-    mc_PutLE(address,&address_salt,sizeof(uint32_t));    
+    mc_PutLE(address+sizeof(uint32_t),&address_salt,sizeof(uint32_t));    
 }
 
 /** Returns non-zero value if flag is set */
@@ -3326,7 +3326,7 @@ void mc_Permissions::FreePermissionList(mc_Buffer *permissions)
 
 int mc_Permissions::IsActivateEnough(uint32_t type)
 {
-    if(type & ( MC_PTP_ADMIN | MC_PTP_ISSUE | MC_PTP_MINE | MC_PTP_ACTIVATE | MC_PTP_CREATE | MC_PTP_FILTER))
+    if(type & ( MC_PTP_ADMIN | MC_PTP_ISSUE | MC_PTP_MINE | MC_PTP_ACTIVATE | MC_PTP_CREATE | MC_PTP_FILTER | MC_PTP_DETAILS ))
     {
         return 0;
     }    

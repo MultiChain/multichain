@@ -8,6 +8,8 @@
 #include "rpc/rpcwallet.h"
 
 Array AssetHistory(mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level);
+void ParseRawTokenInfo(const Value *value,mc_Script *lpDetailsScript,mc_Script *lpDetailsScriptTmp,string *token,int64_t *raw,mc_EntityDetails *entity,int *errorCode,string *strError);
+
 
 void mergeGenesisWithAssets(mc_Buffer *genesis_amounts, mc_Buffer *asset_amounts)
 {
@@ -69,7 +71,10 @@ Value issuefromcmd(const Array& params, bool fHelp)
     dUnit=1.;
     if (params.size() > 3 && params[3].type() != null_type)
     {
-        dQuantity=params[3].get_real();
+        if(params[3].type() != obj_type)
+        {
+            dQuantity=params[3].get_real();
+        }
     }
     
     if (params.size() > 4 && params[4].type() != null_type)
@@ -118,18 +123,31 @@ Value issuefromcmd(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Destination address doesn't have receive permission");        
     }
     
-    lpScript->SetAssetGenesis(quantity);
     
     mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;   
     lpDetailsScript->Clear();
     mc_Script *lpDetails=mc_gState->m_TmpBuffers->m_RpcScript2;
     lpDetails->Clear();
+    mc_Script *lpDetailsToken=mc_gState->m_TmpBuffers->m_RpcScript4;   
+    lpDetailsToken->Clear();
     
     int ret,type;
     string asset_name="";
     bool is_open=false;
     bool is_anyone_can_issuemore=false;
+    bool can_open=false;
+    bool can_close=false;
+    bool fungible=true;
+    bool single_unit=false;
+    int64_t limit=MC_ENT_DEFAULT_MAX_ASSET_TOTAL;
+    int err;
+    size_t bytes;
+    const unsigned char *script;
+    size_t elem_size;
+    const unsigned char *elem;
+            
     bool name_is_found=false;
+    bool field_found=false;
     uint32_t permissions=0;
     
     if (params.size() > 2 && params[2].type() != null_type)// && !params[2].get_str().empty())
@@ -139,6 +157,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
             Object objSpecialParams = params[2].get_obj();
             BOOST_FOREACH(const Pair& s, objSpecialParams) 
             {  
+                field_found=false;
                 if(s.name_ == "name")
                 {
                     if(!name_is_found)
@@ -146,6 +165,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
                         asset_name=s.value_.get_str().c_str();
                         name_is_found=true;
                     }
+                    field_found=true;
                 }
                 if(s.name_ == "open")
                 {
@@ -157,6 +177,67 @@ Value issuefromcmd(const Array& params, bool fHelp)
                     {
                         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'open' field, should be boolean");                                                                
                     }
+                    field_found=true;
+                }
+                if(s.name_ == "canopen")
+                {
+                    if(s.value_.type() == bool_type)
+                    {
+                        can_open=s.value_.get_bool();
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'canopen' field, should be boolean");                                                                
+                    }
+                    field_found=true;
+                }
+                if(s.name_ == "canclose")
+                {
+                    if(s.value_.type() == bool_type)
+                    {
+                        can_close=s.value_.get_bool();
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'canclose' field, should be boolean");                                                                
+                    }
+                    field_found=true;
+                }
+                if(s.name_ == "fungible")
+                {
+                    if(s.value_.type() == bool_type)
+                    {
+                        fungible=s.value_.get_bool();
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'fungible' field, should be boolean");                                                                
+                    }
+                    field_found=true;
+                }
+                if(s.name_ == "issueonlysingleunit")
+                {
+                    if(s.value_.type() == bool_type)
+                    {
+                        single_unit=s.value_.get_bool();
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'issueonlysingleunit' field, should be boolean");                                                                
+                    }
+                    field_found=true;
+                }
+                if(s.name_ == "limit")
+                {
+                    if(s.value_.type() == int_type)
+                    {
+                        limit=s.value_.get_int64();
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'limit' field, should be integer");                                                                
+                    }
+                    field_found=true;
                 }
                 if(s.name_ == "unrestrict")
                 {
@@ -175,6 +256,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
                     {
                         throw JSONRPCError(RPC_NOT_SUPPORTED, "unrestrict field is not supported in this protocol version");                                                                                        
                     }
+                    field_found=true;
                 }
                 if(s.name_ == "restrict")
                 {
@@ -193,6 +275,11 @@ Value issuefromcmd(const Array& params, bool fHelp)
                             }
                         }
                     }
+                    field_found=true;
+                }
+                if(!field_found)
+                {
+                    throw JSONRPCError(RPC_NOT_SUPPORTED, strprintf("Invalid field: %s",s.name_.c_str()));                       
                 }
             }
         }
@@ -241,21 +328,119 @@ Value issuefromcmd(const Array& params, bool fHelp)
     }        
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,4);
     
+    unsigned char b=MC_ENT_FOMD_NONE;
     if(is_open)
     {
-        unsigned char b=MC_ENT_FOMD_ALLOWED_INSTANT;        
-        if(is_anyone_can_issuemore)
+        b |= MC_ENT_FOMD_ALLOWED_INSTANT;
+    }
+    if(can_open)
+    {
+        b |= MC_ENT_FOMD_CAN_OPEN;
+    }
+    if(can_close)
+    {
+        b |= MC_ENT_FOMD_CAN_CLOSE;
+    }
+    if(is_anyone_can_issuemore)
+    {
+        b |= MC_ENT_FOMD_ANYONE_CAN_ISSUEMORE;
+    }
+    if(single_unit)
+    {
+        b |= MC_ENT_FOMD_SINGLE_UNIT;
+    }
+    if(!fungible)
+    {
+        b |= MC_ENT_FOMD_NON_FUNGIBLE_TOKENS;
+    }
+    if(!is_open && !can_open && is_anyone_can_issuemore)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Asset cannot have unrestricted issue permission if follow-ons are not allowed or cannot be allowed");   
+    }
+    if(!is_open && !can_open && can_close)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Asset cannot be closed if follow-ons are not allowed or cannot be allowed");   
+    }
+    if(!is_open && !can_open && !fungible)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Asset cannot have non-fungible tokens if follow-ons are not allowed or cannot be allowed");   
+    }
+    if(single_unit)
+    {
+        if(multiple != 1)
         {
-            b |= MC_ENT_FOMD_ANYONE_CAN_ISSUEMORE;
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Asset with single unit issuance should have multiple 1");               
+        }        
+    }
+
+    if(!fungible)
+    {
+        if(multiple != 1)
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Non-fungible token asset should have multiple 1");               
         }
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);
+        if( (quantity != 0) || (params[3].type() != obj_type) )
+        {
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Quantity should be either 0 or object for non-fungible token asset ");               
+        }
+        string token;
+        int64_t raw=0;
+        int errorCode=RPC_INVALID_PARAMETER;
+        string strError;
+        
+        if((params[3].type() == obj_type))
+        {
+            ParseRawTokenInfo(&(params[3]),lpDetailsToken,lpDetailsScript,&token,&raw,NULL,&errorCode,&strError);
+            if(strError.size())
+            {
+                throw JSONRPCError(errorCode, strError);                           
+            }
+            if(raw>limit)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, over the limit for this asset");               
+            }
+            if(single_unit)
+            {
+                if(raw!=1)
+                {
+                    throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, should be 1");                               
+                }
+            }
+            lpScript->SetAssetGenesis(raw);
+            script=lpDetailsToken->GetData(0,&bytes);
+            lpScript->SetInlineDetails(script,bytes);
+        }
     }
     else
     {
-        if(is_anyone_can_issuemore)
+        if(params[3].type() == obj_type)
         {
-            throw JSONRPCError(RPC_NOT_SUPPORTED, "Asset cannot have unrestricted issue permission if follow-ons are not allowed");   
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Invalid quantity, should be numeric");   
         }        
+        if(quantity>limit)
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the limit for this asset");               
+        }
+        if(quantity > 0)
+        {
+            if(single_unit)
+            {
+                if(quantity!=1)
+                {
+                    throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, should be 1 or 0");                               
+                }
+            }
+            lpScript->SetAssetGenesis(quantity);
+        }
+    }
+    
+    if(b != MC_ENT_FOMD_NONE)
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);        
+    }
+    if(limit != MC_ENT_DEFAULT_MAX_ASSET_TOTAL)
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MAX_TOTAL,(unsigned char*)&limit,sizeof(int64_t));                
     }
     
     if(permissions)
@@ -280,11 +465,6 @@ Value issuefromcmd(const Array& params, bool fHelp)
         }
     }
  */ 
-    int err;
-    size_t bytes;
-    const unsigned char *script;
-    size_t elem_size;
-    const unsigned char *elem;
     CScript scriptOpReturn=CScript();
     
     
@@ -383,7 +563,7 @@ exitlbl:
     {
         throw JSONRPCError(errorCode, strError);            
     }
-                
+
     return wtx.GetHash().GetHex();    
 }
  
@@ -455,8 +635,10 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     
     lpBuffer->Add(buf);
     
-    lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
-    
+    if(quantity > 0)
+    {
+        lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
+    }
     // Wallet comments
     CWalletTx wtx;
     

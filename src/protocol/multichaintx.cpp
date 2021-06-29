@@ -1855,6 +1855,7 @@ bool MultiChainTransaction_ProcessTokenIssuance(const CTransaction& tx,
     int token_details_size,token_id_size,token_details_element;
     uint256 issue_txid=txid;
     uint256 token_hash,this_txid;
+    string token_details_str;
     
     update_mempool=0;
     if(accept)
@@ -1874,6 +1875,9 @@ bool MultiChainTransaction_ProcessTokenIssuance(const CTransaction& tx,
                 reason="Token issuance script rejected - multiple inline details";
                 return false;                                                    
             }
+            token_details_str.resize(token_details_size+1,0x00);
+            std::copy(token_details,token_details+token_details_size,begin(token_details_str));
+            token_details=(unsigned char*)token_details_str.c_str();
             token_details_element=e;
         }
         else
@@ -1893,11 +1897,14 @@ bool MultiChainTransaction_ProcessTokenIssuance(const CTransaction& tx,
     for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
     {
         mc_gState->m_TmpScript->SetElement(e);
-        err=mc_gState->m_TmpScript->GetAssetGenesis(&quantity);         
-        if(err == 0)                                               
+        if(txid != 0)
         {
-            vout_total+=quantity;
-            new_issue=true;
+            err=mc_gState->m_TmpScript->GetAssetGenesis(&quantity);         
+            if(err == 0)                                               
+            {
+                vout_total+=quantity;
+                new_issue=true;
+            }
         }
         err=mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_TOKEN);
         if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
@@ -2155,7 +2162,7 @@ bool MultiChainTransaction_ProcessTokenIssuance(const CTransaction& tx,
     size_t special_script_size=0;
     special_script=mc_gState->m_TmpScript->GetData(0,&special_script_size);
     this_txid=tx.GetHash();
-    err=mc_gState->m_Assets->InsertAssetFollowOn(&this_txid,offset,vout_total,token_details,token_details_size,special_script,special_script_size,0,entity.GetTxID(),update_mempool);
+    err=mc_gState->m_Assets->InsertAssetFollowOn(&this_txid,offset,vout_total,token_details,token_details_size+1,special_script,special_script_size,0,entity.GetTxID(),update_mempool);
     
     if(err)           
     {
@@ -2168,8 +2175,7 @@ bool MultiChainTransaction_ProcessTokenIssuance(const CTransaction& tx,
         }
         return false;                                            
     }
-        
-    err=mc_gState->m_Assets->InsertEntity(&token_hash,-1,MC_ENT_TYPE_TOKEN,token_details,token_details_size,special_script,special_script_size,0,update_mempool);    
+    err=mc_gState->m_Assets->InsertEntity(&token_hash,offset,MC_ENT_TYPE_TOKEN,token_details,token_details_size+1,special_script,special_script_size,0,update_mempool,MC_ENT_FLAG_NO_OFFSET_KEY);    
     
     if(err)           
     {
@@ -3118,17 +3124,6 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
             txid=tx.GetHash();
             err=mc_gState->m_Permissions->SetPermission(&txid,issuer_buf,MC_PTP_CONNECT,
                     (unsigned char*)issuers[0].begin(),0,(uint32_t)(-1),timestamp,flags | MC_PFL_ENTITY_GENESIS ,update_mempool,offset);
-            if(mc_gState->m_Features->NFTokens())
-            {
-                if(followon_mode & (MC_ENT_FOMD_CAN_CLOSE | MC_ENT_FOMD_CAN_OPEN) )
-                {
-                    mc_gState->m_Permissions->DetailsAddress(details_address, MC_PDF_ASSET_OPEN);
-                    err=mc_gState->m_Permissions->SetPermission(&txid,details_address,MC_PTP_DETAILS,
-                            (unsigned char*)issuers[0].begin(),0,
-                            (followon_mode & (MC_ENT_FOMD_ALLOWED_INSTANT &MC_ENT_FOMD_ALLOWED_WITH_APPROVAL)) ? (uint32_t)(-1) : 0, 
-                            timestamp,flags,update_mempool,offset);
-                }
-            }
         }
 
         uint32_t all_permissions=MC_PTP_ADMIN | MC_PTP_ISSUE;
@@ -3165,6 +3160,23 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
 
         memset(issuer_buf,0,sizeof(issuer_buf));
         mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ISSUER,issuer_buf,1);                    
+        if(err == MC_ERR_NOERROR)
+        {
+            if(new_issue)                                                               
+            {
+                if(mc_gState->m_Features->NFTokens())
+                {
+                    if(followon_mode & (MC_ENT_FOMD_CAN_CLOSE | MC_ENT_FOMD_CAN_OPEN) )
+                    {
+                        mc_gState->m_Permissions->DetailsAddress(details_address, MC_PDF_ASSET_OPEN);
+                        err=mc_gState->m_Permissions->SetPermission(&txid,details_address,MC_PTP_DETAILS,
+                                (unsigned char*)issuers[0].begin(),0,
+                                (followon_mode & (MC_ENT_FOMD_ALLOWED_INSTANT  | MC_ENT_FOMD_ALLOWED_WITH_APPROVAL)) ? (uint32_t)(-1) : 0, 
+                                timestamp,flags,update_mempool,offset);
+                    }
+                }            
+            }
+        }
         if(err)
         {
             reason="Cannot update permission database for issued asset";
@@ -3431,7 +3443,7 @@ bool MultiChainTransaction_ProcessEntityCreation(const CTransaction& tx,        
     special_script=mc_gState->m_TmpScript->GetData(0,&special_script_size);
                                                                                 // Updating entity datanase
     err=mc_gState->m_Assets->InsertEntity(&txid,offset,details->new_entity_type,details->details_script,details->details_script_size,
-            special_script,special_script_size,details->extended_script_row,update_mempool);
+            special_script,special_script_size,details->extended_script_row,update_mempool,0);
 
     if(err)           
     {

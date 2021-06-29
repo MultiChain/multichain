@@ -611,6 +611,146 @@ CScript RawDataScriptFormatted(Value *param,uint32_t *data_format,mc_Script *lpD
     return scriptOpReturn;
 }
 
+void ParseRawTokenInfo(const Value *value,mc_Script *lpDetailsScript,mc_Script *lpDetailsScriptTmp,string *token,int64_t *raw,mc_EntityDetails *entity,int *errorCode,string *strError)
+{
+    bool field_parsed;
+    bool missing_details=true;
+    bool missing_asset=true;
+    bool missing_token=true;
+    bool missing_raw=true;
+    
+    if(value->type() != obj_type)
+    {
+        *strError=string("Token info should be object"); 
+        return;
+    }
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();                       
+    
+    BOOST_FOREACH(const Pair& d, value->get_obj()) 
+    {
+        field_parsed=false;
+        if(d.name_ == "token")
+        {
+            if(!missing_token)
+            {
+                *strError=string("token field can appear only once in the object");                                                                                                        
+            }
+            if(d.value_.type() == str_type)
+            {
+                *token=d.value_.get_str();
+                                
+                if( (*token == "*") || (*token == "") )
+                {
+                    *strError=string("Invalid token name"); 
+                }
+                
+                lpDetailsScript->SetSpecialParamValue(MC_ENT_SPRM_UPDATE_NAME,(const unsigned char*)(token->c_str()),token->size());                    
+            }
+            else
+            {
+                *strError=string("Invalid token");                            
+            }
+            missing_token=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "asset")
+        {
+            if(!missing_token)
+            {
+                *strError=string("asset field can appear only once in the object");                                                                                                        
+            }
+            if(entity == NULL)
+            {
+                *strError=string("asset field is not allowed in this object");                                                                                                                        
+            }
+            if(d.value_.type() == str_type)
+            {
+                ParseEntityIdentifier(d.value_,entity, MC_ENT_TYPE_ASSET);       
+            }
+            else
+            {
+                *strError=string("Invalid asset");                            
+            }
+            missing_asset=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "details")
+        {
+            if(!missing_details)
+            {
+                *strError=string("details field can appear only once in the object");                                                                                                        
+            }
+            ParseRawDetails(&(d.value_),lpDetailsScript,lpDetailsScriptTmp,errorCode,strError);
+            missing_details=false;
+            field_parsed=true;
+        }         
+        if(d.name_ == "raw")
+        {
+            if(!missing_raw)
+            {
+                *strError=string("raw field can appear only once in the object");                                                                                                        
+            }
+            if(d.value_.type() == int_type)
+            {
+                *raw=d.value_.get_int64();
+                if(*raw <= 0)
+                {
+                    *strError=string("Invalid raw - should be positive");                                                                                                        
+                }
+            }
+            else
+            {
+                *strError=string("Invalid raw");                            
+            }
+            missing_raw=false;
+            field_parsed=true;
+        }
+        
+        if(!field_parsed)
+        {
+            *strError=strprintf("Invalid field: %s",d.name_.c_str());;                                
+        }
+    }    
+    
+    if(strError->size() == 0)
+    {
+        if(missing_token)
+        {                    
+            *strError=string("Missing token"); 
+        }
+    }
+    if(strError->size() == 0)
+    {
+        if(missing_raw)
+        {                    
+            *strError=string("Missing raw"); 
+        }
+    }
+    if(strError->size() == 0)
+    {
+        if(missing_asset)
+        {                    
+            if(entity)
+            {
+                *strError=string("Missing asset"); 
+            }
+        }        
+    }
+    
+/*    
+    if(strError->size() == 0)
+    {
+        script=lpDetailsScriptTmp1->GetData(0,&bytes);
+        err=lpDetailsScript->SetInlineDetails(script,bytes);
+        if(err)
+        {
+            *strError=string("Invalid token details, too long");                                                            
+        }
+    }    
+ */ 
+}
+
 CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError)
 {
     CScript scriptOpReturn=CScript();

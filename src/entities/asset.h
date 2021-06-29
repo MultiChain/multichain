@@ -124,9 +124,9 @@
 #define MC_ENT_SPRM_FILE_END                  0xFF
 
 #define MC_ENT_FLAG_OFFSET_IS_SET     0x00000001
+#define MC_ENT_FLAG_NO_OFFSET_KEY     0x00000002
 #define MC_ENT_FLAG_NAME_IS_SET       0x00000010
-
-#define MC_ENT_FLAG_ENTITYLIST       0x00000100
+#define MC_ENT_FLAG_ENTITYLIST        0x00000100
 
 
 
@@ -337,7 +337,7 @@ typedef struct mc_AssetDB
 
     int Initialize(const char *name,int mode);
         
-    int InsertEntity(const void* txid, int offset, int entity_type, const void *script,size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row,int update_mempool);
+    int InsertEntity(const void* txid, int offset, int entity_type, const void *script,size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row,int update_mempool,uint32_t flags);
     int InsertAsset(const void* txid, int offset, int asset_type, uint64_t quantity,const char *name,int multiple,const void *script,size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row,int update_mempool);
     int InsertAssetFollowOn(const void* txid, int offset, uint64_t quantity, const void *script,size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row,const void* original_txid,int update_mempool);
     int UpdateEntityLists(const void* txid,int offset,int entity_type);

@@ -950,7 +950,7 @@ void mc_AssetDB::GetFromMemPool(mc_EntityLedgerRow *row,int mprow)
 }
 
 
-int mc_AssetDB::InsertEntity(const void* txid, int offset, int entity_type, const void *script,size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row,int update_mempool)
+int mc_AssetDB::InsertEntity(const void* txid, int offset, int entity_type, const void *script,size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row,int update_mempool,uint32_t flags)
 {
     mc_EntityLedgerRow aldRow;
     mc_EntityDetails details;
@@ -1076,7 +1076,8 @@ int mc_AssetDB::InsertEntity(const void* txid, int offset, int entity_type, cons
     delete lpDetails;
     
     details.Set(&aldRow);
-        
+    details.m_Flags |= flags;
+    
     for(pass=0;pass<1+update_mempool;pass++)
     {
         memset(aldRow.m_Key,0,MC_ENT_KEY_SIZE);
@@ -1097,24 +1098,26 @@ int mc_AssetDB::InsertEntity(const void* txid, int offset, int entity_type, cons
             }            
         }
 
-        if(details.m_Flags & MC_ENT_FLAG_OFFSET_IS_SET)
+        if((details.m_Flags & MC_ENT_FLAG_NO_OFFSET_KEY) == 0)
         {
-            memset(aldRow.m_Key,0,MC_ENT_KEY_SIZE);
-            memcpy(aldRow.m_Key,details.m_Ref,MC_ENT_REF_SIZE);
-            aldRow.m_KeyType=MC_ENT_KEYTYPE_REF;
-            
-            if(pass)
+            if(details.m_Flags & MC_ENT_FLAG_OFFSET_IS_SET)
             {
-                AddToMemPool(&aldRow);                
-//SMPS                m_MemPool->Add((unsigned char*)&aldRow,(unsigned char*)&aldRow+m_Ledger->m_ValueOffset);
-            }
-            else
-            {
-                if(GetEntity(&aldRow))
+                memset(aldRow.m_Key,0,MC_ENT_KEY_SIZE);
+                memcpy(aldRow.m_Key,details.m_Ref,MC_ENT_REF_SIZE);
+                aldRow.m_KeyType=MC_ENT_KEYTYPE_REF;
+
+                if(pass)
                 {
-                    err=MC_ERR_FOUND;                                            
-                    goto exitlbl;
-                }            
+                    AddToMemPool(&aldRow);                
+                }
+                else
+                {
+                    if(GetEntity(&aldRow))
+                    {
+                        err=MC_ERR_FOUND;                                            
+                        goto exitlbl;
+                    }            
+                }
             }
         }
 
