@@ -2020,7 +2020,7 @@ bool MultiChainTransaction_ProcessTokenIssuance(const CTransaction& tx,
     
     if(txid == 0)
     {
-        if(memcmp((unsigned char*)&token_hash+MC_AST_SHORT_TXID_OFFSET,mc_gState->m_TmpAssetsOut->GetRow(0),MC_AST_SHORT_TXID_SIZE))
+        if(memcmp((unsigned char*)&token_hash+MC_AST_SHORT_TXID_OFFSET,mc_gState->m_TmpAssetsOut->GetRow(0)+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE))
         {
             reason="Token issuance script rejected - token hash mismatch";
             return false;                                                                                                    

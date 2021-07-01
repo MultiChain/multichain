@@ -3040,6 +3040,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 #ifdef ENABLE_WALLET
         if (pwalletMain) {
             // Add wallet transactions that aren't already in a block to mapTransactions
+            uiInterface.InitMessage(_("Reaccepting unconfirmed wallet transactions..."));
             pwalletMain->ReacceptWalletTransactions();
         }
 #endif

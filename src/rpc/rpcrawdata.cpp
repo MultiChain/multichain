@@ -672,6 +672,7 @@ void ParseRawTokenInfo(const Value *value,mc_Script *lpDetailsScript,mc_Script *
             {
                 *strError=string("Invalid asset");                            
             }
+            lpDetailsScript->SetSpecialParamValue(MC_ENT_SPRM_PARENT_ENTITY,entity->GetTxID(),sizeof(uint256));                    
             missing_asset=false;
             field_parsed=true;
         }

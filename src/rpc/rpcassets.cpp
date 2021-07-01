@@ -379,7 +379,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
         {
             throw JSONRPCError(RPC_NOT_ALLOWED, "Non-fungible token asset should have multiple 1");               
         }
-        if( (quantity != 0) || (params[3].type() != obj_type) )
+        if( (quantity != 0) && (params[3].type() != obj_type) )
         {
             throw JSONRPCError(RPC_NOT_SUPPORTED, "Quantity should be either 0 or object for non-fungible token asset ");               
         }
@@ -604,10 +604,21 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     
     mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
     lpScript->Clear();
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;   
+    lpDetailsScript->Clear();
+    mc_Script *lpDetailsToken=mc_gState->m_TmpBuffers->m_RpcScript4;   
+    lpDetailsToken->Clear();
+    
     unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
+    unsigned char buf_token[MC_AST_ASSET_FULLREF_BUF_SIZE];
     memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
     int multiple=1;
-    mc_EntityDetails entity;
+    mc_EntityDetails entity;    
+    int err;
+    size_t bytes;
+    const unsigned char *script;
+    size_t elem_size;
+    const unsigned char *elem;
     
     if (params.size() > 2 && params[2].type() != null_type && !params[2].get_str().empty())
     {        
@@ -619,26 +630,117 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset identifier");        
     }
-    
+
     Value raw_qty=params[3];
+    int64_t quantity=0;
     
-    int64_t quantity = (int64_t)(raw_qty.get_real() * multiple + 0.499999);
+    if(raw_qty.type() != obj_type)
+    {
+        quantity = (int64_t)(raw_qty.get_real() * multiple + 0.499999);
+    }
+    
     if(quantity<0)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset quantity");        
     }
-        
-    mc_SetABQuantity(buf,quantity);
     
+    bool fungible=(entity.IsNFTAsset() == 0);
     mc_Buffer *lpBuffer=mc_gState->m_TmpBuffers->m_RpcABNoMapBuffer2;
     lpBuffer->Clear();
     
-    lpBuffer->Add(buf);
+    int64_t last_total=mc_gState->m_Assets->GetTotalQuantity(&entity);
     
-    if(quantity > 0)
+    if(!fungible)
     {
-        lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
+        if( (quantity != 0) && (params[3].type() != obj_type) )
+        {
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Quantity should be either 0 or object for non-fungible token asset ");               
+        }
+        string token;
+        int64_t raw=0;
+        int errorCode=RPC_INVALID_PARAMETER;
+        string strError;
+        
+        if((params[3].type() == obj_type))
+        {
+            ParseRawTokenInfo(&(params[3]),lpDetailsToken,lpDetailsScript,&token,&raw,NULL,&errorCode,&strError);
+            lpDetailsToken->SetSpecialParamValue(MC_ENT_SPRM_PARENT_ENTITY,entity.GetTxID(),sizeof(uint256));         
+            
+            if(strError.size())
+            {
+                throw JSONRPCError(errorCode, strError);                           
+            }
+            if(raw+last_total>entity.MaxTotalIssuance())
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, over the limit for this asset");               
+            }
+            if(entity.SingleUnitAsset())
+            {
+                if(raw!=1)
+                {
+                    throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, should be 1");                               
+                }
+            }
+
+            uint256 token_hash;
+            mc_SHA256 *hasher=new mc_SHA256();
+            hasher->Reset();
+            hasher->Write(entity.GetTxID(),sizeof(uint256));
+            hasher->Write(token.c_str(),token.size());
+            hasher->GetHash((unsigned char *)&token_hash);
+            hasher->Reset();
+            hasher->Write((unsigned char *)&token_hash,sizeof(uint256));
+            hasher->GetHash((unsigned char *)&token_hash);    
+            delete hasher;
+            
+            memcpy(buf_token,buf,MC_AST_ASSET_FULLREF_BUF_SIZE);
+            memcpy(buf_token+MC_AST_SHORT_TXID_OFFSET,(unsigned char*)&token_hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+
+            mc_EntityDetails token_entity;
+            if(mc_gState->m_Assets->FindEntityByShortTxID(&token_entity,buf_token+MC_AST_SHORT_TXID_OFFSET))
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Token with this ID already exists in this asset");                               
+            }
+            mc_SetABQuantity(buf_token,raw);    
+
+            lpBuffer->Add(buf_token);
+
+            lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_TOKEN);
+            script=lpDetailsToken->GetData(0,&bytes);
+            lpScript->SetInlineDetails(script,bytes);
+        }
     }
+    else
+    {
+        if(params[3].type() == obj_type)
+        {
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Invalid quantity, should be numeric");   
+        }        
+        if(quantity+last_total>entity.MaxTotalIssuance())
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the limit for this asset");               
+        }
+        if(quantity > 0)
+        {
+            if(entity.SingleUnitAsset())
+            {
+                if(quantity!=1)
+                {
+                    throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, should be 1 or 0");                               
+                }
+            }            
+            mc_SetABQuantity(buf,quantity);    
+
+            lpBuffer->Add(buf);
+
+            if(quantity > 0)
+            {
+                lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
+            }
+        }
+    }
+    
+        
     // Wallet comments
     CWalletTx wtx;
     
@@ -650,7 +752,6 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     }
     
     
-    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
     lpDetailsScript->Clear();
     
     mc_Script *lpDetails=mc_gState->m_TmpBuffers->m_RpcScript2;
@@ -690,11 +791,6 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
         }
     }
 */    
-    int err;
-    size_t bytes;
-    const unsigned char *script;
-    size_t elem_size;
-    const unsigned char *elem;
     
     script=lpDetails->GetData(0,&bytes);
     if(bytes > 0)
