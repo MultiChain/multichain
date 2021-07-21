@@ -7,7 +7,7 @@
 
 #include "rpc/rpcwallet.h"
 
-Array AssetHistory(mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level);
+Array AssetHistory(mc_EntityDetails *asset_entity,mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level);
 void ParseRawTokenInfo(const Value *value,mc_Script *lpDetailsScript,mc_Script *lpDetailsScriptTmp,string *token,int64_t *raw,mc_EntityDetails *entity,int *errorCode,string *strError);
 
 
@@ -2716,6 +2716,6 @@ Value listassetissues(const Array& params, bool fHelp)
     
     mc_AdjustStartAndCount(&count,&start,issue_items);
     
-    return AssetHistory(&last_entity,multiple,count,start,output_level);
+    return AssetHistory(&asset_entity,&last_entity,multiple,count,start,output_level);
 }
 

@@ -2171,6 +2171,14 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                     }
                     entry.push_back(Pair("restrict",pObject));                                            
                 }
+                if(mc_gState->m_Features->NFTokens())
+                {
+                    entry.push_back(Pair("fungible",(entity.IsNFTAsset() == 0)));                                                    
+                    entry.push_back(Pair("canopen",(entity.AdminCanOpen() != 0)));                                                    
+                    entry.push_back(Pair("canclose",(entity.AdminCanClose() != 0)));                                                    
+                    entry.push_back(Pair("issueonlysingleunit",(entity.SingleUnitAsset() != 0)));                                                    
+                    entry.push_back(Pair("limit",entity.MaxTotalIssuance()));                                                    
+                }
             }
         }
         
@@ -2285,6 +2293,15 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                         if(vfields.type() == null_type)
                         {                        
                             vfields=followon_fields;
+                        }
+                        if(entity.IsNFTAsset())
+                        {
+                            ptr=(unsigned char *)followon->GetSpecialParam(MC_ENT_SPRM_UPDATE_NAME,&value_size);
+                            if(ptr)
+                            {
+                                string token_name ((char*)ptr,value_size);
+                                issue.push_back(Pair("token", token_name));
+                            }      
                         }
                         if( (output_level & 0x0400) == 0)
                         {
@@ -2426,7 +2443,7 @@ mc_Buffer *mc_GetEntityTxIDList(uint32_t entity_type,int req_count,int req_start
     return mc_gState->m_Assets->GetEntityList(NULL,NULL,entity_type);
 }
 
-Array AssetHistory(mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level,string& lasttxid,Array& lastwriters,int& lastvout)
+Array AssetHistory(mc_EntityDetails *asset_entity,mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level,string& lasttxid,Array& lastwriters,int& lastvout)
 {
     size_t value_size;
     int64_t offset,new_offset;
@@ -2525,6 +2542,15 @@ Array AssetHistory(mc_EntityDetails *last_entity,uint64_t multiple,int count,int
                     {                        
                         vfields=followon_fields;
                     }
+                    if(asset_entity->IsNFTAsset())
+                    {
+                        ptr=(unsigned char *)followon->GetSpecialParam(MC_ENT_SPRM_UPDATE_NAME,&value_size);
+                        if(ptr)
+                        {
+                            string token_name ((char*)ptr,value_size);
+                            issue.push_back(Pair("token", token_name));
+                        }      
+                    }
                     if(output_level & 0x0040)
                     {
                         issue.push_back(Pair("details",vfields)); 
@@ -2556,13 +2582,13 @@ Array AssetHistory(mc_EntityDetails *last_entity,uint64_t multiple,int count,int
     return issues;
 }
 
-Array AssetHistory(mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level)
+Array AssetHistory(mc_EntityDetails *asset_entity,mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level)
 {
     string lasttxid;
     Array lastwriters;
     int lastvout;
     
-    return AssetHistory(last_entity,multiple,count,start,output_level,lasttxid,lastwriters,lastvout);
+    return AssetHistory(asset_entity,last_entity,multiple,count,start,output_level,lasttxid,lastwriters,lastvout);
 }
 
 
