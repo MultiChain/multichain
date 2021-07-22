@@ -2218,6 +2218,8 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         Array issues;
         int64_t total=0;
         int32_t issue_count=1;
+        mc_EntityDetails last_entity;
+        
         
         if(( (output_level & 0x0020) !=0 ) )// ||                                   // issuers
                                                                                 // For listassets with followons
@@ -2225,15 +2227,24 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         {
             total=0;
             int64_t qty;
+            mc_gState->m_Assets->FindLastEntity(&last_entity,genesis_entity);            
+            
+            issue_count=mc_GetEntityIndex(&last_entity)+1;
             mc_Buffer *followons;
+            followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(&last_entity,issue_count,0);
+            for(int i=followons->GetCount()-1;i>=0;i--)
+            {
+                Object issue;
+                followon=(mc_EntityDetails *)followons->GetRow(i);
+/*                
             followons=mc_gState->m_Assets->GetFollowOns(txid);
             issue_count=followons->GetCount();
             for(int i=followons->GetCount()-1;i>=0;i--)
             {
                 Object issue;
-//                mc_EntityDetails followon;
                 followon->Zero();
                 if(mc_gState->m_Assets->FindEntityByTxID(followon,followons->GetRow(i)))
+ */ 
                 {
                     qty=followon->GetQuantity();
                     total+=qty;
@@ -2294,7 +2305,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                         {                        
                             vfields=followon_fields;
                         }
-                        if(entity.IsNFTAsset())
+                        if(genesis_entity->IsNFTAsset())
                         {
                             ptr=(unsigned char *)followon->GetSpecialParam(MC_ENT_SPRM_UPDATE_NAME,&value_size);
                             if(ptr)
@@ -3377,7 +3388,138 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
     
     return entry;
 }
-
+void ParseRawTokenInfo(const Value *value,mc_Script *lpDetailsScript,mc_Script *lpDetailsScriptTmp,string *token,int64_t *raw,mc_EntityDetails *entity,int *errorCode,string *strError)
+{
+    bool field_parsed;
+    bool missing_details=true;
+    bool missing_asset=true;
+    bool missing_token=true;
+    bool missing_raw=true;
+    
+    if(value->type() != obj_type)
+    {
+        *strError=string("Token info should be object"); 
+        return;
+    }
+    
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();                       
+    
+    BOOST_FOREACH(const Pair& d, value->get_obj()) 
+    {
+        field_parsed=false;
+        if(d.name_ == "token")
+        {
+            if(!missing_token)
+            {
+                *strError=string("token field can appear only once in the object");                                                                                                        
+            }
+            if(d.value_.type() == str_type)
+            {
+                *token=d.value_.get_str();
+                                
+                if( (*token == "*") || (*token == "") )
+                {
+                    *strError=string("Invalid token name"); 
+                }
+                
+                lpDetailsScript->SetSpecialParamValue(MC_ENT_SPRM_UPDATE_NAME,(const unsigned char*)(token->c_str()),token->size());                    
+            }
+            else
+            {
+                *strError=string("Invalid token");                            
+            }
+            missing_token=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "asset")
+        {
+            if(!missing_asset)
+            {
+                *strError=string("asset field can appear only once in the object");                                                                                                        
+            }
+            if(entity == NULL)
+            {
+                *strError=string("asset field is not allowed in this object");                                                                                                                        
+            }
+            if(d.value_.type() == str_type)
+            {
+                ParseEntityIdentifier(d.value_,entity, MC_ENT_TYPE_ASSET);       
+            }
+            else
+            {
+                *strError=string("Invalid asset");                            
+            }
+            if(strError->size() == 0)
+            {
+                lpDetailsScript->SetSpecialParamValue(MC_ENT_SPRM_PARENT_ENTITY,entity->GetTxID(),sizeof(uint256));                    
+            }
+            missing_asset=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "details")
+        {
+            if(!missing_details)
+            {
+                *strError=string("details field can appear only once in the object");                                                                                                        
+            }
+            ParseRawDetails(&(d.value_),lpDetailsScript,lpDetailsScriptTmp,errorCode,strError);
+            missing_details=false;
+            field_parsed=true;
+        }         
+        if(d.name_ == "raw")
+        {
+            if(!missing_raw)
+            {
+                *strError=string("raw field can appear only once in the object");                                                                                                        
+            }
+            if(d.value_.type() == int_type)
+            {
+                *raw=d.value_.get_int64();
+                if(*raw <= 0)
+                {
+                    *strError=string("Invalid raw - should be positive");                                                                                                        
+                }
+            }
+            else
+            {
+                *strError=string("Invalid raw");                            
+            }
+            missing_raw=false;
+            field_parsed=true;
+        }
+        
+        if(!field_parsed)
+        {
+            *strError=strprintf("Invalid field: %s",d.name_.c_str());;                                
+        }
+    }    
+    
+    if(strError->size() == 0)
+    {
+        if(missing_token)
+        {                    
+            *strError=string("Missing token"); 
+        }
+    }
+    if(strError->size() == 0)
+    {
+        if(missing_raw)
+        {                    
+            *strError=string("Missing raw"); 
+        }
+    }
+    if(strError->size() == 0)
+    {
+        if(missing_asset)
+        {                    
+            if(entity)
+            {
+                *strError=string("Missing asset"); 
+            }
+        }        
+    }    
+}
 
 string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, int *required,int *eErrorCode)
 {
@@ -3387,14 +3529,24 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
     lpBuffer->Clear();
     mc_Buffer *lpFollowonBuffer=mc_gState->m_TmpBuffers->m_RpcABNoMapBuffer2;
     lpFollowonBuffer->Clear();
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcTokenScript1;   
+    lpDetailsScript->Clear();
+    mc_Script *lpDetailsToken=mc_gState->m_TmpBuffers->m_RpcTokenScript2;   
+    lpDetailsToken->Clear();
+    
     int assets_per_opdrop=(MAX_STANDARD_TX_SIZE)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
     int32_t verify_level=-1;
     int asset_error=0;
     int multiple;
+    mc_EntityDetails entity;
     int64_t max_block=0xffffffff;
-    string asset_name;
+    string asset_name,token_name;
     string type_string;
+    bool nft_asset;
     nAmount=0;
+    size_t bytes;
+    const unsigned char *script;
+    
     
     if(eErrorCode)
     {
@@ -3434,45 +3586,73 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
             if(!parsed && (a.name_ == "issue"))
             {
                 int64_t quantity=-1;
-                BOOST_FOREACH(const Pair& d, a.value_.get_obj()) 
+                
+                nft_asset=false;
+                if(mc_gState->m_Features->NFTokens())
                 {
-                    bool field_parsed=false;
-                    if(!field_parsed && (d.name_ == "raw"))
-                    {                 
-                        if (d.value_.type() != null_type)
-                        {
-                            quantity=d.value_.get_int64();
-                            if(quantity<0)
-                            {
-                                strError=string("Negative value for issue raw qty");
-                                goto exitlbl;                                
-                            }
-                        }                
-                        else
-                        {
-                            strError=string("Invalid value for issue raw qty");
-                            goto exitlbl;
-                            
-                        }
-                        field_parsed=true;
-                    }
-                    if(!field_parsed)
+                    int errorCode=RPC_INVALID_PARAMETER;
+                    string token;
+                    ParseRawTokenInfo(&(a.value_),lpDetailsToken,lpDetailsScript,&token,&quantity,NULL,&errorCode,&strError);
+                    if(strError.size() == 0)
                     {
-                        strError=string("Invalid field for object ") + a.name_ + string(": ") + d.name_;
-                        goto exitlbl;
-                    }
+                        nft_asset=true;
+                    }                   
+                    strError="";
                 }
-                if(quantity < 0)
+                if(nft_asset)
                 {
-                    strError=string("Issue raw qty not specified");
-                    goto exitlbl;                    
+                    if(quantity < 0)
+                    {
+                        strError=string("Issue raw qty should be non-negative");
+                        goto exitlbl;                    
+                    }
+                    lpScript->SetAssetGenesis(quantity);
+                    script=lpDetailsToken->GetData(0,&bytes);
+                    lpScript->SetInlineDetails(script,bytes);                    
                 }
-                lpScript->SetAssetGenesis(quantity);        
+                else
+                {                    
+                    BOOST_FOREACH(const Pair& d, a.value_.get_obj()) 
+                    {
+                        bool field_parsed=false;
+                        if(!field_parsed && (d.name_ == "raw"))
+                        {                 
+                            if (d.value_.type() != null_type)
+                            {
+                                quantity=d.value_.get_int64();
+                                if(quantity<0)
+                                {
+                                    strError=string("Negative value for issue raw qty");
+                                    goto exitlbl;                                
+                                }
+                            }                
+                            else
+                            {
+                                strError=string("Invalid value for issue raw qty");
+                                goto exitlbl;
+
+                            }
+                            field_parsed=true;
+                        }
+                        if(!field_parsed)
+                        {
+                            strError=string("Invalid field for object ") + a.name_ + string(": ") + d.name_;
+                            goto exitlbl;
+                        }
+                    }
+                    if(quantity < 0)
+                    {
+                        strError=string("Issue raw qty not specified");
+                        goto exitlbl;                    
+                    }
+                    lpScript->SetAssetGenesis(quantity);        
+                }
                 parsed=true;
             }
             
             if(!parsed && (a.name_ == "issuemore"))
             {
+                string token_field="";
                 int64_t quantity=-1;
                 asset_name="";
                 BOOST_FOREACH(const Pair& d, a.value_.get_obj()) 
@@ -3513,6 +3693,12 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                             field_parsed=true;
                         }
                     }
+                    if(!field_parsed && ((d.name_ == "token") || (d.name_ == "details")))                        
+                    {                 
+                        token_field=d.name_;
+                        field_parsed=true;
+                        
+                    }
                     if(!field_parsed)
                     {
                         strError=string("Invalid field for object ") + a.name_ + string(": ") + d.name_;
@@ -3529,21 +3715,98 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                     strError=string("Issuemore raw qty not specified");
                     goto exitlbl;                    
                 }
-                if(lpFollowonBuffer->GetCount())
+                nft_asset=false;
+                if(mc_gState->m_Features->NFTokens())
                 {
-                    if(verify_level & 0x0008)
+                    mc_gState->m_Assets->FindEntityByShortTxID(&entity,buf+MC_AST_SHORT_TXID_OFFSET);    
+                    if(entity.IsNFTAsset())
                     {
-                        if(memcmp(buf,lpFollowonBuffer->GetRow(0),MC_AST_ASSET_QUANTITY_OFFSET))
+                        nft_asset=true;
+                    }
+                }
+                if(nft_asset)
+                {
+                    int errorCode=RPC_INVALID_PARAMETER;
+                    string token;
+                    
+                    ParseRawTokenInfo(&(a.value_),lpDetailsToken,lpDetailsScript,&token,&quantity,&entity,&errorCode,&strError);
+                    if(eErrorCode)
+                    {
+                        *eErrorCode=errorCode;
+                    }
+                    lpDetailsToken->SetSpecialParamValue(MC_ENT_SPRM_PARENT_ENTITY,entity.GetTxID(),sizeof(uint256));         
+
+                    if(strError.size())
+                    {
+                        goto exitlbl;                    
+                    }
+                    if(entity.SingleUnitAsset())
+                    {
+                        if(quantity!=1)
                         {
-                            strError=string("Issuemore for different assets");
-                            goto exitlbl;                                                
+                            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, should be 1");                               
                         }
                     }
+
+                    uint256 token_hash;
+                    mc_SHA256 *hasher=new mc_SHA256();
+                    hasher->Reset();
+                    hasher->Write(entity.GetTxID(),sizeof(uint256));
+                    hasher->Write(token.c_str(),token.size());
+                    hasher->GetHash((unsigned char *)&token_hash);
+                    hasher->Reset();
+                    hasher->Write((unsigned char *)&token_hash,sizeof(uint256));
+                    hasher->GetHash((unsigned char *)&token_hash);    
+                    delete hasher;
+
+                    memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
+                    memcpy(buf+MC_AST_SHORT_TXID_OFFSET,(unsigned char*)&token_hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+
+                    mc_EntityDetails token_entity;
+                    if(mc_gState->m_Assets->FindEntityByShortTxID(&token_entity,buf+MC_AST_SHORT_TXID_OFFSET))
+                    {
+                        throw JSONRPCError(RPC_NOT_ALLOWED, "Token with this ID already exists in this asset");                               
+                    }
+                    mc_SetABQuantity(buf,quantity);    
+                    if(lpFollowonBuffer->GetCount())
+                    {
+                        if(verify_level & 0x0008)
+                        {
+                            strError=string("Issuemore for multiple tokens");
+                            goto exitlbl;                                                
+                        }
+                    }                
+
                     lpFollowonBuffer->Clear();
+                    lpFollowonBuffer->Add(buf);
+
+                    lpScript->SetAssetQuantities(lpFollowonBuffer,MC_SCR_ASSET_SCRIPT_TYPE_TOKEN);
+                    script=lpDetailsToken->GetData(0,&bytes);
+                    lpScript->SetInlineDetails(script,bytes);                    
                 }
-                mc_SetABQuantity(buf,quantity);
-                lpFollowonBuffer->Add(buf);                    
-                lpScript->SetAssetQuantities(lpFollowonBuffer,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);                
+                else
+                {
+                    if(token_field.size())
+                    {
+                        strError=string("Invalid field for object ") + a.name_ + string(": ") + token_field;
+                        goto exitlbl;                        
+                    }
+                    if(lpFollowonBuffer->GetCount())
+                    {
+                        if(verify_level & 0x0008)
+                        {
+                            if(memcmp(buf,lpFollowonBuffer->GetRow(0),MC_AST_ASSET_QUANTITY_OFFSET))
+                            {
+                                strError=string("Issuemore for different assets");
+                                goto exitlbl;                                                
+                            }
+                        }
+                        lpFollowonBuffer->Clear();
+                    }                
+                    mc_SetABQuantity(buf,quantity);
+                    lpFollowonBuffer->Add(buf);                    
+                    lpScript->SetAssetQuantities(lpFollowonBuffer,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);                
+                }
                 parsed=true;
             }
 

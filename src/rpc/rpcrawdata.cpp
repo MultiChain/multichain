@@ -611,147 +611,6 @@ CScript RawDataScriptFormatted(Value *param,uint32_t *data_format,mc_Script *lpD
     return scriptOpReturn;
 }
 
-void ParseRawTokenInfo(const Value *value,mc_Script *lpDetailsScript,mc_Script *lpDetailsScriptTmp,string *token,int64_t *raw,mc_EntityDetails *entity,int *errorCode,string *strError)
-{
-    bool field_parsed;
-    bool missing_details=true;
-    bool missing_asset=true;
-    bool missing_token=true;
-    bool missing_raw=true;
-    
-    if(value->type() != obj_type)
-    {
-        *strError=string("Token info should be object"); 
-        return;
-    }
-    lpDetailsScript->Clear();
-    lpDetailsScript->AddElement();                       
-    
-    BOOST_FOREACH(const Pair& d, value->get_obj()) 
-    {
-        field_parsed=false;
-        if(d.name_ == "token")
-        {
-            if(!missing_token)
-            {
-                *strError=string("token field can appear only once in the object");                                                                                                        
-            }
-            if(d.value_.type() == str_type)
-            {
-                *token=d.value_.get_str();
-                                
-                if( (*token == "*") || (*token == "") )
-                {
-                    *strError=string("Invalid token name"); 
-                }
-                
-                lpDetailsScript->SetSpecialParamValue(MC_ENT_SPRM_UPDATE_NAME,(const unsigned char*)(token->c_str()),token->size());                    
-            }
-            else
-            {
-                *strError=string("Invalid token");                            
-            }
-            missing_token=false;
-            field_parsed=true;
-        }
-        if(d.name_ == "asset")
-        {
-            if(!missing_token)
-            {
-                *strError=string("asset field can appear only once in the object");                                                                                                        
-            }
-            if(entity == NULL)
-            {
-                *strError=string("asset field is not allowed in this object");                                                                                                                        
-            }
-            if(d.value_.type() == str_type)
-            {
-                ParseEntityIdentifier(d.value_,entity, MC_ENT_TYPE_ASSET);       
-            }
-            else
-            {
-                *strError=string("Invalid asset");                            
-            }
-            lpDetailsScript->SetSpecialParamValue(MC_ENT_SPRM_PARENT_ENTITY,entity->GetTxID(),sizeof(uint256));                    
-            missing_asset=false;
-            field_parsed=true;
-        }
-        if(d.name_ == "details")
-        {
-            if(!missing_details)
-            {
-                *strError=string("details field can appear only once in the object");                                                                                                        
-            }
-            ParseRawDetails(&(d.value_),lpDetailsScript,lpDetailsScriptTmp,errorCode,strError);
-            missing_details=false;
-            field_parsed=true;
-        }         
-        if(d.name_ == "raw")
-        {
-            if(!missing_raw)
-            {
-                *strError=string("raw field can appear only once in the object");                                                                                                        
-            }
-            if(d.value_.type() == int_type)
-            {
-                *raw=d.value_.get_int64();
-                if(*raw <= 0)
-                {
-                    *strError=string("Invalid raw - should be positive");                                                                                                        
-                }
-            }
-            else
-            {
-                *strError=string("Invalid raw");                            
-            }
-            missing_raw=false;
-            field_parsed=true;
-        }
-        
-        if(!field_parsed)
-        {
-            *strError=strprintf("Invalid field: %s",d.name_.c_str());;                                
-        }
-    }    
-    
-    if(strError->size() == 0)
-    {
-        if(missing_token)
-        {                    
-            *strError=string("Missing token"); 
-        }
-    }
-    if(strError->size() == 0)
-    {
-        if(missing_raw)
-        {                    
-            *strError=string("Missing raw"); 
-        }
-    }
-    if(strError->size() == 0)
-    {
-        if(missing_asset)
-        {                    
-            if(entity)
-            {
-                *strError=string("Missing asset"); 
-            }
-        }        
-    }
-    
-/*    
-    if(strError->size() == 0)
-    {
-        script=lpDetailsScriptTmp1->GetData(0,&bytes);
-        err=lpDetailsScript->SetInlineDetails(script,bytes);
-        if(err)
-        {
-            *strError=string("Invalid token details, too long");                                                            
-        }
-    }    
- */ 
-}
-
 CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetailsScript,int *errorCode,string *strError)
 {
     CScript scriptOpReturn=CScript();
@@ -761,14 +620,25 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
     const unsigned char *script;
     string entity_name;
     int multiple=1;
-    int is_open=0;
-    int is_anyone_can_issuemore=0;
+    bool is_open=false;
+    bool is_anyone_can_issuemore=false;
+    bool can_open=false;
+    bool can_close=false;
+    bool fungible=true;
+    bool single_unit=false;
+    int64_t limit=MC_ENT_DEFAULT_MAX_ASSET_TOTAL;
+    
     uint32_t permissions=0;
     bool missing_name=true;
     bool missing_multiple=true;
     bool missing_open=true;
     bool missing_anyone_can_issuemore=true;
     bool missing_details=true;
+    bool missing_can_open=true;
+    bool missing_can_close=true;
+    bool missing_fungible=true;
+    bool missing_single_unit=true;
+    bool missing_limit=true;
     
     lpDetails->Clear();
     lpDetails->AddElement();                   
@@ -849,6 +719,134 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             missing_open=false;
             field_parsed=true;
         }
+        if(d.name_ == "canopen")
+        {
+            if(!missing_can_open)
+            {
+                *strError=string("canopen field can appear only once in the object");                                                                                                        
+            }
+            if(mc_gState->m_Features->NFTokens())
+            {
+                if(d.value_.type() == bool_type)
+                {
+                    can_open=d.value_.get_bool();
+                }    
+                else
+                {
+                    *strError=string("Invalid canopen");                                            
+                }
+            }
+            else
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "canopen field is not supported in this protocol version");                   
+            }
+            missing_can_open=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "canclose")
+        {
+            if(!missing_can_close)
+            {
+                *strError=string("canclose field can appear only once in the object");                                                                                                        
+            }
+            if(mc_gState->m_Features->NFTokens())
+            {
+                if(d.value_.type() == bool_type)
+                {
+                    can_close=d.value_.get_bool();
+                }    
+                else
+                {
+                    *strError=string("Invalid canclose");                                            
+                }
+            }
+            else
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "canclose field is not supported in this protocol version");                   
+            }
+            missing_can_close=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "fungible")
+        {
+            if(!missing_fungible)
+            {
+                *strError=string("fungible field can appear only once in the object");                                                                                                        
+            }
+            if(mc_gState->m_Features->NFTokens())
+            {
+                if(d.value_.type() == bool_type)
+               {
+                   fungible=d.value_.get_bool();
+               }    
+               else
+               {
+                   *strError=string("Invalid fungible");                                            
+               }
+            }
+            else
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "fungible field is not supported in this protocol version");                   
+            }
+            missing_fungible=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "issueonlysingleunit")
+        {
+            if(!missing_single_unit)
+            {
+                *strError=string("issueonlysingleunit field can appear only once in the object");                                                                                                        
+            }
+            if(mc_gState->m_Features->NFTokens())
+            {
+                if(d.value_.type() == bool_type)
+                {
+                    single_unit=d.value_.get_bool();
+                }    
+                else
+                {
+                    *strError=string("Invalid issueonlysingleunit");                                            
+                }
+            }
+            else
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "issueonlysingleunit field is not supported in this protocol version");                   
+            }
+            missing_single_unit=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "limit")
+        {
+            if(!missing_limit)
+            {
+                *strError=string("limit field can appear only once in the object");                                                                                                        
+            }
+            if(mc_gState->m_Features->NFTokens())
+            {
+                if(d.value_.type() == int_type)
+                {
+                    limit=d.value_.get_int64();
+                    if(limit < 0)
+                    {
+                        *strError=string("Invalid limit - should be non-negative");                                                                                                        
+                    }
+                    else
+                    {
+                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MAX_TOTAL,(unsigned char*)&limit,sizeof(int64_t));
+                    }
+                }
+                else
+                {
+                    *strError=string("Invalid limit");                            
+                }
+            }
+            else
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "limit field is not supported in this protocol version");                   
+            }
+            missing_limit=false;
+            field_parsed=true;
+        }
         if(d.name_ == "unrestrict")
         {
             if(!missing_anyone_can_issuemore)
@@ -922,22 +920,83 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
         }
     }    
     
+    unsigned char b=MC_ENT_FOMD_NONE;
     if(is_open)
     {
-        is_open=MC_ENT_FOMD_ALLOWED_INSTANT;
-        if(is_anyone_can_issuemore)
-        {
-            is_open |= MC_ENT_FOMD_ANYONE_CAN_ISSUEMORE;
-        }
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,(unsigned char*)&is_open,1);                        
+        b |= MC_ENT_FOMD_ALLOWED_INSTANT;
     }
-    else
+    if(can_open)
     {
-        if(is_anyone_can_issuemore)
+        b |= MC_ENT_FOMD_CAN_OPEN;
+    }
+    if(can_close)
+    {
+        b |= MC_ENT_FOMD_CAN_CLOSE;
+    }
+    if(is_anyone_can_issuemore)
+    {
+        b |= MC_ENT_FOMD_ANYONE_CAN_ISSUEMORE;
+    }
+    if(single_unit)
+    {
+        b |= MC_ENT_FOMD_SINGLE_UNIT;
+    }
+    if(!fungible)
+    {
+        b |= MC_ENT_FOMD_NON_FUNGIBLE_TOKENS;
+    }
+    if(strError->size() == 0)
+    {
+        if(!is_open && !can_open && is_anyone_can_issuemore)
         {
             *errorCode=RPC_NOT_SUPPORTED;
-            *strError=string("Asset cannot have unrestricted issue permission if follow-ons are not allowed");   
-        }        
+            *strError="Asset cannot have unrestricted issue permission if follow-ons are not allowed or cannot be allowed";   
+        }
+    }
+    if(strError->size() == 0)
+    {
+        if(!is_open && !can_open && can_close)
+        {
+            *errorCode=RPC_NOT_SUPPORTED;
+            *strError="Asset cannot be closed if follow-ons are not allowed or cannot be allowed";   
+        }
+    }
+    if(strError->size() == 0)
+    {
+        if(!is_open && !can_open && !fungible)
+        {
+            *errorCode=RPC_NOT_SUPPORTED;
+            *strError= "Asset cannot have non-fungible tokens if follow-ons are not allowed or cannot be allowed";   
+        }
+    }
+    if(strError->size() == 0)
+    {
+        if(single_unit)
+        {
+            if(multiple != 1)
+            {
+                *errorCode=RPC_NOT_ALLOWED;
+                *strError= "Asset with single unit issuance should have multiple 1";   
+            }        
+        }
+    }
+    if(strError->size() == 0)
+    {
+        if(!fungible)
+        {
+            if(multiple != 1)
+            {
+                *errorCode=RPC_NOT_ALLOWED;
+                *strError= "Non-fungible token asset should have multiple 1";               
+            }
+        }
+    }
+    if(strError->size() == 0)
+    {    
+        if(b != MC_ENT_FOMD_NONE)
+        {        
+            lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,(unsigned char*)&b,1);                        
+        }
     }
     
     if(strError->size() == 0)

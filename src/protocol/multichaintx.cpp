@@ -2907,6 +2907,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                     reason="Asset issue script rejected - follow-ons or asset reopening should be allowed";
                     return false;                                                                                                                                    
                 }
+                total=0;
             }
             if(followon_mode & MC_ENT_FOMD_SINGLE_UNIT)
             {
@@ -3206,18 +3207,20 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     {
         err=mc_gState->m_Assets->InsertAssetFollowOn(&txid,offset,total,details->details_script,details->details_script_size,special_script,special_script_size,details->extended_script_row,entity.GetTxID(),update_mempool);
     }
-            
-    if(mc_gState->m_Features->NFTokens())
+    if(err == 0)
     {
-        if(followon_mode & MC_ENT_FOMD_NON_FUNGIBLE_TOKENS)
+        if(mc_gState->m_Features->NFTokens())
         {
-            for (unsigned int vout = 0; vout < tx.vout.size(); vout++)
+            if(followon_mode & MC_ENT_FOMD_NON_FUNGIBLE_TOKENS)
             {
-                MultiChainTransaction_SetTmpOutputScript(tx.vout[vout].scriptPubKey);
-                if(!MultiChainTransaction_ProcessTokenIssuance(tx,offset,accept,vout,txid,details,reason))
+                for (unsigned int vout = 0; vout < tx.vout.size(); vout++)
                 {
-                    return false;                
-                }        
+                    MultiChainTransaction_SetTmpOutputScript(tx.vout[vout].scriptPubKey);
+                    if(!MultiChainTransaction_ProcessTokenIssuance(tx,offset,accept,vout,txid,details,reason))
+                    {
+                        return false;                
+                    }        
+                }
             }
         }
     }

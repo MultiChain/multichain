@@ -232,6 +232,10 @@ Value issuefromcmd(const Array& params, bool fHelp)
                     if(s.value_.type() == int_type)
                     {
                         limit=s.value_.get_int64();
+                        if(limit < 0)
+                        {
+                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'limit' field, should be non-negative");                                                                                            
+                        }
                     }
                     else
                     {

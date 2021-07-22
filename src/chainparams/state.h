@@ -196,6 +196,8 @@ typedef struct mc_TmpBuffers
     mc_Script               *m_RpcScript2;
     mc_Script               *m_RpcScript3;
     mc_Script               *m_RpcScript4;
+    mc_Script               *m_RpcTokenScript1;
+    mc_Script               *m_RpcTokenScript2;
     mc_Buffer               *m_RpcABBuffer1;
     mc_Buffer               *m_RpcABBuffer2;
     mc_Buffer               *m_RpcBuffer1;
@@ -218,6 +220,8 @@ typedef struct mc_TmpBuffers
         m_RpcScript2=new mc_Script();
         m_RpcScript3=new mc_Script();
         m_RpcScript4=new mc_Script();
+        m_RpcTokenScript1=new mc_Script();
+        m_RpcTokenScript2=new mc_Script();
         m_RpcABBuffer1=new mc_Buffer;
         mc_InitABufferMap(m_RpcABBuffer1);
         m_RpcABBuffer2=new mc_Buffer;
@@ -247,6 +251,8 @@ typedef struct mc_TmpBuffers
         delete m_RpcScript2;
         delete m_RpcScript3;
         delete m_RpcScript4;
+        delete m_RpcTokenScript1;
+        delete m_RpcTokenScript2;
         delete m_RpcABBuffer1;
         delete m_RpcABBuffer2;
         delete m_RpcBuffer1;
