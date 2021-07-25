@@ -4336,16 +4336,21 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
         mc_EntityDetails entity;
         
         entity.Zero();
-        CScript scriptPubKey = GetScriptForString(s.name_,MC_ENT_TYPE_FILTER | MC_ENT_TYPE_LIBRARY,&entity);
+        CScript scriptPubKey = GetScriptForString(s.name_,MC_ENT_TYPE_FILTER | MC_ENT_TYPE_LIBRARY | MC_ENT_TYPE_ASSET,&entity);
         CAmount nAmount=0;
 
         if(entity.GetEntityType())
         {
-            uint32_t approval,timestamp;
+            uint32_t approval,perm_type,timestamp;
             size_t elem_size;
             const unsigned char *elem;
+            mc_EntityDetails update_entity;
+            uint160 details_address;
+            mc_EntityDetails stream_entity;
+            uint160 filter_address;
             
             approval=0;
+            perm_type=MC_PTP_NONE;
             timestamp=mc_TimeNowAsUInt();
             mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript4;
             lpScript->Clear();
@@ -4353,69 +4358,106 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
             
 //            bool ParseLibraryApproval(Value param,mc_EntityDetails *library_entity,mc_EntityDetails *update_entity)
 
-            if(entity.GetEntityType() == MC_ENT_TYPE_LIBRARY)
+            switch(entity.GetEntityType())
             {
-                mc_EntityDetails update_entity;
-                update_entity.Zero();                
-                if(mc_gState->m_Features->Libraries() == 0)
-                {
-                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Libraries can not be approved/disapproved in this protocol version.");        
-                }        
-                if(entity.ApproveRequired() == 0)
-                {
-                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Approval is not required for this library");        
-                }
-                approval=ParseLibraryApproval(s.value_,&entity,&update_entity);
-                uint160 filter_address;
-                filter_address=0;
-                memcpy(&filter_address,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-                unsigned char *ptr;
-                size_t bytes;
-
-                ptr=(unsigned char *)update_entity.GetSpecialParam(MC_ENT_SPRM_CHAIN_INDEX,&bytes);
-                if(ptr)
-                {
-                    if((bytes>0) && (bytes<=4))
+                case MC_ENT_TYPE_LIBRARY:
+                    perm_type=MC_PTP_FILTER;
+                    update_entity.Zero();                
+                    if(mc_gState->m_Features->Libraries() == 0)
                     {
-                       memcpy(((unsigned char*)&filter_address)+MC_AST_SHORT_TXID_SIZE,ptr,bytes);
-                    }
-                }      
-                else
-                {
-                    throw JSONRPCError(RPC_INTERNAL_ERROR, "Corrupted Library database");                                                                
-                }
-                scriptPubKey = GetScriptForDestination(CKeyID(filter_address));
-            }
-            else
-            {
-                if(entity.GetFilterType() == MC_FLT_TYPE_STREAM)
-                {
-                    mc_EntityDetails stream_entity;
-                    stream_entity.Zero();
-                    if(mc_gState->m_Features->StreamFilters() == 0)
-                    {
-                        throw JSONRPCError(RPC_NOT_SUPPORTED, "Only Tx filters can be approved/disapproved in this protocol version.");        
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "Libraries can not be approved/disapproved in this protocol version.");        
                     }        
-    //                approval=ParseStreamFilterApproval(s.value_.get_obj()[0].value_,&stream_entity);
-                    approval=ParseStreamFilterApproval(s.value_,&stream_entity);
-                    lpScript->SetEntity(stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);                    
-                }
-                else
-                {
+                    if(entity.ApproveRequired() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "Approval is not required for this library");        
+                    }
+                    approval=ParseLibraryApproval(s.value_,&entity,&update_entity);
+                    filter_address=0;
+                    memcpy(&filter_address,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+                    unsigned char *ptr;
+                    size_t bytes;
+
+                    ptr=(unsigned char *)update_entity.GetSpecialParam(MC_ENT_SPRM_CHAIN_INDEX,&bytes);
+                    if(ptr)
+                    {
+                        if((bytes>0) && (bytes<=4))
+                        {
+                           memcpy(((unsigned char*)&filter_address)+MC_AST_SHORT_TXID_SIZE,ptr,bytes);
+                        }
+                    }      
+                    else
+                    {
+                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Corrupted Library database");                                                                
+                    }
+                    scriptPubKey = GetScriptForDestination(CKeyID(filter_address));
+                    break;
+                case MC_ENT_TYPE_FILTER:
+                    perm_type=MC_PTP_FILTER;
+                    if(entity.GetFilterType() == MC_FLT_TYPE_STREAM)
+                    {
+                        stream_entity.Zero();
+                        if(mc_gState->m_Features->StreamFilters() == 0)
+                        {
+                            throw JSONRPCError(RPC_NOT_SUPPORTED, "Only Tx filters can be approved/disapproved in this protocol version.");        
+                        }        
+        //                approval=ParseStreamFilterApproval(s.value_.get_obj()[0].value_,&stream_entity);
+                        approval=ParseStreamFilterApproval(s.value_,&stream_entity);
+                        lpScript->SetEntity(stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);                    
+                    }
+                    else
+                    {
+                        if ( (s.value_.type() != obj_type) || 
+                             (s.value_.get_obj().size() != 1) || 
+                             (s.value_.get_obj()[0].name_ != "approve") )
+                        {
+                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Filter approval should be object with single field - approve");                
+                        }
+                        approval=1;
+                        if(!paramtobool(s.value_.get_obj()[0].value_))
+                        {
+                            approval=0;
+                        }
+                    }            
+                    break;
+                case MC_ENT_TYPE_ASSET:
+                    perm_type=MC_PTP_DETAILS;
+                    if(mc_gState->m_Features->NFTokens() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "Assets can not be opened/closed in this protocol version.");        
+                    }        
                     if ( (s.value_.type() != obj_type) || 
                          (s.value_.get_obj().size() != 1) || 
-                         (s.value_.get_obj()[0].name_ != "approve") )
+                         (s.value_.get_obj()[0].name_ != "open") )
                     {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Filter approval should be object with single field - approve");                
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Asset update should be object with single field - open");                
                     }
                     approval=1;
                     if(!paramtobool(s.value_.get_obj()[0].value_))
                     {
                         approval=0;
                     }
-                }            
+                    if(approval)
+                    {
+                        if(entity.AdminCanOpen() == 0)
+                        {
+                            throw JSONRPCError(RPC_NOT_ALLOWED, "Opening is not allowed for this asset");                                            
+                        }
+                    }
+                    else
+                    {
+                        if(entity.AdminCanClose() == 0)
+                        {
+                            throw JSONRPCError(RPC_NOT_ALLOWED, "Closing is not allowed for this asset");                                            
+                        }                        
+                    }
+                    
+                    mc_gState->m_Permissions->DetailsAddress((unsigned char*)&details_address, MC_PDF_ASSET_OPEN);                    
+                    scriptPubKey = GetScriptForDestination(CKeyID(details_address));
+                    lpScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);                            
+                    
+                    break;
             }
-            lpScript->SetPermission(MC_PTP_FILTER,0,approval ? 4294967295U : 0,timestamp);
+            lpScript->SetPermission(perm_type,0,approval ? 4294967295U : 0,timestamp);
             for(int element=0;element < lpScript->GetNumElements();element++)
             {
                 elem = lpScript->GetData(element,&elem_size);

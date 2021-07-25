@@ -301,6 +301,8 @@ extern json_spirit::Value verifypermission(const json_spirit::Array& params, boo
 extern json_spirit::Value getfiltertxinput(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value createcmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value createfromcmd(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value updatecmd(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value updatefromcmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value publish(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value publishfrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value publishmulti(const json_spirit::Array& params, bool fHelp);

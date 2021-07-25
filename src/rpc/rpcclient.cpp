@@ -273,6 +273,8 @@ static const std::string vAPINames[] =
 "explorerlistaddressassettransactions",
 "explorergetrawtransaction",
 "getchaintotals",
+"update",
+"updatefrom",
 };
 
 static const CRPCConvertParam vRPCConvertParams[] =
@@ -450,6 +452,8 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "createfrom", 4 },                                                            
     { "create", 2 },                                                            
     { "create", 3 },                                                            
+    { "updatefrom", 2 },                                                            
+    { "update", 1 },                                                            
     { "subscribe", 0 },
     { "subscribe", 1 },
     { "trimsubscribe", 0 },

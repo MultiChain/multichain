@@ -453,6 +453,164 @@ Value revokecmd(const Array& params, bool fHelp)
     
 }
 
+Value updatefromcmd(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 3)
+        throw runtime_error("Help message not found\n");
+    
+    mc_EntityDetails entity;
+    uint32_t type,from,to,timestamp;
+    vector<CTxDestination> addresses;
+    uint160 details_address;
+    CWalletTx wtx;
+    CScript scriptOpReturn=CScript();
+    
+    
+    if (params[1].type() != null_type && !params[1].get_str().empty())
+    {        
+        ParseEntityIdentifier(params[1],&entity, MC_ENT_TYPE_ANY);           
+    }
+    else
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid entity identifier");        
+    }
+
+    switch(entity.GetEntityType())
+    {
+        case MC_ENT_TYPE_ASSET:
+            if ( (params[2].type() != obj_type) || 
+                 (params[2].get_obj().size() != 1) || 
+                 (params[2].get_obj()[0].name_ != "open") )
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Asset update should be object with single field - open");                
+            }
+            to=0;
+            if(paramtobool(params[2].get_obj()[0].value_))
+            {
+                to=4294967295U;
+                if(entity.AdminCanOpen() == 0)
+                {
+                    throw JSONRPCError(RPC_NOT_ALLOWED, "Opening is not allowed for this asset");                                            
+                }
+            }
+            else
+            {
+                if(entity.AdminCanClose() == 0)
+                {
+                    throw JSONRPCError(RPC_NOT_ALLOWED, "Closing is not allowed for this asset");                                            
+                }                        
+            }
+            type=MC_PTP_DETAILS;
+            timestamp=mc_TimeNowAsUInt();
+            from=0;
+            mc_gState->m_Permissions->DetailsAddress((unsigned char*)&details_address, MC_PDF_ASSET_OPEN);                 
+            addresses.push_back(CKeyID(details_address));
+            
+            break;
+        default:
+            throw JSONRPCError(RPC_NOT_SUBSCRIBED, "This entity cannot be updated");        
+            break;
+    }
+    
+    mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
+    lpScript->Clear();    
+    lpScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);        
+    lpScript->SetPermission(type,from,to,timestamp);
+    
+    vector<CTxDestination> fromaddresses;       
+    if(params[0].get_str() != "*")
+    {
+        fromaddresses=ParseAddresses(params[0].get_str(),false,false);
+    }
+
+    if(fromaddresses.size() > 1)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Single from-address should be specified");                        
+    }
+    
+    EnsureWalletIsUnlocked();
+    
+    if(fromaddresses.size() == 1)
+    {
+        if( (IsMine(*pwalletMain, fromaddresses[0]) & ISMINE_SPENDABLE) != ISMINE_SPENDABLE )
+        {
+            throw JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Private key for from-address is not found in this wallet");                        
+        }
+        
+        CKeyID *lpKeyID=boost::get<CKeyID> (&fromaddresses[0]);
+        if(lpKeyID != NULL)
+        {
+            if(entity.GetEntityType())
+            {
+                if(mc_gState->m_Permissions->CanAdmin(entity.GetTxID(),(unsigned char*)(lpKeyID)) == 0)
+                {
+                    throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "from-address doesn't have admin permission for this entity");                                                                        
+                }                                                                     
+            }
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Please use raw transactions to grant/revoke from P2SH addresses");                                                
+        }
+    }
+    else
+    {
+        bool admin_found=false;
+        
+        BOOST_FOREACH(const PAIRTYPE(CBitcoinAddress, CAddressBookData)& item, pwalletMain->mapAddressBook)
+        {
+            const CBitcoinAddress& address = item.first;
+            CKeyID keyID;
+
+            if(address.GetKeyID(keyID))
+            {
+                if(entity.GetEntityType())
+                {
+                    if(mc_gState->m_Permissions->CanAdmin(entity.GetTxID(),(unsigned char*)(&keyID)))
+                    {
+                        admin_found=true;
+                    }                                                                     
+                }
+            }
+        }        
+        
+        if(!admin_found)
+        {
+            string strErrorMessage="This wallet doesn't have addresses with ";
+            strErrorMessage+="admin permission";                                
+            if(entity.GetEntityType())
+            {
+                strErrorMessage+=" for this entity";                                
+            }
+            throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, strErrorMessage);                                                                        
+        }
+    }
+    
+    
+    LOCK (pwalletMain->cs_wallet_send);    
+
+    SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn, fromaddresses);
+
+    return wtx.GetHash().GetHex();    
+}
+
+
+Value updatecmd(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 2 )
+        throw runtime_error("Help message not found\n");
+
+    Array ext_params;
+    ext_params.push_back("*");
+    BOOST_FOREACH(const Value& value, params)
+    {
+        ext_params.push_back(value);
+    }
+    return updatefromcmd(ext_params,fHelp);
+    
+}
+
+
 Value verifypermission(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 2)
