@@ -352,6 +352,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                                 asset_entry.push_back(Pair("type", "transfer"));                                            
                                 break;
                             case MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON:
+                            case MC_SCR_ASSET_SCRIPT_TYPE_TOKEN:
                                 asset_entry.push_back(Pair("type", "issuemore"));                                            
                                 issuerawqty+=mc_GetABQuantity(ptr);
                                 is_issuemore=true;

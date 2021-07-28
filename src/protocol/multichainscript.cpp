@@ -1984,6 +1984,11 @@ int mc_Script::GetFullRef(unsigned char *ref,uint32_t *script_type)
         *script_type=MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON;
     }
     
+    if(ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN] == MC_DCT_SCRIPT_MULTICHAIN_ASSET_TOKEN_PREFIX)
+    {
+        *script_type=MC_SCR_ASSET_SCRIPT_TYPE_TOKEN;
+    }
+    
     if(*script_type == 0)
     {
         return MC_ERR_WRONG_SCRIPT;        

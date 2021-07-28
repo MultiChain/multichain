@@ -253,6 +253,8 @@ typedef struct mc_EntityDetails
     uint32_t UpgradeStartBlock(); 
     uint64_t GetQuantity();
     uint32_t GetEntityType();    
+    const char* GetUpdateName(size_t* bytes);
+    const unsigned char* GetParentTxID();
     const void* GetSpecialParam(uint32_t param,size_t* bytes);
     const void* GetSpecialParam(uint32_t param,size_t* bytes,int check_extended_script);
     const void* GetParam(const char *param,size_t* bytes);

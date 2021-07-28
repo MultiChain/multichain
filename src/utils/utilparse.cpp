@@ -33,7 +33,7 @@ bool mc_ExtractOutputAssetQuantities(mc_Buffer *assets,string& reason,bool with_
     uint32_t script_type=MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER;
     if(with_followons)
     {        
-        script_type |= MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON;
+        script_type |= MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON | MC_SCR_ASSET_SCRIPT_TYPE_TOKEN;
     }
     for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
     {
@@ -63,9 +63,9 @@ bool mc_VerifyAssetPermissions(mc_Buffer *assets, vector<CTxDestination> address
                 if(entity.GetEntityType() == MC_ENT_TYPE_TOKEN)
                 {                    
                     const unsigned char *ptr; 
-                    size_t bytes;
+                    size_t bytes;                   
                     ptr=(const unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_PARENT_ENTITY,&bytes);
-                    if( (ptr != NULL) || (bytes != sizeof(uint256)))
+                    if( (ptr == NULL) || (bytes != sizeof(uint256)))
                     {
                         reason="Asset issue TxID not found in token script";
                         return false;                                                                            
@@ -344,11 +344,22 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
     uint32_t type,from,to,timestamp,type_ored,approval;
     bool issue_found;
     uint32_t new_entity_type;
+    unsigned char* token_details;
+//    unsigned char* token_id;
+    unsigned char* token_asset_txid;
+    int token_details_size;//,token_id_size;
+    uint32_t value_offset;
+    size_t value_size;
+//    uint256 token_hash;
+    mc_EntityDetails entity;
     
     memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
     
     expected_allowed=0;
     expected_required=0;
+    
+    token_asset_txid=NULL;
+//    token_id=NULL;
     
     strFailReason="";
     
@@ -403,6 +414,37 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
             }
         }    
     
+        for (int e = 0; e < lpScript->GetNumElements(); e++)
+        {
+            err=mc_gState->m_TmpScript->GetInlineDetails(&token_details,&token_details_size);
+            if(err == 0)
+            {
+/*                
+                value_offset=mc_FindSpecialParamInDetailsScript(token_details,token_details_size,MC_ENT_SPRM_UPDATE_NAME,&value_size);
+                if(value_offset<(uint32_t)token_details_size)
+                {
+                    token_id=token_details+value_offset;
+                    token_id_size=(uint32_t)value_size;
+                    if(token_id_size == 0)
+                    {
+                        strFailReason="Invalid token tranfer - empty token identifier";
+                        return false;                                                                        
+                    }
+                }
+ */ 
+                value_offset=mc_FindSpecialParamInDetailsScript(token_details,token_details_size,MC_ENT_SPRM_PARENT_ENTITY,&value_size);
+                if(value_offset<(uint32_t)token_details_size)
+                {
+                    token_asset_txid=token_details+value_offset;
+                    if(value_size != sizeof(uint256))
+                    {
+                        strFailReason="Invalid token tranfer - bad asset issuance txid";
+                        return false;                                                                        
+                    }
+                }
+            }            
+        }
+
         issue_found=false;
         total=0;
         for (int e = 0; e < lpScript->GetNumElements(); e++)
@@ -464,7 +506,7 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                     {
                         mc_SetABQuantity(buf,total);
                         amounts->Add(buf);                        
-                    }
+                    }                        
 
                     if(required)
                     {
@@ -518,7 +560,7 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                                 
                 if(hash != 0)                                                   // Follow-ons
                 {
-                    err=lpScript->GetAssetQuantities(amounts,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);                  
+                    err=lpScript->GetAssetQuantities(amounts,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON | MC_SCR_ASSET_SCRIPT_TYPE_TOKEN);                  
                     if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
                     {
                         strFailReason="Invalid asset followon script";
@@ -542,8 +584,47 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                     switch(script_type)
                     {
                         case MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON:
-                            mc_EntityDetails entity;
                             if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ref))
+                            {
+                                if(entity.AnyoneCanIssueMore() == 0)
+                                {
+                                    if(required)
+                                    {
+                                        *required |= MC_PTP_ISSUE;                    
+                                    }
+                                    if(mapSpecialEntity)
+                                    {
+                                        std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_ISSUE);
+                                        if (it == mapSpecialEntity->end())
+                                        {
+                                            mapSpecialEntity->insert(make_pair(MC_PTP_ISSUE,*(uint256*)(entity.GetTxID())));
+                                        }
+                                        else
+                                        {
+                                            if(it->second != *(uint256*)(entity.GetTxID()))
+                                            {
+                                                strFailReason="Invalid asset follow-on script, multiple assets";
+                                                return false;                                                                                                            
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                strFailReason="Invalid asset follow-on script, asset not found";
+                                return false;                                                                    
+                            }
+
+                            break;
+                            
+                        case MC_SCR_ASSET_SCRIPT_TYPE_TOKEN:
+                            if(token_asset_txid == NULL)
+                            {
+                                strFailReason="Invalid token issuance script, missing asset issue txid";
+                                return false;                                                                                                                                            
+                            }
+                            if(mc_gState->m_Assets->FindEntityByTxID(&entity,token_asset_txid))
                             {
                                 if(entity.AnyoneCanIssueMore() == 0)
                                 {
@@ -940,7 +1021,7 @@ bool CreateAssetBalanceList(const CTxOut& txout,mc_Buffer *amounts,mc_Script *lp
                 return false;                                
             }
 
-            err=lpScript->GetAssetQuantities(amounts,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);   
+            err=lpScript->GetAssetQuantities(amounts,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON | MC_SCR_ASSET_SCRIPT_TYPE_TOKEN);   
             
             if(err == 0)
             {
@@ -981,7 +1062,7 @@ bool FindFollowOnsInScript(const CScript& script1,mc_Buffer *amounts,mc_Script *
     for (int e = 0; e < lpScript->GetNumElements(); e++)                        // Parsing asset quantities
     {
         lpScript->SetElement(e);
-        err=lpScript->GetAssetQuantities(amounts,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);   
+        err=lpScript->GetAssetQuantities(amounts,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON | MC_SCR_ASSET_SCRIPT_TYPE_TOKEN);   
         if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
         {
             return false;                                

@@ -2558,6 +2558,27 @@ const char* mc_EntityDetails::GetName()
     return m_Name;
 }
 
+const char* mc_EntityDetails::GetUpdateName(size_t* bytes)
+{
+    return (char *)GetSpecialParam(MC_ENT_SPRM_UPDATE_NAME,bytes);
+}
+
+const unsigned char* mc_EntityDetails::GetParentTxID()
+{
+    unsigned char *ptr;
+    size_t value_size;
+    ptr=(unsigned char *)GetSpecialParam(MC_ENT_SPRM_PARENT_ENTITY,&value_size);
+    if(ptr)
+    {
+        if(value_size == sizeof(uint256))
+        {
+            return ptr;
+        }
+    }
+    return NULL;
+}
+
+
 const unsigned char* mc_EntityDetails::GetTxID()
 {
     return m_LedgerRow.m_Key;

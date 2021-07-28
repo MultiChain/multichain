@@ -211,11 +211,11 @@ bool mc_ExtractInputAssetQuantities(mc_Buffer *assets, const CScript& script1, u
 
     mc_gState->m_TmpScript->Clear();
     mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
-        
+
     for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
     {
         mc_gState->m_TmpScript->SetElement(e);
-        err=mc_gState->m_TmpScript->GetAssetQuantities(assets,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER | MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
+        err=mc_gState->m_TmpScript->GetAssetQuantities(assets,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER | MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON | MC_SCR_ASSET_SCRIPT_TYPE_TOKEN);
         if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
         {
             reason="Asset transfer script rejected - error in script";
@@ -242,13 +242,13 @@ bool mc_ExtractInputAssetQuantities(mc_Buffer *assets, const CScript& script1, u
                     mc_SetABQuantity(buf_amounts,quantity);
                     assets->Add(buf_amounts);
                 }
-            }                
+            }
             else
             {
                 reason="Asset transfer script rejected - issue tx not found";
                 return false;                                
             }                
-        }            
+        }
         else
         {
             if(err != MC_ERR_WRONG_SCRIPT)
@@ -258,7 +258,7 @@ bool mc_ExtractInputAssetQuantities(mc_Buffer *assets, const CScript& script1, u
             }
         }
     }
-
+    
     return true;
 }
 
@@ -1914,6 +1914,19 @@ bool MultiChainTransaction_ProcessTokenIssuance(const CTransaction& tx,
         }
     }
     
+    if(new_issue)                                                               // Token issuance in genesis transaction is not supported        
+    {
+        if(vout_total)
+        {
+            reason="Token issuance script rejected - not allowed in asset genesis transaction";
+            return false;                                            
+        }
+        else
+        {
+            return true;
+        }
+    }
+    
     if(!new_issue && (mc_gState->m_TmpAssetsOut->GetCount() == 0))
     {
         return true;
@@ -2885,6 +2898,14 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                     {
                         reason="Asset follow-on script rejected - should be single unit";
                         return false;                                                                                            
+                    }
+                }
+                if(entity.IsNFTAsset())
+                {
+                    if(followoon_out_count)
+                    {
+                        reason="Asset follow-on script rejected - not allowed for NFT assets";
+                        return false;                                                                                                                    
                     }
                 }
             }                    

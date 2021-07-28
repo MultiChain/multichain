@@ -383,9 +383,13 @@ Value issuefromcmd(const Array& params, bool fHelp)
         {
             throw JSONRPCError(RPC_NOT_ALLOWED, "Non-fungible token asset should have multiple 1");               
         }
-        if( (quantity != 0) && (params[3].type() != obj_type) )
+        if(params[3].type() == obj_type)
         {
-            throw JSONRPCError(RPC_NOT_SUPPORTED, "Quantity should be either 0 or object for non-fungible token asset ");               
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Invalid quantity, should be numeric");   
+        }        
+        if( (quantity != 0)  )// && (params[3].type() != obj_type) )
+        {
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Quantity should be 0 for non-fungible token asset ");               
         }
         string token;
         int64_t raw=0;
