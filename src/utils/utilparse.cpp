@@ -70,7 +70,8 @@ bool mc_VerifyAssetPermissions(mc_Buffer *assets, vector<CTxDestination> address
                         reason="Asset issue TxID not found in token script";
                         return false;                                                                            
                     }
-                    if(mc_gState->m_Assets->FindEntityByTxID(&entity,ptr))
+                    uint256 issue_txid=*(uint256*)ptr;
+                    if(mc_gState->m_Assets->FindEntityByTxID(&entity,(const unsigned char *)&issue_txid) == 0)
                     {
                         reason="Token asset not found";
                         return false;                                                                                                    
