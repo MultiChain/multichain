@@ -3452,20 +3452,23 @@ void ParseRawTokenInfo(const Value *value,mc_Script *lpDetailsScript,mc_Script *
             {
                 *strError=string("token field can appear only once in the object");                                                                                                        
             }
-            if(d.value_.type() == str_type)
+            if(token)
             {
-                *token=d.value_.get_str();
-                                
-                if( (*token == "*") || (*token == "") )
+                if(d.value_.type() == str_type)
                 {
-                    *strError=string("Invalid token name"); 
+                    *token=d.value_.get_str();
+
+                    if( (*token == "*") || (*token == "") )
+                    {
+                        *strError=string("Invalid token name"); 
+                    }
+
+                    lpDetailsScript->SetSpecialParamValue(MC_ENT_SPRM_UPDATE_NAME,(const unsigned char*)(token->c_str()),token->size());                    
                 }
-                
-                lpDetailsScript->SetSpecialParamValue(MC_ENT_SPRM_UPDATE_NAME,(const unsigned char*)(token->c_str()),token->size());                    
-            }
-            else
-            {
-                *strError=string("Invalid token");                            
+                else
+                {
+                    *strError=string("Invalid token");                            
+                }
             }
             missing_token=false;
             field_parsed=true;
@@ -3592,6 +3595,7 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
     size_t bytes;
     const unsigned char *script;
     bool token_field_found;
+    bool token_field_any;
     bool asset_field_found;
     
     
@@ -3608,6 +3612,7 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
     {
         token_field_found=false;
         asset_field_found=false;
+        token_field_any=false;
         if(a.value_.type() == obj_type)
         {
             BOOST_FOREACH(const Pair& d, a.value_.get_obj()) 
@@ -3615,6 +3620,10 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                 if(d.name_ == "token")
                 {
                     token_field_found=true;
+                    if( (d.value_.type() == str_type) && (d.value_.get_str() == "*") )
+                    {
+                        token_field_any=true;
+                    }
                 }
                 if(d.name_ == "asset")
                 {
@@ -4075,12 +4084,15 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                     goto exitlbl;
                 }
                 nft_asset=false;
-                if(mc_gState->m_Features->NFTokens())
+                if(!token_field_any)
                 {
-                    mc_gState->m_Assets->FindEntityByShortTxID(&entity,buf+MC_AST_SHORT_TXID_OFFSET);    
-                    if(entity.IsNFTAsset())
+                    if(mc_gState->m_Features->NFTokens())
                     {
-                        nft_asset=true;
+                        mc_gState->m_Assets->FindEntityByShortTxID(&entity,buf+MC_AST_SHORT_TXID_OFFSET);    
+                        if(entity.IsNFTAsset())
+                        {
+                            nft_asset=true;
+                        }
                     }
                 }
                 if(nft_asset)
@@ -4162,7 +4174,24 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                 }
                 else
                 {
-                    int64_t quantity = (int64_t)(a.value_.get_real() * multiple + 0.499999);                        
+                    int64_t quantity=0;
+                    if(token_field_any)
+                    {
+                        int errorCode=RPC_INVALID_PARAMETER;
+                        ParseRawTokenInfo(&(a.value_),lpDetailsToken,NULL,NULL,&quantity,NULL,&errorCode,&strError);
+                        if(eErrorCode)
+                        {
+                            *eErrorCode=errorCode;
+                        }
+                        if(strError.size())
+                        {
+                            goto exitlbl;                    
+                        }
+                    }
+                    else
+                    {
+                        quantity = (int64_t)(a.value_.get_real() * multiple + 0.499999);                        
+                    }
                     if(verify_level & 0x0010)
                     {
                         if(quantity < 0)
@@ -4172,13 +4201,39 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                         }
                     }
                     mc_SetABQuantity(buf,quantity);
-                    lpBuffer->Add(buf);                    
-                    if(verify_level & 0x0001)
+                    if(token_field_any)
                     {
-                        if(lpBuffer->GetCount() >= assets_per_opdrop)
+                        if(lpBuffer->GetCount())
                         {
+                            if(Params().RequireStandard())
+                            {
+                                if(verify_level & 0x0002)
+                                {
+                                    if(lpBuffer->GetCount() > assets_per_opdrop)
+                                    {
+                                        strError=string("Too many assets in one group");
+                                        goto exitlbl;                                    
+                                    }
+                                }
+                            }
                             lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);                
                             lpBuffer->Clear();
+                        }
+                        lpBuffer->Add(buf);   
+                        lpScript->AddElement();                                 // Empty element, meaning that the next element should be in separate output
+                        lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);                
+                        lpBuffer->Clear();                        
+                    }
+                    else
+                    {
+                        lpBuffer->Add(buf);                    
+                        if(verify_level & 0x0001)
+                        {
+                            if(lpBuffer->GetCount() >= assets_per_opdrop)
+                            {
+                                lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);                
+                                lpBuffer->Clear();
+                            }
                         }
                     }
                 }
