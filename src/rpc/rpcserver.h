@@ -267,6 +267,7 @@ extern json_spirit::Value preparelockunspentfrom(const json_spirit::Array& param
 extern json_spirit::Value sendfromaddress(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value createrawsendfrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getmultibalances(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value gettokenbalances(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getaddressbalances(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value disablerawtransaction(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value sendwithmetadata(const json_spirit::Array& params, bool fHelp);

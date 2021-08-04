@@ -960,7 +960,7 @@ Value issuemorecmd(const Array& params, bool fHelp)
     return issuemorefromcmd(ext_params,fHelp);
 }    
 
-Value getmultibalances(const Array& params, bool fHelp)
+Value getmultibalances_operation(const Array& params, bool fHelp,bool aggregate_tokens)
 {
     if (fHelp || params.size() > 5)
         throw runtime_error("Help message not found\n");
@@ -969,6 +969,11 @@ Value getmultibalances(const Array& params, bool fHelp)
     
     Object balances;
 
+    uint32_t output_level=0x00;
+    if(!aggregate_tokens)
+    {
+        output_level=0x0800;
+    }
     bool fUnlockedOnly=true;
     bool fIncludeWatchOnly=false;    
     int nMinDepth = 1;
@@ -1166,7 +1171,7 @@ Value getmultibalances(const Array& params, bool fHelp)
                 }                
             }
             asset_amounts->Clear();
-            if(CreateAssetBalanceList(txout,asset_amounts,lpScript))
+            if(CreateAssetBalanceList(txout,asset_amounts,lpScript,NULL,aggregate_tokens))
             {
                 for(int a=0;a<asset_amounts->GetCount();a++)
                 {
@@ -1279,7 +1284,7 @@ Value getmultibalances(const Array& params, bool fHelp)
                     else
                     {
                         Object asset_entry;
-                        asset_entry=AssetEntry(ptr+48,quantity,0x00);
+                        asset_entry=AssetEntry(ptr+48,quantity,output_level);
                         addr_balances.push_back(asset_entry);  
                         if(setAssets.size())
                         {
@@ -1297,7 +1302,7 @@ Value getmultibalances(const Array& params, bool fHelp)
                     if(setAssetsWithBalances.count(rem_asset) == 0)
                     {
                         Object asset_entry;
-                        asset_entry=AssetEntry((unsigned char*)&rem_asset,0,0x00);
+                        asset_entry=AssetEntry((unsigned char*)&rem_asset,0,output_level);
                         addr_balances.push_back(asset_entry);   
                     }
                 }                
@@ -1305,7 +1310,7 @@ Value getmultibalances(const Array& params, bool fHelp)
             if(MCP_WITH_NATIVE_CURRENCY)
             {
                 Object asset_entry;
-                asset_entry=AssetEntry(NULL,btc,0x00);
+                asset_entry=AssetEntry(NULL,btc,output_level);
                 addr_balances.push_back(asset_entry);                        
             }
             
@@ -1326,7 +1331,7 @@ Value getmultibalances(const Array& params, bool fHelp)
                                 BOOST_FOREACH(const uint256& rem_asset, setAssets) 
                                 {
                                     Object asset_entry;
-                                    asset_entry=AssetEntry((unsigned char*)&rem_asset,0,0x00);
+                                    asset_entry=AssetEntry((unsigned char*)&rem_asset,0,output_level);
                                     empty_balances.push_back(asset_entry);   
                                 }                
                             }
@@ -1357,6 +1362,22 @@ Value getmultibalances(const Array& params, bool fHelp)
     }        
         
     return balances;    
+}
+
+Value getmultibalances(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 5)
+        throw runtime_error("Help message not found\n");
+    
+    return getmultibalances_operation(params,fHelp,true);
+}
+
+Value gettokenbalances(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 5)
+        throw runtime_error("Help message not found\n");
+    
+    return getmultibalances_operation(params,fHelp,false);
 }
 
 Value getaddressbalances(const Array& params, bool fHelp)

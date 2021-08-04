@@ -940,7 +940,7 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
     return ParseMultichainTxOutToBuffer(hash,txout,amounts,lpScript,allowed,required,NULL,strFailReason);
 }
 
-bool CreateAssetBalanceList(const CTxOut& txout,mc_Buffer *amounts,mc_Script *lpScript,int *required)
+bool CreateAssetBalanceList(const CTxOut& txout,mc_Buffer *amounts,mc_Script *lpScript,int *required,bool aggregate_tokens)
 {
     string strFailReason;
     
@@ -1043,9 +1043,74 @@ bool CreateAssetBalanceList(const CTxOut& txout,mc_Buffer *amounts,mc_Script *lp
         }            
     }    
 
+    if(mc_gState->m_Features->NFTokens())
+    {        
+        if(aggregate_tokens)
+        {
+            mc_EntityDetails entity;
+            bool tokens_found=false;
+            int n=amounts->GetCount();
+            int a;
+            for(a=0;a<amounts->GetCount();a++)
+            {
+                if(mc_gState->m_Assets->FindEntityByFullRef(&entity,amounts->GetRow(a)))
+                {
+                    if(entity.GetEntityType() == MC_ENT_TYPE_TOKEN)
+                    {
+                        memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
+                        memcpy(buf+MC_AST_SHORT_TXID_OFFSET,entity.GetParentTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+                        mc_SetABRefType(buf,MC_AST_ASSET_REF_TYPE_SHORT_TXID);
+                        
+                        int64_t quantity=mc_GetABQuantity(amounts->GetRow(a));
+                        int row=amounts->Seek(buf);
+                        if(row < 0)                                                         // New asset
+                        {
+                            row=amounts->GetCount();
+                            mc_SetABQuantity(buf,quantity);
+                            err=amounts->Add(buf);
+                            if(err)
+                            {
+                                return false;
+                            }
+                        }
+                        else                                                                // Old asset, but the value can be non zero if we've seen token for this asset before.
+                        {
+                            quantity+=mc_GetABQuantity(amounts->GetRow(row));
+                            mc_SetABQuantity(amounts->GetRow(row),quantity);
+                        }
+                        mc_SetABQuantity(amounts->GetRow(a),-1);     
+                        tokens_found=true;
+                    }
+                }
+            }   
+            if(tokens_found)
+            {
+                n=0;
+                a=0;
+                while(a<amounts->GetCount())
+                {
+                    if(mc_GetABQuantity(amounts->GetRow(a)) >= 0)
+                    {
+                        if(a>n)
+                        {
+                            memcpy(amounts->GetRow(n),amounts->GetRow(a),MC_AST_ASSET_FULLREF_BUF_SIZE);
+                        }
+                        n++;
+                    }
+                    a++;
+                }
+                amounts->SetCount(n);
+            }            
+        }
+    }
+    
     return true;
 
     
+}
+bool CreateAssetBalanceList(const CTxOut& txout,mc_Buffer *amounts,mc_Script *lpScript,int *required)
+{
+    return CreateAssetBalanceList(txout,amounts,lpScript,NULL,true);
 }
 
 bool CreateAssetBalanceList(const CTxOut& txout,mc_Buffer *amounts,mc_Script *lpScript)

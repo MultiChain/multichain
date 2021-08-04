@@ -32,6 +32,7 @@ static const CRPCCommand vRPCWalletReadCommands[] =
     { "wallet",             "gettotalbalances",       &gettotalbalances,       false,     false,      true },
     
     { "wallet",             "getmultibalances",       &getmultibalances,       false,     false,      true },
+    { "wallet",             "gettokenbalances",       &gettokenbalances,       false,     false,      true },
     { "wallet",             "getaddressbalances",     &getaddressbalances,     false,     false,      true },
     
     { "wallet",             "listwallettransactions", &listwallettransactions, false,     false,      true },
@@ -273,6 +274,7 @@ static const CRPCCommand vRPCCommands[] =
     { "hidden",             "sendfromaddress",        &sendfromaddress,        false,     false,      true },
     { "wallet",             "sendfrom",               &sendfromaddress,        false,     false,      true },
     { "wallet",             "getmultibalances",       &getmultibalances,       false,     false,      true },
+    { "wallet",             "gettokenbalances",       &gettokenbalances,       false,     false,      true },
     { "wallet",             "getaddressbalances",     &getaddressbalances,     false,     false,      true },
     { "wallet",             "disablerawtransaction",  &disablerawtransaction,  false,     false,      true },
     { "hidden",             "sendwithmetadata",       &sendwithmetadata,       false,     false,      true },

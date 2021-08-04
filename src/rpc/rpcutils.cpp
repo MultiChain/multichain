@@ -2066,6 +2066,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
 // 0x0100 skip all quantities and add "type":"asset|
 // 0x0200 skip list of issuers in issues list
 // 0x0400 skip details in issues list
+// 0x0800 replace "name" by "asset" 
     Object entry;
     mc_EntityDetails entity;
     mc_EntityDetails sec_entity;
@@ -2135,7 +2136,14 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         ptr=(unsigned char *)genesis_entity->GetName();
         if(ptr && strlen((char*)ptr))
         {
-            entry.push_back(Pair("name", string((char*)ptr)));            
+            if(output_level & 0x0800)
+            {
+                entry.push_back(Pair("asset", string((char*)ptr)));                            
+            }
+            else
+            {
+                entry.push_back(Pair("name", string((char*)ptr)));            
+            }
         }
         
         if(output_level & 0x0004)
