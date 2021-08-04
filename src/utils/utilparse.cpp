@@ -99,7 +99,7 @@ bool mc_VerifyAssetPermissions(mc_Buffer *assets, vector<CTxDestination> address
                         }
                     }
                     if(asset_count > 1)
-                    {
+                    {                       
                         if(permission == MC_PTP_SEND)
                         {
                             reason="One of multiple assets in input has per-asset permissions";
@@ -685,6 +685,10 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                             if(new_entity_type == MC_ENT_TYPE_UPGRADE)
                             {
                                 *required |= MC_PTP_CREATE | MC_PTP_ADMIN;                    
+                            }
+                            if(new_entity_type == MC_ENT_TYPE_ASSET)
+                            {
+                                *required |= MC_PTP_ISSUE;                    
                             }
                         }
                     }

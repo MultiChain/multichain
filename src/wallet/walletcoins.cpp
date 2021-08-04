@@ -700,6 +700,41 @@ void AvalableCoinsForAddress(CWallet *lpWallet,vector<COutput>& vCoins, const CC
     last_time=this_time;
 }
 
+bool CheckForTokenAssetConflicts(mc_Buffer *out_amounts,
+                                 map<uint256, vector<int>>& mapNFTAssetOutputs,
+                                 std::string& strFailReason)
+{
+    unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
+    mc_EntityDetails entity;
+    uint256 asset_txid;
+    
+    if(mapNFTAssetOutputs.size())
+    {
+        for(int i=0;i<out_amounts->GetCount();i++)                              
+        {
+            entity.Zero();
+            asset_txid=0;
+            if(mc_gState->m_Assets->FindEntityByFullRef(&entity,out_amounts->GetRow(i)))
+            {
+                if(entity.GetEntityType() == MC_ENT_TYPE_TOKEN)
+                {
+                    memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
+                    memcpy(buf+MC_AST_SHORT_TXID_OFFSET,entity.GetParentTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+//                    asset_txid=*(uint256*)buf;
+                    memcpy(&asset_txid,buf,sizeof(uint256));
+                    if(mapNFTAssetOutputs.find(asset_txid) != mapNFTAssetOutputs.end())
+                    {
+                        strFailReason="Sending by token and by amount for the same asset is not supported, please use createrawtransaction";
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
 /*
  * Updates input asset matrix
  */
@@ -746,7 +781,8 @@ bool InsertCoinIntoMatrix(int coin_id,                                          
                     {
                         memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
                         memcpy(buf+MC_AST_SHORT_TXID_OFFSET,entity.GetParentTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-                        asset_txid=*(uint256*)buf;
+//                        asset_txid=*(uint256*)buf;
+                        memcpy(&asset_txid,buf,sizeof(uint256));
                         if(mapNFTAssetOutputs.find(asset_txid) == mapNFTAssetOutputs.end())
                         {
                             asset_txid=0;
@@ -1564,7 +1600,7 @@ bool ModifyForNFTAssets(const vector<pair<CScript, CAmount> >& vecSend,
                                     int outp=0;
                                     while(outp<(int)asset_outputs.size())
                                     {
-                                        if(nft_output_quantity[outp]>0)
+                                        if(nft_output_quantity[asset_outputs[outp]]>0)
                                         {
                                             int64_t out_quantity=nft_output_quantity[asset_outputs[outp]];
                                             if(quantity < out_quantity)
@@ -1575,7 +1611,7 @@ bool ModifyForNFTAssets(const vector<pair<CScript, CAmount> >& vecSend,
                                             mc_SetABQuantity(out_amounts->GetRow(nft_output_row[asset_outputs[outp]]),
                                                     mc_GetABQuantity(out_amounts->GetRow(nft_output_row[asset_outputs[outp]]))-out_quantity);
                                             quantity-=out_quantity;
-                                            nft_output_quantity[outp]-=out_quantity;
+                                            nft_output_quantity[asset_outputs[outp]]-=out_quantity;
                                             
                                             memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
                                             memcpy(buf,in_amounts->GetRow(row),MC_AST_ASSET_QUANTITY_OFFSET);
@@ -2517,7 +2553,8 @@ bool CheckOutputPermissions(const vector<pair<CScript, CAmount> >& vecSend,map<u
                         {
                             memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
                             memcpy(buf+MC_AST_SHORT_TXID_OFFSET,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-                            uint256 txid=*(uint256*)buf;
+                            uint256 txid;//=*(uint256*)buf;
+                            memcpy(&txid,buf,sizeof(uint256));
                             
                             map<uint256, vector<int>>::iterator it = mapNFTAssetOutputs.find(txid);                            
                             if(it != mapNFTAssetOutputs.end())
@@ -2663,7 +2700,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
     
     if(eErrorCode)*eErrorCode=RPC_INVALID_PARAMETER;
     CAmount nValue = 0;
-    BOOST_FOREACH (const PAIRTYPE(CScript, CAmount)& s, vecSend)
+    BOOST_FOREACH (const PAIRTYPE(CScript, CAmount)& s, vecSendIn)
     {
         if (nValue < 0)                                                         // Multichain allows protocol zero-value outputs
         {
@@ -2787,6 +2824,10 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                 }
                 required |= this_required;
             }
+        }
+        if(!CheckForTokenAssetConflicts(out_amounts,mapNFTAssetOutputs,strFailReason))        
+        {
+            goto exitlbl;                                    
         }
         if(required & MC_PTP_ISSUE)
         {

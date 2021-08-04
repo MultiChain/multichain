@@ -2123,12 +2123,9 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
 //                    ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_PARENT_ENTITY,&value_size);
                     if(ptr)
                     {
-                        if(value_size == sizeof(uint256))
+                        if(mc_gState->m_Assets->FindEntityByTxID(genesis_entity,ptr))
                         {
-                            if(mc_gState->m_Assets->FindEntityByTxID(genesis_entity,ptr))
-                            {
-                                hash=*(uint256*)ptr;
-                            }
+                            hash=*(uint256*)ptr;
                         }
                     }      
                 }
