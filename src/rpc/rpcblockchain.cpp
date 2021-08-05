@@ -634,7 +634,7 @@ Value gettxout(const Array& params, bool fHelp)
     
     asset_amounts->Clear();
     CTxOut txout=coins.vout[n];
-    if(CreateAssetBalanceList(txout,asset_amounts,lpScript))
+    if(CreateAssetBalanceList(txout,asset_amounts,lpScript,NULL,false))
     {
         Array assets;
         unsigned char *ptr;

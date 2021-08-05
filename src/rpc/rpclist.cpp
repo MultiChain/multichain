@@ -182,6 +182,7 @@ static const CRPCCommand vRPCCommands[] =
     { "hidden",             "getfilterstream",        &purehelpitem_onlyfilter,true,      false,      false },
     { "hidden",             "getfiltertransaction",   &purehelpitem_onlyfilter,true,      false,      false },
     { "hidden",             "getfilterassetbalances", &purehelpitem_onlyfilter,true,      false,      false },
+    { "hidden",             "getfiltertokenbalances", &purehelpitem_onlyfilter,true,      false,      false },
     { "hidden",             "getfiltertxid",          &purehelpitem_onlyfilter,true,      true,       false },
     { "hidden",             "getfiltertxinput",       &purehelpitem_onlyfilter,true,      true,       false },
     { "hidden",             "setfilterparam",         &purehelpitem_onlyfilter,true,      true,       false },

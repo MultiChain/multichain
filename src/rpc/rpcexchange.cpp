@@ -140,7 +140,7 @@ Object ExchangeAssetEntry(uint256 hash,const CTxOut txout,mc_Script *lpScript,mc
     Array assets;
     
     asset_amounts->Clear();
-    if(!CreateAssetBalanceList(txout,asset_amounts,lpScript))
+    if(!CreateAssetBalanceList(txout,asset_amounts,lpScript,NULL,false))
     {
         if(strError.size() == 0)
         {

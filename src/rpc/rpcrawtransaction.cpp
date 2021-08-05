@@ -305,7 +305,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         bool is_valid_asset;
         
         asset_amounts->Clear();
-        if(CreateAssetBalanceList(txout,asset_amounts,lpScript,&required))
+        if(CreateAssetBalanceList(txout,asset_amounts,lpScript,&required,false))
         {
             Array assets;
             unsigned char *ptr;
@@ -895,7 +895,7 @@ Value listunspent(const Array& params, bool fHelp)
         }
         
         asset_amounts->Clear();
-        if(CreateAssetBalanceList(txout,asset_amounts,lpScript))
+        if(CreateAssetBalanceList(txout,asset_amounts,lpScript,NULL,false))
         {
             Array assets;
             unsigned char *ptr;

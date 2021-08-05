@@ -1071,6 +1071,7 @@ Value getmultibalances_operation(const Array& params, bool fHelp,bool aggregate_
     }
     
     set<uint256> setAssets;        
+    set<uint256> setTokensAndAssets;        
     if(inputStrings.size())
     {
         for(int is=0;is<(int)inputStrings.size();is++)
@@ -1176,13 +1177,16 @@ Value getmultibalances_operation(const Array& params, bool fHelp,bool aggregate_
                 for(int a=0;a<asset_amounts->GetCount();a++)
                 {
                     const unsigned char *txid;
+                    const unsigned char *asset_txid;
                     txid=NULL;
+                    asset_txid=NULL;
                     ptr=(unsigned char *)asset_amounts->GetRow(a);
                     if(mc_GetABRefType(ptr) == MC_AST_ASSET_REF_TYPE_GENESIS)
 //                    if(mc_GetLE(ptr,4) == 0)
                     {
 //                        hash=out.tx->GetHash();
                         txid=(unsigned char*)&hash;
+                        asset_txid=txid;
                     }
                     else
                     {
@@ -1191,6 +1195,11 @@ Value getmultibalances_operation(const Array& params, bool fHelp,bool aggregate_
                         if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptr))
                         {
                             txid=entity.GetTxID();
+                            asset_txid=txid;
+                            if(entity.GetEntityType() == MC_ENT_TYPE_TOKEN)
+                            {
+                                asset_txid=entity.GetParentTxID();
+                            }
                         }                                
                     }
                     if(txid)
@@ -1198,9 +1207,16 @@ Value getmultibalances_operation(const Array& params, bool fHelp,bool aggregate_
                         if(setAssets.size())
                         {
 //                            hash=*(uint256*)txid;
-                            if(setAssets.count(*(uint256*)txid) == 0)
+                            if(setAssets.count(*(uint256*)asset_txid) == 0)
                             {
                                 txid=NULL;
+                            }
+                            else
+                            {
+                                if(setTokensAndAssets.count(*(uint256*)txid) == 0)
+                                {
+                                    setTokensAndAssets.insert(*(uint256*)txid);
+                                }
                             }
                         }
                     }
@@ -1297,7 +1313,7 @@ Value getmultibalances_operation(const Array& params, bool fHelp,bool aggregate_
             }
             if(setAssets.size())
             {
-                BOOST_FOREACH(const uint256& rem_asset, setAssets) 
+                BOOST_FOREACH(const uint256& rem_asset, setTokensAndAssets) 
                 {
                     if(setAssetsWithBalances.count(rem_asset) == 0)
                     {
@@ -1328,7 +1344,7 @@ Value getmultibalances_operation(const Array& params, bool fHelp,bool aggregate_
                             Array empty_balances;
                             if(setAssets.size())
                             {
-                                BOOST_FOREACH(const uint256& rem_asset, setAssets) 
+                                BOOST_FOREACH(const uint256& rem_asset, setTokensAndAssets) 
                                 {
                                     Object asset_entry;
                                     asset_entry=AssetEntry((unsigned char*)&rem_asset,0,output_level);
@@ -2293,12 +2309,10 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
     return entry;    
 }
 
-Value getfilterassetbalances(const Array& params, bool fHelp)
+Value getfilterassetbalances_operation(const Array& params, bool fHelp,bool aggregate_tokens)
 {
-    if (fHelp || params.size() < 1 || params.size() > 2)                        
-        mc_ThrowHelpMessage("getfilterassetbalances");        
-    
     mc_EntityDetails asset_entity;
+    mc_EntityDetails token_entity;
     mc_EntityDetails* lpAsset=NULL;
     double multiple=1.;
     if(COIN > 0)
@@ -2326,7 +2340,16 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
         multiple=(double)(lpAsset->GetAssetMultiple());
     }
     
+    if(!aggregate_tokens)
+    {
+        if(lpAsset->IsNFTAsset() == 0)
+        {
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "getfiltertokenbalances callback is available only for NFT assets");                                                                    
+        }
+    }
+    
     map <CTxDestination,int64_t> mAddresses;
+    map <string,map<CTxDestination,int64_t>> mTokenAddresses;
     
     mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
     asset_amounts->Clear();
@@ -2363,32 +2386,70 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
             ExtractDestination(coins.vout[n].scriptPubKey, address);
     
             quantity=-1;
-            
             if(lpAsset)
             {
                 asset_amounts->Clear();
-                if(CreateAssetBalanceList(coins.vout[n],asset_amounts,lpScript,&required))
+                if(CreateAssetBalanceList(coins.vout[n],asset_amounts,lpScript,&required,aggregate_tokens))
                 {
                     for(int i=0;i<asset_amounts->GetCount();i++)
                     {
-                        if(memcmp(lpAsset->GetFullRef(),asset_amounts->GetRow(i),MC_AST_ASSET_FULLREF_SIZE) == 0)
+                        if(aggregate_tokens)
                         {
-                            quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
+                            if(memcmp(lpAsset->GetFullRef(),asset_amounts->GetRow(i),MC_AST_ASSET_FULLREF_SIZE) == 0)
+                            {
+                                quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
+                            }
+                            else
+                            {
+                                int gin=j;
+                                if(mc_gState->m_Features->FixedIn20006() == 0)
+                                {
+                                    gin=i;
+                                }
+                                if(memcmp(lpAsset->GetTxID(),&(pMultiChainFilterEngine->m_Tx.vin[gin].prevout.hash),sizeof(uint256)) == 0)
+                                {
+                                    if( mc_GetABRefType(asset_amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_GENESIS )                    
+                                    {
+                                        quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
+                                    }                            
+                                }
+                            }
                         }
                         else
                         {
-                            int gin=j;
-                            if(mc_gState->m_Features->FixedIn20006() == 0)
+                            if(mc_gState->m_Assets->FindEntityByFullRef(&token_entity,asset_amounts->GetRow(i)))
                             {
-                                gin=i;
-                            }
-                            if(memcmp(lpAsset->GetTxID(),&(pMultiChainFilterEngine->m_Tx.vin[gin].prevout.hash),sizeof(uint256)) == 0)
-                            {
-                                if( mc_GetABRefType(asset_amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_GENESIS )                    
+                                if(memcmp(lpAsset->GetTxID(),token_entity.GetParentTxID(),sizeof(uint256)) == 0)
                                 {
                                     quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
-                                }                            
-                            }
+                                    map <CTxDestination,int64_t> mEmptyAddresses;
+                                    unsigned char *ptr;
+                                    size_t value_size;
+                                    string token;
+
+                                    ptr=(unsigned char *)token_entity.GetUpdateName(&value_size);                
+                                    if(ptr)
+                                    {
+                                        string token_name ((char*)ptr,value_size);
+                                        token=token_name;
+                                    }      
+
+                                    if(mTokenAddresses.find(token) == mTokenAddresses.end())
+                                    {
+                                        mTokenAddresses.insert(make_pair(token,mEmptyAddresses));
+                                    }
+                                    map<string,map<CTxDestination, int64_t>>::iterator ittoken = mTokenAddresses.find(token);
+                                    map<CTxDestination, int64_t>::iterator itold = ittoken->second.find(address);
+                                    if (itold == ittoken->second.end())
+                                    {
+                                        ittoken->second.insert(make_pair(address, -quantity));
+                                    }
+                                    else
+                                    {
+                                        itold->second-=quantity;
+                                    }                            
+                                }                                
+                            }                            
                         }
 
                     }
@@ -2398,17 +2459,21 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
             {
                 quantity=coins.vout[n].nValue;
             }    
-            if(quantity >= 0)
-            {                        
-                map<CTxDestination, int64_t>::iterator itold = mAddresses.find(address);
-                if (itold == mAddresses.end())
-                {
-                    mAddresses.insert(make_pair(address, -quantity));
+            
+            if(aggregate_tokens)
+            {
+                if(quantity >= 0)
+                {                        
+                    map<CTxDestination, int64_t>::iterator itold = mAddresses.find(address);
+                    if (itold == mAddresses.end())
+                    {
+                        mAddresses.insert(make_pair(address, -quantity));
+                    }
+                    else
+                    {
+                        itold->second-=quantity;
+                    }                            
                 }
-                else
-                {
-                    itold->second-=quantity;
-                }                            
             }
         }        
     }
@@ -2426,24 +2491,63 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
             if(lpAsset)
             {
                 asset_amounts->Clear();
-                if(CreateAssetBalanceList(txout,asset_amounts,lpScript,&required))
+                if(CreateAssetBalanceList(txout,asset_amounts,lpScript,&required,aggregate_tokens))
                 {
                     for(int i=0;i<asset_amounts->GetCount();i++)
                     {
-                        if(memcmp(lpAsset->GetFullRef(),asset_amounts->GetRow(i),MC_AST_ASSET_FULLREF_SIZE) == 0)
+                        if(aggregate_tokens)
                         {
-                            quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
+                            if(memcmp(lpAsset->GetFullRef(),asset_amounts->GetRow(i),MC_AST_ASSET_FULLREF_SIZE) == 0)
+                            {
+                                quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
+                            }
+                            else
+                            {
+                                if(memcmp(lpAsset->GetTxID(),&(pMultiChainFilterEngine->m_TxID),sizeof(uint256)) == 0)
+                                {
+                                    if( mc_GetABRefType(asset_amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_GENESIS )                    
+                                    {
+                                        quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
+                                    }                            
+                                }
+                            }
                         }
                         else
                         {
-                            if(memcmp(lpAsset->GetTxID(),&(pMultiChainFilterEngine->m_TxID),sizeof(uint256)) == 0)
+                            if(mc_gState->m_Assets->FindEntityByFullRef(&token_entity,asset_amounts->GetRow(i)))
                             {
-                                if( mc_GetABRefType(asset_amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_GENESIS )                    
+                                if(memcmp(lpAsset->GetTxID(),token_entity.GetParentTxID(),sizeof(uint256)) == 0)
                                 {
                                     quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
-                                }                            
-                            }
-                        }
+                                    map <CTxDestination,int64_t> mEmptyAddresses;
+                                    unsigned char *ptr;
+                                    size_t value_size;
+                                    string token;
+
+                                    ptr=(unsigned char *)token_entity.GetUpdateName(&value_size);                
+                                    if(ptr)
+                                    {
+                                        string token_name ((char*)ptr,value_size);
+                                        token=token_name;
+                                    }      
+
+                                    if(mTokenAddresses.find(token) == mTokenAddresses.end())
+                                    {
+                                        mTokenAddresses.insert(make_pair(token,mEmptyAddresses));
+                                    }
+                                    map<string,map<CTxDestination, int64_t>>::iterator ittoken = mTokenAddresses.find(token);
+                                    map<CTxDestination, int64_t>::iterator itold = ittoken->second.find(address);
+                                    if (itold == ittoken->second.end())
+                                    {
+                                        ittoken->second.insert(make_pair(address, +quantity));
+                                    }
+                                    else
+                                    {
+                                        itold->second+=quantity;
+                                    }                            
+                                }                                
+                            }                            
+                        }                    
                     }
                 }
             }         
@@ -2451,45 +2555,98 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
             {
                 quantity=txout.nValue;                
             }
-            if(quantity >= 0)
+            if(aggregate_tokens)
             {
-                map<CTxDestination, int64_t>::iterator itold = mAddresses.find(address);
-                if (itold == mAddresses.end())
+                if(quantity >= 0)
                 {
-                    mAddresses.insert(make_pair(address, +quantity));
+                    map<CTxDestination, int64_t>::iterator itold = mAddresses.find(address);
+                    if (itold == mAddresses.end())
+                    {
+                        mAddresses.insert(make_pair(address, +quantity));
+                    }
+                    else
+                    {
+                        itold->second+=quantity;
+                    }                            
                 }
-                else
-                {
-                    itold->second+=quantity;
-                }                            
             }
         }        
     }
     
-    int64_t other_amount=0;
-    
-    Object oBalance;
-    BOOST_FOREACH(const PAIRTYPE(CTxDestination, int64_t)& item, mAddresses)
+    if(aggregate_tokens)
     {
-        const CTxDestination dest=item.first;
-        const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
-        const CScriptID *lpScript=boost::get<CScriptID> (&dest);
-        if( (lpKeyID == NULL) && (lpScript == NULL) )
+        int64_t other_amount=0;
+
+        Object oBalance;
+        BOOST_FOREACH(const PAIRTYPE(CTxDestination, int64_t)& item, mAddresses)
         {
-            other_amount=item.second;
+            const CTxDestination dest=item.first;
+            const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
+            const CScriptID *lpScript=boost::get<CScriptID> (&dest);
+            if( (lpKeyID == NULL) && (lpScript == NULL) )
+            {
+                other_amount=item.second;
+            }
+            else            
+            {
+                oBalance.push_back(Pair(CBitcoinAddress(item.first).ToString(), raw_value ? item.second : item.second/multiple));            
+            }
         }
-        else            
+        if(other_amount != 0)
         {
-            oBalance.push_back(Pair(CBitcoinAddress(item.first).ToString(), raw_value ? item.second : item.second/multiple));            
+            oBalance.push_back(Pair("", raw_value ? other_amount : other_amount/multiple));                    
         }
+        return oBalance;
     }
-    if(other_amount != 0)
+    else
     {
-        oBalance.push_back(Pair("", raw_value ? other_amount : other_amount/multiple));                    
+        Array aTokenBalances;
+        for(auto const &token_item : mTokenAddresses)
+        {
+            int64_t other_amount=0;
+            Object oBalance;
+            oBalance.push_back(Pair("token",token_item.first));
+            BOOST_FOREACH(const PAIRTYPE(CTxDestination, int64_t)& item, token_item.second)
+            {
+                const CTxDestination dest=item.first;
+                const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
+                const CScriptID *lpScript=boost::get<CScriptID> (&dest);
+                if( (lpKeyID == NULL) && (lpScript == NULL) )
+                {
+                    other_amount=item.second;
+                }
+                else            
+                {
+                    oBalance.push_back(Pair(CBitcoinAddress(item.first).ToString(), raw_value ? item.second : item.second/multiple));            
+                }
+            }
+            if(other_amount != 0)
+            {
+                oBalance.push_back(Pair("", raw_value ? other_amount : other_amount/multiple));                    
+            }     
+            aTokenBalances.push_back(oBalance);
+        }        
+        return aTokenBalances;
     }
 
-    return oBalance;
+    return Value::null;
 }
+
+Value getfilterassetbalances(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)                        
+        mc_ThrowHelpMessage("getfilterassetbalances");        
+    
+    return getfilterassetbalances_operation(params,fHelp,true);
+}    
+
+Value getfiltertokenbalances(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)                        
+        mc_ThrowHelpMessage("getfiltertokenbalances");        
+    
+    return getfilterassetbalances_operation(params,fHelp,false);
+}    
 
 Value getassettransaction(const Array& params, bool fHelp)
 {

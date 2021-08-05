@@ -85,6 +85,7 @@ static const std::string vAPINames[] =
 "getconnectioncount",
 "getdifficulty",
 "getfilterassetbalances",
+"getfiltertokenbalances",
 "getfiltercode",
 "getfilterstreamitem",
 "getfilterstream",
