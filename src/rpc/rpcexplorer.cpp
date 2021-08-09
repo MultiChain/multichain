@@ -34,6 +34,7 @@ uint32_t mc_CheckExplorerAssetTransfers(
                                  std::vector< std::map<uint160,int64_t> >& OutputAssetQuantities,
                                  std::map<uint160,mc_TxAddressAssetQuantity>& AssetsAddressQuantities);
 int mc_EntityExplorerCodeToType(int entity_explorer_code);
+uint256 mc_ExplorerTxIDHashMap(uint256 hash_in);
 
 /*
 uint32_t mc_GetExplorerTxDetails(int rpc_slot,
@@ -459,7 +460,7 @@ Value explorerlisttransactions(const json_spirit::Array& params, bool fHelp)
     if (fHelp || params.size() > 3)
         throw runtime_error("Help message not found\n");
 
-    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER) == 0)
+    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
     }   
@@ -551,7 +552,8 @@ Value explorerlisttransactions(const json_spirit::Array& params, bool fHelp)
         }
         else
         {
-            memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);                
+            memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);        
+            hash=mc_ExplorerTxIDHashMap(hash);
         }
 
         Object entry;
@@ -584,7 +586,7 @@ Value explorergetrawtransaction(const json_spirit::Array& params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 2)                        // MCHN
         throw runtime_error("Help message not found\n");
 
-    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER) == 0)
+    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
     }   
@@ -892,7 +894,7 @@ Value explorerlistaddresses(const json_spirit::Array& params, bool fHelp)
     if (fHelp || params.size() > 4)
         throw runtime_error("Help message not found\n");
     
-    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER) == 0)
+    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
     }   
@@ -1000,7 +1002,7 @@ Value explorerlistaddresstransactions(const json_spirit::Array& params, bool fHe
     if (fHelp || params.size() < 1 || params.size() > 4)
         throw runtime_error("Help message not found\n");
 
-    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER) == 0)
+    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
     }   
@@ -1102,6 +1104,7 @@ Value explorerlistaddresstransactions(const json_spirit::Array& params, bool fHe
         else
         {
             memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);                
+            hash=mc_ExplorerTxIDHashMap(hash);
         }
 
         Object entry;
@@ -1134,7 +1137,7 @@ Value explorerlistblocktransactions(const json_spirit::Array& params, bool fHelp
     if (fHelp || params.size() < 1 || params.size() > 4)
         throw runtime_error("Help message not found\n");
 
-    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER) == 0)
+    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
     }   
@@ -1239,6 +1242,7 @@ Value explorerlistblocktransactions(const json_spirit::Array& params, bool fHelp
         else
         {
             memcpy(&hash,lpEntTx->m_TxId,MC_TDB_TXID_SIZE);                
+            hash=mc_ExplorerTxIDHashMap(hash);
         }
 
         Object entry;
@@ -1271,7 +1275,7 @@ Value explorerlistredeemtransactions(const json_spirit::Array& params, bool fHel
     if (fHelp || params.size() != 2)
         throw runtime_error("Help message not found\n");
 
-    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER) == 0)
+    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
     }   
@@ -1362,7 +1366,7 @@ Value explorerlistaddressstreams(const json_spirit::Array& params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 4)
         throw runtime_error("Help message not found\n");
 
-    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER) == 0)
+    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
     }   
@@ -1503,7 +1507,7 @@ Value explorerlistaddressassets(const json_spirit::Array& params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 4)
         throw runtime_error("Help message not found\n");
 
-    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER) == 0)
+    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
     }   
@@ -1674,7 +1678,7 @@ Value explorerlistassetaddresses(const json_spirit::Array& params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 4)
         throw runtime_error("Help message not found\n");
 
-    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER) == 0)
+    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
     }   
@@ -1846,7 +1850,7 @@ Value explorerlistaddressassettransactions(const json_spirit::Array& params, boo
     if (fHelp || params.size() < 2 || params.size() > 5)
         throw runtime_error("Help message not found\n");
 
-    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER) == 0)
+    if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
     }   

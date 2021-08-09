@@ -3813,7 +3813,7 @@ exitlbl:
 
 int mc_WalletTxs::AddExplorerEntities(mc_Buffer *lpEntities)
 {
-    if( (m_Mode & MC_WMD_EXPLORER) == 0 )
+    if( (m_Mode & MC_WMD_EXPLORER_MASK) == 0 )
     {
         return MC_ERR_NOERROR;
     }
@@ -3975,6 +3975,26 @@ uint32_t mc_CheckExplorerAssetTransfers(
     return tx_tag;
 }
 
+uint256 mc_ExplorerTxIDHashMap(uint256 hash_in)
+{
+    unsigned char t;
+    unsigned char temp[32];
+    uint256 hash_out=hash_in;
+    memcpy(temp,&hash_in,32);
+    for(int i=1;i<32;i++)
+    {
+        if(temp[i] != temp[0])
+        {
+            t=temp[i];
+            temp[i]=temp[0];
+            temp[0]=t;
+            memcpy(&hash_out,temp,32);
+            return hash_out;
+        }
+    }    
+    return hash_out;
+}
+
 int mc_WalletTxs::AddExplorerTx(                                                          
               mc_TxImport *import,                                              // Import object, NULL if chain update
               const CTransaction& tx,                                           // Tx to add
@@ -4104,7 +4124,7 @@ int mc_WalletTxs::AddExplorerTx(
         }
     }
     
-    if( (m_Mode & MC_WMD_EXPLORER) == 0 )
+    if( (m_Mode & MC_WMD_EXPLORER_MASK) == 0 )
     {
         return MC_ERR_NOERROR;
     }
@@ -4149,7 +4169,7 @@ int mc_WalletTxs::AddExplorerTx(
     }   
     
     direct_tx_tag=(uint32_t)(tx_tag & MC_MTX_TAG_DIRECT_MASK);
-    tag_hash=hash;
+    tag_hash=mc_ExplorerTxIDHashMap(hash);
     memset(extended_tag_data,0,MC_MTX_TAG_EXTENSION_TOTAL_SIZE);
     if(tx_tag & MC_MTX_TAG_EXTENSION_MASK)
     {
@@ -4496,9 +4516,10 @@ int mc_WalletTxs::AddExplorerTx(
     entity.Zero();
     entity.m_EntityType=MC_TET_EXP_TX | MC_TET_CHAINPOS;
     imp->m_TmpEntities->Add(&entity,NULL);
-    if(tag_hash == hash)
+//    if(tag_hash == hash)
+    if(direct_tx_tag != MC_MTX_TAG_EXTENDED_TAGS)        
     {
-        err=m_Database->AddData(imp,(unsigned char*)&hash,NULL,0,block,direct_tx_tag,timestamp,imp->m_TmpEntities);
+        err=m_Database->AddData(imp,(unsigned char*)&tag_hash,NULL,0,block,direct_tx_tag,timestamp,imp->m_TmpEntities);
     }
     else
     {
