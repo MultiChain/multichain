@@ -1518,7 +1518,7 @@ void mc_Permissions::DetailsAddress(void* address,uint32_t flag)
     address_salt=MC_PTP_DETAILS;
     memset(address,0,MC_PLS_SIZE_ADDRESS);
     mc_PutLE(address,&flag,sizeof(uint32_t));
-    mc_PutLE(address+sizeof(uint32_t),&address_salt,sizeof(uint32_t));    
+    mc_PutLE((unsigned char*)address+sizeof(uint32_t),&address_salt,sizeof(uint32_t));    
 }
 
 /** Returns non-zero value if flag is set */
@@ -1732,7 +1732,6 @@ int mc_Permissions::GetMinerInfo(const void* lpAddress,uint32_t *confirmed_start
     mc_PermissionLedgerRow row;
     
     int result;    
-    int32_t last;
         
     Lock(0);
 

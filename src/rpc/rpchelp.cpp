@@ -2415,6 +2415,11 @@ void mc_InitRPCHelpMap10()
             "      \"open\" : true|false           (boolean, optional, default false) True if follow-on issues are allowed\n"
             "      \"restrict\" : \"restrictions\"   (string, optional) Permission strings, comma delimited. Possible values: send,receive\n"
             "      \"unrestrict\" : \"issue\"        (string, optional) If set, issue permission is not required for follow-on issues. Possible value: issue\n"
+            "      \"fungible\" : true|false       (boolean, optional, default true) False if units of the asset are non-fungible \n"
+            "      \"canclose\" : true|false       (boolean, optional, default false) True if asset admin can close the asset (change openness) \n"
+            "      \"canopen\" : true|false        (boolean, optional, default false) True if asset admin can open the asset (change openness) \n"
+            "      \"issueonlysingleunit\" : true|false (boolean, optional, default false) Allow only one raw unit per issuance output \n"
+            "      \"limit\" : n                   (numeric, optional, default unlimited) Limit on total issuance in raw units \n"
             "    }\n"                                
             "3. quantity                         (numeric, required) The asset total amount in display units. eg. 1234.56\n"
             "4. smallest-unit                    (numeric, optional, default=1) Number of raw units in one displayed unit, eg 0.01 for cents\n"
@@ -2447,6 +2452,11 @@ void mc_InitRPCHelpMap10()
             "      \"open\" : true|false           (boolean, optional, default false) True if follow-on issues are allowed\n"
             "      \"restrict\" : \"restrictions\"   (string, optional) Permission strings, comma delimited. Possible values: send,receive\n"
             "      \"unrestrict\" : \"issue\"        (string, optional) If set, issue permission is not required for follow-on issues. Possible value: issue\n"
+            "      \"fungible\" : true|false       (boolean, optional, default true) False if units of the asset are non-fungible \n"
+            "      \"canclose\" : true|false       (boolean, optional, default false) True if asset admin can close the asset (change openness) \n"
+            "      \"canopen\" : true|false        (boolean, optional, default false) True if asset admin can open the asset (change openness) \n"
+            "      \"issueonlysingleunit\" : true|false (boolean, optional, default false) Allow only one raw unit per issuance output \n"
+            "      \"limit\" : n                   (numeric, optional, default unlimited) Limit on total issuance in raw units \n"
             "    }\n"                                
             "4. quantity                         (numeric, required) The asset total amount in display units. eg. 1234.56\n"
             "5. smallest-unit                    (numeric, optional, default=1) Number of raw units in one displayed unit, eg 0.01 for cents\n"
@@ -2472,6 +2482,8 @@ void mc_InitRPCHelpMap10()
             "1. \"address\"                        (string, required) The address to send newly created asset to.\n"
             "2. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             "3. quantity                         (numeric, required) The asset total amount in display units. eg. 1234.56\n"
+            " or\n"
+            "3. token-quantity                   (object, required) For NFT assets, object with two fields - token and raw, eg. {\"token\":\"token-id\", \"raw\":token-units}\n"
             "4. native-amount                    (numeric, optional) native currency amount to send. eg 0.1, Default: minimum-per-output.\n"
             "5  custom-fields                    (object, optional)  a json object with custom fields\n"
             "    {\n"
@@ -2495,6 +2507,8 @@ void mc_InitRPCHelpMap10()
             "2. \"to-address\"                     (string, required) The  address to send newly created asset to.\n"
             "3. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             "4. quantity                         (numeric, required) The asset total amount in display units. eg. 1234.56\n"
+            " or\n"
+            "4. token-quantity                   (object, required) For NFT assets, object with two fields - token and raw, eg. {\"token\":\"token-id\", \"raw\":token-units}\n"
             "5. native-amount                    (numeric, optional) native currency amount to send. eg 0.1, Default: minimum-per-output.\n"
             "6  custom-fields                    (object, optional)  a json object with custom fields\n"
             "    {\n"
@@ -3938,6 +3952,11 @@ void mc_InitRPCHelpMap16()
             "      \"open\" : true|false             (boolean, optional, default false) True if follow-on issues are allowed\n"                
             "      \"restrict\" : \"restrictions\"     (string, optional) Permission strings, comma delimited. Possible values: send,receive\n"
             "      \"unrestrict\" : \"issue\"        (string, optional) If set, issue permission is not required for follow-on issues. Possible value: issue\n"
+            "      \"fungible\" : true|false         (boolean, optional, default true) False if units of the asset are non-fungible \n"
+            "      \"canclose\" : true|false         (boolean, optional, default false) True if asset admin can close the asset (change openness) \n"
+            "      \"canopen\" : true|false          (boolean, optional, default false) True if asset admin can open the asset (change openness) \n"
+            "      \"issueonlysingleunit\" : true|false (boolean, optional, default false) Allow only one raw unit per issuance output \n"
+            "      \"limit\" : n                     (numeric, optional, default unlimited) Limit on total issuance in raw units \n"
             "      \"details\" :                     (object, optional) A json object with custom fields\n"           
             "        {\n"
             "          \"param-name\": \"param-value\" (strings, required) The key is the parameter name, the value is parameter value\n"
@@ -4132,6 +4151,11 @@ void mc_InitRPCHelpMap16()
             "   {                                   (object) A json object of assets to send\n"
             "      \"asset-identifier\" :             (string, required) Asset identifier - one of: issue txid, asset reference, asset name. \"\" for native currency.\n"
             "       asset-quantity                  (numeric, required) The asset value. \n"
+            "        or \n"
+            "       {                               (object) A json object of tokens to send (for NFT asset)\n"
+            "          \"token\" : \"token-id\"         (string, required) Token identifier, if \"*\" is passed, select any tokens.\n"
+            "          \"raw\" : token-inits          (numeric, required) The asset value. \n"
+            "       }\n"                                
             "     ,...\n"
             "   }\n"                                
             "      or \n"
@@ -4146,6 +4170,7 @@ void mc_InitRPCHelpMap16()
             "     \"issuemore\" : \n"
             "       {\n"
             "          \"asset\" : \"asset-identifier\" (string, required) Asset identifier - one of: issue txid. asset reference, asset name.\n"
+            "          \"token\" : \"token-identifier\" (string, required for NFT assets) Token identifier\n"     
             "          \"raw\" : n                    (numeric, required) The asset total amount in raw units \n"
             "       }\n"                                
             "   }\n"                                
@@ -4212,6 +4237,12 @@ void mc_InitRPCHelpMap16()
             "   {\n"
             "     \"approve\" : approve               (boolean, required) Approve or disapprove\n"
             "     \"updatename\" : \"update-name\"      (string, required) Update name\n"
+            "   }\n"                                
+            "}\n"
+            "{\n"
+            "  \"asset-identifier\":                 (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
+            "   {\n"
+            "     \"open\" : true | false            (boolean, required) Change asset openness\n"
             "   }\n"                                
             "}\n"
         ));
@@ -4596,6 +4627,7 @@ void mc_InitRPCHelpMap19()
             "                         getfilterstream (only for stream filters)\n"
             "                         getfiltertxinput (only for tx filters)\n"
             "                         getfilterassetbalances (only for tx filters)\n"
+            "                         getfiltertokenbalances (only for tx filters)\n"
             "                         setfilterparam \n"             
         ));
     
@@ -5567,6 +5599,71 @@ void mc_InitRPCHelpMap24()
             + HelpExampleRpc("getchaintotals", "")
         ));
     
+    mapHelpStrings.insert(std::make_pair("updatefrom",
+            "updatefrom \"from-address\" \"entity-identifier\" update-object\n"
+            "\nUpdate entity parameters\n"
+            + HelpRequiringPassphraseWrapper() +
+            "\nArguments:\n"
+            "1. \"from-address\"                   (string, required) Address used for approval.\n"
+            "2. \"entity-identifier\"              (string, required) Entity identifier - one of: create/issue txid, entity name, entity ref.\n"
+            "3. update                           (object, required)\n"
+            "    {\n"                
+            "      \"open\" : true | false         (boolean, required) Change asset openness\n"
+            "    }\n"                                
+            "\nResult:\n"
+            "\"transactionid\"                     (string) The transaction id.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("updatefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"asset1\" '{\"open\":true}}'")
+            + HelpExampleRpc("updatefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"asset1\", '{\"open\":true}'")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("update",
+            "update \"entity-identifier\" update-object\n"
+            "\nUpdate entity parameters\n"
+            + HelpRequiringPassphraseWrapper() +
+            "\nArguments:\n"
+            "1. \"entity-identifier\"              (string, required) Entity identifier - one of: create/issue txid, entity name, entity ref.\n"
+            "2. update                           (object, required)\n"
+            "    {\n"                
+            "      \"open\" : true | false         (boolean, required) Change asset openness\n"
+            "    }\n"                                
+            "\nResult:\n"
+            "\"transactionid\"                     (string) The transaction id.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("update", "\"asset1\" '{\"open\":true}}'")
+            + HelpExampleRpc("update", "\"asset1\", '{\"open\":true}'")
+        ));
+    
+     mapHelpStrings.insert(std::make_pair("gettokenbalances",
+            "gettokenbalances ( address(es) assets minconf includeLocked includeWatchonly ) \n"
+            "\nReturns token balances for specified address. Asset balances are returned for non-NFT assets\n"
+            "\nArguments:\n"
+            "1. \"address(es)\"                    (string, optional, default=*) Address(es) to return balance for, comma delimited\n"
+            " or\n"
+            "1. address(es)                      (array, optional) A json array of addresses to return balance for\n"                
+            "2. \"asset\"                          (string, optional, default=*) Single asset identifier to return balance for\n"                
+            " or\n"
+            "2. assets                           (array, optional) A json array of asset identifiers to return balance for\n"                
+            "3. minconf                          (numeric, optional, default=1) Only include transactions confirmed at least this many times.\n"
+            "4. includeWatchonly                 (bool, optional, default=false) Include transactions to watchonly addresses (see 'importaddress')\n"
+            "5. includeLocked                    (bool, optional, default=false) Also take locked outputs into account\n"
+            "\nResult:\n"
+            "An object of balance arrays with totals and details for each address.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("gettokenbalances", "")
+            + HelpExampleCli("gettokenbalances", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\"")
+            + HelpExampleRpc("gettokenbalances", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\"")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("getfiltertokenbalances",
+            "getfiltertokenbalances \"asset-identifier\"\n"
+            "\nReturns information about token balances for every address involved in transaction for specific NFT asset.\n"
+            "\nArguments:\n"
+            "1. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name. \n"
+            "\nResult:\n"
+            "Object with token balances for every address involved in transaction\n"            
+        ));
+     
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));

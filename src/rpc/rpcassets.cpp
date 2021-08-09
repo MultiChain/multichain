@@ -2342,7 +2342,7 @@ Value getfilterassetbalances_operation(const Array& params, bool fHelp,bool aggr
     
     if(!aggregate_tokens)
     {
-        if(lpAsset->IsNFTAsset() == 0)
+        if((lpAsset == NULL ) || (lpAsset->IsNFTAsset() == 0))
         {
             throw JSONRPCError(RPC_NOT_SUPPORTED, "getfiltertokenbalances callback is available only for NFT assets");                                                                    
         }
@@ -2617,12 +2617,12 @@ Value getfilterassetbalances_operation(const Array& params, bool fHelp,bool aggr
                 }
                 else            
                 {
-                    oBalance.push_back(Pair(CBitcoinAddress(item.first).ToString(), raw_value ? item.second : item.second/multiple));            
+                    oBalance.push_back(Pair(CBitcoinAddress(item.first).ToString(), item.second));            
                 }
             }
             if(other_amount != 0)
             {
-                oBalance.push_back(Pair("", raw_value ? other_amount : other_amount/multiple));                    
+                oBalance.push_back(Pair("", other_amount));                    
             }     
             aTokenBalances.push_back(oBalance);
         }        
@@ -2642,7 +2642,7 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
 
 Value getfiltertokenbalances(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > 2)                        
+    if (fHelp || params.size() != 1)                        
         mc_ThrowHelpMessage("getfiltertokenbalances");        
     
     return getfilterassetbalances_operation(params,fHelp,false);
