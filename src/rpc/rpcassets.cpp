@@ -383,7 +383,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
         {
             throw JSONRPCError(RPC_NOT_ALLOWED, "Non-fungible token asset should have multiple 1");               
         }
-        if(params[3].type() == obj_type)
+        if(params[3].type() == obj_type)                                        // Disabled token issuance in genesis transaction
         {
             throw JSONRPCError(RPC_NOT_SUPPORTED, "Invalid quantity, should be numeric");   
         }        
@@ -418,6 +418,10 @@ Value issuefromcmd(const Array& params, bool fHelp)
             script=lpDetailsToken->GetData(0,&bytes);
             lpScript->SetInlineDetails(script,bytes);
         }
+        else
+        {
+            lpScript->SetAssetGenesis(raw);            
+        }
     }
     else
     {
@@ -439,6 +443,10 @@ Value issuefromcmd(const Array& params, bool fHelp)
                 }
             }
             lpScript->SetAssetGenesis(quantity);
+        }
+        else
+        {
+            lpScript->SetAssetGenesis(quantity);            
         }
     }
     
@@ -2224,7 +2232,10 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
     
     if(mAddresses.size() == 0)
     {
-        return entry;            
+        if(memcmp(entity->GetTxID(),&hash,sizeof(uint256)))
+        {
+            return entry;                        
+        }
     }
     
     Array vin;

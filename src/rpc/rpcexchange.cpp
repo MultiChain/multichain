@@ -380,13 +380,34 @@ Object DecodeExchangeTransaction(const CTransaction tx,int verbose,int64_t& nati
                     {
                         quantity=-quantity;
                         asset_entry=AssetEntry(txid,quantity,0x00);
-                        ask.push_back(asset_entry);  
-                        uint256 hash;
-                        hash=*(uint256*)txid;
-                        
-//                        ParseAssetKey(hash.GetHex().c_str(),NULL,buf,NULL,&multiple,NULL, MC_ENT_TYPE_ASSET);
-                        ParseAssetKeyToFullAssetRef(hash.GetHex().c_str(),buf,&multiple,NULL, MC_ENT_TYPE_ASSET);
-                        tocomplete.push_back(Pair(hash.GetHex(),(double)quantity/double(multiple)));
+                        ask.push_back(asset_entry);                          
+                        if(entity.GetEntityType() == MC_ENT_TYPE_TOKEN)
+                        {
+                            string token;
+                            size_t value_size;
+                            unsigned char *token_ptr=(unsigned char *)entity.GetUpdateName(&value_size);       
+                            
+                            if(token_ptr)
+                            {
+                                string token_name ((char*)token_ptr,value_size);
+                                token=token_name;
+                            }      
+                            uint256 hash;
+                            hash=*(uint256*)entity.GetParentTxID();
+                            Object token_object;
+                            token_object.push_back(Pair("token",token));
+                            token_object.push_back(Pair("raw",quantity));
+                            tocomplete.push_back(Pair(hash.GetHex(),token_object));
+                        }
+                        else
+                        {
+                            uint256 hash;
+                            hash=*(uint256*)txid;
+
+    //                        ParseAssetKey(hash.GetHex().c_str(),NULL,buf,NULL,&multiple,NULL, MC_ENT_TYPE_ASSET);
+                            ParseAssetKeyToFullAssetRef(hash.GetHex().c_str(),buf,&multiple,NULL, MC_ENT_TYPE_ASSET);
+                            tocomplete.push_back(Pair(hash.GetHex(),(double)quantity/double(multiple)));
+                        }
                     }
                 }        
             }
@@ -664,6 +685,10 @@ Value createrawexchange(const json_spirit::Array& params, bool fHelp)
         size_t elem_size;    
         const unsigned char *elem;
         elem = lpScript->GetData(element,&elem_size);
+        if(elem_size == 0)
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Token ID should be specified explicitly in exchange");            
+        }
         if(elem)
         {
             scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
@@ -770,6 +795,10 @@ Value appendrawexchange(const json_spirit::Array& params, bool fHelp)
         size_t elem_size;    
         const unsigned char *elem;
         elem = lpScript->GetData(element,&elem_size);
+        if(elem_size == 0)
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Token ID should be specified explicitly in exchange");            
+        }
         if(elem)
         {
             scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
@@ -897,6 +926,10 @@ Value completerawexchange(const json_spirit::Array& params, bool fHelp)
         size_t elem_size;    
         const unsigned char *elem;
         elem = lpScript->GetData(element,&elem_size);
+        if(elem_size == 0)
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Token ID should be specified explicitly in exchange");            
+        }
         if(elem)
         {
             scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;

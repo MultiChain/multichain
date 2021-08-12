@@ -4162,7 +4162,7 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                             {
                                 *eErrorCode=RPC_ENTITY_NOT_FOUND;
                             }
-                            strError=string("Token " + token + " not found in this asset");
+                            strError=strprintf("Token %s not found in this asset",token.c_str());
                             goto exitlbl;                                        
                         }
                         mc_SetABQuantity(buf,quantity);
