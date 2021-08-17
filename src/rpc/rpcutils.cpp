@@ -3537,23 +3537,23 @@ void ParseRawTokenInfo(const Value *value,mc_Script *lpDetailsScript,mc_Script *
             missing_details=false;
             field_parsed=true;
         }         
-        if(d.name_ == "raw")
+        if((d.name_ == "raw") || (d.name_ == "qty"))
         {
             if(!missing_raw)
             {
-                *strError=string("raw field can appear only once in the object");                                                                                                        
+                *strError=string("qty field can appear only once in the object");                                                                                                        
             }
             if(d.value_.type() == int_type)
             {
                 *raw=d.value_.get_int64();
                 if(*raw <= 0)
                 {
-                    *strError=string("Invalid raw - should be positive");                                                                                                        
+                    *strError=string("Invalid qty - should be positive");                                                                                                        
                 }
             }
             else
             {
-                *strError=string("Invalid raw");                            
+                *strError=string("Invalid qty");                            
             }
             missing_raw=false;
             field_parsed=true;
@@ -3788,7 +3788,7 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                             field_parsed=true;
                         }
                     }
-                    if(!field_parsed && ((d.name_ == "token") || (d.name_ == "details")))                        
+                    if(!field_parsed && ((d.name_ == "token") || (d.name_ == "details") || (d.name_ == "qty")))                        
                     {                 
                         token_field=d.name_;
                         field_parsed=true;
