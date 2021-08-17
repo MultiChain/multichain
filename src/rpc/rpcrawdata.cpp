@@ -626,7 +626,10 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
     bool can_close=false;
     bool fungible=true;
     bool single_unit=false;
-    int64_t limit=MC_ENT_DEFAULT_MAX_ASSET_TOTAL;
+    double d_totallimit=0.;
+    double d_issuelimit=0.;
+    int64_t totallimit=MC_ENT_DEFAULT_MAX_ASSET_TOTAL;
+    int64_t issuelimit=MC_ENT_DEFAULT_MAX_ASSET_TOTAL;
     
     uint32_t permissions=0;
     bool missing_name=true;
@@ -638,7 +641,8 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
     bool missing_can_close=true;
     bool missing_fungible=true;
     bool missing_single_unit=true;
-    bool missing_limit=true;
+    bool missing_totallimit=true;
+    bool missing_issuelimit=true;
     
     lpDetails->Clear();
     lpDetails->AddElement();                   
@@ -815,36 +819,62 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             missing_single_unit=false;
             field_parsed=true;
         }
-        if(d.name_ == "limit")
+        if(d.name_ == "totallimit")
         {
-            if(!missing_limit)
+            if(!missing_totallimit)
             {
-                *strError=string("limit field can appear only once in the object");                                                                                                        
+                *strError=string("totallimit field can appear only once in the object");                                                                                                        
             }
             if(mc_gState->m_Features->NFTokens())
             {
                 if(d.value_.type() == int_type)
                 {
-                    limit=d.value_.get_int64();
-                    if(limit < 0)
+                    d_totallimit=d.value_.get_real();
+//                    totallimit=d.value_.get_int64();
+                    if(d_totallimit < 0)
                     {
-                        *strError=string("Invalid limit - should be non-negative");                                                                                                        
-                    }
-                    else
-                    {
-                        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MAX_TOTAL,(unsigned char*)&limit,sizeof(int64_t));
+                        *strError=string("Invalid totallimit - should be non-negative");                                                                                                        
                     }
                 }
                 else
                 {
-                    *strError=string("Invalid limit");                            
+                    *strError=string("Invalid totallimit");                            
                 }
             }
             else
             {
-                throw JSONRPCError(RPC_NOT_SUPPORTED, "limit field is not supported in this protocol version");                   
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "totallimit field is not supported in this protocol version");                   
             }
-            missing_limit=false;
+            missing_totallimit=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "issuelimit")
+        {
+            if(!missing_issuelimit)
+            {
+                *strError=string("issuelimit field can appear only once in the object");                                                                                                        
+            }
+            if(mc_gState->m_Features->NFTokens())
+            {
+                if(d.value_.type() == int_type)
+                {
+                    d_issuelimit=d.value_.get_real();
+//                    issuelimit=d.value_.get_int64();
+                    if(d_issuelimit < 0)
+                    {
+                        *strError=string("Invalid issuelimit - should be non-negative");                                                                                                        
+                    }
+                }
+                else
+                {
+                    *strError=string("Invalid issuelimit");                            
+                }
+            }
+            else
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "issuelimit field is not supported in this protocol version");                   
+            }
+            missing_issuelimit=false;
             field_parsed=true;
         }
         if(d.name_ == "unrestrict")
@@ -920,6 +950,24 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
         }
     }    
     
+    if(!missing_totallimit)
+    {
+        totallimit=(int64_t)(d_totallimit*multiple+0.1);        
+    }
+    if(!missing_issuelimit)
+    {
+        issuelimit=(int64_t)(d_issuelimit*multiple+0.1);        
+    }
+
+    if(totallimit != MC_ENT_DEFAULT_MAX_ASSET_TOTAL)
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MAX_TOTAL,(unsigned char*)&totallimit,sizeof(int64_t));
+    }
+    if(issuelimit != MC_ENT_DEFAULT_MAX_ASSET_TOTAL)
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MAX_ISSUE,(unsigned char*)&issuelimit,sizeof(int64_t));
+    }
+    
     unsigned char b=MC_ENT_FOMD_NONE;
     if(is_open)
     {
@@ -936,10 +984,6 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
     if(is_anyone_can_issuemore)
     {
         b |= MC_ENT_FOMD_ANYONE_CAN_ISSUEMORE;
-    }
-    if(single_unit)
-    {
-        b |= MC_ENT_FOMD_SINGLE_UNIT;
     }
     if(!fungible)
     {
@@ -958,7 +1002,7 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
         if(!is_open && !can_open && can_close)
         {
             *errorCode=RPC_NOT_SUPPORTED;
-            *strError="Asset cannot be closed if follow-ons are not allowed or cannot be allowed";   
+            *strError="Issued asset must either be open now, or possible to open later (canopen parameter)";   
         }
     }
     if(strError->size() == 0)

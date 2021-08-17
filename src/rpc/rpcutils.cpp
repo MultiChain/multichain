@@ -2216,9 +2216,26 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                 {
                     entry.push_back(Pair("fungible",(entity.IsNFTAsset() == 0)));                                                    
                     entry.push_back(Pair("canopen",(entity.AdminCanOpen() != 0)));                                                    
-                    entry.push_back(Pair("canclose",(entity.AdminCanClose() != 0)));                                                    
-                    entry.push_back(Pair("issueonlysingleunit",(entity.SingleUnitAsset() != 0)));                                                    
-                    entry.push_back(Pair("limit",entity.MaxTotalIssuance()));                                                    
+                    entry.push_back(Pair("canclose",(entity.AdminCanClose() != 0)));                
+                    int64_t raw_value;
+                    raw_value=entity.MaxTotalIssuance();
+                    if(raw_value != MC_ENT_DEFAULT_MAX_ASSET_TOTAL)
+                    {
+                        entry.push_back(Pair("totallimit",(double)raw_value*units));                                                                            
+                    }
+                    else
+                    {
+                        entry.push_back(Pair("totallimit",Value::null));                                                                                                    
+                    }
+                    raw_value=entity.MaxSingleIssuance();
+                    if(raw_value != MC_ENT_DEFAULT_MAX_ASSET_TOTAL)
+                    {
+                        entry.push_back(Pair("issuelimit",(double)raw_value*units));                                                                            
+                    }
+                    else
+                    {
+                        entry.push_back(Pair("issuelimit",Value::null));                                                                                                    
+                    }
                 }
             }
         }
@@ -3818,12 +3835,9 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                     {
                         goto exitlbl;                    
                     }
-                    if(entity.SingleUnitAsset())
+                    if(quantity>entity.MaxSingleIssuance())
                     {
-                        if(quantity!=1)
-                        {
-                            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, should be 1");                               
-                        }
+                        throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, above issuance limit for this asset");                               
                     }
 
                     uint256 token_hash;
@@ -4133,12 +4147,9 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                         {
                             goto exitlbl;                    
                         }
-                        if(entity.SingleUnitAsset())
+                        if(quantity>entity.MaxSingleIssuance())
                         {
-                            if(quantity!=1)
-                            {
-                                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, should be 1");                               
-                            }
+                            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, above issuance limit for this asset");                               
                         }
                         
                         uint256 token_hash;

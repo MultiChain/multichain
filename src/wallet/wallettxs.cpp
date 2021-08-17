@@ -3466,7 +3466,7 @@ uint64_t mc_GetExplorerTxOutputDetails(int rpc_slot,
                 {
                     OutputScriptTags[i] |= MC_MTX_TAG_ASSET_TRANSFER;
                 }
-                err=tmpscript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
+                err=tmpscript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON | MC_SCR_ASSET_SCRIPT_TYPE_TOKEN);
                 if(err == MC_ERR_NOERROR)
                 {
                     OutputScriptTags[i] |= MC_MTX_TAG_ASSET_FOLLOWON;
@@ -3481,22 +3481,26 @@ uint64_t mc_GetExplorerTxOutputDetails(int rpc_slot,
                         ptrOut=mc_gState->m_TmpAssetsOut->GetRow(k);
                         asset=0;
                         memcpy(&asset,ptrOut+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);                        
-                        quantity=mc_GetABQuantity(ptrOut);
-                        if(quantity > 0)
+                        if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptrOut))
                         {
-                            if( (n == 1) && (quantity == 1) )
+                            if(entity.GetEntityType() == MC_ENT_TYPE_TOKEN)
                             {
-                                if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptrOut))
+                                memcpy(&asset,entity.GetParentTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);                                                        
+                            }
+                            quantity=mc_GetABQuantity(ptrOut);
+                            if(quantity > 0)
+                            {
+                                if( (n == 1) && (quantity == 1) )
                                 {
                                     if(entity.GetEntityType() == MC_ENT_TYPE_LICENSE_TOKEN)
                                     {
                                         OutputScriptTags[i] |= MC_MTX_TAG_LICENSE_TOKEN;
                                     }   
                                 }
-                            }
-                            if( (OutputScriptTags[i] & MC_MTX_TAG_LICENSE_TOKEN) == 0 )
-                            {
-                                assets.insert(make_pair(asset,quantity));                                
+                                if( (OutputScriptTags[i] & MC_MTX_TAG_LICENSE_TOKEN) == 0 )
+                                {
+                                    assets.insert(make_pair(asset,quantity));                                
+                                }
                             }
                         }
                     }                    

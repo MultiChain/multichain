@@ -87,6 +87,7 @@
 #define MC_ENT_SPRM_FILTER_TYPE               0x47
 #define MC_ENT_SPRM_FILTER_LIBRARIES          0x48
 #define MC_ENT_SPRM_ASSET_MAX_TOTAL           0x49
+#define MC_ENT_SPRM_ASSET_MAX_ISSUE           0x4a
 
 #define MC_ENT_SPRM_ASSET_TOTAL               0x51                              // Optimization parameters
 #define MC_ENT_SPRM_CHAIN_INDEX               0x52 
@@ -135,9 +136,8 @@
 #define MC_ENT_FOMD_ANYONE_CAN_ISSUEMORE      0x02
 #define MC_ENT_FOMD_ALLOWED_WITH_APPROVAL     0x04
 #define MC_ENT_FOMD_NON_FUNGIBLE_TOKENS       0x08
-#define MC_ENT_FOMD_SINGLE_UNIT               0x10
-#define MC_ENT_FOMD_CAN_CLOSE                 0x20
-#define MC_ENT_FOMD_CAN_OPEN                  0x40
+#define MC_ENT_FOMD_CAN_CLOSE                 0x10
+#define MC_ENT_FOMD_CAN_OPEN                  0x20
 
 
 
@@ -241,10 +241,10 @@ typedef struct mc_EntityDetails
     int AnyoneCanIssueMore(); 
     int ApproveRequired();     
     int IsNFTAsset();     
-    int SingleUnitAsset();     
     int AdminCanOpen();     
     int AdminCanClose();     
     int64_t MaxTotalIssuance();
+    int64_t MaxSingleIssuance();
     uint32_t Permissions(); 
     uint32_t Restrictions(); 
     int AnyoneCanWrite(); 

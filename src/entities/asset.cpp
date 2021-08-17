@@ -2690,6 +2690,21 @@ int64_t mc_EntityDetails::MaxTotalIssuance()
     return MC_ENT_DEFAULT_MAX_ASSET_TOTAL;    
 }
 
+int64_t mc_EntityDetails::MaxSingleIssuance()
+{
+    unsigned char *ptr;
+    size_t bytes;
+    ptr=(unsigned char *)GetSpecialParam(MC_ENT_SPRM_ASSET_MAX_ISSUE,&bytes);
+    if(ptr)
+    {
+        if((bytes>0) && (bytes<=8))
+        {
+            return mc_GetLE(ptr,bytes);
+        }
+    }
+    return MC_ENT_DEFAULT_MAX_ASSET_TOTAL;    
+}
+
 int mc_EntityDetails::FollowonMode()
 {
     unsigned char *ptr;
@@ -2760,15 +2775,6 @@ int mc_EntityDetails::IsNFTAsset()
         return 0;
     }
     return FollowonMode() & MC_ENT_FOMD_NON_FUNGIBLE_TOKENS;    
-}
-
-int mc_EntityDetails::SingleUnitAsset()
-{
-    if(mc_gState->m_Features->NFTokens() == 0)
-    {
-        return 0;
-    }
-    return FollowonMode() & MC_ENT_FOMD_SINGLE_UNIT;    
 }
 
 int mc_EntityDetails::AdminCanOpen()

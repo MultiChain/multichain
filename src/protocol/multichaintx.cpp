@@ -1842,7 +1842,7 @@ bool MultiChainTransaction_ProcessTokenIssuance(const CTransaction& tx,
     mc_EntityDetails this_entity;
     int update_mempool;
     int err;
-    int64_t quantity,last_total,left_position,max_total,vout_total;
+    int64_t quantity,last_total,left_position,max_total,max_issue,vout_total;
     int32_t chain_size;
     bool new_issue;
     vector <uint160> issuers;
@@ -2012,15 +2012,6 @@ bool MultiChainTransaction_ProcessTokenIssuance(const CTransaction& tx,
         return false;                                                                                        
     }
     
-    if(entity.SingleUnitAsset())
-    {
-        if(vout_total != 1)
-        {
-            reason="Token issuance script rejected - output quantity should be 1";
-            return false;                                                                                                    
-        }
-    }    
-    
     mc_SHA256 *hasher=new mc_SHA256();
     hasher->Reset();
     hasher->Write(&issue_txid,sizeof(uint256));
@@ -2045,6 +2036,7 @@ bool MultiChainTransaction_ProcessTokenIssuance(const CTransaction& tx,
     left_position=0;
     
     max_total=entity.MaxTotalIssuance();
+    max_issue=entity.MaxSingleIssuance();
         
     details->SetRelevantEntity((unsigned char*)entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);
         
@@ -2060,6 +2052,12 @@ bool MultiChainTransaction_ProcessTokenIssuance(const CTransaction& tx,
         return false;                                                                                                                
     }
     if(vout_total+last_total>max_total)
+    {
+        reason="Token issuance script rejected - above total asset issuance limit";
+        return false;                                                                    
+    }
+    
+    if(vout_total>max_issue)
     {
         reason="Token issuance script rejected - above total asset issuance limit";
         return false;                                                                    
@@ -2533,7 +2531,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     int multiple,out_count,issue_vout,followoon_out_count;
     int err;
     uint32_t followon_mode;
-    int64_t quantity,total,last_total,left_position,max_total,vout_total;
+    int64_t quantity,total,last_total,left_position,max_total,max_issue,vout_total;
     int32_t chain_size;
     uint256 txid;
     bool new_issue,follow_on,issue_in_output;
@@ -2569,6 +2567,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
     issue_vout=-1;
     followon_mode=MC_ENT_FOMD_NONE;
     max_total=MC_ENT_DEFAULT_MAX_ASSET_TOTAL;
+    max_issue=MC_ENT_DEFAULT_MAX_ASSET_TOTAL;
     
     if(details->details_script_type == 0)                                       // New asset/variable/library with details script
     {
@@ -2604,6 +2603,14 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
             if((value_size>0) && (value_size<=8))
             {
                 max_total=mc_GetLE(details->details_script+value_offset,value_size);
+            }
+        }                                    
+        value_offset=mc_FindSpecialParamInDetailsScript(details->details_script,details->details_script_size,MC_ENT_SPRM_ASSET_MAX_ISSUE,&value_size);
+        if(value_offset<(uint32_t)details->details_script_size)
+        {
+            if((value_size>0) && (value_size<=8))
+            {
+                max_issue=mc_GetLE(details->details_script+value_offset,value_size);
             }
         }                                    
     }
@@ -2661,14 +2668,11 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                             reason="Asset issue script rejected - above total asset issuance limit";
                             return false;                                                                    
                         }
-                        if(followon_mode & MC_ENT_FOMD_SINGLE_UNIT)
+                        if(vout_total>max_issue)
                         {
-                            if(vout_total != 1)
-                            {
-                                reason="Asset issue script rejected - single unit should be issued";
-                                return false;                                                                                                    
-                            }
-                        }                        
+                            reason="Asset issue script rejected - above asset issuance limit";
+                            return false;                                                                    
+                        }
                     }
                     
                     if(details->vOutputDestinations[vout].size() != 1)
@@ -2858,6 +2862,7 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
         }
         
         max_total=entity.MaxTotalIssuance();
+        max_issue=entity.MaxSingleIssuance();
         
         if(details->details_script_type > 0)
         {
@@ -2892,13 +2897,10 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                     reason="Asset follow-on script rejected - above total asset issuance limit";
                     return false;                                                                    
                 }
-                if(entity.SingleUnitAsset())
+                if(total>max_issue)
                 {
-                    if( (total != 1) || (followoon_out_count != 1) )
-                    {
-                        reason="Asset follow-on script rejected - should be single unit";
-                        return false;                                                                                            
-                    }
+                    reason="Asset follow-on script rejected - above asset issuance limit";
+                    return false;                                                                    
                 }
                 if(entity.IsNFTAsset())
                 {
@@ -2929,19 +2931,6 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                     return false;                                                                                                                                    
                 }
                 total=0;
-            }
-            if(followon_mode & MC_ENT_FOMD_SINGLE_UNIT)
-            {
-                if(multiple != 1)
-                {
-                    reason="Asset issue script rejected - multiple should be 1 for single unit issuance asset";
-                    return false;                                                                                                                
-                }                
-                if(total > 1)
-                {
-                    reason="Asset issue script rejected - should be single unit or zero";
-                    return false;                                                                                            
-                }
             }
             if(followon_mode & MC_ENT_FOMD_CAN_CLOSE)
             {

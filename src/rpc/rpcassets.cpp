@@ -65,6 +65,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
     int64_t quantity;
     int multiple;
     double dQuantity;
+    double dValue;
     double dUnit;
     
     dQuantity=0.;
@@ -138,8 +139,8 @@ Value issuefromcmd(const Array& params, bool fHelp)
     bool can_open=false;
     bool can_close=false;
     bool fungible=true;
-    bool single_unit=false;
-    int64_t limit=MC_ENT_DEFAULT_MAX_ASSET_TOTAL;
+    int64_t totallimit=MC_ENT_DEFAULT_MAX_ASSET_TOTAL;
+    int64_t issuelimit=MC_ENT_DEFAULT_MAX_ASSET_TOTAL;
     int err;
     size_t bytes;
     const unsigned char *script;
@@ -215,31 +216,38 @@ Value issuefromcmd(const Array& params, bool fHelp)
                     }
                     field_found=true;
                 }
-                if(s.name_ == "issueonlysingleunit")
-                {
-                    if(s.value_.type() == bool_type)
-                    {
-                        single_unit=s.value_.get_bool();
-                    }
-                    else
-                    {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'issueonlysingleunit' field, should be boolean");                                                                
-                    }
-                    field_found=true;
-                }
-                if(s.name_ == "limit")
+                if(s.name_ == "totallimit")
                 {
                     if(s.value_.type() == int_type)
                     {
-                        limit=s.value_.get_int64();
-                        if(limit < 0)
+                        dValue=s.value_.get_real();
+                        totallimit=(int64_t)(dValue*multiple+0.1);
+                        if(totallimit < 0)
                         {
-                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'limit' field, should be non-negative");                                                                                            
+                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'totallimit' field, should be non-negative");                                                                                            
                         }
                     }
                     else
                     {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'limit' field, should be integer");                                                                
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'totallimit' field, should be integer");                                                                
+                    }
+                    field_found=true;
+                }
+                if(s.name_ == "issuelimit")
+                {
+                    if(s.value_.type() == int_type)
+                    {
+                        dValue=s.value_.get_real();
+                        issuelimit=(int64_t)(dValue*multiple+0.1);
+//                        issuelimit=s.value_.get_int64();
+                        if(issuelimit < 0)
+                        {
+                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'issuelimit' field, should be non-negative");                                                                                            
+                        }
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'issuelimit' field, should be integer");                                                                
                     }
                     field_found=true;
                 }
@@ -349,10 +357,6 @@ Value issuefromcmd(const Array& params, bool fHelp)
     {
         b |= MC_ENT_FOMD_ANYONE_CAN_ISSUEMORE;
     }
-    if(single_unit)
-    {
-        b |= MC_ENT_FOMD_SINGLE_UNIT;
-    }
     if(!fungible)
     {
         b |= MC_ENT_FOMD_NON_FUNGIBLE_TOKENS;
@@ -363,18 +367,11 @@ Value issuefromcmd(const Array& params, bool fHelp)
     }
     if(!is_open && !can_open && can_close)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "Asset cannot be closed if follow-ons are not allowed or cannot be allowed");   
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Issued asset must either be open now, or possible to open later (canopen parameter)");   
     }
     if(!is_open && !can_open && !fungible)
     {
         throw JSONRPCError(RPC_NOT_SUPPORTED, "Asset cannot have non-fungible tokens if follow-ons are not allowed or cannot be allowed");   
-    }
-    if(single_unit)
-    {
-        if(multiple != 1)
-        {
-            throw JSONRPCError(RPC_NOT_ALLOWED, "Asset with single unit issuance should have multiple 1");               
-        }        
     }
 
     if(!fungible)
@@ -403,16 +400,13 @@ Value issuefromcmd(const Array& params, bool fHelp)
             {
                 throw JSONRPCError(errorCode, strError);                           
             }
-            if(raw>limit)
+            if(raw>totallimit)
             {
-                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, over the limit for this asset");               
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, over the totallimit for this asset");               
             }
-            if(single_unit)
+            if(raw>issuelimit)
             {
-                if(raw!=1)
-                {
-                    throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, should be 1");                               
-                }
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, over the issuelimit for this asset");               
             }
             lpScript->SetAssetGenesis(raw);
             script=lpDetailsToken->GetData(0,&bytes);
@@ -429,34 +423,28 @@ Value issuefromcmd(const Array& params, bool fHelp)
         {
             throw JSONRPCError(RPC_NOT_SUPPORTED, "Invalid quantity, should be numeric");   
         }        
-        if(quantity>limit)
+        if(quantity>totallimit)
         {
-            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the limit for this asset");               
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the totallimit for this asset");               
         }
-        if(quantity > 0)
+        if(quantity>issuelimit)
         {
-            if(single_unit)
-            {
-                if(quantity!=1)
-                {
-                    throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, should be 1 or 0");                               
-                }
-            }
-            lpScript->SetAssetGenesis(quantity);
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the issuelimit for this asset");               
         }
-        else
-        {
-            lpScript->SetAssetGenesis(quantity);            
-        }
+        lpScript->SetAssetGenesis(quantity);
     }
     
     if(b != MC_ENT_FOMD_NONE)
     {
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);        
     }
-    if(limit != MC_ENT_DEFAULT_MAX_ASSET_TOTAL)
+    if(totallimit != MC_ENT_DEFAULT_MAX_ASSET_TOTAL)
     {
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MAX_TOTAL,(unsigned char*)&limit,sizeof(int64_t));                
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MAX_TOTAL,(unsigned char*)&totallimit,sizeof(int64_t));                
+    }
+    if(issuelimit != MC_ENT_DEFAULT_MAX_ASSET_TOTAL)
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MAX_ISSUE,(unsigned char*)&issuelimit,sizeof(int64_t));                
     }
     
     if(permissions)
@@ -688,14 +676,11 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
             }
             if(raw+last_total>entity.MaxTotalIssuance())
             {
-                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, over the limit for this asset");               
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, over the total limit for this asset");               
             }
-            if(entity.SingleUnitAsset())
+            if(raw>entity.MaxSingleIssuance())
             {
-                if(raw!=1)
-                {
-                    throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, should be 1");                               
-                }
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, over the issuance limit for this asset");               
             }
 
             uint256 token_hash;
@@ -734,17 +719,14 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
         }        
         if(quantity+last_total>entity.MaxTotalIssuance())
         {
-            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the limit for this asset");               
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the total limit for this asset");               
+        }
+        if(quantity>entity.MaxSingleIssuance())
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the issue limit for this asset");               
         }
         if(quantity > 0)
         {
-            if(entity.SingleUnitAsset())
-            {
-                if(quantity!=1)
-                {
-                    throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, should be 1 or 0");                               
-                }
-            }            
             mc_SetABQuantity(buf,quantity);    
 
             lpBuffer->Add(buf);
