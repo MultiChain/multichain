@@ -1166,6 +1166,7 @@ Value getmultibalances_operation(const Array& params, bool fHelp,bool aggregate_
             {
                 for(int a=0;a<asset_amounts->GetCount();a++)
                 {
+                    mc_EntityDetails entity;
                     const unsigned char *txid;
                     const unsigned char *asset_txid;
                     txid=NULL;
@@ -1177,11 +1178,13 @@ Value getmultibalances_operation(const Array& params, bool fHelp,bool aggregate_
 //                        hash=out.tx->GetHash();
                         txid=(unsigned char*)&hash;
                         asset_txid=txid;
+                        if(!aggregate_tokens)
+                        {
+                            txid=NULL;
+                        }
                     }
                     else
                     {
-                        mc_EntityDetails entity;
-
                         if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptr))
                         {
                             txid=entity.GetTxID();
@@ -1189,6 +1192,20 @@ Value getmultibalances_operation(const Array& params, bool fHelp,bool aggregate_
                             if(entity.GetEntityType() == MC_ENT_TYPE_TOKEN)
                             {
                                 asset_txid=entity.GetParentTxID();
+                                if(!aggregate_tokens)
+                                {
+                                    if(mc_GetABQuantity(ptr) == 0)
+                                    {
+                                        txid=NULL;                                        
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                if(!aggregate_tokens)
+                                {
+                                    txid=NULL;
+                                }                                
                             }
                         }                                
                     }
@@ -1315,9 +1332,12 @@ Value getmultibalances_operation(const Array& params, bool fHelp,bool aggregate_
             }
             if(MCP_WITH_NATIVE_CURRENCY)
             {
-                Object asset_entry;
-                asset_entry=AssetEntry(NULL,btc,output_level);
-                addr_balances.push_back(asset_entry);                        
+                if(!aggregate_tokens)
+                {
+                    Object asset_entry;
+                    asset_entry=AssetEntry(NULL,btc,output_level);
+                    addr_balances.push_back(asset_entry);                        
+                }
             }
             
             string out_addr="";
