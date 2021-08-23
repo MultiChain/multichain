@@ -1132,7 +1132,8 @@ bool FindFollowOnsInScript(const CScript& script1,mc_Buffer *amounts,mc_Script *
     for (int e = 0; e < lpScript->GetNumElements(); e++)                        // Parsing asset quantities
     {
         lpScript->SetElement(e);
-        err=lpScript->GetAssetQuantities(amounts,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON | MC_SCR_ASSET_SCRIPT_TYPE_TOKEN);   
+        err=lpScript->GetAssetQuantities(amounts,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);// | MC_SCR_ASSET_SCRIPT_TYPE_TOKEN);   
+                                                                                // This checks only real followons, for conflict with details object
         if((err != MC_ERR_NOERROR) && (err != MC_ERR_WRONG_SCRIPT))
         {
             return false;                                

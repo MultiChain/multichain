@@ -1062,7 +1062,26 @@ Value testfilter(const vector <uint160>& entities,string filter_code, Value txpa
         if(relevant_filter)
         {
             bool checkpoint=false;
-            if ( (filter_type == MC_FLT_TYPE_TX) && !txid_given)
+            bool all_inputs_found=false;
+            if(!txid_given)
+            {
+                LOCK(mempool.cs);
+                all_inputs_found=true;
+                CCoins coins;
+                string reason;
+                CCoinsView dummy;
+                CCoinsViewCache view(&dummy);
+                CCoinsViewMemPool viewMemPool(pcoinsTip, mempool);
+                view.SetBackend(viewMemPool);
+                for(unsigned int i=0;i<tx.vin.size();i++)
+                {
+                    if (!view.GetCoins(tx.vin[i].prevout.hash, coins))
+                    {
+                        all_inputs_found=false;                                            
+                    }                    
+                }                
+            }
+            if ( (filter_type == MC_FLT_TYPE_TX) && all_inputs_found)
             {
                 bool txsigned=true;
                 for(unsigned int i=0;i<tx.vin.size();i++)
@@ -1123,7 +1142,7 @@ Value testfilter(const vector <uint160>& entities,string filter_code, Value txpa
                         goto exitlbl;
                     }
                     checkpoint=true;
-                }                
+                }
 
             }
             

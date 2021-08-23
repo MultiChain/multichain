@@ -218,36 +218,36 @@ Value issuefromcmd(const Array& params, bool fHelp)
                 }
                 if(s.name_ == "totallimit")
                 {
-                    if(s.value_.type() == int_type)
+                    if((s.value_.type() == int_type) || (s.value_.type() == real_type))
                     {
                         dValue=s.value_.get_real();
                         totallimit=(int64_t)(dValue*multiple+0.1);
-                        if(totallimit < 0)
+                        if(totallimit <= 0)
                         {
-                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'totallimit' field, should be non-negative");                                                                                            
+                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'totallimit' field, should be positive");                                                                                            
                         }
                     }
                     else
                     {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'totallimit' field, should be integer");                                                                
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'totallimit' field, should be numeric");                                                                
                     }
                     field_found=true;
                 }
                 if(s.name_ == "issuelimit")
                 {
-                    if(s.value_.type() == int_type)
+                    if((s.value_.type() == int_type) || (s.value_.type() == real_type))
                     {
                         dValue=s.value_.get_real();
                         issuelimit=(int64_t)(dValue*multiple+0.1);
 //                        issuelimit=s.value_.get_int64();
-                        if(issuelimit < 0)
+                        if(issuelimit <= 0)
                         {
-                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'issuelimit' field, should be non-negative");                                                                                            
+                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'issuelimit' field, should be positive");                                                                                            
                         }
                     }
                     else
                     {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'issuelimit' field, should be integer");                                                                
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'issuelimit' field, should be numeric");                                                                
                     }
                     field_found=true;
                 }
@@ -402,11 +402,11 @@ Value issuefromcmd(const Array& params, bool fHelp)
             }
             if(raw>totallimit)
             {
-                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, over the totallimit for this asset");               
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the totallimit for this asset");               
             }
             if(raw>issuelimit)
             {
-                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, over the issuelimit for this asset");               
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the issuelimit for this asset");               
             }
             lpScript->SetAssetGenesis(raw);
             script=lpDetailsToken->GetData(0,&bytes);
@@ -676,11 +676,11 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
             }
             if(raw+last_total>entity.MaxTotalIssuance())
             {
-                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, over the total limit for this asset");               
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the total limit for this asset");               
             }
             if(raw>entity.MaxSingleIssuance())
             {
-                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, over the issuance limit for this asset");               
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the issuance limit for this asset");               
             }
 
             uint256 token_hash;

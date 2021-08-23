@@ -749,7 +749,10 @@ Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong)
                 }
                 if( (type & MC_PTP_FILTER) == 0)
                 {
-                    results.push_back(entry);
+                    if( (mc_gState->m_Features->NFTokens() == 0) || ( (type & MC_PTP_DETAILS) == 0) )
+                    {
+                        results.push_back(entry);
+                    }
                 }
             }            
             else
@@ -2075,7 +2078,8 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
     mc_TxEntityStat entStat;
     unsigned char *ptr;
     size_t value_size;
-    string token="";
+    Value token=Value::null;
+    bool nft_asset=false;
 
     genesis_entity=&sec_entity;
     followon=&sec_entity;
@@ -2111,6 +2115,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         {
             if((entity.GetEntityType() == MC_ENT_TYPE_TOKEN) || ( (entity.IsFollowOn() != 0) && (genesis_entity->IsNFTAsset() != 0) ) )
             {
+                nft_asset=true;
                 ptr=(unsigned char *)entity.GetUpdateName(&value_size);                
 //                ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_UPDATE_NAME,&value_size);
                 if(ptr)
@@ -2166,7 +2171,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
             assetref += itostr((int)mc_GetLE(ptr+8,2));
             entry.push_back(Pair("assetref", assetref));
         }
-        if(token.size())
+        if(nft_asset)
         {
             entry.push_back(Pair("token", token));
         }
@@ -2372,6 +2377,10 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                                 string token_name ((char*)ptr,value_size);
                                 issue.push_back(Pair("token", token_name));
                             }      
+                            else
+                            {
+                                issue.push_back(Pair("token", Value::null));                                
+                            }
                         }
                         if( (output_level & 0x0400) == 0)
                         {
@@ -2621,6 +2630,10 @@ Array AssetHistory(mc_EntityDetails *asset_entity,mc_EntityDetails *last_entity,
                             string token_name ((char*)ptr,value_size);
                             issue.push_back(Pair("token", token_name));
                         }      
+                        else
+                        {
+                            issue.push_back(Pair("token", Value::null));                            
+                        }
                     }
                     if(output_level & 0x0040)
                     {
@@ -3548,12 +3561,12 @@ void ParseRawTokenInfo(const Value *value,mc_Script *lpDetailsScript,mc_Script *
                 *raw=d.value_.get_int64();
                 if(*raw <= 0)
                 {
-                    *strError=string("Invalid qty - should be positive");                                                                                                        
+                    *strError=string("Invalid quantity - should be positive");                                                                                                        
                 }
             }
             else
             {
-                *strError=string("Invalid qty");                            
+                *strError=string("Invalid quantity - should be integer");                            
             }
             missing_raw=false;
             field_parsed=true;
@@ -3576,7 +3589,7 @@ void ParseRawTokenInfo(const Value *value,mc_Script *lpDetailsScript,mc_Script *
     {
         if(missing_raw)
         {                    
-            *strError=string("Missing raw"); 
+            *strError=string("Missing quantity"); 
         }
     }
     if(strError->size() == 0)
@@ -3698,7 +3711,7 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                 {
                     if(quantity < 0)
                     {
-                        strError=string("Issue raw qty should be non-negative");
+                        strError=string("Issue quantity should be non-negative");
                         goto exitlbl;                    
                     }
                     lpScript->SetAssetGenesis(quantity);
@@ -3805,11 +3818,6 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                     strError=string("Issuemore asset not specified");
                     goto exitlbl;                    
                 }
-                if(quantity < 0)
-                {
-                    strError=string("Issuemore raw qty not specified");
-                    goto exitlbl;                    
-                }
                 nft_asset=false;
                 if(mc_gState->m_Features->NFTokens())
                 {
@@ -3837,7 +3845,7 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                     }
                     if(quantity>entity.MaxSingleIssuance())
                     {
-                        throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, above issuance limit for this asset");                               
+                        throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, above issuance limit for this asset");                               
                     }
 
                     uint256 token_hash;
@@ -3878,6 +3886,11 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                 }
                 else
                 {
+                    if(quantity < 0)
+                    {
+                        strError=string("Issuemore raw qty not specified");
+                        goto exitlbl;                    
+                    }
                     if(token_field.size())
                     {
                         strError=string("Invalid field for object ") + a.name_ + string(": ") + token_field;
@@ -4149,7 +4162,7 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                         }
                         if(quantity>entity.MaxSingleIssuance())
                         {
-                            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid raw, above issuance limit for this asset");                               
+                            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, above issuance limit for this asset");                               
                         }
                         
                         uint256 token_hash;

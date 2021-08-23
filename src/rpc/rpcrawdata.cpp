@@ -827,18 +827,18 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             }
             if(mc_gState->m_Features->NFTokens())
             {
-                if(d.value_.type() == int_type)
+                if((d.value_.type() == int_type) || (d.value_.type() == real_type))
                 {
                     d_totallimit=d.value_.get_real();
 //                    totallimit=d.value_.get_int64();
-                    if(d_totallimit < 0)
+                    if(d_totallimit <= 0)
                     {
-                        *strError=string("Invalid totallimit - should be non-negative");                                                                                                        
+                        *strError=string("Invalid totallimit - should be positive");                                                                                                        
                     }
                 }
                 else
                 {
-                    *strError=string("Invalid totallimit");                            
+                    *strError=string("Invalid totallimit - should be numeric");                            
                 }
             }
             else
@@ -856,18 +856,18 @@ CScript RawDataScriptIssue(Value *param,mc_Script *lpDetails,mc_Script *lpDetail
             }
             if(mc_gState->m_Features->NFTokens())
             {
-                if(d.value_.type() == int_type)
+                if((d.value_.type() == int_type) || (d.value_.type() == real_type))
                 {
                     d_issuelimit=d.value_.get_real();
 //                    issuelimit=d.value_.get_int64();
-                    if(d_issuelimit < 0)
+                    if(d_issuelimit <= 0)
                     {
-                        *strError=string("Invalid issuelimit - should be non-negative");                                                                                                        
+                        *strError=string("Invalid issuelimit - should be positive");                                                                                                        
                     }
                 }
                 else
                 {
-                    *strError=string("Invalid issuelimit");                            
+                    *strError=string("Invalid issuelimit - should be numeric");                            
                 }
             }
             else

@@ -176,6 +176,7 @@ static const CRPCCommand vRPCCommands[] =
     { "hidden",             "data-all",               &purehelpitem_nomethod,  true,      true,       false },
     { "hidden",             "data-with",              &purehelpitem_nomethod,  true,      true,       false },
     { "hidden",             "addresses-all",          &purehelpitem_nomethod,  true,      true,       false },
+    { "hidden",             "amounts-all",            &purehelpitem_nomethod,  true,      true,       false },
     { "hidden",             "feed-options",           &purehelpitem_nomethod,  true,      true,       false },
     
     { "hidden",             "getfilterstreamitem",    &purehelpitem_onlyfilter,true,      false,      false },
