@@ -182,6 +182,10 @@ Value issuefromcmd(const Array& params, bool fHelp)
                 }
                 if(s.name_ == "canopen")
                 {
+                    if(mc_gState->m_Features->NFTokens() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "canopen field is not supported in this protocol version");                   
+                    }
                     if(s.value_.type() == bool_type)
                     {
                         can_open=s.value_.get_bool();
@@ -194,6 +198,10 @@ Value issuefromcmd(const Array& params, bool fHelp)
                 }
                 if(s.name_ == "canclose")
                 {
+                    if(mc_gState->m_Features->NFTokens() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "canclose field is not supported in this protocol version");                   
+                    }
                     if(s.value_.type() == bool_type)
                     {
                         can_close=s.value_.get_bool();
@@ -206,6 +214,10 @@ Value issuefromcmd(const Array& params, bool fHelp)
                 }
                 if(s.name_ == "fungible")
                 {
+                    if(mc_gState->m_Features->NFTokens() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "fungible field is not supported in this protocol version");                   
+                    }
                     if(s.value_.type() == bool_type)
                     {
                         fungible=s.value_.get_bool();
@@ -218,6 +230,10 @@ Value issuefromcmd(const Array& params, bool fHelp)
                 }
                 if(s.name_ == "totallimit")
                 {
+                    if(mc_gState->m_Features->NFTokens() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "totallimit field is not supported in this protocol version");                   
+                    }
                     if((s.value_.type() == int_type) || (s.value_.type() == real_type))
                     {
                         dValue=s.value_.get_real();
@@ -235,6 +251,10 @@ Value issuefromcmd(const Array& params, bool fHelp)
                 }
                 if(s.name_ == "issuelimit")
                 {
+                    if(mc_gState->m_Features->NFTokens() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "issuelimit field is not supported in this protocol version");                   
+                    }
                     if((s.value_.type() == int_type) || (s.value_.type() == real_type))
                     {
                         dValue=s.value_.get_real();
@@ -423,13 +443,16 @@ Value issuefromcmd(const Array& params, bool fHelp)
         {
             throw JSONRPCError(RPC_NOT_SUPPORTED, "Invalid quantity, should be numeric");   
         }        
-        if(quantity>totallimit)
+        if(mc_gState->m_Features->NFTokens())
         {
-            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the totallimit for this asset");               
-        }
-        if(quantity>issuelimit)
-        {
-            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the issuelimit for this asset");               
+            if(quantity>totallimit)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the totallimit for this asset");               
+            }
+            if(quantity>issuelimit)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the issuelimit for this asset");               
+            }
         }
         lpScript->SetAssetGenesis(quantity);
     }
@@ -717,13 +740,16 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
         {
             throw JSONRPCError(RPC_NOT_SUPPORTED, "Invalid quantity, should be numeric");   
         }        
-        if(quantity+last_total>entity.MaxTotalIssuance())
-        {
-            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the total limit for this asset");               
-        }
-        if(quantity>entity.MaxSingleIssuance())
-        {
-            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the issue limit for this asset");               
+        if(mc_gState->m_Features->NFTokens())
+        {        
+            if(quantity+last_total>entity.MaxTotalIssuance())
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the total limit for this asset");               
+            }
+            if(quantity>entity.MaxSingleIssuance())
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the issue limit for this asset");               
+            }
         }
         if(quantity > 0)
         {

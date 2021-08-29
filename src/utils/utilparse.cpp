@@ -1110,7 +1110,7 @@ bool CreateAssetBalanceList(const CTxOut& txout,mc_Buffer *amounts,mc_Script *lp
 }
 bool CreateAssetBalanceList(const CTxOut& txout,mc_Buffer *amounts,mc_Script *lpScript,int *required)
 {
-    return CreateAssetBalanceList(txout,amounts,lpScript,NULL,true);
+    return CreateAssetBalanceList(txout,amounts,lpScript,required,true);
 }
 
 bool CreateAssetBalanceList(const CTxOut& txout,mc_Buffer *amounts,mc_Script *lpScript)

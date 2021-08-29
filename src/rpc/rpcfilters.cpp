@@ -1079,8 +1079,15 @@ Value testfilter(const vector <uint160>& entities,string filter_code, Value txpa
                     {
                         all_inputs_found=false;                                            
                     }                    
-                }                
-            }
+                    else
+                    {
+                        if(!coins.IsAvailable(tx.vin[i].prevout.n))
+                        {
+                            all_inputs_found=false;                                                                        
+                        }
+                    }
+                }
+            }                
             if ( (filter_type == MC_FLT_TYPE_TX) && all_inputs_found)
             {
                 bool txsigned=true;
