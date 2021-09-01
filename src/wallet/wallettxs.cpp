@@ -3499,7 +3499,15 @@ uint64_t mc_GetExplorerTxOutputDetails(int rpc_slot,
                                 }
                                 if( (OutputScriptTags[i] & MC_MTX_TAG_LICENSE_TOKEN) == 0 )
                                 {
-                                    assets.insert(make_pair(asset,quantity));                                
+                                    std::map<uint160,int64_t>::iterator it = assets.find(asset);
+                                    if(it == assets.end())
+                                    {
+                                        assets.insert(make_pair(asset,quantity));                        
+                                    }
+                                    else
+                                    {
+                                        it->second += quantity;
+                                    }                            
                                 }
                             }
                         }
@@ -3543,7 +3551,18 @@ uint64_t mc_GetExplorerTxOutputDetails(int rpc_slot,
                     {
                         if(prev_element_is_entity)
                         {
-                            OutputScriptTags[i] |= (from < to) ? MC_MTX_TAG_GRANT_ENTITY : MC_MTX_TAG_REVOKE_ENTITY;
+                            if(type == MC_PTP_DETAILS)
+                            {
+                                if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,short_txid))
+                                {
+                                    OutputScriptTags[i] |= mc_EntityTypeToExplorerCode(entity.GetEntityType()) << MC_MTX_TAG_ENTITY_MASK_SHIFT;
+                                }
+                                OutputScriptTags[i] |= MC_MTX_TAG_ENTITY_UPDATE;
+                            }
+                            else
+                            {
+                                OutputScriptTags[i] |= (from < to) ? MC_MTX_TAG_GRANT_ENTITY : MC_MTX_TAG_REVOKE_ENTITY;
+                            }
                         }
                         else
                         {

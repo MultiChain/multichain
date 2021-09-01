@@ -217,7 +217,14 @@ Value TagEntry(uint64_t tag,bool tx)
     {
         if(entity=="asset")
         {
-            tags.push_back("issuemore-asset-details");
+            if(tag & MC_MTX_TAG_OP_RETURN)
+            {
+                tags.push_back("issuemore-asset-details");
+            }
+            else
+            {
+                tags.push_back("update-asset");                
+            }
         }
         else
         {
