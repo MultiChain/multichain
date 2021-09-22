@@ -1848,7 +1848,7 @@ bool MultiChainTransaction_ProcessTokenIssuance(const CTransaction& tx,
     vector <uint160> issuers;
     vector <uint32_t> issuer_flags;
     uint32_t flags;
-    uint32_t value_offset;
+    uint32_t value_offset,param_offset;
     size_t value_size;
     unsigned char* token_details;
     unsigned char* token_id;
@@ -1958,8 +1958,8 @@ bool MultiChainTransaction_ProcessTokenIssuance(const CTransaction& tx,
     }
     
     
-    value_offset=mc_FindSpecialParamInDetailsScript(token_details,token_details_size,MC_ENT_SPRM_UPDATE_NAME,&value_size);
-    if(value_offset<(uint32_t)token_details_size)
+    value_offset=mc_FindSpecialParamInDetailsScriptFull(token_details,token_details_size,MC_ENT_SPRM_UPDATE_NAME,&value_size,&param_offset);
+    if(param_offset<(uint32_t)token_details_size)
     {
         token_id=token_details+value_offset;
         token_id_size=(uint32_t)value_size;
@@ -1977,8 +1977,8 @@ bool MultiChainTransaction_ProcessTokenIssuance(const CTransaction& tx,
     
     if(issue_txid == 0)
     {
-        value_offset=mc_FindSpecialParamInDetailsScript(token_details,token_details_size,MC_ENT_SPRM_PARENT_ENTITY,&value_size);
-        if(value_offset<(uint32_t)token_details_size)
+        value_offset=mc_FindSpecialParamInDetailsScriptFull(token_details,token_details_size,MC_ENT_SPRM_PARENT_ENTITY,&value_size,&param_offset);
+        if(param_offset<(uint32_t)token_details_size)
         {
             if(value_size != sizeof(uint256))
             {
@@ -2584,7 +2584,10 @@ bool MultiChainTransaction_ProcessAssetIssuance(const CTransaction& tx,         
                 value_size=MC_ENT_MAX_NAME_SIZE;
             }
             
-            memcpy(asset_name,details->details_script+value_offset,value_size);
+            if(value_size)
+            {
+                memcpy(asset_name,details->details_script+value_offset,value_size);
+            }
             asset_name[value_size]=0x00;
         }
         value_offset=mc_FindSpecialParamInDetailsScript(details->details_script,details->details_script_size,MC_ENT_SPRM_ASSET_MULTIPLE,&value_size);

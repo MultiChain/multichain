@@ -53,11 +53,17 @@ bool mc_VerifyAssetPermissions(mc_Buffer *assets, vector<CTxDestination> address
 {
     mc_EntityDetails entity;
     int asset_count=-1;
+    int extra_token_count=0;
+    uint256 last_issue_txid=0;
+    int last_non_special=-1;
+    uint32_t all_restrictions=0;
+    
     
     for(int i=0;i<assets->GetCount();i++)
     {
         if(mc_gState->m_Assets->FindEntityByFullRef(&entity,assets->GetRow(i)))
         {
+            bool is_token=false;
             if(mc_gState->m_Features->NFTokens())
             {
                 if(entity.GetEntityType() == MC_ENT_TYPE_TOKEN)
@@ -75,10 +81,21 @@ bool mc_VerifyAssetPermissions(mc_Buffer *assets, vector<CTxDestination> address
                     {
                         reason="Token asset not found";
                         return false;                                                                                                    
-                    }                    
+                    }         
+                    if(issue_txid == last_issue_txid)
+                    {
+                        extra_token_count++;
+                    }
+                    else
+                    {
+                        extra_token_count=0;
+                        last_issue_txid=issue_txid;
+                    }
+                    is_token=true;
                 }
             }
-            if( entity.Permissions() & (MC_PTP_SEND | MC_PTP_RECEIVE) )
+            all_restrictions |= entity.Permissions();
+            if( all_restrictions & (MC_PTP_SEND | MC_PTP_RECEIVE) )
             {
                 if( (addressRets.size() != 1) || (required_permissions > 1) )
                 {
@@ -95,10 +112,18 @@ bool mc_VerifyAssetPermissions(mc_Buffer *assets, vector<CTxDestination> address
                             if(mc_GetABRefType(assets->GetRow(j)) != MC_AST_ASSET_REF_TYPE_SPECIAL)
                             {
                                 asset_count++;
+                                last_non_special=j;
                             }                            
                         }
                     }
-                    if(asset_count > 1)
+                                                                                // This check is needed to prevent with-permission asset being unspendable because
+                                                                                // of another no-permission asset in this output
+                                                                                // Multiple tokens for the same asset are allowed, we check only last token
+                                                                                // before extra_token_count is wrong before that
+                                                                                // all regular assets are checked - there should be no tokens in the output 
+                    if( (is_token && (i == last_non_special) && ((asset_count - extra_token_count) > 1)) ||
+                        (!is_token &&  (asset_count > 1) )   
+                      )
                     {                       
                         if(permission == MC_PTP_SEND)
                         {
@@ -417,7 +442,8 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
     
         for (int e = 0; e < lpScript->GetNumElements(); e++)
         {
-            err=mc_gState->m_TmpScript->GetInlineDetails(&token_details,&token_details_size);
+            lpScript->SetElement(e);
+            err=lpScript->GetInlineDetails(&token_details,&token_details_size);
             if(err == 0)
             {
 /*                

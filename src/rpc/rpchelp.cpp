@@ -1606,7 +1606,7 @@ void mc_InitRPCHelpMap06()
             "\nArguments:\n"
             "1. \"txid\"                           (string, required) Transaction ID of the output prepared by preparelockunspent.\n"
             "2. vout                             (numeric, required) Output index\n"
-            "3. ask-assets                       (object, required) A JSON object of assets to send, see help amounts-all for details. k\n"
+            "3. ask-assets                       (object, required) A JSON object of assets to send, see help amounts-all for details. \n"
             "\nResult:\n"
             "\"transaction\"                       (string) hex string of the transaction\n"
             "\nExamples:\n"

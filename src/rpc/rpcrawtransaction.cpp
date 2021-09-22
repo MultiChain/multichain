@@ -411,9 +411,14 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
 /* MCHN END */    
         vout.push_back(out);
     }
+    
     entry.push_back(Pair("vout", vout));
     if(is_issuefirst || is_issuemore)
     {
+        uint32_t followon_mode=MC_ENT_FOMD_NONE;
+        uint32_t per_asset_permissions=MC_PTP_ADMIN | MC_PTP_ACTIVATE;
+        int64_t max_total=MC_ENT_DEFAULT_MAX_ASSET_TOTAL;
+        int64_t max_issue=MC_ENT_DEFAULT_MAX_ASSET_TOTAL;
         Object issue;
         Object details;
         uint32_t offset,next_offset,param_value_start;
@@ -446,11 +451,30 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                         {
                             case MC_ENT_SPRM_FOLLOW_ONS:
                                 if( (param_value_size > 0) && (param_value_size <= 4) )
-                                {
-                                    if(mc_GetLE(details_script+param_value_start,param_value_size))
+                                {        
+                                    followon_mode=mc_GetLE(details_script+param_value_start,param_value_size);
+                                    if(followon_mode)                           // It is wrong, but we cannot change it for old protocols
                                     {
-                                        is_open=true;
+                                        is_open=true;                           
                                     }
+                                }
+                                break;
+                            case MC_ENT_SPRM_PERMISSIONS:
+                                if( (param_value_size > 0) && (param_value_size <= 4) )
+                                {        
+                                    per_asset_permissions=mc_GetLE(details_script+param_value_start,param_value_size);
+                                }
+                                break;                                
+                            case MC_ENT_SPRM_ASSET_MAX_TOTAL:
+                                if( (param_value_size > 0) && (param_value_size <= 8) )
+                                {        
+                                    max_total=mc_GetLE(details_script+param_value_start,param_value_size);
+                                }
+                                break;
+                            case MC_ENT_SPRM_ASSET_MAX_ISSUE:
+                                if( (param_value_size > 0) && (param_value_size <= 8) )
+                                {        
+                                    max_issue=mc_GetLE(details_script+param_value_start,param_value_size);
                                 }
                                 break;
                         }
@@ -465,8 +489,45 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                 {
                     issue.push_back(Pair("name", string(asset_name)));            
                 }
-                issue.push_back(Pair("multiple", multiple));            
-                issue.push_back(Pair("open", is_open));            
+                issue.push_back(Pair("multiple", multiple));      
+                if(mc_gState->m_Features->NFTokens())
+                {
+                    issue.push_back(Pair("open", (followon_mode & (MC_ENT_FOMD_ALLOWED_INSTANT | MC_ENT_FOMD_ALLOWED_WITH_APPROVAL)) ? true : false));        
+                    if((followon_mode & MC_ENT_FOMD_ANYONE_CAN_ISSUEMORE) == 0)
+                    {
+                        per_asset_permissions |= MC_PTP_ISSUE;
+                    }
+                    Object pObject;
+                    pObject.push_back(Pair("send",(per_asset_permissions & MC_PTP_SEND) ? true : false));
+                    pObject.push_back(Pair("receive",(per_asset_permissions & MC_PTP_RECEIVE) ? true : false));
+                    pObject.push_back(Pair("issue",(per_asset_permissions & MC_PTP_ISSUE) ? true : false));
+                    issue.push_back(Pair("restrict",pObject));                                            
+                    issue.push_back(Pair("fungible",(followon_mode & MC_ENT_FOMD_NON_FUNGIBLE_TOKENS) ? false : true));                                                    
+                    issue.push_back(Pair("canopen",(followon_mode & MC_ENT_FOMD_CAN_OPEN) ? true : false));                                                    
+                    issue.push_back(Pair("canclose",(followon_mode & MC_ENT_FOMD_CAN_CLOSE) ? true : false));                                                    
+                    double units=1.;
+                    units= 1./(double)multiple;                    
+                    if(max_total != MC_ENT_DEFAULT_MAX_ASSET_TOTAL)
+                    {
+                        issue.push_back(Pair("totallimit",(double)max_total*units));                                                                            
+                    }
+                    else
+                    {
+                        issue.push_back(Pair("totallimit",Value::null));                                                                                                    
+                    }
+                    if(max_issue != MC_ENT_DEFAULT_MAX_ASSET_TOTAL)
+                    {
+                        issue.push_back(Pair("issuelimit",(double)max_issue*units));                                                                            
+                    }
+                    else
+                    {
+                        issue.push_back(Pair("issuelimit",Value::null));                                                                                                    
+                    }                    
+                }
+                else
+                {
+                    issue.push_back(Pair("open", is_open));                     
+                }
             }        
             if(is_issuemore)
             {
