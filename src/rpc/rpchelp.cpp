@@ -2415,7 +2415,7 @@ void mc_InitRPCHelpMap10()
             "\nExamples:\n"
             + HelpExampleCli("issue", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"Dollar\" 1000000")
             + HelpExampleCli("issue", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" Dollar 1000000 0.01 0.01 ")
-            + HelpExampleRpc("issue", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"Dollar\", 1000000, 0.01, 0.01 \"description=1 Million dollars\"")
+            + HelpExampleRpc("issue", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"Dollar\", 1000000, 0.01, 0.01 ")
         ));
     
     mapHelpStrings.insert(std::make_pair("issuefrom",
@@ -2449,7 +2449,7 @@ void mc_InitRPCHelpMap10()
             "\nExamples:\n"
             + HelpExampleCli("issuefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"Dollar\" 1000000")
             + HelpExampleCli("issuefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" Dollar 1000000 0.01 0.01 ")
-            + HelpExampleRpc("issuefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"Dollar\", 1000000, 0.01, 0.01 \"description=1 Million dollars\"")
+            + HelpExampleRpc("issuefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"Dollar\", 1000000, 0.01, 0.01")
         ));
     
     mapHelpStrings.insert(std::make_pair("issuemore",
@@ -2459,14 +2459,7 @@ void mc_InitRPCHelpMap10()
             "\nArguments:\n"
             "1. \"address\"                        (string, required) The address to send newly created asset to.\n"
             "2. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
-            "3. quantity                         (numeric, required) Fungible assets. The asset total amount in display units. eg. 1234.56\n"
-            " or\n"
-            "3. token-quantity                   (object, required) Non-fungible assets.\n"
-            "     {\n"
-            "        \"token\" : \"token-identifier\" (string, required) Token identifier\n"     
-            "        \"qty\" : n                    (numeric, required) The asset total amount in raw units \n"
-            "        \"details\" : {...}            (object, optional) A JSON object with custom fields\n"           
-            "     }\n"                                
+            "3. quantity                         (numeric, required) The asset total amount in display units. eg. 1234.56. \n"
             "4. native-amount                    (numeric, optional) native currency amount to send. eg 0.1, Default: minimum-per-output.\n"
             "5  custom-fields                    (object, optional)  a JSON object with custom fields\n"
             "     {...}\n"
@@ -2475,7 +2468,7 @@ void mc_InitRPCHelpMap10()
             "\nExamples:\n"
             + HelpExampleCli("issuemore", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"Dollar\" 1000000")
             + HelpExampleCli("issuemore", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" Dollar 1000000 0.01 ")
-            + HelpExampleRpc("issuemore", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"Dollar\", 1000000,  0.01 \"description=1 Million dollars\"")
+            + HelpExampleRpc("issuemore", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"Dollar\", 1000000,  0.01")
         ));
     
     mapHelpStrings.insert(std::make_pair("issuemorefrom",
@@ -2486,14 +2479,7 @@ void mc_InitRPCHelpMap10()
             "1. \"from-address\"                   (string, required) Address used for issuing.\n"
             "2. \"to-address\"                     (string, required) The  address to send newly created asset to.\n"
             "3. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
-            "4. quantity                         (numeric, required) Fungible assets. The asset total amount in display units. eg. 1234.56\n"
-            " or\n"
-            "4. token-quantity                   (object, required) Non-fungible assets.\n"
-            "     {\n"
-            "        \"token\" : \"token-identifier\" (string, required) Token identifier\n"     
-            "        \"qty\" : n                    (numeric) The asset total amount in raw units \n"
-            "        \"details\" : {...}            (object, optional) A JSON object with custom fields\n"           
-            "     }\n"                                
+            "4. quantity                         (numeric, required) The asset total amount in display units. eg. 1234.56. \n"
             "5. native-amount                    (numeric, optional) native currency amount to send. eg 0.1, Default: minimum-per-output.\n"
             "6  custom-fields                    (object, optional)  a JSON object with custom fields\n"
             "     {...}\n"
@@ -2502,7 +2488,7 @@ void mc_InitRPCHelpMap10()
             "\nExamples:\n"
             + HelpExampleCli("issuemorefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"Dollar\" 1000000")
             + HelpExampleCli("issuemorefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" Dollar 1000000 0.01 ")
-            + HelpExampleRpc("issuemorefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"Dollar\", 1000000, 0.01 \"description=1 Million dollars\"")
+            + HelpExampleRpc("issuemorefrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"Dollar\", 1000000, 0.01")
         ));
     
 }
@@ -4100,14 +4086,21 @@ void mc_InitRPCHelpMap16()
             "       }\n"                                
             "   }\n"                                
             "      or \n"
-            "   {                                   (object) A JSON object describing follow-on asset issue\n"
+            "   {                                   (object) A JSON object describing follow-on issue for fungible asset\n"
             "     \"issuemore\" : \n"
             "       {\n"
             "          \"asset\" : \"asset-identifier\" (string, required) Asset identifier - one of: issue txid. asset reference, asset name.\n"
-            "          \"token\" : \"token-identifier\" (string, required for non-fungible assets) Token identifier\n"     
             "          \"raw\" : n                    (numeric, required for fungible assets) The asset total amount in raw units \n"
-            "          \"qty\" : n                    (numeric, required for non-fungible assets) The asset total amount in raw units \n"
-            "          \"details\" : {...}            (object, optional, only for non-fungible assets) A JSON object with custom fields\n"           
+            "       }\n"                                
+            "   }\n"                                
+            "      or \n"
+            "   {                                   (object) A JSON object describing token issue\n"
+            "     \"issuetoken\" : \n"
+            "       {\n"
+            "          \"asset\" : \"asset-identifier\" (string, required) Asset identifier - one of: issue txid. asset reference, asset name.\n"
+            "          \"token\" : \"token-identifier\" (string, required) Token identifier\n"     
+            "          \"qty\" : n                    (numeric, required) The number of token units to issue. \n"
+            "          \"details\" : {...}            (object, optional) A JSON object with custom fields\n"           
             "       }\n"                                
             "   }\n"                                
             "      or \n"
@@ -5645,6 +5638,47 @@ void mc_InitRPCHelpMap24()
         ));
     
 
+    mapHelpStrings.insert(std::make_pair("issuetoken",
+            "issuetoken \"address\" \"asset-identifier\" \"token-identifier\" quantity ( native-amount token-details )\n"
+            "\nCreate tokens for non-fungible asset\n"
+            + HelpRequiringPassphraseWrapper() +
+            "\nArguments:\n"
+            "1. \"address\"                        (string, required) The address to send newly created token to.\n"
+            "2. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
+            "3. \"token-identifier\"               (string, required) Token identifier.\n"
+            "4. quantity                         (numeric, required) The number of token units to issue.\n"
+            "5. native-amount                    (numeric, optional) native currency amount to send. eg 0.1, Default: minimum-per-output.\n"
+            "6. token-details                    (object, optional)  a JSON object with token details\n"
+            "     {...}\n"
+            "\nResult:\n"
+            "\"transactionid\"                     (string) The transaction id.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("issuetoken", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"Asset1\" \"Token1\" 1000000")
+            + HelpExampleCli("issuetoken", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" Asset1 Token1 1000000 0.01 ")
+            + HelpExampleRpc("issuetoken", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"Asset1\", \"Token1\", 1000000,  0.01")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("issuetokenfrom",
+            "issuetokenfrom \"from-address\" \"address\" \"asset-identifier\" \"token-identifier\" quantity ( native-amount token-details)\n"
+            "\nCreate tokens for non-fungible asset from specific address\n"
+            + HelpRequiringPassphraseWrapper() +
+            "\nArguments:\n"
+            "1. \"from-address\"                   (string, required) Address used for issuing.\n"
+            "2. \"address\"                        (string, required) The address to send newly created token to.\n"
+            "3. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
+            "4. \"token-identifier\"               (string, required) Token identifier.\n"
+            "5. quantity                         (numeric, required) The number of token units to issue.\n"
+            "6. native-amount                    (numeric, optional) native currency amount to send. eg 0.1, Default: minimum-per-output.\n"
+            "7. token-details                    (object, optional)  a JSON object with token details\n"
+            "     {...}\n"
+            "\nResult:\n"
+            "\"transactionid\"                     (string) The transaction id.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("issuetokenfrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"Asset1\" \"Token1\" 1000000")
+            + HelpExampleCli("issuetokenfrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" Asset1 Token1 1000000 0.01 ")
+            + HelpExampleRpc("issuetokenfrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"Asset1\", \"Token1\", 1000000,  0.01")
+        ));
+        
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));

@@ -729,7 +729,7 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                         }
                     }
                     
-                    if(lpScript->GetNumElements() == 3)                         // Publish or set variable
+                    if(lpScript->GetNumElements() == 3)                         // Publish or set variable or update asset details
                     {
                         unsigned char short_txid[MC_AST_SHORT_TXID_SIZE];
                         lpScript->SetElement(0);
@@ -738,6 +738,30 @@ bool ParseMultichainTxOutToBuffer(uint256 hash,                                 
                             mc_EntityDetails entity;
                             if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,short_txid))
                             {
+                                if(entity.GetEntityType() == MC_ENT_TYPE_ASSET)
+                                {
+                                    if(required)
+                                    {
+                                        *required |= MC_PTP_ISSUE;                    
+                                    }
+                                    if(mapSpecialEntity)
+                                    {
+                                        std::map<uint32_t,uint256>::const_iterator it = mapSpecialEntity->find(MC_PTP_ISSUE);
+                                        if (it == mapSpecialEntity->end())
+                                        {
+                                            mapSpecialEntity->insert(make_pair(MC_PTP_ISSUE,*(uint256*)(entity.GetTxID())));
+                                        }
+                                        else
+                                        {
+                                            if(it->second != *(uint256*)(entity.GetTxID()))
+                                            {
+                                                strFailReason="Invalid update script, multiple assets";
+                                                return false;                                                                                                            
+                                            }
+                                        }
+                                    }                                                                        
+                                }                                    
+                                
                                 if(entity.GetEntityType() == MC_ENT_TYPE_STREAM)
                                 {
                                     if(entity.AnyoneCanWrite() == 0)

@@ -611,10 +611,8 @@ Value issuecmd(const Array& params, bool fHelp)
     return issuefromcmd(ext_params,fHelp);    
 }
 
-Value issuemorefromcmd(const Array& params, bool fHelp)
+Value issuemorefrom_operation(const Array& params, bool is_token)
 {
-    if (fHelp || params.size() < 4 || params.size() > 6)
-        throw runtime_error("Help message not found\n");
 
     CBitcoinAddress address(params[1].get_str());
     if (!address.IsValid())
@@ -665,6 +663,7 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     {
         quantity = (int64_t)(raw_qty.get_real() * multiple + 0.499999);
     }
+
     
     if(quantity<0)
     {
@@ -678,11 +677,26 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     int64_t last_total=mc_gState->m_Assets->GetTotalQuantity(&entity);
     
     if(!fungible)
-    {
-        if( (quantity != 0) && (params[3].type() != obj_type) )
+    {    
+        if(params[3].type() == obj_type)
         {
-            throw JSONRPCError(RPC_NOT_SUPPORTED, "Quantity should be either 0 or object for non-fungible token asset ");               
+            if(!is_token)
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "Invalid quantity, must be 0 if adding custom fields to non-fungible assets");   
+            }            
         }
+        else
+        {
+            if(quantity != 0)
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "Invalid quantity, must be 0 if adding custom fields to non-fungible assets");                           
+            }
+            if (params.size() <= 5)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Custom fields required for non-fungible assets");                                           
+            }            
+        }
+        
         string token;
         int64_t raw=0;
         int errorCode=RPC_INVALID_PARAMETER;
@@ -738,6 +752,10 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     {
         if(params[3].type() == obj_type)
         {
+            if(is_token)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Issuing tokens not supported for this asset");                   
+            }
             throw JSONRPCError(RPC_NOT_SUPPORTED, "Invalid quantity, should be numeric");   
         }        
         if(mc_gState->m_Features->NFTokens())
@@ -961,9 +979,17 @@ exitlbl:
     return wtx.GetHash().GetHex();    
 }
  
-Value issuemorecmd(const Array& params, bool fHelp)
+Value issuemorefrom(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 3)
+    if (fHelp || params.size() < 4 || params.size() > 6)
+        throw runtime_error("Help message not found\n");
+    
+    return issuemorefrom_operation(params,false);    
+}
+
+Value issuemore(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 3 || params.size() > 5)
         throw runtime_error("Help message not found\n");
 
     Array ext_params;
@@ -973,8 +999,54 @@ Value issuemorecmd(const Array& params, bool fHelp)
         ext_params.push_back(value);
     }
     
-    return issuemorefromcmd(ext_params,fHelp);
+    return issuemorefrom(ext_params,fHelp);  
 }    
+
+Value issuetokenfrom(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 5 || params.size() > 7)
+        throw runtime_error("Help message not found\n");
+    
+    if(mc_gState->m_Features->NFTokens() == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
+    }   
+    
+    Array ext_params;
+    Object token_details;
+    token_details.push_back(Pair("token",params[3]));
+    token_details.push_back(Pair("qty",params[4]));
+    if(params.size()>6)
+    {
+        token_details.push_back(Pair("details",params[6]));        
+    }
+    
+    ext_params.push_back(params[0]);
+    ext_params.push_back(params[1]);
+    ext_params.push_back(params[2]);
+    ext_params.push_back(token_details);
+    if(params.size()>5)
+    {
+        ext_params.push_back(params[5]);        
+    }    
+    return issuemorefrom_operation(ext_params,true);    
+}
+
+Value issuetoken(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 4 || params.size() > 6)
+        throw runtime_error("Help message not found\n");
+    
+    Array ext_params;
+    ext_params.push_back("*");
+    BOOST_FOREACH(const Value& value, params)
+    {
+        ext_params.push_back(value);
+    }
+    
+    return issuetokenfrom(ext_params,fHelp);    
+}
+
 
 Value getmultibalances_operation(const Array& params, bool fHelp,bool aggregate_tokens)
 {
@@ -1095,10 +1167,17 @@ Value getmultibalances_operation(const Array& params, bool fHelp,bool aggregate_
             mc_EntityDetails entity;
             ParseEntityIdentifier(inputStrings[is],&entity, MC_ENT_TYPE_ASSET);           
             uint256 hash=*(uint256*)entity.GetTxID();
+            if(!aggregate_tokens)
+            {
+                if(entity.IsNFTAsset() == 0)
+                {
+                    throw JSONRPCError(RPC_NOT_ALLOWED, "Token balances are only available for non-fungible assets");         
+                }
+            }
             if (setAssets.count(hash))
             {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, duplicate asset: " + inputStrings[is]);                        
-            }
+            }            
             setAssets.insert(hash);
         }
     }
@@ -1428,6 +1507,11 @@ Value gettokenbalances(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 5)
         throw runtime_error("Help message not found\n");
+    
+    if(mc_gState->m_Features->NFTokens() == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
+    }   
     
     return getmultibalances_operation(params,fHelp,false);
 }

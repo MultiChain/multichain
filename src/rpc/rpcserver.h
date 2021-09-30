@@ -241,7 +241,8 @@ extern json_spirit::Value combineunspent(const json_spirit::Array& params, bool 
 extern json_spirit::Value grantcmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value revokecmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value issuecmd(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value issuemorecmd(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value issuemore(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value issuetoken(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listassets(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listpermissions(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listminers(const json_spirit::Array& params, bool fHelp);
@@ -261,7 +262,8 @@ extern json_spirit::Value approvefrom(const json_spirit::Array& params, bool fHe
 extern json_spirit::Value grantfromcmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value revokefromcmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value issuefromcmd(const json_spirit::Array& params, bool fHelp);
-extern json_spirit::Value issuemorefromcmd(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value issuemorefrom(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value issuetokenfrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value sendassetfrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value sendfromaddress(const json_spirit::Array& params, bool fHelp);
