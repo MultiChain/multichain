@@ -1214,6 +1214,12 @@ void mc_MultiChainFilterEngine::SetCallbackNamesInternal()
         callbacks.push_back("getvariablevalue");
         callbacks.push_back("getvariablehistory");
     }
+
+    if(mc_gState->m_NetworkParams->ProtocolVersion() >= 20013)
+    {
+        callbacks.push_back("getfiltertokenbalances");        
+        callbacks.push_back("listassetissues");
+    }
     
     m_CallbackNames.push_back(callbacks);                                       // Stream filters callbacks
     

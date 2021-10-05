@@ -16,6 +16,8 @@ static std::map<std::string, rpcfn_type> FilterCallbackFunctions{
     CALLBACK_LOOKUP(getfilterstreamitem),
     CALLBACK_LOOKUP(getfilterstream),
     CALLBACK_LOOKUP(getfilterassetbalances),
+    CALLBACK_LOOKUP(getfiltertokenbalances),
+    CALLBACK_LOOKUP(listassetissues),            
     CALLBACK_LOOKUP(getvariableinfo),
     CALLBACK_LOOKUP(getvariablevalue),
     CALLBACK_LOOKUP(getvariablehistory),

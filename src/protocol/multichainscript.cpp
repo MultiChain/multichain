@@ -31,10 +31,12 @@
 #define MC_DCT_SCRIPT_MULTICHAIN_ASSET_QUANTITY_PREFIX 'q'
 #define MC_DCT_SCRIPT_MULTICHAIN_ASSET_DETAILS_PREFIX 'a'
 #define MC_DCT_SCRIPT_MULTICHAIN_ASSET_FOLLOWON_PREFIX 'o'
+#define MC_DCT_SCRIPT_MULTICHAIN_ASSET_TOKEN_PREFIX 't'
 #define MC_DCT_SCRIPT_MULTICHAIN_GENERAL_DETAILS_PREFIX 'c'
 #define MC_DCT_SCRIPT_MULTICHAIN_EXTENDED_DETAILS_PREFIX 'c'
 #define MC_DCT_SCRIPT_MULTICHAIN_DATA_FORMAT_PREFIX 'f'
 #define MC_DCT_SCRIPT_MULTICHAIN_RAW_DATA_PREFIX 'd'
+#define MC_DCT_SCRIPT_MULTICHAIN_INLINE_DETAILS 'l'
 
 #define MC_DCT_SCRIPT_EXTENDED_TYPE_CHUNK_DEF              0xF0
 
@@ -1982,6 +1984,11 @@ int mc_Script::GetFullRef(unsigned char *ref,uint32_t *script_type)
         *script_type=MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON;
     }
     
+    if(ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN] == MC_DCT_SCRIPT_MULTICHAIN_ASSET_TOKEN_PREFIX)
+    {
+        *script_type=MC_SCR_ASSET_SCRIPT_TYPE_TOKEN;
+    }
+    
     if(*script_type == 0)
     {
         return MC_ERR_WRONG_SCRIPT;        
@@ -2072,6 +2079,15 @@ int mc_Script::GetAssetQuantities(mc_Buffer *amounts,uint32_t script_type)
         }
     }
     
+    if(script_type & MC_SCR_ASSET_SCRIPT_TYPE_TOKEN)
+    {
+        if(ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN] == MC_DCT_SCRIPT_MULTICHAIN_ASSET_TOKEN_PREFIX)
+        {
+            valid_identitfier=1;
+            found_script_type=MC_SCR_ASSET_SCRIPT_TYPE_TOKEN;
+        }
+    }
+    
     if(valid_identitfier == 0)
     {
         return MC_ERR_WRONG_SCRIPT;        
@@ -2159,6 +2175,9 @@ int mc_Script::SetAssetQuantities(mc_Buffer *amounts,uint32_t script_type)
             break;
         case MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON:
             ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_ASSET_FOLLOWON_PREFIX;
+            break;
+        case MC_SCR_ASSET_SCRIPT_TYPE_TOKEN:
+            ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_ASSET_TOKEN_PREFIX;
             break;
         default:
             return MC_ERR_INVALID_PARAMETER_VALUE;
@@ -2361,6 +2380,45 @@ int mc_Script::GetRawData(unsigned char **data,int *size)
     return MC_ERR_NOERROR;        
 }
 
+int mc_Script::GetInlineDetails(unsigned char **data,int *size)
+{
+    unsigned char *ptr;
+    unsigned char *ptrEnd;
+    
+    if(m_CurrentElement<0)
+    {
+        return MC_ERR_INVALID_PARAMETER_VALUE;
+    }
+    
+    if(m_lpCoord[m_CurrentElement*2+1] < MC_DCT_SCRIPT_IDENTIFIER_LEN+1+1)
+    {
+        return MC_ERR_WRONG_SCRIPT;
+    }
+    
+    ptr=m_lpData+m_lpCoord[m_CurrentElement*2+0];
+    ptrEnd=ptr+m_lpCoord[m_CurrentElement*2+1];
+    
+    if(memcmp(ptr,MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN) != 0)
+    {
+        return MC_ERR_WRONG_SCRIPT;
+    }
+        
+    if(ptr[MC_DCT_SCRIPT_IDENTIFIER_LEN] != MC_DCT_SCRIPT_MULTICHAIN_INLINE_DETAILS)
+    {
+        return MC_ERR_WRONG_SCRIPT;            
+    }
+    
+    ptr+=MC_DCT_SCRIPT_IDENTIFIER_LEN+1;
+    
+    if(data)
+    {
+        *data=ptr;
+        *size=ptrEnd-ptr;
+    }
+    
+    return MC_ERR_NOERROR;        
+}
+
 int mc_Script::SetRawData(const unsigned char *data,const int size)
 {
     int err;
@@ -2374,6 +2432,38 @@ int mc_Script::SetRawData(const unsigned char *data,const int size)
     
     memcpy(buf,MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
     buf[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_RAW_DATA_PREFIX;        
+    
+    err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+1);
+    if(err)
+    {
+        return err;
+    }
+
+    if(size)
+    {
+        err=SetData(data,size);
+        if(err)
+        {
+            return err;
+        }
+    }
+
+    return MC_ERR_NOERROR;        
+}
+
+int mc_Script::SetInlineDetails(const unsigned char *data,const int size)
+{
+    int err;
+    unsigned char buf[MC_DCT_SCRIPT_IDENTIFIER_LEN+1];
+    
+    err=AddElement();
+    if(err)
+    {
+        return err;
+    }
+    
+    memcpy(buf,MC_DCT_SCRIPT_MULTICHAIN_IDENTIFIER,MC_DCT_SCRIPT_IDENTIFIER_LEN);
+    buf[MC_DCT_SCRIPT_IDENTIFIER_LEN]=MC_DCT_SCRIPT_MULTICHAIN_INLINE_DETAILS;        
     
     err=SetData(buf,MC_DCT_SCRIPT_IDENTIFIER_LEN+1);
     if(err)

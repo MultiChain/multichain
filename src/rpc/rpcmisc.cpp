@@ -120,7 +120,7 @@ Value getinfo(const Array& params, bool fHelp)
         obj.push_back(Pair("streams",       (int)entity_count));        
     }
 
-    if(mc_gState->m_WalletMode & MC_WMD_EXPLORER)
+    if(mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK)
     {
         mc_TxEntity entity;
 
@@ -192,7 +192,7 @@ Value getchaintotals(const json_spirit::Array& params, bool fHelp)
     obj.push_back(Pair("rewards",        chain_balance));
     
 
-    if(mc_gState->m_WalletMode & MC_WMD_EXPLORER)
+    if(mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK)
     {
         mc_TxEntity entity;
 
