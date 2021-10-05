@@ -43,7 +43,7 @@ public:
 };
 
 extern void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
-extern Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDetails = false, int verbose_level = 1);
+extern Object blockToJSON(CBlock& block, const CBlockIndex* blockindex, bool txDetails = false, int verbose_level = 1);
 
 static RestErr RESTERR(enum HTTPStatusCode status, string message)
 {

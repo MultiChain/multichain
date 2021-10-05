@@ -749,7 +749,10 @@ Array PermissionEntries(const CTxOut& txout,mc_Script *lpScript,bool fLong)
                 }
                 if( (type & MC_PTP_FILTER) == 0)
                 {
-                    results.push_back(entry);
+                    if( (mc_gState->m_Features->NFTokens() == 0) || ( (type & MC_PTP_DETAILS) == 0) )
+                    {
+                        results.push_back(entry);
+                    }
                 }
             }            
             else
@@ -2066,6 +2069,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
 // 0x0100 skip all quantities and add "type":"asset|
 // 0x0200 skip list of issuers in issues list
 // 0x0400 skip details in issues list
+// 0x0800 replace "name" by "asset" 
     Object entry;
     mc_EntityDetails entity;
     mc_EntityDetails sec_entity;
@@ -2073,6 +2077,9 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
     mc_EntityDetails *followon;
     mc_TxEntityStat entStat;
     unsigned char *ptr;
+    size_t value_size;
+    Value token=Value::null;
+    bool nft_asset=false;
 
     genesis_entity=&sec_entity;
     followon=&sec_entity;
@@ -2104,11 +2111,46 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
             entry.push_back(Pair("type", "asset"));                        
         }
         
+        if(mc_gState->m_Features->NFTokens())
+        {
+            if((entity.GetEntityType() == MC_ENT_TYPE_TOKEN) || ( (entity.IsFollowOn() != 0) && (genesis_entity->IsNFTAsset() != 0) ) )
+            {
+                nft_asset=true;
+                ptr=(unsigned char *)entity.GetUpdateName(&value_size);                
+//                ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_UPDATE_NAME,&value_size);
+                if(ptr)
+                {
+                    string token_name ((char*)ptr,value_size);
+                    token=token_name;
+                }      
+                if(entity.GetEntityType() == MC_ENT_TYPE_TOKEN)
+                {
+                    ptr=(unsigned char *)entity.GetParentTxID();
+//                    ptr=(unsigned char *)entity.GetSpecialParam(MC_ENT_SPRM_PARENT_ENTITY,&value_size);
+                    if(ptr)
+                    {
+                        if(mc_gState->m_Assets->FindEntityByTxID(genesis_entity,ptr))
+                        {
+                            hash=*(uint256*)ptr;
+                        }
+                    }      
+                }
+            }
+        }
+        
         ptr=(unsigned char *)genesis_entity->GetName();
         if(ptr && strlen((char*)ptr))
         {
-            entry.push_back(Pair("name", string((char*)ptr)));            
+            if(output_level & 0x0800)
+            {
+                entry.push_back(Pair("asset", string((char*)ptr)));                            
+            }
+            else
+            {
+                entry.push_back(Pair("name", string((char*)ptr)));            
+            }
         }
+        
         if(output_level & 0x0004)
         {
             entry.push_back(Pair("issuetxid", hash.GetHex()));
@@ -2129,11 +2171,15 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
             assetref += itostr((int)mc_GetLE(ptr+8,2));
             entry.push_back(Pair("assetref", assetref));
         }
+        if(nft_asset)
+        {
+            entry.push_back(Pair("token", token));
+        }
 
+        
         entStat.Zero();
         memcpy(&entStat,genesis_entity->GetShortRef(),mc_gState->m_NetworkParams->m_AssetRefSize);
         
-        size_t value_size;
         int64_t offset,new_offset;
         int64_t raw_output;
         uint32_t value_offset;
@@ -2170,6 +2216,31 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                         pObject.push_back(Pair("issue",(entity.AnyoneCanIssueMore()) ? false : true));
                     }
                     entry.push_back(Pair("restrict",pObject));                                            
+                }
+                if(mc_gState->m_Features->NFTokens())
+                {
+                    entry.push_back(Pair("fungible",(entity.IsNFTAsset() == 0)));                                                    
+                    entry.push_back(Pair("canopen",(entity.AdminCanOpen() != 0)));                                                    
+                    entry.push_back(Pair("canclose",(entity.AdminCanClose() != 0)));                
+                    int64_t raw_value;
+                    raw_value=entity.MaxTotalIssuance();
+                    if(raw_value != MC_ENT_DEFAULT_MAX_ASSET_TOTAL)
+                    {
+                        entry.push_back(Pair("totallimit",(double)raw_value*units));                                                                            
+                    }
+                    else
+                    {
+                        entry.push_back(Pair("totallimit",Value::null));                                                                                                    
+                    }
+                    raw_value=entity.MaxSingleIssuance();
+                    if(raw_value != MC_ENT_DEFAULT_MAX_ASSET_TOTAL)
+                    {
+                        entry.push_back(Pair("issuelimit",(double)raw_value*units));                                                                            
+                    }
+                    else
+                    {
+                        entry.push_back(Pair("issuelimit",Value::null));                                                                                                    
+                    }
                 }
             }
         }
@@ -2210,6 +2281,8 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         Array issues;
         int64_t total=0;
         int32_t issue_count=1;
+        mc_EntityDetails last_entity;
+        
         
         if(( (output_level & 0x0020) !=0 ) )// ||                                   // issuers
                                                                                 // For listassets with followons
@@ -2217,15 +2290,24 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         {
             total=0;
             int64_t qty;
+            mc_gState->m_Assets->FindLastEntity(&last_entity,genesis_entity);            
+            
+            issue_count=mc_GetEntityIndex(&last_entity)+1;
             mc_Buffer *followons;
+            followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(&last_entity,issue_count,0);
+            for(int i=followons->GetCount()-1;i>=0;i--)
+            {
+                Object issue;
+                followon=(mc_EntityDetails *)followons->GetRow(i);
+/*                
             followons=mc_gState->m_Assets->GetFollowOns(txid);
             issue_count=followons->GetCount();
             for(int i=followons->GetCount()-1;i>=0;i--)
             {
                 Object issue;
-//                mc_EntityDetails followon;
                 followon->Zero();
                 if(mc_gState->m_Assets->FindEntityByTxID(followon,followons->GetRow(i)))
+ */ 
                 {
                     qty=followon->GetQuantity();
                     total+=qty;
@@ -2285,6 +2367,20 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
                         if(vfields.type() == null_type)
                         {                        
                             vfields=followon_fields;
+                        }
+                        if(genesis_entity->IsNFTAsset())
+                        {
+                            ptr=(unsigned char *)followon->GetUpdateName(&value_size);                
+//                            ptr=(unsigned char *)followon->GetSpecialParam(MC_ENT_SPRM_UPDATE_NAME,&value_size);
+                            if(ptr)
+                            {
+                                string token_name ((char*)ptr,value_size);
+                                issue.push_back(Pair("token", token_name));
+                            }      
+                            else
+                            {
+                                issue.push_back(Pair("token", Value::null));                                
+                            }
                         }
                         if( (output_level & 0x0400) == 0)
                         {
@@ -2426,7 +2522,7 @@ mc_Buffer *mc_GetEntityTxIDList(uint32_t entity_type,int req_count,int req_start
     return mc_gState->m_Assets->GetEntityList(NULL,NULL,entity_type);
 }
 
-Array AssetHistory(mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level,string& lasttxid,Array& lastwriters,int& lastvout)
+Array AssetHistory(mc_EntityDetails *asset_entity,mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level,string& lasttxid,Array& lastwriters,int& lastvout)
 {
     size_t value_size;
     int64_t offset,new_offset;
@@ -2525,6 +2621,20 @@ Array AssetHistory(mc_EntityDetails *last_entity,uint64_t multiple,int count,int
                     {                        
                         vfields=followon_fields;
                     }
+                    if(asset_entity->IsNFTAsset())
+                    {
+                        ptr=(unsigned char *)followon->GetUpdateName(&value_size);                
+//                        ptr=(unsigned char *)followon->GetSpecialParam(MC_ENT_SPRM_UPDATE_NAME,&value_size);
+                        if(ptr)
+                        {
+                            string token_name ((char*)ptr,value_size);
+                            issue.push_back(Pair("token", token_name));
+                        }      
+                        else
+                        {
+                            issue.push_back(Pair("token", Value::null));                            
+                        }
+                    }
                     if(output_level & 0x0040)
                     {
                         issue.push_back(Pair("details",vfields)); 
@@ -2556,13 +2666,13 @@ Array AssetHistory(mc_EntityDetails *last_entity,uint64_t multiple,int count,int
     return issues;
 }
 
-Array AssetHistory(mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level)
+Array AssetHistory(mc_EntityDetails *asset_entity,mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level)
 {
     string lasttxid;
     Array lastwriters;
     int lastvout;
     
-    return AssetHistory(last_entity,multiple,count,start,output_level,lasttxid,lastwriters,lastvout);
+    return AssetHistory(asset_entity,last_entity,multiple,count,start,output_level,lasttxid,lastwriters,lastvout);
 }
 
 
@@ -3351,7 +3461,148 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
     
     return entry;
 }
+void ParseRawTokenInfo(const Value *value,mc_Script *lpDetailsScript,mc_Script *lpDetailsScriptTmp,string *token,int64_t *raw,mc_EntityDetails *entity,int *errorCode,string *strError)
+{
+    bool field_parsed;
+    bool missing_details=true;
+    bool missing_asset=true;
+    bool missing_token=true;
+    bool missing_raw=true;
+    
+    if(value->type() != obj_type)
+    {
+        *strError=string("Token info should be object"); 
+        return;
+    }
+    
+    lpDetailsScript->Clear();
+    lpDetailsScript->AddElement();                       
+    
+    BOOST_FOREACH(const Pair& d, value->get_obj()) 
+    {
+        field_parsed=false;
+        if(d.name_ == "token")
+        {
+            if(!missing_token)
+            {
+                *strError=string("token field can appear only once in the object");                                                                                                        
+            }
+            if(token)
+            {
+                if(d.value_.type() == str_type)
+                {
+                    *token=d.value_.get_str();
 
+                    if( (*token == "*") || (*token == "") )
+                    {
+                        *strError=string("Invalid token name"); 
+                    }
+
+                    lpDetailsScript->SetSpecialParamValue(MC_ENT_SPRM_UPDATE_NAME,(const unsigned char*)(token->c_str()),token->size());                    
+                }
+                else
+                {
+                    *strError=string("Invalid token");                            
+                }
+            }
+            missing_token=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "asset")
+        {
+            if(!missing_asset)
+            {
+                *strError=string("asset field can appear only once in the object");                                                                                                        
+            }
+            if(entity == NULL)
+            {
+                *strError=string("asset field is not allowed in this object");                                                                                                                        
+            }
+            if(d.value_.type() == str_type)
+            {
+                ParseEntityIdentifier(d.value_,entity, MC_ENT_TYPE_ASSET);       
+            }
+            else
+            {
+                *strError=string("Invalid asset");                            
+            }
+            if(strError->size() == 0)
+            {
+                lpDetailsScript->SetSpecialParamValue(MC_ENT_SPRM_PARENT_ENTITY,entity->GetTxID(),sizeof(uint256));                    
+            }
+            missing_asset=false;
+            field_parsed=true;
+        }
+        if(d.name_ == "details")
+        {
+            if(!missing_details)
+            {
+                *strError=string("details field can appear only once in the object");                                                                                                        
+            }
+            if(lpDetailsScriptTmp == NULL)
+            {
+                *strError=string("details field is not allowed in this object");                                                                                                                        
+            }
+            if(strError->size() == 0)
+            {
+                ParseRawDetails(&(d.value_),lpDetailsScript,lpDetailsScriptTmp,errorCode,strError);
+            }
+            missing_details=false;
+            field_parsed=true;
+        }         
+        if((d.name_ == "raw") || (d.name_ == "qty"))
+        {
+            if(!missing_raw)
+            {
+                *strError=string("qty field can appear only once in the object");                                                                                                        
+            }
+            if(d.value_.type() == int_type)
+            {
+                *raw=d.value_.get_int64();
+                if(*raw <= 0)
+                {
+                    *strError=string("Invalid quantity - should be positive");                                                                                                        
+                }
+            }
+            else
+            {
+                *strError=string("Invalid quantity - should be integer");                            
+            }
+            missing_raw=false;
+            field_parsed=true;
+        }
+        
+        if(!field_parsed)
+        {
+            *strError=strprintf("Invalid field: %s",d.name_.c_str());;                                
+        }
+    }    
+    
+    if(strError->size() == 0)
+    {
+        if(missing_token)
+        {                    
+            *strError=string("Missing token"); 
+        }
+    }
+    if(strError->size() == 0)
+    {
+        if(missing_raw)
+        {                    
+            *strError=string("Missing quantity"); 
+        }
+    }
+    if(strError->size() == 0)
+    {
+        if(missing_asset)
+        {                    
+            if(entity)
+            {
+                *strError=string("Missing asset"); 
+            }
+        }        
+    }    
+}
 
 string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, int *required,int *eErrorCode)
 {
@@ -3361,14 +3612,27 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
     lpBuffer->Clear();
     mc_Buffer *lpFollowonBuffer=mc_gState->m_TmpBuffers->m_RpcABNoMapBuffer2;
     lpFollowonBuffer->Clear();
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcTokenScript1;   
+    lpDetailsScript->Clear();
+    mc_Script *lpDetailsToken=mc_gState->m_TmpBuffers->m_RpcTokenScript2;   
+    lpDetailsToken->Clear();
+    
     int assets_per_opdrop=(MAX_STANDARD_TX_SIZE)/(mc_gState->m_NetworkParams->m_AssetRefSize+MC_AST_ASSET_QUANTITY_SIZE);
     int32_t verify_level=-1;
     int asset_error=0;
     int multiple;
+    mc_EntityDetails entity;
     int64_t max_block=0xffffffff;
-    string asset_name;
+    string asset_name,token_name;
     string type_string;
+    bool nft_asset;
     nAmount=0;
+    size_t bytes;
+    const unsigned char *script;
+    bool token_field_found;
+    bool token_field_any;
+    bool asset_field_found;
+    
     
     if(eErrorCode)
     {
@@ -3381,7 +3645,29 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
     
     BOOST_FOREACH(const Pair& a, param.get_obj()) 
     {
-        if( (a.value_.type() == obj_type) ||
+        token_field_found=false;
+        asset_field_found=false;
+        token_field_any=false;
+        if(a.value_.type() == obj_type)
+        {
+            BOOST_FOREACH(const Pair& d, a.value_.get_obj()) 
+            {
+                if(d.name_ == "token")
+                {
+                    token_field_found=true;
+                    if( (d.value_.type() == str_type) && (d.value_.get_str() == "*") )
+                    {
+                        token_field_any=true;
+                    }
+                }
+                if(d.name_ == "asset")
+                {
+                    asset_field_found=true;
+                }
+            }            
+        }
+        
+        if( ((a.value_.type() == obj_type) && (!token_field_found || asset_field_found) ) ||
             (( (a.value_.type() == str_type) || (a.value_.type() == array_type) ) && (a.name_== "data")) )
         {
             bool parsed=false;
@@ -3408,6 +3694,75 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
             if(!parsed && (a.name_ == "issue"))
             {
                 int64_t quantity=-1;
+                
+                nft_asset=false;
+                if(mc_gState->m_Features->NFTokens() && false)                  // Token issuance in genesis transaction is not supported  
+                {
+                    int errorCode=RPC_INVALID_PARAMETER;
+                    string token;
+                    ParseRawTokenInfo(&(a.value_),lpDetailsToken,lpDetailsScript,&token,&quantity,NULL,&errorCode,&strError);
+                    if(strError.size() == 0)
+                    {
+                        nft_asset=true;
+                    }                   
+                    strError="";
+                }
+                if(nft_asset)
+                {
+                    if(quantity < 0)
+                    {
+                        strError=string("Issue quantity should be non-negative");
+                        goto exitlbl;                    
+                    }
+                    lpScript->SetAssetGenesis(quantity);
+                    script=lpDetailsToken->GetData(0,&bytes);
+                    lpScript->SetInlineDetails(script,bytes);                    
+                }
+                else
+                {                    
+                    BOOST_FOREACH(const Pair& d, a.value_.get_obj()) 
+                    {
+                        bool field_parsed=false;
+                        if(!field_parsed && (d.name_ == "raw"))
+                        {                 
+                            if (d.value_.type() != null_type)
+                            {
+                                quantity=d.value_.get_int64();
+                                if(quantity<0)
+                                {
+                                    strError=string("Negative value for issue raw qty");
+                                    goto exitlbl;                                
+                                }
+                            }                
+                            else
+                            {
+                                strError=string("Invalid value for issue raw qty");
+                                goto exitlbl;
+
+                            }
+                            field_parsed=true;
+                        }
+                        if(!field_parsed)
+                        {
+                            strError=string("Invalid field for object ") + a.name_ + string(": ") + d.name_;
+                            goto exitlbl;
+                        }
+                    }
+                    if(quantity < 0)
+                    {
+                        strError=string("Issue raw qty not specified");
+                        goto exitlbl;                    
+                    }
+                    lpScript->SetAssetGenesis(quantity);        
+                }
+                parsed=true;
+            }
+/*            
+            if(!parsed && (a.name_ == "issuemore"))
+            {
+                string token_field="";
+                int64_t quantity=-1;
+                asset_name="";
                 BOOST_FOREACH(const Pair& d, a.value_.get_obj()) 
                 {
                     bool field_parsed=false;
@@ -3418,17 +3773,39 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                             quantity=d.value_.get_int64();
                             if(quantity<0)
                             {
-                                strError=string("Negative value for issue raw qty");
+                                strError=string("Negative value for issuemore raw qty");
                                 goto exitlbl;                                
                             }
                         }                
                         else
                         {
-                            strError=string("Invalid value for issue raw qty");
+                            strError=string("Invalid value for issuemore raw qty");
                             goto exitlbl;
                             
                         }
                         field_parsed=true;
+                    }
+                    if(!field_parsed && (d.name_ == "asset"))                        
+                    {                 
+                        if(d.value_.type() != null_type && !d.value_.get_str().empty())
+                        {
+                            asset_name=d.value_.get_str();
+                        }
+                        if(asset_name.size())
+                        {
+                            asset_error=ParseAssetKeyToFullAssetRef(asset_name.c_str(),buf,&multiple,NULL, MC_ENT_TYPE_ASSET);
+                            if(asset_error)
+                            {
+                                goto exitlbl;
+                            }                                                    
+                            field_parsed=true;
+                        }
+                    }
+                    if(!field_parsed && ((d.name_ == "token") || (d.name_ == "details") || (d.name_ == "qty")))                        
+                    {                 
+                        token_field=d.name_;
+                        field_parsed=true;
+                        
                     }
                     if(!field_parsed)
                     {
@@ -3436,17 +3813,111 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                         goto exitlbl;
                     }
                 }
-                if(quantity < 0)
+                if(asset_name.size() == 0)
                 {
-                    strError=string("Issue raw qty not specified");
+                    strError=string("Issuemore asset not specified");
                     goto exitlbl;                    
                 }
-                lpScript->SetAssetGenesis(quantity);        
+                nft_asset=false;
+                if(mc_gState->m_Features->NFTokens())
+                {
+                    mc_gState->m_Assets->FindEntityByShortTxID(&entity,buf+MC_AST_SHORT_TXID_OFFSET);    
+                    if(entity.IsNFTAsset())
+                    {
+                        nft_asset=true;
+                    }
+                }
+                if(nft_asset)
+                {
+                    int errorCode=RPC_INVALID_PARAMETER;
+                    string token;
+                    
+                    ParseRawTokenInfo(&(a.value_),lpDetailsToken,lpDetailsScript,&token,&quantity,&entity,&errorCode,&strError);
+                    if(eErrorCode)
+                    {
+                        *eErrorCode=errorCode;
+                    }
+//                    lpDetailsToken->SetSpecialParamValue(MC_ENT_SPRM_PARENT_ENTITY,entity.GetTxID(),sizeof(uint256));         
+
+                    if(strError.size())
+                    {
+                        goto exitlbl;                    
+                    }
+                    if(quantity>entity.MaxSingleIssuance())
+                    {
+                        throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, above issuance limit for this asset");                               
+                    }
+
+                    uint256 token_hash;
+                    mc_SHA256 *hasher=new mc_SHA256();
+                    hasher->Reset();
+                    hasher->Write(entity.GetTxID(),sizeof(uint256));
+                    hasher->Write(token.c_str(),token.size());
+                    hasher->GetHash((unsigned char *)&token_hash);
+                    hasher->Reset();
+                    hasher->Write((unsigned char *)&token_hash,sizeof(uint256));
+                    hasher->GetHash((unsigned char *)&token_hash);    
+                    delete hasher;
+
+                    memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
+                    memcpy(buf+MC_AST_SHORT_TXID_OFFSET,(unsigned char*)&token_hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+
+                    mc_EntityDetails token_entity;
+                    if(mc_gState->m_Assets->FindEntityByShortTxID(&token_entity,buf+MC_AST_SHORT_TXID_OFFSET))
+                    {
+                        throw JSONRPCError(RPC_NOT_ALLOWED, "Token with this ID already exists in this asset");                               
+                    }
+                    mc_SetABQuantity(buf,quantity);    
+                    if(lpFollowonBuffer->GetCount())
+                    {
+                        if(verify_level & 0x0008)
+                        {
+                            strError=string("Issuemore for multiple tokens");
+                            goto exitlbl;                                                
+                        }
+                    }                
+
+                    lpFollowonBuffer->Clear();
+                    lpFollowonBuffer->Add(buf);
+
+                    lpScript->SetAssetQuantities(lpFollowonBuffer,MC_SCR_ASSET_SCRIPT_TYPE_TOKEN);
+                    script=lpDetailsToken->GetData(0,&bytes);
+                    lpScript->SetInlineDetails(script,bytes);                    
+                }
+                else
+                {
+                    if(quantity < 0)
+                    {
+                        strError=string("Issuemore raw qty not specified");
+                        goto exitlbl;                    
+                    }
+                    if(token_field.size())
+                    {
+                        strError=string("Invalid field for object ") + a.name_ + string(": ") + token_field;
+                        goto exitlbl;                        
+                    }
+                    if(lpFollowonBuffer->GetCount())
+                    {
+                        if(verify_level & 0x0008)
+                        {
+                            if(memcmp(buf,lpFollowonBuffer->GetRow(0),MC_AST_ASSET_QUANTITY_OFFSET))
+                            {
+                                strError=string("Issuemore for different assets");
+                                goto exitlbl;                                                
+                            }
+                        }
+                        lpFollowonBuffer->Clear();
+                    }                
+                    mc_SetABQuantity(buf,quantity);
+                    lpFollowonBuffer->Add(buf);                    
+                    lpScript->SetAssetQuantities(lpFollowonBuffer,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);                
+                }
                 parsed=true;
             }
-            
+*/
             if(!parsed && (a.name_ == "issuemore"))
             {
+                string token_field="";
                 int64_t quantity=-1;
                 asset_name="";
                 BOOST_FOREACH(const Pair& d, a.value_.get_obj()) 
@@ -3498,6 +3969,20 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                     strError=string("Issuemore asset not specified");
                     goto exitlbl;                    
                 }
+                nft_asset=false;
+                if(mc_gState->m_Features->NFTokens())
+                {
+                    mc_gState->m_Assets->FindEntityByShortTxID(&entity,buf+MC_AST_SHORT_TXID_OFFSET);    
+                    if(entity.IsNFTAsset())
+                    {
+                        nft_asset=true;
+                    }
+                }
+                if(nft_asset)
+                {
+                    strError=string("Issuing more units for non-fungible assets is not allowed");
+                    goto exitlbl;                    
+                }
                 if(quantity < 0)
                 {
                     strError=string("Issuemore raw qty not specified");
@@ -3514,13 +3999,90 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                         }
                     }
                     lpFollowonBuffer->Clear();
-                }
+                }                
                 mc_SetABQuantity(buf,quantity);
                 lpFollowonBuffer->Add(buf);                    
                 lpScript->SetAssetQuantities(lpFollowonBuffer,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);                
                 parsed=true;
             }
+            
+            if(!parsed && (a.name_ == "issuetoken"))
+            {
+                if(mc_gState->m_Features->NFTokens() == 0)
+                {
+                    strError=string("issuetoken is not supported in this protocol version");
+                    goto exitlbl;                                                                    
+                }
+                
+                string token_field="";
+                int64_t quantity=-1;
+                asset_name="";
 
+                int errorCode=RPC_INVALID_PARAMETER;
+                string token;
+
+                ParseRawTokenInfo(&(a.value_),lpDetailsToken,lpDetailsScript,&token,&quantity,&entity,&errorCode,&strError);
+                if(eErrorCode)
+                {
+                    *eErrorCode=errorCode;
+                }
+//                    lpDetailsToken->SetSpecialParamValue(MC_ENT_SPRM_PARENT_ENTITY,entity.GetTxID(),sizeof(uint256));         
+
+                if(strError.size())
+                {
+                    goto exitlbl;                    
+                }
+                if(quantity>entity.MaxSingleIssuance())
+                {
+                    *eErrorCode=RPC_NOT_ALLOWED;
+                    strError="Invalid quantity, above issuance limit for this asset";
+                    goto exitlbl;                    
+                }
+                if(entity.IsNFTAsset() == 0)
+                {
+                    strError=string("Issuing tokens for fungible assets is not allowed");
+                }
+
+                uint256 token_hash;
+                mc_SHA256 *hasher=new mc_SHA256();
+                hasher->Reset();
+                hasher->Write(entity.GetTxID(),sizeof(uint256));
+                hasher->Write(token.c_str(),token.size());
+                hasher->GetHash((unsigned char *)&token_hash);
+                hasher->Reset();
+                hasher->Write((unsigned char *)&token_hash,sizeof(uint256));
+                hasher->GetHash((unsigned char *)&token_hash);    
+                delete hasher;
+
+                memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
+                memcpy(buf+MC_AST_SHORT_TXID_OFFSET,(unsigned char*)&token_hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+
+                mc_EntityDetails token_entity;
+                if(mc_gState->m_Assets->FindEntityByShortTxID(&token_entity,buf+MC_AST_SHORT_TXID_OFFSET))
+                {
+                    throw JSONRPCError(RPC_NOT_ALLOWED, "Token with this ID already exists in this asset");                               
+                }
+                mc_SetABQuantity(buf,quantity);    
+                if(lpFollowonBuffer->GetCount())
+                {
+                    if(verify_level & 0x0008)
+                    {
+                        strError=string("Issuetoken for multiple tokens");
+                        goto exitlbl;                                                
+                    }
+                }                
+
+                lpFollowonBuffer->Clear();
+                lpFollowonBuffer->Add(buf);
+
+                lpScript->SetAssetQuantities(lpFollowonBuffer,MC_SCR_ASSET_SCRIPT_TYPE_TOKEN);
+                script=lpDetailsToken->GetData(0,&bytes);
+                lpScript->SetInlineDetails(script,bytes);                    
+                
+                parsed=true;
+            }
+
+            
             if(!parsed && (a.name_ == "data"))
             {
                 Array arr;
@@ -3721,23 +4283,155 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                 {
                     goto exitlbl;
                 }
-                int64_t quantity = (int64_t)(a.value_.get_real() * multiple + 0.499999);                        
-                if(verify_level & 0x0010)
+                nft_asset=false;
+                if(!token_field_any)
                 {
-                    if(quantity < 0)
+                    if(mc_gState->m_Features->NFTokens())
                     {
-                        strError=string("Negative asset quantity");
-                        goto exitlbl;                                        
+                        mc_gState->m_Assets->FindEntityByShortTxID(&entity,buf+MC_AST_SHORT_TXID_OFFSET);    
+                        if(entity.IsNFTAsset())
+                        {
+                            nft_asset=true;
+                        }
                     }
                 }
-                mc_SetABQuantity(buf,quantity);
-                lpBuffer->Add(buf);                    
-                if(verify_level & 0x0001)
+                if(nft_asset)
                 {
-                    if(lpBuffer->GetCount() >= assets_per_opdrop)
+                    Array tokens;
+                    if(a.value_.type() == array_type)
                     {
+                        tokens=a.value_.get_array();
+                    }
+                    else
+                    {
+                        if(a.value_.type() == obj_type)
+                        {
+                            tokens.push_back(a.value_);
+                        }                        
+                        else
+                        {
+                            strError=string("Invalid token quantity, should be object or array of objects");
+                            goto exitlbl;                                                                                            
+                        }
+                    }
+                    for(int t=0;t<(int)tokens.size();t++)
+                    {
+                        int errorCode=RPC_INVALID_PARAMETER;
+                        string token;
+                        int64_t quantity=-1;
+                        ParseRawTokenInfo(&(tokens[t]),lpDetailsToken,NULL,&token,&quantity,NULL,&errorCode,&strError);
+                        if(eErrorCode)
+                        {
+                            *eErrorCode=errorCode;
+                        }
+                        if(strError.size())
+                        {
+                            goto exitlbl;                    
+                        }
+                        if(quantity>entity.MaxSingleIssuance())
+                        {
+                            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, above issuance limit for this asset");                               
+                        }
+                        
+                        uint256 token_hash;
+                        mc_SHA256 *hasher=new mc_SHA256();
+                        hasher->Reset();
+                        hasher->Write(entity.GetTxID(),sizeof(uint256));
+                        hasher->Write(token.c_str(),token.size());
+                        hasher->GetHash((unsigned char *)&token_hash);
+                        hasher->Reset();
+                        hasher->Write((unsigned char *)&token_hash,sizeof(uint256));
+                        hasher->GetHash((unsigned char *)&token_hash);    
+                        delete hasher;
+
+                        memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
+                        memcpy(buf+MC_AST_SHORT_TXID_OFFSET,(unsigned char*)&token_hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+
+                        mc_EntityDetails token_entity;
+                        if(mc_gState->m_Assets->FindEntityByShortTxID(&token_entity,buf+MC_AST_SHORT_TXID_OFFSET) == 0)
+                        {
+                            if(eErrorCode)
+                            {
+                                *eErrorCode=RPC_ENTITY_NOT_FOUND;
+                            }
+                            strError=strprintf("Token %s not found in this asset",token.c_str());
+                            goto exitlbl;                                        
+                        }
+                        mc_SetABQuantity(buf,quantity);
+                        lpBuffer->Add(buf);                    
+                        if(verify_level & 0x0001)
+                        {
+                            if(lpBuffer->GetCount() >= assets_per_opdrop)
+                            {
+                                lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);                
+                                lpBuffer->Clear();
+                            }
+                        }                        
+                    }                    
+                }
+                else
+                {
+                    int64_t quantity=0;
+                    if(token_field_any)
+                    {
+                        int errorCode=RPC_INVALID_PARAMETER;
+                        ParseRawTokenInfo(&(a.value_),lpDetailsToken,NULL,NULL,&quantity,NULL,&errorCode,&strError);
+                        if(eErrorCode)
+                        {
+                            *eErrorCode=errorCode;
+                        }
+                        if(strError.size())
+                        {
+                            goto exitlbl;                    
+                        }
+                    }
+                    else
+                    {
+                        quantity = (int64_t)(a.value_.get_real() * multiple + 0.499999);                        
+                    }
+                    if(verify_level & 0x0010)
+                    {
+                        if(quantity < 0)
+                        {
+                            strError=string("Negative asset quantity");
+                            goto exitlbl;                                        
+                        }
+                    }
+                    mc_SetABQuantity(buf,quantity);
+                    if(token_field_any)
+                    {
+                        if(lpBuffer->GetCount())
+                        {
+                            if(Params().RequireStandard())
+                            {
+                                if(verify_level & 0x0002)
+                                {
+                                    if(lpBuffer->GetCount() > assets_per_opdrop)
+                                    {
+                                        strError=string("Too many assets in one group");
+                                        goto exitlbl;                                    
+                                    }
+                                }
+                            }
+                            lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);                
+                            lpBuffer->Clear();
+                        }
+                        lpBuffer->Add(buf);   
+                        lpScript->AddElement();                                 // Empty element, meaning that the next element should be in separate output
                         lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);                
-                        lpBuffer->Clear();
+                        lpBuffer->Clear();                        
+                    }
+                    else
+                    {
+                        lpBuffer->Add(buf);                    
+                        if(verify_level & 0x0001)
+                        {
+                            if(lpBuffer->GetCount() >= assets_per_opdrop)
+                            {
+                                lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);                
+                                lpBuffer->Clear();
+                            }
+                        }
                     }
                 }
             }            
@@ -4047,16 +4741,21 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
         mc_EntityDetails entity;
         
         entity.Zero();
-        CScript scriptPubKey = GetScriptForString(s.name_,MC_ENT_TYPE_FILTER | MC_ENT_TYPE_LIBRARY,&entity);
+        CScript scriptPubKey = GetScriptForString(s.name_,MC_ENT_TYPE_FILTER | MC_ENT_TYPE_LIBRARY | MC_ENT_TYPE_ASSET,&entity);
         CAmount nAmount=0;
 
         if(entity.GetEntityType())
         {
-            uint32_t approval,timestamp;
+            uint32_t approval,perm_type,timestamp;
             size_t elem_size;
             const unsigned char *elem;
+            mc_EntityDetails update_entity;
+            uint160 details_address;
+            mc_EntityDetails stream_entity;
+            uint160 filter_address;
             
             approval=0;
+            perm_type=MC_PTP_NONE;
             timestamp=mc_TimeNowAsUInt();
             mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript4;
             lpScript->Clear();
@@ -4064,69 +4763,106 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
             
 //            bool ParseLibraryApproval(Value param,mc_EntityDetails *library_entity,mc_EntityDetails *update_entity)
 
-            if(entity.GetEntityType() == MC_ENT_TYPE_LIBRARY)
+            switch(entity.GetEntityType())
             {
-                mc_EntityDetails update_entity;
-                update_entity.Zero();                
-                if(mc_gState->m_Features->Libraries() == 0)
-                {
-                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Libraries can not be approved/disapproved in this protocol version.");        
-                }        
-                if(entity.ApproveRequired() == 0)
-                {
-                    throw JSONRPCError(RPC_NOT_SUPPORTED, "Approval is not required for this library");        
-                }
-                approval=ParseLibraryApproval(s.value_,&entity,&update_entity);
-                uint160 filter_address;
-                filter_address=0;
-                memcpy(&filter_address,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
-                unsigned char *ptr;
-                size_t bytes;
-
-                ptr=(unsigned char *)update_entity.GetSpecialParam(MC_ENT_SPRM_CHAIN_INDEX,&bytes);
-                if(ptr)
-                {
-                    if((bytes>0) && (bytes<=4))
+                case MC_ENT_TYPE_LIBRARY:
+                    perm_type=MC_PTP_FILTER;
+                    update_entity.Zero();                
+                    if(mc_gState->m_Features->Libraries() == 0)
                     {
-                       memcpy(((unsigned char*)&filter_address)+MC_AST_SHORT_TXID_SIZE,ptr,bytes);
-                    }
-                }      
-                else
-                {
-                    throw JSONRPCError(RPC_INTERNAL_ERROR, "Corrupted Library database");                                                                
-                }
-                scriptPubKey = GetScriptForDestination(CKeyID(filter_address));
-            }
-            else
-            {
-                if(entity.GetFilterType() == MC_FLT_TYPE_STREAM)
-                {
-                    mc_EntityDetails stream_entity;
-                    stream_entity.Zero();
-                    if(mc_gState->m_Features->StreamFilters() == 0)
-                    {
-                        throw JSONRPCError(RPC_NOT_SUPPORTED, "Only Tx filters can be approved/disapproved in this protocol version.");        
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "Libraries can not be approved/disapproved in this protocol version.");        
                     }        
-    //                approval=ParseStreamFilterApproval(s.value_.get_obj()[0].value_,&stream_entity);
-                    approval=ParseStreamFilterApproval(s.value_,&stream_entity);
-                    lpScript->SetEntity(stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);                    
-                }
-                else
-                {
+                    if(entity.ApproveRequired() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "Approval is not required for this library");        
+                    }
+                    approval=ParseLibraryApproval(s.value_,&entity,&update_entity);
+                    filter_address=0;
+                    memcpy(&filter_address,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+                    unsigned char *ptr;
+                    size_t bytes;
+
+                    ptr=(unsigned char *)update_entity.GetSpecialParam(MC_ENT_SPRM_CHAIN_INDEX,&bytes);
+                    if(ptr)
+                    {
+                        if((bytes>0) && (bytes<=4))
+                        {
+                           memcpy(((unsigned char*)&filter_address)+MC_AST_SHORT_TXID_SIZE,ptr,bytes);
+                        }
+                    }      
+                    else
+                    {
+                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Corrupted Library database");                                                                
+                    }
+                    scriptPubKey = GetScriptForDestination(CKeyID(filter_address));
+                    break;
+                case MC_ENT_TYPE_FILTER:
+                    perm_type=MC_PTP_FILTER;
+                    if(entity.GetFilterType() == MC_FLT_TYPE_STREAM)
+                    {
+                        stream_entity.Zero();
+                        if(mc_gState->m_Features->StreamFilters() == 0)
+                        {
+                            throw JSONRPCError(RPC_NOT_SUPPORTED, "Only Tx filters can be approved/disapproved in this protocol version.");        
+                        }        
+        //                approval=ParseStreamFilterApproval(s.value_.get_obj()[0].value_,&stream_entity);
+                        approval=ParseStreamFilterApproval(s.value_,&stream_entity);
+                        lpScript->SetEntity(stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);                    
+                    }
+                    else
+                    {
+                        if ( (s.value_.type() != obj_type) || 
+                             (s.value_.get_obj().size() != 1) || 
+                             (s.value_.get_obj()[0].name_ != "approve") )
+                        {
+                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Filter approval should be object with single field - approve");                
+                        }
+                        approval=1;
+                        if(!paramtobool(s.value_.get_obj()[0].value_))
+                        {
+                            approval=0;
+                        }
+                    }            
+                    break;
+                case MC_ENT_TYPE_ASSET:
+                    perm_type=MC_PTP_DETAILS;
+                    if(mc_gState->m_Features->NFTokens() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "Assets can not be opened/closed in this protocol version.");        
+                    }        
                     if ( (s.value_.type() != obj_type) || 
                          (s.value_.get_obj().size() != 1) || 
-                         (s.value_.get_obj()[0].name_ != "approve") )
+                         (s.value_.get_obj()[0].name_ != "open") )
                     {
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Filter approval should be object with single field - approve");                
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Asset update should be object with single field - open");                
                     }
                     approval=1;
                     if(!paramtobool(s.value_.get_obj()[0].value_))
                     {
                         approval=0;
                     }
-                }            
+                    if(approval)
+                    {
+                        if(entity.AdminCanOpen() == 0)
+                        {
+                            throw JSONRPCError(RPC_NOT_ALLOWED, "Opening is not allowed for this asset");                                            
+                        }
+                    }
+                    else
+                    {
+                        if(entity.AdminCanClose() == 0)
+                        {
+                            throw JSONRPCError(RPC_NOT_ALLOWED, "Closing is not allowed for this asset");                                            
+                        }                        
+                    }
+                    
+                    mc_gState->m_Permissions->DetailsAddress((unsigned char*)&details_address, MC_PDF_ASSET_OPEN);                    
+                    scriptPubKey = GetScriptForDestination(CKeyID(details_address));
+                    lpScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);                            
+                    
+                    break;
             }
-            lpScript->SetPermission(MC_PTP_FILTER,0,approval ? 4294967295U : 0,timestamp);
+            lpScript->SetPermission(perm_type,0,approval ? 4294967295U : 0,timestamp);
             for(int element=0;element < lpScript->GetNumElements();element++)
             {
                 elem = lpScript->GetData(element,&elem_size);
@@ -4782,6 +5518,7 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
                 {
                     if(is_open)
                     {
+                        is_open=MC_ENT_FOMD_ALLOWED_INSTANT;
                         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,(unsigned char*)&is_open,1);                
                     }            
                     if(multiple_is_set)
@@ -5677,6 +6414,7 @@ Array AssetArrayFromAmounts(mc_Buffer *asset_amounts,int issue_asset_id,uint256 
                                 asset_entry.push_back(Pair("type", "transfer"));                                            
                                 break;
                             case MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON:
+                            case MC_SCR_ASSET_SCRIPT_TYPE_TOKEN:
                                 asset_entry.push_back(Pair("type", "issuemore"));                                            
                                 break;
                             case MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER | MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON:

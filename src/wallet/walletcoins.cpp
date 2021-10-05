@@ -700,6 +700,41 @@ void AvalableCoinsForAddress(CWallet *lpWallet,vector<COutput>& vCoins, const CC
     last_time=this_time;
 }
 
+bool CheckForTokenAssetConflicts(mc_Buffer *out_amounts,
+                                 map<uint256, vector<int>>& mapNFTAssetOutputs,
+                                 std::string& strFailReason)
+{
+    unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
+    mc_EntityDetails entity;
+    uint256 asset_txid;
+    
+    if(mapNFTAssetOutputs.size())
+    {
+        for(int i=0;i<out_amounts->GetCount();i++)                              
+        {
+            entity.Zero();
+            asset_txid=0;
+            if(mc_gState->m_Assets->FindEntityByFullRef(&entity,out_amounts->GetRow(i)))
+            {
+                if(entity.GetEntityType() == MC_ENT_TYPE_TOKEN)
+                {
+                    memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
+                    memcpy(buf+MC_AST_SHORT_TXID_OFFSET,entity.GetParentTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+//                    asset_txid=*(uint256*)buf;
+                    memcpy(&asset_txid,buf,sizeof(uint256));
+                    if(mapNFTAssetOutputs.find(asset_txid) != mapNFTAssetOutputs.end())
+                    {
+                        strFailReason="Sending by token and by amount for the same asset is not supported, please use createrawtransaction";
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
 /*
  * Updates input asset matrix
  */
@@ -710,14 +745,20 @@ bool InsertCoinIntoMatrix(int coin_id,                                          
                           mc_Buffer *out_amounts,                               // IN  Only assets found in this buffer will be added, if NULL - all assets
                           mc_Buffer *in_amounts,                                // OUT Buffer to fill, rows -assets, columns - coins
                           mc_Buffer *in_map,                                    // OUT txid/vout->coin id map (used in coin selection)
+                          map<uint256, vector<int>>& mapNFTAssetOutputs,
+                          map<uint256, int>& mapTokenToNFTAssetRow,
                           unsigned char *in_row,int in_size,                    // TMP temporary buffer row and its size
                           int *in_special_row,                                  // IN  Coordinates of special rows
                           int64_t pure_native)                                  // IN  Pure native currency flag
 {
     unsigned char buf_map[32+4+4];
+    unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
     int row,err;
     int64_t quantity;
-    
+    bool nft_tokens=false;
+    mc_EntityDetails entity;
+    uint256 asset_txid;
+    bool take_it;
     
     memcpy(buf_map,&hash,32);                                                   // Updating txid/vout->coin id map
     mc_PutLE(buf_map+32,&out_i,4);
@@ -727,7 +768,40 @@ bool InsertCoinIntoMatrix(int coin_id,                                          
     for(int i=0;i<tmp_amounts->GetCount();i++)                                  // Inserting asset amounts into the matrix
     {
         quantity=mc_GetABQuantity(tmp_amounts->GetRow(i));
+        entity.Zero();
+        asset_txid=0;
+        take_it=false;
+        if(mapNFTAssetOutputs.size())
+        {
+            if(mc_gState->m_Features->NFTokens())
+            {
+                if(mc_gState->m_Assets->FindEntityByFullRef(&entity,tmp_amounts->GetRow(i)))
+                {
+                    if(entity.GetEntityType() == MC_ENT_TYPE_TOKEN)
+                    {
+                        memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
+                        memcpy(buf+MC_AST_SHORT_TXID_OFFSET,entity.GetParentTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+//                        asset_txid=*(uint256*)buf;
+                        memcpy(&asset_txid,buf,sizeof(uint256));
+                        if(mapNFTAssetOutputs.find(asset_txid) == mapNFTAssetOutputs.end())
+                        {
+                            asset_txid=0;
+                        }
+                        else
+                        {
+                            nft_tokens=true;
+                            take_it=true;
+                        }
+                    }
+                }
+            }
+        }
         if( (out_amounts == NULL) || (out_amounts->Seek(tmp_amounts->GetRow(i)) >= 0) )// Only assets found in out_amounts if specified
+        {
+            take_it=true;
+        }
+        
+        if(take_it)
         {
             row=in_amounts->Seek(tmp_amounts->GetRow(i));
             if(row < 0)                                                         // New asset
@@ -746,15 +820,50 @@ bool InsertCoinIntoMatrix(int coin_id,                                          
                 mc_SetABCoinQuantity(in_amounts->GetRow(row),coin_id,quantity);
             }
         }
+        if(asset_txid != 0)
+        {
+            memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
+            memcpy(buf+MC_AST_SHORT_TXID_OFFSET,(unsigned char*)&asset_txid+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+            mc_SetABRefType(buf,MC_AST_ASSET_REF_TYPE_SHORT_TXID);
+            row=in_amounts->Seek(buf);
+            if(row < 0)                                                         // New asset
+            {
+                row=in_amounts->GetCount();
+                memset(in_row,0,in_size);
+                memcpy(in_row,buf,MC_AST_ASSET_QUANTITY_OFFSET);
+                mc_SetABCoinQuantity(in_row,coin_id,quantity);
+                err=in_amounts->Add(in_row);
+                if(err)
+                {
+                    return false;
+                }
+            }
+            else                                                                // Old asset, but the value can be non zero if we've seen token for this asset before.
+            {
+                quantity+=mc_GetABQuantity(tmp_amounts->GetRow(row));
+                mc_SetABCoinQuantity(in_amounts->GetRow(row),coin_id,quantity);
+            }
+            
+            uint256 token_txid=*(uint256*)(tmp_amounts->GetRow(i));
+            if(mapTokenToNFTAssetRow.find(token_txid) == mapTokenToNFTAssetRow.end())
+            {
+                mapTokenToNFTAssetRow.insert(make_pair(token_txid,row));
+            }
+        }
     }    
 
     quantity=0;                                                                 // Setting "selected" flag to 0
     mc_SetABCoinQuantity(in_amounts->GetRow(in_special_row[0]),coin_id,quantity);
     quantity=1;                                                                 // Setting "parsed" flag to 1
     mc_SetABCoinQuantity(in_amounts->GetRow(in_special_row[1]),coin_id,quantity);                   
-            
-    mc_SetABCoinQuantity(in_amounts->GetRow(in_special_row[4]),coin_id,pure_native);                   
     
+    mc_SetABCoinQuantity(in_amounts->GetRow(in_special_row[4]),coin_id,pure_native);                   
+
+    if(nft_tokens)
+    {
+        quantity=1;                                                             // Setting "NFT asset" flag to 1
+        mc_SetABCoinQuantity(in_amounts->GetRow(in_special_row[10]),coin_id,quantity);                           
+    }
     return true;
 }
 
@@ -859,6 +968,8 @@ bool FindRelevantCoins(CWallet *lpWallet,                                       
                        mc_Script *lpScript,                                     // TMP temporary multichain script object
                        int *in_special_row,                                     // IN  Coordinates of special rows
                        map<uint32_t, uint256>* mapSpecialEntity,
+                       map<uint256, vector<int>>& mapNFTAssetOutputs,
+                       map<uint256, int>& mapTokenToNFTAssetRow,
                        std::string& strFailReason)                              // OUT error message
 {
     int coin_id=0;
@@ -1023,7 +1134,7 @@ bool FindRelevantCoins(CWallet *lpWallet,                                       
                 {
                     if(allowed & MC_PTP_SEND)
                     {                    
-                        if(!InsertCoinIntoMatrix(coin_id,hash,out_i,tmp_amounts,out_amounts,in_amounts,in_map,in_row,in_size,in_special_row,pure_native))
+                        if(!InsertCoinIntoMatrix(coin_id,hash,out_i,tmp_amounts,out_amounts,in_amounts,in_map,mapNFTAssetOutputs,mapTokenToNFTAssetRow,in_row,in_size,in_special_row,pure_native))
                         {
                             strFailReason=_("Internal error: Cannot update input amount matrix");
                             return false;
@@ -1090,6 +1201,8 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
     vector <pair<int,int> > active_groups;                                      // Groups found in UTXOs
     bool check_for_inline_coins=GetBoolArg("-lockinlinemetadata",true);
     bool txout_with_inline_data;
+    map<uint256, vector<int>> mapNFTAssetOutputs;
+    map<uint256, int> mapTokenToNFTAssetRow;
     
     group_count=lpWallet->lpAssetGroups->GroupCount();
     pure_native_count=0;
@@ -1140,7 +1253,7 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
                             {
                                 if(debug_print)DebugPrintAssetTxOut(hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
                             }
-                            if(!InsertCoinIntoMatrix(coin_id,hash,out_i,tmp_amounts,NULL,in_amounts,in_map,in_row,in_size,in_special_row,0))
+                            if(!InsertCoinIntoMatrix(coin_id,hash,out_i,tmp_amounts,NULL,in_amounts,in_map,mapNFTAssetOutputs,mapTokenToNFTAssetRow,in_row,in_size,in_special_row,0))
                             {
                                 strFailReason=_("Internal error: Cannot update input amount matrix");
                                 return false;
@@ -1250,7 +1363,7 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
                                 {
                                     if(debug_print)DebugPrintAssetTxOut(hash,out_i,tmp_amounts->GetRow(i),mc_GetABQuantity(tmp_amounts->GetRow(i)));
                                 }
-                                if(!InsertCoinIntoMatrix(coin_id,hash,out_i,tmp_amounts,NULL,in_amounts,in_map,in_row,in_size,in_special_row,0))
+                                if(!InsertCoinIntoMatrix(coin_id,hash,out_i,tmp_amounts,NULL,in_amounts,in_map,mapNFTAssetOutputs,mapTokenToNFTAssetRow,in_row,in_size,in_special_row,0))
                                 {
                                     strFailReason=_("Internal error");
                                     return false;
@@ -1282,6 +1395,291 @@ bool FindCoinsToCombine(CWallet *lpWallet,                                      
     memcpy(in_amounts->GetRow(in_special_row[0]),in_amounts->GetRow(in_special_row[1]),in_size);
     
     
+    return true;
+}
+
+bool SplitOutputsIfNeeded(const vector<pair<CScript, CAmount> >& vecSend,
+                        vector<pair<CScript, CAmount> >& vecSendOut,
+                        std::string& strFailReason)                             // OUT error message
+{
+    if(mc_gState->m_Features->NFTokens() == 0)
+    {
+        vecSendOut=vecSend;
+        return true;
+    }
+    
+    vecSendOut.clear();
+     
+    for(int vout=0;vout<(int)vecSend.size();vout++)
+    {
+        int separate_elements=0;
+        
+        CScript script1=vecSend[vout].first;
+        CScript::const_iterator pc1 = script1.begin();
+
+        mc_gState->m_TmpScript->Clear();
+        mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+        
+        int element=0;
+        size_t elem_size;
+        const unsigned char *elem;
+        
+        while(element < mc_gState->m_TmpScript->GetNumElements()-1)
+        {
+            elem = mc_gState->m_TmpScript->GetData(element,&elem_size);
+            if(elem_size == 0)
+            {
+                separate_elements++;
+                element++;
+            }            
+            element++;
+        }
+        if(separate_elements)
+        {
+            txnouttype typeRet;
+            int nRequiredRet;
+            vector<CTxDestination> addressRets;
+            if(!ExtractDestinations(script1,typeRet,addressRets,nRequiredRet) || (addressRets.size() != 1))
+            {
+                strFailReason="Non-standard and bare multisig outputs are not allowed for one of the outputs";
+                return false;
+            }
+            
+            CAmount nAmount=vecSend[vout].second;
+            if(separate_elements*2 < mc_gState->m_TmpScript->GetNumElements())
+            {
+                
+                CScript scriptPubKey= GetScriptForDestination(addressRets[0]);
+                element=0;
+                while(element < mc_gState->m_TmpScript->GetNumElements())
+                {
+                    elem = mc_gState->m_TmpScript->GetData(element,&elem_size);
+                    if(elem_size == 0)
+                    {
+                        separate_elements++;
+                        element++;
+                    }            
+                    else
+                    {
+                        scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
+                    }
+                    element++;
+                }
+                vecSendOut.push_back(make_pair(scriptPubKey, nAmount));                                                                    
+                nAmount=0;                
+            }
+            element=0;
+            while(element < mc_gState->m_TmpScript->GetNumElements()-1)
+            {
+                elem = mc_gState->m_TmpScript->GetData(element,&elem_size);
+                if(elem_size == 0)
+                {
+                    element++;
+                    CScript scriptPubKey= GetScriptForDestination(addressRets[0]);
+                    elem = mc_gState->m_TmpScript->GetData(element,&elem_size);
+                    scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
+                    vecSendOut.push_back(make_pair(scriptPubKey, nAmount));                                                                    
+                    nAmount=0;                
+                }
+                element++;
+            }            
+        }
+        else
+        {
+            vecSendOut.push_back(vecSend[vout]);
+        }
+    }    
+    return true;
+}
+
+/*
+ * Modifies output array and quantity buffers if in case of "any token" send
+ */
+
+
+bool ModifyForNFTAssets(const vector<pair<CScript, CAmount> >& vecSend,
+                        vector<pair<CScript, CAmount> >& vecSendOut,
+                        map<uint256, vector<int>>& mapNFTAssetOutputs,
+                        map<uint256, int>& mapTokenToNFTAssetRow,
+                        mc_Buffer *out_amounts,                                 // IN  assets amounts to be found                            
+                        mc_Buffer *in_amounts,                                  // IN  selected asset amounts
+                        mc_Buffer *tmp_amounts,                                 // TMP temporary asset-quantity buffer
+                        int coins_count,
+                        mc_Script *lpScript,                                    // TMP temporary multichain script object
+                        int *in_special_row,                                    // IN  Coordinates of special rows
+                        std::string& strFailReason)                             // OUT error message
+{
+    unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
+    set <int> nft_output_indexes;
+    vector <CTxDestination>nft_output_destination;
+    vector <CAmount>nft_output_native;
+    vector <int64_t>nft_output_quantity;
+    vector <int>nft_output_row;
+    nft_output_destination.resize(vecSend.size());
+    nft_output_native.resize(vecSend.size());
+    nft_output_quantity.resize(vecSend.size());
+    nft_output_row.resize(vecSend.size());
+    
+    for (map<uint256, vector<int>>::const_iterator it = mapNFTAssetOutputs.begin(); it != mapNFTAssetOutputs.end(); ++it)
+    {
+        for(int i=0;i<(int)it->second.size();i++)
+        {
+            int vout=it->second[i];
+            nft_output_indexes.insert(vout);
+            CScript script1=vecSend[vout].first;
+            CTxDestination addressRet;        
+            ExtractDestinationScriptValid(script1, addressRet);
+            nft_output_destination[vout]=addressRet;
+            nft_output_native[vout]=vecSend[vout].second;
+            
+            CScript::const_iterator pc1 = script1.begin();
+
+            mc_gState->m_TmpScript->Clear();
+            mc_gState->m_TmpScript->SetScript((unsigned char*)(&pc1[0]),(size_t)(script1.end()-pc1),MC_SCR_TYPE_SCRIPTPUBKEY);
+            
+            tmp_amounts->Clear();
+            mc_ExtractOutputAssetQuantities(tmp_amounts,strFailReason,true);   
+            nft_output_quantity[vout]=mc_GetABQuantity(tmp_amounts->GetRow(0));            
+            nft_output_row[vout]=out_amounts->Seek(tmp_amounts->GetRow(0));
+            if(nft_output_row[vout] < 0)
+            {
+                strFailReason=_("Internal error: Cannot find asset output row");
+                return false;                                    
+            }
+        }
+    }    
+    
+    vecSendOut.clear();
+    for(int i=0;i<(int)vecSend.size();i++)
+    {
+        if(nft_output_indexes.find(i) == nft_output_indexes.end())
+        {
+            vecSendOut.push_back(vecSend[i]);
+        }
+    }
+    
+    for(int coin_id=0;coin_id<coins_count;coin_id++)
+    {
+                                                                                // Coin is taken
+        if(mc_GetABCoinQuantity(in_amounts->GetRow(in_special_row[1]),coin_id))
+        {
+                                                                                // Coin is selected
+            if(mc_GetABCoinQuantity(in_amounts->GetRow(in_special_row[0]),coin_id))
+            {
+                                                                                // Coin has nft_asset token
+                if(mc_GetABCoinQuantity(in_amounts->GetRow(in_special_row[10]),coin_id))
+                {
+                    for(int row=0;row<in_amounts->GetCount();row++)
+                    {
+                        int64_t quantity=mc_GetABCoinQuantity(in_amounts->GetRow(row),coin_id);
+                        int asset_row=-1;
+                        if(quantity>0)
+                        {
+                            uint256 token_txid=*(uint256*)(in_amounts->GetRow(row));
+                            map<uint256, int>::const_iterator it=mapTokenToNFTAssetRow.find(token_txid);
+                            if(it != mapTokenToNFTAssetRow.end())
+                            {
+                                asset_row=it->second;
+                            }
+                            if(asset_row>=0)
+                            {
+                                memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
+                                memcpy(buf,in_amounts->GetRow(row),MC_AST_ASSET_QUANTITY_OFFSET);
+                                
+                                uint256 asset_txid=*(uint256*)(in_amounts->GetRow(asset_row));
+                                map<uint256, vector<int>>::const_iterator ait=mapNFTAssetOutputs.find(asset_txid);
+                                if(ait == mapNFTAssetOutputs.end())
+                                {
+                                    strFailReason=_("Internal error: Cannot find asset output");
+                                    return false;                                    
+                                }
+                                vector <int>asset_outputs=ait->second;
+                                while(quantity>0)
+                                {
+                                    
+                                    int outp=0;
+                                    while(outp<(int)asset_outputs.size())
+                                    {
+                                        if(nft_output_quantity[asset_outputs[outp]]>0)
+                                        {
+                                            int64_t out_quantity=nft_output_quantity[asset_outputs[outp]];
+                                            if(quantity < out_quantity)
+                                            {
+                                                out_quantity=quantity;
+                                            }
+                                            mc_SetABCoinQuantity(in_amounts->GetRow(asset_row),coin_id,mc_GetABCoinQuantity(in_amounts->GetRow(asset_row),coin_id)-out_quantity);
+                                            mc_SetABQuantity(out_amounts->GetRow(nft_output_row[asset_outputs[outp]]),
+                                                    mc_GetABQuantity(out_amounts->GetRow(nft_output_row[asset_outputs[outp]]))-out_quantity);
+                                            quantity-=out_quantity;
+                                            nft_output_quantity[asset_outputs[outp]]-=out_quantity;
+                                            
+                                            memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
+                                            memcpy(buf,in_amounts->GetRow(row),MC_AST_ASSET_QUANTITY_OFFSET);
+                                            mc_SetABRefType(buf,MC_AST_ASSET_REF_TYPE_SHORT_TXID);                                            
+                                            mc_SetABQuantity(buf,out_quantity);
+                                            int out_row_token=out_amounts->Seek(in_amounts->GetRow(row));
+                                            if(out_row_token >= 0)
+                                            {
+                                                mc_SetABQuantity(out_amounts->GetRow(out_row_token),mc_GetABQuantity(out_amounts->GetRow(out_row_token))+out_quantity);
+                                            }
+                                            else
+                                            {
+                                                out_row_token=out_amounts->GetCount();
+                                                out_amounts->Add(buf);                        
+                                            }                        
+
+                                            CAmount nAmount;
+                                            size_t elem_size;
+                                            const unsigned char *elem;
+                                            CScript scriptPubKey= GetScriptForDestination(nft_output_destination[asset_outputs[outp]]);
+                                            tmp_amounts->Clear();
+                                            lpScript->Clear();
+                                            tmp_amounts->Add(buf);                    
+                                            lpScript->SetAssetQuantities(tmp_amounts,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER);                
+                                            for(int element=0;element < lpScript->GetNumElements();element++)
+                                            {
+                                                elem = lpScript->GetData(element,&elem_size);
+                                                if(elem)
+                                                {
+                                                    scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
+                                                }
+                                                else
+                                                {
+                                                    strFailReason=_("Internal error: Invalid script");
+                                                    return false;                                    
+                                                }
+                                            }                
+                                                                                        
+                                            nAmount=nft_output_native[asset_outputs[outp]];
+                                            if(MCP_WITH_NATIVE_CURRENCY)
+                                            {
+                                                if(nAmount==0)
+                                                {
+                                                    CTxOut txout_for_size(0, scriptPubKey);
+                                                    nAmount=3*(::minRelayTxFee.GetFee(txout_for_size.GetSerializeSize(SER_DISK,0)+148u));                
+                                                }                                                
+                                            }
+                                            nft_output_native[asset_outputs[outp]]=0;
+                                            
+                                            vecSendOut.push_back(make_pair(scriptPubKey, nAmount));                                            
+                                            
+                                            outp=(int)asset_outputs.size();
+                                        }
+                                        outp++;
+                                    }
+                                    if(outp == (int)asset_outputs.size())              // Original outputs are empty, all extra tokens will go to change
+                                    {
+                                        quantity=0;                             
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+        
     return true;
 }
 
@@ -1602,7 +2000,7 @@ bool SelectAssetCoins(CWallet *lpWallet,                                        
         CAmount nAssetValueIn = 0;
         
         int in_prefered_row=in_asset_row;   
-        for(int i=0;i<7;i++)
+        for(int i=0;i<11;i++)
         {
             if(in_asset_row == in_special_row[i])
             {
@@ -2091,13 +2489,16 @@ CAmount BuildAssetTransaction(CWallet *lpWallet,                                
     return 0;
 }
 
-bool CheckOutputPermissions(const vector<pair<CScript, CAmount> >& vecSend,mc_Buffer *tmp_amounts,std::string& strFailReason,int *eErrorCode)
+bool CheckOutputPermissions(const vector<pair<CScript, CAmount> >& vecSend,map<uint256, vector<int>>& mapNFTAssetOutputs,mc_Buffer *tmp_amounts,std::string& strFailReason,int *eErrorCode)
 {
     int receive_required;
     int64_t quantity;
-    int err;
+    int err,count;
     bool fIsMaybePurePermission,fIsGenesis;
+    unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
     
+    
+    count=0;
     BOOST_FOREACH (const PAIRTYPE(CScript, CAmount)& s, vecSend)            
     {
         txnouttype typeRet;
@@ -2140,6 +2541,35 @@ bool CheckOutputPermissions(const vector<pair<CScript, CAmount> >& vecSend,mc_Bu
             {
                 *eErrorCode=RPC_NOT_ALLOWED;
                 return false;
+            }
+            if(mc_gState->m_Features->NFTokens())
+            {
+                if(tmp_amounts->GetCount() == 1)
+                {
+                    mc_EntityDetails entity;
+                    if(mc_gState->m_Assets->FindEntityByFullRef(&entity,tmp_amounts->GetRow(0)))
+                    {
+                        if(entity.IsNFTAsset())
+                        {
+                            memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
+                            memcpy(buf+MC_AST_SHORT_TXID_OFFSET,entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+                            uint256 txid;//=*(uint256*)buf;
+                            memcpy(&txid,buf,sizeof(uint256));
+                            
+                            map<uint256, vector<int>>::iterator it = mapNFTAssetOutputs.find(txid);                            
+                            if(it != mapNFTAssetOutputs.end())
+                            {
+                                it->second.push_back(count);
+                            }
+                            else
+                            {
+                                vector<int> v;
+                                v.push_back(count);
+                                mapNFTAssetOutputs.insert(make_pair(txid,v));
+                            }
+                        }
+                    }
+                }
             }
             
             fIsMaybePurePermission=true;
@@ -2219,6 +2649,7 @@ bool CheckOutputPermissions(const vector<pair<CScript, CAmount> >& vecSend,mc_Bu
                 }
             }            
         }            
+        count++;
     }
     
     return true;
@@ -2252,10 +2683,13 @@ bool IsLicenseTokenIssuanceDetails(const CTxOut& txout,mc_Script *lpScript)
 }
 
 
-bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript, CAmount> >& vecSend,
+bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript, CAmount> >& vecSendIn,
                                 CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, std::string& strFailReason, const CCoinControl* coinControl,
                                 const set<CTxDestination>* addresses,int min_conf,int min_inputs,int max_inputs,const vector<COutPoint>* lpCoinsToUse,uint32_t flags,int *eErrorCode)
 {   
+    vector<pair<CScript, CAmount> > vecSend;
+    vector<pair<CScript, CAmount> > vecSendFinal;
+    
     double start_time=mc_TimeNowAsDouble();
     double last_time,this_time;
     last_time=start_time;
@@ -2266,7 +2700,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
     
     if(eErrorCode)*eErrorCode=RPC_INVALID_PARAMETER;
     CAmount nValue = 0;
-    BOOST_FOREACH (const PAIRTYPE(CScript, CAmount)& s, vecSend)
+    BOOST_FOREACH (const PAIRTYPE(CScript, CAmount)& s, vecSendIn)
     {
         if (nValue < 0)                                                         // Multichain allows protocol zero-value outputs
         {
@@ -2326,7 +2760,15 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
     CMutableTransaction txNew;
     map<uint32_t, uint256> mapSpecialEntity;
     set<CTxDestination> usedAddresses;
+    vector<CAmount> vecNFTAsset;
     bool skip_error_message=false;
+    map<uint256, vector<int>> mapNFTAssetOutputs;
+    map<uint256, int> mapTokenToNFTAssetRow;
+            
+    if(!SplitOutputsIfNeeded(vecSendIn,vecSend,strFailReason))
+    {
+        goto exitlbl;        
+    }
     
     in_row=NULL;
     out_amounts->Clear();
@@ -2336,7 +2778,9 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
     required=0;
     if(vecSend.size())
     {
-        if(!CheckOutputPermissions(vecSend,tmp_amounts,strFailReason,eErrorCode))
+        vecNFTAsset.resize(vecSend.size());
+        
+        if(!CheckOutputPermissions(vecSend,mapNFTAssetOutputs,tmp_amounts,strFailReason,eErrorCode))
         {
             goto exitlbl;
         }
@@ -2380,6 +2824,10 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                 }
                 required |= this_required;
             }
+        }
+        if(!CheckForTokenAssetConflicts(out_amounts,mapNFTAssetOutputs,strFailReason))        
+        {
+            goto exitlbl;                                    
         }
         if(required & MC_PTP_ISSUE)
         {
@@ -2441,7 +2889,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
     if(fDebug)LogPrint("mcperf","Coin Selection, available coins time: %8.6f\n",this_time-last_time);
     last_time=this_time;
     
-    int in_special_row[10];
+    int in_special_row[11];
     int in_size;
                                                                                 // Input coin matrix
                                                                                 // Rows - assets, columns - coins
@@ -2461,7 +2909,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
     in_row=(unsigned char*)mc_New(in_size);
     
         
-    for(int i=0;i<10;i++)
+    for(int i=0;i<11;i++)
     {
         in_special_row[i]=-1;
     }
@@ -2561,6 +3009,14 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
         in_amounts->Add(in_row);
     }
     
+                                                                                // Special row, if coin has NFT-asset
+    in_special_row[10]=in_amounts->GetCount();
+    memset(in_row,0,in_size);
+    type=0;
+    mc_PutLE(in_row+4,&type,4);
+    mc_SetABRefType(in_row,MC_AST_ASSET_REF_TYPE_SPECIAL);
+    in_amounts->Add(in_row);
+    
     this_time=mc_TimeNowAsDouble();
     if(csperf_debug_print)if(vecSend.size())printf("Initialize              : %8.6f\n",this_time-last_time);
     last_time=this_time;
@@ -2577,7 +3033,8 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
             if(vecSend.size())                                                  // Normal transaction
             {
                                                                                 // Find coins for relevant assets
-                if(!FindRelevantCoins(lpWallet,vCoins,out_amounts,required,&no_send_coins,&inline_coins,in_amounts,in_map,tmp_amounts,in_row,in_size,lpScript,in_special_row,&mapSpecialEntity,strFailReason))
+                if(!FindRelevantCoins(lpWallet,vCoins,out_amounts,required,&no_send_coins,&inline_coins,in_amounts,in_map,tmp_amounts,in_row,in_size,lpScript,in_special_row,
+                        &mapSpecialEntity,mapNFTAssetOutputs,mapTokenToNFTAssetRow,strFailReason))
                 {
                     goto exitlbl;
                 }
@@ -2604,7 +3061,6 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                         int in_asset_row;
                         nTotalOutValue=mc_GetABQuantity(out_amounts->GetRow(asset));
                         in_asset_row=in_amounts->Seek(out_amounts->GetRow(asset));
-        
                         if((nTotalOutValue > 0) ||                              // Can send 0 amount of specific asset if there are no outputs carrying this asset
                              ((mc_GetABRefType(out_amounts->GetRow(asset)) == MC_AST_ASSET_REF_TYPE_SPECIAL) &&
                              (mc_GetLE(out_amounts->GetRow(asset)+4,4) == MC_PTP_SEND)))// But not for native currency, otherwise we can get "no inputs"                                  
@@ -2712,6 +3168,17 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                 }                
             }
             
+            if(mapNFTAssetOutputs.size())
+            {
+                if(!ModifyForNFTAssets(vecSend,vecSendFinal,mapNFTAssetOutputs,mapTokenToNFTAssetRow,out_amounts,in_amounts,tmp_amounts,vCoins.size(),lpScript,in_special_row,strFailReason))
+                {
+                    goto exitlbl;                            
+                }
+            }
+            else
+            {
+                vecSendFinal=vecSend;
+            }
                                                                                 // Calculate change
             if(!CalculateChangeAmounts(lpWallet,vCoins,nValue,out_amounts,required,in_amounts,change_amounts,tmp_amounts,lpScript,in_special_row,&mapSpecialEntity,&usedAddresses,strFailReason))
             {
@@ -2737,7 +3204,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
             if(csperf_debug_print)if(vecSend.size())printf("Address                 : %8.6f\n",this_time-last_time);
             last_time=this_time;
 
-            missing_amount=BuildAssetTransaction(lpWallet,wtxNew,change_address,nFeeRet,vecSend,vCoins,in_amounts,change_amounts,required,min_output,tmp_amounts,lpScript,in_special_row,&usedAddresses,flags,strFailReason);
+            missing_amount=BuildAssetTransaction(lpWallet,wtxNew,change_address,nFeeRet,vecSendFinal,vCoins,in_amounts,change_amounts,required,min_output,tmp_amounts,lpScript,in_special_row,&usedAddresses,flags,strFailReason);
             if(missing_amount<0)                                                // Error
             {
                 goto exitlbl; 
@@ -2779,7 +3246,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
                 }
                 
                                                                                 // Try to build transaction again
-                missing_amount=BuildAssetTransaction(lpWallet,wtxNew,change_address,nFeeRet,vecSend,vCoins,in_amounts,change_amounts,required,min_output,tmp_amounts,lpScript,in_special_row,&usedAddresses,flags,strFailReason);                
+                missing_amount=BuildAssetTransaction(lpWallet,wtxNew,change_address,nFeeRet,vecSendFinal,vCoins,in_amounts,change_amounts,required,min_output,tmp_amounts,lpScript,in_special_row,&usedAddresses,flags,strFailReason);                
                 if(missing_amount<0)                                            // Error
                 {
                     if(eErrorCode)*eErrorCode=RPC_WALLET_INSUFFICIENT_FUNDS;

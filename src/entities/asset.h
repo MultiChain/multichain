@@ -41,6 +41,7 @@
 #define MC_ENT_MAX_FIXED_FIELDS_SIZE                  128 
 #define MC_ENT_MAX_STORED_ISSUERS                     128 
 #define MC_ENT_SCRIPT_ALLOC_SIZE                    66000 // > MC_ENT_MAX_SCRIPT_SIZE + MC_ENT_MAX_FIXED_FIELDS_SIZE + 27*MC_ENT_MAX_STORED_ISSUERS
+#define MC_ENT_DEFAULT_MAX_ASSET_TOTAL 0x7FFFFFFFFFFFFFFF
 
 #define MC_ENT_KEY_SIZE              32
 #define MC_ENT_KEYTYPE_TXID           0x00000001
@@ -61,7 +62,8 @@
 #define MC_ENT_TYPE_LICENSE_TOKEN     0x12
 #define MC_ENT_TYPE_VARIABLE          0x13
 #define MC_ENT_TYPE_LIBRARY           0x14
-#define MC_ENT_TYPE_MAX               0x14
+#define MC_ENT_TYPE_TOKEN             0x15
+#define MC_ENT_TYPE_MAX               0x15
 #define MC_ENT_TYPE_ENTITYLIST        0xF0
 
 #define MC_ENT_SPRM_NAME                      0x01                              // Cross-entity parameters
@@ -74,6 +76,7 @@
 #define MC_ENT_SPRM_JSON_VALUE                0x08
 #define MC_ENT_SPRM_VOUT                      0x09
 #define MC_ENT_SPRM_UPDATE_NAME               0x0a
+#define MC_ENT_SPRM_PARENT_ENTITY             0x0b
 
 #define MC_ENT_SPRM_ASSET_MULTIPLE            0x41                              // Entity-specific parameters
 #define MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION  0x42
@@ -83,6 +86,8 @@
 #define MC_ENT_SPRM_FILTER_CODE               0x46
 #define MC_ENT_SPRM_FILTER_TYPE               0x47
 #define MC_ENT_SPRM_FILTER_LIBRARIES          0x48
+#define MC_ENT_SPRM_ASSET_MAX_TOTAL           0x49
+#define MC_ENT_SPRM_ASSET_MAX_ISSUE           0x4a
 
 #define MC_ENT_SPRM_ASSET_TOTAL               0x51                              // Optimization parameters
 #define MC_ENT_SPRM_CHAIN_INDEX               0x52 
@@ -120,9 +125,20 @@
 #define MC_ENT_SPRM_FILE_END                  0xFF
 
 #define MC_ENT_FLAG_OFFSET_IS_SET     0x00000001
+#define MC_ENT_FLAG_NO_OFFSET_KEY     0x00000002
 #define MC_ENT_FLAG_NAME_IS_SET       0x00000010
+#define MC_ENT_FLAG_ENTITYLIST        0x00000100
 
-#define MC_ENT_FLAG_ENTITYLIST       0x00000100
+
+
+#define MC_ENT_FOMD_NONE                      0x00                                 // Follow-on (update) modes
+#define MC_ENT_FOMD_ALLOWED_INSTANT           0x01
+#define MC_ENT_FOMD_ANYONE_CAN_ISSUEMORE      0x02
+#define MC_ENT_FOMD_ALLOWED_WITH_APPROVAL     0x04
+#define MC_ENT_FOMD_NON_FUNGIBLE_TOKENS       0x08
+#define MC_ENT_FOMD_CAN_CLOSE                 0x10
+#define MC_ENT_FOMD_CAN_OPEN                  0x20
+
 
 
 
@@ -221,9 +237,14 @@ typedef struct mc_EntityDetails
     int IsFollowOn(); 
 //    int HasFollowOns(); 
     int AllowedFollowOns(); 
-    int UpdateMode(); 
+    int FollowonMode(); 
     int AnyoneCanIssueMore(); 
     int ApproveRequired();     
+    int IsNFTAsset();     
+    int AdminCanOpen();     
+    int AdminCanClose();     
+    int64_t MaxTotalIssuance();
+    int64_t MaxSingleIssuance();
     uint32_t Permissions(); 
     uint32_t Restrictions(); 
     int AnyoneCanWrite(); 
@@ -232,6 +253,8 @@ typedef struct mc_EntityDetails
     uint32_t UpgradeStartBlock(); 
     uint64_t GetQuantity();
     uint32_t GetEntityType();    
+    const char* GetUpdateName(size_t* bytes);
+    const unsigned char* GetParentTxID();
     const void* GetSpecialParam(uint32_t param,size_t* bytes);
     const void* GetSpecialParam(uint32_t param,size_t* bytes,int check_extended_script);
     const void* GetParam(const char *param,size_t* bytes);
@@ -316,7 +339,7 @@ typedef struct mc_AssetDB
 
     int Initialize(const char *name,int mode);
         
-    int InsertEntity(const void* txid, int offset, int entity_type, const void *script,size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row,int update_mempool);
+    int InsertEntity(const void* txid, int offset, int entity_type, const void *script,size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row,int update_mempool,uint32_t flags);
     int InsertAsset(const void* txid, int offset, int asset_type, uint64_t quantity,const char *name,int multiple,const void *script,size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row,int update_mempool);
     int InsertAssetFollowOn(const void* txid, int offset, uint64_t quantity, const void *script,size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row,const void* original_txid,int update_mempool);
     int UpdateEntityLists(const void* txid,int offset,int entity_type);

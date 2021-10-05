@@ -12,6 +12,7 @@
 
 #define MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER              0x00000001
 #define MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON              0x00000002
+#define MC_SCR_ASSET_SCRIPT_TYPE_TOKEN                 0x00000004
 
 #define MC_SCR_DATA_FORMAT_UNKNOWN                 0x00 
 #define MC_SCR_DATA_FORMAT_UTF8                    0x01 
@@ -108,6 +109,9 @@ typedef struct mc_Script
 
     int GetRawData(unsigned char **data,int *size);
     int SetRawData(const unsigned char *data,const int size);
+    
+    int GetInlineDetails(unsigned char **data,int *size);
+    int SetInlineDetails(const unsigned char *data,const int size);
     
     int GetDataFormat(uint32_t *format);
     int SetDataFormat(const uint32_t format);

@@ -565,7 +565,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -lockinlinemetadata=0|1                  " + _("Outputs with inline metadata can be sent only using create/appendrawtransaction, default 1") + "\n";
     strUsage += "  -purgemethod=<method>                    " + _("Overwrite data before purging. Available modes: unlink, simple(=zero, default), one, zeroone, random1-random4, dod, doe, rcmp, gutmann.") + "\n";
     strUsage += "                                           " + _("Can be followed by '-pattern' (up to 6 characters), i.e. random2-mchn makes two random pattern passes followed by 'mchn'. Enterprise Edition only.") + "\n";
-    strUsage += "  -explorersupport=0|1                     " + _("Provide support for MultiChain Explorer 2, default 0") + "\n";
+    strUsage += "  -explorersupport=0|2                     " + _("Provide support for MultiChain Explorer 2, default 0") + "\n";
 
     strUsage += "\n" + _("MultiChain API response parameters") + "\n";        
     strUsage += "  -hideknownopdrops      " + strprintf(_("Remove recognized MultiChain OP_DROP metadata from the responses to JSON-RPC calls (default: %u)"), 0) + "\n";
@@ -1818,7 +1818,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                             }
                             break;
                         case MC_TET_EXP_TX:
-                            explorer_support=1;
+                            explorer_support=2;
                             break;
                     }
                 }
@@ -1926,17 +1926,24 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 int explorer_mode=GetArg("-explorersupport",explorer_support);
                 if(explorer_mode > 0)
                 {
-                    mc_gState->m_WalletMode |= MC_WMD_EXPLORER;
+                    if(explorer_mode != 2)
+                    {
+                        return InitError("-explorersupport should be either 0 or 2\n");                                                
+                    }
+                    mc_gState->m_WalletMode |= MC_WMD_EXPLORER2;
                 }
 
                 if(pwalletTxsMain->Initialize(mc_gState->m_NetworkParams->Name(),mc_gState->m_WalletMode))
                 {
                     return InitError("Wallet tx database corrupted. Please restart multichaind with -rescan\n");                        
                 }
-
+                if((pwalletTxsMain->m_Database->m_DBStat.m_InitMode & MC_WMD_EXPLORER_MASK) == MC_WMD_EXPLORER1)
+                {
+                    return InitError("-explorersupport=1 is not supported by this version of MultiChain. To change it, please restart multichaind with -rescan -explorersupport=2\n");                                                                                
+                }
                 if(explorer_mode >= 0)
                 {                    
-                    if( (pwalletTxsMain->m_Database->m_DBStat.m_InitMode & MC_WMD_EXPLORER) != (mc_gState->m_WalletMode & MC_WMD_EXPLORER) )
+                    if( (pwalletTxsMain->m_Database->m_DBStat.m_InitMode & MC_WMD_EXPLORER_MASK) != (mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) )
                     {
                         return InitError("Explorer database was initialized with different setting. To change it, please restart multichaind with -rescan\n");                                                    
                     }
@@ -1950,13 +1957,13 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 }
                 else
                 {
-                    if(pwalletTxsMain->m_Database->m_DBStat.m_InitMode & MC_WMD_EXPLORER)
+                    if(pwalletTxsMain->m_Database->m_DBStat.m_InitMode & MC_WMD_EXPLORER_MASK)
                     {
-                        mc_gState->m_WalletMode |= MC_WMD_EXPLORER;
+                        mc_gState->m_WalletMode |= MC_WMD_EXPLORER2;
                     }
                 }
 
-                if(mc_gState->m_WalletMode & MC_WMD_EXPLORER)
+                if(mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK)
                 {
                     if (mapArgs.count("-autosubscribe") == 0)
                     {
@@ -1987,7 +1994,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     return InitError(strprintf("Wallet tx database was created with different wallet version (%d). Please restart multichaind with reindex=1 \n",pwalletTxsMain->m_Database->m_DBStat.m_WalletVersion));                        
                 }        
 
-                if((pwalletTxsMain->m_Database->m_DBStat.m_InitMode & (MC_WMD_MODE_MASK - MC_WMD_EXPLORER)) != (mc_gState->m_WalletMode & (MC_WMD_MODE_MASK - MC_WMD_EXPLORER)))
+                if((pwalletTxsMain->m_Database->m_DBStat.m_InitMode & (MC_WMD_MODE_MASK - MC_WMD_EXPLORER_MASK)) != (mc_gState->m_WalletMode & (MC_WMD_MODE_MASK - MC_WMD_EXPLORER_MASK)))
                 {
                     return InitError(strprintf("Wallet tx database was created in different mode (%08X). Please restart multichaind with reindex=1 \n",pwalletTxsMain->m_Database->m_DBStat.m_InitMode));                        
                 }        
@@ -3040,6 +3047,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 #ifdef ENABLE_WALLET
         if (pwalletMain) {
             // Add wallet transactions that aren't already in a block to mapTransactions
+            uiInterface.InitMessage(_("Reaccepting unconfirmed wallet transactions..."));
             pwalletMain->ReacceptWalletTransactions();
         }
 #endif

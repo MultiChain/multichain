@@ -35,6 +35,7 @@ string EncodeHexTx(const CTransaction& tx);
 int OrphanPoolSize();
 bool paramtobool(Value param);
 bool StringToInt(string str,int *value);
+void FindSigner(CBlock *block,unsigned char *sig,int *sig_size,uint32_t *hash_type);
 /* MCHN END */
 
 void ScriptPubKeyToJSON(const CScript& scriptPubKey, Object& out, bool fIncludeHex);
@@ -70,7 +71,7 @@ double GetDifficulty(const CBlockIndex* blockindex)
     return dDiff;
 }
 
-Object blockToJSONForListBlocks(const CBlock& block, const CBlockIndex* blockindex, bool verbose)
+Object blockToJSONForListBlocks(CBlock& block, const CBlockIndex* blockindex, bool verbose)
 {
     Object result;
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
@@ -79,8 +80,22 @@ Object blockToJSONForListBlocks(const CBlock& block, const CBlockIndex* blockind
     Value miner;
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-        if(mc_gState->m_Permissions->GetBlockMiner(blockindex->nHeight,(unsigned char*)&keyID) == MC_ERR_NOERROR)
+        if (chainActive.Contains(blockindex))
         {
+            if(mc_gState->m_Permissions->GetBlockMiner(blockindex->nHeight,(unsigned char*)&keyID) == MC_ERR_NOERROR)
+            {
+                miner=CBitcoinAddress(keyID).ToString();
+            }
+        }
+        else
+        {
+            unsigned char sig[255];
+            int sig_size;
+            uint32_t hash_type;
+            FindSigner(&block, sig, &sig_size, &hash_type);
+            std::vector<unsigned char> vchPubKey=std::vector<unsigned char> (block.vSigner+1, block.vSigner+1+block.vSigner[0]);
+            CPubKey pubKeyOut(vchPubKey);
+            keyID=pubKeyOut.GetID();
             miner=CBitcoinAddress(keyID).ToString();
         }
     }
@@ -117,7 +132,7 @@ Object blockToJSONForListBlocks(const CBlock& block, const CBlockIndex* blockind
 
 
 
-Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDetails = false, int verbose_level = 1)
+Object blockToJSON(CBlock& block, const CBlockIndex* blockindex, bool txDetails = false, int verbose_level = 1)
 {
     Object result;
     result.push_back(Pair("hash", block.GetHash().GetHex()));
@@ -126,8 +141,22 @@ Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDe
     Value miner;
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-        if(mc_gState->m_Permissions->GetBlockMiner(blockindex->nHeight,(unsigned char*)&keyID) == MC_ERR_NOERROR)
+        if (chainActive.Contains(blockindex))
         {
+            if(mc_gState->m_Permissions->GetBlockMiner(blockindex->nHeight,(unsigned char*)&keyID) == MC_ERR_NOERROR)
+            {
+                miner=CBitcoinAddress(keyID).ToString();
+            }
+        }
+        else
+        {
+            unsigned char sig[255];
+            int sig_size;
+            uint32_t hash_type;
+            FindSigner(&block, sig, &sig_size, &hash_type);
+            std::vector<unsigned char> vchPubKey=std::vector<unsigned char> (block.vSigner+1, block.vSigner+1+block.vSigner[0]);
+            CPubKey pubKeyOut(vchPubKey);
+            keyID=pubKeyOut.GetID();
             miner=CBitcoinAddress(keyID).ToString();
         }
     }
@@ -634,7 +663,7 @@ Value gettxout(const Array& params, bool fHelp)
     
     asset_amounts->Clear();
     CTxOut txout=coins.vout[n];
-    if(CreateAssetBalanceList(txout,asset_amounts,lpScript))
+    if(CreateAssetBalanceList(txout,asset_amounts,lpScript,NULL,false))
     {
         Array assets;
         unsigned char *ptr;

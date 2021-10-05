@@ -81,6 +81,8 @@ FILTER_FUNCTION(getfiltertransaction)
 FILTER_FUNCTION(getfilterstreamitem)
 FILTER_FUNCTION(getfilterstream)
 FILTER_FUNCTION(getfilterassetbalances)
+FILTER_FUNCTION(getfiltertokenbalances)
+FILTER_FUNCTION(listassetissues)
 FILTER_FUNCTION(getvariableinfo)
 FILTER_FUNCTION(getvariablevalue)
 FILTER_FUNCTION(getvariablehistory)
@@ -100,6 +102,8 @@ std::map<std::string, v8::FunctionCallback> callbackLookup{
     FILTER_LOOKUP(getfilterstreamitem),
     FILTER_LOOKUP(getfilterstream),
     FILTER_LOOKUP(getfilterassetbalances),
+    FILTER_LOOKUP(getfiltertokenbalances),
+    FILTER_LOOKUP(listassetissues),
     FILTER_LOOKUP(getvariableinfo),
     FILTER_LOOKUP(getvariablevalue),
     FILTER_LOOKUP(getvariablehistory),

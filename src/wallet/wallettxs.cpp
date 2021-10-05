@@ -2572,7 +2572,7 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
             for (int e = 0; e < mc_gState->m_TmpScript->GetNumElements(); e++)
             {
                 mc_gState->m_TmpScript->SetElement(e);
-                mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER | MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
+                mc_gState->m_TmpScript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_TRANSFER | MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON | MC_SCR_ASSET_SCRIPT_TYPE_TOKEN);
                 if(mc_gState->m_TmpScript->GetAssetGenesis(&quantity) == 0)
                 {
                     fNewAsset=true;                    
@@ -2972,16 +2972,20 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                     }                    
                 }
             }
-            if(m_Mode & MC_WMD_AUTOSUBSCRIBE_STREAMS)
+            if(mc_gState->m_TmpScript->GetNumElements() == 2) 
             {
-                if(mc_gState->m_TmpScript->GetNumElements() == 2) 
+                uint32_t new_entity_type;
+                mc_gState->m_TmpScript->SetElement(0);
+                                                                            // Should be spkn
+                if(mc_gState->m_TmpScript->GetNewEntityType(&new_entity_type) == 0)    // New entity element
                 {
-                    uint32_t new_entity_type;
-                    mc_gState->m_TmpScript->SetElement(0);
-                                                                                // Should be spkn
-                    if(mc_gState->m_TmpScript->GetNewEntityType(&new_entity_type) == 0)    // New entity element
+                    if(new_entity_type == MC_ENT_TYPE_ASSET)
                     {
-                        if(new_entity_type == MC_ENT_TYPE_STREAM)
+                        fNewAsset=true;
+                    }
+                    if(new_entity_type == MC_ENT_TYPE_STREAM)
+                    {
+                        if(m_Mode & MC_WMD_AUTOSUBSCRIBE_STREAMS)
                         {
                             entity.Zero();
                             memcpy(entity.m_EntityID,(unsigned char*)&hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
@@ -2995,28 +2999,11 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
                                         fNewStream=true;
                                     }
                                 }
-/*                                
-                                else
-                                {
-                                    int chain_row=m_Database->m_Imports->FindEntity(&entity);
-                                    if(chain_row < 0)    
-                                    {
-                                        fNewStream=true;
-                                    }
-                                    else
-                                    {
-                                        if(m_Database->m_Imports->GetEntity(chain_row)->m_Flags & MC_EFL_NOT_IN_SYNC)
-                                        {
-                                            fNewStream=true;                                            
-                                        }
-                                    }
-                                }
- */ 
                             }
                         }
                     }
-                }                
-            }
+                }
+            }                
         }
     }
     
@@ -3057,10 +3044,18 @@ int mc_WalletTxs::AddTx(mc_TxImport *import,const CWalletTx& tx,int block,CDiskT
     
     for(i=0;i<mc_gState->m_TmpAssetsOut->GetCount();i++)
     {
+        mc_EntityDetails asset_details;        
         ptrOut=mc_gState->m_TmpAssetsOut->GetRow(i);
         entity.Zero();
         memcpy(entity.m_EntityID,ptrOut+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
         entity.m_EntityType=MC_TET_ASSET | MC_TET_CHAINPOS;
+        if(mc_gState->m_Assets->FindEntityByShortTxID(&asset_details,ptrOut+MC_AST_SHORT_TXID_OFFSET))
+        {
+            if(asset_details.GetEntityType() == MC_ENT_TYPE_TOKEN)
+            {
+                memcpy(entity.m_EntityID,asset_details.GetParentTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);                
+            }
+        }
         fRelevantEntity=false;
         if(imp->FindEntity(&entity) >= 0)    
         {
@@ -3471,7 +3466,7 @@ uint64_t mc_GetExplorerTxOutputDetails(int rpc_slot,
                 {
                     OutputScriptTags[i] |= MC_MTX_TAG_ASSET_TRANSFER;
                 }
-                err=tmpscript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
+                err=tmpscript->GetAssetQuantities(mc_gState->m_TmpAssetsOut,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON | MC_SCR_ASSET_SCRIPT_TYPE_TOKEN);
                 if(err == MC_ERR_NOERROR)
                 {
                     OutputScriptTags[i] |= MC_MTX_TAG_ASSET_FOLLOWON;
@@ -3486,22 +3481,34 @@ uint64_t mc_GetExplorerTxOutputDetails(int rpc_slot,
                         ptrOut=mc_gState->m_TmpAssetsOut->GetRow(k);
                         asset=0;
                         memcpy(&asset,ptrOut+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);                        
-                        quantity=mc_GetABQuantity(ptrOut);
-                        if(quantity > 0)
+                        if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptrOut))
                         {
-                            if( (n == 1) && (quantity == 1) )
+                            if(entity.GetEntityType() == MC_ENT_TYPE_TOKEN)
                             {
-                                if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptrOut))
+                                memcpy(&asset,entity.GetParentTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);                                                        
+                            }
+                            quantity=mc_GetABQuantity(ptrOut);
+                            if(quantity > 0)
+                            {
+                                if( (n == 1) && (quantity == 1) )
                                 {
                                     if(entity.GetEntityType() == MC_ENT_TYPE_LICENSE_TOKEN)
                                     {
                                         OutputScriptTags[i] |= MC_MTX_TAG_LICENSE_TOKEN;
                                     }   
                                 }
-                            }
-                            if( (OutputScriptTags[i] & MC_MTX_TAG_LICENSE_TOKEN) == 0 )
-                            {
-                                assets.insert(make_pair(asset,quantity));                                
+                                if( (OutputScriptTags[i] & MC_MTX_TAG_LICENSE_TOKEN) == 0 )
+                                {
+                                    std::map<uint160,int64_t>::iterator it = assets.find(asset);
+                                    if(it == assets.end())
+                                    {
+                                        assets.insert(make_pair(asset,quantity));                        
+                                    }
+                                    else
+                                    {
+                                        it->second += quantity;
+                                    }                            
+                                }
                             }
                         }
                     }                    
@@ -3544,7 +3551,18 @@ uint64_t mc_GetExplorerTxOutputDetails(int rpc_slot,
                     {
                         if(prev_element_is_entity)
                         {
-                            OutputScriptTags[i] |= (from < to) ? MC_MTX_TAG_GRANT_ENTITY : MC_MTX_TAG_REVOKE_ENTITY;
+                            if(type == MC_PTP_DETAILS)
+                            {
+                                if(mc_gState->m_Assets->FindEntityByShortTxID(&entity,short_txid))
+                                {
+                                    OutputScriptTags[i] |= mc_EntityTypeToExplorerCode(entity.GetEntityType()) << MC_MTX_TAG_ENTITY_MASK_SHIFT;
+                                }
+                                OutputScriptTags[i] |= MC_MTX_TAG_ENTITY_UPDATE;
+                            }
+                            else
+                            {
+                                OutputScriptTags[i] |= (from < to) ? MC_MTX_TAG_GRANT_ENTITY : MC_MTX_TAG_REVOKE_ENTITY;
+                            }
                         }
                         else
                         {
@@ -3813,7 +3831,7 @@ exitlbl:
 
 int mc_WalletTxs::AddExplorerEntities(mc_Buffer *lpEntities)
 {
-    if( (m_Mode & MC_WMD_EXPLORER) == 0 )
+    if( (m_Mode & MC_WMD_EXPLORER_MASK) == 0 )
     {
         return MC_ERR_NOERROR;
     }
@@ -3975,6 +3993,26 @@ uint32_t mc_CheckExplorerAssetTransfers(
     return tx_tag;
 }
 
+uint256 mc_ExplorerTxIDHashMap(uint256 hash_in)
+{
+    unsigned char t;
+    unsigned char temp[32];
+    uint256 hash_out=hash_in;
+    memcpy(temp,&hash_in,32);
+    for(int i=1;i<32;i++)
+    {
+        if(temp[i] != temp[0])
+        {
+            t=temp[i];
+            temp[i]=temp[0];
+            temp[0]=t;
+            memcpy(&hash_out,temp,32);
+            return hash_out;
+        }
+    }    
+    return hash_out;
+}
+
 int mc_WalletTxs::AddExplorerTx(                                                          
               mc_TxImport *import,                                              // Import object, NULL if chain update
               const CTransaction& tx,                                           // Tx to add
@@ -4104,7 +4142,7 @@ int mc_WalletTxs::AddExplorerTx(
         }
     }
     
-    if( (m_Mode & MC_WMD_EXPLORER) == 0 )
+    if( (m_Mode & MC_WMD_EXPLORER_MASK) == 0 )
     {
         return MC_ERR_NOERROR;
     }
@@ -4149,7 +4187,7 @@ int mc_WalletTxs::AddExplorerTx(
     }   
     
     direct_tx_tag=(uint32_t)(tx_tag & MC_MTX_TAG_DIRECT_MASK);
-    tag_hash=hash;
+    tag_hash=mc_ExplorerTxIDHashMap(hash);
     memset(extended_tag_data,0,MC_MTX_TAG_EXTENSION_TOTAL_SIZE);
     if(tx_tag & MC_MTX_TAG_EXTENSION_MASK)
     {
@@ -4496,9 +4534,10 @@ int mc_WalletTxs::AddExplorerTx(
     entity.Zero();
     entity.m_EntityType=MC_TET_EXP_TX | MC_TET_CHAINPOS;
     imp->m_TmpEntities->Add(&entity,NULL);
-    if(tag_hash == hash)
+//    if(tag_hash == hash)
+    if(direct_tx_tag != MC_MTX_TAG_EXTENDED_TAGS)        
     {
-        err=m_Database->AddData(imp,(unsigned char*)&hash,NULL,0,block,direct_tx_tag,timestamp,imp->m_TmpEntities);
+        err=m_Database->AddData(imp,(unsigned char*)&tag_hash,NULL,0,block,direct_tx_tag,timestamp,imp->m_TmpEntities);
     }
     else
     {

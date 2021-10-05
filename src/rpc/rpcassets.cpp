@@ -7,7 +7,9 @@
 
 #include "rpc/rpcwallet.h"
 
-Array AssetHistory(mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level);
+Array AssetHistory(mc_EntityDetails *asset_entity,mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level);
+void ParseRawTokenInfo(const Value *value,mc_Script *lpDetailsScript,mc_Script *lpDetailsScriptTmp,string *token,int64_t *raw,mc_EntityDetails *entity,int *errorCode,string *strError);
+
 
 void mergeGenesisWithAssets(mc_Buffer *genesis_amounts, mc_Buffer *asset_amounts)
 {
@@ -63,13 +65,17 @@ Value issuefromcmd(const Array& params, bool fHelp)
     int64_t quantity;
     int multiple;
     double dQuantity;
+    double dValue;
     double dUnit;
     
     dQuantity=0.;
     dUnit=1.;
     if (params.size() > 3 && params[3].type() != null_type)
     {
-        dQuantity=params[3].get_real();
+        if(params[3].type() != obj_type)
+        {
+            dQuantity=params[3].get_real();
+        }
     }
     
     if (params.size() > 4 && params[4].type() != null_type)
@@ -118,18 +124,31 @@ Value issuefromcmd(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INSUFFICIENT_PERMISSIONS, "Destination address doesn't have receive permission");        
     }
     
-    lpScript->SetAssetGenesis(quantity);
     
     mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;   
     lpDetailsScript->Clear();
     mc_Script *lpDetails=mc_gState->m_TmpBuffers->m_RpcScript2;
     lpDetails->Clear();
+    mc_Script *lpDetailsToken=mc_gState->m_TmpBuffers->m_RpcScript4;   
+    lpDetailsToken->Clear();
     
     int ret,type;
     string asset_name="";
     bool is_open=false;
     bool is_anyone_can_issuemore=false;
+    bool can_open=false;
+    bool can_close=false;
+    bool fungible=true;
+    int64_t totallimit=MC_ENT_DEFAULT_MAX_ASSET_TOTAL;
+    int64_t issuelimit=MC_ENT_DEFAULT_MAX_ASSET_TOTAL;
+    int err;
+    size_t bytes;
+    const unsigned char *script;
+    size_t elem_size;
+    const unsigned char *elem;
+            
     bool name_is_found=false;
+    bool field_found=false;
     uint32_t permissions=0;
     
     if (params.size() > 2 && params[2].type() != null_type)// && !params[2].get_str().empty())
@@ -139,6 +158,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
             Object objSpecialParams = params[2].get_obj();
             BOOST_FOREACH(const Pair& s, objSpecialParams) 
             {  
+                field_found=false;
                 if(s.name_ == "name")
                 {
                     if(!name_is_found)
@@ -146,6 +166,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
                         asset_name=s.value_.get_str().c_str();
                         name_is_found=true;
                     }
+                    field_found=true;
                 }
                 if(s.name_ == "open")
                 {
@@ -157,6 +178,98 @@ Value issuefromcmd(const Array& params, bool fHelp)
                     {
                         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'open' field, should be boolean");                                                                
                     }
+                    field_found=true;
+                }
+                if(s.name_ == "canopen")
+                {
+                    if(mc_gState->m_Features->NFTokens() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "canopen field is not supported in this protocol version");                   
+                    }
+                    if(s.value_.type() == bool_type)
+                    {
+                        can_open=s.value_.get_bool();
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'canopen' field, should be boolean");                                                                
+                    }
+                    field_found=true;
+                }
+                if(s.name_ == "canclose")
+                {
+                    if(mc_gState->m_Features->NFTokens() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "canclose field is not supported in this protocol version");                   
+                    }
+                    if(s.value_.type() == bool_type)
+                    {
+                        can_close=s.value_.get_bool();
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'canclose' field, should be boolean");                                                                
+                    }
+                    field_found=true;
+                }
+                if(s.name_ == "fungible")
+                {
+                    if(mc_gState->m_Features->NFTokens() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "fungible field is not supported in this protocol version");                   
+                    }
+                    if(s.value_.type() == bool_type)
+                    {
+                        fungible=s.value_.get_bool();
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'fungible' field, should be boolean");                                                                
+                    }
+                    field_found=true;
+                }
+                if(s.name_ == "totallimit")
+                {
+                    if(mc_gState->m_Features->NFTokens() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "totallimit field is not supported in this protocol version");                   
+                    }
+                    if((s.value_.type() == int_type) || (s.value_.type() == real_type))
+                    {
+                        dValue=s.value_.get_real();
+                        totallimit=(int64_t)(dValue*multiple+0.1);
+                        if(totallimit <= 0)
+                        {
+                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'totallimit' field, should be positive");                                                                                            
+                        }
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'totallimit' field, should be numeric");                                                                
+                    }
+                    field_found=true;
+                }
+                if(s.name_ == "issuelimit")
+                {
+                    if(mc_gState->m_Features->NFTokens() == 0)
+                    {
+                        throw JSONRPCError(RPC_NOT_SUPPORTED, "issuelimit field is not supported in this protocol version");                   
+                    }
+                    if((s.value_.type() == int_type) || (s.value_.type() == real_type))
+                    {
+                        dValue=s.value_.get_real();
+                        issuelimit=(int64_t)(dValue*multiple+0.1);
+//                        issuelimit=s.value_.get_int64();
+                        if(issuelimit <= 0)
+                        {
+                            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'issuelimit' field, should be positive");                                                                                            
+                        }
+                    }
+                    else
+                    {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for 'issuelimit' field, should be numeric");                                                                
+                    }
+                    field_found=true;
                 }
                 if(s.name_ == "unrestrict")
                 {
@@ -175,6 +288,7 @@ Value issuefromcmd(const Array& params, bool fHelp)
                     {
                         throw JSONRPCError(RPC_NOT_SUPPORTED, "unrestrict field is not supported in this protocol version");                                                                                        
                     }
+                    field_found=true;
                 }
                 if(s.name_ == "restrict")
                 {
@@ -193,6 +307,11 @@ Value issuefromcmd(const Array& params, bool fHelp)
                             }
                         }
                     }
+                    field_found=true;
+                }
+                if(!field_found)
+                {
+                    throw JSONRPCError(RPC_NOT_SUPPORTED, strprintf("Invalid field: %s",s.name_.c_str()));                       
                 }
             }
         }
@@ -241,21 +360,114 @@ Value issuefromcmd(const Array& params, bool fHelp)
     }        
     lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MULTIPLE,(unsigned char*)&multiple,4);
     
+    unsigned char b=MC_ENT_FOMD_NONE;
     if(is_open)
     {
-        unsigned char b=1;        
-        if(is_anyone_can_issuemore)
+        b |= MC_ENT_FOMD_ALLOWED_INSTANT;
+    }
+    if(can_open)
+    {
+        b |= MC_ENT_FOMD_CAN_OPEN;
+    }
+    if(can_close)
+    {
+        b |= MC_ENT_FOMD_CAN_CLOSE;
+    }
+    if(is_anyone_can_issuemore)
+    {
+        b |= MC_ENT_FOMD_ANYONE_CAN_ISSUEMORE;
+    }
+    if(!fungible)
+    {
+        b |= MC_ENT_FOMD_NON_FUNGIBLE_TOKENS;
+    }
+    if(!is_open && !can_open && is_anyone_can_issuemore)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Asset cannot have unrestricted issue permission if follow-ons are not allowed or cannot be allowed");   
+    }
+    if(!is_open && !can_open && can_close)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Issued asset must either be open now, or possible to open later (canopen parameter)");   
+    }
+    if(!is_open && !can_open && !fungible)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Asset cannot have non-fungible tokens if follow-ons are not allowed or cannot be allowed");   
+    }
+
+    if(!fungible)
+    {
+        if(multiple != 1)
         {
-            b |= 0x02;
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Non-fungible token asset should have multiple 1");               
         }
-        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);
+        if(params[3].type() == obj_type)                                        // Disabled token issuance in genesis transaction
+        {
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Invalid quantity, should be numeric");   
+        }        
+        if( (quantity != 0)  )// && (params[3].type() != obj_type) )
+        {
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Quantity should be 0 for non-fungible token asset ");               
+        }
+        string token;
+        int64_t raw=0;
+        int errorCode=RPC_INVALID_PARAMETER;
+        string strError;
+        
+        if((params[3].type() == obj_type))
+        {
+            ParseRawTokenInfo(&(params[3]),lpDetailsToken,lpDetailsScript,&token,&raw,NULL,&errorCode,&strError);
+            if(strError.size())
+            {
+                throw JSONRPCError(errorCode, strError);                           
+            }
+            if(raw>totallimit)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the totallimit for this asset");               
+            }
+            if(raw>issuelimit)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the issuelimit for this asset");               
+            }
+            lpScript->SetAssetGenesis(raw);
+            script=lpDetailsToken->GetData(0,&bytes);
+            lpScript->SetInlineDetails(script,bytes);
+        }
+        else
+        {
+            lpScript->SetAssetGenesis(raw);            
+        }
     }
     else
     {
-        if(is_anyone_can_issuemore)
+        if(params[3].type() == obj_type)
         {
-            throw JSONRPCError(RPC_NOT_SUPPORTED, "Asset cannot have unrestricted issue permission if follow-ons are not allowed");   
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Invalid quantity, should be numeric");   
         }        
+        if(mc_gState->m_Features->NFTokens())
+        {
+            if(quantity>totallimit)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the totallimit for this asset");               
+            }
+            if(quantity>issuelimit)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the issuelimit for this asset");               
+            }
+        }
+        lpScript->SetAssetGenesis(quantity);
+    }
+    
+    if(b != MC_ENT_FOMD_NONE)
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);        
+    }
+    if(totallimit != MC_ENT_DEFAULT_MAX_ASSET_TOTAL)
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MAX_TOTAL,(unsigned char*)&totallimit,sizeof(int64_t));                
+    }
+    if(issuelimit != MC_ENT_DEFAULT_MAX_ASSET_TOTAL)
+    {
+        lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ASSET_MAX_ISSUE,(unsigned char*)&issuelimit,sizeof(int64_t));                
     }
     
     if(permissions)
@@ -280,11 +492,6 @@ Value issuefromcmd(const Array& params, bool fHelp)
         }
     }
  */ 
-    int err;
-    size_t bytes;
-    const unsigned char *script;
-    size_t elem_size;
-    const unsigned char *elem;
     CScript scriptOpReturn=CScript();
     
     
@@ -383,7 +590,7 @@ exitlbl:
     {
         throw JSONRPCError(errorCode, strError);            
     }
-                
+
     return wtx.GetHash().GetHex();    
 }
  
@@ -404,10 +611,8 @@ Value issuecmd(const Array& params, bool fHelp)
     return issuefromcmd(ext_params,fHelp);    
 }
 
-Value issuemorefromcmd(const Array& params, bool fHelp)
+Value issuemorefrom_operation(const Array& params, bool is_token)
 {
-    if (fHelp || params.size() < 4 || params.size() > 6)
-        throw runtime_error("Help message not found\n");
 
     CBitcoinAddress address(params[1].get_str());
     if (!address.IsValid())
@@ -424,10 +629,21 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     
     mc_Script *lpScript=mc_gState->m_TmpBuffers->m_RpcScript3;
     lpScript->Clear();
+    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;   
+    lpDetailsScript->Clear();
+    mc_Script *lpDetailsToken=mc_gState->m_TmpBuffers->m_RpcScript4;   
+    lpDetailsToken->Clear();
+    
     unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
+    unsigned char buf_token[MC_AST_ASSET_FULLREF_BUF_SIZE];
     memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
     int multiple=1;
-    mc_EntityDetails entity;
+    mc_EntityDetails entity;    
+    int err;
+    size_t bytes;
+    const unsigned char *script;
+    size_t elem_size;
+    const unsigned char *elem;
     
     if (params.size() > 2 && params[2].type() != null_type && !params[2].get_str().empty())
     {        
@@ -439,24 +655,134 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset identifier");        
     }
-    
+
     Value raw_qty=params[3];
+    int64_t quantity=0;
     
-    int64_t quantity = (int64_t)(raw_qty.get_real() * multiple + 0.499999);
+    if(raw_qty.type() != obj_type)
+    {
+        quantity = (int64_t)(raw_qty.get_real() * multiple + 0.499999);
+    }
+
+    
     if(quantity<0)
     {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset quantity");        
     }
-        
-    mc_SetABQuantity(buf,quantity);
     
+    bool fungible=(entity.IsNFTAsset() == 0);
     mc_Buffer *lpBuffer=mc_gState->m_TmpBuffers->m_RpcABNoMapBuffer2;
     lpBuffer->Clear();
     
-    lpBuffer->Add(buf);
+    int64_t last_total=mc_gState->m_Assets->GetTotalQuantity(&entity);
     
-    lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
+    if(!fungible)
+    {    
+        if(params[3].type() == obj_type)
+        {
+            if(!is_token)
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "Invalid quantity, must be 0 if adding custom fields to non-fungible assets");   
+            }            
+        }
+        else
+        {
+            if(quantity != 0)
+            {
+                throw JSONRPCError(RPC_NOT_SUPPORTED, "Invalid quantity, must be 0 if adding custom fields to non-fungible assets");                           
+            }
+            if (params.size() <= 5)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Custom fields required for non-fungible assets");                                           
+            }            
+        }
+        
+        string token;
+        int64_t raw=0;
+        int errorCode=RPC_INVALID_PARAMETER;
+        string strError;
+        
+        if((params[3].type() == obj_type))
+        {
+            ParseRawTokenInfo(&(params[3]),lpDetailsToken,lpDetailsScript,&token,&raw,NULL,&errorCode,&strError);
+            lpDetailsToken->SetSpecialParamValue(MC_ENT_SPRM_PARENT_ENTITY,entity.GetTxID(),sizeof(uint256));         
+            
+            if(strError.size())
+            {
+                throw JSONRPCError(errorCode, strError);                           
+            }
+            if(raw+last_total>entity.MaxTotalIssuance())
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the total limit for this asset");               
+            }
+            if(raw>entity.MaxSingleIssuance())
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the issuance limit for this asset");               
+            }
+
+            uint256 token_hash;
+            mc_SHA256 *hasher=new mc_SHA256();
+            hasher->Reset();
+            hasher->Write(entity.GetTxID(),sizeof(uint256));
+            hasher->Write(token.c_str(),token.size());
+            hasher->GetHash((unsigned char *)&token_hash);
+            hasher->Reset();
+            hasher->Write((unsigned char *)&token_hash,sizeof(uint256));
+            hasher->GetHash((unsigned char *)&token_hash);    
+            delete hasher;
+            
+            memcpy(buf_token,buf,MC_AST_ASSET_FULLREF_BUF_SIZE);
+            memcpy(buf_token+MC_AST_SHORT_TXID_OFFSET,(unsigned char*)&token_hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+
+            mc_EntityDetails token_entity;
+            if(mc_gState->m_Assets->FindEntityByShortTxID(&token_entity,buf_token+MC_AST_SHORT_TXID_OFFSET))
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Token with this ID already exists in this asset");                               
+            }
+            mc_SetABQuantity(buf_token,raw);    
+
+            lpBuffer->Add(buf_token);
+
+            lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_TOKEN);
+            script=lpDetailsToken->GetData(0,&bytes);
+            lpScript->SetInlineDetails(script,bytes);
+        }
+    }
+    else
+    {
+        if(params[3].type() == obj_type)
+        {
+            if(is_token)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Issuing tokens not supported for this asset");                   
+            }
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "Invalid quantity, should be numeric");   
+        }        
+        if(mc_gState->m_Features->NFTokens())
+        {        
+            if(quantity+last_total>entity.MaxTotalIssuance())
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the total limit for this asset");               
+            }
+            if(quantity>entity.MaxSingleIssuance())
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid quantity, over the issue limit for this asset");               
+            }
+        }
+        if(quantity > 0)
+        {
+            mc_SetABQuantity(buf,quantity);    
+
+            lpBuffer->Add(buf);
+
+            if(quantity > 0)
+            {
+                lpScript->SetAssetQuantities(lpBuffer,MC_SCR_ASSET_SCRIPT_TYPE_FOLLOWON);
+            }
+        }
+    }
     
+        
     // Wallet comments
     CWalletTx wtx;
     
@@ -468,7 +794,6 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
     }
     
     
-    mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;
     lpDetailsScript->Clear();
     
     mc_Script *lpDetails=mc_gState->m_TmpBuffers->m_RpcScript2;
@@ -508,11 +833,6 @@ Value issuemorefromcmd(const Array& params, bool fHelp)
         }
     }
 */    
-    int err;
-    size_t bytes;
-    const unsigned char *script;
-    size_t elem_size;
-    const unsigned char *elem;
     
     script=lpDetails->GetData(0,&bytes);
     if(bytes > 0)
@@ -659,9 +979,17 @@ exitlbl:
     return wtx.GetHash().GetHex();    
 }
  
-Value issuemorecmd(const Array& params, bool fHelp)
+Value issuemorefrom(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 3)
+    if (fHelp || params.size() < 4 || params.size() > 6)
+        throw runtime_error("Help message not found\n");
+    
+    return issuemorefrom_operation(params,false);    
+}
+
+Value issuemore(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 3 || params.size() > 5)
         throw runtime_error("Help message not found\n");
 
     Array ext_params;
@@ -671,10 +999,56 @@ Value issuemorecmd(const Array& params, bool fHelp)
         ext_params.push_back(value);
     }
     
-    return issuemorefromcmd(ext_params,fHelp);
+    return issuemorefrom(ext_params,fHelp);  
 }    
 
-Value getmultibalances(const Array& params, bool fHelp)
+Value issuetokenfrom(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 5 || params.size() > 7)
+        throw runtime_error("Help message not found\n");
+    
+    if(mc_gState->m_Features->NFTokens() == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
+    }   
+    
+    Array ext_params;
+    Object token_details;
+    token_details.push_back(Pair("token",params[3]));
+    token_details.push_back(Pair("qty",params[4]));
+    if(params.size()>6)
+    {
+        token_details.push_back(Pair("details",params[6]));        
+    }
+    
+    ext_params.push_back(params[0]);
+    ext_params.push_back(params[1]);
+    ext_params.push_back(params[2]);
+    ext_params.push_back(token_details);
+    if(params.size()>5)
+    {
+        ext_params.push_back(params[5]);        
+    }    
+    return issuemorefrom_operation(ext_params,true);    
+}
+
+Value issuetoken(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 4 || params.size() > 6)
+        throw runtime_error("Help message not found\n");
+    
+    Array ext_params;
+    ext_params.push_back("*");
+    BOOST_FOREACH(const Value& value, params)
+    {
+        ext_params.push_back(value);
+    }
+    
+    return issuetokenfrom(ext_params,fHelp);    
+}
+
+
+Value getmultibalances_operation(const Array& params, bool fHelp,bool aggregate_tokens)
 {
     if (fHelp || params.size() > 5)
         throw runtime_error("Help message not found\n");
@@ -683,6 +1057,11 @@ Value getmultibalances(const Array& params, bool fHelp)
     
     Object balances;
 
+    uint32_t output_level=0x00;
+    if(!aggregate_tokens)
+    {
+        output_level=0x0800;
+    }
     bool fUnlockedOnly=true;
     bool fIncludeWatchOnly=false;    
     int nMinDepth = 1;
@@ -780,6 +1159,7 @@ Value getmultibalances(const Array& params, bool fHelp)
     }
     
     set<uint256> setAssets;        
+    set<uint256> setTokensAndAssets;        
     if(inputStrings.size())
     {
         for(int is=0;is<(int)inputStrings.size();is++)
@@ -787,10 +1167,17 @@ Value getmultibalances(const Array& params, bool fHelp)
             mc_EntityDetails entity;
             ParseEntityIdentifier(inputStrings[is],&entity, MC_ENT_TYPE_ASSET);           
             uint256 hash=*(uint256*)entity.GetTxID();
+            if(!aggregate_tokens)
+            {
+                if(entity.IsNFTAsset() == 0)
+                {
+                    throw JSONRPCError(RPC_NOT_ALLOWED, "Token balances are only available for non-fungible assets");         
+                }
+            }
             if (setAssets.count(hash))
             {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, duplicate asset: " + inputStrings[is]);                        
-            }
+            }            
             setAssets.insert(hash);
         }
     }
@@ -880,26 +1267,51 @@ Value getmultibalances(const Array& params, bool fHelp)
                 }                
             }
             asset_amounts->Clear();
-            if(CreateAssetBalanceList(txout,asset_amounts,lpScript))
+            if(CreateAssetBalanceList(txout,asset_amounts,lpScript,NULL,aggregate_tokens))
             {
                 for(int a=0;a<asset_amounts->GetCount();a++)
                 {
+                    mc_EntityDetails entity;
                     const unsigned char *txid;
+                    const unsigned char *asset_txid;
                     txid=NULL;
+                    asset_txid=NULL;
                     ptr=(unsigned char *)asset_amounts->GetRow(a);
                     if(mc_GetABRefType(ptr) == MC_AST_ASSET_REF_TYPE_GENESIS)
 //                    if(mc_GetLE(ptr,4) == 0)
                     {
 //                        hash=out.tx->GetHash();
                         txid=(unsigned char*)&hash;
+                        asset_txid=txid;
+                        if(!aggregate_tokens)
+                        {
+                            txid=NULL;
+                        }
                     }
                     else
                     {
-                        mc_EntityDetails entity;
-
                         if(mc_gState->m_Assets->FindEntityByFullRef(&entity,ptr))
                         {
                             txid=entity.GetTxID();
+                            asset_txid=txid;
+                            if(entity.GetEntityType() == MC_ENT_TYPE_TOKEN)
+                            {
+                                asset_txid=entity.GetParentTxID();
+                                if(!aggregate_tokens)
+                                {
+                                    if(mc_GetABQuantity(ptr) == 0)
+                                    {
+                                        txid=NULL;                                        
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                if(!aggregate_tokens)
+                                {
+                                    txid=NULL;
+                                }                                
+                            }
                         }                                
                     }
                     if(txid)
@@ -907,9 +1319,16 @@ Value getmultibalances(const Array& params, bool fHelp)
                         if(setAssets.size())
                         {
 //                            hash=*(uint256*)txid;
-                            if(setAssets.count(*(uint256*)txid) == 0)
+                            if(setAssets.count(*(uint256*)asset_txid) == 0)
                             {
                                 txid=NULL;
+                            }
+                            else
+                            {
+                                if(setTokensAndAssets.count(*(uint256*)txid) == 0)
+                                {
+                                    setTokensAndAssets.insert(*(uint256*)txid);
+                                }
                             }
                         }
                     }
@@ -993,7 +1412,7 @@ Value getmultibalances(const Array& params, bool fHelp)
                     else
                     {
                         Object asset_entry;
-                        asset_entry=AssetEntry(ptr+48,quantity,0x00);
+                        asset_entry=AssetEntry(ptr+48,quantity,output_level);
                         addr_balances.push_back(asset_entry);  
                         if(setAssets.size())
                         {
@@ -1006,21 +1425,24 @@ Value getmultibalances(const Array& params, bool fHelp)
             }
             if(setAssets.size())
             {
-                BOOST_FOREACH(const uint256& rem_asset, setAssets) 
+                BOOST_FOREACH(const uint256& rem_asset, setTokensAndAssets) 
                 {
                     if(setAssetsWithBalances.count(rem_asset) == 0)
                     {
                         Object asset_entry;
-                        asset_entry=AssetEntry((unsigned char*)&rem_asset,0,0x00);
+                        asset_entry=AssetEntry((unsigned char*)&rem_asset,0,output_level);
                         addr_balances.push_back(asset_entry);   
                     }
                 }                
             }
             if(MCP_WITH_NATIVE_CURRENCY)
             {
-                Object asset_entry;
-                asset_entry=AssetEntry(NULL,btc,0x00);
-                addr_balances.push_back(asset_entry);                        
+                if(!aggregate_tokens)
+                {
+                    Object asset_entry;
+                    asset_entry=AssetEntry(NULL,btc,output_level);
+                    addr_balances.push_back(asset_entry);                        
+                }
             }
             
             string out_addr="";
@@ -1037,10 +1459,10 @@ Value getmultibalances(const Array& params, bool fHelp)
                             Array empty_balances;
                             if(setAssets.size())
                             {
-                                BOOST_FOREACH(const uint256& rem_asset, setAssets) 
+                                BOOST_FOREACH(const uint256& rem_asset, setTokensAndAssets) 
                                 {
                                     Object asset_entry;
-                                    asset_entry=AssetEntry((unsigned char*)&rem_asset,0,0x00);
+                                    asset_entry=AssetEntry((unsigned char*)&rem_asset,0,output_level);
                                     empty_balances.push_back(asset_entry);   
                                 }                
                             }
@@ -1071,6 +1493,27 @@ Value getmultibalances(const Array& params, bool fHelp)
     }        
         
     return balances;    
+}
+
+Value getmultibalances(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 5)
+        throw runtime_error("Help message not found\n");
+    
+    return getmultibalances_operation(params,fHelp,true);
+}
+
+Value gettokenbalances(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 5)
+        throw runtime_error("Help message not found\n");
+    
+    if(mc_gState->m_Features->NFTokens() == 0)
+    {
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");        
+    }   
+    
+    return getmultibalances_operation(params,fHelp,false);
 }
 
 Value getaddressbalances(const Array& params, bool fHelp)
@@ -1901,7 +2344,10 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
     
     if(mAddresses.size() == 0)
     {
-        return entry;            
+        if(memcmp(entity->GetTxID(),&hash,sizeof(uint256)))
+        {
+            return entry;                        
+        }
     }
     
     Array vin;
@@ -1986,12 +2432,10 @@ Object ListAssetTransactions(const CWalletTx& wtx, mc_EntityDetails *entity, boo
     return entry;    
 }
 
-Value getfilterassetbalances(const Array& params, bool fHelp)
+Value getfilterassetbalances_operation(const Array& params, bool fHelp,bool aggregate_tokens)
 {
-    if (fHelp || params.size() < 1 || params.size() > 2)                        
-        mc_ThrowHelpMessage("getfilterassetbalances");        
-    
     mc_EntityDetails asset_entity;
+    mc_EntityDetails token_entity;
     mc_EntityDetails* lpAsset=NULL;
     double multiple=1.;
     if(COIN > 0)
@@ -2019,7 +2463,16 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
         multiple=(double)(lpAsset->GetAssetMultiple());
     }
     
+    if(!aggregate_tokens)
+    {
+        if((lpAsset == NULL ) || (lpAsset->IsNFTAsset() == 0))
+        {
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "getfiltertokenbalances callback is available only for NFT assets");                                                                    
+        }
+    }
+    
     map <CTxDestination,int64_t> mAddresses;
+    map <string,map<CTxDestination,int64_t>> mTokenAddresses;
     
     mc_Buffer *asset_amounts=mc_gState->m_TmpBuffers->m_RpcABBuffer1;
     asset_amounts->Clear();
@@ -2056,32 +2509,70 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
             ExtractDestination(coins.vout[n].scriptPubKey, address);
     
             quantity=-1;
-            
             if(lpAsset)
             {
                 asset_amounts->Clear();
-                if(CreateAssetBalanceList(coins.vout[n],asset_amounts,lpScript,&required))
+                if(CreateAssetBalanceList(coins.vout[n],asset_amounts,lpScript,&required,aggregate_tokens))
                 {
                     for(int i=0;i<asset_amounts->GetCount();i++)
                     {
-                        if(memcmp(lpAsset->GetFullRef(),asset_amounts->GetRow(i),MC_AST_ASSET_FULLREF_SIZE) == 0)
+                        if(aggregate_tokens)
                         {
-                            quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
+                            if(memcmp(lpAsset->GetFullRef(),asset_amounts->GetRow(i),MC_AST_ASSET_FULLREF_SIZE) == 0)
+                            {
+                                quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
+                            }
+                            else
+                            {
+                                int gin=j;
+                                if(mc_gState->m_Features->FixedIn20006() == 0)
+                                {
+                                    gin=i;
+                                }
+                                if(memcmp(lpAsset->GetTxID(),&(pMultiChainFilterEngine->m_Tx.vin[gin].prevout.hash),sizeof(uint256)) == 0)
+                                {
+                                    if( mc_GetABRefType(asset_amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_GENESIS )                    
+                                    {
+                                        quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
+                                    }                            
+                                }
+                            }
                         }
                         else
                         {
-                            int gin=j;
-                            if(mc_gState->m_Features->FixedIn20006() == 0)
+                            if(mc_gState->m_Assets->FindEntityByFullRef(&token_entity,asset_amounts->GetRow(i)))
                             {
-                                gin=i;
-                            }
-                            if(memcmp(lpAsset->GetTxID(),&(pMultiChainFilterEngine->m_Tx.vin[gin].prevout.hash),sizeof(uint256)) == 0)
-                            {
-                                if( mc_GetABRefType(asset_amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_GENESIS )                    
+                                if(memcmp(lpAsset->GetTxID(),token_entity.GetParentTxID(),sizeof(uint256)) == 0)
                                 {
                                     quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
-                                }                            
-                            }
+                                    map <CTxDestination,int64_t> mEmptyAddresses;
+                                    unsigned char *ptr;
+                                    size_t value_size;
+                                    string token;
+
+                                    ptr=(unsigned char *)token_entity.GetUpdateName(&value_size);                
+                                    if(ptr)
+                                    {
+                                        string token_name ((char*)ptr,value_size);
+                                        token=token_name;
+                                    }      
+
+                                    if(mTokenAddresses.find(token) == mTokenAddresses.end())
+                                    {
+                                        mTokenAddresses.insert(make_pair(token,mEmptyAddresses));
+                                    }
+                                    map<string,map<CTxDestination, int64_t>>::iterator ittoken = mTokenAddresses.find(token);
+                                    map<CTxDestination, int64_t>::iterator itold = ittoken->second.find(address);
+                                    if (itold == ittoken->second.end())
+                                    {
+                                        ittoken->second.insert(make_pair(address, -quantity));
+                                    }
+                                    else
+                                    {
+                                        itold->second-=quantity;
+                                    }                            
+                                }                                
+                            }                            
                         }
 
                     }
@@ -2091,17 +2582,21 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
             {
                 quantity=coins.vout[n].nValue;
             }    
-            if(quantity >= 0)
-            {                        
-                map<CTxDestination, int64_t>::iterator itold = mAddresses.find(address);
-                if (itold == mAddresses.end())
-                {
-                    mAddresses.insert(make_pair(address, -quantity));
+            
+            if(aggregate_tokens)
+            {
+                if(quantity >= 0)
+                {                        
+                    map<CTxDestination, int64_t>::iterator itold = mAddresses.find(address);
+                    if (itold == mAddresses.end())
+                    {
+                        mAddresses.insert(make_pair(address, -quantity));
+                    }
+                    else
+                    {
+                        itold->second-=quantity;
+                    }                            
                 }
-                else
-                {
-                    itold->second-=quantity;
-                }                            
             }
         }        
     }
@@ -2119,24 +2614,63 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
             if(lpAsset)
             {
                 asset_amounts->Clear();
-                if(CreateAssetBalanceList(txout,asset_amounts,lpScript,&required))
+                if(CreateAssetBalanceList(txout,asset_amounts,lpScript,&required,aggregate_tokens))
                 {
                     for(int i=0;i<asset_amounts->GetCount();i++)
                     {
-                        if(memcmp(lpAsset->GetFullRef(),asset_amounts->GetRow(i),MC_AST_ASSET_FULLREF_SIZE) == 0)
+                        if(aggregate_tokens)
                         {
-                            quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
+                            if(memcmp(lpAsset->GetFullRef(),asset_amounts->GetRow(i),MC_AST_ASSET_FULLREF_SIZE) == 0)
+                            {
+                                quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
+                            }
+                            else
+                            {
+                                if(memcmp(lpAsset->GetTxID(),&(pMultiChainFilterEngine->m_TxID),sizeof(uint256)) == 0)
+                                {
+                                    if( mc_GetABRefType(asset_amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_GENESIS )                    
+                                    {
+                                        quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
+                                    }                            
+                                }
+                            }
                         }
                         else
                         {
-                            if(memcmp(lpAsset->GetTxID(),&(pMultiChainFilterEngine->m_TxID),sizeof(uint256)) == 0)
+                            if(mc_gState->m_Assets->FindEntityByFullRef(&token_entity,asset_amounts->GetRow(i)))
                             {
-                                if( mc_GetABRefType(asset_amounts->GetRow(i)) == MC_AST_ASSET_REF_TYPE_GENESIS )                    
+                                if(memcmp(lpAsset->GetTxID(),token_entity.GetParentTxID(),sizeof(uint256)) == 0)
                                 {
                                     quantity=mc_GetABQuantity(asset_amounts->GetRow(i));
-                                }                            
-                            }
-                        }
+                                    map <CTxDestination,int64_t> mEmptyAddresses;
+                                    unsigned char *ptr;
+                                    size_t value_size;
+                                    string token;
+
+                                    ptr=(unsigned char *)token_entity.GetUpdateName(&value_size);                
+                                    if(ptr)
+                                    {
+                                        string token_name ((char*)ptr,value_size);
+                                        token=token_name;
+                                    }      
+
+                                    if(mTokenAddresses.find(token) == mTokenAddresses.end())
+                                    {
+                                        mTokenAddresses.insert(make_pair(token,mEmptyAddresses));
+                                    }
+                                    map<string,map<CTxDestination, int64_t>>::iterator ittoken = mTokenAddresses.find(token);
+                                    map<CTxDestination, int64_t>::iterator itold = ittoken->second.find(address);
+                                    if (itold == ittoken->second.end())
+                                    {
+                                        ittoken->second.insert(make_pair(address, +quantity));
+                                    }
+                                    else
+                                    {
+                                        itold->second+=quantity;
+                                    }                            
+                                }                                
+                            }                            
+                        }                    
                     }
                 }
             }         
@@ -2144,45 +2678,98 @@ Value getfilterassetbalances(const Array& params, bool fHelp)
             {
                 quantity=txout.nValue;                
             }
-            if(quantity >= 0)
+            if(aggregate_tokens)
             {
-                map<CTxDestination, int64_t>::iterator itold = mAddresses.find(address);
-                if (itold == mAddresses.end())
+                if(quantity >= 0)
                 {
-                    mAddresses.insert(make_pair(address, +quantity));
+                    map<CTxDestination, int64_t>::iterator itold = mAddresses.find(address);
+                    if (itold == mAddresses.end())
+                    {
+                        mAddresses.insert(make_pair(address, +quantity));
+                    }
+                    else
+                    {
+                        itold->second+=quantity;
+                    }                            
                 }
-                else
-                {
-                    itold->second+=quantity;
-                }                            
             }
         }        
     }
     
-    int64_t other_amount=0;
-    
-    Object oBalance;
-    BOOST_FOREACH(const PAIRTYPE(CTxDestination, int64_t)& item, mAddresses)
+    if(aggregate_tokens)
     {
-        const CTxDestination dest=item.first;
-        const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
-        const CScriptID *lpScript=boost::get<CScriptID> (&dest);
-        if( (lpKeyID == NULL) && (lpScript == NULL) )
+        int64_t other_amount=0;
+
+        Object oBalance;
+        BOOST_FOREACH(const PAIRTYPE(CTxDestination, int64_t)& item, mAddresses)
         {
-            other_amount=item.second;
+            const CTxDestination dest=item.first;
+            const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
+            const CScriptID *lpScript=boost::get<CScriptID> (&dest);
+            if( (lpKeyID == NULL) && (lpScript == NULL) )
+            {
+                other_amount=item.second;
+            }
+            else            
+            {
+                oBalance.push_back(Pair(CBitcoinAddress(item.first).ToString(), raw_value ? item.second : item.second/multiple));            
+            }
         }
-        else            
+        if(other_amount != 0)
         {
-            oBalance.push_back(Pair(CBitcoinAddress(item.first).ToString(), raw_value ? item.second : item.second/multiple));            
+            oBalance.push_back(Pair("", raw_value ? other_amount : other_amount/multiple));                    
         }
+        return oBalance;
     }
-    if(other_amount != 0)
+    else
     {
-        oBalance.push_back(Pair("", raw_value ? other_amount : other_amount/multiple));                    
+        Array aTokenBalances;
+        for(auto const &token_item : mTokenAddresses)
+        {
+            int64_t other_amount=0;
+            Object oBalance;
+            oBalance.push_back(Pair("token",token_item.first));
+            BOOST_FOREACH(const PAIRTYPE(CTxDestination, int64_t)& item, token_item.second)
+            {
+                const CTxDestination dest=item.first;
+                const CKeyID *lpKeyID=boost::get<CKeyID> (&dest);
+                const CScriptID *lpScript=boost::get<CScriptID> (&dest);
+                if( (lpKeyID == NULL) && (lpScript == NULL) )
+                {
+                    other_amount=item.second;
+                }
+                else            
+                {
+                    oBalance.push_back(Pair(CBitcoinAddress(item.first).ToString(), item.second));            
+                }
+            }
+            if(other_amount != 0)
+            {
+                oBalance.push_back(Pair("", other_amount));                    
+            }     
+            aTokenBalances.push_back(oBalance);
+        }        
+        return aTokenBalances;
     }
 
-    return oBalance;
+    return Value::null;
 }
+
+Value getfilterassetbalances(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)                        
+        mc_ThrowHelpMessage("getfilterassetbalances");        
+    
+    return getfilterassetbalances_operation(params,fHelp,true);
+}    
+
+Value getfiltertokenbalances(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)                        
+        mc_ThrowHelpMessage("getfiltertokenbalances");        
+    
+    return getfilterassetbalances_operation(params,fHelp,false);
+}    
 
 Value getassettransaction(const Array& params, bool fHelp)
 {
@@ -2438,6 +3025,6 @@ Value listassetissues(const Array& params, bool fHelp)
     
     mc_AdjustStartAndCount(&count,&start,issue_items);
     
-    return AssetHistory(&last_entity,multiple,count,start,output_level);
+    return AssetHistory(&asset_entity,&last_entity,multiple,count,start,output_level);
 }
 

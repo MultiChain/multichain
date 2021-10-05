@@ -170,9 +170,9 @@ Value createlibraryfromcmd(const Array& params, bool fHelp)
             {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid updatemode field");
             }
-            if(d.value_.get_str() == "none")b=0x00;
-            if(d.value_.get_str() == "instant")b=0x01;
-            if(d.value_.get_str() == "approve")b=0x04;
+            if(d.value_.get_str() == "none")b=MC_ENT_FOMD_NONE;
+            if(d.value_.get_str() == "instant")b=MC_ENT_FOMD_ALLOWED_INSTANT;
+            if(d.value_.get_str() == "approve")b=MC_ENT_FOMD_ALLOWED_WITH_APPROVAL;
             if(b == 255)
             {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid updatemode field");                        

@@ -28,6 +28,7 @@
 #define MC_PTP_BLOCK_MINER      0x01000000
 #define MC_PTP_BLOCK_INDEX      0x02000000
 #define MC_PTP_FILTER           0x04000000
+#define MC_PTP_DETAILS          0x08000000
 #define MC_PTP_SPECIFIED        0x80000000
 #define MC_PTP_ALL              0x00FFFFFF
 #define MC_PTP_GLOBAL_ALL       0x00003137
@@ -63,6 +64,10 @@
 
 #define MC_PSE_UPGRADE                0x01                                      
 #define MC_PSE_ADMINMINERLIST         0x02                                      
+
+                                                                                // Details flags modified by permission mechanism
+#define MC_PDF_ASSET_OPEN                              0x01                     // Asset open                 
+
 
 
 
@@ -354,6 +359,8 @@ typedef struct mc_Permissions
     int CanActivate(const void* lpEntity,const void* lpAddress);    
     int CanCustom(const void* lpEntity,const void* lpAddress,uint32_t permission);    
     int FilterApproved(const void* lpEntity,const void* lpAddress);
+    int DetailsFlag(const void* lpEntity,uint32_t flag);
+    void DetailsAddress(void* lpAddress,uint32_t flag);
     
     int CanMineBlock(const void* lpAddress,uint32_t block);
     

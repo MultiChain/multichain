@@ -950,7 +950,7 @@ void mc_AssetDB::GetFromMemPool(mc_EntityLedgerRow *row,int mprow)
 }
 
 
-int mc_AssetDB::InsertEntity(const void* txid, int offset, int entity_type, const void *script,size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row,int update_mempool)
+int mc_AssetDB::InsertEntity(const void* txid, int offset, int entity_type, const void *script,size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row,int update_mempool,uint32_t flags)
 {
     mc_EntityLedgerRow aldRow;
     mc_EntityDetails details;
@@ -1076,7 +1076,8 @@ int mc_AssetDB::InsertEntity(const void* txid, int offset, int entity_type, cons
     delete lpDetails;
     
     details.Set(&aldRow);
-        
+    details.m_Flags |= flags;
+    
     for(pass=0;pass<1+update_mempool;pass++)
     {
         memset(aldRow.m_Key,0,MC_ENT_KEY_SIZE);
@@ -1097,24 +1098,26 @@ int mc_AssetDB::InsertEntity(const void* txid, int offset, int entity_type, cons
             }            
         }
 
-        if(details.m_Flags & MC_ENT_FLAG_OFFSET_IS_SET)
+        if((details.m_Flags & MC_ENT_FLAG_NO_OFFSET_KEY) == 0)
         {
-            memset(aldRow.m_Key,0,MC_ENT_KEY_SIZE);
-            memcpy(aldRow.m_Key,details.m_Ref,MC_ENT_REF_SIZE);
-            aldRow.m_KeyType=MC_ENT_KEYTYPE_REF;
-            
-            if(pass)
+            if(details.m_Flags & MC_ENT_FLAG_OFFSET_IS_SET)
             {
-                AddToMemPool(&aldRow);                
-//SMPS                m_MemPool->Add((unsigned char*)&aldRow,(unsigned char*)&aldRow+m_Ledger->m_ValueOffset);
-            }
-            else
-            {
-                if(GetEntity(&aldRow))
+                memset(aldRow.m_Key,0,MC_ENT_KEY_SIZE);
+                memcpy(aldRow.m_Key,details.m_Ref,MC_ENT_REF_SIZE);
+                aldRow.m_KeyType=MC_ENT_KEYTYPE_REF;
+
+                if(pass)
                 {
-                    err=MC_ERR_FOUND;                                            
-                    goto exitlbl;
-                }            
+                    AddToMemPool(&aldRow);                
+                }
+                else
+                {
+                    if(GetEntity(&aldRow))
+                    {
+                        err=MC_ERR_FOUND;                                            
+                        goto exitlbl;
+                    }            
+                }
             }
         }
 
@@ -1611,7 +1614,7 @@ int mc_AssetDB::UpdateEntityLists(const void* txid,int offset,int entity_type)
         lpDetails=new mc_Script;
         lpDetails->AddElement();
 
-        unsigned char b=1;        
+        unsigned char b=MC_ENT_FOMD_ALLOWED_INSTANT;        
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_FOLLOW_ONS,&b,1);
         
         lpDetails->SetSpecialParamValue(MC_ENT_SPRM_ENTITY_TXID,(unsigned char*)txid,MC_ENT_KEY_SIZE);    
@@ -2555,6 +2558,27 @@ const char* mc_EntityDetails::GetName()
     return m_Name;
 }
 
+const char* mc_EntityDetails::GetUpdateName(size_t* bytes)
+{
+    return (char *)GetSpecialParam(MC_ENT_SPRM_UPDATE_NAME,bytes);
+}
+
+const unsigned char* mc_EntityDetails::GetParentTxID()
+{
+    unsigned char *ptr;
+    size_t value_size;
+    ptr=(unsigned char *)GetSpecialParam(MC_ENT_SPRM_PARENT_ENTITY,&value_size);
+    if(ptr)
+    {
+        if(value_size == sizeof(uint256))
+        {
+            return ptr;
+        }
+    }
+    return NULL;
+}
+
+
 const unsigned char* mc_EntityDetails::GetTxID()
 {
     return m_LedgerRow.m_Key;
@@ -2651,7 +2675,43 @@ int mc_EntityDetails::IsFollowOn()
     return 0;
 }
 
-int mc_EntityDetails::UpdateMode()
+int64_t mc_EntityDetails::MaxTotalIssuance()
+{
+    unsigned char *ptr;
+    size_t bytes;
+    if(mc_gState->m_Features->NFTokens())
+    {
+        ptr=(unsigned char *)GetSpecialParam(MC_ENT_SPRM_ASSET_MAX_TOTAL,&bytes);
+        if(ptr)
+        {
+            if((bytes>0) && (bytes<=8))
+            {
+                return mc_GetLE(ptr,bytes);
+            }
+        }
+    }
+    return MC_ENT_DEFAULT_MAX_ASSET_TOTAL;    
+}
+
+int64_t mc_EntityDetails::MaxSingleIssuance()
+{
+    unsigned char *ptr;
+    size_t bytes;
+    if(mc_gState->m_Features->NFTokens())
+    {
+        ptr=(unsigned char *)GetSpecialParam(MC_ENT_SPRM_ASSET_MAX_ISSUE,&bytes);
+        if(ptr)
+        {
+            if((bytes>0) && (bytes<=8))
+            {
+                return mc_GetLE(ptr,bytes);
+            }
+        }
+    }
+    return MC_ENT_DEFAULT_MAX_ASSET_TOTAL;    
+}
+
+int mc_EntityDetails::FollowonMode()
 {
     unsigned char *ptr;
     size_t bytes;
@@ -2668,25 +2728,41 @@ int mc_EntityDetails::UpdateMode()
 
 int mc_EntityDetails::AllowedFollowOns()
 {
-    return UpdateMode() & 0x05;
-/*    
-    unsigned char *ptr;
-    size_t bytes;
-    ptr=(unsigned char *)GetSpecialParam(MC_ENT_SPRM_FOLLOW_ONS,&bytes);
-    if(ptr)
+    int mode=FollowonMode();
+    int result=mode & (MC_ENT_FOMD_ALLOWED_INSTANT | MC_ENT_FOMD_ALLOWED_WITH_APPROVAL);
+    
+    if(mc_gState->m_Features->NFTokens())
     {
-        if((bytes>0) && (bytes<=4))
+        if(mode & (MC_ENT_FOMD_CAN_OPEN | MC_ENT_FOMD_CAN_CLOSE))
         {
-            return (int)mc_GetLE(ptr,bytes) & 0x01;
+            int open=mc_gState->m_Permissions->DetailsFlag(GetTxID(),MC_PDF_ASSET_OPEN);
+            if(mode & MC_ENT_FOMD_CAN_OPEN)
+            {
+                if(open)
+                {
+                    if(result == 0)
+                    {
+                        result=MC_ENT_FOMD_ALLOWED_INSTANT;
+                    }
+                    return result;
+                }
+            }
+            if(mode & MC_ENT_FOMD_CAN_CLOSE)
+            {
+                if(open == 0)
+                {
+                    return 0;
+                }
+            }            
         }
     }
-    return 0;
- */ 
+    
+    return result;
 }
 
 int mc_EntityDetails::ApproveRequired()
 {
-    return UpdateMode() & 0x04;    
+    return FollowonMode() & MC_ENT_FOMD_ALLOWED_WITH_APPROVAL;    
 }
 
 int mc_EntityDetails::AnyoneCanIssueMore()
@@ -2695,20 +2771,34 @@ int mc_EntityDetails::AnyoneCanIssueMore()
     {
         return 0;
     }
-    return UpdateMode() & 0x02;
-/*    
-    unsigned char *ptr;
-    size_t bytes;
-    ptr=(unsigned char *)GetSpecialParam(MC_ENT_SPRM_FOLLOW_ONS,&bytes);
-    if(ptr)
+    return FollowonMode() & MC_ENT_FOMD_ANYONE_CAN_ISSUEMORE;
+}
+
+int mc_EntityDetails::IsNFTAsset()
+{
+    if(mc_gState->m_Features->NFTokens() == 0)
     {
-        if((bytes>0) && (bytes<=4))
-        {
-            return (int)mc_GetLE(ptr,bytes) & 0x02;
-        }
+        return 0;
     }
-    return 0;
- */ 
+    return FollowonMode() & MC_ENT_FOMD_NON_FUNGIBLE_TOKENS;    
+}
+
+int mc_EntityDetails::AdminCanOpen()
+{
+    if(mc_gState->m_Features->NFTokens() == 0)
+    {
+        return 0;
+    }
+    return FollowonMode() & MC_ENT_FOMD_CAN_OPEN;    
+}
+
+int mc_EntityDetails::AdminCanClose()
+{
+    if(mc_gState->m_Features->NFTokens() == 0)
+    {
+        return 0;
+    }
+    return FollowonMode() & MC_ENT_FOMD_CAN_CLOSE;    
 }
 
 uint32_t mc_EntityDetails::Permissions()
@@ -2985,6 +3075,10 @@ uint32_t mc_AssetDB::MaxEntityType()
         {
             return MC_ENT_TYPE_VARIABLE;
         }        
+    }
+    if(mc_gState->m_Features->NFTokens() == 0)
+    {
+        return MC_ENT_TYPE_LIBRARY;
     }
     return MC_ENT_TYPE_MAX; 
 }
