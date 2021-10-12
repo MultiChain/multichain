@@ -183,7 +183,7 @@ string mc_GetUUID()
     char line[200];
     string uuid="";
     
-    fHan = popen("/usr/sbin/dmidecode | grep UUID","r"); 
+    fHan = popen("/usr/sbin/dmidecode 2> /dev/null | grep UUID","r"); 
 
     if(fHan == NULL)
     {
@@ -465,7 +465,7 @@ Value decodelicenseconfirmation(const json_spirit::Array& params, bool fHelp)
 
 Value activatelicense(const json_spirit::Array& params, bool fHelp)
 {
-    if (fHelp || params.size() > 1)
+    if (fHelp || params.size() != 1)
         throw runtime_error("Help message not found\n");
     
     pEF->ENT_RPCVerifyEdition("activatelicense API");
@@ -483,7 +483,7 @@ Value activatelicense(const json_spirit::Array& params, bool fHelp)
 
 Value activatelicensefrom(const json_spirit::Array& params, bool fHelp)
 {
-    if (fHelp || params.size() > 2)
+    if (fHelp || params.size() != 2)
         throw runtime_error("Help message not found\n");
     
     pEF->ENT_RPCVerifyEdition("activatelicensefrom API");

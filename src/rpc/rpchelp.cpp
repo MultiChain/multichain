@@ -5021,7 +5021,7 @@ void mc_InitRPCHelpMap21()
 
             "\nArguments:\n"
             "1. \"license-confirmation-hex\"                     (string, optional) The license confirmation hex string\n"
-            "                                                       If omitted, empty, self-signed license is activated.\n"
+            "                                                       If empty string, self-signed license with no unlocked features is activated.\n"
 
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
@@ -5039,7 +5039,7 @@ void mc_InitRPCHelpMap21()
             "\nArguments:\n"
             "1. \"from-address\"                     (string, required) Address used for publishing.\n"
             "2. \"license-confirmation-hex\"                     (string, optional) The license confirmation hex string\n"
-            "                                                       If omitted, empty, self-signed license is activated.\n"
+            "                                                       If empty string, self-signed license with no unlocked features is activated.\n"
 
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
