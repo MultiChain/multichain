@@ -3746,6 +3746,7 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
     CMultiChainTxDetails details;
     bool fReject=false;
     int64_t mandatory_fee=0;
+    int permission_mempool_size;
     bool accept=true;
     if(flags & MC_AMT_NO_ACCEPT)
     {
@@ -3771,6 +3772,10 @@ bool AcceptMultiChainTransaction   (const CTransaction& tx,                     
    
     mc_gState->m_Permissions->SetCheckPoint();                                  // if there is an error after this point or it is just check, permission mempool should be restored
     mc_gState->m_Assets->SetCheckPoint();    
+    if(offset<0)
+    {
+        permission_mempool_size=(int)mc_gState->m_Permissions->m_CheckPointMemPoolSize;
+    }
     
     if(!MultiChainTransaction_CheckOutputs(tx,inputs,offset,accept,&details,reason))   // Outputs        
     {
@@ -3884,6 +3889,12 @@ exitlbl:
     if(mandatory_fee_out)
     {
         *mandatory_fee_out=mandatory_fee;
+    }
+
+    if(offset<0)
+    {
+        uint256 hash=tx.GetHash();
+        mc_gState->m_Permissions->SetMempoolTxID(&hash,permission_mempool_size);
     }
 
     if(replay)

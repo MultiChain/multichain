@@ -359,6 +359,10 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
     
     LogPrint("mchn", "mchn: Replaying memory pool (%d new transactions, total %d)\n",total_txs-from,total_txs);
     mc_gState->m_Permissions->MempoolPermissionsCopy();
+    if(accept && (from == 0))
+    {
+        mc_gState->m_Permissions->ClearMempoolTxIDs();
+    }
     
     for(pos=from;pos<pool.hashList->m_Count;pos++)
     {
