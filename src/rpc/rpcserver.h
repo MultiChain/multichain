@@ -358,6 +358,10 @@ extern json_spirit::Value addlibraryupdate(const json_spirit::Array& params, boo
 extern json_spirit::Value addlibraryupdatefrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getlibrarycode(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value testlibrary(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getdiagnostics(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value applycommands(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value decodehexubjson(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value encodehexubjson(const json_spirit::Array& params, bool fHelp);
 
 extern json_spirit::Value explorerlisttransactions(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value explorerlistaddresses(const json_spirit::Array& params, bool fHelp);

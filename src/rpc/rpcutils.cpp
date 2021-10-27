@@ -3604,7 +3604,7 @@ void ParseRawTokenInfo(const Value *value,mc_Script *lpDetailsScript,mc_Script *
     }    
 }
 
-string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, int *required,int *eErrorCode)
+string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, int *required,int *eErrorCode,CScript *scriptPubKey)
 {
     string strError="";
     unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
@@ -4263,6 +4263,42 @@ string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript, in
                 {
                     lpScript->SetEntity(entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET);                            
                 }
+                else
+                {
+                    if(type & MC_PTP_MINE)
+                    {
+                        if(from<to)
+                        {
+                            if(scriptPubKey)
+                            {
+                                bool is_allowed=false;
+                                txnouttype typeRet;
+                                int nRequiredRet;
+                                vector<CTxDestination> addressRets;
+                                if(ExtractDestinations(*scriptPubKey,typeRet,addressRets,nRequiredRet)) 
+                                {
+                                    if(addressRets.size() == 1)
+                                    {
+                                        CKeyID *lpKeyID=boost::get<CKeyID> (&addressRets[0]);
+                                        if(lpKeyID)
+                                        {
+                                            is_allowed=true;
+                                        }
+                                    }
+                                }
+                                if(!is_allowed)
+                                {
+                                    if(eErrorCode)
+                                    {
+                                        *eErrorCode=RPC_NOT_ALLOWED;
+                                    }
+                                    strError="Granting mine permission is allowed only to P2PKH addresses";                                    
+                                    goto exitlbl;                
+                                }
+                            }
+                        }
+                    }                    
+                }
                 lpScript->SetPermission(type,from,to,timestamp);
                 parsed=true;
             }
@@ -4514,7 +4550,7 @@ exitlbl:
 
 string ParseRawOutputObject(Value param,CAmount& nAmount,mc_Script *lpScript,int *eErrorCode)
 {
-    return ParseRawOutputObject(param,nAmount,lpScript,NULL,eErrorCode);
+    return ParseRawOutputObject(param,nAmount,lpScript,NULL,eErrorCode,NULL);
 }
 
 bool FindPreparedTxOut(CTxOut& txout,COutPoint outpoint,string& reason)
@@ -4891,7 +4927,7 @@ vector <pair<CScript, CAmount> > ParseRawOutputMultiObject(Object sendTo,int *re
                 nAmount=0;
                 int eErrorCode;
 
-                string strError=ParseRawOutputObject(s.value_,nAmount,lpScript, required,&eErrorCode);
+                string strError=ParseRawOutputObject(s.value_,nAmount,lpScript, required,&eErrorCode,&scriptPubKey);
                 if(strError.size())
                 {
                     throw JSONRPCError(eErrorCode, strError);                            

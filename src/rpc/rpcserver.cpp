@@ -1290,6 +1290,52 @@ static string JSONRPCExecBatch(const Array& vReq)
     return write_string(Value(ret), false) + "\n";
 }
 
+Array JSONRPCExecInternalBatch(const Array& vReq)
+{
+    Array ret;
+    for (unsigned int reqIdx = 0; reqIdx < vReq.size(); reqIdx++)
+    {
+        bool take_it=true;
+        Value defaultaddress=find_value(vReq[reqIdx].get_obj(), "defaultaddress");
+        if( (defaultaddress.type() == str_type) && (defaultaddress.get_str().size() > 0) )
+        {
+            take_it=false;
+            if(defaultaddress == CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString())
+            {
+                take_it=true;
+            }
+        }        
+        if(take_it)
+        {
+            Object result=JSONRPCExecOne(vReq[reqIdx]);
+            Value error=find_value(result, "error");
+            ret.push_back(result);
+            Value ignore_error=true;
+            if( (error.type() == str_type) && (error.get_str().size() > 0) )
+            {
+                ignore_error=find_value(vReq[reqIdx].get_obj(), "ignoreerror");
+                if(ignore_error.type() != bool_type)
+                {
+                    ignore_error=false;
+                }
+            }
+            if(!ignore_error.get_bool())
+            {
+                return ret;
+            }            
+        }
+        else
+        {
+            JSONRequest jreq;
+            jreq.parse(vReq[reqIdx]);
+            Object result=JSONRPCReplyObj(Value::null,JSONRPCError(RPC_WALLET_ADDRESS_NOT_FOUND, "Ignored for this default address"), jreq.id);
+            ret.push_back(result);
+        }
+    }
+
+    return ret;
+}
+
 static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
                             string& strRequest,
                             map<string, string>& mapHeaders,
