@@ -295,6 +295,11 @@ int CAssetGroupTree::GroupCount()
     return lpAssetGroups->GetCount();
 }
 
+int CAssetGroupTree::AssetsPerGroup()
+{
+    return nAssetsPerGroup;
+}
+
 /*
  * Returns group id of list of assets if all belong to the same group or error
  * Adds new assets to the groups if addIfNeeded==1

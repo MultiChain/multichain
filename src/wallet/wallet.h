@@ -221,6 +221,7 @@ public:
     int Resize(int newAssets);
     int Initialize(int assetsPerGroup,int maxAssetsPerGroup,int optimalGroupCount,int mode);
     int GroupCount();
+    int AssetsPerGroup();
     int GetGroup(mc_Buffer *assets,int addIfNeeded);
     int GetGroup(unsigned char *assetRef,int addIfNeeded);
 };

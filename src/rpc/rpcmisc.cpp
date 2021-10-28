@@ -1616,6 +1616,63 @@ Value getdiagnostics(const Array& params, bool fHelp)
     }
        
     result.push_back(Pair("peers",peers));
+
+    if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
+    {    
+        pwalletTxsMain->Lock();
+        Object wallet;
+
+        int entity_count,address_count;
+        mc_TxEntityStat *lpEntity;
+
+        entity_count=pwalletTxsMain->GetEntityListCount();
+
+        address_count=0;
+        for(int i=0;i<entity_count;i++)
+        {
+            lpEntity=pwalletTxsMain->GetEntity(i);
+            if( ((lpEntity->m_Entity.m_EntityType == (MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS)) || 
+                (lpEntity->m_Entity.m_EntityType == (MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS))) &&
+                ((lpEntity->m_Flags & MC_EFL_NOT_IN_LISTS) == 0 ) )               
+            {
+                address_count++;
+            }
+        }
+
+        wallet.push_back(Pair("entities",entity_count));
+        wallet.push_back(Pair("addresses",address_count));
+        wallet.push_back(Pair("assetgroups",pwalletMain->lpAssetGroups->GroupCount()));
+        wallet.push_back(Pair("assetspergroup",pwalletMain->lpAssetGroups->AssetsPerGroup()));
+
+        int max_utxos=0;
+        int total_utxos=(int)pwalletTxsMain->m_UTXOs[0].size();
+        map <uint160,int> mapAddressCoinCounts;
+        for (map<COutPoint, mc_Coin>::const_iterator it = pwalletTxsMain->m_UTXOs[0].begin(); it != pwalletTxsMain->m_UTXOs[0].end(); ++it)
+        {
+            const mc_Coin& coin = it->second;
+            map <uint160,int>::iterator ait=mapAddressCoinCounts.find(coin.m_EntityID);
+            if(ait == mapAddressCoinCounts.end())
+            {
+                mapAddressCoinCounts.insert(make_pair(coin.m_EntityID,1));
+                if(max_utxos == 0)
+                {
+                    max_utxos=1;
+                }
+            }
+            else
+            {
+                ait->second+=1;
+                if(max_utxos < ait->second)
+                {
+                    max_utxos=ait->second;
+                }
+            }
+        }        
+        wallet.push_back(Pair("utxocount",total_utxos));
+        wallet.push_back(Pair("maxutxosperaddress",max_utxos));
+        result.push_back(Pair("wallet",wallet));
+        pwalletTxsMain->UnLock();        
+    }
     
     bool fVerbose = false;
     if (params.size() > 0)
