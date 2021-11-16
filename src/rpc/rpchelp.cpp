@@ -1085,7 +1085,7 @@ void mc_InitRPCHelpMap05()
 
             "\nArguments:\n"
             "1. \"txid\"                           (string, required) The transaction id\n"
-            "2. verbose                          (numeric or boolean, optional, default=0(false)) If 0, return a string, other return a JSON object\n"
+            "2. verbose                          (numeric or boolean, optional, default=0(false)) If 0, return a string, otherwise return a JSON object\n"
 
             "\nResult (if verbose is not set or set to 0):\n"
             "\"data\"                              (string) The serialized, hex-encoded data for 'txid'\n"
@@ -5021,7 +5021,7 @@ void mc_InitRPCHelpMap21()
 
             "\nArguments:\n"
             "1. \"license-confirmation-hex\"                     (string, optional) The license confirmation hex string\n"
-            "                                                       If omitted, empty, self-signed license is activated.\n"
+            "                                                       If empty string, self-signed license with no unlocked features is activated.\n"
 
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
@@ -5039,7 +5039,7 @@ void mc_InitRPCHelpMap21()
             "\nArguments:\n"
             "1. \"from-address\"                     (string, required) Address used for publishing.\n"
             "2. \"license-confirmation-hex\"                     (string, optional) The license confirmation hex string\n"
-            "                                                       If omitted, empty, self-signed license is activated.\n"
+            "                                                       If empty string, self-signed license with no unlocked features is activated.\n"
 
             "\nResult:\n"
             "\"transactionid\"                     (string) The transaction id.\n"
@@ -5679,10 +5679,79 @@ void mc_InitRPCHelpMap24()
             + HelpExampleRpc("issuetokenfrom", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"Asset1\", \"Token1\", 1000000,  0.01")
         ));
         
+}
+
+void mc_InitRPCHelpMap25()
+{
+    mapHelpStrings.insert(std::make_pair("getdiagnostics",
+            "getdiagnostics ( verbose )\n"
+            "\nReturns information useful for various recovery procedures.\n"
+            "\nArguments:\n"
+            "1. verbose                          (numeric or boolean, optional, default=0(false)) If 0, return a string, otherwise return a JSON object\n"
+
+            "\nResult (if verbose is not set or set to 0):\n"
+            "\"data\"                              (string) Hex-encoded UBJSON result, use decodehexubjson for decoding\n"
+
+            "\nResult (if verbose > 0):\n"
+            "diagnostics                         (object) Information about current state of the node\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getdiagnostics", "")
+            + HelpExampleRpc("getdiagnostics", "")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("applycommands",
+            "applycommands \"commands\"\n"
+            "\nRuns API commands described in hex-encoded UBJSON array.\n"
+            "\nArguments:\n"
+            "1. \"commands\"                          (string) Hex-encoded UBJSON arrays of commands to run, see encodehexubjson for examples\n"
+
+            "\nEach command is JSON object with the following fields:\n"
+            "   {                      \n"   
+            "      \"method\":\"method\",               (string, required) API to run\n"
+            "      params: [...],                   (array, optional) Array of API parameters. \n"
+            "      id: id,                          (any JSON, optional) ID of the command (echoed in the output). \n"
+            "      ignoreerror: true|false,         (boolean, optional, default false) Continue execution of subsequent commands if command returns error. \n"
+            "      \"defaultaddress\":\"address\",      (string, optional) Apply command only on the node with specified defaultaddress (see output of getdiagnostics)\n"
+            "   }\n"                    
+    
+            "\nResult\n"
+            "\"data\"                              (string) Hex-encoded UBJSON array of command outputs, use decodehexubjson for decoding\n"
+
+            "\nExamples:\n"
+            + HelpExampleCli("applycommands", "5b7b69066d6574686f6453690e676574646961676e6f73746963736906706172616d735b545d7d5d")
+            + HelpExampleRpc("applycommands", "5b7b69066d6574686f6453690e676574646961676e6f73746963736906706172616d735b545d7d5d")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("decodehexubjson",
+            "decodehexubjson \"data\"\n"
+            "\nDecodes Hex-encoded UBJSON data into JSON.\n"
+            "\nArguments:\n"
+            "1. \"data\"                           (string, required) Hex-encoded UBJSON data\n"
+            "\nResult\n"
+            "json                                (any JSON) decoded JSON\n"
+
+            "\nExamples:\n"
+            + HelpExampleCli("decodehexubjson", "5b7b69066d6574686f6453690e676574646961676e6f73746963736906706172616d735b545d7d5d")
+            + HelpExampleRpc("decodehexubjson", "5b7b69066d6574686f6453690e676574646961676e6f73746963736906706172616d735b545d7d5d")
+        ));
+   
+    mapHelpStrings.insert(std::make_pair("encodehexubjson",
+            "encodehexubjson json\n"
+            "\nEncodes JSON into Hex-encoded UBJSON data.\n"
+
+            "\nArguments:\n"
+            "1. json                             (any JSON) JSON to encode\n"
+            "\nResult\n"
+            "\"data\"                              (string, required) Hex-encoded UBJSON data\n"
+
+            "\nExamples:\n"
+            + HelpExampleCli("encodehexubjson", "'[{\"method\":\"getdiagnostics\",\"params\":[true]}]'")
+            + HelpExampleRpc("encodehexubjson", "'[{\"method\":\"getdiagnostics\",\"params\":[true]}]'")
+        ));
+   
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
-        ));
-       
+        ));       
 }
 
 void mc_InitRPCLogParamCountMap()
@@ -5759,6 +5828,8 @@ void mc_InitRPCAllowedWhenOffline()
     setAllowedWhenOffline.insert("decodelicenserequest");    
     setAllowedWhenOffline.insert("decodelicenseconfirmation");    
     setAllowedWhenOffline.insert("getlicenseconfirmation");    
+    setAllowedWhenOffline.insert("decodehexubjson");    
+    setAllowedWhenOffline.insert("encodehexubjson");    
     
 }
 
@@ -5788,6 +5859,7 @@ void mc_InitRPCHelpMap()
     mc_InitRPCHelpMap22();
     mc_InitRPCHelpMap23();
     mc_InitRPCHelpMap24();
+    mc_InitRPCHelpMap25();
     
     pEF->ENT_InitRPCHelpMap();
     

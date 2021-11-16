@@ -14,7 +14,7 @@ int mc_State::VersionInfo(int version)
         return custom_version;
     }
     
-    int this_build=20200203;
+    int this_build=20200901;
     int this_protocol=20013;   
     
     if(mc_gState->m_EnterpriseBuild)
@@ -48,7 +48,8 @@ int mc_State::VersionInfo(int version)
     if(version < 10002)return 10002;                                            // first version
     if(version < 10008)return -10000201;                                        // last build supporting this version (negative)
     if(version < 10013)return -this_build;                                      // supported by this version    
-    if(version < 20001)return 20001;                                            // next version
+    if(version < 20001)return 20004;                                            // next version
+    if(version < 20004)return -20200203;                                        // last build supporting this version (negative)
     if(version < this_protocol+1)return -this_build;                            // supported by this version    
         
     return VersionInfo(MULTICHAIN_VERSION_CODE_BUILD)-1;                        // Created by the following builds

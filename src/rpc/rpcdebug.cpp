@@ -4,12 +4,16 @@
 #include "core/init.h"
 #include "rpc/rpcwallet.h"
 #include "protocol/relay.h"
+#include "json/json_spirit_ubjson.h"
 #include "wallet/wallettxs.h"
 #include "net/net.h"
 
 void *mcd_RWLock=NULL;
 
 void parseStreamIdentifier(Value stream_identifier,mc_EntityDetails *entity);
+Array listminers_operation(const Array& params);
+Array listadmins_operation(const Array& params);
+Array JSONRPCExecInternalBatch(const Array& vReq);
 
 string mcd_ParamStringValue(const Object& params,string name,string default_value)
 {
@@ -41,6 +45,170 @@ int mcd_ParamIntValue(const Object& params,string name,int default_value)
         }
     }
     return value;
+}
+
+Object mcd_GetChainState(const Object& params)
+{
+    LOCK(cs_main);
+
+    Array solution;
+    BOOST_FOREACH(const Pair& d, params) 
+    {
+        if(d.name_ == "solution")
+        {
+            Value value=d.value_;
+            if(value.type() == str_type)
+            {
+                vector<unsigned char> encoded=ParseHex(value.get_str());
+                int err;
+                value=ubjson_read((const unsigned char *)(&encoded[0]),encoded.size(),MAX_FORMATTED_DATA_DEPTH,&err);
+                if(err)
+                {
+                    throw JSONRPCError(RPC_INTERNAL_ERROR, "Error decoding UBJSON");                                            
+                }
+            }
+            if(d.value_.type() == array_type)
+            {
+                solution=d.value_.get_array();
+            }
+        }
+    }
+    
+    Array solution_result=JSONRPCExecInternalBatch(solution);
+    
+    unsigned char* ptr;
+    int size;
+    Object result;
+    
+    Object chain;
+    Object node;
+    
+    ptr=(unsigned char*)mc_gState->m_NetworkParams->GetParam("chainparamshash",&size);    
+    chain.push_back(Pair("chainparamshash", HexStr(ptr,ptr+size)));    
+    chain.push_back(Pair("protocolversion", mc_gState->m_NetworkParams->ProtocolVersion()));
+    chain.push_back(Pair("maximumblocksize", (int)MAX_BLOCK_SIZE));    
+    chain.push_back(Pair("targetblocktime", MCP_TARGET_BLOCK_TIME));    
+    chain.push_back(Pair("anyonecanmine", mc_gState->m_NetworkParams->GetInt64Param("anyonecanmine") ? true : false));    
+    chain.push_back(Pair("anyonecanadmin", mc_gState->m_NetworkParams->GetInt64Param("anyonecanadmin") ? true : false));    
+    chain.push_back(Pair("targetadjustfreq", (int)mc_gState->m_NetworkParams->GetInt64Param("targetadjustfreq")));    
+    chain.push_back(Pair("setupblocks", mc_gState->m_NetworkParams->GetInt64Param("setupfirstblocks")));    
+    chain.push_back(Pair("miningdiversity",mc_gState->m_NetworkParams->GetDoubleParam("miningdiversity")));    
+    chain.push_back(Pair("adminconsensusadmin",mc_gState->m_NetworkParams->GetDoubleParam("adminconsensusadmin")));    
+    chain.push_back(Pair("adminconsensusmine",mc_gState->m_NetworkParams->GetDoubleParam("adminconsensusmine")));    
+    ptr=(unsigned char*)mc_gState->m_NetworkParams->GetParam("addresspubkeyhashversion",&size);    
+    chain.push_back(Pair("addresspubkeyhashversion", HexStr(ptr,ptr+size)));    
+    ptr=(unsigned char*)mc_gState->m_NetworkParams->GetParam("addressscripthashversion",&size);    
+    chain.push_back(Pair("addressscripthashversion", HexStr(ptr,ptr+size)));    
+    ptr=(unsigned char*)mc_gState->m_NetworkParams->GetParam("addresschecksumvalue",&size);    
+    chain.push_back(Pair("addresschecksumvalue", HexStr(ptr,ptr+size)));    
+    result.push_back(Pair("chain",chain));
+    
+    node.push_back(Pair("nodeversion", mc_gState->GetNumericVersion()));
+    node.push_back(Pair("defaultaddress", CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString()));
+    node.push_back(Pair("incomingpaused", (mc_gState->m_NodePausedState & MC_NPS_INCOMING) ? true : false));                
+    node.push_back(Pair("miningpaused", (mc_gState->m_NodePausedState & MC_NPS_MINING) ? true : false));                
+    node.push_back(Pair("reindex",       fReindex));    
+    node.push_back(Pair("miningrequirespeers",Params().MiningRequiresPeers()));        
+    node.push_back(Pair("mineemptyrounds", Params().MineEmptyRounds()));        
+    node.push_back(Pair("lockadminminerounds", Params().LockAdminMineRounds()));       
+    node.push_back(Pair("mempooltxs", (int64_t) mempool.size()));
+    node.push_back(Pair("mempoolsize", (int64_t) mempool.GetTotalTxSize()));    
+    node.push_back(Pair("bantx",GetArg("-bantx","")));
+    node.push_back(Pair("lockblock",GetArg("-lockblock","")));                        
+    
+    result.push_back(Pair("node",node));
+//    obj.push_back(Pair("", mc_gState->m_NetworkParams->GetInt64Param("")));    
+    
+    Array chaintips_params;
+    result.push_back(Pair("chaintips",getchaintips(chaintips_params,false)));
+    
+    Array blocks;
+    int height=chainActive.Height();
+    set<CKeyID> prev_keyids;
+    int32_t from_block=mcd_ParamIntValue(params,"fromblock",-1);
+    bool found=false;
+    while((height>=0) && !found)
+    {
+        CKeyID keyID;
+        if(mc_gState->m_Permissions->GetBlockMiner(height,(unsigned char*)&keyID) == MC_ERR_NOERROR)
+        {
+            Object entry;
+            entry.push_back(Pair("height",height));
+            entry.push_back(Pair("hash",chainActive[height]->GetBlockHash().ToString()));
+            entry.push_back(Pair("miner",CBitcoinAddress(keyID).ToString()));
+            entry.push_back(Pair("size",(int)chainActive[height]->nSize));
+            entry.push_back(Pair("txs",(int)chainActive[height]->nTx));
+            entry.push_back(Pair("time",(int)chainActive[height]->nTime));
+            blocks.push_back(entry);
+            if(prev_keyids.find(keyID) != prev_keyids.end())
+            {
+                if((from_block==-1) || (height <= from_block))
+                {
+                    found=true;
+                }
+                else
+                {
+                    height--;                    
+                }
+            }
+            else
+            {
+                prev_keyids.insert(keyID);
+                height--;
+            }
+        }
+        else
+        {
+            found=true;
+        }        
+    }
+    result.push_back(Pair("blocks",blocks));
+    
+    Array miner_params;
+    miner_params.push_back(false);
+    miner_params.push_back(0x03);
+    miner_params.push_back(height);    
+//    miner_params.push_back(0);
+    
+    result.push_back(Pair("miners",listminers_operation(miner_params)));
+    result.push_back(Pair("admins",listadmins_operation(miner_params)));
+    
+
+    Array peers;
+
+    {
+        LOCK(cs_vNodes);
+        BOOST_FOREACH(CNode* pnode, vNodes) 
+        {
+            CNodeStats stats;
+            pnode->copyStats(stats);
+            if(stats.fSuccessfullyConnected)
+            {
+                Object obj;
+                obj.push_back(Pair("id", stats.nodeid));
+                if(MCP_ANYONE_CAN_CONNECT)
+                {
+                    Value null_value;
+                    obj.push_back(Pair("handshakelocal", null_value));                
+                    obj.push_back(Pair("handshake", null_value));                
+                }            
+                else
+                {
+                    obj.push_back(Pair("handshakelocal", CBitcoinAddress(stats.kAddrLocal).ToString()));                
+                    obj.push_back(Pair("handshake", CBitcoinAddress(stats.kAddrRemote).ToString()));                
+                }
+                obj.push_back(Pair("inbound", stats.fInbound));
+                peers.push_back(obj);
+            }
+        }
+    }
+       
+    result.push_back(Pair("peers",peers));
+    result.push_back(Pair("solution",solution));
+    result.push_back(Pair("result",solution_result));
+        
+    
+    return result;
 }
 
 int64_t mcd_OpenDatabase(const char *name,const char *dbname,int key_size,int value_size,mc_Database **lpDB)
@@ -325,6 +493,64 @@ Value mcd_DebugRequest(string method,const Object& params)
     if(method == "issuelicensetoken")
     {
         return mcd_DebugIssueLicenseToken(params);
+    }
+    if(method == "ubjsonencode")
+    {        
+        LOCK(cs_main);
+        
+        size_t bytes;
+        int err;
+        const unsigned char *script;
+        mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;   
+        lpDetailsScript->Clear();
+        lpDetailsScript->Clear();
+        lpDetailsScript->AddElement();
+        if((err = ubjson_write(params,lpDetailsScript,MAX_FORMATTED_DATA_DEPTH)) != MC_ERR_NOERROR)
+        {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't transfer JSON object to internal UBJSON format");                                            
+        }
+        script = lpDetailsScript->GetData(0,&bytes);
+        vector<unsigned char> vValue=vector<unsigned char> (script,script+bytes);                                            
+        return HexStr(vValue);            
+    }    
+    if(method == "ubjsondecode")
+    {
+        int err;
+        string encoded_hex=mcd_ParamStringValue(params,"data","");
+        vector<unsigned char> encoded=ParseHex(encoded_hex);
+        
+        Value value=ubjson_read((const unsigned char *)(&encoded[0]),encoded.size(),MAX_FORMATTED_DATA_DEPTH,&err);
+        if(err)
+        {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Error decoding UBJSON");                                            
+        }
+        
+        return value;
+    }        
+    if(method == "chainstate")
+    {
+        LOCK(cs_main);
+        
+        int pretty=mcd_ParamIntValue(params,"verbose",0);
+        Value value=mcd_GetChainState(params);
+        if(pretty == 0)
+        {
+            size_t bytes;
+            int err;
+            const unsigned char *script;
+            mc_Script *lpDetailsScript=mc_gState->m_TmpBuffers->m_RpcScript1;   
+            lpDetailsScript->Clear();
+            lpDetailsScript->Clear();
+            lpDetailsScript->AddElement();
+            if((err = ubjson_write(value,lpDetailsScript,MAX_FORMATTED_DATA_DEPTH)) != MC_ERR_NOERROR)
+            {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't transfer JSON object to internal UBJSON format");                                            
+            }
+            script = lpDetailsScript->GetData(0,&bytes);
+            vector<unsigned char> vValue=vector<unsigned char> (script,script+bytes);                                            
+            return HexStr(vValue);            
+        }
+        return value;
     }
     if(method == "rwlock")
     {

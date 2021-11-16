@@ -291,6 +291,7 @@ int mc_Permissions::Zero()
     
     m_MempoolPermissions=NULL;
     m_MempoolPermissionsToReplay=NULL;
+    m_MempoolTxIDs=NULL;
     m_CheckForMempoolFlag=0;
     
     m_ThreadRollBackPos=NULL;
@@ -394,6 +395,10 @@ int mc_Permissions::Initialize(const char *name,int mode)
     m_MempoolPermissionsToReplay=new mc_Buffer;
     
     err=m_MempoolPermissionsToReplay->Initialize(sizeof(mc_MempoolPermissionRow),sizeof(mc_MempoolPermissionRow),0);
+    
+    m_MempoolTxIDs=new mc_Buffer;
+    
+    err=m_MempoolTxIDs->Initialize(MC_PLS_SIZE_HASH,MC_PLS_SIZE_HASH,0);
     
     pldBlock=-1;
     pldLastRow=1;
@@ -695,6 +700,11 @@ int mc_Permissions::Destroy()
     if(m_MempoolPermissionsToReplay)
     {
         delete m_MempoolPermissionsToReplay;
+    }
+    
+    if(m_MempoolTxIDs)
+    {
+        delete m_MempoolTxIDs;        
     }
     
     if(m_ThreadRollBackPos)
@@ -3083,6 +3093,100 @@ exitlbl:
     return result;
 }
 
+mc_Buffer *mc_Permissions::GetPermissionRows(mc_PermissionDetails *plsRow,uint32_t from_block)
+{
+    mc_Buffer *result;
+    
+    Lock(0);
+    
+    result=new mc_Buffer;
+
+    result->Initialize(m_Ledger->m_ValueOffset,sizeof(mc_PermissionDetails),MC_BUF_MODE_DEFAULT);
+
+    if(m_Ledger->Open() <= 0)
+    {
+        LogString("Error: GetPermissionRows: couldn't open ledger");
+        goto exitlbl;
+    }
+        
+    int exit_now;
+    uint64_t prevRow,countLedgerRows;
+    mc_PermissionLedgerRow pldRow;
+    mc_PermissionDetails plsDetails;
+    
+    countLedgerRows=m_Row-m_MemPool->GetCount();
+        
+    prevRow=plsRow->m_LastRow;
+    exit_now=0;
+    while(exit_now == 0)
+    {    
+        if(prevRow >= countLedgerRows)                                          // in mempool
+        {
+            pldRow.Zero();
+            memcpy((unsigned char*)&pldRow+m_Ledger->m_KeyOffset,m_MemPool->GetRow(prevRow-countLedgerRows),m_Ledger->m_TotalSize);
+            pldRow.m_Offset=prevRow-countLedgerRows;
+        }
+        else
+        {
+            if(m_Ledger->GetRow(prevRow,&pldRow))
+            {
+                m_Ledger->Close();
+                LogString("Error: GetPermissionRows: couldn't get row");
+                goto exitlbl;
+            }            
+            if(memcmp(&pldRow,plsRow,m_Database->m_ValueOffset) != 0)           // m_Database->m_ValueOffset are common for all structures
+            {
+                m_Ledger->Close();
+                LogString("Error: GetPermissionRows: row key mismatch");
+                goto exitlbl;
+            }
+                    
+            if(prevRow != pldRow.m_ThisRow)
+            {
+                m_Ledger->Close();
+                LogString("Error: GetPermissionRows: row id mismatch");
+                goto exitlbl;
+            }
+        }       
+        
+        plsDetails.Zero();
+        memcpy(plsDetails.m_Entity,pldRow.m_Entity,MC_PLS_SIZE_ENTITY);
+        memcpy(plsDetails.m_Address,pldRow.m_Address,MC_PLS_SIZE_ADDRESS);
+        plsDetails.m_Type=pldRow.m_Type;
+        plsDetails.m_BlockFrom=pldRow.m_BlockFrom;
+        plsDetails.m_BlockTo=pldRow.m_BlockTo;
+        plsDetails.m_GrantFrom=pldRow.m_GrantFrom;
+        plsDetails.m_GrantTo=pldRow.m_GrantTo;
+        plsDetails.m_Flags=pldRow.m_Flags;
+        plsDetails.m_LastRow=pldRow.m_ThisRow;
+        memcpy(plsDetails.m_LastAdmin,pldRow.m_Admin,MC_PLS_SIZE_ADDRESS);
+        plsDetails.m_BlockReceived=pldRow.m_BlockReceived;
+        plsDetails.m_Offset=pldRow.m_Offset;
+
+        result->Add(&plsDetails,(unsigned char*)&plsDetails+m_Ledger->m_ValueOffset);
+
+        prevRow=pldRow.m_PrevRow;
+
+        if(prevRow == 0)
+        {
+            exit_now=1;
+        }   
+        if(pldRow.m_BlockReceived < from_block)
+        {
+            exit_now=1;
+        }        
+    }
+
+exitlbl:    
+            
+    m_Ledger->Close();
+    UnLock();    
+    
+    return result;
+}
+
+
+
 /** Returns list of upgrade approval */
 
 mc_Buffer *mc_Permissions::GetUpgradeList(const void* lpUpgrade,mc_Buffer *old_buffer)
@@ -3335,6 +3439,35 @@ int mc_Permissions::IsActivateEnough(uint32_t type)
     }
     return 1;
 }
+
+void mc_Permissions::ClearMempoolTxIDs()
+{
+    m_MempoolTxIDs->Clear();
+}
+
+int mc_Permissions::SetMempoolTxID(const void* txid,int from)
+{
+    int to=m_MemPool->GetCount();
+    if(to>m_MempoolTxIDs->GetCount())
+    {
+        m_MempoolTxIDs->SetCount(to);
+    }
+    for(int i=from;i<to;i++)
+    {
+        m_MempoolTxIDs->PutRow(i,txid,txid);
+    }
+    return MC_ERR_NOERROR;
+}
+
+const void* mc_Permissions::GetMempoolTxID(int pos)
+{
+    if(pos<m_MempoolTxIDs->GetCount())
+    {
+        return m_MempoolTxIDs->GetRow(pos);
+    }
+    return NULL;
+}
+
 
 /** Sets permission record, external, locks */
 
