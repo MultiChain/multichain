@@ -64,6 +64,8 @@ static const CRPCCommand vRPCCommands[] =
     { "control",            "getblockchainparams",    &getblockchainparams,    true,      false,      false }, 
     { "control",            "getruntimeparams",       &getruntimeparams,       true,      false,      false }, 
     { "control",            "setruntimeparam",        &setruntimeparam,        true,      false,      false }, 
+    { "control",            "getdiagnostics",         &getdiagnostics,         true,      false,      false }, 
+    { "control",            "applycommands",          &applycommands,          true,      false,      false }, 
 /* MCHN END */    
 
     /* P2P networking */
@@ -168,6 +170,8 @@ static const CRPCCommand vRPCCommands[] =
     { "util",               "createbinarycache",      &createbinarycache,      true,      true,      false },
     { "util",               "appendbinarycache",      &appendbinarycache,      true,      true,      false },
     { "util",               "deletebinarycache",      &deletebinarycache,      true,      true,      false },
+    { "util",               "decodehexubjson",        &decodehexubjson,        true,      true,      false },
+    { "util",               "encodehexubjson",        &encodehexubjson,        true,      true,      false },
 
     /* Not shown in help */
     { "hidden",             "invalidateblock",        &invalidateblock,        true,      true,       false },

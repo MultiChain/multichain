@@ -232,11 +232,14 @@ typedef struct mc_PermissionDetails
     unsigned char m_Entity[MC_PLS_SIZE_ENTITY];                                 // Entity genesis transaction TxID, all 0s for master permissions 
     unsigned char m_Address[MC_PLS_SIZE_ADDRESS];                               // Address 
     uint32_t m_Type;                                                            // Permission type MC_PTP_ constants
+    uint32_t m_GrantFrom;                                                       // Permission block-from in permission row
+    uint32_t m_GrantTo;                                                         // Permission block-to in permission row
     uint32_t m_BlockFrom;                                                       // Permission block-from after processing this row
     uint32_t m_BlockTo;                                                         // Permission block-to after processing this row
     uint32_t m_Flags;                                                           // Flags MC_PFL_ constants
     int32_t m_RequiredAdmins;                                                   // Number of admins required for consensus                                                  
     unsigned char m_LastAdmin[MC_PLS_SIZE_ADDRESS];                             // Last admin address 
+    int32_t m_Offset;
     uint32_t m_BlockReceived;                                                   // BlockHeight
     uint64_t m_LastRow;                                                         // Last row in the ledger        
     void Zero();
@@ -291,7 +294,8 @@ typedef struct mc_Permissions
 
     int m_CheckForMempoolFlag;
     mc_Buffer               *m_MempoolPermissions;
-    mc_Buffer               *m_MempoolPermissionsToReplay;    
+    mc_Buffer               *m_MempoolPermissionsToReplay;  
+    mc_Buffer               *m_MempoolTxIDs;
     
     mc_Buffer   *m_ThreadRollBackPos;
     
@@ -313,6 +317,10 @@ typedef struct mc_Permissions
 
     int SetPermission(const void* lpEntity,const void* lpAddress,uint32_t type,const void* lpAdmin,uint32_t from,uint32_t to,uint32_t timestamp,
                                                                                                    uint32_t flags,int update_mempool,int offset);
+    int SetMempoolTxID(const void* txid,int from);
+    void ClearMempoolTxIDs();
+    const void* GetMempoolTxID(int pos);
+    
     int SetApproval(const void* lpUpgrade,uint32_t approval,const void* lpAdmin,uint32_t from,uint32_t timestamp,uint32_t flags,int update_mempool,int offset);
     int Commit(const void* lpMiner,const void* lpHash);
     int RollBack(int block);
@@ -370,6 +378,7 @@ typedef struct mc_Permissions
     mc_Buffer *GetPermissionList(const void* lpEntity,const void* lpAddress,uint32_t type,mc_Buffer *old_buffer);
     mc_Buffer *GetUpgradeList(const void* lpUpgrade,mc_Buffer *old_buffer);
     mc_Buffer *GetPermissionDetails(mc_PermissionDetails *plsRow);
+    mc_Buffer *GetPermissionRows(mc_PermissionDetails *plsRow,uint32_t from_block);
     void FreePermissionList(mc_Buffer *permissions);
     
     void MempoolPermissionsCopy();

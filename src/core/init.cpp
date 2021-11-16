@@ -1370,6 +1370,30 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     string seed_resolved="";
     int resolved_port = 0;
     string resolved_host = "";
+    
+    vector<std::string> vAddedNodesIn = mapMultiArgs["-addnode"];
+    vector<std::string> vAddedNodesOut;
+    if(vAddedNodesIn.size())
+    {
+        BOOST_FOREACH(string& strAddNode, vAddedNodesIn)
+        {
+            CService resolved_addr;
+            if(!Lookup(strAddNode.c_str(), resolved_addr, 0, 1))
+            {                
+                LogPrintf("-addnode=%s cannot be resolved, ignored\n",strAddNode.c_str());                
+            }
+            else
+            {
+                if(resolved_addr.ToString() != strAddNode)
+                {
+                    LogPrintf("-addnode=%s resolved as %s, replaced\n",strAddNode.c_str(),resolved_addr.ToString().c_str());                                    
+                }
+                vAddedNodesOut.push_back(resolved_addr.ToString());
+            }
+        }                
+        mapMultiArgs["-addnode"]=vAddedNodesOut;
+    }
+    
     if(seed_node)
     {        
         seed_resolved=string(seed_node);

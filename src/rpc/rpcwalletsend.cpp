@@ -880,6 +880,10 @@ Value sendassetfrom(const Array& params, bool fHelp)
     {        
         mc_EntityDetails entity;
         ParseEntityIdentifier(params[2],&entity, MC_ENT_TYPE_ASSET);           
+        if(entity.IsNFTAsset())
+        {
+            throw JSONRPCError(RPC_NOT_SUPPORTED, "This API is not supported for nun-fungible assets");                    
+        }
         memcpy(buf,entity.GetFullRef(),MC_AST_ASSET_FULLREF_SIZE);
         multiple=entity.GetAssetMultiple();
     }

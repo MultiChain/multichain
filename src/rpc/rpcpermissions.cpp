@@ -156,6 +156,20 @@ Value grantoperation(const Array& params)
             }
         }        
     }
+    if(type & MC_PTP_MINE)
+    {
+        if(from<to)
+        {
+            BOOST_FOREACH(CTxDestination& txdest, addresses) 
+            {
+                CScriptID *lpScriptID=boost::get<CScriptID> (&txdest);
+                if(lpScriptID != NULL)
+                {
+                    throw JSONRPCError(RPC_NOT_ALLOWED, "Granting mine permission to P2SH addresses is not allowed");                                    
+                }
+            }        
+        }
+    }
     
     lpScript->SetPermission(type,from,to,timestamp);
     
@@ -944,8 +958,16 @@ Value listpermissions_operation(const Array& params, bool fOnlyPermittedOrPendin
                     {
                         uint160 addr;
                         memcpy(&addr,plsDet->m_LastAdmin,sizeof(uint160));
-                        CKeyID lpKeyID=CKeyID(addr);
-                        admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                        if(plsDet->m_Flags & MC_PFL_IS_SCRIPTHASH)
+                        {
+                            CScriptID lpScriptID=CScriptID(addr);
+                            admins.push_back(CBitcoinAddress(lpScriptID).ToString());                                                                            
+                        }
+                        else
+                        {
+                            CKeyID lpKeyID=CKeyID(addr);
+                            admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                        }
                     }
                 }                    
                 for(int j=0;j<details->GetCount();j++)
@@ -971,9 +993,17 @@ Value listpermissions_operation(const Array& params, bool fOnlyPermittedOrPendin
                                     {
                                         uint160 addr;
                                         memcpy(&addr,plsPend->m_LastAdmin,sizeof(uint160));
-                                        CKeyID lpKeyID=CKeyID(addr);
-//                                        CKeyID lpKeyID=CKeyID(*(uint160*)((void*)(plsPend->m_LastAdmin)));
-                                        pend_admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                                        if(plsPend->m_Flags & MC_PFL_IS_SCRIPTHASH)
+                                        {
+                                            CScriptID lpScriptID=CScriptID(addr);
+                                            pend_admins.push_back(CBitcoinAddress(lpScriptID).ToString());                                                                            
+                                        }
+                                        else
+                                        {
+                                            CKeyID lpKeyID=CKeyID(addr);
+    //                                        CKeyID lpKeyID=CKeyID(*(uint160*)((void*)(plsPend->m_LastAdmin)));
+                                            pend_admins.push_back(CBitcoinAddress(lpKeyID).ToString());                                                
+                                        }
                                         plsPend->m_RequiredAdmins=0x01010101;
                                     }                                    
                                 }
@@ -1026,12 +1056,16 @@ typedef struct mc_MinerInfo
     uint32_t m_ConfirmedStartBlock;
     uint32_t m_ConfirmedEndBlock;
     uint32_t m_LastMined;
+    uint32_t m_Flags;
+    uint256 m_LastTxID;
+    uint256 m_ConfirmedLastTxID;
     bool m_Active;
     Value m_Pending;
     int m_Recent;
     uint32_t m_WaitBlocks;
     uint32_t m_NextAllowed;
-            
+    Array m_Grants;
+    
     void Zero();
     
     mc_MinerInfo()
@@ -1049,12 +1083,16 @@ void mc_MinerInfo::Zero()
     m_BlockReceived=0;
     m_ConfirmedStartBlock=0;
     m_ConfirmedEndBlock=0;
+    m_LastTxID=0;
+    m_ConfirmedLastTxID=0;
     m_LastMined=0;
+    m_Flags=0;
     m_Active=false;
     m_Pending=Value::null;
     m_Recent=-1;
     m_WaitBlocks=INT_MAX;    
     m_NextAllowed=INT_MAX;
+    m_Grants.clear();
 }
 
 bool ListMinersSort(mc_MinerInfo a,mc_MinerInfo b)
@@ -1067,11 +1105,255 @@ bool ListMinersSort(mc_MinerInfo a,mc_MinerInfo b)
     return (a.m_WaitBlocks<b.m_WaitBlocks);
 }
 
-Value listminers(const Array& params, bool fHelp)
+Array mc_GetRecentGrants(mc_PermissionDetails *plsRow,uint32_t from_block)
 {
-    if (fHelp || params.size() > 1)
-        throw runtime_error("Help message not found\n");
+    Array result;
+    mc_Buffer *details;
+    uint32_t last_block=INT_MAX;
+    int last_offset=-1;
+    int last_tx=-1;
+    CBlock block;
+      
+    details=mc_gState->m_Permissions->GetPermissionRows(plsRow,from_block);                            
+    if(details)
+    {
+        for(int j=details->GetCount()-1;j>=0;j--)
+        {
+            mc_PermissionDetails *plsDet;
+            Object entry;
+            plsDet=(mc_PermissionDetails *)(details->GetRow(j));
 
+            entry.push_back(Pair("grants", strprintf("%d-%d",plsDet->m_GrantFrom,plsDet->m_GrantTo)));
+            entry.push_back(Pair("blocks", strprintf("%d-%d",plsDet->m_BlockFrom,plsDet->m_BlockTo)));
+            uint160 addr;
+            memcpy(&addr,plsDet->m_LastAdmin,sizeof(uint160));
+            if(plsDet->m_Flags & MC_PFL_IS_SCRIPTHASH)
+            {
+                CScriptID lpScriptID=CScriptID(addr);
+                entry.push_back(Pair("admin",CBitcoinAddress(lpScriptID).ToString()));                
+            }
+            else
+            {
+                CKeyID lpKeyID=CKeyID(addr);
+                entry.push_back(Pair("admin",CBitcoinAddress(lpKeyID).ToString()));
+            }
+            if((int)plsDet->m_BlockReceived <= chainActive.Height())
+            {
+                entry.push_back(Pair("block", (int64_t)plsDet->m_BlockReceived));
+                if(plsDet->m_BlockReceived != last_block)
+                {
+                    if(ReadBlockFromDisk(block, chainActive[plsDet->m_BlockReceived]))
+                    {
+                        last_block=plsDet->m_BlockReceived;
+                        last_offset=80 + 1;
+                        if(block.vtx.size() >= 0xfd)
+                        {
+                            last_offset+=2;
+                        }
+                        if(block.vtx.size() > 0xffff)
+                        {
+                            last_offset+=2;
+                        }    
+                        last_tx=0;
+                    }
+                }
+                int offset=last_offset;
+                int t=last_tx;
+                while( (t<(int)block.vtx.size()) && (offset < plsDet->m_Offset))
+                {   
+                    offset+=block.vtx[t].GetSerializeSize(SER_NETWORK,block.vtx[t].nVersion);
+                    t++;
+                }
+                last_offset=offset;
+                last_tx=t;
+                if((t<(int)block.vtx.size()) && (offset == plsDet->m_Offset))
+                {
+                    entry.push_back(Pair("txid", block.vtx[t].GetHash().ToString()));                                                                
+                }
+                else
+                {
+                    entry.push_back(Pair("txid", Value::null));                                                                
+                    entry.push_back(Pair("offset", (int64_t)plsDet->m_Offset));                                            
+                }
+            }
+            else
+            {
+                entry.push_back(Pair("block", Value::null));                
+                const void *txid=mc_gState->m_Permissions->GetMempoolTxID(plsDet->m_Offset);
+                if(txid)
+                {
+                    entry.push_back(Pair("txid", ((uint256*)txid)->ToString()));                                                                                    
+                }
+                else
+                {
+                    entry.push_back(Pair("txid", Value::null));                                                                
+                    entry.push_back(Pair("offset", (int64_t)plsDet->m_Offset));                                                                
+                }                    
+            }
+            result.push_back(entry);
+        }
+        
+        mc_gState->m_Permissions->FreePermissionList(details);                      
+    }            
+    return result;
+}
+
+Array listconnect_operation(const Array& params)
+{
+    Array result;
+    mc_Buffer *permissions;
+    permissions=mc_gState->m_Permissions->GetPermissionList(NULL,NULL,MC_PTP_CONNECT,NULL);
+    for(int i=0;i<permissions->GetCount();i++)
+    {
+        Object entry;
+        mc_PermissionDetails *plsRow;
+        plsRow=(mc_PermissionDetails *)(permissions->GetRow(i));
+        mc_MinerInfo admin;
+        if(plsRow->m_BlockFrom < plsRow->m_BlockTo)
+        {
+            if(plsRow->m_Flags & MC_PFL_IS_SCRIPTHASH)
+            {
+                CScriptID address=(CScriptID)(*(uint160*)(plsRow->m_Address));
+                entry.push_back(Pair("address",CBitcoinAddress(address).ToString()));
+                entry.push_back(Pair("islocal",false));                            
+            }
+            else
+            {
+                CKeyID address=(CKeyID)(*(uint160*)(plsRow->m_Address));
+                bool is_mine=(IsMine(*pwalletMain, address)  == ISMINE_SPENDABLE);
+                entry.push_back(Pair("address",CBitcoinAddress(address).ToString()));
+                entry.push_back(Pair("islocal",is_mine));            
+            }
+            result.push_back(entry);
+        }
+    }    
+    return  result;    
+}
+
+
+Array listadmins_operation(const Array& params)
+{
+    mc_Buffer *permissions;
+    permissions=mc_gState->m_Permissions->GetPermissionList(NULL,NULL,MC_PTP_ADMIN,NULL);
+
+    int verbose=0;
+    if (params.size() > 0)    
+    {
+        if(paramtobool(params[0]))
+        {
+            verbose=1;
+        }        
+    }
+
+    int details_level=0x00;
+    
+    if (params.size() > 1)    
+    {
+        details_level=params[1].get_int();
+// 0x01 - hide nice details       
+// 0x02 - check last changes
+    }    
+    
+    
+    uint32_t next_block=chainActive.Height()+1;
+    uint32_t from_block=chainActive.Height()+2;
+    if(params.size() > 2)    
+    {
+        from_block=params[2].get_int();
+    }
+    
+    vector <mc_MinerInfo> admins;
+    vector <int> block_admin_counts;
+    int admin_count=0;
+    for(int i=0;i<permissions->GetCount();i++)
+    {
+        mc_PermissionDetails *plsRow;
+        plsRow=(mc_PermissionDetails *)(permissions->GetRow(i));
+        mc_MinerInfo admin;
+        admin.Zero();
+        admin.m_StartBlock=plsRow->m_BlockFrom;
+        admin.m_EndBlock=plsRow->m_BlockTo;
+        admin.m_BlockReceived=plsRow->m_BlockReceived;
+        admin.m_Address=*(uint160*)(plsRow->m_Address);
+        admin.m_Flags=plsRow->m_Flags;
+        if(details_level & 0x02)    
+        {
+            admin.m_Grants=mc_GetRecentGrants(plsRow,from_block);
+        }
+        
+        admin.m_Active=false;
+        if(next_block >= admin.m_StartBlock)
+        {
+            if(next_block < admin.m_EndBlock)
+            {
+                admin.m_Active=true;
+                admin_count++;
+            }                                
+        }
+        if(admin.m_BlockReceived == next_block)
+        {
+            admin.m_Pending=false;
+            if(admin.m_StartBlock < admin.m_EndBlock)
+            {
+                admin.m_Pending=true;                
+            }        
+        }
+        admins.push_back(admin);
+    }    
+        
+    block_admin_counts.push_back(admin_count);
+    
+    mc_gState->m_Permissions->FreePermissionList(permissions);
+    
+    Array result;
+    
+    for(int i=0;i<(int)admins.size();i++)
+    {
+        Object entry;
+        if(admins[i].m_Flags & MC_PFL_IS_SCRIPTHASH)
+        {
+            entry.push_back(Pair("address",CBitcoinAddress((CScriptID)(admins[i].m_Address)).ToString()));            
+            entry.push_back(Pair("islocal",false));
+        }
+        else
+        {
+            bool is_mine=(IsMine(*pwalletMain, (CKeyID)(admins[i].m_Address))  == ISMINE_SPENDABLE);
+            entry.push_back(Pair("address",CBitcoinAddress((CKeyID)(admins[i].m_Address)).ToString()));
+            entry.push_back(Pair("islocal",is_mine));
+        }
+        entry.push_back(Pair("permitted",admins[i].m_Active));
+        if(verbose)
+        {
+            entry.push_back(Pair("startblock",(int64_t)admins[i].m_StartBlock));
+            entry.push_back(Pair("endblock",(int64_t)admins[i].m_EndBlock));            
+        }
+        string chain_state= "no-admin-permissions" ;
+        if(admins[i].m_Active)
+        {
+            chain_state="admin-permitted";
+        }
+        else
+        {
+            if(!admins[i].m_Pending.is_null() &&  admins[i].m_Pending.get_bool())
+            {
+                chain_state="pending-admin-permissions";                                
+            }            
+        }
+        entry.push_back(Pair("chainstate",chain_state));            
+        
+        if(details_level & 0x02)
+        {
+            entry.push_back(Pair("lastgrants",admins[i].m_Grants));                                    
+        }
+        
+        result.push_back(entry);
+    }   
+    
+    return  result;    
+}
+
+Array listminers_operation(const Array& params)
+{
     mc_Buffer *permissions;
     permissions=mc_gState->m_Permissions->GetPermissionList(NULL,NULL,MC_PTP_MINE,NULL);
 
@@ -1083,8 +1365,23 @@ Value listminers(const Array& params, bool fHelp)
             verbose=1;
         }        
     }
+
+    int details_level=0x00;
+    
+    if (params.size() > 1)    
+    {
+        details_level=params[1].get_int();
+// 0x01 - hide nice details       
+// 0x02 - check last changes
+    }    
+    
     
     uint32_t next_block=chainActive.Height()+1;
+    uint32_t from_block=chainActive.Height()+2;
+    if(params.size() > 2)    
+    {
+        from_block=params[2].get_int();
+    }
     
     vector <mc_MinerInfo> miners;
     vector <int> block_miner_counts;
@@ -1099,6 +1396,11 @@ Value listminers(const Array& params, bool fHelp)
         miner.m_EndBlock=plsRow->m_BlockTo;
         miner.m_BlockReceived=plsRow->m_BlockReceived;
         miner.m_Address=*(uint160*)(plsRow->m_Address);
+        miner.m_Flags=plsRow->m_Flags;
+        if(details_level & 0x02)    
+        {
+            miner.m_Grants=mc_GetRecentGrants(plsRow,from_block);
+        }
         
         mc_gState->m_Permissions->GetMinerInfo(plsRow->m_Address,&miner.m_ConfirmedStartBlock,&miner.m_ConfirmedEndBlock,&miner.m_LastMined);
         miner.m_Active=false;
@@ -1183,10 +1485,19 @@ Value listminers(const Array& params, bool fHelp)
     
     for(int i=0;i<(int)miners.size();i++)
     {
-        bool is_mine=(IsMine(*pwalletMain, (CKeyID)(miners[i].m_Address))  == ISMINE_SPENDABLE);
         Object entry;
-        entry.push_back(Pair("address",CBitcoinAddress((CKeyID)(miners[i].m_Address)).ToString()));
-        entry.push_back(Pair("islocal",is_mine));
+        bool is_mine=false;
+        if(miners[i].m_Flags & MC_PFL_IS_SCRIPTHASH)
+        {
+            entry.push_back(Pair("address",CBitcoinAddress((CScriptID)(miners[i].m_Address)).ToString()));            
+            entry.push_back(Pair("islocal",is_mine));
+        }
+        else
+        {
+            is_mine=(IsMine(*pwalletMain, (CKeyID)(miners[i].m_Address))  == ISMINE_SPENDABLE);
+            entry.push_back(Pair("address",CBitcoinAddress((CKeyID)(miners[i].m_Address)).ToString()));
+            entry.push_back(Pair("islocal",is_mine));
+        }
         entry.push_back(Pair("permitted",miners[i].m_Active));
         if(miners[i].m_WaitBlocks != INT_MAX)
         {
@@ -1297,11 +1608,23 @@ Value listminers(const Array& params, bool fHelp)
         {
             entry.push_back(Pair("localstate",Value::null));                                    
         }
-        
+        if(details_level & 0x02)
+        {
+            entry.push_back(Pair("lastgrants",miners[i].m_Grants));                                    
+        }
         
         result.push_back(entry);
     }   
     
     return  result;
 }
-    
+
+
+
+Value listminers(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 1)
+        throw runtime_error("Help message not found\n");
+
+    return listminers_operation(params);
+}

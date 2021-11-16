@@ -279,6 +279,10 @@ static const std::string vAPINames[] =
 "getchaintotals",
 "update",
 "updatefrom",
+"getdiagnostics",
+"applycommands",
+"decodehexubjson",
+"encodehexubjson",
 };
 
 static const CRPCConvertParam vRPCConvertParams[] =
@@ -635,6 +639,8 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "explorerlistaddressassettransactions", 2 },
     { "explorerlistaddressassettransactions", 3 },
     { "explorerlistaddressassettransactions", 4 },
+    { "encodehexubjson", 0 },
+    { "getdiagnostics", 0 },
 };
 
 class CRPCConvertTable
