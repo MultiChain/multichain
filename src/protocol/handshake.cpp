@@ -4,6 +4,7 @@
 // Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
+#include "storage/addrman.h"
 #include "core/init.h"
 #include "core/main.h"
 #include "utils/util.h"
@@ -257,6 +258,20 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
         
         CKeyID pubKeyHash=pubKeyOut.GetID();
         pfrom->kAddrRemote=pubKeyHash;
+        
+        if(fIsVerackack)
+        {
+            if(addrman.GetMCAddrMan()->SetOutcome(pfrom->addrFromVersion,pfrom->kAddrRemote,true))
+            {
+                if(false)
+                {
+                    LogPrintf("mchn: Already connected to address %s, disconnecting peer=%d\n",CBitcoinAddress(pubKeyHash).ToString().c_str(), pfrom->id);            
+                    return false;
+                }
+            }
+        }
+        
+//        addrman.GetMCAddrMan()->Set(pfrom->addrFromVersion,pfrom->kAddrRemote);
         if(fIsVerackack)
         {
             LogPrintf("mchn: Connection from %s received on peer=%d in verackack (%s)\n",CBitcoinAddress(pubKeyHash).ToString().c_str(), pfrom->id,pfrom->addr.ToString());

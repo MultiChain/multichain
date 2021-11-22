@@ -931,7 +931,14 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     // Check for -tor - as this is a privacy risk to continue, exit here
     if (GetBoolArg("-tor", false))
         return InitError(_("Error: Unsupported argument -tor found, use -onion."));
-    int MaxOutConnections=GetArg("-maxoutconnections",8);
+    
+    OutConnectionsAlgoritm=GetArg("-addrmanversion",0);
+    if(OutConnectionsAlgoritm)
+    {
+        nMaxOutConnections=32;
+    }
+    
+    int MaxOutConnections=GetArg("-maxoutconnections",nMaxOutConnections);
     if ( (MaxOutConnections < 1) || (MaxOutConnections > 32) )
     {
         return InitError(_("Error: -maxoutconnections out of range."));        

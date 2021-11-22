@@ -48,6 +48,7 @@ uint64_t nMainThreadID=0;
 
 std::map <string,CNetAddr> mCachedAddresses;
 
+static const unsigned char pchZero[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 static const unsigned char pchIPv4[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff };
 
 // Need ample time for negotiation for very slow proxies such as Tor (milliseconds)
@@ -772,6 +773,11 @@ CNetAddr::CNetAddr(const std::string &strIp, bool fAllowLookup)
 unsigned int CNetAddr::GetByte(int n) const
 {
     return ip[15-n];
+}
+
+bool CNetAddr::IsZero() const
+{
+    return (memcmp(ip, pchZero, sizeof(pchZero)) == 0);
 }
 
 bool CNetAddr::IsIPv4() const

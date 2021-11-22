@@ -91,6 +91,8 @@ uint64_t nLocalHostNonce = 0;
 static std::vector<ListenSocket> vhListenSocket;
 CAddrMan addrman;
 int nMaxConnections = 125;
+int nMaxOutConnections = 8;
+int OutConnectionsAlgoritm=0;
 bool fAddressesInitialized = false;
 
 vector<CNode*> vNodes;
@@ -1019,7 +1021,7 @@ void ThreadSocketHandler()
                     if (nErr != WSAEWOULDBLOCK)
                         LogPrintf("socket error accept failed: %s\n", NetworkErrorString(nErr));
                 }
-                else if (nInbound >= nMaxConnections - GetArg("-maxoutconnections",MAX_OUTBOUND_CONNECTIONS))
+                else if (nInbound >= nMaxConnections - nMaxOutConnections) // (nInbound >= nMaxConnections - GetArg("-maxoutconnections",MAX_OUTBOUND_CONNECTIONS))
                 {
                     CloseSocket(hSocket);
                 }
@@ -1407,6 +1409,105 @@ void ThreadOpenConnections()
     }
 
 /* MCHN END */    
+    
+    set<CService> setLocalAddrCopy;
+    uint32_t mcaddr_count[MC_AMM_MODE_COUNT];
+    if(MCP_ANYONE_CAN_CONNECT)
+    {
+        OutConnectionsAlgoritm=0;
+    }
+    while(OutConnectionsAlgoritm == 1)
+    {
+        if(!GetBoolArg("-addnodeonly",false))
+        {
+            {
+                LOCK(cs_setLocalAddr);        
+                BOOST_FOREACH(CService laddr, setLocalAddr) 
+                {                
+                    setLocalAddrCopy.insert(laddr);
+                }
+            }
+            int nOutBound=addrman.GetMCAddrMan()->PrepareSelect(setLocalAddrCopy,mcaddr_count);
+            int nRemaining=nMaxOutConnections-nOutBound;
+            
+            if( nRemaining * 2 < (int)mcaddr_count[MC_AMM_RECENT_SUCCESS] )
+            {
+                LogPrintf("Too many addresses to connect (%d) for remaining %d slots, falling back to stochastic algorithm\n",mcaddr_count[MC_AMM_RECENT_SUCCESS],nRemaining);
+                OutConnectionsAlgoritm=0;
+            }
+            if(MCP_ANYONE_CAN_CONNECT)
+            {
+                LogPrintf("anyone-can-connect=true, falling back to stochastic algorithm\n");
+                OutConnectionsAlgoritm=0;
+            }
+            
+            CMCAddrInfo *addr;
+            int nTotal=0;
+            for(uint32_t mode=MC_AMM_MIN_MODE;mode<MC_AMM_MODE_COUNT;mode++)
+            {
+                nTotal+=mcaddr_count[mode];
+            }
+
+            for(uint32_t mode=MC_AMM_MIN_MODE;mode<MC_AMM_MODE_COUNT;mode++)
+            {
+                double ratio=1.;
+                int sleep_time=500;
+                if(mode == MC_AMM_RECENT_SUCCESS)
+                {
+                    sleep_time=100;
+                }
+                else
+                {
+                    if(nRemaining * 4 < nMaxOutConnections)
+                    {
+                        sleep_time=2000;                        
+                    }
+                }
+                
+                if(nRemaining > 0)
+                {
+                    if(nRemaining < nTotal)
+                    {
+                        if(nRemaining < (int)mcaddr_count[mode])
+                        {
+                            ratio=(double)nRemaining/(double)mcaddr_count[mode];
+                        }
+                        if((mode == MC_AMM_OLD_FAIL) || (mode == MC_AMM_TRIED_NET))
+                        {
+                            ratio /= 2.;
+                        }
+                    }
+
+                    while((addr = addrman.GetMCAddrMan()->Select(mode)))
+                    {
+                        if(mc_RandomDouble() <= ratio)
+                        {
+                            CSemaphoreGrant grant(*semOutbound);
+                            CAddress addrConnect(addr->GetNetAddress());
+
+                            bool outcome=OpenNetworkConnection(addrConnect, &grant);
+                            if(outcome)
+                            {
+                                addrman.GetMCAddrMan()->SetOutcome(addr->GetNetAddress(),0,outcome);
+                                nRemaining--;
+                            }
+                            else
+                            {
+                                addrman.GetMCAddrMan()->SetOutcome(addr->GetNetAddress(),addr->GetMCAddress(),outcome);                            
+                            }
+                            boost::this_thread::interruption_point();                
+                            MilliSleep(sleep_time);
+                        }
+                        nTotal--;
+                    }
+                }
+            }
+        }   
+        
+        boost::this_thread::interruption_point();                
+        MilliSleep(500);
+    }
+    
     
     // Initiate network connections
     int64_t nStart = GetTime();
@@ -1979,7 +2080,8 @@ void StartNode(boost::thread_group& threadGroup)
 
     if (semOutbound == NULL) {
         // initialize semaphore
-        int nMaxOutbound = min((int)GetArg("-maxoutconnections",MAX_OUTBOUND_CONNECTIONS), nMaxConnections);
+//        int nMaxOutbound = min((int)GetArg("-maxoutconnections",MAX_OUTBOUND_CONNECTIONS), nMaxConnections);
+        int nMaxOutbound = min(nMaxOutConnections, nMaxConnections);
         semOutbound = new CSemaphore(nMaxOutbound);
     }
 
@@ -2040,7 +2142,7 @@ bool StopNode()
     LogPrintf("StopNode()\n");
     MapPort(false);
     if (semOutbound)
-        for (int i=0; i<GetArg("-maxoutconnections",MAX_OUTBOUND_CONNECTIONS); i++)
+        for (int i=0; i< nMaxOutConnections; i++)// i<GetArg("-maxoutconnections",MAX_OUTBOUND_CONNECTIONS); i++)
             semOutbound->post();
 
     if (fAddressesInitialized)
