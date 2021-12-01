@@ -18,6 +18,7 @@
 #include "core/main.h"
 #include "miner/miner.h"
 #include "net/net.h"
+#include "rpc/rpchttpserver.h"
 #include "rpc/rpcserver.h"
 #include "script/standard.h"
 #include "storage/txdb.h"
@@ -87,6 +88,10 @@ extern bool fRequestShutdown;
 extern bool fShutdownCompleted;
 
 
+void Interrupt_Cold()
+{
+    InterruptHTTPServer();
+}
 
 bool static InitError(const std::string &str)
 {
@@ -137,7 +142,8 @@ void Shutdown_Cold()
     /// Be sure that anything that writes files or flushes caches only does this if the respective
     /// module was initialized.
     RenameThread("bitcoin-shutoff");
-    StopRPCThreads();
+
+    StopHTTPServer();
 #ifdef ENABLE_WALLET
     if (pwalletMain)
         bitdbwrap.Flush(false);
@@ -970,7 +976,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     if (fServer)
     {
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
-        StartRPCThreads(rpc_threads_error);
+        StartHTTPServer();
     }
 /* MCHN END*/        
     

@@ -19,6 +19,7 @@
 #include "miner/miner.h"
 #include "net/net.h"
 #include "rpc/rpcserver.h"
+#include "rpc/rpchttpserver.h"
 #include "script/standard.h"
 #include "storage/txdb.h"
 #include "ui/ui_interface.h"
@@ -147,6 +148,11 @@ CInitNodeStatus::CInitNodeStatus()
 volatile bool fRequestShutdown = false;
 volatile bool fShutdownCompleted = false;
 
+void Interrupt()
+{
+    InterruptHTTPServer();
+}
+
 void StartShutdown()
 {
     fRequestShutdown = true;
@@ -194,7 +200,9 @@ void Shutdown()
     /// module was initialized.
     RenameThread("bitcoin-shutoff");
     mempool.AddTransactionsUpdated(1);
-    StopRPCThreads();
+    
+    StopHTTPServer();        
+    
 #ifdef ENABLE_WALLET
     if (pwalletMain)
         bitdbwrap.Flush(false);
@@ -1262,7 +1270,10 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     {
         JSON_DOUBLE_DECIMAL_DIGITS=GetArg("-apidecimaldigits",-1);        
 //        uiInterface.InitMessage.connect(SetRPCWarmupStatus);
-        StartRPCThreads(rpc_threads_error);
+        
+        if (!InitHTTPServer())
+            return InitError("InitHTTPServer");          
+        StartHTTPServer();                
     }
     if(rpc_threads_error.size())
     {
@@ -1725,12 +1736,12 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                             {
                                 LogPrintf("Restarting RPC server...\n");
                                 SelectMultiChainParams(mc_gState->m_Params->NetworkName());
-                                StopRPCThreads();
+                                StopHTTPServer();        
                                 if (fServer)
                                 {
                                     JSON_DOUBLE_DECIMAL_DIGITS=GetArg("-apidecimaldigits",-1);        
                             //        uiInterface.InitMessage.connect(SetRPCWarmupStatus);
-                                    StartRPCThreads(rpc_threads_error);
+                                    StartHTTPServer();
                                 }
                                 if(rpc_threads_error.size())
                                 {

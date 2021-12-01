@@ -24,6 +24,7 @@ mc_EnterpriseFeatures* pEF = NULL;
 void DebugPrintClose();
 std::string HelpMessage_Cold();
 bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe=STDOUT_FILENO);
+void Interrupt_Cold();
 void Shutdown_Cold();
 
 void DetectShutdownThread(boost::thread_group* threadGroup)
@@ -374,6 +375,7 @@ bool AppInit(int argc, char* argv[])
         detectShutdownThread = NULL;
     }
 
+    Interrupt();
     Shutdown();    
     DebugPrintClose();
     

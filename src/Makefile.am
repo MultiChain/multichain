@@ -130,7 +130,6 @@ BITCOIN_CORE_H = \
   utils/utilparse.h \
   rpc/rpcclient.h \
   rpc/rpcprotocol.h \
-  rpc/rpcasio.h \
   rpc/rpcutils.h \
   rpc/rpcwallet.h \
   rpc/rpcserver.h \
@@ -471,6 +470,11 @@ V8_LIBS += \
     -lrt
 endif
 
+EVENT_LIBS = \
+    -levent \
+    -levent_pthreads
+
+
 libbitcoin_v8_a_SOURCES = \
   v8/v8engine.cpp \
   v8/v8filter.cpp \
@@ -520,7 +524,7 @@ else
 multichaind_SOURCES += filters/filter.cpp
 endif
 
-multichaind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
+multichaind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_LIBS)
 multichaind_CPPFLAGS = $(BITCOIN_INCLUDES) $(V8_INCLUDE)
 multichaind_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -pthread
 if !TARGET_WINDOWS
@@ -559,7 +563,7 @@ if TARGET_WINDOWS
 multichaind_cold_SOURCES += multichaind-cold-res.rc
 endif
 
-multichaind_cold_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
+multichaind_cold_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_LIBS)
 multichaind_cold_CPPFLAGS = $(BITCOIN_INCLUDES)
 multichaind_cold_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -pthread
 
@@ -572,7 +576,8 @@ multichain_cli_LDADD = \
   $(LIBLEVELDB) \
   $(BOOST_LIBS) \
   $(SSL_LIBS) \
-  $(CRYPTO_LIBS)
+  $(CRYPTO_LIBS) \
+  $(EVENT_LIBS)
 
 multichain_cli_SOURCES =  multichain/multichain-cli.cpp
 
