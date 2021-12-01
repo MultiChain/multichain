@@ -1186,7 +1186,7 @@ void CMCAddrMan::Save() const
         write(FileHan,&m_MCAddrs[row],m_RowSize);        
     }
     if(fDebug)LogPrint("mcaddrman","mchn: Saved %d addresses\n",(int)m_MCAddrs.size());
-    fsync(FileHan);    
+    __US_FlushFile(FileHan);    
     close(FileHan);    
 }
 
