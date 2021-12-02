@@ -279,7 +279,7 @@ static void http_request_done(struct evhttp_request *req, void *ctx)
 #if LIBEVENT_VERSION_NUMBER >= 0x02010300
 static void http_error_cb(enum evhttp_request_error err, void *ctx)
 {
-    HTTPReply *reply = static_cast<HTTPReply*>(ctx);
+    RPCHTTPReply *reply = static_cast<RPCHTTPReply*>(ctx);
     reply->error = err;
 }
 #endif
