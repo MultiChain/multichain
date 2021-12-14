@@ -341,7 +341,7 @@ int mc_EnterpriseFeatures::HCH_GetPort()
     return 0;    
 }
 
-std::string mc_EnterpriseFeatures::HCH_ProcessRequest(std::string strRequest,std::string* strHeader)    
+std::string mc_EnterpriseFeatures::HCH_ProcessRequest(std::string strRequest,std::string* strHeader,map<string, string>& mapHeaders,int& http_code)    
 {
     *strHeader="";
     return "";

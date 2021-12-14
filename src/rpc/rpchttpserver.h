@@ -11,6 +11,7 @@
 static const int DEFAULT_HTTP_THREADS=4;
 static const int DEFAULT_HTTP_WORKQUEUE=16;
 static const int DEFAULT_HTTP_SERVER_TIMEOUT=30;
+static const int DEFAULT_HTTP_HEALTH_CHECKER_TIMEOUT=2;
 
 struct evhttp_request;
 struct event_base;
@@ -58,6 +59,7 @@ class HTTPRequest
 private:
     struct evhttp_request* req;
     bool replySent;
+    uint32_t flags;
 
 public:
     explicit HTTPRequest(struct evhttp_request* req, bool replySent = false);
@@ -113,6 +115,10 @@ public:
      * main thread, do not call any other HTTPRequest methods after calling this.
      */
     void WriteReply(int nStatus, const std::string& strReply = "");
+    
+    void SetFlags(uint32_t flags_in);
+    
+    uint32_t GetFlags();
 };
 
 /** Event handler closure.

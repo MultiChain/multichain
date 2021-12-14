@@ -162,6 +162,7 @@ public:
     /** Thread function */
     void Run()
     {
+        uint64_t thread_id=__US_ThreadID();
         while (true) {
             std::unique_ptr<WorkItem> i;
             bool found=false;
@@ -185,7 +186,20 @@ public:
             }
             if(found)
             {
-                (*i)();
+                if(running)
+                {
+                    map<uint64_t,RPCThreadLoad>::iterator load_it=rpc_loads.find(thread_id);
+                    if(load_it != rpc_loads.end())
+                    {
+                        load_it->second.start=GetTimeMicros();
+                    }
+                    (*i)();
+                    if(load_it != rpc_loads.end())
+                    {
+                        load_it->second.end=GetTimeMicros();
+                        load_it->second.Update();
+                    }
+                }
             }
             else
             {
@@ -924,7 +938,7 @@ Array JSONRPCExecInternalBatch(const Array& vReq)
     return ret;
 }
 
-bool  HTTPReq_JSONRPC(string& strRequest, uint32_t flags, string& strReply, string& strHeader, map<string, string> mapHeaders,json_spirit::Value& valError,json_spirit::Value& req_id)
+bool  HTTPReq_JSONRPC(string& strRequest, uint32_t flags, string& strReply, string& strHeader, map<string, string>& mapHeaders,int& http_code,json_spirit::Value& valError,json_spirit::Value& req_id)
 {
     JSONRequest jreq;
     bool jreq_parsed=false;
@@ -942,7 +956,15 @@ bool  HTTPReq_JSONRPC(string& strRequest, uint32_t flags, string& strReply, stri
                     throw JSONRPCError(RPC_IN_WARMUP, rpcWarmupStatus);                    
                 }
             }
-            strReply=pEF->HCH_ProcessRequest(strRequest,&strHeader);
+            strReply=pEF->HCH_ProcessRequest(strRequest,&strHeader,mapHeaders,http_code);
+            string reason; 
+            if(http_code != HTTP_OK)
+            {
+                if(pEF->LIC_VerifyFeature(MC_EFT_HEALTH_CHECK,reason) == 0)
+                {
+                    MilliSleep(20000);        
+                }
+            }
         }
         else
         {            
@@ -1006,6 +1028,9 @@ bool  HTTPReq_JSONRPC(string& strRequest, uint32_t flags, string& strReply, stri
         valError=JSONRPCError(RPC_PARSE_ERROR, e.what());
         return false;
     }
+    
+    mapHeaders.insert(make_pair("Server",strprintf("multichain-json-rpc/%s",FormatFullMultiChainVersion())));
+    
     return true;    
 }
 
@@ -1200,14 +1225,20 @@ std::vector<CRPCCommand> vStaticRPCWalletReadCommands;
 static struct event_base* eventBase = nullptr;
 //! HTTP server
 static struct evhttp* eventHTTP = nullptr;
+//! HTTP Health check server
+static struct evhttp* eventHTTPHC = nullptr;
 //! List of subnets to allow RPC connections from
 static std::vector<CSubNet> rpc_allow_subnets;
 //! Work queue for handling longer requests off the event loop thread
 static std::unique_ptr<WorkQueue<HTTPClosure>> g_work_queue{nullptr};
+//! Work queue for handling health checker requests
+static std::unique_ptr<WorkQueue<HTTPClosure>> g_work_queue_hc{nullptr};
 //! Handlers for (sub)paths
 static std::vector<HTTPPathHandler> pathHandlers;
 //! Bound listening sockets
 static std::vector<evhttp_bound_socket *> boundSockets;
+//! Bound listening sockets
+static std::vector<evhttp_bound_socket *> boundSocketsHC;
 
 bool LookupHost(const std::string& name, CNetAddr& addr, bool fAllowLookup)
 {
@@ -1339,6 +1370,7 @@ static void http_request_cb(struct evhttp_request* req, void* arg)
 
     // Dispatch to worker thread
     if (i != iend) {
+        hreq->SetFlags(MC_ACF_NONE);
         std::unique_ptr<HTTPWorkItem> item(new HTTPWorkItem(std::move(hreq), path, i->handler));
         assert(g_work_queue);
         if (g_work_queue->Enqueue(item.get())) {
@@ -1348,6 +1380,81 @@ static void http_request_cb(struct evhttp_request* req, void* arg)
             LogPrintf("WARNING: request rejected because http work queue depth exceeded, it can be increased with the -rpcworkqueue= setting\n");
             item->req->WriteReply(HTTP_SERVICE_UNAVAILABLE, "Work queue depth exceeded");
         }
+    } else {
+        hreq->WriteReply(HTTP_NOT_FOUND);
+    }
+}
+
+
+
+/** HTTP health checker request callback */
+static void http_hc_request_cb(struct evhttp_request* req, void* arg)
+{
+    // Disable reading to work around a libevent bug, fixed in 2.2.0.
+    if (event_get_version_number() >= 0x02010600 && event_get_version_number() < 0x02020001) {
+        evhttp_connection* conn = evhttp_request_get_connection(req);
+        if (conn) {
+            bufferevent* bev = evhttp_connection_get_bufferevent(conn);
+            if (bev) {
+                bufferevent_disable(bev, EV_READ);
+            }
+        }
+    }
+    std::unique_ptr<HTTPRequest> hreq(new HTTPRequest(req));
+
+    // Early address-based allow check
+    if (!ClientAllowed(hreq->GetPeer())) {
+        LogPrintf( "HTTP request from %s rejected: Client network is not allowed RPC access\n",
+                 hreq->GetPeer().ToString());
+        
+        hreq->WriteReply(HTTP_FORBIDDEN);
+        return;
+    }
+
+    // Early reject unknown HTTP methods
+    if (hreq->GetRequestMethod() == HTTPRequest::UNKNOWN) {
+        LogPrintf("HTTP request from %s rejected: Unknown HTTP request method\n",
+                 hreq->GetPeer().ToString());
+        hreq->WriteReply(HTTP_BAD_METHOD);
+ 
+        return;
+    }
+
+    if(fDebug)LogPrint("rpc", "Received a health checker %s request for %s from %s\n",
+             RequestMethodString(hreq->GetRequestMethod()), SanitizeString(hreq->GetURI()).substr(0, 100), hreq->GetPeer().ToString().c_str());
+
+    // Find registered handler for prefix
+    std::string strURI = hreq->GetURI();
+    std::string path;
+    std::vector<HTTPPathHandler>::const_iterator i = pathHandlers.begin();
+    std::vector<HTTPPathHandler>::const_iterator iend = pathHandlers.end();
+    for (; i != iend; ++i) {
+        bool match = false;
+        if (i->exactMatch)
+            match = (strURI == i->prefix);
+        else
+            match = (strURI.substr(0, i->prefix.size()) == i->prefix);
+        if (match) {
+            path = strURI.substr(i->prefix.size());
+            break;
+        }
+    }
+
+    // Dispatch to worker thread
+    if (i != iend) {
+        hreq->SetFlags(MC_ACF_ENTERPRISE);        
+        std::unique_ptr<HTTPWorkItem> item(new HTTPWorkItem(std::move(hreq), path, i->handler));
+        assert(g_work_queue_hc);
+        if (g_work_queue_hc->Enqueue(item.get())) {
+            item.release(); /* if true, queue took ownership */
+        } else {
+
+            LogPrintf("WARNING: health checker request rejected because http work queue depth exceeded\n");
+            item->req->WriteHeader("Connection", "close");
+            item->req->WriteReply(HTTP_SERVICE_UNAVAILABLE, "Health checker work queue depth exceeded");
+        }
+        
+//        (*item)();
     } else {
         hreq->WriteReply(HTTP_NOT_FOUND);
     }
@@ -1378,15 +1485,36 @@ static bool ThreadHTTP(struct event_base* base)
 }
 
 /** Bind HTTP server to specified addresses */
-static bool HTTPBindAddresses(struct evhttp* http)
+static bool HTTPBindAddresses(struct evhttp* http,struct evhttp* http_hc)
 {
     uint16_t http_port{static_cast<uint16_t>(GetArg("-rpcport", BaseParams().RPCPort()))};
     std::vector<std::pair<std::string, uint16_t>> endpoints;
 
+    int ihcPort=pEF->HCH_GetPort();
+    
+    if((ihcPort < 0) || (ihcPort > 65535))
+    {
+        uiInterface.ThreadSafeMessageBox("Invalid health checker port", "", CClientUIInterface::MSG_ERROR);
+        return false;        
+    }
+    
+    uint16_t hcPort = (uint16_t)ihcPort;
+    if(hcPort == http_port)
+    {
+        uiInterface.ThreadSafeMessageBox("Health checker and RPC ports should be different", "", CClientUIInterface::MSG_ERROR);
+        return false;
+    }
+    
     // Determine what addresses to bind to
     if (!((mapMultiArgs.count("-rpcallowip") > 0) && (mapMultiArgs.count("-rpcbind") > 0))) { // Default to loopback if not allowing external IPs
         endpoints.push_back(std::make_pair("::1", http_port));
         endpoints.push_back(std::make_pair("127.0.0.1", http_port));
+        if(hcPort)
+        {
+            endpoints.push_back(std::make_pair("::1", hcPort));
+            endpoints.push_back(std::make_pair("127.0.0.1", hcPort));
+        }
+        
         if (mapMultiArgs.count("-rpcallowip") > 0) {
             LogPrintf("WARNING: option -rpcallowip was specified without -rpcbind; this doesn't usually make sense\n");
         }
@@ -1401,23 +1529,49 @@ static bool HTTPBindAddresses(struct evhttp* http)
             SplitHostPort(strRPCBind, iport, host);
             uint16_t port=(uint16_t)iport;
             endpoints.push_back(std::make_pair(host, port));
+            if(hcPort)
+            {
+                endpoints.push_back(std::make_pair(host, hcPort));
+            }
         }
     }
+    
+    bool hcOK=hcPort ? false : true;
 
     // Bind addresses
     for (std::vector<std::pair<std::string, uint16_t> >::iterator i = endpoints.begin(); i != endpoints.end(); ++i) {
-        if(fDebug)LogPrint("rpc", "Binding RPC on address %s port %i\n", i->first, i->second);
-        evhttp_bound_socket *bind_handle = evhttp_bind_socket_with_handle(http, i->first.empty() ? NULL : i->first.c_str(), i->second);
-        if (bind_handle) {
-            CNetAddr addr;
-            if (i->first.empty() || (LookupHost(i->first, addr, false))) {
-                LogPrintf("WARNING: the RPC server is not safe to expose to untrusted networks such as the public internet\n");
+        if(i->second == hcPort)
+        {
+            if(fDebug)LogPrint("rpc", "Binding health checker on address %s port %i\n", i->first, i->second);
+            evhttp_bound_socket *bind_handle = evhttp_bind_socket_with_handle(http_hc, i->first.empty() ? NULL : i->first.c_str(), i->second);
+            if (bind_handle) {
+                hcOK=true;
+                boundSocketsHC.push_back(bind_handle);
+            } else {
+                LogPrintf("Binding health checker on address %s port %i failed.\n", i->first, i->second);
             }
-            boundSockets.push_back(bind_handle);
-        } else {
-            LogPrintf("Binding RPC on address %s port %i failed.\n", i->first, i->second);
+        }
+        else    
+        {
+            if(fDebug)LogPrint("rpc", "Binding RPC on address %s port %i\n", i->first, i->second);
+            evhttp_bound_socket *bind_handle = evhttp_bind_socket_with_handle(http, i->first.empty() ? NULL : i->first.c_str(), i->second);
+            if (bind_handle) {
+                CNetAddr addr;
+                if (i->first.empty() || (LookupHost(i->first, addr, false))) {
+                    LogPrintf("WARNING: the RPC server is not safe to expose to untrusted networks such as the public internet\n");
+                }
+                boundSockets.push_back(bind_handle);
+            } else {
+                LogPrintf("Binding RPC on address %s port %i failed.\n", i->first, i->second);
+            }
         }
     }
+    
+    if(!hcOK)
+    {
+        return false;        
+    }
+    
     return !boundSockets.empty();
 }
 
@@ -1476,13 +1630,26 @@ bool InitHTTPServer()
         return false;
     }
 
-//    evhttp_set_timeout(http, gArgs.GetIntArg("-rpcservertimeout", DEFAULT_HTTP_SERVER_TIMEOUT));
+//    raii_event_base base_hc_ctr = obtain_event_base();
+    
+    raii_evhttp http_hc_ctr = obtain_evhttp(base_ctr.get());
+    struct evhttp* http_hc = http_hc_ctr.get();
+    if (!http_hc) {
+        LogPrintf("couldn't create evhttp. Exiting.\n");
+        return false;
+    }
+    
     evhttp_set_timeout(http, GetArg("-rpcservertimeout", DEFAULT_HTTP_SERVER_TIMEOUT));
     evhttp_set_max_headers_size(http, MAX_HEADERS_SIZE);
     evhttp_set_max_body_size(http, MAX_SIZE);
     evhttp_set_gencb(http, http_request_cb, NULL);
 
-    if (!HTTPBindAddresses(http)) {
+    evhttp_set_timeout(http_hc, DEFAULT_HTTP_SERVER_TIMEOUT);
+    evhttp_set_max_headers_size(http_hc, MAX_HEADERS_SIZE);
+    evhttp_set_max_body_size(http_hc, MAX_SIZE);
+    evhttp_set_gencb(http_hc, http_hc_request_cb, NULL);
+    
+    if (!HTTPBindAddresses(http,http_hc)) {
         LogPrintf("Unable to bind any endpoint for RPC server\n");
         return false;
     }
@@ -1493,9 +1660,13 @@ bool InitHTTPServer()
     LogPrintf("HTTP: creating work queue of depth %d\n", workQueueDepth);
 
     g_work_queue = std::make_unique<WorkQueue<HTTPClosure>>(workQueueDepth);
+    g_work_queue_hc = std::make_unique<WorkQueue<HTTPClosure>>(DEFAULT_HTTP_WORKQUEUE);
+    
     // transfer ownership to eventBase/HTTP via .release()
     eventBase = base_ctr.release();
+//    eventBaseHC = base_hc_ctr.release();
     eventHTTP = http_ctr.release();
+    eventHTTPHC = http_hc_ctr.release();
     return true;
 }
 
@@ -1650,6 +1821,16 @@ CService HTTPRequest::GetPeer() const
     return peer;
 }
 
+void HTTPRequest::SetFlags(uint32_t flags_in)
+{
+    flags=flags_in;
+}
+
+uint32_t HTTPRequest::GetFlags()
+{
+    return flags;
+}
+
 std::string HTTPRequest::GetURI() const
 {
     return evhttp_request_get_uri(req);
@@ -1751,9 +1932,13 @@ static bool RPCAuthorized(const std::string& strAuth, std::string& strAuthUserna
 static bool HTTPReq_JSONRPC(HTTPRequest* req)
 {
     // JSONRPC handles only POST
-    if (req->GetRequestMethod() != HTTPRequest::POST) {
-        req->WriteReply(HTTP_BAD_METHOD, "JSONRPC server handles only POST requests");
-        return false;
+    if((req->GetFlags() & MC_ACF_ENTERPRISE) == 0)
+    {
+        if (req->GetRequestMethod() != HTTPRequest::POST) 
+        {
+            req->WriteReply(HTTP_BAD_METHOD, "JSONRPC server handles only POST requests");
+            return false;
+        }
     }
     // Check authorization
     std::pair<bool, std::string> authHeader = req->GetHeader("authorization");
@@ -1781,15 +1966,20 @@ static bool HTTPReq_JSONRPC(HTTPRequest* req)
     std::map<std::string, std::string> mapHeadersOut;
     Value valError;
     Value req_id;
+    int http_code=HTTP_OK;
     strRequest=req->ReadBody();
-    bool result=HTTPReq_JSONRPC(strRequest,0,strReply,strHeaderOut,mapHeadersOut,valError,req_id);
+    bool result=HTTPReq_JSONRPC(strRequest,req->GetFlags(),strReply,strHeaderOut,mapHeadersOut,http_code,valError,req_id);
     if(result)
     {
         for (std::map<std::string, std::string>::const_iterator it = mapHeadersOut.begin(); it != mapHeadersOut.end(); ++it)
         {
             req->WriteHeader(it->first, it->second);            
         }
-        req->WriteReply(HTTP_OK, strReply);        
+        req->WriteReply(http_code, strReply);        
+        if(http_code != HTTP_OK)
+        {
+            result=false;
+        }
     }
     else
     {
@@ -1803,7 +1993,6 @@ void StartHTTPServer()
     mc_InitRPCList(vStaticRPCCommands,vStaticRPCWalletReadCommands);
     mc_InitRPCListIfLimited();
     tableRPC.initialize();
-    fRPCRunning = true;
     
     strRPCUserColonPass = mapArgs["-rpcuser"] + ":" + mapArgs["-rpcpassword"];
 
@@ -1821,6 +2010,7 @@ void StartHTTPServer()
     for (int i = 0; i < rpcThreads; i++) {
         g_thread_http_workers.emplace_back(HTTPWorkQueueRun, g_work_queue.get(), i);
     }
+    g_thread_http_workers.emplace_back(HTTPWorkQueueRun, g_work_queue_hc.get(), rpcThreads);
     
     for (int i = 0; i < rpcThreads; i++) 
     {
@@ -1834,6 +2024,9 @@ void StartHTTPServer()
         rpc_loads.insert(make_pair(thread_id,load));
         rpc_slots.insert(make_pair(thread_id,i));        
     }
+    
+    mc_gState->InitRPCThreads(rpcThreads);
+    fRPCRunning = true;
 }
 
 void InterruptHTTPServer()
@@ -1843,8 +2036,15 @@ void InterruptHTTPServer()
         // Reject requests on current connections
         evhttp_set_gencb(eventHTTP, http_reject_request_cb, NULL);
     }
+    if (eventHTTPHC) {
+        // Reject requests on current connections
+        evhttp_set_gencb(eventHTTPHC, http_reject_request_cb, NULL);
+    }
     if (g_work_queue) {
         g_work_queue->Interrupt();
+    }
+    if (g_work_queue_hc) {
+        g_work_queue_hc->Interrupt();
     }
 }
 
@@ -1862,6 +2062,10 @@ void StopHTTPServer()
     }
     // Unlisten sockets, these are what make the event loop running, which means
     // that after this and all connections are closed the event loop will quit.
+    for (evhttp_bound_socket *socket : boundSocketsHC) {
+        evhttp_del_accept_socket(eventHTTPHC, socket);
+    }
+    boundSocketsHC.clear();
     for (evhttp_bound_socket *socket : boundSockets) {
         evhttp_del_accept_socket(eventHTTP, socket);
     }
@@ -1869,6 +2073,10 @@ void StopHTTPServer()
     if (eventBase) {
         if(fDebug)LogPrint("rpc", "Waiting for RPC HTTP event thread to exit\n");
         if (g_thread_http.joinable()) g_thread_http.join();
+    }
+    if (eventHTTPHC) {
+        evhttp_free(eventHTTPHC);
+        eventHTTPHC = NULL;
     }
     if (eventHTTP) {
         evhttp_free(eventHTTP);
@@ -1879,6 +2087,7 @@ void StopHTTPServer()
         eventBase = NULL;
     }
     g_work_queue.reset();
+    g_work_queue_hc.reset();
     if(fDebug)LogPrint("rpc", "Stopped RPC HTTP server\n");
 }
 

@@ -60,7 +60,7 @@ bool RecoverAfterCrash();
 #include <boost/filesystem.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <boost/thread.hpp>
-#include <openssl/crypto.h>
+//#include <openssl/crypto.h>
 
 using namespace boost;
 using namespace std;
@@ -1272,7 +1272,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 //        uiInterface.InitMessage.connect(SetRPCWarmupStatus);
         
         if (!InitHTTPServer())
-            return InitError("InitHTTPServer");          
+            return InitError("Couldn't start RPC HTTP Server");          
+        
         StartHTTPServer();                
     }
     if(rpc_threads_error.size())
