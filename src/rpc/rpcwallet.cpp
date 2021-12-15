@@ -2177,11 +2177,13 @@ Value keypoolrefill(const Array& params, bool fHelp)
 }
 
 
-static void LockWallet(CWallet* pWallet)
+//static void LockWallet(CWallet* pWallet)
+void LockWallet(CWallet* pWallet)
 {
     LOCK(cs_nWalletUnlockTime);
     nWalletUnlockTime = 0;
     pWallet->Lock();
+    LogPrint("wallet","Wallet locked\n");
 }
 
 Value walletpassphrase(const Array& params, bool fHelp)
@@ -2216,7 +2218,8 @@ Value walletpassphrase(const Array& params, bool fHelp)
     int64_t nSleepTime = params[1].get_int64();
     LOCK(cs_nWalletUnlockTime);
     nWalletUnlockTime = GetTime() + nSleepTime;
-    RPCRunLater("lockwallet", boost::bind(LockWallet, pwalletMain), nSleepTime);
+    LogPrint("wallet","Wallet unlocked for %ld seconds\n",nSleepTime);
+//    RPCRunLater("lockwallet", boost::bind(LockWallet, pwalletMain), nSleepTime);
 
     return Value::null;
 }
@@ -2265,9 +2268,12 @@ Value walletlock(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_WALLET_WRONG_ENC_STATE, "Error: running with an unencrypted wallet, but walletlock was called.");
 
     {
+        LockWallet(pwalletMain);
+/*        
         LOCK(cs_nWalletUnlockTime);
         pwalletMain->Lock();
         nWalletUnlockTime = 0;
+ */ 
     }
 
     return Value::null;

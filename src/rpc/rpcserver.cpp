@@ -58,6 +58,8 @@ static map<uint64_t, RPCThreadLoad> rpc_loads;
 static map<uint64_t, int> rpc_slots;
 static uint32_t rpc_thread_flags[MC_PRM_MAX_THREADS];
 
+void LockWallet(CWallet* pWallet);
+
 #define MC_ACF_NONE              0x00000000 
 #define MC_ACF_ENTERPRISE        0x00000001 
 
@@ -165,7 +167,7 @@ public:
         uint64_t thread_id=__US_ThreadID();
         while (true) {
             std::unique_ptr<WorkItem> i;
-            bool found=false;
+            bool found=false;            
             {
 /*                
                 WAIT_LOCK(cs, lock);
@@ -177,6 +179,18 @@ public:
                 queue.pop_front();
  */
                 LOCK(cs);
+                if(nWalletUnlockTime)
+                {
+                    map<uint64_t,RPCThreadLoad>::iterator load_it=rpc_loads.find(thread_id);
+                    if(load_it != rpc_loads.end())                              // Only RPC threads deal with Wallet lock
+                    {
+                        if(GetTime() > nWalletUnlockTime)
+                        {
+                            LockWallet(pwalletMain);
+                        }
+                    }                
+                }
+                
                 if(!queue.empty())
                 {
                     found=true;
