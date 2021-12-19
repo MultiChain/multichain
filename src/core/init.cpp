@@ -1417,21 +1417,31 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     {        
         seed_resolved=string(seed_node);
         
-        if((mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY) 
-           || (mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL))
-        {        
-            SplitHostPort(seed_resolved, resolved_port, resolved_host);
-            if(resolved_port == 0)
+        bool ignore_error=true;
+        if((mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY) || (mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_MINIMAL))
+        {
+            ignore_error=false;
+        }
+        SplitHostPort(seed_resolved, resolved_port, resolved_host);
+        if(resolved_port == 0)
+        {
+            if(!ignore_error)                
             {
                 return InitError(strprintf("Couldn't connect to the seed node %s - please specify port number explicitly.",seed_node));                                        
             }
+        }
 
-            LogPrintf("mchn: Checking seed address %s\n",seed_node);            
-            CService resolved_addr;
-            if(!Lookup(seed_node, resolved_addr, 0, 1))
+        LogPrintf("mchn: Checking seed address %s\n",seed_node);            
+        CService resolved_addr;
+        if(!Lookup(seed_node, resolved_addr, 0, 1))
+        {
+            if(!ignore_error)                
             {
                 return InitError(strprintf("Couldn't resolve seed address %s.",seed_node));                                                    
             }
+        }
+        else
+        {
             seed_resolved=resolved_addr.ToString();        
         }
         

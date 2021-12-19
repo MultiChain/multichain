@@ -124,7 +124,7 @@ bool static LookupIntern(const char *pszName, std::vector<CNetAddr>& vIP, unsign
 */
     if(nMainThreadID != __US_ThreadID())
     {
-        LogPrintf("ERROR: Calling address lookup for %s from secondary thread, please report this\n",pszName);
+        LogPrintf("ERROR: Calling address lookup for %s from secondary thread, please report this if it is valid address\n",pszName);
         return false;
     }    
 
