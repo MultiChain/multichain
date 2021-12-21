@@ -40,6 +40,7 @@
 #define MC_ENT_MAX_SCRIPT_SIZE                      65536
 #define MC_ENT_MAX_FIXED_FIELDS_SIZE                  128 
 #define MC_ENT_MAX_STORED_ISSUERS                     128 
+#define MC_ENT_SCRIPT_STATIC_SIZE                    4096
 #define MC_ENT_SCRIPT_ALLOC_SIZE                    66000 // > MC_ENT_MAX_SCRIPT_SIZE + MC_ENT_MAX_FIXED_FIELDS_SIZE + 27*MC_ENT_MAX_STORED_ISSUERS
 #define MC_ENT_DEFAULT_MAX_ASSET_TOTAL 0x7FFFFFFFFFFFFFFF
 
@@ -201,9 +202,22 @@ typedef struct mc_EntityLedgerRow
     int64_t m_ChainPos;                                                         // Position in the ledger corresponding to last object in the chain
     int32_t m_ScriptMemPoolPos;                                                 // Position of script in temp script buffer, -1 if not in temp buffer
     int32_t m_ExtendedScriptMemPoolPos;                                         // Position of extended script in temp script buffer, -1 if not in temp buffer
-    unsigned char m_Script[MC_ENT_SCRIPT_ALLOC_SIZE];                           // Script > MC_ENT_MAX_SCRIPT_SIZE + MC_ENT_MAX_FIXED_FIELDS_SIZE + 27*MC_ENT_MAX_STORED_ISSUERS
+//    unsigned char m_Script[MC_ENT_SCRIPT_ALLOC_SIZE];                           // Script > MC_ENT_MAX_SCRIPT_SIZE + MC_ENT_MAX_FIXED_FIELDS_SIZE + 27*MC_ENT_MAX_STORED_ISSUERS
+    unsigned char *m_Script;
+    unsigned char m_StaticScript[MC_ENT_SCRIPT_STATIC_SIZE]; 
+    mc_EntityLedgerRow()
+    {
+        Zero();
+    }
     
+    ~mc_EntityLedgerRow()
+    {
+        Destroy();
+    }
     void Zero();
+    void Destroy();
+    void Copy(mc_EntityLedgerRow *row);
+    void SetScript(const void *lpData, int size);
 } mc_EntityLedgerRow;
 
 /** Entity details structure */
@@ -222,6 +236,7 @@ typedef struct mc_EntityDetails
     mc_EntityLedgerRow m_LedgerRow;
     void Zero();
     void Set(mc_EntityLedgerRow *row);
+    void Copy(mc_EntityDetails *entity);
     const char* GetName();
     const unsigned char* GetTxID();
     const unsigned char* GetRef();    
@@ -310,6 +325,8 @@ typedef struct mc_AssetDB
     mc_Script   *m_ExtendedScripts;
     mc_Script   *m_RowExtendedScript;
     
+    mc_TSHeap   *m_LedgerRowScripts;
+    
     char m_Name[MC_PRM_NETWORK_NAME_MAX_SIZE+1]; 
     int m_Block;
     int64_t m_PrevPos;
@@ -364,6 +381,7 @@ typedef struct mc_AssetDB
     int FindUpdateByName(mc_EntityDetails *entity, const void* txid,const char* name);
     int FindActiveUpdate(mc_EntityDetails *entity, const void* txid);
     int FindEntityList(mc_EntityDetails *entity,int entity_type);
+    int FindEntityByPosition(mc_EntityDetails *entity, int64_t pos);
     
     void ReloadDetailsIfNeeded(mc_EntityDetails *entity);
     
@@ -376,7 +394,8 @@ typedef struct mc_AssetDB
     mc_Buffer *GetEntityList(mc_Buffer *old_result,const void* txid,uint32_t entity_type);
     void FreeEntityList(mc_Buffer *entities);
     mc_Buffer *GetFollowOns(const void* txid);
-    mc_Buffer *GetFollowOnsByLastEntity(mc_EntityDetails *last_entity,int count,int start);
+//    mc_Buffer *GetFollowOnsByLastEntity(mc_EntityDetails *last_entity,int count,int start);
+    mc_Buffer *GetFollowOnPositionsByLastEntity(mc_EntityDetails *last_entity,int count,int start);
     int HasFollowOns(const void* txid);
     int64_t GetTotalQuantity(mc_EntityDetails *entity);
     int64_t GetTotalQuantity(mc_EntityDetails *entity,int32_t *chain_size);
