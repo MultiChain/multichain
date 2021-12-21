@@ -976,7 +976,10 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     if (fServer)
     {
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
-        StartHTTPServer();
+        if (!InitHTTPServer())
+            return InitError("Couldn't start RPC HTTP Server");          
+        
+        StartHTTPServer();                
     }
 /* MCHN END*/        
     
