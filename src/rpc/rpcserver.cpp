@@ -1151,6 +1151,14 @@ void CheckFlagsOnException(const string& strMethod,const Value& req_id,const str
         LogPrintf("WARNING: Unlocking wallet after failure: method: %s, error: %s\n",JSONRPCMethodIDForLog(strMethod,req_id).c_str(),message);
         pwalletTxsMain->WRPReadUnLock();
     }   
+    {
+        LOCK(cs_rpcWarmup);
+    
+        if(!fRPCInWarmup)
+        {
+            mc_gState->m_Assets->ThreadCleanse(__US_ThreadID());
+        }
+    }
 }
 
 

@@ -24,11 +24,12 @@ void mc_EntityLedgerRow::Zero()
 
 void mc_EntityDetails::Zero()
 {
+    m_LedgerRow.ReleaseScriptPointer();
     memset(this,0,sizeof(mc_EntityDetails));
     m_LedgerRow.Zero();    
 }
 
-void mc_EntityLedgerRow::Destroy()
+void mc_EntityLedgerRow::ReleaseScriptPointer()
 {
     if(m_Script)
     {
@@ -36,11 +37,17 @@ void mc_EntityLedgerRow::Destroy()
         {
             mc_gState->m_Assets->m_LedgerRowScripts->ReleasePointer(this);
         }
-    }
+    }    
+}
+
+void mc_EntityLedgerRow::Destroy()
+{
+    ReleaseScriptPointer();
 }
 
 void mc_EntityLedgerRow::Copy(mc_EntityLedgerRow *row)
 {
+    ReleaseScriptPointer();
     Zero();
     memcpy(this,row,sizeof(mc_EntityLedgerRow));
     m_Script=(unsigned char *)mc_gState->m_Assets->m_LedgerRowScripts->GetPointer(this,m_StaticScript,row->m_Script,m_ScriptSize);
@@ -48,6 +55,7 @@ void mc_EntityLedgerRow::Copy(mc_EntityLedgerRow *row)
 
 void mc_EntityLedgerRow::SetScript(const void *lpData, int size)
 {
+    ReleaseScriptPointer();
     m_ScriptSize=size;
     m_Script=(unsigned char *)mc_gState->m_Assets->m_LedgerRowScripts->GetPointer(this,m_StaticScript,lpData,m_ScriptSize);    
 }
@@ -169,6 +177,7 @@ int mc_EntityLedger::GetRow(int64_t pos, mc_EntityLedgerRow* row)
         return MC_ERR_NOT_FOUND;
     }
     
+    row->ReleaseScriptPointer();
     row->Zero();
 
     if(read(m_FileHan,(unsigned char*)row+m_KeyOffset,m_TotalSize) != m_TotalSize)
@@ -969,6 +978,7 @@ void mc_AssetDB::AddToMemPool(mc_EntityLedgerRow* row)
 
 void mc_AssetDB::GetFromMemPool(mc_EntityLedgerRow *row,int mprow)
 {
+    row->ReleaseScriptPointer();
     row->Zero();
     memcpy(row,m_MemPool->GetRow(mprow),m_Ledger->m_MemPoolSize);
     row->m_Script=row->m_StaticScript;
@@ -1508,6 +1518,7 @@ int mc_AssetDB::InsertAssetFollowOn(const void* txid, int offset, uint64_t quant
         }
     }
     
+    aldRow.ReleaseScriptPointer();
     aldRow.Zero();
     memcpy(aldRow.m_Key,txid,MC_ENT_KEY_SIZE);
     aldRow.m_KeyType=MC_ENT_KEYTYPE_FOLLOW_ON | MC_ENT_KEYTYPE_TXID;    
@@ -1724,6 +1735,7 @@ int mc_AssetDB::UpdateEntityLists(const void* txid,int offset,int entity_type)
         }
     }
     
+    aldRow.ReleaseScriptPointer();
     aldRow.Zero();
     memcpy(aldRow.m_Key,entitylist_key,MC_ENT_KEY_SIZE);
     aldRow.m_KeyType=MC_ENT_KEYTYPE_FOLLOW_ON | MC_ENT_KEYTYPE_TXID | MC_ENT_KEYTYPE_FOLLOW_MULTI;    
@@ -1804,6 +1816,7 @@ int mc_AssetDB::Commit()
                 if(err == MC_ERR_NOERROR)
                 {
                     GetFromMemPool(&aldRow,i);
+                    aldGenesisRow.ReleaseScriptPointer();
                     aldGenesisRow.Zero();
                     if( (aldRow.m_KeyType  & MC_ENT_KEYTYPE_MASK) == MC_ENT_KEYTYPE_TXID)
                     {
@@ -4096,6 +4109,12 @@ void mc_AssetDB::FreeEntityList(mc_Buffer *assets)
         delete assets;
     }
 }
+
+void mc_AssetDB::ThreadCleanse(uint64_t thread_id)
+{
+    m_LedgerRowScripts->ReleaseAll(thread_id);
+}
+
 
 uint32_t mc_GetABScriptType(void *ptr)
 {

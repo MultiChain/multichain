@@ -218,6 +218,7 @@ typedef struct mc_EntityLedgerRow
     void Destroy();
     void Copy(mc_EntityLedgerRow *row);
     void SetScript(const void *lpData, int size);
+    void ReleaseScriptPointer();
 } mc_EntityLedgerRow;
 
 /** Entity details structure */
@@ -389,6 +390,7 @@ typedef struct mc_AssetDB
     int SetRollBackPos(int block,int offset,int inmempool);
     void ResetRollBackPos();
     
+    void ThreadCleanse(uint64_t thread_id);
     
     void Dump();
     mc_Buffer *GetEntityList(mc_Buffer *old_result,const void* txid,uint32_t entity_type);

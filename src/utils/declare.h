@@ -124,7 +124,7 @@ typedef struct mc_TSHeap
     int Initialize(int MinSize,int MaxSize,uint32_t Mode);
     void *GetPointer(void *lpKey,void *lpStack,const void *lpData, int Size);
     void ReleasePointer(void *lpKey);
-    
+    void ReleaseAll(uint64_t thread_id);
 } mc_TSHeap;
     
 typedef struct mc_List
