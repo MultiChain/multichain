@@ -1997,7 +1997,6 @@ int mc_TSHeap::Initialize(int MinSize,int MaxSize,uint32_t Mode)
 
 void *mc_TSHeap::GetPointer(void *lpKey,void *lpStack,const void *lpData, int Size)
 {
-//    printf("G0 %d %016X\n",Size,(int64_t)lpKey);
     if(Size <= m_MinSize)
     {
         if(lpStack)
@@ -2008,7 +2007,6 @@ void *mc_TSHeap::GetPointer(void *lpKey,void *lpStack,const void *lpData, int Si
     }
     
     uint64_t thread_id=__US_ThreadID();
-//    printf("G1 %lu %016X\n",thread_id,(int64_t)lpKey);
     int mprow=m_lpBuffers->Seek(&thread_id);
     if(mprow < 0)
     {
@@ -2048,46 +2046,52 @@ void *mc_TSHeap::GetPointer(void *lpKey,void *lpStack,const void *lpData, int Si
         mprow=buf->GetCount();
         buf->Add(&lpKey,NULL);                
     }
-//    printf("G2 %d %016X\n",mprow,(int64_t)lpKey);
     
     rptr=buf->GetRow(mprow);
-//    printf("G3 %d %016X\n",mprow,(int64_t)lpKey);
     *(void**)rptr=lpKey;
-//    printf("G4 %d %016X %016X %016X\n",mprow,(int64_t)buf,(int64_t)*(void**)rptr,(int64_t)lpKey);
     unsigned char *ptr=rptr+sizeof(void*);
-//    printf("G5 %d %016X\n",mprow,(int64_t)lpKey);
     memcpy(ptr,lpData,Size);
-//    printf("G6 %d %016X\n",mprow,(int64_t)lpKey);
+    
     return ptr;                
 }
 
 void mc_TSHeap::ReleasePointer(void *lpKey)
 {
-//    printf("R0 %d %016X\n",0,(int64_t)lpKey);
     uint64_t thread_id=__US_ThreadID();
     int mprow=m_lpBuffers->Seek(&thread_id);
     if(mprow < 0)
     {
         return;
     }
-//    printf("R1 %d %016X\n",0,(int64_t)lpKey);
     
     mc_Buffer *buf=*(mc_Buffer**)(m_lpBuffers->GetRow(mprow)+sizeof(uint64_t)); 
-//    printf("R2 %d %016X\n",0,(int64_t)lpKey);
     
     unsigned char *rptr;
     for(int i=0;i<buf->GetCount();i++)
     {
-//    printf("R3 %d %016X\n",i,(int64_t)lpKey);
         rptr=buf->GetRow(i);
-//    printf("R4 %d %016X %016X %016X\n",i,(int64_t)buf,(int64_t)*(void**)rptr,(int64_t)lpKey);
         if(*(void**)rptr == lpKey)
         {
-//    printf("R5 %d %016X\n",i,(int64_t)lpKey);
             *(void**)rptr=NULL;
             return;
         }
     }    
-//    printf("R6 %d %016X\n",0,(int64_t)lpKey);
 }
     
+void mc_TSHeap::ReleaseAll(uint64_t thread_id)
+{
+    int mprow=m_lpBuffers->Seek(&thread_id);
+    if(mprow < 0)
+    {
+        return;
+    }
+    
+    mc_Buffer *buf=*(mc_Buffer**)(m_lpBuffers->GetRow(mprow)+sizeof(uint64_t)); 
+    
+    unsigned char *rptr;
+    for(int i=0;i<buf->GetCount();i++)
+    {
+        rptr=buf->GetRow(i);
+        *(void**)rptr=NULL;
+    }        
+}

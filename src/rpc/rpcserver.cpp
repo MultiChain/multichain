@@ -790,6 +790,8 @@ void CheckFlagsOnException(const string& strMethod,const Value& req_id,const str
         LogPrintf("WARNING: Unlocking wallet after failure: method: %s, error: %s\n",JSONRPCMethodIDForLog(strMethod,req_id).c_str(),message);
         pwalletTxsMain->WRPReadUnLock();
     }   
+    
+    mc_gState->m_Assets->ThreadCleanse(__US_ThreadID());
 }
 
 
@@ -1044,7 +1046,7 @@ bool  HTTPReq_JSONRPC(string& strRequest, uint32_t flags, string& strReply, stri
     }
     
     mapHeaders.insert(make_pair("Server",strprintf("multichain-json-rpc/%s",FormatFullMultiChainVersion())));
-    
+
     return true;    
 }
 
