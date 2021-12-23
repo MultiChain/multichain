@@ -497,6 +497,11 @@ int CommandLineRPC(int argc, char *argv[])
 int main(int argc, char* argv[])
 {
     SetupEnvironment();
+    if (!SetupNetworking()) {
+        printf("Error: Initializing networking failed\n");
+        return EXIT_FAILURE;
+    }
+    
     try {
         int ret = AppInitRPC(argc, argv);
         if (ret != CONTINUE_EXECUTION)

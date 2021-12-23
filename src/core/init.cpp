@@ -823,7 +823,10 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     } else {
         umask(077);
     }
-
+    
+    if (!SetupNetworking()) {
+        return InitError("Error: Initializing networking failed.");
+    }
     // Clean shutdown on SIGTERM
     struct sigaction sa;
     sa.sa_handler = HandleSIGTERM;

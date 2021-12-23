@@ -315,6 +315,10 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     }
 
     fRequestShutdown=false;
+
+    if (!SetupNetworking()) {
+        return InitError("Error: Initializing networking failed.");
+    }
     
     // Clean shutdown on SIGTERM
     struct sigaction sa;
