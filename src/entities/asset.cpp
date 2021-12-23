@@ -10,6 +10,9 @@
 
 #define MC_AST_ASSET_MAX_MEMPOOL_SCRIPT_SIZE   280                              // 384 - 96 bytes (data) - 8 bytes (position fields)
 
+#define MC_AST_ASSET_SCRIPT_POS_EXTENDED_SCRIPT         0
+#define MC_AST_ASSET_SCRIPT_POS_MAX                     1
+
 unsigned char entitylist_key_prefix[MC_ENT_KEY_SIZE];
 
 void mc_EntityDBRow::Zero()
@@ -201,9 +204,13 @@ int mc_EntityLedger::GetRow(int64_t pos, mc_EntityLedgerRow* row)
         }
         if(row->m_ExtendedScript)
         {
+/*            
             mc_gState->m_Assets->m_RowExtendedScript->Clear();
             mc_gState->m_Assets->m_RowExtendedScript->Resize(row->m_ExtendedScript,0);
             if(read(m_FileHan,mc_gState->m_Assets->m_RowExtendedScript->m_lpData,row->m_ExtendedScript) != row->m_ExtendedScript)
+ */
+            mc_Script *script=mc_gState->m_Assets->m_RowExtendedScripts->SetScriptPointer(MC_AST_ASSET_SCRIPT_POS_EXTENDED_SCRIPT,row->m_ExtendedScript);
+            if(read(m_FileHan,script->m_lpData,row->m_ExtendedScript) != row->m_ExtendedScript)
             {
                 return MC_ERR_FILE_READ_ERROR;
             }        
@@ -327,8 +334,9 @@ int mc_AssetDB::Zero()
     m_TmpRelevantEntities = NULL;
     m_ShortTxIDCache = NULL;
     m_ExtendedScripts=NULL;
-    m_RowExtendedScript=NULL;
+//    m_RowExtendedScript=NULL;
     m_LedgerRowScripts=NULL;
+    m_RowExtendedScripts=NULL;
     
     m_Name[0]=0x00; 
     m_Block=-1;    
@@ -427,11 +435,15 @@ int mc_AssetDB::Initialize(const char *name,int mode)
     err=m_ShortTxIDCache->Initialize(MC_AST_SHORT_TXID_SIZE,MC_AST_SHORT_TXID_SIZE+MC_PLS_SIZE_ENTITY,MC_BUF_MODE_MAP);
     
     m_ExtendedScripts=new mc_Script;
-    m_RowExtendedScript=new mc_Script;
+//    m_RowExtendedScript=new mc_Script;
 
     m_LedgerRowScripts=new mc_TSHeap;
     m_LedgerRowScripts->Initialize(MC_ENT_SCRIPT_STATIC_SIZE,MC_ENT_SCRIPT_ALLOC_SIZE,0);
 //    m_LedgerRowScripts->Initialize(32,MC_ENT_SCRIPT_ALLOC_SIZE,0);
+
+    m_RowExtendedScripts=new mc_TSScriptHeap;
+    m_RowExtendedScripts->Initialize(MC_AST_ASSET_SCRIPT_POS_MAX,0);
+    
     
     m_Block=adbBlock;
     m_PrevPos=adbLastPos;            
@@ -601,15 +613,20 @@ int mc_AssetDB::Destroy()
     {
         delete m_ExtendedScripts;
     }
-    
+/*    
     if(m_RowExtendedScript)
     {
         delete m_RowExtendedScript;
     }
-    
+*/    
     if(m_LedgerRowScripts)
     {
         delete m_LedgerRowScripts;
+    }
+    
+    if(m_RowExtendedScripts)
+    {
+        delete m_RowExtendedScripts;
     }
     
     if(m_ThreadRollBackPos)
@@ -2973,12 +2990,18 @@ const void* mc_EntityDetails::GetSpecialParam(uint32_t param,size_t* bytes,int c
                 if(mc_gState->m_Features->ExtendedEntityDetails())
                 {
                     if(m_LedgerRow.m_ExtendedScriptMemPoolPos == 0)
-                    {
-                        offset=mc_FindSpecialParamInDetailsScript(mc_gState->m_Assets->m_RowExtendedScript->m_lpData,m_LedgerRow.m_ExtendedScript,param,bytes);
-                        if((int)offset != m_LedgerRow.m_ExtendedScript)
+                    {                        
+                        mc_Script *script=mc_gState->m_Assets->m_RowExtendedScripts->GetScriptPointer(MC_AST_ASSET_SCRIPT_POS_EXTENDED_SCRIPT);
+                        if(script)
                         {
-                            return mc_gState->m_Assets->m_RowExtendedScript->m_lpData+offset;
-                        }                
+//                            offset=mc_FindSpecialParamInDetailsScript(mc_gState->m_Assets->m_RowExtendedScript->m_lpData,m_LedgerRow.m_ExtendedScript,param,bytes);
+                            offset=mc_FindSpecialParamInDetailsScript(script->m_lpData,m_LedgerRow.m_ExtendedScript,param,bytes);
+                            if((int)offset != m_LedgerRow.m_ExtendedScript)
+                            {
+                                return script->m_lpData+offset;
+//                                return mc_gState->m_Assets->m_RowExtendedScript->m_lpData+offset;
+                            }                
+                        }
                     }
                     else
                     {

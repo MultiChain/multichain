@@ -324,9 +324,10 @@ typedef struct mc_AssetDB
     mc_Buffer   *m_TmpRelevantEntities;
     mc_Buffer   *m_ShortTxIDCache;
     mc_Script   *m_ExtendedScripts;
-    mc_Script   *m_RowExtendedScript;
+//    mc_Script   *m_RowExtendedScript;
     
     mc_TSHeap   *m_LedgerRowScripts;
+    mc_TSScriptHeap   *m_RowExtendedScripts;
     
     char m_Name[MC_PRM_NETWORK_NAME_MAX_SIZE+1]; 
     int m_Block;
