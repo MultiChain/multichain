@@ -129,6 +129,30 @@ typedef struct mc_Script
     
 } mc_Script;
 
+typedef struct mc_TSScriptHeap
+{
+    mc_TSScriptHeap()
+    {
+        Zero();
+    }
+
+    ~mc_TSScriptHeap()
+    {
+        Destroy();
+    }
+
+    mc_Buffer             **m_lppScriptBuffers;
+    void *                  m_Semaphore;    
+    int                     m_MaxScripts;
+    uint32_t                m_Mode;
+    
+    void Zero();
+    int Destroy();
+    int Initialize(int MaxScripts,uint32_t Mode);
+    mc_Script *SetScriptPointer(int script_id, int Size);
+    mc_Script *GetScriptPointer(int script_id);
+} mc_TSScriptHeap;
+    
 
 #endif	/* MULTICHAINSCRIPT_H */
 
