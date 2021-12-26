@@ -1600,6 +1600,12 @@ static void HTTPWorkQueueRun(WorkQueue<HTTPClosure>* queue, int worker_num)
 /* TODO
     SetSyscallSandboxPolicy(SyscallSandboxPolicy::NET_HTTP_SERVER_WORKER);
  */ 
+    uint64_t thread_id=__US_ThreadID();
+    if(fDebug)LogPrint("mcapi", "Starting RPC worker thread %d, id: %lu\n",worker_num,thread_id);
+    RPCThreadLoad load;
+    load.Zero();
+    rpc_loads.insert(make_pair(thread_id,load));
+    rpc_slots.insert(make_pair(thread_id,worker_num));        
     queue->Run();
 }
 
@@ -2025,21 +2031,13 @@ void StartHTTPServer()
 
     for (int i = 0; i < rpcThreads; i++) {
         g_thread_http_workers.emplace_back(HTTPWorkQueueRun, g_work_queue.get(), i);
+        MilliSleep(10);
+        while((int)rpc_slots.size() < i+1)
+        {
+            MilliSleep(10);
+        }
     }
     g_thread_http_workers.emplace_back(HTTPWorkQueueRun, g_work_queue_hc.get(), rpcThreads);
-    
-    for (int i = 0; i < rpcThreads; i++) 
-    {
-        uint64_t thread_id=(uint64_t)(g_thread_http_workers[i].native_handle());
-#ifdef WIN32        
-        thread_id=GetThreadId((HANDLE)thread_id);
-#endif
-        if(fDebug)LogPrint("mcapi", "Starting RPC worker thread, id: %lu\n",thread_id);
-        RPCThreadLoad load;
-        load.Zero();
-        rpc_loads.insert(make_pair(thread_id,load));
-        rpc_slots.insert(make_pair(thread_id,i));        
-    }
     
     mc_gState->InitRPCThreads(rpcThreads);
     fRPCRunning = true;
