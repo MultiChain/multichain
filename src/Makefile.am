@@ -470,13 +470,12 @@ V8_LIBS += \
     -lrt
 endif
 
-if TARGET_WINDOWS
-	EVENT_LIBS = \
-	    -levent 
-else
-	EVENT_LIBS = \
-	    -levent \
-	    -levent_pthreads
+EVENT_LIBS = \
+    -levent 
+
+if !TARGET_WINDOWS
+EVENT_LIBS += \
+    -levent_pthreads
 endif
 
 libbitcoin_v8_a_SOURCES = \
