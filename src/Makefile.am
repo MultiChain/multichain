@@ -470,10 +470,14 @@ V8_LIBS += \
     -lrt
 endif
 
-EVENT_LIBS = \
-    -levent \
-    -levent_pthreads
-
+if TARGET_WINDOWS
+	EVENT_LIBS = \
+	    -levent 
+else
+	EVENT_LIBS = \
+	    -levent \
+	    -levent_pthreads
+endif
 
 libbitcoin_v8_a_SOURCES = \
   v8/v8engine.cpp \
