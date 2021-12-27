@@ -669,6 +669,10 @@ Value preparelockunspentfrom(const json_spirit::Array& params, bool fHelp)
         size_t elem_size;    
         const unsigned char *elem;
         elem = lpScript->GetData(element,&elem_size);
+        if(elem_size == 0)
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Token ID should be specified explicitly in exchange");            
+        }
         if(elem)
         {
             scriptPubKey << vector<unsigned char>(elem, elem + elem_size) << OP_DROP;
