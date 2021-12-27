@@ -50,6 +50,7 @@ using namespace std;
 static std::string strRPCUserColonPass;
 
 static bool fRPCRunning = false;
+static bool fRPCInterrupted = false;
 static bool fRPCInWarmup = true;
 static std::string rpcWarmupStatus("RPC server started");
 static CCriticalSection cs_rpcWarmup;
@@ -978,7 +979,13 @@ bool  HTTPReq_JSONRPC(string& strRequest, uint32_t flags, string& strReply, stri
             {
                 if(pEF->LIC_VerifyFeature(MC_EFT_HEALTH_CHECK,reason) == 0)
                 {
-                    MilliSleep(20000);        
+                    for(int s=0;s<20;s++)
+                    {
+                        if(!fRPCInterrupted)
+                        {
+                            MilliSleep(1000);        
+                        }
+                    }
                 }
             }
         }
@@ -1290,7 +1297,7 @@ static bool InitHTTPAllowList()
     rpc_allow_subnets.push_back(CSubNet("::1")); // always allow IPv6 localhost
     if (mapMultiArgs.count("-rpcallowip"))
     {
-        for (const std::string& strAllow :mapMultiArgs["-rpcallowip"]) 
+        for (const std::string& strAllow : mapMultiArgs["-rpcallowip"]) 
         {
             CSubNet subnet(strAllow);
             if(!subnet.IsValid())
@@ -1601,11 +1608,15 @@ static void HTTPWorkQueueRun(WorkQueue<HTTPClosure>* queue, int worker_num)
     SetSyscallSandboxPolicy(SyscallSandboxPolicy::NET_HTTP_SERVER_WORKER);
  */ 
     uint64_t thread_id=__US_ThreadID();
-    if(fDebug)LogPrint("mcapi", "Starting RPC worker thread %d, id: %lu\n",worker_num,thread_id);
-    RPCThreadLoad load;
-    load.Zero();
-    rpc_loads.insert(make_pair(thread_id,load));
-    rpc_slots.insert(make_pair(thread_id,worker_num));        
+    
+    if(worker_num >= 0)
+    {
+        if(fDebug)LogPrint("mcapi", "Starting RPC worker thread %d, id: %lu\n",worker_num,thread_id);
+        RPCThreadLoad load;
+        load.Zero();
+        rpc_loads.insert(make_pair(thread_id,load));
+        rpc_slots.insert(make_pair(thread_id,worker_num));        
+    }
     queue->Run();
 }
 
@@ -2037,7 +2048,7 @@ void StartHTTPServer()
             MilliSleep(10);
         }
     }
-    g_thread_http_workers.emplace_back(HTTPWorkQueueRun, g_work_queue_hc.get(), rpcThreads);
+    g_thread_http_workers.emplace_back(HTTPWorkQueueRun, g_work_queue_hc.get(), -1);
     
     mc_gState->InitRPCThreads(rpcThreads);
     fRPCRunning = true;
@@ -2054,6 +2065,7 @@ void InterruptHTTPServer()
         // Reject requests on current connections
         evhttp_set_gencb(eventHTTPHC, http_reject_request_cb, NULL);
     }
+    fRPCInterrupted=true;
     if (g_work_queue) {
         g_work_queue->Interrupt();
     }
