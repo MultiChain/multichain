@@ -186,7 +186,13 @@ libbitcoin_community_a_SOURCES = \
   wallet/db.cpp \
   wallet/dbwrap_com.cpp
 
+
+EDITION_LIBS = 
+EDITION_LIBS += $(SSL_LIBS) 
+EDITION_LIBS += $(CRYPTO_LIBS)
+
 if ENABLE_ENTERPRISE
+
 include entMakefile.am
 else
 libbitcoin_enterprise_a_CPPFLAGS = $(BITCOIN_INCLUDES)
@@ -532,7 +538,7 @@ else
 multichaind_SOURCES += filters/filter.cpp
 endif
 
-multichaind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_LIBS)
+multichaind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(EDITION_LIBS) $(MINIUPNPC_LIBS) $(EVENT_LIBS)
 multichaind_CPPFLAGS = $(BITCOIN_INCLUDES) $(V8_INCLUDE)
 multichaind_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -pthread
 if !TARGET_WINDOWS
