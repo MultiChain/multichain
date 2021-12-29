@@ -7,6 +7,7 @@
 #include "version/clientversion.h"
 #include "rpc/rpcclient.h"
 #include "rpc/rpcprotocol.h"
+#include "utils/random.h"
 #include "utils/util.h"
 #include "utils/utilstrencodings.h"
 
@@ -101,6 +102,7 @@ static int AppInitRPC(int argc, char* argv[])
     minargs=1;
 #endif
     
+    RandomInit();
     //
     // Parameters
     //

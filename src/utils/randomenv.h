@@ -10,6 +10,7 @@
 #include <crypto/sha512.h>
 
 
+#ifndef WIN32
 #if defined(__x86_64__) || defined(__amd64__) || defined(__i386__)
 #define HAVE_GETCPUID
 
@@ -26,6 +27,7 @@ void static inline GetCPUID(uint32_t leaf, uint32_t subleaf, uint32_t& a, uint32
 }
 
 #endif // defined(__x86_64__) || defined(__amd64__) || defined(__i386__)
+#endif
 
 
 /** Gather non-cryptographic environment data that changes over time. */

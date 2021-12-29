@@ -216,6 +216,10 @@ static uint64_t GetRdSeed() noexcept
  * Slower sources should probably be invoked separately, and/or only from
  * RandAddPeriodic (which is called once a minute).
  */
+static bool g_rdrand_supported = false;
+static bool g_rdseed_supported = false;
+static uint64_t GetRdRand() noexcept {}
+static uint64_t GetRdSeed() noexcept {}
 static void InitHardwareRand() {}
 static void ReportHardwareRand() {}
 #endif
@@ -482,16 +486,16 @@ public:
     }
 };
 
-static struct RNGState g_rngstate;
+//static struct RNGState g_rngstate;
 
 RNGState& GetRNGState() noexcept
 {
     // This C++11 idiom relies on the guarantee that static variable are initialized
     // on first call, even when multiple parallel calls are permitted.
 //    static std::vector<RNGState, secure_allocator<RNGState>> g_rng(1);
-//    static std::vector<RNGState> g_rng(1);
-//    return g_rng[0];
-    return g_rngstate;
+    static std::vector<RNGState> g_rng(1);
+    return g_rng[0];
+//    return g_rngstate;
 }
 }
 

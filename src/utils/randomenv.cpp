@@ -9,7 +9,7 @@
 //#include <clientversion.h>
 #include <crypto/sha512.h>
 #include "utils/allocators.h"
-#include "utils/utilstrencodings.h" // for GetTime()
+#include "utils/utiltime.h" // for GetTime()
 #ifdef WIN32
 #include "utils/compat.h" // for Windows API
 #endif
@@ -65,12 +65,20 @@ void RandAddSeedPerfmon(CSHA512& hasher)
 
     // This can take up to 2 seconds, so only do it every 10 minutes.
     // Initialize last_perfmon to 0 seconds, we don't skip the first call.
+    static int64_t last_perfmon=0;
+    int64_t this_time=GetTime();
+    if(this_time < last_perfmon + 600)
+    {
+        return;
+    }
+    last_perfmon=this_time;
+/*    
     static std::atomic<std::chrono::seconds> last_perfmon{0s};
     auto last_time = last_perfmon.load();
     auto current_time = GetTime<std::chrono::seconds>();
     if (current_time < last_time + std::chrono::minutes{10}) return;
     last_perfmon = current_time;
-
+*/
     std::vector<unsigned char> vData(250000, 0);
     long ret = 0;
     unsigned long nSize = 0;
