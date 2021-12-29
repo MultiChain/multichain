@@ -60,7 +60,6 @@ bool InitSanityCheck(void);
 #include <boost/filesystem.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <boost/thread.hpp>
-//#include <openssl/crypto.h>
 
 using namespace boost;
 using namespace std;
@@ -320,6 +319,8 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
         return InitError("Error: Initializing networking failed.");
     }
     
+    RandomInit();    
+    
     // Clean shutdown on SIGTERM
     struct sigaction sa;
     sa.sa_handler = HandleSIGTERM;
@@ -417,7 +418,6 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     }
 
 /* MCHN END */    
-    LogPrintf("Using OpenSSL version %s\n", SSLeay_version(SSLEAY_VERSION));
 #ifdef ENABLE_WALLET
     WalletDBLogVersionString();
 #endif

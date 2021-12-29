@@ -3,6 +3,7 @@
 // Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
+#include "utils/allocators.h"
 #include "structs/base58.h"
 
 #include "structs/hash.h"
@@ -352,8 +353,7 @@ bool CBase58Data::SetString(const char* psz, unsigned int nVersionBytes)
     
     
 /* MCHN END */    
-//    OPENSSL_cleanse(&vchTemp[0], vchData.size());
-    OPENSSL_cleanse(&vchTemp[0], vchTemp.size());
+    memory_cleanse(&vchTemp[0], vchTemp.size());
     return true;
 }
 

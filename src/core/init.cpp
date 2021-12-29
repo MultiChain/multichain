@@ -60,7 +60,6 @@ bool RecoverAfterCrash();
 #include <boost/filesystem.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <boost/thread.hpp>
-//#include <openssl/crypto.h>
 
 using namespace boost;
 using namespace std;
@@ -606,19 +605,7 @@ std::string LicenseInfo()
            "\n" +
            FormatParagraph(_("Full terms are shown at: http://www.multichain.com/terms-of-service/")) +
            "\n";
-    
-/*    
-    return FormatParagraph(strprintf(_("Copyright (C) 2009-%i The Bitcoin Core Developers"), COPYRIGHT_YEAR)) + "\n" +
-           "\n" +
-           FormatParagraph(_("This is experimental software.")) + "\n" +
-           "\n" +
-           FormatParagraph(_("Distributed under the MIT software license, see the accompanying file COPYING or <http://www.opensource.org/licenses/mit-license.php>.")) + "\n" +
-           "\n" +
-           FormatParagraph(_("This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit <https://www.openssl.org/> and cryptographic software written by Eric Young and UPnP software written by Thomas Bernard.")) +
-           "\n";
- */ 
-    
-    
+        
 }
 
 static void BlockNotifyCallback(const uint256& hashNewTip)
@@ -827,6 +814,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     if (!SetupNetworking()) {
         return InitError("Error: Initializing networking failed.");
     }
+    
+    RandomInit();    
+    
     // Clean shutdown on SIGTERM
     struct sigaction sa;
     sa.sa_handler = HandleSIGTERM;
@@ -1066,7 +1056,6 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     }
 
 /* MCHN END */    
-    LogPrintf("Using OpenSSL version %s\n", SSLeay_version(SSLEAY_VERSION));
 #ifdef ENABLE_WALLET
     WalletDBLogVersionString();
 #endif
