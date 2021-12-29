@@ -138,6 +138,7 @@ typedef struct mc_EnterpriseFeatures
     int LIC_VerifyLicenses(int block);
     int LIC_VerifyUpdateCoin(int block,mc_Coin *coin,bool is_new);
     std::vector <std::string> LIC_LicensesWithStatus(std::string status);
+    Value LIC_RPCGetLicenseRequest(const Array& params);
     Value LIC_RPCDecodeLicenseRequest(const Array& params);
     Value LIC_RPCDecodeLicenseConfirmation(const Array& params);
     Value LIC_RPCActivateLicense(const Array& params);

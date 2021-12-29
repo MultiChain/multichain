@@ -438,6 +438,11 @@ int mc_EnterpriseFeatures::LIC_VerifyUpdateCoin(int block,mc_Coin *coin,bool is_
     return MC_ERR_NOERROR;    
 }
 
+Value mc_EnterpriseFeatures::LIC_RPCGetLicenseRequest(const Array& params)
+{
+    return Value::null;
+}
+
 Value mc_EnterpriseFeatures::LIC_RPCDecodeLicenseRequest(const Array& params)
 {
     return Value::null;
