@@ -181,25 +181,42 @@ obj/build.h: FORCE
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
 libbitcoin_community_a_CPPFLAGS = $(BITCOIN_INCLUDES)
+if ENABLE_BERKELEY_DB
 libbitcoin_community_a_SOURCES = \
   community/community.cpp \
   wallet/db.cpp \
   wallet/dbwrap_com.cpp
+else
+libbitcoin_community_a_SOURCES = \
+  community/community.cpp \
+  wallet/dbwrap_ent.cpp
+endif
 
 
 EDITION_LIBS = 
 EDITION_LIBS += $(SSL_LIBS) 
 EDITION_LIBS += $(CRYPTO_LIBS)
+if ENABLE_BERKELEY_DB
+EDITION_LIBS += $(BDB_LIBS) 
+endif
 
 if ENABLE_ENTERPRISE
 
 include entMakefile.am
 else
 libbitcoin_enterprise_a_CPPFLAGS = $(BITCOIN_INCLUDES)
+
+if ENABLE_BERKELEY_DB
 libbitcoin_enterprise_a_SOURCES = \
   community/community.cpp \
   wallet/db.cpp \
   wallet/dbwrap_com.cpp
+else
+libbitcoin_enterprise_a_SOURCES = \
+  community/community.cpp \
+  wallet/dbwrap_ent.cpp
+endif
+
 endif
 
 # server: shared between bitcoind and bitcoin-qt
@@ -538,7 +555,7 @@ else
 multichaind_SOURCES += filters/filter.cpp
 endif
 
-multichaind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(EDITION_LIBS) $(MINIUPNPC_LIBS) $(EVENT_LIBS)
+multichaind_LDADD += $(BOOST_LIBS) $(EDITION_LIBS) $(MINIUPNPC_LIBS) $(EVENT_LIBS)
 multichaind_CPPFLAGS = $(BITCOIN_INCLUDES) $(V8_INCLUDE)
 multichaind_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -pthread
 if !TARGET_WINDOWS
@@ -577,7 +594,7 @@ if TARGET_WINDOWS
 multichaind_cold_SOURCES += multichaind-cold-res.rc
 endif
 
-multichaind_cold_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_LIBS)
+multichaind_cold_LDADD += $(BOOST_LIBS) $(EDITION_LIBS) $(MINIUPNPC_LIBS) $(EVENT_LIBS)
 multichaind_cold_CPPFLAGS = $(BITCOIN_INCLUDES)
 multichaind_cold_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -pthread
 

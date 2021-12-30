@@ -46,6 +46,11 @@ CDBWrapEnv::~CDBWrapEnv()
     EnvShutdown();
 }
 
+int CDBWrapEnv::MinWalletDBVersion()
+{
+    return 2;
+}
+
 void CDBWrapEnv::Close()
 {
     EnvShutdown();

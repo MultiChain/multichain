@@ -87,6 +87,12 @@ AC_ARG_ENABLE([enterprise],
   [enable_enterprise=$enableval],
   [enable_enterprise=no])
 
+AC_ARG_ENABLE([berkeley-db4],
+  [AS_HELP_STRING([--enable-berkeley-db4],
+  [enable berkeley_db4 (default is no)])],
+  [enable_berkeley_db4=$enableval],
+  [enable_berkeley_db4=no])
+
 AC_ARG_WITH([miniupnpc],
   [AS_HELP_STRING([--with-miniupnpc],
   [enable UPNP (default is yes if libminiupnpc is found)])],
@@ -773,6 +779,16 @@ else
   AC_MSG_RESULT(no)
 fi
 
+dnl enable berkeley_db4
+AC_MSG_CHECKING([if berkeley should be enabled])
+if test x$enable_berkeley_db4 != xno; then
+  AC_MSG_RESULT(yes)
+  AC_DEFINE_UNQUOTED([ENABLE_BERKELEY_DB],[1],[Define to 1 to enable Berkeley DB4])
+
+else
+  AC_MSG_RESULT(no)
+fi
+
 
 dnl enable upnp support
 AC_MSG_CHECKING([whether to build with support for UPnP])
@@ -875,6 +891,7 @@ AM_CONDITIONAL([BUILD_DARWIN], [test x$BUILD_OS = xdarwin])
 AM_CONDITIONAL([TARGET_WINDOWS], [test x$TARGET_OS = xwindows])
 AM_CONDITIONAL([ENABLE_WALLET],[test x$enable_wallet = xyes])
 AM_CONDITIONAL([ENABLE_ENTERPRISE],[test x$enable_enterprise = xyes])
+AM_CONDITIONAL([ENABLE_BERKELEY_DB],[test x$enable_berkeley_db4 = xyes])
 AM_CONDITIONAL([ENABLE_TESTS],[test x$use_tests = xyes])
 AM_CONDITIONAL([ENABLE_QT],[test x$bitcoin_enable_qt = xyes])
 AM_CONDITIONAL([ENABLE_QT_TESTS],[test x$use_tests$bitcoin_enable_qt_test = xyesyes])

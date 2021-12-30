@@ -457,7 +457,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -walletnotifynew=<cmd> " + _("Execute this command when a transaction is first seen, if it relates to an address in the wallet or a subscribed asset or stream. ") + "\n";
     strUsage += "                         " + _("(more details and % substitutions online)") + "\n";
 /* MCHN START */    
-    strUsage += "  -walletdbversion=2|3   " + _("Specify wallet version, 2 - Berkeley DB, 3 (default) - proprietary") + "\n";
+    strUsage += "  -walletdbversion=3     " + _("Specify wallet version, 3 (default) - proprietary") + "\n";
     strUsage += "  -autosubscribe=<params> " + _("Automatically subscribe to new streams and/or assets, as a comma delimited list of subscriptions.") + "\n";
     strUsage += "                         " + _("All editions: assets, streams. Enterprise Edition only: streams-items,streams-items-local,") + "\n";
     strUsage += "                         " + _("streams-keys,streams-keys-local,streams-publishers,streams-publishers-local,streams-retrieve") + "\n";
@@ -1118,47 +1118,66 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             {
                 if(pEF->ENT_MinWalletDatVersion() > currentwalletdatversion)
                 {
-                    return InitError(strprintf("Wallet version %d is not supported in this edition of MultiChain.\n"
+                    return InitError(strprintf("Wallet version %d is not supported in this edition of MultiChain.\n\n"
                             "To upgrade to version %d, run MultiChain Offline Daemon: \n"
                             "multichaind-cold %s -datadir=%s -walletdbversion=3\n"
                             "and restart multichaind or use Community Edition.\n",
                             currentwalletdatversion,pEF->ENT_MinWalletDatVersion(), mc_gState->m_NetworkParams->Name(),mc_gState->m_Params->DataDir(0,0)));                                                            
+                }
+                CDBWrapEnv env_cur;
+                if(env_cur.MinWalletDBVersion() > currentwalletdatversion)
+                {
+                    return InitError(strprintf("Wallet version %d is not supported in this build of MultiChain.\n\n"
+                            "To upgrade to version %d, run MultiChain Daemon from official build: \n"
+                            "multichaind %s -walletdbversion=%d\n",
+                            currentwalletdatversion,env_cur.MinWalletDBVersion(), mc_gState->m_NetworkParams->Name(), env_cur.MinWalletDBVersion()));                                                                                
                 }
             }
             if( (currentwalletdatversion == 3) && (GetArg("-walletdbversion",MC_TDB_WALLET_VERSION) != 3) )
             {
                 return InitError(_("Wallet downgrade is not allowed"));                                                        
             }
-            if( (currentwalletdatversion == 2) && (GetArg("-walletdbversion",0) == 3) )
+            if( currentwalletdatversion == 2 )
             {
-                if(!boost::filesystem::exists(pathWallet))
+                if(GetArg("-walletdbversion",0) == 3)
                 {
-                    currentwalletdatversion=1;
+                    if(!boost::filesystem::exists(pathWallet))
+                    {
+                        currentwalletdatversion=1;
+                    }
+                    else
+                    {
+                        CDBWrapEnv env2;
+                        if (!env2.Open(GetDataDir()))
+                        {
+                            return InitError(_("Error initializing wallet database environment for upgrade"));                                        
+                        }                
+                        bool allOK = env2.Salvage(strWalletFile, false, salvagedData);
+                        if(!allOK)
+                        {
+                            return InitError(_("wallet.dat corrupt, cannot upgrade, you should repair it first.\n Run multichaind normally or with -salvagewallet flag"));                    
+                        }
+
+                        currentwalletdatversion=3;
+                        wallet_upgrade=true;                
+                    }
                 }
                 else
                 {
-                    CDBWrapEnv env2;
-                    if (!env2.Open(GetDataDir()))
-                    {
-                        return InitError(_("Error initializing wallet database environment for upgrade"));                                        
-                    }                
-                    bool allOK = env2.Salvage(strWalletFile, false, salvagedData);
-                    if(!allOK)
-                    {
-                        return InitError(_("wallet.dat corrupt, cannot upgrade, you should repair it first.\n Run multichaind normally or with -salvagewallet flag"));                    
-                    }
-
-                    currentwalletdatversion=3;
-                    wallet_upgrade=true;                
+                    return InitError(strprintf("Wallet version %d is not supported in this version of MultiChain.\n\n"
+                            "To upgrade to version %d, please run \n"
+                            "multichaind %s -walletdbversion=3\n",
+                            currentwalletdatversion,MC_TDB_WALLET_VERSION, mc_gState->m_NetworkParams->Name()));                                                                                                
                 }
             }
         }
         else
         {
             currentwalletdatversion=wallet_mode;
-            if(pEF->ENT_MinWalletDatVersion() > currentwalletdatversion)
+//            if(pEF->ENT_MinWalletDatVersion() > currentwalletdatversion)
+            if(MC_TDB_WALLET_VERSION > currentwalletdatversion)
             {
-                return InitError(strprintf("Wallet version %d is not supported in this edition of MultiChain.\n",currentwalletdatversion));                                                            
+                return InitError(strprintf("Wallet version %d is not supported in this version of MultiChain.\n",currentwalletdatversion));                                                            
             }
             
             LogPrintf("Wallet file doesn't exist. New file will be created with version %d.\n", currentwalletdatversion);
@@ -1175,7 +1194,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                         "To upgrade to version 2, run MultiChain 1.0: \n"
                         "multichaind %s -walletdbversion=2 -rescan\n",mc_gState->m_NetworkParams->Name()));                                        
             default:
-                return InitError(_("Invalid wallet version, possible values 2, 3.\n"));                                                                    
+                return InitError(_("Invalid wallet version, possible values: 3.\n"));                                                                    
         }
         
         if (!bitdbwrap.Open(GetDataDir()))
