@@ -2352,8 +2352,11 @@ bool CAddrDB::Read(CAddrMan& addr)
     FILE *file = fopen(pathAddr.string().c_str(), "rb");
     CAutoFile filein(file, SER_DISK, CLIENT_VERSION);
     if (filein.IsNull())
-        return error("%s : Failed to open file %s", __func__, pathAddr.string());
-
+    {
+        if(fDebug)LogPrint("addrman","%s : Failed to open file %s", __func__, pathAddr.string().c_str());
+        return false;
+//        return error("%s : Failed to open file %s", __func__, pathAddr.string());
+    }
     // use file size to size memory buffer
     int fileSize = boost::filesystem::file_size(pathAddr);
     int dataSize = fileSize - sizeof(uint256);

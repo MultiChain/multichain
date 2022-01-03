@@ -791,8 +791,14 @@ void CheckFlagsOnException(const string& strMethod,const Value& req_id,const str
         LogPrintf("WARNING: Unlocking wallet after failure: method: %s, error: %s\n",JSONRPCMethodIDForLog(strMethod,req_id).c_str(),message);
         pwalletTxsMain->WRPReadUnLock();
     }   
+    {
+        LOCK(cs_rpcWarmup);
     
-    mc_gState->m_Assets->ThreadCleanse(__US_ThreadID());
+        if(!fRPCInWarmup)
+        {
+            mc_gState->m_Assets->ThreadCleanse(__US_ThreadID());
+        }
+    }
 }
 
 
@@ -1583,10 +1589,12 @@ static bool HTTPBindAddresses(struct evhttp* http,struct evhttp* http_hc)
             if(fDebug)LogPrint("rpc", "Binding RPC on address %s port %i\n", i->first, i->second);
             evhttp_bound_socket *bind_handle = evhttp_bind_socket_with_handle(http, i->first.empty() ? NULL : i->first.c_str(), i->second);
             if (bind_handle) {
+/*               
                 CNetAddr addr;
                 if (i->first.empty() || (LookupHost(i->first, addr, false))) {
                     LogPrintf("WARNING: the RPC server is not safe to expose to untrusted networks such as the public internet\n");
                 }
+ */ 
                 boundSockets.push_back(bind_handle);
             } else {
                 LogPrintf("Binding RPC on address %s port %i failed.\n", i->first, i->second);
