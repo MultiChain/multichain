@@ -289,9 +289,20 @@ case $host in
          dnl Homebrew where each one is located, then adjust paths accordingly.
          dnl It's safe to add these paths even if the functionality is disabled by
          dnl the user (--without-wallet or --without-gui for example).
+	 
+ 	 if test x$enable_enterprise != xno; then
+ 		openssl_prefix=`$BREW --prefix openssl 2>/dev/null`
+	 else
+	 	openssl_prefix=``
+	 fi	 
+	 if test x$enable_berkeley_db4 !=xno; then
+		bdb_prefix=`$BREW --prefix berkeley-db4 2>/dev/null`
+	 else
+		bdb_prefix=``
+	 fi
 
-         openssl_prefix=`$BREW --prefix openssl 2>/dev/null`
-         bdb_prefix=`$BREW --prefix berkeley-db4 2>/dev/null`
+         #openssl_prefix=`$BREW --prefix openssl 2>/dev/null`
+         #bdb_prefix=`$BREW --prefix berkeley-db4 2>/dev/null`
          qt5_prefix=`$BREW --prefix qt5 2>/dev/null`
          if test x$openssl_prefix != x; then
            PKG_CONFIG_PATH="$openssl_prefix/lib/pkgconfig:$PKG_CONFIG_PATH"
@@ -517,8 +528,10 @@ AC_SUBST(LIBLEVELDB)
 AC_SUBST(LIBMEMENV)
 
 if test x$enable_wallet != xno; then
-    dnl Check for libdb_cxx only if wallet enabled
-    BITCOIN_FIND_BDB48
+    dnl Check for libdb_cxx only if wallet enabled and 
+    if test x$enable_berkeley_db4 !=xno; then
+    	BITCOIN_FIND_BDB48
+    fi
 fi
 
 dnl Check for libminiupnpc (optional)
@@ -691,22 +704,25 @@ if test x$use_pkgconfig = xyes; then
   m4_ifdef(
     [PKG_CHECK_MODULES],
     [
-      PKG_CHECK_MODULES([SSL], [libssl],, [AC_MSG_ERROR(openssl  not found.)])
-      PKG_CHECK_MODULES([CRYPTO], [libcrypto],,[AC_MSG_ERROR(libcrypto  not found.)])
       BITCOIN_QT_CHECK([PKG_CHECK_MODULES([PROTOBUF], [protobuf], [have_protobuf=yes], [BITCOIN_QT_FAIL(libprotobuf not found)])])
       if test x$use_qr != xno; then
         BITCOIN_QT_CHECK([PKG_CHECK_MODULES([QR], [libqrencode], [have_qrencode=yes], [have_qrencode=no])])
       fi
+      if test x$enable_enterprise != xno; then
+        PKG_CHECK_MODULES([SSL], [libssl],, [AC_MSG_ERROR(openssl  not found.)])
+        PKG_CHECK_MODULES([CRYPTO], [libcrypto],,[AC_MSG_ERROR(libcrypto  not found.)])
+      fi
     ]
   )
 else
-  AC_CHECK_HEADER([openssl/crypto.h],,AC_MSG_ERROR(libcrypto headers missing))
-  AC_CHECK_LIB([crypto],      [main],CRYPTO_LIBS=-lcrypto, AC_MSG_ERROR(libcrypto missing))
-
-  AC_CHECK_HEADER([openssl/ssl.h],, AC_MSG_ERROR(libssl headers missing),)
-  AC_CHECK_LIB([ssl],         [main],SSL_LIBS=-lssl, AC_MSG_ERROR(libssl missing))
-
   BITCOIN_QT_CHECK(AC_CHECK_LIB([protobuf] ,[main],[PROTOBUF_LIBS=-lprotobuf], BITCOIN_QT_FAIL(libprotobuf not found)))
+  if test x$enable_enterprise != xno; then
+    AC_CHECK_HEADER([openssl/crypto.h],,AC_MSG_ERROR(libcrypto headers missing))
+    AC_CHECK_LIB([crypto],      [main],CRYPTO_LIBS=-lcrypto, AC_MSG_ERROR(libcrypto missing))
+
+    AC_CHECK_HEADER([openssl/ssl.h],, AC_MSG_ERROR(libssl headers missing),)
+    AC_CHECK_LIB([ssl],         [main],SSL_LIBS=-lssl, AC_MSG_ERROR(libssl missing))
+  fi
   if test x$use_qr != xno; then
     BITCOIN_QT_CHECK([AC_CHECK_LIB([qrencode], [main],[QR_LIBS=-lqrencode], [have_qrencode=no])])
     BITCOIN_QT_CHECK([AC_CHECK_HEADER([qrencode.h],, have_qrencode=no)])
@@ -717,7 +733,9 @@ CPPFLAGS_TEMP="$CPPFLAGS"
 LIBS_TEMP="$LIBS"
 CPPFLAGS="$CPPFLAGS $SSL_CFLAGS"
 LIBS="$LIBS $SSL_LIBS"
-AC_CHECK_HEADER([openssl/ec.h],, AC_MSG_ERROR(OpenSSL ec header missing),)
+if test x$enable_enterprise != xno; then
+  AC_CHECK_HEADER([openssl/ec.h],, AC_MSG_ERROR(OpenSSL ec header missing),)
+fi
 CPPFLAGS="$CPPFLAGS_TEMP"
 LIBS="$LIBS_TEMP"
 
