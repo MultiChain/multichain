@@ -86,12 +86,18 @@ AC_ARG_ENABLE([enterprise],
   [enable enterprise (default is no)])],
   [enable_enterprise=$enableval],
   [enable_enterprise=no])
-
-AC_ARG_ENABLE([berkeley-db4],
-  [AS_HELP_STRING([--enable-berkeley-db4],
-  [enable berkeley_db4 (default is no)])],
+ 
+AC_ARG_ENABLE([berkeley],
+  [AS_HELP_STRING([--enable-berkeley],
+  [enable berkeley (default is no)])],
   [enable_berkeley_db4=$enableval],
   [enable_berkeley_db4=no])
+if test x$enable_berkeley_db4 = xyes; then
+      AC_MSG_WARN([enable_berkeley_db4=$enableval])
+    else
+      AC_MSG_WARN([enable_berkeley_db4=no.])
+    fi  
+
 
 AC_ARG_WITH([miniupnpc],
   [AS_HELP_STRING([--with-miniupnpc],
@@ -529,7 +535,7 @@ AC_SUBST(LIBMEMENV)
 
 if test x$enable_wallet != xno; then
     dnl Check for libdb_cxx only if wallet enabled and 
-    if test x$enable_berkeley_db4 !=xno; then
+    if test x$enable_berkeley_db4 != xno; then
     	BITCOIN_FIND_BDB48
     fi
 fi
