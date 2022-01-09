@@ -7,8 +7,10 @@
 #include "utils/declare.h"
 #include "protocol/relay.h"
 #include "wallet/chunkdb.h"
-#include "wallet/chunkdb.h"
 #include "wallet/wallettxdb.h"
+#include "wallet/wallettxs.h"
+#include "protocol/relay.h"
+#include "community/community.h"
 
 #define MC_CCF_NONE                       0x00000000 
 #define MC_CCF_NEW                        0x00000000 
@@ -226,6 +228,10 @@ typedef struct mc_ChunkCollector
     int Lock(int write_mode, int allow_secondary);
     void UnLock();    
 } mc_ChunkCollector;
+
+
+int MultichainCollectChunks(mc_ChunkCollector* collector);
+int MultichainCollectChunksQueueStats(mc_ChunkCollector* collector);
 
 #endif /* MULTICHAIN_CHUNKCOLLECTOR_H */
 
