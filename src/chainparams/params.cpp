@@ -1635,7 +1635,7 @@ int mc_MultichainParams::Print(FILE* fileHan)
                                         }
                                         else
                                         {
-                                            fprintf(fileHan," (%ld - %ld)",(m_lpParams+i)->m_MinIntegerValue,(m_lpParams+i)->m_MaxIntegerValue);                            
+                                            fprintf(fileHan," (%lld - %lld)",(m_lpParams+i)->m_MinIntegerValue,(m_lpParams+i)->m_MaxIntegerValue);                            
                                         }
                                     }
                                     break;
