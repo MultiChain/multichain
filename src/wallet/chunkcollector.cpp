@@ -625,6 +625,12 @@ int mc_ChunkCollector::Initialize(mc_ChunkDB *chunk_db,const char *name,uint32_t
         }
     }
     
+    m_Semaphore=__US_SemCreate();
+    if(m_Semaphore == NULL)
+    {
+        return MC_ERR_INTERNAL_ERROR;
+    }    
+    
     Dump("Initialize");
     
     return err;   

@@ -9,7 +9,6 @@
 #include "wallet/chunkdb.h"
 #include "wallet/wallettxdb.h"
 #include "wallet/wallettxs.h"
-#include "protocol/relay.h"
 #include "community/community.h"
 
 #define MC_CCF_NONE                       0x00000000 
