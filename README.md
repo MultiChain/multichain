@@ -25,15 +25,9 @@ Install dependencies
 
     sudo apt-get update
     sudo apt-get install -y software-properties-common
-    sudo apt-get install -y build-essential libtool autotools-dev automake pkg-config libssl-dev git python python-pip
-    sudo add-apt-repository ppa:bitcoin/bitcoin
-    sudo apt-get install -y libdb4.8-dev libdb4.8++-dev
-	sudo apt-get install -y libevent-dev
-    sudo pip install pathlib2
-
-MultiChain requires Boost version no later than 1.65.
-
-    sudo apt-get install -y libboost1.65-all-dev
+    sudo apt-get install -y build-essential libtool autotools-dev automake pkg-config git
+    sudo apt-get install libboost-all-dev
+    sudo apt-get install libevent-dev
 
 Clone MultiChain
 ----------------
