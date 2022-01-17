@@ -1841,6 +1841,14 @@ CAmount GetBlockValue(int nHeight, const CAmount& nFees)
     return nSubsidy + nFees;
 }
 
+bool IsInitialBlockDownloadNoCheckpoints()
+{
+    if (fImporting || fReindex )
+        return true;
+    
+    return false;
+}
+
 bool IsInitialBlockDownload()
 {
     LOCK(cs_main);
@@ -4187,6 +4195,7 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
 /** Mark a block as having its data received and checked (up to BLOCK_VALID_TRANSACTIONS). */
 bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBlockIndex *pindexNew, const CDiskBlockPos& pos)
 {
+    mc_gState->ChainLock();
     pindexNew->nTx = block.vtx.size();
     pindexNew->nChainTx = 0;
     pindexNew->nFile = pos.nFile;
@@ -4194,6 +4203,7 @@ bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBl
     pindexNew->nUndoPos = 0;
     pindexNew->nStatus |= BLOCK_HAVE_DATA;
     pindexNew->RaiseValidity(BLOCK_VALID_TRANSACTIONS);
+    mc_gState->ChainUnLock();
     
 /*    
     {
@@ -5807,7 +5817,7 @@ void static ProcessGetData(CNode* pfrom)
     
     vector<CInv> vNotFound;
 
-    LOCK(cs_main);
+//    LOCK(cs_main);
 
     while (it != pfrom->vRecvGetData.end()) {
         // Don't bother if send buffer is too full to respond anyway
@@ -5822,14 +5832,22 @@ void static ProcessGetData(CNode* pfrom)
             if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK)
             {
                 bool send = false;
+                
+                CDiskBlockPos block_pos;
+                int block_height;
+                
+                mc_gState->ChainLock();
                 BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
                 if (mi != mapBlockIndex.end())
                 {
+                    block_pos=mi->second->GetBlockPos();
+                    block_height=mi->second->nHeight;
+                    
                     // If the requested block is at a height below our last
                     // checkpoint, only serve it if it's in the checkpointed chain
-                    int nHeight = mi->second->nHeight;
+                    block_height = mi->second->nHeight;
                     CBlockIndex* pcheckpoint = Checkpoints::GetLastCheckpoint();
-                    if (pcheckpoint && nHeight < pcheckpoint->nHeight) {
+                    if (pcheckpoint && block_height < pcheckpoint->nHeight) {
                         if (!chainActive.Contains(mi->second))
                         {
                             LogPrintf("ProcessGetData(): ignoring request for old block that isn't in the main chain\n");
@@ -5840,14 +5858,15 @@ void static ProcessGetData(CNode* pfrom)
                         send = true;
                     }
                 }
+                mc_gState->ChainUnLock();
                 if (send)
                 {
                     // Send block from disk
                     CBlock block;
-                    if (!ReadBlockFromDisk(block, (*mi).second))
+                    if (!ReadBlockFromDisk(block, block_pos))
                         assert(!"cannot load block from disk");
                     
-                    if(fDebug)LogPrint("mcnet","mcnet: Sending block: %s (height %d), to peer=%d\n",inv.hash.ToString().c_str(),mi->second->nHeight,pfrom->id);            
+                    if(fDebug)LogPrint("mcnet","mcnet: Sending block: %s (height %d), to peer=%d\n",inv.hash.ToString().c_str(),block_height,pfrom->id);            
                     if (inv.type == MSG_BLOCK)
                         pfrom->PushMessage("block", block);
                     else // MSG_FILTERED_BLOCK)
@@ -6486,8 +6505,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         uint256 hashStop;
         vRecv >> locator >> hashStop;
 
-        LOCK(cs_main);
-
+//        LOCK(cs_main);
+        mc_gState->ChainLock();
         // Find the last block the caller has in the main chain
         CBlockIndex* pindex = FindForkInGlobalIndex(chainActive, locator);
 
@@ -6513,6 +6532,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 break;
             }
         }
+        mc_gState->ChainUnLock();
     }
 
 
@@ -6522,19 +6542,22 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         uint256 hashStop;
         vRecv >> locator >> hashStop;
 
-        LOCK(cs_main);
-
-        if (IsInitialBlockDownload())
+//        LOCK(cs_main);
+        if (IsInitialBlockDownloadNoCheckpoints())
             return true;
 
           
+        mc_gState->ChainLock();
         CBlockIndex* pindex = NULL;
         if (locator.IsNull())
         {
             // If locator is null, return the hashStop block
             BlockMap::iterator mi = mapBlockIndex.find(hashStop);
             if (mi == mapBlockIndex.end())
+            {
+                mc_gState->ChainUnLock();
                 return true;
+            }
             pindex = (*mi).second;
         }
         else
@@ -6555,6 +6578,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
                 break;
         }
+        mc_gState->ChainUnLock();
         pfrom->PushMessage("headers", vHeaders);
     }
 
@@ -6925,7 +6949,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
     else if (strCommand == "mempool" && MultichainNode_SendInv(pfrom))          // MCHN
     {
-        LOCK2(cs_main, pfrom->cs_filter);
+//        LOCK2(cs_main, pfrom->cs_filter);
+        LOCK(pfrom->cs_filter);
 
         std::vector<uint256> vtxid;
         mempool.queryHashes(vtxid);
