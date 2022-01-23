@@ -486,9 +486,16 @@ void CNode::CloseSocketDisconnect()
     }
 
     // in case this fails, we'll empty the recv buffer when the CNode is deleted
-    TRY_LOCK(cs_vRecvMsg, lockRecv);
-    if (lockRecv)
-        vRecvMsg.clear();
+    {
+        TRY_LOCK(cs_vRecvMsg, lockRecv);
+        if (lockRecv)
+            vRecvMsg.clear();
+    }
+    {
+        TRY_LOCK(cs_vRecvDataMsg, lockDataRecv);
+        if (lockDataRecv)
+            vRecvDataMsg.clear();
+    }
 }
 
 void CNode::PushVersion()
@@ -880,9 +887,13 @@ void ThreadSocketHandler()
                             TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
                             if (lockRecv)
                             {
-                                TRY_LOCK(pnode->cs_inventory, lockInv);
-                                if (lockInv)
-                                    fDelete = true;
+                                TRY_LOCK(pnode->cs_vRecvMsg, lockDataRecv);
+                                if (lockDataRecv)
+                                {
+                                    TRY_LOCK(pnode->cs_inventory, lockInv);
+                                    if (lockInv)
+                                        fDelete = true;
+                                }
                             }
                         }
                     }
@@ -1914,9 +1925,67 @@ void ThreadMessageHandler()
     }
 }
 
+void ThreadDataMessageHandler()
+{
+    SetThreadPriority(THREAD_PRIORITY_BELOW_NORMAL);
+    while (true)
+    {
+        boost::this_thread::interruption_point();
+        vector<CNode*> vNodesCopy;
+        {
+            LOCK(cs_vNodes);
+            vNodesCopy = vNodes;
+            BOOST_FOREACH(CNode* pnode, vNodesCopy) {
+                pnode->AddRef();
+            }
+        }
+
+        bool fSleep = true;
+
+        BOOST_FOREACH(CNode* pnode, vNodesCopy)
+        {
+            if (pnode->fDisconnect)
+                continue;
+
+            // Receive messages
+            {
+                TRY_LOCK(pnode->cs_vRecvDataMsg, lockRecv);
+                if (lockRecv)
+                {
+
+                    if (!g_signals.ProcessDataMessages(pnode))
+                    {
+                        if(fDebug)LogPrint("net","socket closed because of error in message processing\n");
+                        pnode->CloseSocketDisconnect();
+                    }
+
+                    if (!pnode->vRecvDataMsg.empty())
+                    {
+                        fSleep = false;
+                    }
+                }
+            }
+            boost::this_thread::interruption_point();
+
+            if (pnode->fDisconnect)
+                continue;
+        }
 
 
+        boost::this_thread::interruption_point();
+        
+        {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodesCopy)
+                pnode->Release();
+        }
 
+        boost::this_thread::interruption_point();
+        
+        if (fSleep)
+            MilliSleep(100);
+    }
+}
 
 
 bool BindListenPort(const CService &addrBind, string& strError, bool fWhitelisted)
@@ -2114,6 +2183,9 @@ void StartNode(boost::thread_group& threadGroup)
 
     // Process messages
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "msghand", &ThreadMessageHandler));
+
+    // Process data messages
+    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "dmsghand", &ThreadDataMessageHandler));
 
     // Dump network addresses
     threadGroup.create_thread(boost::bind(&LoopForever<void (*)()>, "dumpaddr", &DumpAddresses, DUMP_ADDRESSES_INTERVAL * 1000));

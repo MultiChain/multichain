@@ -933,7 +933,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     if (GetBoolArg("-tor", false))
         return InitError(_("Error: Unsupported argument -tor found, use -onion."));
     
-    OutConnectionsAlgoritm=GetArg("-addrmanversion",0);
+    OutConnectionsAlgoritm=GetArg("-addrmanversion",1);
     if(OutConnectionsAlgoritm)
     {
         nMaxOutConnections=32;

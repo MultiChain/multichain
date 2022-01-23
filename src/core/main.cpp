@@ -861,6 +861,7 @@ void RegisterNodeSignals(CNodeSignals& nodeSignals)
 {
     nodeSignals.GetHeight.connect(&GetHeight);
     nodeSignals.ProcessMessages.connect(&ProcessMessages);
+    nodeSignals.ProcessDataMessages.connect(&ProcessDataMessages);
     nodeSignals.SendMessages.connect(&SendMessages);
     nodeSignals.InitializeNode.connect(&InitializeNode);
     nodeSignals.FinalizeNode.connect(&FinalizeNode);
@@ -870,6 +871,7 @@ void UnregisterNodeSignals(CNodeSignals& nodeSignals)
 {
     nodeSignals.GetHeight.disconnect(&GetHeight);
     nodeSignals.ProcessMessages.disconnect(&ProcessMessages);
+    nodeSignals.ProcessDataMessages.disconnect(&ProcessDataMessages);
     nodeSignals.SendMessages.disconnect(&SendMessages);
     nodeSignals.InitializeNode.disconnect(&InitializeNode);
     nodeSignals.FinalizeNode.disconnect(&FinalizeNode);
@@ -7195,7 +7197,7 @@ bool ProcessMessages(CNode* pfrom)
 
 /* MCHN START */    
     {        
-        LOCK(cs_main);
+//        LOCK(cs_main);
         
         if(!pfrom->fDisconnect)
         {
@@ -7221,12 +7223,13 @@ bool ProcessMessages(CNode* pfrom)
     std::deque<CNetMessage>::iterator it = pfrom->vRecvMsg.begin();
     while (!pfrom->fDisconnect && it != pfrom->vRecvMsg.end()) {
         // Don't bother if send buffer is too full to respond anyway
+        bool fProcessInDataThread=(GetArg("-msghandlerversion",1) == 1);
         CNetMessage& msg1 = *it;
         if(msg1.complete())
         {
             if(msg1.hdr.GetCommand() == "block")
             {
-                if(fDebug)LogPrint("mcblockperf","mchn-block-perf: New block, peer=%d\n", pfrom->id);
+                if(fDebug)if(fProcessInDataThread == 0)LogPrint("mcblockperf","mchn-block-perf: New block, peer=%d\n", pfrom->id);
             }                
         }
         
@@ -7238,7 +7241,7 @@ bool ProcessMessages(CNode* pfrom)
             {
                 if(msg1.hdr.GetCommand() == "block")
                 {
-                    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Processing block, though send buffer is full (%d), peer=%d\n", (int)pfrom->nSendSize,pfrom->id);
+                    if(fDebug)if(fProcessInDataThread == 0)LogPrint("mcblockperf","mchn-block-perf: Processing block, though send buffer is full (%d), peer=%d\n", (int)pfrom->nSendSize,pfrom->id);
                 }                
                 else
                 {
@@ -7264,7 +7267,7 @@ bool ProcessMessages(CNode* pfrom)
 
         if(msg.hdr.GetCommand() == "block")
         {
-            if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Processing new block, peer=%d\n",pfrom->id);
+            if(fDebug)if(fProcessInDataThread == 0)LogPrint("mcblockperf","mchn-block-perf: Processing new block, peer=%d\n",pfrom->id);
         }
         // at this point, any failure means we can delete the current message
         it++;
@@ -7344,16 +7347,24 @@ bool ProcessMessages(CNode* pfrom)
 
         // Process message
         bool fRet = false;
+        if( fProcessInDataThread && (strCommand != "block") && (strCommand != "tx") && (strCommand != "headers") && (strCommand != "inv") )
+        {
+            fProcessInDataThread=false;
+        }
         try
         {
-/* MCHN START */            
             if(pfrom->fDisconnect || !MultichainNode_DisconnectRemote(pfrom))
             {
-/* MCHN END */            
-            fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime);
-/* MCHN START */            
+                if(fProcessInDataThread)
+                {
+                    LOCK(pfrom->cs_vRecvDataMsg);
+                    pfrom->vRecvDataMsg.push_back(msg);
+                }
+                else
+                {
+                    fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime);
+                }
             }
-/* MCHN END */            
             boost::this_thread::interruption_point();
         }
         catch (std::ios_base::failure& e)
@@ -7393,6 +7404,117 @@ bool ProcessMessages(CNode* pfrom)
     if (!pfrom->fDisconnect)
         pfrom->vRecvMsg.erase(pfrom->vRecvMsg.begin(), it);
 
+    return fOk;
+}
+
+// requires LOCK(cs_vRecvDataMsg)
+bool ProcessDataMessages(CNode* pfrom)
+{
+    bool fOk = true;
+
+        
+/* MCHN END */    
+
+    std::deque<CNetMessage>::iterator it = pfrom->vRecvDataMsg.begin();
+    while (!pfrom->fDisconnect && it != pfrom->vRecvDataMsg.end()) {
+        // Don't bother if send buffer is too full to respond anyway
+        CNetMessage& msg1 = *it;
+        if(msg1.complete())
+        {
+            if(msg1.hdr.GetCommand() == "block")
+            {
+                if(fDebug)LogPrint("mcblockperf","mchn-block-perf: New block, peer=%d\n", pfrom->id);
+            }                
+        }
+        
+        if (pfrom->nSendSize >= SendBufferSize())
+        {
+            
+            CNetMessage& msg1 = *it;
+            if(msg1.complete())
+            {
+                if(msg1.hdr.GetCommand() == "block")
+                {
+                    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Processing block, though send buffer is full (%d), peer=%d\n", (int)pfrom->nSendSize,pfrom->id);
+                }                
+                else
+                {
+                    break;
+                }
+            }
+            else
+            {
+                break;
+            }
+        }
+        // get next message
+        CNetMessage& msg = *it;
+
+        if(msg.hdr.GetCommand() == "block")
+        {
+            if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Processing new block, peer=%d\n",pfrom->id);
+        }
+        // at this point, any failure means we can delete the current message
+        it++;
+
+
+        // Read header
+        CMessageHeader& hdr = msg.hdr;
+        string strCommand = hdr.GetCommand();
+
+        if(fDebug)LogPrint("mchnminor","mchn: DATA-RECV: %s, peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
+        
+        // Message size
+        unsigned int nMessageSize = hdr.nMessageSize;
+
+        CDataStream& vRecv = msg.vRecv;
+
+        // Process message
+        bool fRet = false;
+        try
+        {
+            if(pfrom->fDisconnect || !MultichainNode_DisconnectRemote(pfrom))
+            {
+                fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime);
+            }
+            boost::this_thread::interruption_point();
+        }
+        catch (std::ios_base::failure& e)
+        {
+            pfrom->PushMessage("reject", strCommand, REJECT_MALFORMED, string("error parsing message"));
+            if (strstr(e.what(), "end of data"))
+            {
+                // Allow exceptions from under-length message on vRecv
+                LogPrintf("ProcessMessages(%s, %u bytes) : Exception '%s' caught, normally caused by a message being shorter than its stated length\n", SanitizeString(strCommand), nMessageSize, e.what());
+            }
+            else if (strstr(e.what(), "size too large"))
+            {
+                // Allow exceptions from over-long size
+                LogPrintf("ProcessMessages(%s, %u bytes) : Exception '%s' caught\n", SanitizeString(strCommand), nMessageSize, e.what());
+            }
+            else
+            {
+                PrintExceptionContinue(&e, "ProcessMessages()");
+            }
+        }
+        catch (boost::thread_interrupted) {
+            throw;
+        }
+        catch (std::exception& e) {
+            PrintExceptionContinue(&e, "ProcessMessages()");
+        } catch (...) {
+            PrintExceptionContinue(NULL, "ProcessMessages()");
+        }
+
+        if (!fRet)
+            LogPrintf("ProcessMessage(%s, %u bytes) FAILED peer=%d\n", SanitizeString(strCommand), nMessageSize, pfrom->id);
+
+        break;
+    }
+
+    // In case the connection got shut down, its receive buffer was wiped
+    if (!pfrom->fDisconnect)
+        pfrom->vRecvDataMsg.erase(pfrom->vRecvDataMsg.begin(), it);
     return fOk;
 }
 

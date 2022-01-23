@@ -89,6 +89,7 @@ struct CNodeSignals
 {
     boost::signals2::signal<int ()> GetHeight;
     boost::signals2::signal<bool (CNode*)> ProcessMessages;
+    boost::signals2::signal<bool (CNode*)> ProcessDataMessages;
     boost::signals2::signal<bool (CNode*, bool)> SendMessages;
     boost::signals2::signal<void (NodeId, const CNode*)> InitializeNode;
     boost::signals2::signal<void (NodeId)> FinalizeNode;
@@ -245,6 +246,8 @@ public:
     std::deque<CInv> vRecvGetData;
     std::deque<CNetMessage> vRecvMsg;
     CCriticalSection cs_vRecvMsg;
+    std::deque<CNetMessage> vRecvDataMsg;
+    CCriticalSection cs_vRecvDataMsg;
     uint64_t nRecvBytes;
     int nRecvVersion;
 
