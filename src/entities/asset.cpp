@@ -122,7 +122,7 @@ void mc_EntityLedger::Zero()
     m_TotalSize=m_KeySize+m_ValueSize;
     memset(m_ZeroBuffer,0,m_TotalSize);                                         // Allocated for 96, check if m_TotalSize changed
     m_MaxScriptMemPoolSize=MC_AST_ASSET_MAX_MEMPOOL_SCRIPT_SIZE;
-    m_MemPoolSize=m_TotalSize+2*sizeof(int32_t)+m_MaxScriptMemPoolSize;         // 256
+    m_MemPoolSize=m_TotalSize+2*sizeof(int32_t)+sizeof(unsigned char*)+m_MaxScriptMemPoolSize;         // 256
 }
 
 /** Set ledger file name */
