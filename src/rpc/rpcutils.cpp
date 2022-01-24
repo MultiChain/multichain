@@ -2524,7 +2524,152 @@ mc_Buffer *mc_GetEntityTxIDList(uint32_t entity_type,int req_count,int req_start
     return mc_gState->m_Assets->GetEntityList(NULL,NULL,entity_type);
 }
 
+Object AssetIssueEntry(mc_EntityDetails *asset_entity,mc_EntityDetails *followon,uint64_t multiple,uint32_t output_level,string& lasttxid,Array& lastwriters,int& lastvout)
+{
+    size_t value_size;
+    int64_t offset,new_offset;
+    uint32_t value_offset;
+    const unsigned char *ptr;
+    int vout=-1;
+    int64_t qty;   
+    
+    double units=1.;
+    
+    units= 1./(double)multiple;
+    Object issue;
+    if(output_level & 0x0440)
+    {
+        lasttxid=((uint256*)(followon->GetTxID()))->ToString();
+        Array followon_issuers;
+        Object followon_fields;
+
+        ptr=followon->GetScript();
+        offset=0;
+        while(offset>=0)
+        {
+            new_offset=followon->NextParam(offset,&value_offset,&value_size);
+            if(value_offset > 0)
+            {
+                if(ptr[offset])
+                {
+                    if(ptr[offset] != 0xff)
+                    {
+                        string param_name((char*)ptr+offset);
+                        string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
+                        followon_fields.push_back(Pair(param_name, param_value));                                                                        
+                    }                            
+                }
+                else
+                {
+                    if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
+                    {
+                        if(value_size == 20)
+                        {
+                            followon_issuers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
+                        }
+                        if(value_size == 24)
+                        {
+                            unsigned char tptr[4];
+                            memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
+                            if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
+                            {
+                                followon_issuers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
+                            }
+                            else
+                            {
+                                followon_issuers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
+                            }
+                        }
+                    }
+                    if(ptr[offset+1] == MC_ENT_SPRM_VOUT)
+                    {
+                        if((value_size > 0) && (value_size <= 4))
+                        {
+                            vout=mc_GetLE((unsigned char*)ptr+value_offset,value_size);
+                        }
+                    }
+                }
+            }
+            offset=new_offset;
+        }      
+
+        lastwriters=followon_issuers;
+        lastvout=vout;
+        if(output_level & 0x0400)
+        {
+            issue.push_back(Pair("txid", ((uint256*)(followon->GetTxID()))->ToString().c_str()));    
+            qty=followon->GetQuantity();
+            issue.push_back(Pair("qty", (double)qty*units));
+            issue.push_back(Pair("raw", qty));                    
+        }
+        Value vfields=mc_ExtractDetailsJSONObject(followon);
+        if(vfields.type() == null_type)
+        {                        
+            vfields=followon_fields;
+        }
+        if(asset_entity->IsNFTAsset())
+        {
+            ptr=(unsigned char *)followon->GetUpdateName(&value_size);                
+            if(ptr)
+            {
+                string token_name ((char*)ptr,value_size);
+                issue.push_back(Pair("token", token_name));
+            }      
+            else
+            {
+                issue.push_back(Pair("token", Value::null));                            
+            }
+        }
+        if(output_level & 0x0040)
+        {
+            issue.push_back(Pair("details",vfields)); 
+            issue.push_back(Pair("issuers",followon_issuers));                    
+        }
+        qty=followon->GetQuantity();
+        if(output_level & 0x0080)
+        {
+            mc_gState->ChainLock();
+            int block=followon->m_LedgerRow.m_Block;
+            int chain_height=chainActive.Height();
+            issue.push_back(Pair("confirmations", chain_height-block+1));
+            if(chain_height >= block)
+            {
+                uint256 blockHash=chainActive[block]->GetBlockHash();
+                issue.push_back(Pair("blockhash", blockHash.GetHex()));
+                issue.push_back(Pair("blockheight", block));                            
+                issue.push_back(Pair("blocktime", mapBlockIndex[blockHash]->GetBlockTime()));                            
+            }                        
+            mc_gState->ChainUnLock();
+        }
+    }
+    return issue;
+}
+
 Array AssetHistory(mc_EntityDetails *asset_entity,mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level,string& lasttxid,Array& lastwriters,int& lastvout)
+{
+    Array issues;
+    mc_EntityDetails *followon;
+    
+    if(output_level & 0x0660)                                                   
+    {
+        mc_Buffer *followons;
+        followons=mc_gState->m_Assets->GetFollowOnPositionsByLastEntity(last_entity,count,start);
+        for(int i=followons->GetCount()-1;i>=0;i--)
+        {
+            mc_EntityDetails followon_entity;
+            mc_gState->m_Assets->FindEntityByPosition(&followon_entity,*(int64_t*)followons->GetRow(i));
+            followon=&followon_entity;
+            
+            Object issue=AssetIssueEntry(asset_entity,followon,multiple,output_level,lasttxid,lastwriters,lastvout);
+            issues.push_back(issue);                    
+        }
+        mc_gState->m_Assets->FreeEntityList(followons);
+    }
+    
+    return issues;
+}
+
+Array AssetHistoryOld(mc_EntityDetails *asset_entity,mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level,string& lasttxid,Array& lastwriters,int& lastvout)
 {
     size_t value_size;
     int64_t offset,new_offset;

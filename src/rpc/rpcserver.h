@@ -353,6 +353,7 @@ extern json_spirit::Value setvariablevaluefrom(const json_spirit::Array& params,
 extern json_spirit::Value getvariablevalue(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getvariablehistory(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listassetissues(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value gettokendetails(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listlibraries(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value addlibraryupdate(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value addlibraryupdatefrom(const json_spirit::Array& params, bool fHelp);

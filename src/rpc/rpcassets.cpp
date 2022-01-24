@@ -7,6 +7,7 @@
 
 #include "rpc/rpcwallet.h"
 
+Object AssetIssueEntry(mc_EntityDetails *asset_entity,mc_EntityDetails *followon,uint64_t multiple,uint32_t output_level,string& lasttxid,Array& lastwriters,int& lastvout);
 Array AssetHistory(mc_EntityDetails *asset_entity,mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level);
 void ParseRawTokenInfo(const Value *value,mc_Script *lpDetailsScript,mc_Script *lpDetailsScriptTmp,string *token,int64_t *raw,mc_EntityDetails *entity,int *errorCode,string *strError);
 
@@ -3028,3 +3029,79 @@ Value listassetissues(const Array& params, bool fHelp)
     return AssetHistory(&asset_entity,&last_entity,multiple,count,start,output_level);
 }
 
+Value gettokendetails(const Array& params, bool fHelp)
+{
+   if (fHelp || params.size() != 2)
+        mc_ThrowHelpMessage("gettokendetails");   
+    
+   if(mc_gState->m_Features->NFTokens() == 0)
+   {        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");               
+   }
+   
+    mc_EntityDetails asset_entity;
+    uint64_t multiple;
+    unsigned char buf[MC_AST_ASSET_FULLREF_BUF_SIZE];
+    string lasttxid;
+    Array lastwriters;
+    int lastvout;
+    
+    
+    ParseEntityIdentifier(params[0],&asset_entity,MC_ENT_TYPE_ASSET);
+
+    if(asset_entity.IsFollowOn())
+    {
+        throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Asset with this issue txid not found");                                                                
+    }
+
+    if(asset_entity.IsNFTAsset() == 0)
+    {
+        throw JSONRPCError(RPC_NOT_ALLOWED, "Token details are only available for non-fungible assets");         
+    }
+    
+    multiple=asset_entity.GetAssetMultiple();
+    
+    Array results;
+    
+    vector<string> inputStrings;
+    if(params[1].type() == str_type)
+    {
+        inputStrings.push_back(params[1].get_str());
+        if( (inputStrings[0] == "*") || (inputStrings[0] == "") )
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid token name");                                                                
+        }
+    }
+    else
+    {
+        inputStrings=ParseStringList(params[1]);        
+    }
+   
+    for(int is=0;is<(int)inputStrings.size();is++)
+    {
+        string token=inputStrings[is];
+        uint256 token_hash;
+        mc_SHA256 *hasher=new mc_SHA256();
+        hasher->Reset();
+        hasher->Write(asset_entity.GetTxID(),sizeof(uint256));
+        hasher->Write(token.c_str(),token.size());
+        hasher->GetHash((unsigned char *)&token_hash);
+        hasher->Reset();
+        hasher->Write((unsigned char *)&token_hash,sizeof(uint256));
+        hasher->GetHash((unsigned char *)&token_hash);    
+        delete hasher;
+
+        memset(buf,0,MC_AST_ASSET_FULLREF_BUF_SIZE);
+        memcpy(buf+MC_AST_SHORT_TXID_OFFSET,(unsigned char*)&token_hash+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
+
+        mc_EntityDetails token_entity;
+        if(mc_gState->m_Assets->FindEntityByShortTxID(&token_entity,buf+MC_AST_SHORT_TXID_OFFSET) == 0)
+        {
+            throw JSONRPCError(RPC_ENTITY_NOT_FOUND, strprintf("Token %s not found in this asset",token.c_str()));                                                                            
+        }
+
+        results.push_back(AssetIssueEntry(&asset_entity,&token_entity,multiple,0x440,lasttxid,lastwriters,lastvout));
+    }
+    
+    return results;
+}
