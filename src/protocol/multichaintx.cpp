@@ -2186,6 +2186,14 @@ bool MultiChainTransaction_ProcessTokenIssuance(const CTransaction& tx,
         }
         return false;                                            
     }
+    
+    if(mc_gState->m_Assets->m_Version >= 1)
+    {
+        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_TXID,(const unsigned char*)&this_txid,sizeof(uint256));            
+        mc_gState->m_TmpScript->SetSpecialParamValue(MC_ENT_SPRM_ASSET_QUANTITY,(const unsigned char*)&vout_total,sizeof(int64_t));                    
+        special_script=mc_gState->m_TmpScript->GetData(0,&special_script_size);
+    }
+    
     err=mc_gState->m_Assets->InsertEntity(&token_hash,offset,MC_ENT_TYPE_TOKEN,token_details,token_details_size+1,special_script,special_script_size,0,update_mempool,MC_ENT_FLAG_NO_OFFSET_KEY);    
     
     if(err)           

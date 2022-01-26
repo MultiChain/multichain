@@ -5749,19 +5749,17 @@ void mc_InitRPCHelpMap25()
             + HelpExampleRpc("encodehexubjson", "'[{\"method\":\"getdiagnostics\",\"params\":[true]}]'")
         ));
    
-     mapHelpStrings.insert(std::make_pair("gettokendetails",
-            "gettokendetails \"asset-identifier\" token-identifier(s)\n"
-            "\nReturns information about tokens\n"
+     mapHelpStrings.insert(std::make_pair("gettokeninfo",
+            "gettokeninfo \"asset-identifier\" \"token-identifier\"\n"
+            "\nReturns information about token\n"
             "\nArguments:\n"
             "1. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             "2. \"token-identifier\"               (string, required) Token identifier\n"
-            " or\n"
-            "2. token-identifier(s)              (array, required) A JSON array of token identifiers \n"                
             "\nResult:\n"
             "An array containing information about tokens\n"            
             "\nExamples:\n"
-            + HelpExampleCli("gettokendetails", "\"asset1\" \"token1\"")
-            + HelpExampleRpc("gettokendetails", "\"asset1\", \"token1\"")
+            + HelpExampleCli("gettokeninfo", "\"asset1\" \"token1\"")
+            + HelpExampleRpc("gettokeninfo", "\"asset1\", \"token1\"")
         ));
     
     mapHelpStrings.insert(std::make_pair("AAAAAAA",
