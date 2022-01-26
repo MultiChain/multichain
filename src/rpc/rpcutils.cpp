@@ -2524,7 +2524,7 @@ mc_Buffer *mc_GetEntityTxIDList(uint32_t entity_type,int req_count,int req_start
     return mc_gState->m_Assets->GetEntityList(NULL,NULL,entity_type);
 }
 
-Object AssetIssueEntry(mc_EntityDetails *asset_entity,mc_EntityDetails *followon,uint64_t multiple,uint32_t output_level,string& lasttxid,Array& lastwriters,int& lastvout)
+Object AssetIssueEntry(mc_EntityDetails *asset_entity,mc_EntityDetails *followon,uint64_t multiple,int is_token,uint32_t output_level,string& lasttxid,Array& lastwriters,int& lastvout)
 {
     size_t value_size;
     int64_t offset,new_offset;
@@ -2597,8 +2597,30 @@ Object AssetIssueEntry(mc_EntityDetails *asset_entity,mc_EntityDetails *followon
         lastvout=vout;
         if(output_level & 0x0400)
         {
-            issue.push_back(Pair("txid", ((uint256*)(followon->GetTxID()))->ToString().c_str()));    
-            qty=followon->GetQuantity();
+            if(is_token)
+            {
+                unsigned char* tptr;
+                tptr=(unsigned char *)followon->GetSpecialParam(MC_ENT_SPRM_TXID,&value_size);
+                if(tptr)
+                {
+                    issue.push_back(Pair("txid", ((uint256*)tptr)->ToString().c_str()));  
+                }
+                else
+                {
+                    issue.push_back(Pair("txid", Value::null));                      
+                }
+                qty=0;
+                tptr=(unsigned char *)followon->GetSpecialParam(MC_ENT_SPRM_ASSET_QUANTITY,&value_size);
+                if(tptr)
+                {
+                    qty=mc_GetLE(tptr,value_size);
+                }                
+            }
+            else
+            {
+                issue.push_back(Pair("txid", ((uint256*)(followon->GetTxID()))->ToString().c_str()));    
+                qty=followon->GetQuantity();
+            }
             issue.push_back(Pair("qty", (double)qty*units));
             issue.push_back(Pair("raw", qty));                    
         }
@@ -2660,7 +2682,7 @@ Array AssetHistory(mc_EntityDetails *asset_entity,mc_EntityDetails *last_entity,
             mc_gState->m_Assets->FindEntityByPosition(&followon_entity,*(int64_t*)followons->GetRow(i));
             followon=&followon_entity;
             
-            Object issue=AssetIssueEntry(asset_entity,followon,multiple,output_level,lasttxid,lastwriters,lastvout);
+            Object issue=AssetIssueEntry(asset_entity,followon,multiple,0,output_level,lasttxid,lastwriters,lastvout);
             issues.push_back(issue);                    
         }
         mc_gState->m_Assets->FreeEntityList(followons);

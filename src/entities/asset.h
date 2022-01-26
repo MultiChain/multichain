@@ -7,6 +7,8 @@
 #include "utils/declare.h"
 #include "utils/dbwrapper.h"
 
+#define MC_AST_DEFAULT_VERSION        1
+
 #define MC_AST_ASSET_REF_SIZE        10
 #define MC_AST_ASSET_BUF_TOTAL_SIZE  22
 #define MC_AST_SHORT_TXID_OFFSET     16
@@ -78,6 +80,7 @@
 #define MC_ENT_SPRM_VOUT                      0x09
 #define MC_ENT_SPRM_UPDATE_NAME               0x0a
 #define MC_ENT_SPRM_PARENT_ENTITY             0x0b
+#define MC_ENT_SPRM_TXID                      0x0c
 
 #define MC_ENT_SPRM_ASSET_MULTIPLE            0x41                              // Entity-specific parameters
 #define MC_ENT_SPRM_UPGRADE_PROTOCOL_VERSION  0x42
@@ -89,6 +92,7 @@
 #define MC_ENT_SPRM_FILTER_LIBRARIES          0x48
 #define MC_ENT_SPRM_ASSET_MAX_TOTAL           0x49
 #define MC_ENT_SPRM_ASSET_MAX_ISSUE           0x4a
+#define MC_ENT_SPRM_ASSET_QUANTITY            0x4b
 
 #define MC_ENT_SPRM_ASSET_TOTAL               0x51                              // Optimization parameters
 #define MC_ENT_SPRM_CHAIN_INDEX               0x52 
@@ -193,7 +197,7 @@ typedef struct mc_EntityLedgerRow
     int32_t m_Block;                                                            // Block entity is confirmed in
     int32_t m_Offset;                                                           // Offset of the entity in the block
     uint32_t m_ScriptSize;                                                      // Script Size
-    int64_t m_Quantity;                                                         // Total quantity of the entity (including follow-ons)
+    int64_t m_Quantity;                                                         // Total quantity of the entity (including follow-ons), 4b mode + 4b version for the zero row
     uint32_t m_EntityType;                                                      // Entity type - MC_ENT_TYPE_ constants
     int32_t m_ExtendedScript;                                                   // Size of extended script when in file, row+1 in temp buffer if in mempool
     int64_t m_PrevPos;                                                          // Position of the previous entity in the ledger
@@ -337,6 +341,8 @@ typedef struct mc_AssetDB
     uint64_t m_CheckPointMemPoolSize;
     int m_DBRowCount;
     uint32_t m_Flags;
+    uint32_t m_Mode;
+    int32_t m_Version;
     
     mc_Buffer   *m_ThreadRollBackPos;    
     
@@ -356,7 +362,7 @@ typedef struct mc_AssetDB
 
 // External functions    
 
-    int Initialize(const char *name,int mode);
+    int Initialize(const char *name,uint32_t mode,int32_t version);
         
     int InsertEntity(const void* txid, int offset, int entity_type, const void *script,size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row,int update_mempool,uint32_t flags);
     int InsertAsset(const void* txid, int offset, int asset_type, uint64_t quantity,const char *name,int multiple,const void *script,size_t script_size, const void* special_script, size_t special_script_size,int32_t extended_script_row,int update_mempool);

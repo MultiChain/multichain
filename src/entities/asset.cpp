@@ -353,7 +353,7 @@ int mc_AssetDB::Zero()
     return MC_ERR_NOERROR;
 }
 
-int mc_AssetDB::Initialize(const char *name,int mode)
+int mc_AssetDB::Initialize(const char *name,uint32_t mode,int32_t version)
 {
     int err,value_len,take_it;    
     int32_t adbBlock,aldBlock;
@@ -455,11 +455,15 @@ int mc_AssetDB::Initialize(const char *name,int mode)
     {
         return MC_ERR_DBOPEN_ERROR;
     }
+    int64_t modeversion=0;
     if(m_Ledger->GetRow(0,&aldRow) == 0)
     {
         aldBlock=aldRow.m_Block;
         aldLastPos=aldRow.m_PrevPos;
-        m_PrevPos=adbLastPos;                    
+        m_PrevPos=adbLastPos;       
+        modeversion=aldRow.m_Quantity;
+        m_Version=mc_GetLE(&modeversion,sizeof(int32_t));
+        m_Mode=mc_GetLE((unsigned char*)&modeversion+sizeof(int32_t),sizeof(uint32_t));
         if(m_Ledger->GetRow(m_PrevPos,&aldRow))
         {
             return MC_ERR_CORRUPTED;
@@ -472,6 +476,11 @@ int mc_AssetDB::Initialize(const char *name,int mode)
         aldRow.Zero();
         aldRow.m_Block=(uint32_t)aldBlock;
         aldRow.m_PrevPos=aldLastPos;
+        m_Version=version;
+        m_Mode=mode;
+        mc_PutLE(&modeversion,&m_Version,sizeof(int32_t));
+        mc_PutLE((unsigned char*)&modeversion+sizeof(int32_t),&m_Mode,sizeof(uint32_t));
+        aldRow.m_Quantity=modeversion;
         m_Ledger->SetZeroRow(&aldRow);
     }        
     if(m_Pos != m_Ledger->GetSize())
