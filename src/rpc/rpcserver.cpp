@@ -135,10 +135,11 @@ template <typename WorkItem>
 class WorkQueue
 {
 private:
-    CCriticalSection cs;
-    std::condition_variable cond GUARDED_BY(cs);
-    std::deque<std::unique_ptr<WorkItem>> queue GUARDED_BY(cs);
-    bool running GUARDED_BY(cs);
+    boost::condition_variable cond;
+    boost::mutex mutex;
+    
+    std::deque<std::unique_ptr<WorkItem>> queue;
+    bool running;
     const size_t maxDepth;
 
 public:
@@ -154,7 +155,7 @@ public:
     /** Enqueue a work item */
     bool Enqueue(WorkItem* item)
     {
-        LOCK(cs);
+        boost::unique_lock<boost::mutex> lock(mutex);
         if (!running || queue.size() >= maxDepth) {
             return false;
         }
@@ -162,73 +163,48 @@ public:
         cond.notify_one();
         return true;
     }
+    
     /** Thread function */
     void Run()
     {
         uint64_t thread_id=__US_ThreadID();
         while (true) {
             std::unique_ptr<WorkItem> i;
-            bool found=false;            
             {
-/*                
-                WAIT_LOCK(cs, lock);
+                boost::unique_lock<boost::mutex> lock(mutex);
+                
                 while (running && queue.empty())
                     cond.wait(lock);
                 if (!running && queue.empty())
                     break;
                 i = std::move(queue.front());
                 queue.pop_front();
- */
-                LOCK(cs);
+            }
+            map<uint64_t,RPCThreadLoad>::iterator load_it=rpc_loads.find(thread_id);
+            if(load_it != rpc_loads.end())
+            {
                 if(nWalletUnlockTime)
                 {
-                    map<uint64_t,RPCThreadLoad>::iterator load_it=rpc_loads.find(thread_id);
-                    if(load_it != rpc_loads.end())                              // Only RPC threads deal with Wallet lock
+                    if(GetTime() > nWalletUnlockTime)
                     {
-                        if(GetTime() > nWalletUnlockTime)
-                        {
-                            LockWallet(pwalletMain);
-                        }
-                    }                
-                }
-                
-                if(!queue.empty())
-                {
-                    found=true;
-                    i = std::move(queue.front());
-                    queue.pop_front();                    
-                }                
-            }
-            if(found)
-            {
-                if(running)
-                {
-                    map<uint64_t,RPCThreadLoad>::iterator load_it=rpc_loads.find(thread_id);
-                    if(load_it != rpc_loads.end())
-                    {
-                        load_it->second.start=GetTimeMicros();
-                    }
-                    (*i)();
-                    if(load_it != rpc_loads.end())
-                    {
-                        load_it->second.end=GetTimeMicros();
-                        load_it->second.Update();
+                        LockWallet(pwalletMain);
                     }
                 }
+                load_it->second.start=GetTimeMicros();
             }
-            else
+            (*i)();
+            if(load_it != rpc_loads.end())
             {
-                if (!running && queue.empty())
-                    break;                
-                MilliSleep(10);
+                load_it->second.end=GetTimeMicros();
+                load_it->second.Update();
             }
         }
     }
-    
+
     /** Interrupt and exit loops */
     void Interrupt()
     {
-        LOCK(cs);
+        boost::unique_lock<boost::mutex> lock(mutex);
         running = false;
         cond.notify_all();
     }
