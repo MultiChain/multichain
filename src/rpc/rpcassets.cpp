@@ -3020,7 +3020,7 @@ Value listassetissues(const Array& params, bool fHelp)
     {
         if(paramtobool(params[1]))
         {
-            output_level|=0x40;
+            output_level|=0x60;
         }
     }
     
@@ -3031,9 +3031,9 @@ Value listassetissues(const Array& params, bool fHelp)
 
 Value gettokeninfo(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() != 2)
+    if (fHelp || params.size() < 2 || params.size() > 3)
          mc_ThrowHelpMessage("gettokeninfo");   
-
+    
     if(mc_gState->m_Features->NFTokens() == 0)
     {        
          throw JSONRPCError(RPC_NOT_SUPPORTED, "API is not supported with this protocol version.");               
@@ -3050,6 +3050,7 @@ Value gettokeninfo(const Array& params, bool fHelp)
     string lasttxid;
     Array lastwriters;
     int lastvout;
+    uint32_t output_level;
     
     
     ParseEntityIdentifier(params[0],&asset_entity,MC_ENT_TYPE_ASSET);
@@ -3089,5 +3090,15 @@ Value gettokeninfo(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_ENTITY_NOT_FOUND, strprintf("Token %s not found in this asset",token.c_str()));                                                                            
     }
 
-    return AssetIssueEntry(&asset_entity,&token_entity,multiple,1,0x440,lasttxid,lastwriters,lastvout);
+    output_level=0x440;
+    
+    if (params.size() > 2)    
+    {
+        if(paramtobool(params[2]))
+        {
+            output_level|=0x20;
+        }
+    }
+    
+    return AssetIssueEntry(&asset_entity,&token_entity,multiple,1,output_level,lasttxid,lastwriters,lastvout);
 }

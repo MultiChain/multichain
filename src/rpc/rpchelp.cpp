@@ -5659,7 +5659,7 @@ void mc_InitRPCHelpMap24()
         ));
     
     mapHelpStrings.insert(std::make_pair("issuetokenfrom",
-            "issuetokenfrom \"from-address\" \"address\" \"asset-identifier\" \"token-identifier\" quantity ( native-amount token-details)\n"
+            "issuetokenfrom \"from-address\" \"address\" \"asset-identifier\" \"token-identifier\" quantity ( native-amount token-details )\n"
             "\nCreate tokens for non-fungible asset from specific address\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -5750,11 +5750,12 @@ void mc_InitRPCHelpMap25()
         ));
    
      mapHelpStrings.insert(std::make_pair("gettokeninfo",
-            "gettokeninfo \"asset-identifier\" \"token-identifier\"\n"
+            "gettokeninfo \"asset-identifier\" \"token-identifier\" ( verbose )\n"
             "\nReturns information about token\n"
             "\nArguments:\n"
             "1. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
             "2. \"token-identifier\"               (string, required) Token identifier\n"
+            "3. verbose                          (boolean, optional, default=false) If true, returns list of issuers \n"
             "\nResult:\n"
             "An array containing information about tokens\n"            
             "\nExamples:\n"
