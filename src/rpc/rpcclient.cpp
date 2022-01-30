@@ -353,6 +353,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "listassetissues", 1 },                                                            
     { "listassetissues", 2 },                                                            
     { "listassetissues", 3 },         
+    { "gettokeninfo", 2 },                                                            
     { "listupgrades", 0 },
     { "listupgrades", 1 },                                                            
     { "listupgrades", 2 },                                                            

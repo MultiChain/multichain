@@ -2537,7 +2537,7 @@ Object AssetIssueEntry(mc_EntityDetails *asset_entity,mc_EntityDetails *followon
     
     units= 1./(double)multiple;
     Object issue;
-    if(output_level & 0x0440)
+    if(output_level & 0x0460)
     {
         lasttxid=((uint256*)(followon->GetTxID()))->ToString();
         Array followon_issuers;
@@ -2645,6 +2645,9 @@ Object AssetIssueEntry(mc_EntityDetails *asset_entity,mc_EntityDetails *followon
         if(output_level & 0x0040)
         {
             issue.push_back(Pair("details",vfields)); 
+        }
+        if(output_level & 0x0020)
+        {
             issue.push_back(Pair("issuers",followon_issuers));                    
         }
         qty=followon->GetQuantity();
