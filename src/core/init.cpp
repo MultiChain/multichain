@@ -1851,6 +1851,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         }
 
         vector <mc_TxEntity> vSubscribedEntities;
+        vector <uint32_t> vSubscribedEntitiesFlags;
         int explorer_support=-1;
         if(GetBoolArg("-reindex", false) || GetBoolArg("-rescan", false))
         {
@@ -1868,6 +1869,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                         case MC_TET_PUBKEY_ADDRESS:
                         case MC_TET_SCRIPT_ADDRESS:
                             vSubscribedEntities.push_back(stat->m_Entity);
+                            vSubscribedEntitiesFlags.push_back(stat->m_Flags);
                             break;
                         case MC_TET_STREAM:
                         case MC_TET_STREAM_KEY:
@@ -1876,6 +1878,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                             if(!GetBoolArg("-dropallsubscriptions",false))
                             {
                                 vSubscribedEntities.push_back(stat->m_Entity);
+                                vSubscribedEntitiesFlags.push_back(0);
                             }
                             break;
                         case MC_TET_EXP_TX:
@@ -2159,7 +2162,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 
                 for(int e=0;e<(int)vSubscribedEntities.size();e++)
                 {
-                    pwalletTxsMain->AddEntity(&(vSubscribedEntities[e]),MC_EFL_NOT_IN_SYNC);                    
+                    pwalletTxsMain->AddEntity(&(vSubscribedEntities[e]),MC_EFL_NOT_IN_SYNC | vSubscribedEntitiesFlags[e]);                    
                 }                                
                 
                 mc_TxEntityStat entstat;
