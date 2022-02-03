@@ -1234,6 +1234,20 @@ Value createkeypairs(const Array& params, bool fHelp)
     return retArray;
 }
 
+bool mc_GetDefaultLicenseAddress(CBitcoinAddress& license_address)
+{
+    BOOST_FOREACH(const PAIRTYPE(CBitcoinAddress, CAddressBookData)& item, pwalletMain->mapAddressBook)
+    {
+        const CBitcoinAddress& address = item.first;
+        if(item.second.purpose == "license")
+        {
+            license_address=address;
+            return true;
+        }
+    }    
+    return false;
+}
+
 Value getaddresses(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)                                            // MCHN
@@ -1262,7 +1276,9 @@ Value getaddresses(const Array& params, bool fHelp)
     {
         int entity_count;
         mc_TxEntityStat *lpEntity;
-
+        CBitcoinAddress license_address;
+        bool has_license=mc_GetDefaultLicenseAddress(license_address);
+        
         entity_count=pwalletTxsMain->GetEntityListCount();
         for(int i=0;i<entity_count;i++)
         {
@@ -1273,13 +1289,16 @@ Value getaddresses(const Array& params, bool fHelp)
             {
                 if(CBitcoinAddressFromTxEntity(address,&(lpEntity->m_Entity)))
                 {
-                    if(verbose)
+                    if(!has_license || !(address == license_address) )
                     {
-                        ret.push_back(AddressEntry(address,verbose));
-                    }
-                    else
-                    {
-                        ret.push_back(address.ToString());                        
+                        if(verbose)
+                        {
+                            ret.push_back(AddressEntry(address,verbose));
+                        }
+                        else
+                        {
+                            ret.push_back(address.ToString());                        
+                        }
                     }
                 }
             }
