@@ -1744,7 +1744,8 @@ int mc_TxDB::AddData(mc_TxImport *import,
 
     newtx=0;
     ondisk=0;
-//    err=GetTx(&txdef,hash,IsCSkipped(MC_TET_GETDB_ADD_TX));
+    err=GetTx(&txdef,hash,0);
+/*    
     if(m_TxCachedFlags & MC_TCF_FOUND)
     {
         memcpy(&txdef,&(m_TxCachedDef),sizeof(mc_TxDefRow));
@@ -1757,7 +1758,7 @@ int mc_TxDB::AddData(mc_TxImport *import,
     {
         err=MC_ERR_INTERNAL_ERROR;
     }
-    
+*/    
     if(err == MC_ERR_NOT_FOUND)                                                 // Data is not found, neither on disk, nor in the mempool    
     {
         err=MC_ERR_NOERROR;
