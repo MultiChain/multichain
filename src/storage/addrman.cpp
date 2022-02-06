@@ -1267,50 +1267,74 @@ uint32_t CMCAddrMan::PrepareSelect(set<CService> setLocalAddr,uint32_t *counts)
     
     {
         LOCK(cs_vNodes);
-        BOOST_FOREACH(CNode* pnode, vNodes) 
-        {                
-            CService naddr;
-            if (!pnode->fInbound) 
-            {
-                nOutbound++;
-            }
-            if(pnode->kAddrRemote != 0)
-            {
-                if (pnode->fInbound) 
-                {                
-                    if (((CNetAddr)pnode->addr) == (CNetAddr)pnode->addrFromVersion)
+        for(int pass=0;pass<2;pass++)
+        {
+            BOOST_FOREACH(CNode* pnode, vNodes) 
+            {                
+                CService naddr;
+                if(pass == 0)
+                {
+                    if (!pnode->fInbound) 
                     {
-                        naddr=pnode->addrFromVersion;
+                        nOutbound++;
                     }
                 }
-                else
+                if(pnode->kAddrRemote != 0)
                 {
-                    naddr=pnode->addr;
-                }
-                if(!naddr.IsZero())
-                {
-                    if(m_NetAddrConnected.find(naddr) != m_NetAddrConnected.end())
+                    bool take_it=false;
+                    if(pnode->kAddrLocal < pnode->kAddrRemote)
                     {
-                        LogPrintf("mchn: Duplicate connection to %s, disconnecting node %d\n", naddr.ToStringIPPort().c_str(), pnode->id);
-                        pnode->fDisconnect=true;
+                        if(pass == 0)
+                        {
+                            take_it=true;
+                        }
+                    }
+                    else
+                    {
+                        if(pass == 1)
+                        {
+                            take_it=true;
+                        }                        
+                    }
+                    if(take_it)
+                    {
+                        if (pnode->fInbound) 
+                        {                
+                            if (((CNetAddr)pnode->addr) == (CNetAddr)pnode->addrFromVersion)
+                            {
+                                naddr=pnode->addrFromVersion;
+                            }
+                        }
+                        else
+                        {
+                            naddr=pnode->addr;
+                        }
+                        if(!naddr.IsZero())
+                        {
+                            if(m_NetAddrConnected.find(naddr) != m_NetAddrConnected.end())
+                            {
+                                LogPrintf("mchn: Duplicate connection to %s, disconnecting peer %d\n", naddr.ToStringIPPort().c_str(), pnode->id);
+                                pnode->fDisconnect=true;
+                            }
+                        }
+                        if(m_MCAddrConnected.find((uint160)pnode->kAddrRemote) != m_MCAddrConnected.end())
+                        {
+                            LogPrintf("mchn: Duplicate connection to %s, disconnecting peer %d\n", CBitcoinAddress((CKeyID)(pnode->kAddrRemote)).ToString().c_str(), pnode->id);
+                            pnode->fDisconnect=true;                    
+                        }                
+
+                        if(!pnode->fDisconnect)
+                        {
+                            if(!naddr.IsZero())
+                            {
+                                m_NetAddrConnected.insert(naddr);
+                            }
+                            m_MCAddrConnected.insert((uint160)pnode->kAddrRemote);                    
+                        }
                     }
                 }
-                if(m_MCAddrConnected.find((uint160)pnode->kAddrRemote) != m_MCAddrConnected.end())
-                {
-                    LogPrintf("mchn: Duplicate connection to %s, disconnecting node %d\n", CBitcoinAddress((CKeyID)(pnode->kAddrRemote)).ToString().c_str(), pnode->id);
-                    pnode->fDisconnect=true;                    
-                }                
-                
-                if(!pnode->fDisconnect)
-                {
-                    if(!naddr.IsZero())
-                    {
-                        m_NetAddrConnected.insert(naddr);
-                    }
-                    m_MCAddrConnected.insert((uint160)pnode->kAddrRemote);                    
-                }
-            }
-        }        
+            }        
+        }
     }
     
     for(int mode=0;mode<MC_AMM_MODE_COUNT;mode++)
@@ -1427,7 +1451,7 @@ uint32_t CMCAddrMan::PrepareSelect(set<CService> setLocalAddr,uint32_t *counts)
         }
     }
     
-    LogPrint("addrman","Prepared for select: %u recent successes, %u recent fails, %u new, %u old, %u never successful\n",
+   if(fDebug)LogPrint("addrman","Prepared for select: %u recent successes, %u recent fails, %u new, %u old, %u never successful\n",
             m_Selected[MC_AMM_RECENT_SUCCESS].size(),m_Selected[MC_AMM_RECENT_FAIL].size(),m_Selected[MC_AMM_NEW_NET].size(),
             m_Selected[MC_AMM_OLD_FAIL].size(),m_Selected[MC_AMM_TRIED_NET].size());
     
