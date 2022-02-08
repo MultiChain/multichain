@@ -999,15 +999,14 @@ void CMCAddrMan::Set(const CService &netaddr, uint160 mcaddr)
     
     addr=Find(netaddr,mcaddr);
     
-    if(mcaddr != 0)
-    {
-        mcparent=Find(CService(),mcaddr);
-        netparent=Find(netaddr,0);
-    }
-    
     if(addr)
     {
         row=addr->GetLastRow();
+        if(mcaddr != 0)
+        {
+            mcparent=Find(CService(),mcaddr);
+            netparent=Find(netaddr,0);
+        }    
     }
     else
     {
@@ -1026,6 +1025,11 @@ void CMCAddrMan::Set(const CService &netaddr, uint160 mcaddr)
         {
             if(fDebug)LogPrint("addrman","mcaddrman: New full address %s on %s\n",CBitcoinAddress((CKeyID)addr->GetMCAddress()).ToString().c_str(),addr->GetNetAddress().ToStringIPPort().c_str());            
         }
+        if(mcaddr != 0)
+        {
+            mcparent=Find(CService(),mcaddr);
+            netparent=Find(netaddr,0);
+        }    
         if(mcparent)
         {
             addr->SetPrevRow(mcparent->GetLastRow());
@@ -1494,6 +1498,7 @@ CMCAddrInfo *CMCAddrMan::Select(int mode)
                     take_it=false;        
                 }
             }
+/*            
             if(take_it)
             {
                 if(m_MCAddrTried.find(addr->GetMCAddress()) != m_MCAddrTried.end())
@@ -1501,6 +1506,7 @@ CMCAddrInfo *CMCAddrMan::Select(int mode)
                     take_it=false;        
                 }
             }
+ */ 
         }
         if(take_it)
         {
