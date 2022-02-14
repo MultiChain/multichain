@@ -3,6 +3,7 @@
 
 #include "multichain/multichain.h"
 #include "chainparams/globals.h"
+#include "utils/random.h"
 #include "utils/util.h"
 
 int main(int argc, char* argv[])
@@ -17,6 +18,8 @@ int main(int argc, char* argv[])
 #ifndef WIN32
     umask(077);        
 #endif
+    
+    RandomInit();    
     
     mc_MultichainParams* params;
     mc_MultichainParams* paramsOld;

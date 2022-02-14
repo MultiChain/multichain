@@ -43,6 +43,7 @@ using namespace json_spirit;
 int64_t nWalletUnlockTime;
 static CCriticalSection cs_nWalletUnlockTime;
 
+bool mc_GetDefaultLicenseAddress(CBitcoinAddress& license_address);
 
 
 std::string HelpRequiringPassphrase()
@@ -436,6 +437,9 @@ Value listaddresses(const Array& params, bool fHelp)
         }
     }
     
+    CBitcoinAddress license_address;
+    bool has_license=mc_GetDefaultLicenseAddress(license_address);
+    
     address_count=0;
     for(int i=0;i<entity_count;i++)
     {
@@ -451,13 +455,23 @@ Value listaddresses(const Array& params, bool fHelp)
                 {
                     if(setAddresses.count(address.ToString()) > 0)
                     {
-                        address_count++;
+                        if(!has_license || !(address == license_address) )
+                        {
+                            address_count++;
+                        }
                     }
                 }
             }
             else
             {
-                address_count++;
+                CBitcoinAddress address;
+                if(CBitcoinAddressFromTxEntity(address,&(lpEntity->m_Entity)))
+                {
+                    if(!has_license || !(address == license_address) )
+                    {
+                        address_count++;
+                    }
+                }
             }
         }
     }
@@ -504,11 +518,14 @@ Value listaddresses(const Array& params, bool fHelp)
             {
                 if( (setAddresses.size() == 0) || (setAddresses.count(address.ToString()) > 0) )
                 {
-                    if((address_count >= start) && (address_count < start+count))
+                    if(!has_license || !(address == license_address) )
                     {
-                        result.push_back(AddressEntry(address,verbose));
+                        if((address_count >= start) && (address_count < start+count))
+                        {
+                            result.push_back(AddressEntry(address,verbose));
+                        }
+                        address_count++;
                     }
-                    address_count++;
                 }
             }
         }
@@ -2177,11 +2194,13 @@ Value keypoolrefill(const Array& params, bool fHelp)
 }
 
 
-static void LockWallet(CWallet* pWallet)
+//static void LockWallet(CWallet* pWallet)
+void LockWallet(CWallet* pWallet)
 {
     LOCK(cs_nWalletUnlockTime);
     nWalletUnlockTime = 0;
     pWallet->Lock();
+    LogPrint("wallet","Wallet locked\n");
 }
 
 Value walletpassphrase(const Array& params, bool fHelp)
@@ -2216,7 +2235,8 @@ Value walletpassphrase(const Array& params, bool fHelp)
     int64_t nSleepTime = params[1].get_int64();
     LOCK(cs_nWalletUnlockTime);
     nWalletUnlockTime = GetTime() + nSleepTime;
-    RPCRunLater("lockwallet", boost::bind(LockWallet, pwalletMain), nSleepTime);
+    LogPrint("wallet","Wallet unlocked for %ld seconds\n",nSleepTime);
+//    RPCRunLater("lockwallet", boost::bind(LockWallet, pwalletMain), nSleepTime);
 
     return Value::null;
 }
@@ -2265,9 +2285,12 @@ Value walletlock(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_WALLET_WRONG_ENC_STATE, "Error: running with an unencrypted wallet, but walletlock was called.");
 
     {
+        LockWallet(pwalletMain);
+/*        
         LOCK(cs_nWalletUnlockTime);
         pwalletMain->Lock();
         nWalletUnlockTime = 0;
+ */ 
     }
 
     return Value::null;

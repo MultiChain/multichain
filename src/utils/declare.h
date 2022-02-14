@@ -101,6 +101,31 @@ typedef struct mc_Buffer
     
 } mc_Buffer;
 
+typedef struct mc_TSHeap
+{
+    mc_TSHeap()
+    {
+        Zero();
+    }
+
+    ~mc_TSHeap()
+    {
+        Destroy();
+    }
+
+    mc_Buffer              *m_lpBuffers;
+    void *                  m_Semaphore;    
+    int                     m_MinSize;
+    int                     m_MaxSize;
+    uint32_t                m_Mode;
+    
+    void Zero();
+    int Destroy();
+    int Initialize(int MinSize,int MaxSize,uint32_t Mode);
+    void *GetPointer(void *lpKey,void *lpStack,const void *lpData, int Size);
+    void ReleasePointer(void *lpKey);
+    void ReleaseAll(uint64_t thread_id);
+} mc_TSHeap;
     
 typedef struct mc_List
 {

@@ -24,8 +24,6 @@
 #include <boost/foreach.hpp>
 #include <boost/scoped_ptr.hpp>
 
-#include <openssl/rand.h>
-
 using namespace std;
 using namespace boost;
 

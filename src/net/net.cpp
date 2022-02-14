@@ -91,6 +91,8 @@ uint64_t nLocalHostNonce = 0;
 static std::vector<ListenSocket> vhListenSocket;
 CAddrMan addrman;
 int nMaxConnections = 125;
+int nMaxOutConnections = 8;
+int OutConnectionsAlgoritm=0;
 bool fAddressesInitialized = false;
 
 vector<CNode*> vNodes;
@@ -484,9 +486,16 @@ void CNode::CloseSocketDisconnect()
     }
 
     // in case this fails, we'll empty the recv buffer when the CNode is deleted
-    TRY_LOCK(cs_vRecvMsg, lockRecv);
-    if (lockRecv)
-        vRecvMsg.clear();
+    {
+        TRY_LOCK(cs_vRecvMsg, lockRecv);
+        if (lockRecv)
+            vRecvMsg.clear();
+    }
+    {
+        TRY_LOCK(cs_vRecvDataMsg, lockDataRecv);
+        if (lockDataRecv)
+            vRecvDataMsg.clear();
+    }
 }
 
 void CNode::PushVersion()
@@ -878,9 +887,13 @@ void ThreadSocketHandler()
                             TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
                             if (lockRecv)
                             {
-                                TRY_LOCK(pnode->cs_inventory, lockInv);
-                                if (lockInv)
-                                    fDelete = true;
+                                TRY_LOCK(pnode->cs_vRecvMsg, lockDataRecv);
+                                if (lockDataRecv)
+                                {
+                                    TRY_LOCK(pnode->cs_inventory, lockInv);
+                                    if (lockInv)
+                                        fDelete = true;
+                                }
                             }
                         }
                     }
@@ -1019,7 +1032,7 @@ void ThreadSocketHandler()
                     if (nErr != WSAEWOULDBLOCK)
                         LogPrintf("socket error accept failed: %s\n", NetworkErrorString(nErr));
                 }
-                else if (nInbound >= nMaxConnections - GetArg("-maxoutconnections",MAX_OUTBOUND_CONNECTIONS))
+                else if (nInbound >= nMaxConnections - nMaxOutConnections) // (nInbound >= nMaxConnections - GetArg("-maxoutconnections",MAX_OUTBOUND_CONNECTIONS))
                 {
                     CloseSocket(hSocket);
                 }
@@ -1407,6 +1420,105 @@ void ThreadOpenConnections()
     }
 
 /* MCHN END */    
+    
+    set<CService> setLocalAddrCopy;
+    uint32_t mcaddr_count[MC_AMM_MODE_COUNT];
+    if(MCP_ANYONE_CAN_CONNECT)
+    {
+        OutConnectionsAlgoritm=0;
+    }
+    while(OutConnectionsAlgoritm == 1)
+    {
+        if(!GetBoolArg("-addnodeonly",false))
+        {
+            {
+                LOCK(cs_setLocalAddr);        
+                BOOST_FOREACH(CService laddr, setLocalAddr) 
+                {                
+                    setLocalAddrCopy.insert(laddr);
+                }
+            }
+            int nOutBound=addrman.GetMCAddrMan()->PrepareSelect(setLocalAddrCopy,mcaddr_count);
+            int nRemaining=nMaxOutConnections-nOutBound;
+            
+            if( nRemaining * 2 < (int)mcaddr_count[MC_AMM_RECENT_SUCCESS] )
+            {
+                LogPrintf("Too many addresses to connect (%d) for remaining %d slots, falling back to stochastic algorithm\n",mcaddr_count[MC_AMM_RECENT_SUCCESS],nRemaining);
+                OutConnectionsAlgoritm=0;
+            }
+            if(MCP_ANYONE_CAN_CONNECT)
+            {
+                LogPrintf("anyone-can-connect=true, falling back to stochastic algorithm\n");
+                OutConnectionsAlgoritm=0;
+            }
+            
+            CMCAddrInfo *addr;
+            int nTotal=0;
+            for(uint32_t mode=MC_AMM_MIN_MODE;mode<MC_AMM_MODE_COUNT;mode++)
+            {
+                nTotal+=mcaddr_count[mode];
+            }
+
+            for(uint32_t mode=MC_AMM_MIN_MODE;mode<MC_AMM_MODE_COUNT;mode++)
+            {
+                double ratio=1.;
+                int sleep_time=500;
+                if(mode == MC_AMM_RECENT_SUCCESS)
+                {
+                    sleep_time=100;
+                }
+                else
+                {
+                    if(nRemaining * 4 < nMaxOutConnections)
+                    {
+                        sleep_time=2000;                        
+                    }
+                }
+                
+                if(nRemaining > 0)
+                {
+                    if(nRemaining < nTotal)
+                    {
+                        if(nRemaining < (int)mcaddr_count[mode])
+                        {
+                            ratio=(double)nRemaining/(double)mcaddr_count[mode];
+                        }
+                        if((mode == MC_AMM_OLD_FAIL) || (mode == MC_AMM_TRIED_NET))
+                        {
+                            ratio /= 2.;
+                        }
+                    }
+
+                    while((addr = addrman.GetMCAddrMan()->Select(mode)))
+                    {
+                        if(mc_RandomDouble() <= ratio)
+                        {
+                            CSemaphoreGrant grant(*semOutbound);
+                            CAddress addrConnect(addr->GetNetAddress());
+
+                            bool outcome=OpenNetworkConnection(addrConnect, &grant);
+                            if(outcome)
+                            {
+                                addrman.GetMCAddrMan()->SetOutcome(addr->GetNetAddress(),0,outcome);
+                                nRemaining--;
+                            }
+                            else
+                            {
+                                addrman.GetMCAddrMan()->SetOutcome(addr->GetNetAddress(),addr->GetMCAddress(),outcome);                            
+                            }
+                            boost::this_thread::interruption_point();                
+                            MilliSleep(sleep_time);
+                        }
+                        nTotal--;
+                    }
+                }
+            }
+        }   
+        
+        boost::this_thread::interruption_point();                
+        MilliSleep(500);
+    }
+    
     
     // Initiate network connections
     int64_t nStart = GetTime();
@@ -1813,9 +1925,67 @@ void ThreadMessageHandler()
     }
 }
 
+void ThreadDataMessageHandler()
+{
+    SetThreadPriority(THREAD_PRIORITY_BELOW_NORMAL);
+    while (true)
+    {
+        boost::this_thread::interruption_point();
+        vector<CNode*> vNodesCopy;
+        {
+            LOCK(cs_vNodes);
+            vNodesCopy = vNodes;
+            BOOST_FOREACH(CNode* pnode, vNodesCopy) {
+                pnode->AddRef();
+            }
+        }
+
+        bool fSleep = true;
+
+        BOOST_FOREACH(CNode* pnode, vNodesCopy)
+        {
+            if (pnode->fDisconnect)
+                continue;
+
+            // Receive messages
+            {
+                TRY_LOCK(pnode->cs_vRecvDataMsg, lockRecv);
+                if (lockRecv)
+                {
+
+                    if (!g_signals.ProcessDataMessages(pnode))
+                    {
+                        if(fDebug)LogPrint("net","socket closed because of error in message processing\n");
+                        pnode->CloseSocketDisconnect();
+                    }
+
+                    if (!pnode->vRecvDataMsg.empty())
+                    {
+                        fSleep = false;
+                    }
+                }
+            }
+            boost::this_thread::interruption_point();
+
+            if (pnode->fDisconnect)
+                continue;
+        }
 
 
+        boost::this_thread::interruption_point();
+        
+        {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodesCopy)
+                pnode->Release();
+        }
 
+        boost::this_thread::interruption_point();
+        
+        if (fSleep)
+            MilliSleep(100);
+    }
+}
 
 
 bool BindListenPort(const CService &addrBind, string& strError, bool fWhitelisted)
@@ -1979,7 +2149,8 @@ void StartNode(boost::thread_group& threadGroup)
 
     if (semOutbound == NULL) {
         // initialize semaphore
-        int nMaxOutbound = min((int)GetArg("-maxoutconnections",MAX_OUTBOUND_CONNECTIONS), nMaxConnections);
+//        int nMaxOutbound = min((int)GetArg("-maxoutconnections",MAX_OUTBOUND_CONNECTIONS), nMaxConnections);
+        int nMaxOutbound = min(nMaxOutConnections, nMaxConnections);
         semOutbound = new CSemaphore(nMaxOutbound);
     }
 
@@ -2013,6 +2184,9 @@ void StartNode(boost::thread_group& threadGroup)
     // Process messages
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "msghand", &ThreadMessageHandler));
 
+    // Process data messages
+    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "dmsghand", &ThreadDataMessageHandler));
+
     // Dump network addresses
     threadGroup.create_thread(boost::bind(&LoopForever<void (*)()>, "dumpaddr", &DumpAddresses, DUMP_ADDRESSES_INTERVAL * 1000));
 }
@@ -2040,7 +2214,7 @@ bool StopNode()
     LogPrintf("StopNode()\n");
     MapPort(false);
     if (semOutbound)
-        for (int i=0; i<GetArg("-maxoutconnections",MAX_OUTBOUND_CONNECTIONS); i++)
+        for (int i=0; i< nMaxOutConnections; i++)// i<GetArg("-maxoutconnections",MAX_OUTBOUND_CONNECTIONS); i++)
             semOutbound->post();
 
     if (fAddressesInitialized)
@@ -2250,8 +2424,11 @@ bool CAddrDB::Read(CAddrMan& addr)
     FILE *file = fopen(pathAddr.string().c_str(), "rb");
     CAutoFile filein(file, SER_DISK, CLIENT_VERSION);
     if (filein.IsNull())
-        return error("%s : Failed to open file %s", __func__, pathAddr.string());
-
+    {
+        if(fDebug)LogPrint("addrman","%s : Failed to open file %s", __func__, pathAddr.string().c_str());
+        return false;
+//        return error("%s : Failed to open file %s", __func__, pathAddr.string());
+    }
     // use file size to size memory buffer
     int fileSize = boost::filesystem::file_size(pathAddr);
     int dataSize = fileSize - sizeof(uint256);

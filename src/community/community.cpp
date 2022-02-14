@@ -341,7 +341,7 @@ int mc_EnterpriseFeatures::HCH_GetPort()
     return 0;    
 }
 
-std::string mc_EnterpriseFeatures::HCH_ProcessRequest(std::string strRequest,std::string* strHeader)    
+std::string mc_EnterpriseFeatures::HCH_ProcessRequest(std::string strRequest,std::string* strHeader,map<string, string>& mapHeaders,int& http_code)    
 {
     *strHeader="";
     return "";
@@ -436,6 +436,11 @@ int mc_EnterpriseFeatures::LIC_VerifyLicenses(int block)
 int mc_EnterpriseFeatures::LIC_VerifyUpdateCoin(int block,mc_Coin *coin,bool is_new)
 {
     return MC_ERR_NOERROR;    
+}
+
+Value mc_EnterpriseFeatures::LIC_RPCGetLicenseRequest(const Array& params)
+{
+    return Value::null;
 }
 
 Value mc_EnterpriseFeatures::LIC_RPCDecodeLicenseRequest(const Array& params)

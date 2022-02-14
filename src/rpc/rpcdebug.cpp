@@ -1,6 +1,7 @@
 // Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
+#include "storage/addrman.h"
 #include "core/init.h"
 #include "rpc/rpcwallet.h"
 #include "protocol/relay.h"
@@ -209,6 +210,131 @@ Object mcd_GetChainState(const Object& params)
         
     
     return result;
+}
+
+Object mcd_AddrMan()
+{
+    Object result;
+    vector <CMCAddrInfo> empty;
+    map<CService, vector<CMCAddrInfo> > m_NetAddresses;
+    map<uint160, vector<CMCAddrInfo> > m_MCAddresses;
+    
+    CMCAddrInfo *info;
+    
+    addrman.GetMCAddrMan()->Reset();
+    while((info=addrman.GetMCAddrMan()->Next()))
+    {
+        map<CService, vector<CMCAddrInfo> >::iterator nit = m_NetAddresses.find(info->GetNetAddress());
+        if(nit == m_NetAddresses.end())
+        {
+            m_NetAddresses.insert(make_pair(info->GetNetAddress(),empty));
+            nit = m_NetAddresses.find(info->GetNetAddress());
+        }
+        nit->second.push_back(info);
+        if(info->GetMCAddress() != 0)
+        {
+            map<uint160, vector<CMCAddrInfo> >::iterator mit = m_MCAddresses.find(info->GetMCAddress());
+            if(mit == m_MCAddresses.end())
+            {
+                m_MCAddresses.insert(make_pair(info->GetMCAddress(),empty));
+                mit = m_MCAddresses.find(info->GetMCAddress());
+            }
+            if(!info->GetNetAddress().IsZero())
+            {
+                mit->second.push_back(info);
+            }
+        }
+    }
+        
+    Object netaddresses;
+    BOOST_FOREACH(PAIRTYPE(CService, vector<CMCAddrInfo>) naddr, m_NetAddresses)
+    {
+        Array items;
+        BOOST_FOREACH(CMCAddrInfo info, naddr.second)
+        {
+            Object entry;
+            int64_t lastsuccess,lasttry;
+            int attempts;
+            attempts=info.GetLastTryInfo(&lastsuccess,&lasttry,NULL);
+            if(info.GetMCAddress() != 0)
+            {
+                entry.push_back(Pair("mcaddress",CBitcoinAddress((CKeyID)info.GetMCAddress()).ToString()));
+            }
+            else
+            {
+                entry.push_back(Pair("mcaddress",Value::null));                
+            }
+            if(lastsuccess != 0)
+            {
+                entry.push_back(Pair("lastsuccess",DateTimeStrFormat("%Y-%m-%d %H:%M:%S", lastsuccess)));
+            }
+            else
+            {
+                entry.push_back(Pair("lastsuccess",Value::null));                
+            }
+            if(lasttry != 0)
+            {
+                entry.push_back(Pair("lasttry",DateTimeStrFormat("%Y-%m-%d %H:%M:%S", lasttry)));
+            }
+            else
+            {
+                entry.push_back(Pair("lasttry",Value::null));                                
+            }
+            entry.push_back(Pair("attempts",attempts));     
+            if((info.GetMCAddress() != 0) ||  (naddr.second.size() == 1))
+            {
+                items.push_back(entry);
+            }
+        }        
+        if(!naddr.first.IsZero())
+        {
+            string snaddr=naddr.first.ToStringIPPort();
+            netaddresses.push_back(Pair(snaddr,items));
+        }
+    }
+    
+    result.push_back(Pair("netaddresses",netaddresses));
+    
+    Object mcaddresses;
+    BOOST_FOREACH(PAIRTYPE(uint160, vector<CMCAddrInfo>) maddr, m_MCAddresses)
+    {
+        Array items;
+        BOOST_FOREACH(CMCAddrInfo info, maddr.second)
+        {
+            if(!info.GetNetAddress().IsZero())
+            {
+                Object entry;
+                int64_t lastsuccess,lasttry;
+                int attempts;
+                attempts=info.GetLastTryInfo(&lastsuccess,&lasttry,NULL);
+                entry.push_back(Pair("netaddress",info.GetNetAddress().ToStringIPPort()));
+                if(lastsuccess != 0)
+                {
+                    entry.push_back(Pair("lastsuccess",DateTimeStrFormat("%Y-%m-%d %H:%M:%S", lastsuccess)));
+                }
+                else
+                {
+                    entry.push_back(Pair("lastsuccess",Value::null));                
+                }
+                if(lasttry != 0)
+                {
+                    entry.push_back(Pair("lasttry",DateTimeStrFormat("%Y-%m-%d %H:%M:%S", lasttry)));
+                }
+                else
+                {
+                    entry.push_back(Pair("lasttry",Value::null));                                
+                }
+                entry.push_back(Pair("attempts",attempts));     
+                items.push_back(entry);
+            }        
+            string smaddr=CBitcoinAddress((CKeyID)maddr.first).ToString();
+            mcaddresses.push_back(Pair(smaddr,items));
+        }
+    }
+    
+    result.push_back(Pair("mcaddresses",mcaddresses));
+    
+    return  result;
 }
 
 int64_t mcd_OpenDatabase(const char *name,const char *dbname,int key_size,int value_size,mc_Database **lpDB)
@@ -551,6 +677,12 @@ Value mcd_DebugRequest(string method,const Object& params)
             return HexStr(vValue);            
         }
         return value;
+    }
+    if(method == "addrman")
+    {
+        LOCK(cs_main);
+        
+        return mcd_AddrMan();
     }
     if(method == "rwlock")
     {

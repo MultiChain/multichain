@@ -118,7 +118,7 @@ typedef struct mc_EnterpriseFeatures
     uint64_t NET_Services();
     
     int HCH_GetPort();
-    std::string HCH_ProcessRequest(std::string strRequest,std::string* strHeader);    
+    std::string HCH_ProcessRequest(std::string strRequest,std::string* strHeader,map<string, string>& mapHeaders,int& http_code);    
     Value HCH_RPCHealthCheck(const Array& params);  
     
     std::string ENT_Edition();
@@ -138,6 +138,7 @@ typedef struct mc_EnterpriseFeatures
     int LIC_VerifyLicenses(int block);
     int LIC_VerifyUpdateCoin(int block,mc_Coin *coin,bool is_new);
     std::vector <std::string> LIC_LicensesWithStatus(std::string status);
+    Value LIC_RPCGetLicenseRequest(const Array& params);
     Value LIC_RPCDecodeLicenseRequest(const Array& params);
     Value LIC_RPCDecodeLicenseConfirmation(const Array& params);
     Value LIC_RPCActivateLicense(const Array& params);

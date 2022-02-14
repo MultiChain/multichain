@@ -1945,3 +1945,153 @@ void mc_SwapBytes(void *vptr,uint32_t size)
         ptr[size-i-1]=t;
     }
 }
+
+    
+void mc_TSHeap::Zero()
+{
+    m_lpBuffers=NULL;
+    m_Semaphore=NULL;
+    m_MinSize=0;
+    m_MaxSize=0;
+    m_Mode=0;
+}
+
+int mc_TSHeap::Destroy()
+{
+    if(m_lpBuffers)
+    {
+        for(int i=0;i<m_lpBuffers->GetCount();i++)
+        {
+            unsigned char *row=m_lpBuffers->GetRow(i);    
+            mc_Buffer *buf=*(mc_Buffer**)(row+sizeof(uint64_t)); 
+            if(buf)
+            {
+                delete buf;
+            }
+        }
+        delete m_lpBuffers;
+    }
+
+    if(m_Semaphore)
+    {
+        __US_SemDestroy(m_Semaphore);
+    }    
+    Zero();
+    
+    return MC_ERR_NOERROR;
+}
+
+int mc_TSHeap::Initialize(int MinSize,int MaxSize,uint32_t Mode)
+{
+    m_Mode=Mode;
+    m_MinSize=MinSize;
+    m_MaxSize=MaxSize;
+    
+    m_lpBuffers=new mc_Buffer;
+    m_lpBuffers->Initialize(sizeof(uint64_t),sizeof(uint64_t)+sizeof(mc_Buffer*),MC_BUF_MODE_MAP);    
+    m_lpBuffers->Realloc(MC_PRM_MAX_THREADS);
+    m_Semaphore=__US_SemCreate();
+    
+    return MC_ERR_NOERROR;
+}
+
+void *mc_TSHeap::GetPointer(void *lpKey,void *lpStack,const void *lpData, int Size)
+{
+    if(Size <= m_MinSize)
+    {
+        if(lpStack)
+        {
+            memcpy(lpStack,lpData,Size);
+            return lpStack;
+        }
+    }
+    
+    uint64_t thread_id=__US_ThreadID();
+    int mprow=m_lpBuffers->Seek(&thread_id);
+    if(mprow < 0)
+    {
+        __US_SemWait(m_Semaphore);
+        mc_Buffer *new_buffer=new mc_Buffer;
+        new_buffer->Initialize(sizeof(void*),sizeof(void*)+m_MaxSize,MC_BUF_MODE_DEFAULT);        
+        mprow=m_lpBuffers->GetCount();
+        m_lpBuffers->Add(&thread_id,&new_buffer);        
+        __US_SemPost(m_Semaphore);
+    }
+    
+    mc_Buffer *buf=*(mc_Buffer**)(m_lpBuffers->GetRow(mprow)+sizeof(uint64_t)); 
+    
+    unsigned char *rptr;
+    mprow=-1;
+    for(int i=0;i<buf->GetCount();i++)
+    {
+        rptr=buf->GetRow(i);
+        if(*(void**)rptr == NULL)
+        {
+            if(mprow == -1)
+            {
+                mprow=i;
+            }
+        }
+        else
+        {
+            if(*(void**)rptr == lpKey)
+            {
+                mprow=i;
+            }
+        }
+    }
+    
+    if(mprow<0)
+    {
+        mprow=buf->GetCount();
+        buf->Add(&lpKey,NULL);                
+    }
+    
+    rptr=buf->GetRow(mprow);
+    *(void**)rptr=lpKey;
+    unsigned char *ptr=rptr+sizeof(void*);
+    memcpy(ptr,lpData,Size);
+    
+    return ptr;                
+}
+
+void mc_TSHeap::ReleasePointer(void *lpKey)
+{
+    uint64_t thread_id=__US_ThreadID();
+    int mprow=m_lpBuffers->Seek(&thread_id);
+    if(mprow < 0)
+    {
+        return;
+    }
+    
+    mc_Buffer *buf=*(mc_Buffer**)(m_lpBuffers->GetRow(mprow)+sizeof(uint64_t)); 
+    
+    unsigned char *rptr;
+    for(int i=0;i<buf->GetCount();i++)
+    {
+        rptr=buf->GetRow(i);
+        if(*(void**)rptr == lpKey)
+        {
+            *(void**)rptr=NULL;
+            return;
+        }
+    }    
+}
+    
+void mc_TSHeap::ReleaseAll(uint64_t thread_id)
+{
+    int mprow=m_lpBuffers->Seek(&thread_id);
+    if(mprow < 0)
+    {
+        return;
+    }
+    
+    mc_Buffer *buf=*(mc_Buffer**)(m_lpBuffers->GetRow(mprow)+sizeof(uint64_t)); 
+    
+    unsigned char *rptr;
+    for(int i=0;i<buf->GetCount();i++)
+    {
+        rptr=buf->GetRow(i);
+        *(void**)rptr=NULL;
+    }        
+}

@@ -1011,7 +1011,7 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
     {        
         if(raw_entity)
         {
-            memcpy(&entity,raw_entity,sizeof(mc_EntityDetails));
+            entity.Copy(raw_entity);
         }
         ptr=(unsigned char *)entity.GetName();
         
@@ -2103,7 +2103,7 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
         }
         else
         {
-            memcpy(genesis_entity,&entity,sizeof(mc_EntityDetails));
+            genesis_entity->Copy(&entity);
         }
         
         if(output_level & 0x100)
@@ -2294,20 +2294,15 @@ Object AssetEntry(const unsigned char *txid,int64_t quantity,uint32_t output_lev
             
             issue_count=mc_GetEntityIndex(&last_entity)+1;
             mc_Buffer *followons;
-            followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(&last_entity,issue_count,0);
+//            followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(&last_entity,issue_count,0);
+            followons=mc_gState->m_Assets->GetFollowOnPositionsByLastEntity(&last_entity,issue_count,0);
             for(int i=followons->GetCount()-1;i>=0;i--)
             {
+                mc_EntityDetails followon_entity;
+                mc_gState->m_Assets->FindEntityByPosition(&followon_entity,*(int64_t*)followons->GetRow(i));
+                followon=&followon_entity;
                 Object issue;
-                followon=(mc_EntityDetails *)followons->GetRow(i);
-/*                
-            followons=mc_gState->m_Assets->GetFollowOns(txid);
-            issue_count=followons->GetCount();
-            for(int i=followons->GetCount()-1;i>=0;i--)
-            {
-                Object issue;
-                followon->Zero();
-                if(mc_gState->m_Assets->FindEntityByTxID(followon,followons->GetRow(i)))
- */ 
+//                followon=(mc_EntityDetails *)followons->GetRow(i);
                 {
                     qty=followon->GetQuantity();
                     total+=qty;
@@ -2498,13 +2493,20 @@ mc_Buffer *mc_GetEntityTxIDList(uint32_t entity_type,int req_count,int req_start
             
             mc_AdjustStartAndCount(&count,&start,items);
             mc_Buffer *followons;
-            followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(&last_entity,count,start);
+//            followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(&last_entity,count,start);
+            followons=mc_gState->m_Assets->GetFollowOnPositionsByLastEntity(&last_entity,count,start);
             for(int i=followons->GetCount()-1;i>=0;i--)
             {
+/*                
                 mc_EntityDetails *followon=(mc_EntityDetails *)followons->GetRow(i);
                 size_t value_size;
                 const void* ptr=followon->GetSpecialParam(MC_ENT_SPRM_ENTITY_TXID,&value_size,0);
-                
+*/              
+                mc_EntityDetails followon;
+                mc_gState->m_Assets->FindEntityByPosition(&followon,*(int64_t*)followons->GetRow(i));
+                size_t value_size;
+                const void* ptr=followon.GetSpecialParam(MC_ENT_SPRM_ENTITY_TXID,&value_size,0);
+
                 if(ptr)
                 {
                     result->Add(ptr,NULL);
@@ -2522,7 +2524,177 @@ mc_Buffer *mc_GetEntityTxIDList(uint32_t entity_type,int req_count,int req_start
     return mc_gState->m_Assets->GetEntityList(NULL,NULL,entity_type);
 }
 
+Object AssetIssueEntry(mc_EntityDetails *asset_entity,mc_EntityDetails *followon,uint64_t multiple,int is_token,uint32_t output_level,string& lasttxid,Array& lastwriters,int& lastvout)
+{
+    size_t value_size;
+    int64_t offset,new_offset;
+    uint32_t value_offset;
+    const unsigned char *ptr;
+    int vout=-1;
+    int64_t qty;   
+    
+    double units=1.;
+    
+    units= 1./(double)multiple;
+    Object issue;
+    if(output_level & 0x0460)
+    {
+        lasttxid=((uint256*)(followon->GetTxID()))->ToString();
+        Array followon_issuers;
+        Object followon_fields;
+
+        ptr=followon->GetScript();
+        offset=0;
+        while(offset>=0)
+        {
+            new_offset=followon->NextParam(offset,&value_offset,&value_size);
+            if(value_offset > 0)
+            {
+                if(ptr[offset])
+                {
+                    if(ptr[offset] != 0xff)
+                    {
+                        string param_name((char*)ptr+offset);
+                        string param_value((char*)ptr+value_offset,(char*)ptr+value_offset+value_size);
+                        followon_fields.push_back(Pair(param_name, param_value));                                                                        
+                    }                            
+                }
+                else
+                {
+                    if(ptr[offset+1] == MC_ENT_SPRM_ISSUER)
+                    {
+                        if(value_size == 20)
+                        {
+                            followon_issuers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
+                        }
+                        if(value_size == 24)
+                        {
+                            unsigned char tptr[4];
+                            memcpy(tptr,ptr+value_offset+sizeof(uint160),4);
+                            if(mc_GetLE(tptr,4) & MC_PFL_IS_SCRIPTHASH)
+                            {
+                                followon_issuers.push_back(CBitcoinAddress(*(CScriptID*)(ptr+value_offset)).ToString());                                                
+                            }
+                            else
+                            {
+                                followon_issuers.push_back(CBitcoinAddress(*(CKeyID*)(ptr+value_offset)).ToString());
+                            }
+                        }
+                    }
+                    if(ptr[offset+1] == MC_ENT_SPRM_VOUT)
+                    {
+                        if((value_size > 0) && (value_size <= 4))
+                        {
+                            vout=mc_GetLE((unsigned char*)ptr+value_offset,value_size);
+                        }
+                    }
+                }
+            }
+            offset=new_offset;
+        }      
+
+        lastwriters=followon_issuers;
+        lastvout=vout;
+        if(output_level & 0x0400)
+        {
+            if(is_token)
+            {
+                unsigned char* tptr;
+                tptr=(unsigned char *)followon->GetSpecialParam(MC_ENT_SPRM_TXID,&value_size);
+                if(tptr)
+                {
+                    issue.push_back(Pair("txid", ((uint256*)tptr)->ToString().c_str()));  
+                }
+                else
+                {
+                    issue.push_back(Pair("txid", Value::null));                      
+                }
+                qty=0;
+                tptr=(unsigned char *)followon->GetSpecialParam(MC_ENT_SPRM_ASSET_QUANTITY,&value_size);
+                if(tptr)
+                {
+                    qty=mc_GetLE(tptr,value_size);
+                }                
+            }
+            else
+            {
+                issue.push_back(Pair("txid", ((uint256*)(followon->GetTxID()))->ToString().c_str()));    
+                qty=followon->GetQuantity();
+            }
+            issue.push_back(Pair("qty", (double)qty*units));
+            issue.push_back(Pair("raw", qty));                    
+        }
+        Value vfields=mc_ExtractDetailsJSONObject(followon);
+        if(vfields.type() == null_type)
+        {                        
+            vfields=followon_fields;
+        }
+        if(asset_entity->IsNFTAsset())
+        {
+            ptr=(unsigned char *)followon->GetUpdateName(&value_size);                
+            if(ptr)
+            {
+                string token_name ((char*)ptr,value_size);
+                issue.push_back(Pair("token", token_name));
+            }      
+            else
+            {
+                issue.push_back(Pair("token", Value::null));                            
+            }
+        }
+        if(output_level & 0x0040)
+        {
+            issue.push_back(Pair("details",vfields)); 
+        }
+        if(output_level & 0x0020)
+        {
+            issue.push_back(Pair("issuers",followon_issuers));                    
+        }
+        qty=followon->GetQuantity();
+        if(output_level & 0x0080)
+        {
+            mc_gState->ChainLock();
+            int block=followon->m_LedgerRow.m_Block;
+            int chain_height=chainActive.Height();
+            issue.push_back(Pair("confirmations", chain_height-block+1));
+            if(chain_height >= block)
+            {
+                uint256 blockHash=chainActive[block]->GetBlockHash();
+                issue.push_back(Pair("blockhash", blockHash.GetHex()));
+                issue.push_back(Pair("blockheight", block));                            
+                issue.push_back(Pair("blocktime", mapBlockIndex[blockHash]->GetBlockTime()));                            
+            }                        
+            mc_gState->ChainUnLock();
+        }
+    }
+    return issue;
+}
+
 Array AssetHistory(mc_EntityDetails *asset_entity,mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level,string& lasttxid,Array& lastwriters,int& lastvout)
+{
+    Array issues;
+    mc_EntityDetails *followon;
+    
+    if(output_level & 0x0660)                                                   
+    {
+        mc_Buffer *followons;
+        followons=mc_gState->m_Assets->GetFollowOnPositionsByLastEntity(last_entity,count,start);
+        for(int i=followons->GetCount()-1;i>=0;i--)
+        {
+            mc_EntityDetails followon_entity;
+            mc_gState->m_Assets->FindEntityByPosition(&followon_entity,*(int64_t*)followons->GetRow(i));
+            followon=&followon_entity;
+            
+            Object issue=AssetIssueEntry(asset_entity,followon,multiple,0,output_level,lasttxid,lastwriters,lastvout);
+            issues.push_back(issue);                    
+        }
+        mc_gState->m_Assets->FreeEntityList(followons);
+    }
+    
+    return issues;
+}
+
+Array AssetHistoryOld(mc_EntityDetails *asset_entity,mc_EntityDetails *last_entity,uint64_t multiple,int count,int start,uint32_t output_level,string& lasttxid,Array& lastwriters,int& lastvout)
 {
     size_t value_size;
     int64_t offset,new_offset;
@@ -2542,14 +2714,19 @@ Array AssetHistory(mc_EntityDetails *asset_entity,mc_EntityDetails *last_entity,
     if(output_level & 0x0660)                                                   // For listvariables with followons                                 
     {
         mc_Buffer *followons;
-        followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(last_entity,count,start);
+//        followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(last_entity,count,start);
+//        for(int i=followons->GetCount()-1;i>=0;i--)
+//        {
+        followons=mc_gState->m_Assets->GetFollowOnPositionsByLastEntity(last_entity,count,start);
         for(int i=followons->GetCount()-1;i>=0;i--)
         {
+            mc_EntityDetails followon_entity;
+            mc_gState->m_Assets->FindEntityByPosition(&followon_entity,*(int64_t*)followons->GetRow(i));
+            followon=&followon_entity;
+            
             Object issue;
-//            followon->Zero();
-//            if(mc_gState->m_Assets->FindEntityByTxID(followon,followons->GetRow(i)))
-            followon=(mc_EntityDetails *)followons->GetRow(i);
-            mc_gState->m_Assets->ReloadDetailsIfNeeded(followon);
+//            followon=(mc_EntityDetails *)followons->GetRow(i);
+//            mc_gState->m_Assets->ReloadDetailsIfNeeded(followon);
             {
                 if(output_level & 0x0440)
                 {
@@ -2692,14 +2869,19 @@ Array VariableHistory(mc_EntityDetails *last_entity,int count,int start,uint32_t
     if(output_level & 0x0660)                                                   // For listvariables with followons                                 
     {
         mc_Buffer *followons;
-        followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(last_entity,count,start);
+//        followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(last_entity,count,start);
+//        for(int i=followons->GetCount()-1;i>=0;i--)
+ //       {
+        followons=mc_gState->m_Assets->GetFollowOnPositionsByLastEntity(last_entity,count,start);
         for(int i=followons->GetCount()-1;i>=0;i--)
         {
+            mc_EntityDetails followon_entity;
+            mc_gState->m_Assets->FindEntityByPosition(&followon_entity,*(int64_t*)followons->GetRow(i));
+            followon=&followon_entity;
+            
             Object issue;
-//            followon->Zero();
-//            if(mc_gState->m_Assets->FindEntityByTxID(followon,followons->GetRow(i)))
-            followon=(mc_EntityDetails *)followons->GetRow(i);
-            mc_gState->m_Assets->ReloadDetailsIfNeeded(followon);
+//            followon=(mc_EntityDetails *)followons->GetRow(i);
+//            mc_gState->m_Assets->ReloadDetailsIfNeeded(followon);
             {
                 issue.push_back(Pair("value",mc_ExtractValueJSONObject(followon))); 
                 if(output_level & 0x0440)
@@ -2894,7 +3076,7 @@ Object VariableEntry(const CTxOut& txout,mc_Script *lpScript,const CTransaction&
         entity_row.m_ScriptSize=details_script_size;
         if(details_script_size)
         {
-            memcpy(entity_row.m_Script,details_script,details_script_size);
+            entity_row.SetScript(details_script,details_script_size);
         }
         unsigned char *ptr;
         size_t bytes;        
@@ -3032,7 +3214,7 @@ Object VariableEntry(const unsigned char *txid,uint32_t output_level)
         }
         else
         {
-            memcpy(genesis_entity,&entity,sizeof(mc_EntityDetails));
+            genesis_entity->Copy(&entity);
         }
         
         if(output_level & 0x100)
@@ -3166,7 +3348,7 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
         }
         else
         {
-            memcpy(genesis_entity,&entity,sizeof(mc_EntityDetails));
+            genesis_entity->Copy(&entity);
         }
         
         uint160 filter_address;
@@ -3256,12 +3438,19 @@ Object LibraryEntry(const unsigned char *txid,uint32_t output_level)
         if(output_level & 0x0020)
         {
             mc_Buffer *followons;
-            followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(&last_entity,update_count,0);
+//            followons=mc_gState->m_Assets->GetFollowOnsByLastEntity(&last_entity,update_count,0);
+//            for(int i=followons->GetCount()-1;i>=0;i--)
+//            {
+            followons=mc_gState->m_Assets->GetFollowOnPositionsByLastEntity(&last_entity,update_count,0);
             for(int i=followons->GetCount()-1;i>=0;i--)
             {
+                mc_EntityDetails followon_entity;
+                mc_gState->m_Assets->FindEntityByPosition(&followon_entity,*(int64_t*)followons->GetRow(i));
+                followon=&followon_entity;
+                
                 Object issue;
-                followon=(mc_EntityDetails *)followons->GetRow(i);
-                mc_gState->m_Assets->ReloadDetailsIfNeeded(followon);
+//                followon=(mc_EntityDetails *)followons->GetRow(i);
+//                mc_gState->m_Assets->ReloadDetailsIfNeeded(followon);
                 {
                     issue.push_back(Pair("txid", ((uint256*)(followon->GetTxID()))->ToString().c_str()));    
 
@@ -5203,7 +5392,7 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
                     ParseEntityIdentifier(d.value_,&entity, MC_ENT_TYPE_ANY);       
                     if(found_entity)
                     {
-                        memcpy(found_entity,&entity,sizeof(mc_EntityDetails));
+                        found_entity->Copy(&entity);
                     }                        
                 }                
                 if(entity.GetEntityType() == MC_ENT_TYPE_STREAM)
@@ -5243,7 +5432,7 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
                     ParseEntityIdentifier(d.value_,&entity, MC_ENT_TYPE_ASSET);       
                     if(found_entity)
                     {
-                        memcpy(found_entity,&entity,sizeof(mc_EntityDetails));
+                        found_entity->Copy(&entity);
                     }                        
                 }
                 new_type=-2;
@@ -5459,7 +5648,7 @@ CScript ParseRawMetadataNotRefactored(Value param,uint32_t allowed_objects,mc_En
                 {
                     if(given_entity && given_entity->GetEntityType())
                     {
-                        memcpy(&entity,given_entity,sizeof(mc_EntityDetails));
+                        entity.Copy(given_entity);
                         new_type=-2;
                     }
                     else

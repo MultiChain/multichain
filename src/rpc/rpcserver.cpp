@@ -4,62 +4,223 @@
 // Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
-#include "rpc/rpcserver.h"
-#include "rpc/rpcasio.h"
+#include <rpc/rpchttpserver.h>
+#include "rpc/rpcprotocol.h"
+#include <chainparams/chainparamsbase.h>
+#include <utils/util.h>
+#include <net/netbase.h>
+#include <core/init.h>
 
+#include "rpc/rpcserver.h"
 #include "structs/base58.h"
-#include "core/init.h"
 #include "core/main.h"
 #include "ui/ui_interface.h"
-#include "utils/util.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #endif
 #include "community/community.h"
-
-#include <boost/algorithm/string.hpp>
-#include <boost/asio.hpp>
-#include <boost/asio/ssl.hpp>
-#include <boost/bind.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/foreach.hpp>
-#include <boost/iostreams/concepts.hpp>
-#include <boost/iostreams/stream.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/thread.hpp>
 #include "json/json_spirit_writer_template.h"
 
-using namespace boost;
-using namespace boost::asio;
+#include <boost/algorithm/string.hpp>
+
+#include <deque>
+#include <memory>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#include <event2/thread.h>
+#include <event2/buffer.h>
+#include <event2/bufferevent.h>
+#include <event2/util.h>
+#include <event2/keyvalq_struct.h>
+
+#include <rpc/rpcevents.h>
+
+
 using namespace json_spirit;
 using namespace std;
 
 static std::string strRPCUserColonPass;
 
 static bool fRPCRunning = false;
+static bool fRPCInterrupted = false;
 static bool fRPCInWarmup = true;
 static std::string rpcWarmupStatus("RPC server started");
 static CCriticalSection cs_rpcWarmup;
 
-//! These are created by StartRPCThreads, destroyed in StopRPCThreads
-static asio::io_service* rpc_io_service = NULL;
-static asio::io_service* hc_io_service = NULL;
-static map<string, boost::shared_ptr<deadline_timer> > deadlineTimers;
-static ssl::context* rpc_ssl_context = NULL;
-static ssl::context* hc_ssl_context = NULL;
-static boost::thread_group* rpc_worker_group = NULL;
-static boost::thread_group* hc_worker_group = NULL;
-static boost::asio::io_service::work *rpc_dummy_work = NULL;
-static std::vector<CSubNet> rpc_allow_subnets; //!< List of subnets to allow RPC connections from
-static std::vector< boost::shared_ptr<ip::tcp::acceptor> > rpc_acceptors;
 static map<uint64_t, RPCThreadLoad> rpc_loads;
 static map<uint64_t, int> rpc_slots;
 static uint32_t rpc_thread_flags[MC_PRM_MAX_THREADS];
 
+void LockWallet(CWallet* pWallet);
+
 #define MC_ACF_NONE              0x00000000 
 #define MC_ACF_ENTERPRISE        0x00000001 
-//! Convert boost::asio address to CNetAddr
-extern CNetAddr BoostAsioToCNetAddr(boost::asio::ip::address address);
+
+
+namespace std {
+    template<class T> struct _Unique_if {
+        typedef unique_ptr<T> _Single_object;
+    };
+
+    template<class T> struct _Unique_if<T[]> {
+        typedef unique_ptr<T[]> _Unknown_bound;
+    };
+
+    template<class T, size_t N> struct _Unique_if<T[N]> {
+        typedef void _Known_bound;
+    };
+
+    template<class T, class... Args>
+        typename _Unique_if<T>::_Single_object
+        make_unique(Args&&... args) {
+            return unique_ptr<T>(new T(std::forward<Args>(args)...));
+        }
+
+    template<class T>
+        typename _Unique_if<T>::_Unknown_bound
+        make_unique(size_t n) {
+            typedef typename remove_extent<T>::type U;
+            return unique_ptr<T>(new U[n]());
+        }
+
+    template<class T, class... Args>
+        typename _Unique_if<T>::_Known_bound
+        make_unique(Args&&...) = delete;
+}
+/*
+template<typename T, typename... Args>
+std::unique_ptr<T> make_unique(Args&&... args) {
+    return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+}
+*/
+
+/** WWW-Authenticate to present with 401 Unauthorized response */
+static const char* WWW_AUTH_HEADER_DATA = "Basic realm=\"jsonrpc\"";
+
+/** Maximum size of http request (request line + headers) */
+static const size_t MAX_HEADERS_SIZE = 8192;
+
+/** HTTP request work item */
+class HTTPWorkItem final : public HTTPClosure
+{
+public:
+    HTTPWorkItem(std::unique_ptr<HTTPRequest> _req, const std::string &_path, const HTTPRequestHandler& _func):
+        req(std::move(_req)), path(_path), func(_func)
+    {
+    }
+    void operator()() override
+    {
+        func(req.get(), path);
+    }
+
+    std::unique_ptr<HTTPRequest> req;
+
+private:
+    std::string path;
+    HTTPRequestHandler func;
+};
+
+/** Simple work queue for distributing work over multiple threads.
+ * Work items are simply callable objects.
+ */
+template <typename WorkItem>
+class WorkQueue
+{
+private:
+    boost::condition_variable cond;
+    boost::mutex mutex;
+    
+    std::deque<std::unique_ptr<WorkItem>> queue;
+    bool running;
+    const size_t maxDepth;
+
+public:
+    explicit WorkQueue(size_t _maxDepth) : running(true),
+                                 maxDepth(_maxDepth)
+    {
+    }
+    /** Precondition: worker threads have all stopped (they have been joined).
+     */
+    ~WorkQueue()
+    {
+    }
+    /** Enqueue a work item */
+    bool Enqueue(WorkItem* item)
+    {
+        boost::unique_lock<boost::mutex> lock(mutex);
+        if (!running || queue.size() >= maxDepth) {
+            return false;
+        }
+        queue.emplace_back(std::unique_ptr<WorkItem>(item));
+        cond.notify_one();
+        return true;
+    }
+    
+    /** Thread function */
+    void Run()
+    {
+        uint64_t thread_id=__US_ThreadID();
+        while (true) {
+            std::unique_ptr<WorkItem> i;
+            {
+                boost::unique_lock<boost::mutex> lock(mutex);
+                
+                while (running && queue.empty())
+                    cond.wait(lock);
+                if (!running && queue.empty())
+                    break;
+                i = std::move(queue.front());
+                queue.pop_front();
+            }
+            map<uint64_t,RPCThreadLoad>::iterator load_it=rpc_loads.find(thread_id);
+            if(load_it != rpc_loads.end())
+            {
+                if(nWalletUnlockTime)
+                {
+                    if(GetTime() > nWalletUnlockTime)
+                    {
+                        LockWallet(pwalletMain);
+                    }
+                }
+                load_it->second.start=GetTimeMicros();
+            }
+            (*i)();
+            if(load_it != rpc_loads.end())
+            {
+                load_it->second.end=GetTimeMicros();
+                load_it->second.Update();
+            }
+        }
+    }
+
+    /** Interrupt and exit loops */
+    void Interrupt()
+    {
+        boost::unique_lock<boost::mutex> lock(mutex);
+        running = false;
+        cond.notify_all();
+    }
+};
+
+struct HTTPPathHandler
+{
+    HTTPPathHandler(std::string _prefix, bool _exactMatch, HTTPRequestHandler _handler):
+        prefix(_prefix), exactMatch(_exactMatch), handler(_handler)
+    {
+    }
+    std::string prefix;
+    bool exactMatch;
+    HTTPRequestHandler handler;
+};
+
 
 void RPCThreadLoad::Zero()
 {
@@ -71,7 +232,6 @@ void RPCThreadLoad::Zero()
     
     memset(load,0, size*sizeof(double));    
 }
-
 
 void RPCThreadLoad::Update()
 {
@@ -205,9 +365,6 @@ string JSONRPCRequestForLog(const string& strMethod, const Array& params, const 
         request.push_back(Pair("params", params));
     }
     request.push_back(Pair("id", id));
-/*    
-    request.push_back(Pair("chain_name", string(mc_gState->m_Params->NetworkName())));
- */ 
     return write_string(Value(request), false);// + "\n";
 }
 
@@ -268,7 +425,6 @@ static inline int64_t roundint64(double d)
 CAmount AmountFromValue(const Value& value)
 {
     double dAmount = value.get_real();
-/* MCHN START */    
     if(COIN == 0)
     {
         if(dAmount != 0)
@@ -282,9 +438,6 @@ CAmount AmountFromValue(const Value& value)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");        
     }
     
-//    if (dAmount < 0.0 || dAmount > 21000000.0)                                  // MCHN - was <=
-//        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");
-/* MCHN END */    
     CAmount nAmount = roundint64(dAmount * COIN);
     if (!MoneyRange(nAmount))
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");
@@ -293,12 +446,10 @@ CAmount AmountFromValue(const Value& value)
 
 Value ValueFromAmount(const CAmount& amount)
 {
-/*  MCHN START */   
     if(COIN == 0)
     {
         return (double)amount;
     }
-/*  MCHN END */   
     return (double)amount / (double)COIN;
 }
 
@@ -363,7 +514,6 @@ string CRPCTable::help(string strCommand) const
             continue;
 #endif
 
-/* MCHN START */        
         string strHelp="";
         map<string, string>::iterator it = mapHelpStrings.find(strMethod);
         if (it == mapHelpStrings.end())
@@ -407,38 +557,8 @@ string CRPCTable::help(string strCommand) const
             }
             strRet += strHelp + "\n";            
         }
-/*        
-        try
-        {
-            Array params;
-            rpcfn_type pfn = pcmd->actor;
-            if (setDone.insert(pfn).second)
-                (*pfn)(params, true);
-        }
-        catch (std::exception& e)
-        {
-            // Help text is returned in an exception
-            string strHelp = string(e.what());
-            if (strCommand == "")
-            {
-                if (strHelp.find('\n') != string::npos)
-                    strHelp = strHelp.substr(0, strHelp.find('\n'));
-
-                if (category != pcmd->category)
-                {
-                    if (!category.empty())
-                        strRet += "\n";
-                    category = pcmd->category;
-                    string firstLetter = category.substr(0,1);
-                    boost::to_upper(firstLetter);
-                    strRet += "== " + firstLetter + category.substr(1) + " ==\n";
-                }
-            }
-            strRet += strHelp + "\n";
-        }
- */ 
     }
-/* MCHN END */        
+    
     if (strRet == "")
         strRet = strprintf("help: unknown command: %s\n", strCommand);
     strRet = strRet.substr(0,strRet.size()-1);
@@ -478,8 +598,6 @@ Value stop(const Array& params, bool fHelp)
     StartShutdown();
     return "MultiChain server stopping";
 }
-
-/* MCHN START */
 
 string AllowedPausedServices()
 {
@@ -582,7 +700,6 @@ Value resumecmd(const Array& params, bool fHelp)
     return "Resumed";
 }
 
-/* END */
 
 CRPCTable::CRPCTable()
 {
@@ -615,180 +732,6 @@ const CRPCCommand *CRPCTable::operator[](string name) const
     return (*it).second;
 }
 
-
-bool HTTPAuthorized(map<string, string>& mapHeaders)
-{
-    string strAuth = mapHeaders["authorization"];
-    if (strAuth.substr(0,6) != "Basic ")
-        return false;
-    string strUserPass64 = strAuth.substr(6); boost::trim(strUserPass64);
-    string strUserPass = DecodeBase64(strUserPass64);
-    return TimingResistantEqual(strUserPass, strRPCUserColonPass);
-}
-
-void ErrorReply(std::ostream& stream, const Object& objError, const Value& id)
-{
-    // Send error reply from json-rpc error object
-    int nStatus = HTTP_INTERNAL_SERVER_ERROR;
-    int code = find_value(objError, "code").get_int();
-    if (code == RPC_INVALID_REQUEST) nStatus = HTTP_BAD_REQUEST;
-    else if (code == RPC_METHOD_NOT_FOUND) nStatus = HTTP_NOT_FOUND;
-    string strReply = JSONRPCReply(Value::null, objError, id);
-    stream << HTTPReply(nStatus, strReply, false) << std::flush;
-}
-
-CNetAddr BoostAsioToCNetAddr(boost::asio::ip::address address)
-{
-    CNetAddr netaddr;
-    // Make sure that IPv4-compatible and IPv4-mapped IPv6 addresses are treated as IPv4 addresses
-    if (address.is_v6()
-     && (address.to_v6().is_v4_compatible()
-      || address.to_v6().is_v4_mapped()))
-        address = address.to_v6().to_v4();
-
-    if(address.is_v4())
-    {
-        boost::asio::ip::address_v4::bytes_type bytes = address.to_v4().to_bytes();
-        netaddr.SetRaw(NET_IPV4, &bytes[0]);
-    }
-    else
-    {
-        boost::asio::ip::address_v6::bytes_type bytes = address.to_v6().to_bytes();
-        netaddr.SetRaw(NET_IPV6, &bytes[0]);
-    }
-    return netaddr;
-}
-
-bool ClientAllowed(const boost::asio::ip::address& address)
-{
-    CNetAddr netaddr = BoostAsioToCNetAddr(address);
-    BOOST_FOREACH(const CSubNet &subnet, rpc_allow_subnets)
-        if (subnet.Match(netaddr))
-            return true;
-    return false;
-}
-
-template <typename Protocol>
-class AcceptedConnectionImpl : public AcceptedConnection
-{
-public:
-    AcceptedConnectionImpl(
-            asio::io_service& io_service,
-            ssl::context &context,
-            bool fUseSSL, uint32_t flags) :
-        sslStream(io_service, context),
-        _d(sslStream, fUseSSL),
-        _stream(_d),
-        _flags(flags)        
-    {
-    }
-
-    virtual std::iostream& stream()
-    {
-        return _stream;
-    }
-
-    virtual std::string peer_address_to_string() const
-    {
-        return peer.address().to_string();
-    }
-
-    virtual void close()
-    {
-        _stream.close();
-    }
-
-    virtual uint32_t get_flags()
-    {
-        return _flags;
-    }
-    typename Protocol::endpoint peer;
-    asio::ssl::stream<typename Protocol::socket> sslStream;
-
-private:
-    SSLIOStreamDevice<Protocol> _d;
-    iostreams::stream< SSLIOStreamDevice<Protocol> > _stream;
-    uint32_t _flags;
-};
-
-void ServiceConnection(AcceptedConnection *conn);
-
-//! Forward declaration required for RPCListen
-template <typename Protocol, typename SocketAcceptorService>
-static void RPCAcceptHandler(boost::shared_ptr< basic_socket_acceptor<Protocol, SocketAcceptorService> > acceptor,
-                             ssl::context& context,
-                             bool fUseSSL,
-                             boost::shared_ptr< AcceptedConnection > conn,
-                             const boost::system::error_code& error);
-
-/**
- * Sets up I/O resources to accept and handle a new connection.
- */
-template <typename Protocol, typename SocketAcceptorService>
-static void RPCListen(boost::shared_ptr< basic_socket_acceptor<Protocol, SocketAcceptorService> > acceptor,
-                   ssl::context& context,
-                   const bool fUseSSL,uint32_t flags)
-{
-    // Accept connection
-    boost::shared_ptr< AcceptedConnectionImpl<Protocol> > conn(new AcceptedConnectionImpl<Protocol>(acceptor->get_io_service(), context, fUseSSL, flags));
-
-    acceptor->async_accept(
-            conn->sslStream.lowest_layer(),
-            conn->peer,
-            boost::bind(&RPCAcceptHandler<Protocol, SocketAcceptorService>,
-                acceptor,
-                boost::ref(context),
-                fUseSSL,
-                conn,
-                _1));
-}
-
-
-/**
- * Accept and handle incoming connection.
- */
-template <typename Protocol, typename SocketAcceptorService>
-static void RPCAcceptHandler(boost::shared_ptr< basic_socket_acceptor<Protocol, SocketAcceptorService> > acceptor,
-                             ssl::context& context,
-                             const bool fUseSSL,
-                             boost::shared_ptr< AcceptedConnection > conn,
-                             const boost::system::error_code& error)
-{
-    AcceptedConnectionImpl<ip::tcp>* tcp_conn = dynamic_cast< AcceptedConnectionImpl<ip::tcp>* >(conn.get());
-
-    // Immediately start accepting new connections, except when we're cancelled or our socket is closed.
-    if (error != asio::error::operation_aborted && acceptor->is_open())
-        RPCListen(acceptor, context, fUseSSL, tcp_conn->get_flags());
-
-    if (error)
-    {
-        // TODO: Actually handle errors
-        LogPrintf("%s: Error: %s\n", __func__, error.message());
-    }
-    // Restrict callers by IP.  It is important to
-    // do this before starting client thread, to filter out
-    // certain DoS and misbehaving clients.
-    else if (tcp_conn && !ClientAllowed(tcp_conn->peer.address()))
-    {
-        // Only send a 403 if we're not using SSL to prevent a DoS during the SSL handshake.
-        if (!fUseSSL)
-            conn->stream() << HTTPError(HTTP_FORBIDDEN, false) << std::flush;
-        conn->close();
-    }
-    else {
-        ServiceConnection(conn.get());
-        conn->close();
-    }
-}
-
-static ip::tcp::endpoint ParseEndpoint(const std::string &strEndpoint, int defaultPort)
-{
-    std::string addr;
-    int port = defaultPort;
-    SplitHostPort(strEndpoint, port, addr);
-    return ip::tcp::endpoint(asio::ip::address::from_string(addr), port);
-}
-
 void mc_InitRPCListIfLimited()
 {
     if (mapArgs.count("-rpcallowmethod")) 
@@ -804,333 +747,6 @@ void mc_InitRPCListIfLimited()
             }
         }
     }
-}
-
-void StartRPCThreads(string& strError)
-{
-    mc_InitRPCList(vStaticRPCCommands,vStaticRPCWalletReadCommands);
-    mc_InitRPCListIfLimited();
-    tableRPC.initialize();
-
-    strError="";
-    
-    rpc_allow_subnets.clear();
-    rpc_allow_subnets.push_back(CSubNet("127.0.0.0/8")); // always allow IPv4 local subnet
-    rpc_allow_subnets.push_back(CSubNet("::1")); // always allow IPv6 localhost
-    if (mapMultiArgs.count("-rpcallowip"))
-    {
-        const vector<string>& vAllow = mapMultiArgs["-rpcallowip"];
-        BOOST_FOREACH(string strAllow, vAllow)
-        {
-            CSubNet subnet(strAllow);
-            if(!subnet.IsValid())
-            {
-                uiInterface.ThreadSafeMessageBox(
-                    strprintf("Invalid -rpcallowip subnet specification: %s. Valid are a single IP (e.g. 1.2.3.4), a network/netmask (e.g. 1.2.3.4/255.255.255.0) or a network/CIDR (e.g. 1.2.3.4/24).", strAllow),
-                    "", CClientUIInterface::MSG_ERROR);
-                StartShutdown();
-                return;
-            }
-            rpc_allow_subnets.push_back(subnet);
-        }
-    }
-    std::string strAllowed;
-    BOOST_FOREACH(const CSubNet &subnet, rpc_allow_subnets)
-        strAllowed += subnet.ToString() + " ";
-    if(fDebug)LogPrint("rpc", "Allowing RPC connections from: %s\n", strAllowed);
-
-    strRPCUserColonPass = mapArgs["-rpcuser"] + ":" + mapArgs["-rpcpassword"];
-    if (((mapArgs["-rpcpassword"] == "") ||
-         (mapArgs["-rpcuser"] == mapArgs["-rpcpassword"])) && Params().RequireRPCPassword())
-    {
-        unsigned char rand_pwd[32];
-        GetRandBytes(rand_pwd, 32);
-        uiInterface.ThreadSafeMessageBox(strprintf(
-            _("To use multichaind, you must set an rpcpassword in the configuration file:\n"
-              "%s\n"
-              "It is recommended you use the following random password:\n"
-              "rpcuser=multichainrpc\n"
-              "rpcpassword=%s\n"
-              "(you do not need to remember this password)\n"
-              "The username and password MUST NOT be the same.\n"
-              "If the file does not exist, create it with owner-readable-only file permissions.\n"
-              "It is also recommended to set alertnotify so you are notified of problems;\n"
-              "for example: alertnotify=echo %%s | mail -s \"MultiChain Alert\" admin@foo.com\n"),
-                GetConfigFile().string(),
-                EncodeBase58(&rand_pwd[0],&rand_pwd[0]+32)),
-                "", CClientUIInterface::MSG_ERROR | CClientUIInterface::SECURE);
-        StartShutdown();
-        return;
-    }
-
-    assert(rpc_io_service == NULL);
-    rpc_io_service = new asio::io_service();
-    rpc_ssl_context = new ssl::context(*rpc_io_service, ssl::context::sslv23);
-
-    assert(hc_io_service == NULL);
-    hc_io_service = new asio::io_service();
-    hc_ssl_context = new ssl::context(*hc_io_service, ssl::context::sslv23);
-
-    const bool fUseSSL = GetBoolArg("-rpcssl", false);
-
-    if (fUseSSL)
-    {
-        rpc_ssl_context->set_options(ssl::context::no_sslv2 | ssl::context::no_sslv3);
-        hc_ssl_context->set_options(ssl::context::no_sslv2 | ssl::context::no_sslv3);
-
-        filesystem::path pathCertFile(GetArg("-rpcsslcertificatechainfile", "server.cert"));
-        if (!pathCertFile.is_complete()) pathCertFile = filesystem::path(GetDataDir()) / pathCertFile;
-        if (filesystem::exists(pathCertFile)) 
-        {
-            rpc_ssl_context->use_certificate_chain_file(pathCertFile.string());
-            hc_ssl_context->use_certificate_chain_file(pathCertFile.string());
-        }
-        else
-        {
-            LogPrintf("ThreadRPCServer ERROR: missing server certificate file %s\n", pathCertFile.string());
-            strError += strprintf("Missing server certificate file %s\n", pathCertFile.string().c_str());
-        }
-
-        filesystem::path pathPKFile(GetArg("-rpcsslprivatekeyfile", "server.pem"));
-        if (!pathPKFile.is_complete()) pathPKFile = filesystem::path(GetDataDir()) / pathPKFile;
-        if (filesystem::exists(pathPKFile)) 
-        {
-            rpc_ssl_context->use_private_key_file(pathPKFile.string(), ssl::context::pem);
-            hc_ssl_context->use_private_key_file(pathPKFile.string(), ssl::context::pem);
-        }
-        else
-        {
-            LogPrintf("ThreadRPCServer ERROR: missing server private key file %s\n", pathPKFile.string());
-            strError += strprintf("Missing server private key file %s\n", pathPKFile.string().c_str());
-        }
-
-        string strCiphers = GetArg("-rpcsslciphers", "TLSv1.2+HIGH:TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!3DES:@STRENGTH");
-        SSL_CTX_set_cipher_list(rpc_ssl_context->impl(), strCiphers.c_str());
-        SSL_CTX_set_cipher_list(hc_ssl_context->impl(), strCiphers.c_str());
-    }
-
-    std::vector<ip::tcp::endpoint> vEndpoints;
-    bool bBindAny = false;
-    int defaultPort = GetArg("-rpcport", BaseParams().RPCPort());
-    int hcPort = pEF->HCH_GetPort();
-    if(hcPort == defaultPort)
-    {
-        uiInterface.ThreadSafeMessageBox("Health checker and RPC ports should be different", "", CClientUIInterface::MSG_ERROR);
-        StartShutdown();
-        return;
-    }
-    if (!mapArgs.count("-rpcallowip")) // Default to loopback if not allowing external IPs
-    {
-        vEndpoints.push_back(ip::tcp::endpoint(asio::ip::address_v6::loopback(), defaultPort));
-        vEndpoints.push_back(ip::tcp::endpoint(asio::ip::address_v4::loopback(), defaultPort));
-        if(hcPort)
-        {
-            vEndpoints.push_back(ip::tcp::endpoint(asio::ip::address_v6::loopback(), hcPort));
-            vEndpoints.push_back(ip::tcp::endpoint(asio::ip::address_v4::loopback(), hcPort));            
-        }
-        if (mapArgs.count("-rpcbind"))
-        {
-            LogPrintf("WARNING: option -rpcbind was ignored because -rpcallowip was not specified, refusing to allow everyone to connect\n");
-        }
-    } else if (mapArgs.count("-rpcbind")) // Specific bind address
-    {
-        BOOST_FOREACH(const std::string &addr, mapMultiArgs["-rpcbind"])
-        {
-            try {
-                vEndpoints.push_back(ParseEndpoint(addr, defaultPort));
-                if(hcPort)
-                {
-                    vEndpoints.push_back(ParseEndpoint(addr, hcPort));
-                }
-            }
-            catch(const boost::system::system_error &)
-            {
-                uiInterface.ThreadSafeMessageBox(
-                    strprintf(_("Could not parse -rpcbind value %s as network address"), addr),
-                    "", CClientUIInterface::MSG_ERROR);
-                StartShutdown();
-                return;
-            }
-        }
-    } else { // No specific bind address specified, bind to any
-        vEndpoints.push_back(ip::tcp::endpoint(asio::ip::address_v6::any(), defaultPort));
-        vEndpoints.push_back(ip::tcp::endpoint(asio::ip::address_v4::any(), defaultPort));
-        if(hcPort)
-        {
-            vEndpoints.push_back(ip::tcp::endpoint(asio::ip::address_v6::any(), hcPort));
-            vEndpoints.push_back(ip::tcp::endpoint(asio::ip::address_v4::any(), hcPort));
-        }
-        // Prefer making the socket dual IPv6/IPv4 instead of binding
-        // to both addresses seperately.
-        bBindAny = true;
-    }
-
-    bool fListening = false;
-    bool hcOK=hcPort ? false : true;
-    std::string strerr;
-    std::string straddress;
-    std::string hcerr;
-    BOOST_FOREACH(const ip::tcp::endpoint &endpoint, vEndpoints)
-    {
-        try {
-            asio::ip::address bindAddress = endpoint.address();
-            straddress = bindAddress.to_string();
-            LogPrintf("Binding %s on address %s port %i (IPv4+IPv6 bind any: %i)\n", (endpoint.port() == hcPort) ? "health checker" : "RPC", straddress, endpoint.port(), bBindAny);
-            boost::system::error_code v6_only_error;
-            boost::shared_ptr<ip::tcp::acceptor> acceptor(new ip::tcp::acceptor((endpoint.port() == hcPort) ? *hc_io_service : *rpc_io_service));
-
-            acceptor->open(endpoint.protocol());
-            acceptor->set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
-
-            // Try making the socket dual IPv6/IPv4 when listening on the IPv6 "any" address
-            acceptor->set_option(boost::asio::ip::v6_only(
-                !bBindAny || bindAddress != asio::ip::address_v6::any()), v6_only_error);
-
-            acceptor->bind(endpoint);
-            acceptor->listen(socket_base::max_connections);
-
-            RPCListen(acceptor, (endpoint.port() == hcPort) ? *hc_ssl_context : *rpc_ssl_context, fUseSSL, (endpoint.port() == hcPort) ? MC_ACF_ENTERPRISE : MC_ACF_NONE);
-
-            fListening = true;
-            if(endpoint.port() == hcPort)
-            {
-                hcOK=true;
-            }
-            rpc_acceptors.push_back(acceptor);
-            // If dual IPv6/IPv4 bind successful, skip binding to IPv4 separately
-            if(bBindAny && bindAddress == asio::ip::address_v6::any() && !v6_only_error)
-                break;
-        }
-        catch(boost::system::system_error &e)
-        {
-            LogPrintf("ERROR: Binding RPC on address %s port %i failed: %s\n", straddress, endpoint.port(), e.what());
-            strerr = strprintf(_("An error occurred while setting up the %s address %s port %u for listening: %s"),(endpoint.port() == hcPort) ? "health checker" : "RPC", straddress, endpoint.port(), e.what());
-            if(endpoint.port() == hcPort)
-            {
-                hcerr=strerr;
-            }
-        }
-    }
-
-    if (!fListening) {
-        uiInterface.ThreadSafeMessageBox(strerr, "", CClientUIInterface::MSG_ERROR);
-        StartShutdown();
-        return;
-    }
-    
-    if(!hcOK)
-    {
-        uiInterface.ThreadSafeMessageBox(hcerr, "", CClientUIInterface::MSG_ERROR);
-        StartShutdown();
-        return;        
-    }
-
-    rpc_worker_group = new boost::thread_group();
-    hc_worker_group = new boost::thread_group();
-    rpc_loads.clear();
-    rpc_slots.clear();
-
-#ifdef MAC_OSX
-    boost::thread::attributes attrs;
-    attrs.set_stack_size(8*1024*1024);
-    
-    for (int i = 0; i < GetArg("-rpcthreads", 4); i++)
-    {
-        boost::thread *lpThread=new thread(attrs,boost::bind(&asio::io_service::run, rpc_io_service));
-        uint64_t thread_id=(uint64_t)(lpThread->native_handle());
-        rpc_worker_group->add_thread(lpThread);
-        RPCThreadLoad load;
-        load.Zero();
-        rpc_loads.insert(make_pair(thread_id,load));
-        rpc_slots.insert(make_pair(thread_id,i));
-    }    
-    if(hcPort)
-    {
-        boost::thread *lpThread=new thread(attrs,boost::bind(&asio::io_service::run, hc_io_service));
-        hc_worker_group->add_thread(lpThread);
-    }        
-#else    
-    for (int i = 0; i < GetArg("-rpcthreads", 4); i++)
-    {        
-        boost::thread *lpThread=rpc_worker_group->create_thread(boost::bind(&asio::io_service::run, rpc_io_service));        
-        uint64_t thread_id=(uint64_t)(lpThread->native_handle());
-#ifdef WIN32        
-        thread_id=GetThreadId((HANDLE)thread_id);
-#endif
-        RPCThreadLoad load;
-        load.Zero();
-        rpc_loads.insert(make_pair(thread_id,load));
-        rpc_slots.insert(make_pair(thread_id,i));
-    }    
-    if(hcPort)
-    {
-        hc_worker_group->create_thread(boost::bind(&asio::io_service::run, hc_io_service));        
-    }
-#endif
-    memset(rpc_thread_flags,0,MC_PRM_MAX_THREADS*sizeof(uint32_t));
-    mc_gState->InitRPCThreads(rpc_slots.size());
-    
-    fRPCRunning = true;
-    
-    if(strError.size())
-    {
-        strError += "Node may be unable to process API requests.\n";
-    }
-}
-
-void StartDummyRPCThread()
-{
-    if(rpc_io_service == NULL)
-    {
-        rpc_io_service = new asio::io_service();
-        /* Create dummy "work" to keep the thread from exiting when no timeouts active,
-         * see http://www.boost.org/doc/libs/1_51_0/doc/html/boost_asio/reference/io_service.html#boost_asio.reference.io_service.stopping_the_io_service_from_running_out_of_work */
-        rpc_dummy_work = new asio::io_service::work(*rpc_io_service);
-        rpc_worker_group = new boost::thread_group();
-        rpc_worker_group->create_thread(boost::bind(&asio::io_service::run, rpc_io_service));
-        fRPCRunning = true;
-    }
-}
-
-void StopRPCThreads()
-{
-    if (rpc_io_service == NULL) return;
-    // Set this to false first, so that longpolling loops will exit when woken up
-    fRPCRunning = false;
-
-    // First, cancel all timers and acceptors
-    // This is not done automatically by ->stop(), and in some cases the destructor of
-    // asio::io_service can hang if this is skipped.
-    boost::system::error_code ec;
-    BOOST_FOREACH(const boost::shared_ptr<ip::tcp::acceptor> &acceptor, rpc_acceptors)
-    {
-        acceptor->cancel(ec);
-        if (ec)
-            LogPrintf("%s: Warning: %s when cancelling acceptor", __func__, ec.message());
-    }
-    rpc_acceptors.clear();
-    BOOST_FOREACH(const PAIRTYPE(std::string, boost::shared_ptr<deadline_timer>) &timer, deadlineTimers)
-    {
-        timer.second->cancel(ec);
-        if (ec)
-            LogPrintf("%s: Warning: %s when cancelling timer", __func__, ec.message());
-    }
-    deadlineTimers.clear();
-
-    rpc_io_service->stop();
-    hc_io_service->stop();
-    cvBlockChange.notify_all();
-    if (rpc_worker_group != NULL)
-        rpc_worker_group->join_all();
-    if (hc_worker_group != NULL)
-        hc_worker_group->join_all();
-    delete rpc_dummy_work; rpc_dummy_work = NULL;
-    delete rpc_worker_group; rpc_worker_group = NULL;
-    delete hc_worker_group; hc_worker_group = NULL;
-    delete rpc_ssl_context; rpc_ssl_context = NULL;
-    delete hc_ssl_context; hc_ssl_context = NULL;
-    delete rpc_io_service; rpc_io_service = NULL;
-    delete hc_io_service; hc_io_service = NULL;
 }
 
 int IsRPCWRPReadLockFlagSet() 
@@ -1151,6 +767,14 @@ void CheckFlagsOnException(const string& strMethod,const Value& req_id,const str
         LogPrintf("WARNING: Unlocking wallet after failure: method: %s, error: %s\n",JSONRPCMethodIDForLog(strMethod,req_id).c_str(),message);
         pwalletTxsMain->WRPReadUnLock();
     }   
+    {
+        LOCK(cs_rpcWarmup);
+    
+        if(!fRPCInWarmup)
+        {
+            mc_gState->m_Assets->ThreadCleanse(__US_ThreadID());
+        }
+    }
 }
 
 
@@ -1182,23 +806,9 @@ bool RPCIsInWarmup(std::string *outStatus)
     return fRPCInWarmup;
 }
 
-void RPCRunHandler(const boost::system::error_code& err, boost::function<void(void)> func)
-{
-    if (!err)
-        func();
-}
-
 void RPCRunLater(const std::string& name, boost::function<void(void)> func, int64_t nSeconds)
 {
-    assert(rpc_io_service != NULL);
-
-    if (deadlineTimers.count(name) == 0)
-    {
-        deadlineTimers.insert(make_pair(name,
-                                        boost::shared_ptr<deadline_timer>(new deadline_timer(*rpc_io_service))));
-    }
-    deadlineTimers[name]->expires_from_now(posix_time::seconds(nSeconds));
-    deadlineTimers[name]->async_wait(boost::bind(RPCRunHandler, _1, func));
+/* TODO */    
 }
 
 void JSONRequest::parse(const Value& valRequest)
@@ -1221,7 +831,6 @@ void JSONRequest::parse(const Value& valRequest)
     if (strMethod != "getblocktemplate")
         if(fDebug)LogPrint("rpc", "ThreadRPCServer method=%s\n", SanitizeString(strMethod));
 
-/* MCHN START */    
     Value valChainName = find_value(request, "chain_name");
     if (valChainName.type() != null_type)
     {
@@ -1230,7 +839,6 @@ void JSONRequest::parse(const Value& valRequest)
         if (strcmp(valChainName.get_str().c_str(),mc_gState->m_Params->NetworkName()))
             throw JSONRPCError(RPC_INVALID_REQUEST, "Wrong chain name");
     }
-/* MCHN END */    
     // Parse params
     Value valParams = find_value(request, "params");
     if (valParams.type() == array_type)
@@ -1241,15 +849,12 @@ void JSONRequest::parse(const Value& valRequest)
         throw JSONRPCError(RPC_INVALID_REQUEST, "Params must be an array");
 }
 
-
 static Object JSONRPCExecOne(const Value& req)
 {
     Object rpc_result;
 
     JSONRequest jreq;
-/* MCHN START */    
     uint32_t wallet_mode=mc_gState->m_WalletMode;
-/* MCHN END */    
     try {
         jreq.parse(req);
 
@@ -1258,22 +863,18 @@ static Object JSONRPCExecOne(const Value& req)
     }
     catch (Object& objError)
     {
-/* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
         string strReply = JSONRPCReply(Value::null, objError, jreq.id);
         CheckFlagsOnException(jreq.strMethod,jreq.id,strReply);
         
         if(fDebug)LogPrint("mcapi","mcapi: API request failure A: %s\n",JSONRPCMethodIDForLog(jreq.strMethod,jreq.id).c_str());        
-/* MCHN END */    
         rpc_result = JSONRPCReplyObj(Value::null, objError, jreq.id);
     }
     catch (std::exception& e)
     {
-/* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
         CheckFlagsOnException(jreq.strMethod,jreq.id,e.what());
         if(fDebug)LogPrint("mcapi","mcapi: API request failure B: %s\n",JSONRPCMethodIDForLog(jreq.strMethod,jreq.id).c_str());        
-/* MCHN END */    
         rpc_result = JSONRPCReplyObj(Value::null,
                                      JSONRPCError(RPC_PARSE_ERROR, e.what()), jreq.id);
     }
@@ -1336,45 +937,16 @@ Array JSONRPCExecInternalBatch(const Array& vReq)
     return ret;
 }
 
-static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
-                            string& strRequest,
-                            map<string, string>& mapHeaders,
-                            bool fRun)
+bool  HTTPReq_JSONRPC(string& strRequest, uint32_t flags, string& strReply, string& strHeader, map<string, string>& mapHeaders,int& http_code,json_spirit::Value& valError,json_spirit::Value& req_id)
 {
-    // Check authorization
-    if (mapHeaders.count("authorization") == 0)
-    {
-        conn->stream() << HTTPError(HTTP_UNAUTHORIZED, false) << std::flush;
-        return false;
-    }
-
-    if (!HTTPAuthorized(mapHeaders))
-    {
-        LogPrintf("ThreadRPCServer incorrect password attempt from %s\n", conn->peer_address_to_string());
-        /* Deter brute-forcing
-           If this results in a DoS the user really
-           shouldn't have their RPC port exposed. */
-        MilliSleep(250);
-
-        conn->stream() << HTTPError(HTTP_UNAUTHORIZED, false) << std::flush;
-        return false;
-    }
-
     JSONRequest jreq;
-/* MCHN START */    
     bool jreq_parsed=false;
+    req_id=0;
     uint32_t wallet_mode=mc_gState->m_WalletMode;
-    if( (conn->get_flags() & MC_ACF_ENTERPRISE) == 0)
-    {
-        if(fDebug)LogPrint("mcapi","mcapi: API request from %s\n",conn->peer_address_to_string().c_str());
-    }
-/* MCHN END */    
+    
     try
     {
-        string strReply;
-        string strHeader;        
-        
-        if(conn->get_flags() & MC_ACF_ENTERPRISE)
+        if(flags & MC_ACF_ENTERPRISE)
         {
             {
                 LOCK(cs_rpcWarmup);
@@ -1383,7 +955,21 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
                     throw JSONRPCError(RPC_IN_WARMUP, rpcWarmupStatus);                    
                 }
             }
-            strReply=pEF->HCH_ProcessRequest(strRequest,&strHeader);
+            strReply=pEF->HCH_ProcessRequest(strRequest,&strHeader,mapHeaders,http_code);
+            string reason; 
+            if(http_code != HTTP_OK)
+            {
+                if(pEF->LIC_VerifyFeature(MC_EFT_HEALTH_CHECK,reason) == 0)
+                {
+                    for(int s=0;s<20;s++)
+                    {
+                        if(!fRPCInterrupted)
+                        {
+                            MilliSleep(1000);        
+                        }
+                    }
+                }
+            }
         }
         else
         {            
@@ -1391,7 +977,6 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
             Value valRequest;
             if (!read_string(strRequest, valRequest))
                 throw JSONRPCError(RPC_PARSE_ERROR, "Parse error");
-
             // Return immediately if in warmup
             {
                 LOCK(cs_rpcWarmup);
@@ -1413,9 +998,9 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
                     jreq.parse(valRequest);
                 }
 
+                req_id=jreq.id;
                 Value result = tableRPC.execute(jreq.strMethod, jreq.params,jreq.id);
 
-                // Send reply
                 strReply = JSONRPCReply(result, Value::null, jreq.id);
 
             // array of requests
@@ -1424,35 +1009,34 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
             else
                 throw JSONRPCError(RPC_PARSE_ERROR, "Top-level object parse error");
             
-            strHeader=HTTPReplyHeader(HTTP_OK, fRun, strReply.size());
+            strHeader=HTTPReplyHeader(HTTP_OK, false, strReply.size());
+            mapHeaders.insert(make_pair("Content-Length",strprintf("%u",strReply.size())));
+            mapHeaders.insert(make_pair("Content-Type","application/json"));
         }
-        conn->stream() << strHeader << strReply << std::flush;
     }
     catch (Object& objError)
     {
-/* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
         string strReply = JSONRPCReply(Value::null, objError, jreq.id);
         CheckFlagsOnException(jreq.strMethod,jreq.id,strReply);
         
         if(fDebug)LogPrint("mcapi","mcapi: API request failure: %s, code: %d\n",JSONRPCMethodIDForLog(jreq.strMethod,jreq.id).c_str(),find_value(objError, "code").get_int());
         
-//        if(fDebug)LogPrint("mcapi","mcapi: API request failure C\n");        
-/* MCHN END */    
-        ErrorReply(conn->stream(), objError, jreq.id);
+        valError=objError;
         return false;
     }
     catch (std::exception& e)
     {
-/* MCHN START */    
         mc_gState->m_WalletMode=wallet_mode;
         CheckFlagsOnException(jreq.strMethod,jreq.id,e.what());
         if(fDebug)LogPrint("mcapi","mcapi: API request failure D: %s\n",JSONRPCMethodIDForLog(jreq.strMethod,jreq.id).c_str());        
-/* MCHN END */    
-        ErrorReply(conn->stream(), JSONRPCError(RPC_PARSE_ERROR, e.what()), jreq.id);
+        valError=JSONRPCError(RPC_PARSE_ERROR, e.what());
         return false;
     }
-    return true;
+    
+    mapHeaders.insert(make_pair("Server",strprintf("multichain-json-rpc/%s",FormatFullMultiChainVersion())));
+
+    return true;    
 }
 
 int GetRPCSlot()
@@ -1484,67 +1068,6 @@ void SetRPCWRPReadLockFlag(int lock)
     }    
 }
 
-
-void ServiceConnection(AcceptedConnection *conn)
-{
-    bool fRun = true;
-    
-    uint64_t thread_id=__US_ThreadID();
-    map<uint64_t,RPCThreadLoad>::iterator load_it=rpc_loads.find(thread_id);
-    if(load_it != rpc_loads.end())
-    {
-        load_it->second.start=GetTimeMicros();
-    }
-    
-    string reason; 
-    if(conn->get_flags() & MC_ACF_ENTERPRISE)
-    {
-        if(pEF->LIC_VerifyFeature(MC_EFT_HEALTH_CHECK,reason) == 0)
-        {
-            MilliSleep(30000);        
-        }
-    }
-    
-    while (fRun && !ShutdownRequested())
-    {
-        int nProto = 0;
-        map<string, string> mapHeaders;
-        string strRequest, strMethod, strURI;
-
-        // Read HTTP request line
-        if (!ReadHTTPRequestLine(conn->stream(), nProto, strMethod, strURI))
-            break;
-
-        // Read HTTP message headers and body
-        ReadHTTPMessage(conn->stream(), mapHeaders, strRequest, nProto, MAX_SIZE);
-
-        // HTTP Keep-Alive is false; close connection immediately
-        if ((mapHeaders["connection"] == "close") || (!GetBoolArg("-rpckeepalive", false)))
-            fRun = false;
-
-        // Process via JSON-RPC API
-        if (strURI == "/") {
-            if (!HTTPReq_JSONRPC(conn, strRequest, mapHeaders, fRun))
-                break;
-
-        // Process via HTTP REST API
-        } else if (strURI.substr(0, 6) == "/rest/" && GetBoolArg("-rest", false)) {
-            if (!HTTPReq_REST(conn, strURI, mapHeaders, fRun))
-                break;
-
-        } else {
-            conn->stream() << HTTPError(HTTP_NOT_FOUND, false) << std::flush;
-            break;
-        }
-    }
-    
-    if(load_it != rpc_loads.end())
-    {
-        load_it->second.end=GetTimeMicros();
-        load_it->second.Update();
-    }
-}
-
 json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_spirit::Array &params, const Value& req_id) const
 {
     // Find method
@@ -1565,7 +1088,6 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Method not found (disabled)");
 #endif
 
-//    if(mc_gState->m_ProtocolVersionToUpgrade > mc_gState->m_NetworkParams->ProtocolVersion())
     if( (mc_gState->m_ProtocolVersionToUpgrade > 0) && (mc_gState->IsSupported(mc_gState->m_ProtocolVersionToUpgrade) == 0) )
     {
         if( setAllowedWhenWaitingForUpgrade.count(strMethod) == 0 )
@@ -1602,8 +1124,8 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         if(fDebug)
         {
             string strRequest = JSONRPCRequestForLog(strMethod, params, req_id);
-            LogPrint("mcapi","mcapi: API request: %s\n",strRequest.c_str());
-            LogPrint("drsrv01","drsrv01: %d: --> %s\n",GetRPCSlot(),strMethod.c_str());            
+            if(fDebug)LogPrint("mcapi","mcapi: API request: %s, worker: %lu\n",strRequest.c_str(),__US_ThreadID());
+            if(fDebug)LogPrint("drsrv01","drsrv01: %d: --> %s\n",GetRPCSlot(),strMethod.c_str());            
         }
         
         Value result;
@@ -1616,7 +1138,7 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
                 result = pcmd->actor(params, false);
             } else {
                 LOCK2(cs_main, pwalletMain->cs_wallet);
-/* MCHN START */                
+
                 uint32_t wallet_mode=mc_gState->m_WalletMode;
                 string strResultNone;
                 string strResult;
@@ -1633,9 +1155,9 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
                         }
                     }
                 }                
-/* MCHN END */                
+
                 result = pcmd->actor(params, false);
-/* MCHN START */ 
+
                 if(LogAcceptCategory("walletcompare"))
                 {
                     if(wallet_mode & MC_WMD_MAP_TXS)
@@ -1657,7 +1179,6 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
                         }
                     }
                 }
-/* MCHN END */                
                 
             }
 #else // ENABLE_WALLET
@@ -1667,10 +1188,8 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
             }
 #endif // !ENABLE_WALLET
         }
-/* MCHN START */        
         if(fDebug)LogPrint("mcapi","mcapi: API request successful: %s\n",JSONRPCMethodIDForLog(strMethod,req_id).c_str());
         if(fDebug)LogPrint("drsrv01","drsrv01: %d: <-- %s\n",GetRPCSlot(),strMethod.c_str());            
-/* MCHN END */        
         return result;
     }
     catch (std::exception& e)
@@ -1705,3 +1224,921 @@ std::set<std::string> setAllowedWhenLimited;
 std::vector<CRPCCommand> vStaticRPCCommands;
 std::vector<CRPCCommand> vStaticRPCWalletReadCommands;
 
+/** HTTP module state */
+
+//! libevent event loop
+static struct event_base* eventBase = nullptr;
+//! HTTP server
+static struct evhttp* eventHTTP = nullptr;
+//! HTTP Health check server
+static struct evhttp* eventHTTPHC = nullptr;
+//! List of subnets to allow RPC connections from
+static std::vector<CSubNet> rpc_allow_subnets;
+//! Work queue for handling longer requests off the event loop thread
+static std::unique_ptr<WorkQueue<HTTPClosure>> g_work_queue{nullptr};
+//! Work queue for handling health checker requests
+static std::unique_ptr<WorkQueue<HTTPClosure>> g_work_queue_hc{nullptr};
+//! Handlers for (sub)paths
+static std::vector<HTTPPathHandler> pathHandlers;
+//! Bound listening sockets
+static std::vector<evhttp_bound_socket *> boundSockets;
+//! Bound listening sockets
+static std::vector<evhttp_bound_socket *> boundSocketsHC;
+
+bool LookupHost(const std::string& name, CNetAddr& addr, bool fAllowLookup)
+{
+    std::vector<CNetAddr> vIP;
+    if (LookupHost(name.c_str(), vIP, 1, fAllowLookup))
+    {
+        addr = vIP[0];
+        return true;
+    }
+    return false;
+}
+
+
+/** Check if a network address is allowed to access the HTTP server */
+static bool ClientAllowed(const CNetAddr& netaddr)
+{
+    if (!netaddr.IsValid())
+        return false;
+    for(const CSubNet& subnet : rpc_allow_subnets)
+        if (subnet.Match(netaddr))
+            return true;
+    return false;
+}
+
+/** Initialize ACL list for HTTP server */
+static bool InitHTTPAllowList()
+{
+    
+    rpc_allow_subnets.clear();
+    
+    rpc_allow_subnets.clear();
+    rpc_allow_subnets.push_back(CSubNet("127.0.0.0/8")); // always allow IPv4 local subnet
+    rpc_allow_subnets.push_back(CSubNet("::1")); // always allow IPv6 localhost
+    if (mapMultiArgs.count("-rpcallowip"))
+    {
+        for (const std::string& strAllow : mapMultiArgs["-rpcallowip"]) 
+        {
+            CSubNet subnet(strAllow);
+            if(!subnet.IsValid())
+            {
+                LogPrintf("ERROR: RPC HTTP Server: Invalid -rpcallowip subnet specification: %s. Valid are a single IP (e.g. 1.2.3.4), a network/netmask (e.g. 1.2.3.4/255.255.255.0) or a network/CIDR (e.g. 1.2.3.4/24).",strAllow.c_str());
+                return false;
+            }
+            rpc_allow_subnets.push_back(subnet);
+        }
+    }
+    
+    std::string strAllowed;
+    for (const CSubNet& subnet : rpc_allow_subnets)
+        strAllowed += subnet.ToString() + " ";
+    
+    if(fDebug)LogPrint("rpc", "Allowing HTTP connections from: %s\n", strAllowed.c_str());
+    return true;
+}
+
+/** HTTP request method as string - use for logging only */
+std::string RequestMethodString(HTTPRequest::RequestMethod m)
+{
+    switch (m) {
+    case HTTPRequest::GET:
+        return "GET";
+        break;
+    case HTTPRequest::POST:
+        return "POST";
+        break;
+    case HTTPRequest::HEAD:
+        return "HEAD";
+        break;
+    case HTTPRequest::PUT:
+        return "PUT";
+        break;
+    default:
+        return "unknown";
+    }
+}
+
+/** HTTP request callback */
+static void http_request_cb(struct evhttp_request* req, void* arg)
+{
+    // Disable reading to work around a libevent bug, fixed in 2.2.0.
+    if (event_get_version_number() >= 0x02010600 && event_get_version_number() < 0x02020001) {
+        evhttp_connection* conn = evhttp_request_get_connection(req);
+        if (conn) {
+            bufferevent* bev = evhttp_connection_get_bufferevent(conn);
+            if (bev) {
+                bufferevent_disable(bev, EV_READ);
+            }
+        }
+    }
+    std::unique_ptr<HTTPRequest> hreq(new HTTPRequest(req));
+
+    // Early address-based allow check
+    if (!ClientAllowed(hreq->GetPeer())) {
+        LogPrintf( "HTTP request from %s rejected: Client network is not allowed RPC access\n",
+                 hreq->GetPeer().ToString());
+        
+        hreq->WriteReply(HTTP_FORBIDDEN);
+        return;
+    }
+
+    // Early reject unknown HTTP methods
+    if (hreq->GetRequestMethod() == HTTPRequest::UNKNOWN) {
+        LogPrintf("HTTP request from %s rejected: Unknown HTTP request method\n",
+                 hreq->GetPeer().ToString());
+        hreq->WriteReply(HTTP_BAD_METHOD);
+ 
+        return;
+    }
+
+    if(fDebug)LogPrint("rpc", "Received a %s request for %s from %s\n",
+             RequestMethodString(hreq->GetRequestMethod()), SanitizeString(hreq->GetURI()).substr(0, 100), hreq->GetPeer().ToString().c_str());
+
+    // Find registered handler for prefix
+    std::string strURI = hreq->GetURI();
+    std::string path;
+    std::vector<HTTPPathHandler>::const_iterator i = pathHandlers.begin();
+    std::vector<HTTPPathHandler>::const_iterator iend = pathHandlers.end();
+    for (; i != iend; ++i) {
+        bool match = false;
+        if (i->exactMatch)
+            match = (strURI == i->prefix);
+        else
+            match = (strURI.substr(0, i->prefix.size()) == i->prefix);
+        if (match) {
+            path = strURI.substr(i->prefix.size());
+            break;
+        }
+    }
+
+    // Dispatch to worker thread
+    if (i != iend) {
+        hreq->SetFlags(MC_ACF_NONE);
+        std::unique_ptr<HTTPWorkItem> item(new HTTPWorkItem(std::move(hreq), path, i->handler));
+        assert(g_work_queue);
+        if (g_work_queue->Enqueue(item.get())) {
+            item.release(); /* if true, queue took ownership */
+        } else {
+
+            LogPrintf("WARNING: request rejected because http work queue depth exceeded, it can be increased with the -rpcworkqueue= setting\n");
+            item->req->WriteReply(HTTP_SERVICE_UNAVAILABLE, "Work queue depth exceeded");
+        }
+    } else {
+        hreq->WriteReply(HTTP_NOT_FOUND);
+    }
+}
+
+
+
+/** HTTP health checker request callback */
+static void http_hc_request_cb(struct evhttp_request* req, void* arg)
+{
+    // Disable reading to work around a libevent bug, fixed in 2.2.0.
+    if (event_get_version_number() >= 0x02010600 && event_get_version_number() < 0x02020001) {
+        evhttp_connection* conn = evhttp_request_get_connection(req);
+        if (conn) {
+            bufferevent* bev = evhttp_connection_get_bufferevent(conn);
+            if (bev) {
+                bufferevent_disable(bev, EV_READ);
+            }
+        }
+    }
+    std::unique_ptr<HTTPRequest> hreq(new HTTPRequest(req));
+
+    // Early address-based allow check
+    if (!ClientAllowed(hreq->GetPeer())) {
+        LogPrintf( "HTTP request from %s rejected: Client network is not allowed RPC access\n",
+                 hreq->GetPeer().ToString());
+        
+        hreq->WriteReply(HTTP_FORBIDDEN);
+        return;
+    }
+
+    // Early reject unknown HTTP methods
+    if (hreq->GetRequestMethod() == HTTPRequest::UNKNOWN) {
+        LogPrintf("HTTP request from %s rejected: Unknown HTTP request method\n",
+                 hreq->GetPeer().ToString());
+        hreq->WriteReply(HTTP_BAD_METHOD);
+ 
+        return;
+    }
+
+    if(fDebug)LogPrint("rpc", "Received a health checker %s request for %s from %s\n",
+             RequestMethodString(hreq->GetRequestMethod()), SanitizeString(hreq->GetURI()).substr(0, 100), hreq->GetPeer().ToString().c_str());
+
+    // Find registered handler for prefix
+    std::string strURI = hreq->GetURI();
+    std::string path;
+    std::vector<HTTPPathHandler>::const_iterator i = pathHandlers.begin();
+    std::vector<HTTPPathHandler>::const_iterator iend = pathHandlers.end();
+    for (; i != iend; ++i) {
+        bool match = false;
+        if (i->exactMatch)
+            match = (strURI == i->prefix);
+        else
+            match = (strURI.substr(0, i->prefix.size()) == i->prefix);
+        if (match) {
+            path = strURI.substr(i->prefix.size());
+            break;
+        }
+    }
+
+    // Dispatch to worker thread
+    if (i != iend) {
+        hreq->SetFlags(MC_ACF_ENTERPRISE);        
+        std::unique_ptr<HTTPWorkItem> item(new HTTPWorkItem(std::move(hreq), path, i->handler));
+        assert(g_work_queue_hc);
+        if (g_work_queue_hc->Enqueue(item.get())) {
+            item.release(); /* if true, queue took ownership */
+        } else {
+
+            LogPrintf("WARNING: health checker request rejected because http work queue depth exceeded\n");
+            item->req->WriteHeader("Connection", "close");
+            item->req->WriteReply(HTTP_SERVICE_UNAVAILABLE, "Health checker work queue depth exceeded");
+        }
+        
+//        (*item)();
+    } else {
+        hreq->WriteReply(HTTP_NOT_FOUND);
+    }
+}
+
+/** Callback to reject HTTP requests after shutdown. */
+static void http_reject_request_cb(struct evhttp_request* req, void*)
+{
+    if(fDebug)LogPrint("rpc", "Rejecting request while shutting down\n");
+    evhttp_send_error(req, HTTP_SERVUNAVAIL, NULL);
+}
+
+/** Event dispatcher thread */
+static bool ThreadHTTP(struct event_base* base)
+{
+/* TODO 
+    util::ThreadRename("http");
+ */ 
+    
+/* TODO 
+    SetSyscallSandboxPolicy(SyscallSandboxPolicy::NET_HTTP_SERVER);
+ */ 
+    if(fDebug)LogPrint("rpc", "Entering http event loop\n");
+    event_base_dispatch(base);
+    // Event loop will be interrupted by InterruptHTTPServer()
+    if(fDebug)LogPrint("rpc", "Exited http event loop\n");
+    return event_base_got_break(base) == 0;
+}
+
+/** Bind HTTP server to specified addresses */
+static bool HTTPBindAddresses(struct evhttp* http,struct evhttp* http_hc)
+{
+    uint16_t http_port{static_cast<uint16_t>(GetArg("-rpcport", BaseParams().RPCPort()))};
+    std::vector<std::pair<std::string, uint16_t>> endpoints;
+
+    int ihcPort=pEF->HCH_GetPort();
+    
+    if((ihcPort < 0) || (ihcPort > 65535))
+    {
+        uiInterface.ThreadSafeMessageBox("Invalid health checker port", "", CClientUIInterface::MSG_ERROR);
+        return false;        
+    }
+    
+    uint16_t hcPort = (uint16_t)ihcPort;
+    if(hcPort == http_port)
+    {
+        uiInterface.ThreadSafeMessageBox("Health checker and RPC ports should be different", "", CClientUIInterface::MSG_ERROR);
+        return false;
+    }
+    
+    // Determine what addresses to bind to
+    if (mapMultiArgs.count("-rpcallowip") == 0) { // Default to loopback if not allowing external IPs
+//    if (!((mapMultiArgs.count("-rpcallowip") > 0) && (mapMultiArgs.count("-rpcbind") > 0))) { // Default to loopback if not allowing external IPs
+        endpoints.push_back(std::make_pair("::1", http_port));
+        endpoints.push_back(std::make_pair("127.0.0.1", http_port));
+        if(hcPort)
+        {
+            endpoints.push_back(std::make_pair("::1", hcPort));
+            endpoints.push_back(std::make_pair("127.0.0.1", hcPort));
+        }
+/*        
+        if (mapMultiArgs.count("-rpcallowip") > 0) {
+            LogPrintf("WARNING: option -rpcallowip was specified without -rpcbind; this doesn't usually make sense\n");
+        }
+*/
+        if (mapMultiArgs.count("-rpcbind") > 0) {
+            LogPrintf("WARNING: option -rpcbind was ignored because -rpcallowip was not specified, refusing to allow everyone to connect\n");
+        }
+    } else if (mapMultiArgs.count("-rpcbind") > 0) { // Specific bind address
+        for (const std::string& strRPCBind : mapMultiArgs["-rpcbind"]) {
+            int iport{http_port};
+            std::string host;
+            SplitHostPort(strRPCBind, iport, host);
+            uint16_t port=(uint16_t)iport;
+            endpoints.push_back(std::make_pair(host, port));
+            if(hcPort)
+            {
+                endpoints.push_back(std::make_pair(host, hcPort));
+            }
+        }
+    } else { // No specific bind address specified, bind to any
+        endpoints.push_back(std::make_pair("::", http_port));
+        endpoints.push_back(std::make_pair("0.0.0.0", http_port));
+    }
+    
+    bool hcOK=hcPort ? false : true;
+
+    // Bind addresses
+    for (std::vector<std::pair<std::string, uint16_t> >::iterator i = endpoints.begin(); i != endpoints.end(); ++i) {
+        if(i->second == hcPort)
+        {
+            if(fDebug)LogPrint("rpc", "Binding health checker on address %s port %i\n", i->first, i->second);
+            evhttp_bound_socket *bind_handle = evhttp_bind_socket_with_handle(http_hc, i->first.empty() ? NULL : i->first.c_str(), i->second);
+            if (bind_handle) {
+                hcOK=true;
+                boundSocketsHC.push_back(bind_handle);
+            } else {
+                LogPrintf("Binding health checker on address %s port %i failed.\n", i->first, i->second);
+            }
+        }
+        else    
+        {
+            if(fDebug)LogPrint("rpc", "Binding RPC on address %s port %i\n", i->first, i->second);
+            evhttp_bound_socket *bind_handle = evhttp_bind_socket_with_handle(http, i->first.empty() ? NULL : i->first.c_str(), i->second);
+            if (bind_handle) {
+/*               
+                CNetAddr addr;
+                if (i->first.empty() || (LookupHost(i->first, addr, false))) {
+                    LogPrintf("WARNING: the RPC server is not safe to expose to untrusted networks such as the public internet\n");
+                }
+ */ 
+                boundSockets.push_back(bind_handle);
+            } else {
+                LogPrintf("Binding RPC on address %s port %i failed.\n", i->first, i->second);
+            }
+        }
+    }
+    
+    if(!hcOK)
+    {
+        return false;        
+    }
+    
+    return !boundSockets.empty();
+}
+
+/** Simple wrapper to set thread name and run work queue */
+static void HTTPWorkQueueRun(WorkQueue<HTTPClosure>* queue, int worker_num)
+{
+/* TODO 
+    util::ThreadRename(strprintf("httpworker.%i", worker_num));
+ */ 
+/* TODO
+    SetSyscallSandboxPolicy(SyscallSandboxPolicy::NET_HTTP_SERVER_WORKER);
+ */ 
+    uint64_t thread_id=__US_ThreadID();
+    
+    if(worker_num >= 0)
+    {
+        if(fDebug)LogPrint("mcapi", "Starting RPC worker thread %d, id: %lu\n",worker_num,thread_id);
+        RPCThreadLoad load;
+        load.Zero();
+        rpc_loads.insert(make_pair(thread_id,load));
+        rpc_slots.insert(make_pair(thread_id,worker_num));        
+    }
+    queue->Run();
+}
+
+/** libevent event log callback */
+static void libevent_log_cb(int severity, const char *msg)
+{
+    if (severity >= EVENT_LOG_WARN) // Log warn messages and higher without debug category
+        LogPrintf("libevent: %s\n", msg);
+    else
+    {
+        if(fDebug)LogPrint("libevent", "libevent: %s\n", msg);
+    }
+}
+
+bool InitHTTPServer()
+{
+    if (!InitHTTPAllowList())
+        return false;
+
+    // Redirect libevent's logging to our own log
+    event_set_log_callback(&libevent_log_cb);
+    // Update libevent's log handling. Returns false if our version of
+    // libevent doesn't support debug logging, in which case we should
+    // clear the BCLog::LIBEVENT flag.
+/* TODO
+    if (!UpdateHTTPServerLogging(LogInstance().WillLogCategory(BCLog::LIBEVENT))) {
+        LogInstance().DisableCategory(BCLog::LIBEVENT);
+    }
+ */ 
+
+#ifdef WIN32
+    evthread_use_windows_threads();
+#else
+    evthread_use_pthreads();
+#endif
+
+    raii_event_base base_ctr = obtain_event_base();
+
+    /* Create a new evhttp object to handle requests. */
+    raii_evhttp http_ctr = obtain_evhttp(base_ctr.get());
+    struct evhttp* http = http_ctr.get();
+    if (!http) {
+        LogPrintf("couldn't create evhttp. Exiting.\n");
+        return false;
+    }
+
+//    raii_event_base base_hc_ctr = obtain_event_base();
+    
+    raii_evhttp http_hc_ctr = obtain_evhttp(base_ctr.get());
+    struct evhttp* http_hc = http_hc_ctr.get();
+    if (!http_hc) {
+        LogPrintf("couldn't create evhttp. Exiting.\n");
+        return false;
+    }
+    
+    evhttp_set_timeout(http, GetArg("-rpcservertimeout", DEFAULT_HTTP_SERVER_TIMEOUT));
+    evhttp_set_max_headers_size(http, MAX_HEADERS_SIZE);
+    evhttp_set_max_body_size(http, MAX_SIZE);
+    evhttp_set_gencb(http, http_request_cb, NULL);
+
+    evhttp_set_timeout(http_hc, DEFAULT_HTTP_SERVER_TIMEOUT);
+    evhttp_set_max_headers_size(http_hc, MAX_HEADERS_SIZE);
+    evhttp_set_max_body_size(http_hc, MAX_SIZE);
+    evhttp_set_gencb(http_hc, http_hc_request_cb, NULL);
+    
+    if (!HTTPBindAddresses(http,http_hc)) {
+        LogPrintf("Unable to bind any endpoint for RPC server\n");
+        return false;
+    }
+
+
+    if(fDebug)LogPrint("rpc", "Initialized RPC HTTP server\n");
+    int workQueueDepth = std::max((long)GetArg("-rpcworkqueue", DEFAULT_HTTP_WORKQUEUE), 1L);
+    LogPrintf("HTTP: creating work queue of depth %d\n", workQueueDepth);
+
+    g_work_queue = std::make_unique<WorkQueue<HTTPClosure>>(workQueueDepth);
+    g_work_queue_hc = std::make_unique<WorkQueue<HTTPClosure>>(DEFAULT_HTTP_WORKQUEUE);
+    
+    // transfer ownership to eventBase/HTTP via .release()
+    eventBase = base_ctr.release();
+//    eventBaseHC = base_hc_ctr.release();
+    eventHTTP = http_ctr.release();
+    eventHTTPHC = http_hc_ctr.release();
+    return true;
+}
+
+bool UpdateHTTPServerLogging(bool enable) {
+#if LIBEVENT_VERSION_NUMBER >= 0x02010100
+    if (enable) {
+        event_enable_debug_logging(EVENT_DBG_ALL);
+    } else {
+        event_enable_debug_logging(EVENT_DBG_NONE);
+    }
+    return true;
+#else
+    // Can't update libevent logging if version < 02010100
+    return false;
+#endif
+}
+
+static std::thread g_thread_http;
+static std::vector<std::thread> g_thread_http_workers;
+
+
+struct event_base* EventBase()
+{
+    return eventBase;
+}
+
+static void httpevent_callback_fn(evutil_socket_t, short, void* data)
+{
+    // Static handler: simply call inner handler
+    HTTPEvent *self = static_cast<HTTPEvent*>(data);
+    self->handler();
+    if (self->deleteWhenTriggered)
+        delete self;
+}
+
+HTTPEvent::HTTPEvent(struct event_base* base, bool _deleteWhenTriggered, const std::function<void()>& _handler):
+    deleteWhenTriggered(_deleteWhenTriggered), handler(_handler)
+{
+    ev = event_new(base, -1, 0, httpevent_callback_fn, this);
+    assert(ev);
+}
+HTTPEvent::~HTTPEvent()
+{
+    event_free(ev);
+}
+void HTTPEvent::trigger(struct timeval* tv)
+{
+    if (tv == NULL)
+        event_active(ev, 0, 0); // immediately trigger event in main thread
+    else
+        evtimer_add(ev, tv); // trigger after timeval passed
+}
+HTTPRequest::HTTPRequest(struct evhttp_request* _req, bool _replySent) : req(_req), replySent(_replySent)
+{
+}
+
+HTTPRequest::~HTTPRequest()
+{
+    if (!replySent) {
+        // Keep track of whether reply was sent to avoid request leaks
+        LogPrintf("%s: Unhandled request\n", __func__);
+        WriteReply(HTTP_INTERNAL_SERVER_ERROR, "Unhandled request");
+
+    }
+    // evhttpd cleans up the request, as long as a reply was sent.
+}
+
+std::pair<bool, std::string> HTTPRequest::GetHeader(const std::string& hdr) const
+{
+    const struct evkeyvalq* headers = evhttp_request_get_input_headers(req);
+    assert(headers);
+    const char* val = evhttp_find_header(headers, hdr.c_str());
+    if (val)
+        return std::make_pair(true, val);
+    else
+        return std::make_pair(false, "");
+}
+
+std::string HTTPRequest::ReadBody()
+{
+    struct evbuffer* buf = evhttp_request_get_input_buffer(req);
+    if (!buf)
+        return "";
+    size_t size = evbuffer_get_length(buf);
+    /** Trivial implementation: if this is ever a performance bottleneck,
+     * internal copying can be avoided in multi-segment buffers by using
+     * evbuffer_peek and an awkward loop. Though in that case, it'd be even
+     * better to not copy into an intermediate string but use a stream
+     * abstraction to consume the evbuffer on the fly in the parsing algorithm.
+     */
+    const char* data = (const char*)evbuffer_pullup(buf, size);
+    if (!data) // returns NULL in case of empty buffer
+        return "";
+    std::string rv(data, size);
+    evbuffer_drain(buf, size);
+    return rv;
+}
+
+void HTTPRequest::WriteHeader(const std::string& hdr, const std::string& value)
+{
+    struct evkeyvalq* headers = evhttp_request_get_output_headers(req);
+    assert(headers);
+    evhttp_add_header(headers, hdr.c_str(), value.c_str());
+}
+
+/** Closure sent to main thread to request a reply to be sent to
+ * a HTTP request.
+ * Replies must be sent in the main loop in the main http thread,
+ * this cannot be done from worker threads.
+ */
+void HTTPRequest::WriteReply(int nStatus, const std::string& strReply)
+{
+    assert(!replySent && req);
+    if (ShutdownRequested()) {
+        WriteHeader("Connection", "close");
+    }
+    // Send event to main http thread to send reply message
+    struct evbuffer* evb = evhttp_request_get_output_buffer(req);
+    assert(evb);
+    evbuffer_add(evb, strReply.data(), strReply.size());
+    auto req_copy = req;
+    HTTPEvent* ev = new HTTPEvent(eventBase, true, [req_copy, nStatus]{
+        evhttp_send_reply(req_copy, nStatus, NULL, NULL);
+        // Re-enable reading from the socket. This is the second part of the libevent
+        // workaround above.
+        if (event_get_version_number() >= 0x02010600 && event_get_version_number() < 0x02020001) {
+            evhttp_connection* conn = evhttp_request_get_connection(req_copy);
+            if (conn) {
+                bufferevent* bev = evhttp_connection_get_bufferevent(conn);
+                if (bev) {
+                    bufferevent_enable(bev, EV_READ | EV_WRITE);
+                }
+            }
+        }
+    });
+    ev->trigger(NULL);
+    replySent = true;
+    req = NULL; // transferred back to main thread
+}
+
+CService HTTPRequest::GetPeer() const
+{
+    evhttp_connection* con = evhttp_request_get_connection(req);
+    CService peer;
+    if (con) {
+        // evhttp retains ownership over returned address string
+        const char* address = "";
+        uint16_t port = 0;
+        evhttp_connection_get_peer(con, (char**)&address, &port);
+        LookupNumeric(address, peer, port);        
+    }
+    return peer;
+}
+
+void HTTPRequest::SetFlags(uint32_t flags_in)
+{
+    flags=flags_in;
+}
+
+uint32_t HTTPRequest::GetFlags()
+{
+    return flags;
+}
+
+std::string HTTPRequest::GetURI() const
+{
+    return evhttp_request_get_uri(req);
+}
+
+HTTPRequest::RequestMethod HTTPRequest::GetRequestMethod() const
+{
+    switch (evhttp_request_get_command(req)) {
+    case EVHTTP_REQ_GET:
+        return GET;
+        break;
+    case EVHTTP_REQ_POST:
+        return POST;
+        break;
+    case EVHTTP_REQ_HEAD:
+        return HEAD;
+        break;
+    case EVHTTP_REQ_PUT:
+        return PUT;
+        break;
+    default:
+        return UNKNOWN;
+        break;
+    }
+}
+
+void RegisterHTTPHandler(const std::string &prefix, bool exactMatch, const HTTPRequestHandler &handler)
+{
+/* TODO    
+    if(fDebug)LogPrint(BCLog::HTTP, "Registering HTTP handler for %s (exactmatch %d)\n", prefix, exactMatch);
+ */ 
+    pathHandlers.push_back(HTTPPathHandler(prefix, exactMatch, handler));
+}
+
+void UnregisterHTTPHandler(const std::string &prefix, bool exactMatch)
+{
+    std::vector<HTTPPathHandler>::iterator i = pathHandlers.begin();
+    std::vector<HTTPPathHandler>::iterator iend = pathHandlers.end();
+    for (; i != iend; ++i)
+        if (i->prefix == prefix && i->exactMatch == exactMatch)
+            break;
+    if (i != iend)
+    {
+/* TODO    
+        if(fDebug)LogPrint(BCLog::HTTP, "Unregistering HTTP handler for %s (exactmatch %d)\n", prefix, exactMatch);
+ */ 
+        pathHandlers.erase(i);
+    }
+}
+
+
+static void JSONErrorReply(HTTPRequest* req, const Value& objError, const Value& id)
+{
+    // Send error reply from json-rpc error object
+    int nStatus = HTTP_INTERNAL_SERVER_ERROR;
+    int code = find_value(objError.get_obj(), "code").get_int();
+
+    if (code == RPC_INVALID_REQUEST)
+        nStatus = HTTP_BAD_REQUEST;
+    else if (code == RPC_METHOD_NOT_FOUND)
+        nStatus = HTTP_NOT_FOUND;
+
+    std::string strReply = JSONRPCReply(Value::null, objError, id);
+
+    req->WriteHeader("Content-Type", "application/json");
+    req->WriteReply(nStatus, strReply);
+}
+
+std::string TrimString(const std::string& str, const std::string& pattern = " \f\n\r\t\v")
+{
+    std::string::size_type front = str.find_first_not_of(pattern);
+    if (front == std::string::npos) {
+        return std::string();
+    }
+    std::string::size_type end = str.find_last_not_of(pattern);
+    return str.substr(front, end - front + 1);
+}
+
+static bool RPCAuthorized(const std::string& strAuth, std::string& strAuthUsernameOut)
+{
+    if (strRPCUserColonPass.empty()) // Belt-and-suspenders measure if InitRPCAuthentication was not called
+        return false;
+    if (strAuth.substr(0, 6) != "Basic ")
+        return false;
+    std::string strUserPass64 = TrimString(strAuth.substr(6));
+    std::string strUserPass = DecodeBase64(strUserPass64);
+
+    if (strUserPass.find(':') != std::string::npos)
+        strAuthUsernameOut = strUserPass.substr(0, strUserPass.find(':'));
+
+    //Check if authorized under single-user field
+    if (TimingResistantEqual(strUserPass, strRPCUserColonPass)) {
+        return true;
+    }
+    
+    return false;
+}
+
+static bool HTTPReq_JSONRPC(HTTPRequest* req)
+{
+    // JSONRPC handles only POST
+    if((req->GetFlags() & MC_ACF_ENTERPRISE) == 0)
+    {
+        if (req->GetRequestMethod() != HTTPRequest::POST) 
+        {
+            req->WriteReply(HTTP_BAD_METHOD, "JSONRPC server handles only POST requests");
+            return false;
+        }
+    }
+    // Check authorization
+    std::pair<bool, std::string> authHeader = req->GetHeader("authorization");
+    if (!authHeader.first) {
+        req->WriteHeader("WWW-Authenticate", WWW_AUTH_HEADER_DATA);
+        req->WriteReply(HTTP_UNAUTHORIZED);
+        return false;
+    }
+
+    std::string strAuthUsernameOut;
+    if (!RPCAuthorized(authHeader.second, strAuthUsernameOut)) {
+        LogPrintf("ThreadRPCServer incorrect password attempt from %s\n", req->GetPeer().ToStringIPPort().c_str());
+
+        // Deter brute-forcing           If this results in a DoS the user really           shouldn't have their RPC port exposed. 
+        MilliSleep(250);
+
+        req->WriteHeader("WWW-Authenticate", WWW_AUTH_HEADER_DATA);
+        req->WriteReply(HTTP_UNAUTHORIZED);
+        return false;
+    }
+
+    std::string strRequest;
+    std::string strReply;
+    std::string strHeaderOut;
+    std::map<std::string, std::string> mapHeadersOut;
+    Value valError;
+    Value req_id;
+    int http_code=HTTP_OK;
+    strRequest=req->ReadBody();
+    bool result=HTTPReq_JSONRPC(strRequest,req->GetFlags(),strReply,strHeaderOut,mapHeadersOut,http_code,valError,req_id);
+    if(result)
+    {
+        for (std::map<std::string, std::string>::const_iterator it = mapHeadersOut.begin(); it != mapHeadersOut.end(); ++it)
+        {
+            req->WriteHeader(it->first, it->second);            
+        }
+        req->WriteReply(http_code, strReply);        
+        if(http_code != HTTP_OK)
+        {
+            result=false;
+        }
+    }
+    else
+    {
+        JSONErrorReply(req, valError, req_id);        
+    }
+    return result;
+}
+
+void StartHTTPServer()
+{    
+    mc_InitRPCList(vStaticRPCCommands,vStaticRPCWalletReadCommands);
+    mc_InitRPCListIfLimited();
+    tableRPC.initialize();
+    
+    strRPCUserColonPass = mapArgs["-rpcuser"] + ":" + mapArgs["-rpcpassword"];
+
+    auto handle_rpc = [](HTTPRequest* req, const std::string&) { return HTTPReq_JSONRPC( req); };
+    RegisterHTTPHandler("/", true, handle_rpc);
+    
+    struct event_base* eventBase = EventBase();
+    assert(eventBase);
+    
+    if(fDebug)LogPrint("rpc", "Starting RPC HTTP server\n");
+    int rpcThreads = std::max((long)GetArg("-rpcthreads", DEFAULT_HTTP_THREADS), 1L);
+    LogPrintf("HTTP: starting %d worker threads\n", rpcThreads);
+    g_thread_http = std::thread(ThreadHTTP, eventBase);
+
+    for (int i = 0; i < rpcThreads; i++) {
+        g_thread_http_workers.emplace_back(HTTPWorkQueueRun, g_work_queue.get(), i);
+        MilliSleep(10);
+        while((int)rpc_slots.size() < i+1)
+        {
+            MilliSleep(10);
+        }
+    }
+    g_thread_http_workers.emplace_back(HTTPWorkQueueRun, g_work_queue_hc.get(), -1);
+    
+    mc_gState->InitRPCThreads(rpcThreads);
+    fRPCRunning = true;
+}
+
+void InterruptHTTPServer()
+{
+    if(fDebug)LogPrint("rpc", "Interrupting HTTP server\n");
+    if (eventHTTP) {
+        // Reject requests on current connections
+        evhttp_set_gencb(eventHTTP, http_reject_request_cb, NULL);
+    }
+    if (eventHTTPHC) {
+        // Reject requests on current connections
+        evhttp_set_gencb(eventHTTPHC, http_reject_request_cb, NULL);
+    }
+    fRPCInterrupted=true;
+    if (g_work_queue) {
+        g_work_queue->Interrupt();
+    }
+    if (g_work_queue_hc) {
+        g_work_queue_hc->Interrupt();
+    }
+}
+
+void StopHTTPServer()
+{
+    UnregisterHTTPHandler("/", true);
+    if(fDebug)LogPrint("rpc", "Stopping RPC HTTP server\n");
+    if (g_work_queue) {
+
+        if(fDebug)LogPrint("rpc", "Waiting for RPC HTTP worker threads to exit\n");
+        for (auto& thread : g_thread_http_workers) {
+            thread.join();
+        }
+        g_thread_http_workers.clear();
+    }
+    // Unlisten sockets, these are what make the event loop running, which means
+    // that after this and all connections are closed the event loop will quit.
+    for (evhttp_bound_socket *socket : boundSocketsHC) {
+        evhttp_del_accept_socket(eventHTTPHC, socket);
+    }
+    boundSocketsHC.clear();
+    for (evhttp_bound_socket *socket : boundSockets) {
+        evhttp_del_accept_socket(eventHTTP, socket);
+    }
+    boundSockets.clear();
+    if (eventBase) {
+        if(fDebug)LogPrint("rpc", "Waiting for RPC HTTP event thread to exit\n");
+        if (g_thread_http.joinable()) g_thread_http.join();
+    }
+    if (eventHTTPHC) {
+        evhttp_free(eventHTTPHC);
+        eventHTTPHC = NULL;
+    }
+    if (eventHTTP) {
+        evhttp_free(eventHTTP);
+        eventHTTP = NULL;
+    }
+    if (eventBase) {
+        event_base_free(eventBase);
+        eventBase = NULL;
+    }
+    g_work_queue.reset();
+    g_work_queue_hc.reset();
+    if(fDebug)LogPrint("rpc", "Stopped RPC HTTP server\n");
+}
+
+
+/*
+bool StartHTTPRPC()
+{
+    mc_InitRPCList(vStaticRPCCommands,vStaticRPCWalletReadCommands);
+    mc_InitRPCListIfLimited();
+    tableRPC.initialize();
+    fRPCRunning = true;
+    
+    strRPCUserColonPass = mapArgs["-rpcuser"] + ":" + mapArgs["-rpcpassword"];
+
+    auto handle_rpc = [](HTTPRequest* req, const std::string&) { return HTTPReq_JSONRPC( req); };
+    RegisterHTTPHandler("/", true, handle_rpc);
+    
+    struct event_base* eventBase = EventBase();
+    assert(eventBase);
+    return true;
+}
+void InterruptHTTPRPC()
+{
+    if(fDebug)LogPrint(BCLog::RPC, "Interrupting HTTP RPC server\n");
+}
+
+void StopHTTPRPC()
+{
+    if(fDebug)LogPrint(BCLog::RPC, "Stopping HTTP RPC server\n");
+    UnregisterHTTPHandler("/", true);
+    if (g_wallet_init_interface.HasWalletSupport()) {
+        UnregisterHTTPHandler("/wallet/", false);
+    }
+    
+    if (httpRPCTimerInterface) {
+        RPCUnsetTimerInterface(httpRPCTimerInterface.get());
+        httpRPCTimerInterface.reset();
+    }
+}
+*/

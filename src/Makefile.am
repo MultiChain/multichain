@@ -130,7 +130,6 @@ BITCOIN_CORE_H = \
   utils/utilparse.h \
   rpc/rpcclient.h \
   rpc/rpcprotocol.h \
-  rpc/rpcasio.h \
   rpc/rpcutils.h \
   rpc/rpcwallet.h \
   rpc/rpcserver.h \
@@ -182,19 +181,42 @@ obj/build.h: FORCE
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
 libbitcoin_community_a_CPPFLAGS = $(BITCOIN_INCLUDES)
+if ENABLE_BERKELEY_DB
 libbitcoin_community_a_SOURCES = \
   community/community.cpp \
   wallet/db.cpp \
   wallet/dbwrap_com.cpp
+else
+libbitcoin_community_a_SOURCES = \
+  community/community.cpp \
+  wallet/dbwrap_ent.cpp
+endif
+
+
+EDITION_LIBS = 
+EDITION_LIBS += $(SSL_LIBS) 
+EDITION_LIBS += $(CRYPTO_LIBS)
+if ENABLE_BERKELEY_DB
+EDITION_LIBS += $(BDB_LIBS) 
+endif
 
 if ENABLE_ENTERPRISE
+
 include entMakefile.am
 else
 libbitcoin_enterprise_a_CPPFLAGS = $(BITCOIN_INCLUDES)
+
+if ENABLE_BERKELEY_DB
 libbitcoin_enterprise_a_SOURCES = \
   community/community.cpp \
   wallet/db.cpp \
   wallet/dbwrap_com.cpp
+else
+libbitcoin_enterprise_a_SOURCES = \
+  community/community.cpp \
+  wallet/dbwrap_ent.cpp
+endif
+
 endif
 
 # server: shared between bitcoind and bitcoin-qt
@@ -274,6 +296,8 @@ libbitcoin_wallet_a_SOURCES = \
 # crypto primitives library
 crypto_libbitcoin_crypto_a_CPPFLAGS = $(BITCOIN_CONFIG_INCLUDES)
 crypto_libbitcoin_crypto_a_SOURCES = \
+  crypto/ctaes/ctaes.c \
+  crypto/aes.cpp \
   crypto/sha1.cpp \
   crypto/sha256.cpp \
   crypto/sha512.cpp \
@@ -281,6 +305,8 @@ crypto_libbitcoin_crypto_a_SOURCES = \
   crypto/hmac_sha512.cpp \
   crypto/ripemd160.cpp \
   crypto/common.h \
+  crypto/ctaes/ctaes.h \
+  crypto/aes.h \
   crypto/sha256.h \
   crypto/sha512.h \
   crypto/hmac_sha256.h \
@@ -355,6 +381,7 @@ libbitcoin_util_a_SOURCES = \
   chainparams/chainparamsbase.cpp \
   version/clientversion.cpp \
   utils/random.cpp \
+  utils/randomenv.cpp \
   rpc/rpcprotocol.cpp \
   utils/sync.cpp \
   structs/uint256.cpp \
@@ -471,6 +498,14 @@ V8_LIBS += \
     -lrt
 endif
 
+EVENT_LIBS = \
+    -levent 
+
+if !TARGET_WINDOWS
+EVENT_LIBS += \
+    -levent_pthreads
+endif
+
 libbitcoin_v8_a_SOURCES = \
   v8/v8engine.cpp \
   v8/v8filter.cpp \
@@ -520,7 +555,7 @@ else
 multichaind_SOURCES += filters/filter.cpp
 endif
 
-multichaind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
+multichaind_LDADD += $(BOOST_LIBS) $(EDITION_LIBS) $(MINIUPNPC_LIBS) $(EVENT_LIBS)
 multichaind_CPPFLAGS = $(BITCOIN_INCLUDES) $(V8_INCLUDE)
 multichaind_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -pthread
 if !TARGET_WINDOWS
@@ -559,7 +594,7 @@ if TARGET_WINDOWS
 multichaind_cold_SOURCES += multichaind-cold-res.rc
 endif
 
-multichaind_cold_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
+multichaind_cold_LDADD += $(BOOST_LIBS) $(EDITION_LIBS) $(MINIUPNPC_LIBS) $(EVENT_LIBS)
 multichaind_cold_CPPFLAGS = $(BITCOIN_INCLUDES)
 multichaind_cold_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -pthread
 
@@ -572,7 +607,8 @@ multichain_cli_LDADD = \
   $(LIBLEVELDB) \
   $(BOOST_LIBS) \
   $(SSL_LIBS) \
-  $(CRYPTO_LIBS)
+  $(CRYPTO_LIBS) \
+  $(EVENT_LIBS)
 
 multichain_cli_SOURCES =  multichain/multichain-cli.cpp
 

@@ -590,7 +590,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
             entity_row.m_ScriptSize=details_script_size;
             if(details_script_size)
             {
-                memcpy(entity_row.m_Script,details_script,details_script_size);
+                entity_row.SetScript(details_script,details_script_size);
             }
             entity.Set(&entity_row);
             lpEntity=&entity;

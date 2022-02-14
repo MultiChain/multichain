@@ -48,6 +48,7 @@ extern CInitNodeStatus *pNodeStatus;
 void StartShutdown();
 bool ShutdownRequested();
 void Shutdown();
+void Interrupt();
 
 /* MCHN START */
 #ifndef STDOUT_FILENO

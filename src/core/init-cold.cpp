@@ -18,6 +18,7 @@
 #include "core/main.h"
 #include "miner/miner.h"
 #include "net/net.h"
+#include "rpc/rpchttpserver.h"
 #include "rpc/rpcserver.h"
 #include "script/standard.h"
 #include "storage/txdb.h"
@@ -59,7 +60,6 @@ bool InitSanityCheck(void);
 #include <boost/filesystem.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <boost/thread.hpp>
-#include <openssl/crypto.h>
 
 using namespace boost;
 using namespace std;
@@ -87,6 +87,10 @@ extern bool fRequestShutdown;
 extern bool fShutdownCompleted;
 
 
+void Interrupt_Cold()
+{
+    InterruptHTTPServer();
+}
 
 bool static InitError(const std::string &str)
 {
@@ -137,7 +141,8 @@ void Shutdown_Cold()
     /// Be sure that anything that writes files or flushes caches only does this if the respective
     /// module was initialized.
     RenameThread("bitcoin-shutoff");
-    StopRPCThreads();
+
+    StopHTTPServer();
 #ifdef ENABLE_WALLET
     if (pwalletMain)
         bitdbwrap.Flush(false);
@@ -213,7 +218,7 @@ std::string HelpMessage_Cold()
     strUsage += "  -salvagewallet         " + _("Attempt to recover private keys from a corrupt wallet.dat") + " " + _("on startup") + "\n";
     strUsage += "  -wallet=<file>         " + _("Specify wallet file (within data directory)") + " " + strprintf(_("(default: %s)"), "wallet.dat") + "\n";
 /* MCHN START */    
-    strUsage += "  -walletdbversion=2|3   " + _("Specify wallet version, 2 - Berkeley DB, 3 (default) - proprietary") + "\n";
+    strUsage += "  -walletdbversion=3     " + _("Specify wallet version, 3 (default) - proprietary") + "\n";
 /* MCHN END */    
 #endif
 
@@ -309,6 +314,12 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     }
 
     fRequestShutdown=false;
+
+    if (!SetupNetworking()) {
+        return InitError("Error: Initializing networking failed.");
+    }
+    
+    RandomInit();    
     
     // Clean shutdown on SIGTERM
     struct sigaction sa;
@@ -407,7 +418,6 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     }
 
 /* MCHN END */    
-    LogPrintf("Using OpenSSL version %s\n", SSLeay_version(SSLEAY_VERSION));
 #ifdef ENABLE_WALLET
     WalletDBLogVersionString();
 #endif
@@ -441,37 +451,63 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
             boost::filesystem::path pathWallet=GetDataDir() / "wallet";
 
             LogPrintf("Wallet file exists. WalletDBVersion: %d.\n", currentwalletdatversion);
+            if(currentwalletdatversion != 1)
+            {
+                CDBWrapEnv env_cur;
+                if(env_cur.MinWalletDBVersion() > currentwalletdatversion)
+                {
+                    return InitError(strprintf("Wallet version %d is not supported in this build of MultiChain.\n\n"
+                            "To upgrade to version %d, run MultiChain Daemon from official build: \n"
+                            "multichaind-cold %s -walletdbversion=%d\n",
+                            currentwalletdatversion,env_cur.MinWalletDBVersion(), mc_gState->m_NetworkParams->Name(),env_cur.MinWalletDBVersion()));                                                                                
+                }
+            }
+            
             if( (currentwalletdatversion == 3) && (GetArg("-walletdbversion",MC_TDB_WALLET_VERSION) != 3) )
             {
                 return InitError(_("Wallet downgrade is not allowed"));                                                        
             }
-            if( (currentwalletdatversion == 2) && (GetArg("-walletdbversion",0) == 3) )
+            if( (currentwalletdatversion == 2) )
             {
-                if(!boost::filesystem::exists(pathWallet))
+                if(GetArg("-walletdbversion",0) == 3)
                 {
-                    currentwalletdatversion=1;
+                    if(!boost::filesystem::exists(pathWallet))
+                    {
+                        currentwalletdatversion=1;
+                    }
+                    else
+                    {
+                        CDBWrapEnv env2;
+                        if (!env2.Open(GetDataDir()))
+                        {
+                            return InitError(_("Error initializing wallet database environment for upgrade"));                                        
+                        }                
+                        bool allOK = env2.Salvage(strWalletFile, false, salvagedData);
+                        if(!allOK)
+                        {
+                            return InitError(_("wallet.dat corrupt, cannot upgrade, you should repair it first.\n Run multichaind normally or with -salvagewallet flag"));                    
+                        }
+
+                        currentwalletdatversion=3;
+                        wallet_upgrade=true;                
+                    }
                 }
                 else
                 {
-                    CDBWrapEnv env2;
-                    if (!env2.Open(GetDataDir()))
-                    {
-                        return InitError(_("Error initializing wallet database environment for upgrade"));                                        
-                    }                
-                    bool allOK = env2.Salvage(strWalletFile, false, salvagedData);
-                    if(!allOK)
-                    {
-                        return InitError(_("wallet.dat corrupt, cannot upgrade, you should repair it first.\n Run multichaind normally or with -salvagewallet flag"));                    
-                    }
-
-                    currentwalletdatversion=3;
-                    wallet_upgrade=true;                
-                }
+                    return InitError(strprintf("Wallet version %d is not supported in this version of MultiChain.\n\n"
+                            "To upgrade to version %d, please run \n"
+                            "multichaind-cold %s -walletdbversion=3\n",
+                            currentwalletdatversion,MC_TDB_WALLET_VERSION, mc_gState->m_NetworkParams->Name()));                                                                                                
+                }                
             }
         }
         else
         {
             currentwalletdatversion=wallet_mode;
+            if(MC_TDB_WALLET_VERSION > currentwalletdatversion)
+            {
+                return InitError(strprintf("Wallet version %d is not supported in this version of MultiChain.\n",currentwalletdatversion));                                                            
+            }
             LogPrintf("Wallet file doesn't exist. New file will be created with version %d.\n", currentwalletdatversion);
         }      
         switch(currentwalletdatversion)
@@ -486,7 +522,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
                         "To upgrade to version 2, run MultiChain 1.0: \n"
                         "multichaind %s -walletdbversion=2 -rescan\n",mc_gState->m_NetworkParams->Name()));                                        
             default:
-                return InitError(_("Invalid wallet version, possible values 2, 3.\n"));                                                                    
+                return InitError(_("Invalid wallet version, possible values: 3.\n"));                                                                    
         }
         
         if (!bitdbwrap.Open(GetDataDir()))
@@ -602,7 +638,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
         }
         
         mc_gState->m_Assets= new mc_AssetDB;
-        if(mc_gState->m_Assets->Initialize(mc_gState->m_Params->NetworkName(),0))                                
+        if(mc_gState->m_Assets->Initialize(mc_gState->m_Params->NetworkName(),0,MC_AST_DEFAULT_VERSION))                                
         {
             seed_error=strprintf("ERROR: Couldn't initialize asset database for blockchain %s. Please restart multichaind with reindex=1.\n",mc_gState->m_Params->NetworkName());
             return InitError(_(seed_error.c_str()));        
@@ -970,7 +1006,10 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     if (fServer)
     {
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
-        StartRPCThreads(rpc_threads_error);
+        if (!InitHTTPServer())
+            return InitError("Couldn't start RPC HTTP Server");          
+        
+        StartHTTPServer();                
     }
 /* MCHN END*/        
     

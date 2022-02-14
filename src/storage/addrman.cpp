@@ -4,6 +4,8 @@
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
 #include "storage/addrman.h"
+#include "net/net.h"
+#include "structs/base58.h"
 
 #include "structs/hash.h"
 #include "utils/serialize.h"
@@ -384,6 +386,7 @@ bool CAddrMan::Add_(const CAddress& addr, const CNetAddr& source, int64_t nTimeP
         pinfo->nTime = max((int64_t)0, (int64_t)pinfo->nTime - nTimePenalty);
         nNew++;
         fNew = true;
+        cMCAddrMan.Set(addr,0);
     }
 
     int nUBucket = pinfo->GetNewBucket(nKey, source);
@@ -815,4 +818,709 @@ void CAddrMan::Connected_(const CService& addr, int64_t nTime)
     int64_t nUpdateInterval = 20 * 60;
     if (nTime - info.nTime > nUpdateInterval)
         info.nTime = nTime;
+}
+
+void CMCAddrInfo::Init()
+{
+    memset(&m_NetAddress,0, sizeof(CService));
+    m_MCAddress=0;
+    m_LastSuccess=0;
+    m_Attempts=0;
+    m_Flags=0;
+    m_PrevRow=0;
+    m_LastRow=0;
+    m_LastSuccessRow=0;    
+    m_LastTry=0;
+    m_Reserved1=0;    
+    m_Reserved2=0;    
+}
+
+void CMCAddrInfo::SetFlag(uint32_t flag,int set_flag)
+{
+    if(set_flag)
+    {
+        m_Flags |= flag;
+    }
+    else
+    {
+        m_Flags &= ~flag;
+    }    
+}
+
+void CMCAddrInfo::SetLastRow(uint32_t row)
+{
+    m_LastRow=row;
+}
+
+void CMCAddrInfo::SetPrevRow(uint32_t row)
+{
+    m_PrevRow=row;    
+}
+
+uint32_t CMCAddrInfo::GetFlags()
+{
+    return m_Flags;
+}
+
+uint32_t CMCAddrInfo::GetLastRow()
+{
+    return m_LastRow;
+}
+
+uint32_t CMCAddrInfo::GetPrevRow()
+{
+    return m_PrevRow;
+}
+
+uint160 CMCAddrInfo::GetMCAddress()
+{
+    return m_MCAddress;
+}
+
+CService CMCAddrInfo::GetNetAddress()
+{
+    return m_NetAddress;
+}
+
+int32_t CMCAddrInfo::GetLastTryInfo(int64_t *last_success,int64_t *last_try,uint32_t *last_success_row)
+{
+    if(last_success)
+    {
+        *last_success=m_LastSuccess;
+    }
+    if(last_try)
+    {
+        *last_try=m_LastTry;
+    }
+    if(last_success_row)
+    {
+        *last_success_row=m_LastSuccessRow;
+    }
+    return m_Attempts;
+}
+
+void CMCAddrInfo::Try()
+{
+    m_LastTry=GetAdjustedTime();
+    m_Attempts++;
+}
+
+void CMCAddrInfo::Set(uint32_t row)
+{
+    if((row>0) || (m_MCAddress != 0))
+    {
+        m_LastSuccess=GetAdjustedTime();
+    }
+    m_LastSuccessRow=row;
+    if(IsNet() && (m_MCAddress != 0))
+    {
+        m_LastRow=row;
+    }
+    m_Attempts=0;
+}
+
+bool CMCAddrInfo::IsNet()
+{    
+    return (m_NetAddress.GetPort() != 0 ) || !m_NetAddress.IsZero();
+}
+
+void CMCAddrMan::Init()
+{
+    m_RowSize=sizeof(CMCAddrInfo);
+    m_MCAddrs.clear();
+    m_HashMap.clear();    
+    m_MCAddrs.push_back(CMCAddrInfo(CService(),0));
+    m_MCAddrs[0].SetPrevRow(1);                                                 // Version
+    m_MCAddrs[0].SetLastRow(m_MCAddrs.size());
+    m_HashMap.insert(make_pair(0,0));
+    m_CurRow=0;
+}
+
+uint256 CMCAddrMan::GetHash(const CService &netaddr, uint160 mcaddr)
+{    
+    uint256 hash;
+    if(netaddr.IsZero())
+    {
+        hash=0;
+        memcpy((unsigned char*)&hash+12,&mcaddr,sizeof(uint160));        
+    }
+    else
+    {
+        if(netaddr.IsIPv4())
+        {
+            hash=0;
+            memcpy(&hash,(unsigned char*)&netaddr+sizeof(CService)-12,12);
+            memcpy((unsigned char*)&hash+12,&mcaddr,sizeof(uint160));
+        }
+        else
+        {
+            unsigned char buf[40];
+            memset(buf,0,40);
+            memcpy(buf,&netaddr,sizeof(CService));
+            memcpy(buf+sizeof(CService),&mcaddr,sizeof(uint160));        
+            hash = Hash(buf, buf+40);
+        }
+    }
+//    printf("Hash %s\n",hash.ToString().c_str());
+    return hash;
+}
+
+CMCAddrInfo *CMCAddrMan::Find(const CService &netaddr, uint160 mcaddr)
+{
+    uint256 hash=GetHash(netaddr,mcaddr);
+//    printf("Hash (%s, %s) -> %s\n",netaddr.ToStringIPPort().c_str(),mcaddr.ToString().c_str(),hash.ToString().c_str());
+    std::map<uint256, uint32_t>::iterator it = m_HashMap.find(hash);
+    if(it == m_HashMap.end())
+    {
+        return NULL;
+    }
+    
+    return &m_MCAddrs[it->second];
+}
+
+void CMCAddrMan::Try(const CService &netaddr, uint160 mcaddr)
+{
+    CMCAddrInfo *addr;
+    addr=Find(netaddr,mcaddr);
+    if(addr)
+    {
+        addr->Try();
+    }
+}
+
+void CMCAddrMan::Set(const CService &netaddr, uint160 mcaddr)
+{
+    LOCK(cs);
+    
+    CMCAddrInfo *addr;
+    CMCAddrInfo *netparent=NULL;
+    CMCAddrInfo *mcparent=NULL;
+    uint32_t row=0;
+    
+    addr=Find(netaddr,mcaddr);
+    
+    if(addr)
+    {
+        row=addr->GetLastRow();
+        if(mcaddr != 0)
+        {
+            mcparent=Find(CService(),mcaddr);
+            netparent=Find(netaddr,0);
+        }    
+    }
+    else
+    {
+        uint256 hash=GetHash(netaddr,mcaddr);
+        row=m_MCAddrs.size();
+        m_HashMap.insert(make_pair(hash,row));
+        
+        CMCAddrInfo newaddr=CMCAddrInfo(netaddr,mcaddr);
+        m_MCAddrs.push_back(newaddr);        
+        addr=&m_MCAddrs[row];        
+        if(mcaddr == 0)
+        {
+            if(fDebug)LogPrint("addrman","mcaddrman: New network address %s\n",addr->GetNetAddress().ToStringIPPort().c_str());
+        }
+        else
+        {
+            if(fDebug)LogPrint("addrman","mcaddrman: New full address %s on %s\n",CBitcoinAddress((CKeyID)addr->GetMCAddress()).ToString().c_str(),addr->GetNetAddress().ToStringIPPort().c_str());            
+        }
+        if(mcaddr != 0)
+        {
+            mcparent=Find(CService(),mcaddr);
+            netparent=Find(netaddr,0);
+        }    
+        if(mcparent)
+        {
+            addr->SetPrevRow(mcparent->GetLastRow());
+            mcparent->SetLastRow(row);
+        }
+        m_MCAddrs[0].SetLastRow(m_MCAddrs.size());
+    }
+    
+    if(mcaddr == 0)
+    {
+        return;
+    }
+    
+    addr->Set(row);
+        
+    if(mcparent == NULL)
+    {
+        m_HashMap.insert(make_pair(GetHash(CService(),mcaddr),m_MCAddrs.size()));
+        m_MCAddrs.push_back(CMCAddrInfo(CService(),mcaddr));        
+        mcparent=&m_MCAddrs[m_MCAddrs.size()-1];
+        mcparent->SetLastRow(row);
+        m_MCAddrs[0].SetLastRow(m_MCAddrs.size());
+    }
+    
+    mcparent->Set(row);
+        
+    if(netparent == NULL)
+    {
+        m_HashMap.insert(make_pair(GetHash(netaddr,0),m_MCAddrs.size()));
+        m_MCAddrs.push_back(CMCAddrInfo(netaddr,0));        
+        netparent=&m_MCAddrs[m_MCAddrs.size()-1];
+        m_MCAddrs[0].SetLastRow(m_MCAddrs.size());
+    }
+    
+    netparent->Set(row);        
+}
+
+bool CMCAddrMan::SetOutcome(const CService &netaddr, uint160 mcaddr,bool outcome)
+{
+    LOCK(cs);
+    
+    bool result=false;
+    if(outcome)
+    {
+        if(mcaddr == 0)
+        {
+            if(m_NetAddrConnected.find(netaddr) != m_NetAddrConnected.end())
+            {
+                result=true;
+            }
+            else
+            {
+                m_NetAddrConnected.insert(netaddr);
+            }
+        }
+        else
+        {
+            if(m_NetAddrConnected.find(netaddr) == m_NetAddrConnected.end())
+            {
+                m_NetAddrConnected.insert(netaddr);
+            }
+            if(m_MCAddrConnected.find(mcaddr) != m_MCAddrConnected.end())
+            {
+                result=true;
+            }
+            else
+            {
+                m_MCAddrConnected.insert(mcaddr);
+            }            
+        }
+        Set(netaddr,mcaddr);
+    }
+    else
+    {
+        Try(netaddr,mcaddr);
+    }
+    
+    return result;
+}
+
+uint32_t CMCAddrMan::Load()
+{
+    LOCK(cs);
+    
+    int FileHan;
+    char FileName[MC_DCT_DB_MAX_PATH];                      
+    CMCAddrInfo addr;
+    int64_t file_size;
+    uint32_t row_count,row;
+    
+    mc_GetFullFileName(mc_gState->m_Params->NetworkName(),"addrs",".dat",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,FileName);
+    FileHan=open(FileName,_O_BINARY | O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    
+    if(FileHan<=0)
+    {
+        return 0;
+    }    
+    
+    file_size=lseek64(FileHan,0,SEEK_END);
+    
+    lseek64(FileHan,0,SEEK_SET);
+    if(read(FileHan,&addr,m_RowSize) != m_RowSize)
+    {        
+        close(FileHan);    
+        return 0;
+    }
+     
+    row_count=addr.GetLastRow();
+    if((addr.GetPrevRow() > 1) || (file_size != m_RowSize * row_count))    // Not supported version or corrupted
+    {
+        close(FileHan);    
+        return 0;        
+    }
+    
+    m_MCAddrs.clear();
+    m_HashMap.clear();    
+    m_MCAddrs.push_back(addr);
+    m_HashMap.insert(make_pair(0,0));
+    
+    row=1;
+    while((read(FileHan,&addr,m_RowSize) == m_RowSize))
+    {
+        uint256 hash=GetHash(addr.GetNetAddress(),addr.GetMCAddress());
+        m_HashMap.insert(make_pair(hash,row));
+        m_MCAddrs.push_back(addr);        
+        row++;        
+    }
+        
+    if(row != row_count)
+    {
+        printf("Corrupted \n");
+        Init();
+    }
+    
+    if(fDebug)LogPrint("mcaddrman","mchn: Loaded %d addresses\n",(int)m_MCAddrs.size()-1);
+        
+    close(FileHan);    
+    return 0;
+}
+
+void CMCAddrMan::Save() const
+{
+    LOCK(cs);
+    
+    int FileHan;
+    char FileName[MC_DCT_DB_MAX_PATH];                      
+    
+    mc_GetFullFileName(mc_gState->m_Params->NetworkName(),"addrs",".dat",MC_FOM_RELATIVE_TO_DATADIR | MC_FOM_CREATE_DIR,FileName);
+    FileHan=open(FileName,_O_BINARY | O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    
+    if(FileHan<=0)
+    {
+        return;
+    }    
+    
+    for(unsigned int row=0;row<m_MCAddrs.size();row++)        
+    {
+        write(FileHan,&m_MCAddrs[row],m_RowSize);        
+    }
+    if(fDebug)LogPrint("mcaddrman","mchn: Saved %d addresses\n",(int)m_MCAddrs.size());
+    __US_FlushFile(FileHan);    
+    close(FileHan);    
+}
+
+CMCAddrInfo *CMCAddrMan::Select(uint160 mcaddr,uint32_t mode)
+{
+/*    
+        if(mcaddr == 0)
+        {
+            if(m_NetAddrTried.find(netaddr) == m_NetAddrTried.end())
+            {
+                m_NetAddrTried.insert(netaddr);
+            }
+        }
+        else
+        {
+            if(m_MCAddrTried.find(mcaddr) == m_MCAddrTried.end())
+            {
+                m_MCAddrTried.insert(mcaddr);
+            }            
+        }
+ */ 
+    return NULL;
+}
+
+void CMCAddrMan::Reset()
+{
+    m_CurRow=0;
+}
+
+CMCAddrInfo *CMCAddrMan::Next()
+{
+    m_CurRow++;
+    if(m_CurRow<m_MCAddrs.size())
+    {
+        return &m_MCAddrs[m_CurRow];
+    }
+    return NULL;
+}
+
+bool CMCAddrInfoCompareByAttempts(CMCAddrInfo a,CMCAddrInfo b)
+{ 
+    int a_attempts,b_attempts;
+    a_attempts=a.GetLastTryInfo(NULL,NULL,NULL);
+    b_attempts=b.GetLastTryInfo(NULL,NULL,NULL);
+        
+    if(a_attempts <= b_attempts)
+    {
+        return true;
+    }
+    
+    return false;
+}
+
+bool CMCAddrInfoCompareByLastSuccess(CMCAddrInfo a,CMCAddrInfo b)
+{ 
+    int64_t a_lastsuccess,b_lastsuccess;
+    a.GetLastTryInfo(&a_lastsuccess,NULL,NULL);
+    b.GetLastTryInfo(&b_lastsuccess,NULL,NULL);
+    
+    if(a_lastsuccess >= b_lastsuccess)
+    {
+        return true;
+    }
+    
+    return false;
+}
+
+uint32_t CMCAddrMan::PrepareSelect(set<CService> setLocalAddr,uint32_t *counts)
+{
+    LOCK(cs);
+    
+    m_MCAddrConnected.clear();
+    m_MCAddrTried.clear();
+    m_NetAddrConnected.clear();
+    m_NetAddrTried.clear();
+
+    uint32_t nOutbound=0;
+    
+    {
+        LOCK(cs_vNodes);
+        for(int pass=0;pass<2;pass++)
+        {
+            BOOST_FOREACH(CNode* pnode, vNodes) 
+            {                
+                CService naddr;
+                if(pass == 0)
+                {
+                    if (!pnode->fInbound) 
+                    {
+                        nOutbound++;
+                    }
+                }
+                if(pnode->kAddrRemote != 0)
+                {
+                    bool take_it=false;
+                    if(pnode->kAddrLocal < pnode->kAddrRemote)
+                    {
+                        if(pass == 0)
+                        {
+                            take_it=true;
+                        }
+                    }
+                    else
+                    {
+                        if(pass == 1)
+                        {
+                            take_it=true;
+                        }                        
+                    }
+                    if(take_it)
+                    {
+                        if (pnode->fInbound) 
+                        {                
+                            if (((CNetAddr)pnode->addr) == (CNetAddr)pnode->addrFromVersion)
+                            {
+                                naddr=pnode->addrFromVersion;
+                            }
+                        }
+                        else
+                        {
+                            naddr=pnode->addr;
+                        }
+                        if(!naddr.IsZero())
+                        {
+                            if(m_NetAddrConnected.find(naddr) != m_NetAddrConnected.end())
+                            {
+                                LogPrintf("mchn: Duplicate connection to %s, disconnecting peer %d\n", naddr.ToStringIPPort().c_str(), pnode->id);
+                                pnode->fDisconnect=true;
+                            }
+                        }
+                        if(m_MCAddrConnected.find((uint160)pnode->kAddrRemote) != m_MCAddrConnected.end())
+                        {
+                            LogPrintf("mchn: Duplicate connection to %s, disconnecting peer %d\n", CBitcoinAddress((CKeyID)(pnode->kAddrRemote)).ToString().c_str(), pnode->id);
+                            pnode->fDisconnect=true;                    
+                        }                
+
+                        if(!pnode->fDisconnect)
+                        {
+                            if(!naddr.IsZero())
+                            {
+                                m_NetAddrConnected.insert(naddr);
+                            }
+                            m_MCAddrConnected.insert((uint160)pnode->kAddrRemote);                    
+                        }
+                    }
+                }
+            }        
+        }
+    }
+    
+    for(int mode=0;mode<MC_AMM_MODE_COUNT;mode++)
+    {
+        m_Selected[mode].clear();
+        m_Position[mode]=0;
+    }
+    
+    for(uint32_t row=0;row<m_MCAddrs.size();row++)        
+    {
+        int mode=-1;
+        CMCAddrInfo *addr;
+        addr=&m_MCAddrs[row];
+        
+        bool take_it=false;
+        if(addr->IsNet())
+        {
+            take_it=true;
+            CService naddr=addr->GetNetAddress();            
+            if (!naddr.IsValid() || (IsLocal(naddr) && (naddr.GetPort() == GetListenPort())))
+            {
+                take_it=false;
+            }
+
+            if(setLocalAddr.find(naddr) != setLocalAddr.end())
+            {
+                take_it=false;
+            }            
+            if(m_NetAddrConnected.find(naddr) != m_NetAddrConnected.end())
+            {
+                take_it=false;                
+            }            
+            if(addr->GetMCAddress() != 0)
+            {
+                if(m_MCAddrConnected.find(addr->GetMCAddress()) != m_MCAddrConnected.end())
+                {
+                    take_it=false;                                    
+                }                
+            }
+        }
+        
+        if(take_it)
+        {
+            int64_t lastsuccess,lasttry;
+            int attempts;
+            attempts=addr->GetLastTryInfo(&lastsuccess,&lasttry,NULL);
+            if(addr->GetMCAddress() == 0)
+            {
+                if(lastsuccess == 0)
+                {
+                    if(attempts == 0)
+                    {
+                        mode = MC_AMM_NEW_NET;
+                    }
+                    else
+                    {
+                        mode = MC_AMM_TRIED_NET;
+                    }
+                }
+            }
+            else
+            {
+                if(attempts == 0)
+                {
+                    mode = MC_AMM_RECENT_SUCCESS;                    
+                }                
+                else
+                {
+                    CMCAddrInfo *netparent=Find(addr->GetNetAddress(),0);
+                    CMCAddrInfo *mcparent=Find(CService(),addr->GetMCAddress());
+                    uint32_t parent_lastsuccess_row;
+                    if(netparent)
+                    {
+                        netparent->GetLastTryInfo(NULL,NULL,&parent_lastsuccess_row);
+                        if(parent_lastsuccess_row == addr->GetLastRow())
+                        {
+                            if(mcparent)
+                            {
+//                                mcparent->GetLastTryInfo(NULL,NULL,&parent_lastsuccess_row);
+//                                if(parent_lastsuccess_row == addr->GetLastRow())
+                                {
+                                    if(mcparent->GetLastRow() == addr->GetLastRow())
+                                    {
+                                        mode = MC_AMM_RECENT_FAIL;
+                                    }
+                                    else
+                                    {
+                                        mode = MC_AMM_OLD_FAIL;                            
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if(mode>=0)
+        {
+            m_Selected[mode].push_back(addr);
+        }
+    }
+    
+    random_shuffle(m_Selected[MC_AMM_RECENT_SUCCESS].begin(), m_Selected[MC_AMM_RECENT_SUCCESS].end());
+    random_shuffle(m_Selected[MC_AMM_NEW_NET].begin(), m_Selected[MC_AMM_NEW_NET].end());
+    sort(m_Selected[MC_AMM_TRIED_NET].begin(), m_Selected[MC_AMM_TRIED_NET].end(), CMCAddrInfoCompareByAttempts);
+    sort(m_Selected[MC_AMM_RECENT_FAIL].begin(), m_Selected[MC_AMM_RECENT_FAIL].end(), CMCAddrInfoCompareByLastSuccess);
+    sort(m_Selected[MC_AMM_OLD_FAIL].begin(), m_Selected[MC_AMM_OLD_FAIL].end(), CMCAddrInfoCompareByLastSuccess);
+    
+    if(counts)
+    {
+        for(int mode=0;mode<MC_AMM_MODE_COUNT;mode++)
+        {
+            counts[mode]=m_Selected[mode].size();
+        }
+    }
+    
+   if(fDebug)LogPrint("addrman","Prepared for select: %u recent successes, %u recent fails, %u new, %u old, %u never successful\n",
+            m_Selected[MC_AMM_RECENT_SUCCESS].size(),m_Selected[MC_AMM_RECENT_FAIL].size(),m_Selected[MC_AMM_NEW_NET].size(),
+            m_Selected[MC_AMM_OLD_FAIL].size(),m_Selected[MC_AMM_TRIED_NET].size());
+    
+    return nOutbound;
+}
+
+CMCAddrInfo *CMCAddrMan::Select(int mode)
+{
+    if(mode >= MC_AMM_MODE_COUNT)
+    {
+        return NULL;
+    }
+    
+    while(m_Position[mode] < m_Selected[mode].size())
+    {
+        CMCAddrInfo *addr=&(m_Selected[mode][m_Position[mode]]);
+        m_Position[mode]+=1;
+        bool take_it=true;
+        
+        if(take_it)
+        {
+            if(m_NetAddrConnected.find(addr->GetNetAddress()) != m_NetAddrConnected.end())
+            {
+                take_it=false;        
+            }
+        }
+        if(take_it)
+        {
+            if(m_NetAddrTried.find(addr->GetNetAddress()) != m_NetAddrTried.end())
+            {
+                take_it=false;        
+            }
+        }
+        if(addr->GetMCAddress() != 0)
+        {
+            if(take_it)
+            {
+                if(m_MCAddrConnected.find(addr->GetMCAddress()) != m_MCAddrConnected.end())
+                {
+                    take_it=false;        
+                }
+            }
+/*            
+            if(take_it)
+            {
+                if(m_MCAddrTried.find(addr->GetMCAddress()) != m_MCAddrTried.end())
+                {
+                    take_it=false;        
+                }
+            }
+ */ 
+        }
+        if(take_it)
+        {
+            m_NetAddrTried.insert(addr->GetNetAddress());
+            if(addr->GetMCAddress() != 0)
+            {
+                if((mode == MC_AMM_RECENT_SUCCESS) || (mode == MC_AMM_RECENT_FAIL))
+                {
+                    m_MCAddrTried.insert(addr->GetMCAddress());                
+                }
+            }            
+            return addr;
+        }
+    }    
+    
+    return NULL;
 }

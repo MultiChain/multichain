@@ -2945,3 +2945,99 @@ int mc_Script::DeleteDuplicatesInRange(int from,int to)
     
    return MC_ERR_NOERROR;
  }
+
+void mc_TSScriptHeap::Zero()
+{
+    m_lppScriptBuffers=NULL;
+    m_Semaphore=NULL;
+    m_MaxScripts=0;
+    m_Mode=0;
+}
+
+int mc_TSScriptHeap::Destroy()
+{
+    if(m_MaxScripts)
+    {
+        for(int j=0;j<m_MaxScripts;j++)
+        {
+            for(int i=0;i<m_lppScriptBuffers[j]->GetCount();i++)
+            {
+                unsigned char *row=m_lppScriptBuffers[j]->GetRow(i);    
+                mc_Script *script=*(mc_Script**)(row+sizeof(uint64_t)); 
+                if(script)
+                {
+                    delete script;
+                }
+            }
+            delete m_lppScriptBuffers[j];
+        }
+
+        delete m_lppScriptBuffers;      
+    }
+    
+    if(m_Semaphore)
+    {
+        __US_SemDestroy(m_Semaphore);
+    }    
+    Zero();
+    
+    return MC_ERR_NOERROR;
+}
+typedef mc_Buffer* lpmc_Buffer;
+
+int mc_TSScriptHeap::Initialize(int MaxScripts,uint32_t Mode)
+{
+    m_Mode=Mode;
+    m_MaxScripts=MaxScripts;
+            
+    if(MaxScripts)
+    {
+        m_lppScriptBuffers= new lpmc_Buffer[MaxScripts];
+        for(int j=0;j<MaxScripts;j++)
+        {
+            m_lppScriptBuffers[j]=new mc_Buffer;
+            m_lppScriptBuffers[j]->Initialize(sizeof(uint64_t),sizeof(uint64_t)+sizeof(mc_Script*),MC_BUF_MODE_MAP);    
+            m_lppScriptBuffers[j]->Realloc(MC_PRM_MAX_THREADS);            
+        }
+    }
+    
+    
+    m_Semaphore=__US_SemCreate();
+    
+    return MC_ERR_NOERROR;
+}
+
+mc_Script *mc_TSScriptHeap::SetScriptPointer(int script_id, int Size)
+{
+    uint64_t thread_id=__US_ThreadID();
+    int mprow=m_lppScriptBuffers[script_id]->Seek(&thread_id);
+    if(mprow < 0)
+    {
+        __US_SemWait(m_Semaphore);
+        mc_Script *new_script=new mc_Script;
+        mprow=m_lppScriptBuffers[script_id]->GetCount();
+        m_lppScriptBuffers[script_id]->Add(&thread_id,&new_script);        
+        __US_SemPost(m_Semaphore);
+    }
+
+    
+    mc_Script *script=*(mc_Script**)(m_lppScriptBuffers[script_id]->GetRow(mprow)+sizeof(uint64_t)); 
+    
+    script->Clear();
+    script->Resize(Size,0);
+    
+    return script;
+}
+
+mc_Script *mc_TSScriptHeap::GetScriptPointer(int script_id)
+{
+    uint64_t thread_id=__US_ThreadID();
+    int mprow=m_lppScriptBuffers[script_id]->Seek(&thread_id);
+    if(mprow<0)
+    {
+        return NULL;
+    }
+    mc_Script *script=*(mc_Script**)(m_lppScriptBuffers[script_id]->GetRow(mprow)+sizeof(uint64_t)); 
+    return script;
+}
+

@@ -48,6 +48,7 @@ uint64_t nMainThreadID=0;
 
 std::map <string,CNetAddr> mCachedAddresses;
 
+static const unsigned char pchZero[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 static const unsigned char pchIPv4[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff };
 
 // Need ample time for negotiation for very slow proxies such as Tor (milliseconds)
@@ -69,25 +70,6 @@ std::string GetNetworkName(enum Network net) {
     case NET_TOR: return "onion";
     default: return "";
     }
-}
-
-void SplitHostPort(std::string in, int &portOut, std::string &hostOut) {
-    size_t colon = in.find_last_of(':');
-    // if a : is found, and it either follows a [...], or no other : is in the string, treat it as port separator
-    bool fHaveColon = colon != in.npos;
-    bool fBracketed = fHaveColon && (in[0]=='[' && in[colon-1]==']'); // if there is a colon, and in[0]=='[', colon is not 0, so in[colon-1] is safe
-    bool fMultiColon = fHaveColon && (in.find_last_of(':',colon-1) != in.npos);
-    if (fHaveColon && (colon==0 || fBracketed || !fMultiColon)) {
-        int32_t n;
-        if (ParseInt32(in.substr(colon + 1), &n) && n > 0 && n < 0x10000) {
-            in = in.substr(0, colon);
-            portOut = n;
-        }
-    }
-    if (in.size()>0 && in[0] == '[' && in[in.size()-1] == ']')
-        hostOut = in.substr(1, in.size()-2);
-    else
-        hostOut = in;
 }
 
 bool static LookupIntern(const char *pszName, std::vector<CNetAddr>& vIP, unsigned int nMaxSolutions, bool fAllowLookup)
@@ -142,7 +124,7 @@ bool static LookupIntern(const char *pszName, std::vector<CNetAddr>& vIP, unsign
 */
     if(nMainThreadID != __US_ThreadID())
     {
-        LogPrintf("ERROR: Calling address lookup for %s from secondary thread, please report this\n",pszName);
+        LogPrintf("ERROR: Calling address lookup for %s from secondary thread, please report this if it is valid address\n",pszName);
         return false;
     }    
 
@@ -772,6 +754,11 @@ CNetAddr::CNetAddr(const std::string &strIp, bool fAllowLookup)
 unsigned int CNetAddr::GetByte(int n) const
 {
     return ip[15-n];
+}
+
+bool CNetAddr::IsZero() const
+{
+    return (memcmp(ip, pchZero, sizeof(pchZero)) == 0);
 }
 
 bool CNetAddr::IsIPv4() const

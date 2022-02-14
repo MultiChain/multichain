@@ -115,6 +115,7 @@ boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
 boost::filesystem::path GetTempPath();
 void ShrinkDebugFile();
 void runCommand(std::string strCommand);
+bool SetupNetworking();
 
 inline bool IsSwitchChar(char c)
 {
