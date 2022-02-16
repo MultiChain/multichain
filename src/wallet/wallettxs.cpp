@@ -475,6 +475,28 @@ int mc_WalletTxs::AddEntity(mc_TxEntity *entity,uint32_t flags)
     return err;
 }
 
+int mc_WalletTxs::SaveEntityFlag(mc_TxEntity *entity,uint32_t flag,int set_flag)
+{
+    int err;
+    if((m_Mode & MC_WMD_TXS) == 0)
+    {
+        return MC_ERR_NOERROR;
+    }    
+    if(m_Database == NULL)
+    {
+        return MC_ERR_INTERNAL_ERROR;
+    }
+    
+    m_Database->Lock(1,0);
+    WRPWriteLock();
+    err=m_Database->SaveEntityFlag(entity,flag,set_flag);
+    WRPWriteUnLock();
+    m_Database->UnLock();
+    
+    return err;
+}
+
+
 mc_Buffer* mc_WalletTxs::GetEntityList()
 {
     if((m_Mode & MC_WMD_TXS) == 0)

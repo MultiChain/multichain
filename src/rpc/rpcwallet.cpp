@@ -438,7 +438,8 @@ Value listaddresses(const Array& params, bool fHelp)
     }
     
     CBitcoinAddress license_address;
-    bool has_license=mc_GetDefaultLicenseAddress(license_address);
+//    bool has_license=mc_GetDefaultLicenseAddress(license_address);
+    bool has_license=false;
     
     address_count=0;
     for(int i=0;i<entity_count;i++)
@@ -446,7 +447,7 @@ Value listaddresses(const Array& params, bool fHelp)
         lpEntity=pwalletTxsMain->GetEntity(i);
         if( ((lpEntity->m_Entity.m_EntityType == (MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS)) || 
             (lpEntity->m_Entity.m_EntityType == (MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS))) &&
-            ((lpEntity->m_Flags & MC_EFL_NOT_IN_LISTS) == 0 ) )               
+            ((lpEntity->m_Flags & MC_EFL_LICENSE) == 0 ) )               
         {
             if(setAddresses.size())
             {
