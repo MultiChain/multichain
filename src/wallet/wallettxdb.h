@@ -75,7 +75,7 @@
 #define MC_EFL_RESERVEDMASK                     0x00FF0000
 #define MC_EFL_NOT_IN_SYNC                      0x01000000
 #define MC_EFL_NOT_IN_SYNC_AFTER_IMPORT         0x02000000
-#define MC_EFL_NOT_IN_LISTS                     0x04000000
+#define MC_EFL_LICENSE                          0x04000000
 #define MC_EFL_UNSUBSCRIBED                     0x10000000
 
 #define MC_SFL_NONE             0x00000000
@@ -313,6 +313,9 @@ typedef struct mc_TxDB
     
     int AddEntity(mc_TxEntity *entity,uint32_t flags);                          // Adds entity to chain import
     int AddEntity(mc_TxImport *import,mc_TxEntity *entity,uint32_t flags);      // Adds entity to import
+    int SaveEntityFlag(mc_TxEntity *entity,                                     // Changes Entity flag setting 
+                   uint32_t flag,                                               // Flag to set/unset
+                   int set_flag);                                               // 1 if set, 0 if unset
        
     int FindEntity(mc_TxImport *import,mc_TxEntity *entity);                    // Finds entity in import
     int FindEntity(mc_TxImport *import,mc_TxEntityStat *entity);                // Finds entity in import

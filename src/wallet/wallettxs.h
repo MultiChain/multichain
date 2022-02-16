@@ -149,6 +149,10 @@ typedef struct mc_WalletTxs
     void BindWallet(CWallet *lpWallet);
     
     int AddEntity(mc_TxEntity *entity,uint32_t flags);                          // Adds entity to chain import
+    int SaveEntityFlag(mc_TxEntity *entity,                                     // Changes Entity flag setting 
+                   uint32_t flag,                                               // Flag to set/unset
+                   int set_flag);                                               // 1 if set, 0 if unset
+       
     mc_Buffer* GetEntityList();                                                 // Retruns list of chain import entities
        
     int AddTx(                                                                  // Adds tx to the wallet

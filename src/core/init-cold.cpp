@@ -915,7 +915,7 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
                     uint32_t flags=0;
                     if(item.second.purpose == "license")
                     {
-                        flags |= MC_EFL_NOT_IN_LISTS;
+                        flags |= MC_EFL_LICENSE;
                     }
 
                     entstat.Zero();
