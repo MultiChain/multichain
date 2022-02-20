@@ -415,7 +415,7 @@ CLicenseRequest mc_GetLicenseRequest(int *errorCode,string *strError)
 
 Value getlicenserequest(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() > 0)
+    if (fHelp || params.size() > 1)
         mc_ThrowHelpMessage("getlicenserequest");        
     
     if((mc_gState->m_WalletMode & MC_WMD_TXS) == 0)

@@ -4922,8 +4922,12 @@ void mc_InitRPCHelpMap20()
          ));
     
     mapHelpStrings.insert(std::make_pair("getlicenserequest",
-            "getlicenserequest \n"
+            "getlicenserequest ( new-owner-identity )\n"
             "\nReturns license request.\n"
+    
+            "\nArguments:\n"
+            "1. new-owner-identity                          (boolean, optional, default=false) If true, new node owner identity is generated. \n"
+    
             "\nExamples:\n"
             + HelpExampleCli("getlicenserequest", "") 
             + HelpExampleRpc("getlicenserequest", "")    
@@ -5757,7 +5761,7 @@ void mc_InitRPCHelpMap25()
             "2. \"token-identifier\"               (string, required) Token identifier\n"
             "3. verbose                          (boolean, optional, default=false) If true, returns list of issuers \n"
             "\nResult:\n"
-            "An array containing information about tokens\n"            
+            "Object with token details\n"            
             "\nExamples:\n"
             + HelpExampleCli("gettokeninfo", "\"asset1\" \"token1\"")
             + HelpExampleRpc("gettokeninfo", "\"asset1\", \"token1\"")
