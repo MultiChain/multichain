@@ -9,7 +9,7 @@
 
 Value getlicenserequest(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() > 0)
+    if (fHelp || params.size() > 1)
         mc_ThrowHelpMessage("getlicenserequest");        
     
     pEF->ENT_RPCVerifyEdition("getlicenserequest API");

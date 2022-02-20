@@ -1661,7 +1661,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
         {
             if(!fOnlyUnsynced)
             {
-                printf("Rescan complete\n");                
+                printf("Rescan complete\n\n");                
             }
             LogPrint("wallet","Rescan completed successfully\n");            
         }

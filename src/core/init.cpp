@@ -3135,6 +3135,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             sprintf(bufOutput,"The license %s is available to this node but will not be used automatically, because it appears it was not previously in use.\n",
                     conflicting_licenses[l].c_str());
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+            sprintf(bufOutput,"This may happen also if the node was restarted with -rescan.\n");
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
             sprintf(bufOutput,"To use this license for this node and stop any other from using it, use the 'takelicense %s' command.\n\n",
                     conflicting_licenses[l].c_str());                    
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
