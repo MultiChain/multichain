@@ -64,6 +64,9 @@ void LockWallet(CWallet* pWallet);
 #define MC_ACF_NONE              0x00000000 
 #define MC_ACF_ENTERPRISE        0x00000001 
 
+#define MC_RPC_FLAG_NONE              0x00000000 
+#define MC_RPC_FLAG_WRP_READ_LOCK     0x00000001 
+#define MC_RPC_FLAG_NEW_TX            0x00000002 
 
 namespace std {
     template<class T> struct _Unique_if {
@@ -755,7 +758,7 @@ int IsRPCWRPReadLockFlagSet()
     map<uint64_t,int>::iterator slot_it=rpc_slots.find(thread_id);
     if(slot_it != rpc_slots.end())
     {
-        return (rpc_thread_flags[slot_it->second] & 0x01);
+        return (rpc_thread_flags[slot_it->second] & MC_RPC_FLAG_WRP_READ_LOCK);
     }    
     return 0;
 }
@@ -1059,13 +1062,71 @@ void SetRPCWRPReadLockFlag(int lock)
     {
         if(lock)
         {
-            rpc_thread_flags[slot_it->second] |= 0x01;
+            rpc_thread_flags[slot_it->second] |= MC_RPC_FLAG_WRP_READ_LOCK;
         }
         else
         {
-            if(rpc_thread_flags[slot_it->second] & 0x01)rpc_thread_flags[slot_it->second]-=0x01;
+            if(rpc_thread_flags[slot_it->second] & MC_RPC_FLAG_WRP_READ_LOCK)rpc_thread_flags[slot_it->second]-=MC_RPC_FLAG_WRP_READ_LOCK;
         }
     }    
+}
+
+void SetRPCNewTxFlag()
+{
+    uint64_t thread_id=__US_ThreadID();
+    map<uint64_t,int>::iterator slot_it=rpc_slots.find(thread_id);
+    if(slot_it != rpc_slots.end())
+    {
+        rpc_thread_flags[slot_it->second] |= MC_RPC_FLAG_NEW_TX;
+    }    
+}
+
+void ThrottleTxFlow()
+{
+    uint64_t thread_id=__US_ThreadID();
+    map<uint64_t,int>::iterator slot_it=rpc_slots.find(thread_id);
+    if(slot_it != rpc_slots.end())
+    {
+        if(rpc_thread_flags[slot_it->second] & MC_RPC_FLAG_NEW_TX)
+        {
+            int64_t mempool_bytes=(int64_t) mempool.GetTotalTxSize();
+            int64_t block_size=MAX_BLOCK_SIZE;
+            double blocks_required=(double)mempool_bytes/(double)block_size;
+            
+            int64_t threshold=GetArg("-accepttxthreshold",200);
+            int64_t threshold_multiplier=GetArg("-accepttxthresholdmultiplier",2);
+            int64_t delay=GetArg("-accepttxmindelay",10);
+            int64_t max_delay=GetArg("-accepttxmaxdelay",1000);
+            int64_t delay_multiplier=GetArg("-accepttxdelaymultiplier",10);
+            
+            if(delay_multiplier <= 0)
+            {
+                delay_multiplier=1;
+            }
+            
+            int64_t millisleep_time=0;
+            int count=0;
+            
+            while( (blocks_required > threshold * 0.01) && (millisleep_time <= max_delay) && (threshold > 0) && (count < 10) )
+            {
+                millisleep_time=delay;
+                
+                threshold *= threshold_multiplier;
+                delay *= delay_multiplier;
+                count++;
+            }                
+            
+            if(millisleep_time > max_delay)
+            {
+                millisleep_time=max_delay;
+            }
+            
+            if(millisleep_time > 0)
+            {
+                MilliSleep(millisleep_time);
+            }
+        }
+    }        
 }
 
 json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_spirit::Array &params, const Value& req_id) const
@@ -1188,6 +1249,9 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
             }
 #endif // !ENABLE_WALLET
         }
+        
+        ThrottleTxFlow();
+        
         if(fDebug)LogPrint("mcapi","mcapi: API request successful: %s\n",JSONRPCMethodIDForLog(strMethod,req_id).c_str());
         if(fDebug)LogPrint("drsrv01","drsrv01: %d: <-- %s\n",GetRPCSlot(),strMethod.c_str());            
         return result;

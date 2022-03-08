@@ -75,6 +75,7 @@ bool MultichainNode_IsLocal(CNode *pnode);
 bool MultichainNode_CollectChunks();
 bool IsTxBanned(uint256 txid);
 int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,vector<mc_UpgradeStatus> *vUpgrades);
+void SetRPCNewTxFlag();
 
 
 
@@ -1678,6 +1679,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         SyncWithWallets(tx, NULL);
     }
 
+    SetRPCNewTxFlag();
+    
     return true;
 }
 
