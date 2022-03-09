@@ -418,7 +418,7 @@ void mc_EnterpriseFeatures::LIC_RPCVerifyFeature(uint64_t feature,string message
 
 bool mc_EnterpriseFeatures::LIC_VerifyFeature(uint64_t feature,std::string& reason)
 {
-    reason="Not available in Community edition";
+    reason="This feature is only available in MultiChain Enterprise";
     return false;
 }
 

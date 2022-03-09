@@ -1246,6 +1246,21 @@ Object StreamEntry(const unsigned char *txid,uint32_t output_level,mc_EntityDeta
                         entStat.m_Entity.m_EntityType=MC_TET_STREAM | MC_TET_CHAINPOS;
                         entry.push_back(Pair("retrieve",(pEF->STR_NoRetrieve(&(entStat.m_Entity))==0)));                                                                            
 
+                        bool canretrieve=true;
+                        string reason;
+                        if(entity.AnyoneCanRead() == 0)
+                        {
+                            canretrieve=false;
+                            if(pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_READ,reason))
+                            {
+                                if(pEF->WLT_FindReadPermissionedAddress(&entity).IsValid())
+                                {
+                                    canretrieve=true;                                    
+                                }
+                            }
+                        }
+                        entry.push_back(Pair("canretrieve",canretrieve));                                                                            
+                                                
                         mc_TxImport dummy_import;
                         dummy_import.m_ImportID=-1;
 
