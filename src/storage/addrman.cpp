@@ -1321,12 +1321,13 @@ uint32_t CMCAddrMan::PrepareSelect(set<CService> setLocalAddr,uint32_t *counts)
                                 pnode->fDisconnect=true;
                             }
                         }
+/*                                                                              // Allow connection to several network addresses with the same MC address
                         if(m_MCAddrConnected.find((uint160)pnode->kAddrRemote) != m_MCAddrConnected.end())
                         {
                             LogPrintf("mchn: Duplicate connection to %s, disconnecting peer %d\n", CBitcoinAddress((CKeyID)(pnode->kAddrRemote)).ToString().c_str(), pnode->id);
                             pnode->fDisconnect=true;                    
                         }                
-
+*/
                         if(!pnode->fDisconnect)
                         {
                             if(!naddr.IsZero())
@@ -1371,12 +1372,18 @@ uint32_t CMCAddrMan::PrepareSelect(set<CService> setLocalAddr,uint32_t *counts)
             {
                 take_it=false;                
             }            
+/*            
             if(addr->GetMCAddress() != 0)
             {
                 if(m_MCAddrConnected.find(addr->GetMCAddress()) != m_MCAddrConnected.end())
                 {
                     take_it=false;                                    
                 }                
+            }
+ */ 
+            if( addr->GetFlags() & MC_AMF_DELETED )
+            {
+                take_it=false;                                
             }
         }
         
@@ -1398,7 +1405,19 @@ uint32_t CMCAddrMan::PrepareSelect(set<CService> setLocalAddr,uint32_t *counts)
                         mode = MC_AMM_TRIED_NET;
                     }
                 }
+                else
+                {
+                    if(attempts == 0)
+                    {
+                        mode = MC_AMM_RECENT_SUCCESS;
+                    }
+                    else
+                    {
+                        mode = MC_AMM_RECENT_FAIL;
+                    }                    
+                }
             }
+/*            
             else
             {
                 if(attempts == 0)
@@ -1426,7 +1445,7 @@ uint32_t CMCAddrMan::PrepareSelect(set<CService> setLocalAddr,uint32_t *counts)
                                     }
                                     else
                                     {
-                                        mode = MC_AMM_OLD_FAIL;                            
+//                                        mode = MC_AMM_OLD_FAIL;               // This net addrsss should appear as MC_AMM_RECENT_FAIL if MC address is not checked in selection      
                                     }
                                 }
                             }
@@ -1434,6 +1453,7 @@ uint32_t CMCAddrMan::PrepareSelect(set<CService> setLocalAddr,uint32_t *counts)
                     }
                 }
             }
+ */ 
         }
         if(mode>=0)
         {

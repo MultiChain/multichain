@@ -27,6 +27,11 @@
 #define MC_AMM_TRIED_NET                        4
 #define MC_AMM_MODE_COUNT                       5
 
+#define MC_AMF_NONE                           0x000000000
+#define MC_AMF_DELETED                        0x000000001
+#define MC_AMF_SOURCE_PEER                    0x000000000
+#define MC_AMF_SOURCE_ADDED                   0x000000100
+#define MC_AMF_SOURCE_MASK                    0x00000FF00
 
 class CMCAddrInfo
 {

@@ -641,7 +641,9 @@ void mc_InitRPCHelpMap04()
             "\nArguments:\n"
             "1. \"node\"                           (string, required) The node (see getpeerinfo for nodes)\n"
             "2. \"command\"                        (string, required) 'add' to add a node to the list, 'remove' to remove a node from the list,\n"
-            "                                                       'onetry' to try a connection to the node once\n"
+            "                                                       'onetry' to try a connection to the node once,\n"
+            "                                                       'remember' to add address to the permanent list of known peers,\n"
+            "                                                       'forget' to remove address from the permanent list of known peers,\n"
             "\nExamples:\n"
             + HelpExampleCli("addnode", "\"192.168.0.6:8333\" \"onetry\"")
             + HelpExampleRpc("addnode", "\"192.168.0.6:8333\", \"onetry\"")
@@ -5765,6 +5767,16 @@ void mc_InitRPCHelpMap25()
             "\nExamples:\n"
             + HelpExampleCli("gettokeninfo", "\"asset1\" \"token1\"")
             + HelpExampleRpc("gettokeninfo", "\"asset1\", \"token1\"")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("listknownpeers",
+            "listknownpeers\n"
+            "\nReturns data about known network peers.\n"
+            "\nResult:\n"
+            "Array of objects with peer information\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("listknownpeers", "")
+            + HelpExampleRpc("listknownpeers", "")
         ));
     
     mapHelpStrings.insert(std::make_pair("AAAAAAA",

@@ -1504,6 +1504,7 @@ void ThreadOpenConnections()
                             }
                             else
                             {
+                                addrman.GetMCAddrMan()->SetOutcome(addr->GetNetAddress(),0,outcome);                            
                                 addrman.GetMCAddrMan()->SetOutcome(addr->GetNetAddress(),addr->GetMCAddress(),outcome);                            
                             }
                             boost::this_thread::interruption_point();                

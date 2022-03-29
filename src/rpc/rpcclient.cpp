@@ -108,6 +108,7 @@ static const std::string vAPINames[] =
 "getnetworkinfo",
 "getnewaddress",
 "getpeerinfo",
+"listknownpeers",
 "getrawchangeaddress",
 "getrawmempool",
 "getrawtransaction",

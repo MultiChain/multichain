@@ -14,6 +14,7 @@
 #include "utils/timedata.h"
 #include "utils/util.h"
 #include "version/bcversion.h"
+#include "storage/addrman.h"
 
 #ifdef HAVE_GETADDRINFO_A
 #include <netdb.h>
@@ -153,13 +154,137 @@ Value getpeerinfo(const Array& params, bool fHelp)
     return ret;
 }
 
+bool PeersCompareByTime(Value a,Value b)
+{ 
+    int64_t time_a=0;
+    int64_t time_b=0;
+
+    BOOST_FOREACH(const Pair& p, a.get_obj()) 
+    {
+        if(p.name_ == "lastsuccess")
+        {
+            time_a=p.value_.get_int64();
+        }
+    }
+
+    BOOST_FOREACH(const Pair& p, b.get_obj()) 
+    {
+        if(p.name_ == "lastsuccess")
+        {
+            time_b=p.value_.get_int64();
+        }
+    }
+
+    return (time_a >= time_b);
+}
+
+
+Value listknownpeers(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error("Help message not found\n");
+    
+    vector <CMCAddrInfo> empty;
+    map<CService, vector<CMCAddrInfo> > mNetAddresses;
+    CMCAddrInfo *info;
+    
+    addrman.GetMCAddrMan()->Reset();
+    while((info=addrman.GetMCAddrMan()->Next()))
+    {
+        CService naddr=info->GetNetAddress();
+        if(!naddr.IsZero())
+        {        
+            if (naddr.IsValid() && (!IsLocal(naddr) || (naddr.GetPort() != GetListenPort())))
+            {
+                map<CService, vector<CMCAddrInfo> >::iterator nit = mNetAddresses.find(naddr);
+                if(nit == mNetAddresses.end())
+                {
+                    mNetAddresses.insert(make_pair(naddr,empty));
+                    nit = mNetAddresses.find(naddr);
+                }
+                nit->second.push_back(info);
+            }            
+        }
+    }    
+    
+    Array netaddresses;
+    BOOST_FOREACH(PAIRTYPE(CService, vector<CMCAddrInfo>) naddr, mNetAddresses)
+    {
+        Object entry;
+        int64_t lastattempt=0;
+        int netattempts=0;
+        uint32_t flags=0;
+        Array handshakes;
+        BOOST_FOREACH(CMCAddrInfo info, naddr.second)
+        {
+            Object handshake;
+            int64_t lastsuccess,lasttry;
+            int attempts;
+            attempts=info.GetLastTryInfo(&lastsuccess,&lasttry,NULL);
+            if(info.GetMCAddress() != 0)
+            {
+                handshake.push_back(Pair("hansdhake",CBitcoinAddress((CKeyID)info.GetMCAddress()).ToString()));
+                handshake.push_back(Pair("lastsuccess",lastsuccess));
+                handshakes.push_back(handshake);
+            }
+            else
+            {
+                lastattempt=lasttry;
+                netattempts=attempts;
+                flags=info.GetFlags();
+            }
+        }        
+        
+        sort(handshakes.begin(), handshakes.end(), PeersCompareByTime);
+
+        
+        entry.push_back(Pair("addr",naddr.first.ToStringIPPort()));                     
+        entry.push_back(Pair("handshakes",handshakes));                     
+        if(OutConnectionsAlgoritm == 1)
+        {
+            if(lastattempt != 0)
+            {
+                entry.push_back(Pair("lastattempt",lastattempt));
+            }
+            else
+            {
+                entry.push_back(Pair("lastattempt",Value::null));                                
+            }
+            if(netattempts > 0)
+            {
+                entry.push_back(Pair("attempts",netattempts));                     
+            }
+            else
+            {
+                entry.push_back(Pair("attempts",Value::null));                                     
+            }
+        }
+        if( (flags & MC_AMF_SOURCE_MASK) == MC_AMF_SOURCE_ADDED )
+        {
+            entry.push_back(Pair("source","added"));                                                 
+        }
+        else
+        {
+            entry.push_back(Pair("source","peers"));                                                             
+        }
+        
+        if( (flags & MC_AMF_DELETED) == 0)
+        {        
+            netaddresses.push_back(entry);
+        }        
+    }
+    
+    
+    return netaddresses;
+}
+
 Value addnode(const Array& params, bool fHelp)
 {
     string strCommand;
     if (params.size() == 2)
         strCommand = params[1].get_str();
     if (fHelp || params.size() != 2 ||
-        (strCommand != "onetry" && strCommand != "add" && strCommand != "remove"))
+        (strCommand != "onetry" && strCommand != "add" && strCommand != "remove" && strCommand != "remember" && strCommand != "forget"))
         throw runtime_error("Help message not found\n");
 
     string strNode = params[0].get_str();
@@ -195,7 +320,7 @@ Value addnode(const Array& params, bool fHelp)
 
     if(!is_numeric)
     {
-        throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid node, only numeric addresses are allowed");        
+        throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid node, only numeric valid IPv4 addresses are allowed");        
     }
 /*    
     struct in_addr ipv4_addr;
@@ -213,6 +338,74 @@ Value addnode(const Array& params, bool fHelp)
         return Value::null;
     }
 
+    if (strCommand == "remember")
+    {
+        CAddress addr=CAddress(CService(CNetAddr(hostname),port));
+        if(!addr.IsValid())
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid address");                    
+        }
+        CMCAddrInfo *mcaddrinfo=addrman.GetMCAddrMan()->Find(addr,0);
+        if(mcaddrinfo)
+        {
+            uint32_t flags=mcaddrinfo->GetFlags();
+            if(flags & MC_AMF_DELETED)
+            {
+                mcaddrinfo->SetFlag(MC_AMF_DELETED,0);
+                mcaddrinfo->SetFlag(MC_AMF_SOURCE_ADDED,1);
+                if(fDebug)LogPrint("addrman", "Recall forgotten address %s \n", addr.ToString());
+            }
+            else
+            {
+                if(fDebug)LogPrint("addrman", "Remember found address %s, ignored\n", addr.ToString());                
+            }
+        }
+        else
+        {
+            addrman.Add(addr, addr);
+            addrman.Good(addr);
+            mcaddrinfo=addrman.GetMCAddrMan()->Find(addr,0);
+            if(mcaddrinfo == NULL)
+            {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Internal error when adding new address");                    
+            }
+            mcaddrinfo->SetFlag(MC_AMF_SOURCE_ADDED,1);
+            
+            if(fDebug)LogPrint("addrman", "Remember new address %s\n", addr.ToString());                
+        }        
+        return Value::null;
+    }
+    
+    if (strCommand == "forget")
+    {
+        CAddress addr=CAddress(CService(CNetAddr(hostname),port));
+        if(!addr.IsValid())
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid address");                    
+        }
+        CMCAddrInfo *mcaddrinfo=addrman.GetMCAddrMan()->Find(addr,0);
+        if(mcaddrinfo)
+        {
+            uint32_t flags=mcaddrinfo->GetFlags();
+            if(flags & MC_AMF_DELETED)
+            {
+                if(fDebug)LogPrint("addrman", "Forget forgotten address %s, ignored\n", addr.ToString());
+            }
+            else
+            {
+                mcaddrinfo->SetFlag(MC_AMF_DELETED,1);
+                if(fDebug)LogPrint("addrman", "Forget address %s\n", addr.ToString());                
+            }
+        }
+        else
+        {
+            if(fDebug)LogPrint("addrman", "Forget unknown address %s, ignored\n", addr.ToString());                
+        }        
+        return Value::null;
+    }
+    
+    
+    
     LOCK(cs_vAddedNodes);
     vector<string>::iterator it = vAddedNodes.begin();
     for(; it != vAddedNodes.end(); it++)
