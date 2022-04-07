@@ -1414,9 +1414,38 @@ void ThreadOpenConnections()
     
     if(mc_gState->GetSeedNode())                                                // MCHN-TODO. Connection to seed node, find later how to disconnect
     {
-        CAddress addr;
+        
+        CAddress addr1=CAddress(CService(mc_gState->GetSeedNode()));
+        if(addr1.IsValid())
+        {
+            CMCAddrInfo *mcaddrinfo=addrman.GetMCAddrMan()->Find(addr1,0);
+            if(mcaddrinfo == NULL)
+            {
+                addrman.Add(addr1, addr1);
+                addrman.Good(addr1);
+                mcaddrinfo=addrman.GetMCAddrMan()->Find(addr1,0);
+                if(mcaddrinfo)
+                {
+                    mcaddrinfo->SetFlag(MC_AMF_SOURCE_SEED,1);
+                    if(fDebug)LogPrint("addrman", "Remember seed address %s\n", addr1.ToString());                
+                }
+            }        
+        }
+        
         LogPrintf("Seed node is set, trying to connect to %s...\n",mc_gState->GetSeedNode());
-        OpenNetworkConnection(addr, NULL, mc_gState->GetSeedNode());
+        CAddress addr;
+        bool outcome=OpenNetworkConnection(addr, NULL, mc_gState->GetSeedNode());
+        if(outcome)
+        {
+            addrman.GetMCAddrMan()->SetOutcome(addr1,0,outcome);
+        }
+        else
+        {
+            if(addr1.IsValid())
+            {
+                addrman.GetMCAddrMan()->SetOutcome(addr1,0,outcome);                            
+            }
+        }
     }
 
 /* MCHN END */    

@@ -5769,17 +5769,31 @@ void mc_InitRPCHelpMap25()
             + HelpExampleRpc("gettokeninfo", "\"asset1\", \"token1\"")
         ));
     
-    mapHelpStrings.insert(std::make_pair("listknownpeers",
-            "listknownpeers\n"
+    mapHelpStrings.insert(std::make_pair("liststorednodes",
+            "liststorednodes  ( includeOldIgnores )\n"
             "\nReturns data about known network peers.\n"
+            "\nArguments:\n"
+            "1. includeOldIgnores                 (bool, optional, default=false) Also include information about old ignored peers\n"
             "\nResult:\n"
             "Array of objects with peer information\n"            
             "\nExamples:\n"
-            + HelpExampleCli("listknownpeers", "")
-            + HelpExampleRpc("listknownpeers", "")
+            + HelpExampleCli("liststorednodes", "")
+            + HelpExampleRpc("liststorednodes", "")
         ));
     
-    mapHelpStrings.insert(std::make_pair("AAAAAAA",
+     mapHelpStrings.insert(std::make_pair("storenode",
+            "storenode \"node\" \"tryconnect\"|\"ignore\"\n"
+            "\nAdds or removes a node from the list of peers used for outbound connections.\n"
+            "\nArguments:\n"
+            "1. \"node\"                           (string, required) The node (see getpeerinfo for nodes)\n"
+            "2. \"command\"                        (string, optional, default='tryconnect') 'tryconnect' to add address to the permanent list of known peers,\n"
+            "                                                       'ignore' stop trying to connect to this address until inbound connection is established,\n"
+            "\nExamples:\n"
+            + HelpExampleCli("storenode", "\"192.168.0.6:8333\" \"tryconnect\"")
+            + HelpExampleRpc("storenode", "\"192.168.0.6:8333\", \"tryconnect\"")
+        ));
+    
+   mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));       
 }
@@ -5820,6 +5834,7 @@ void mc_InitRPCAllowedWhenWaitingForUpgradeSet()
     setAllowedWhenWaitingForUpgrade.insert("createmultisig");    
     setAllowedWhenWaitingForUpgrade.insert("validateaddress");    
     setAllowedWhenWaitingForUpgrade.insert("addnode");    
+    setAllowedWhenWaitingForUpgrade.insert("storenode");    
     setAllowedWhenWaitingForUpgrade.insert("getpeerinfo");    
     setAllowedWhenWaitingForUpgrade.insert("signmessage");    
     setAllowedWhenWaitingForUpgrade.insert("verifymessage");    

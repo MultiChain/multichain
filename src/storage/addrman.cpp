@@ -905,12 +905,22 @@ void CMCAddrInfo::Try()
     m_Attempts++;
 }
 
+void CMCAddrInfo::ResetLastTry(bool success)
+{
+    if(success)
+    {
+        m_LastSuccess=GetAdjustedTime();
+        m_Attempts=0;
+    }
+    m_LastTry=GetAdjustedTime();
+}
+
 void CMCAddrInfo::Set(uint32_t row)
 {
     if((row>0) || (m_MCAddress != 0))
     {
         m_LastSuccess=GetAdjustedTime();
-    }
+    }    
     m_LastSuccessRow=row;
     if(IsNet() && (m_MCAddress != 0))
     {
@@ -1064,7 +1074,7 @@ void CMCAddrMan::Set(const CService &netaddr, uint160 mcaddr)
         m_MCAddrs[0].SetLastRow(m_MCAddrs.size());
     }
     
-    netparent->Set(row);        
+    netparent->Set(row);     
 }
 
 bool CMCAddrMan::SetOutcome(const CService &netaddr, uint160 mcaddr,bool outcome)
@@ -1258,6 +1268,21 @@ bool CMCAddrInfoCompareByLastSuccess(CMCAddrInfo a,CMCAddrInfo b)
     return false;
 }
 
+int64_t mc_PeerStatusDelayIgnore()
+{
+    return 90*86400;
+}
+
+int64_t mc_PeerStatusDelayLastTry()
+{
+    return 86400;
+}
+
+int64_t mc_PeerStatusDelayForget()
+{
+    return 90*86400;
+}
+
 uint32_t CMCAddrMan::PrepareSelect(set<CService> setLocalAddr,uint32_t *counts)
 {
     LOCK(cs);
@@ -1381,9 +1406,27 @@ uint32_t CMCAddrMan::PrepareSelect(set<CService> setLocalAddr,uint32_t *counts)
                 }                
             }
  */ 
-            if( addr->GetFlags() & MC_AMF_DELETED )
+            if( addr->GetFlags() & MC_AMF_IGNORED )
             {
                 take_it=false;                                
+            }
+            else
+            {
+                int64_t lastsuccess,lasttry;
+                addr->GetLastTryInfo(&lastsuccess,&lasttry,NULL);
+                int64_t time_now=GetAdjustedTime();
+                if(lastsuccess < time_now - mc_PeerStatusDelayIgnore())
+                {
+                    if(lasttry > time_now - mc_PeerStatusDelayLastTry())
+                    {
+                        addr->SetFlag(MC_AMF_IGNORED,1);
+                        if(addr->GetMCAddress() == 0)
+                        {
+                            if(fDebug)LogPrint("addrman", "Address %s didn't respond for %d days, stop trying\n", addr->GetNetAddress().ToStringIPPort().c_str(),(time_now - lastsuccess + 1)/86400);
+                        }
+                        take_it=false;
+                    }
+                }
             }
         }
         

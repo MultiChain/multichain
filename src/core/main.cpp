@@ -5967,6 +5967,11 @@ void CompleteProcessVersion(CNode* pfrom)
     {
         if (((CNetAddr)pfrom->addr) == (CNetAddr)pfrom->addrFromVersion)
         {
+            CMCAddrInfo *mcaddrinfo=addrman.GetMCAddrMan()->Find(pfrom->addrFromVersion,0);
+            if(mcaddrinfo)
+            {
+                mcaddrinfo->SetFlag(MC_AMF_IGNORED,0);
+            }
             addrman.Add(pfrom->addrFromVersion, pfrom->addrFromVersion);
             addrman.Good(pfrom->addrFromVersion);
         }         
@@ -6004,6 +6009,11 @@ void CompleteProcessVersion(CNode* pfrom)
             {
                 if(fDebug)LogPrint("mchn","Adding seed address %s\n",pfrom->addr.ToStringIPPort().c_str());
                 addrman.Add(pfrom->addr, CNetAddr("127.0.0.1"));
+                CMCAddrInfo *mcaddrinfo=addrman.GetMCAddrMan()->Find(pfrom->addr,0);
+                if(mcaddrinfo)
+                {
+                    mcaddrinfo->SetFlag(MC_AMF_SOURCE_SEED,1);
+                }                
             }
         }
         addrman.Good(pfrom->addr);
@@ -6143,68 +6153,13 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         
         pfrom->ssSend.SetVersion(min(pfrom->nVersion, PROTOCOL_VERSION));
         
-/* MCHN START */
         pfrom->addrFromVersion=addrFrom;
-/*        
-        if (pfrom->fInbound)
-        {
-            if (((CNetAddr)pfrom->addr) == (CNetAddr)addrFrom)
-            {
-                if(!pfrom->fDefaultMessageStart)
-                {
-                    addrman.Add(addrFrom, addrFrom);
-                    addrman.Good(addrFrom);
-                }
-            }            
-        }
-*/        
-/* MCHN END */
         
         if(pfrom->fParameterSetVerified)
         {
             CompleteProcessVersion(pfrom);
         }
         
-/*
-        if (!pfrom->fInbound)
-        {
-            // Advertise our address
-            if (fListen && !IsInitialBlockDownload())
-            {
-                CAddress addr = GetLocalAddress(&pfrom->addr);
-                if (addr.IsRoutable())
-                {
-                    pfrom->PushAddress(addr);
-                } else if (IsPeerAddrLocalGood(pfrom)) {
-                    addr.SetIP(pfrom->addrLocal);
-                    pfrom->PushAddress(addr);
-                }
-            }
-
-            // Get recent addresses
-            if (pfrom->fOneShot || pfrom->nVersion >= CADDR_TIME_VERSION || addrman.size() < 1000)
-            {
-                pfrom->PushMessage("getaddr");
-                pfrom->fGetAddr = true;
-            }
-            addrman.Good(pfrom->addr);
-        } else {
-            if (((CNetAddr)pfrom->addr) == (CNetAddr)addrFrom)
-            {
-                addrman.Add(addrFrom, addrFrom);
-                addrman.Good(addrFrom);
-            }
-        }
-
-        // Relay alerts
-        {
-            LOCK(cs_mapAlerts);
-            BOOST_FOREACH(PAIRTYPE(const uint256, CAlert)& item, mapAlerts)
-                item.second.RelayTo(pfrom);
-        }
-
-        pfrom->fSuccessfullyConnected = true;
-  */      
         string remoteAddr;
         if (fLogIPs)
             remoteAddr = ", peeraddr=" + pfrom->addr.ToString();
