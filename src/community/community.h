@@ -118,7 +118,7 @@ typedef struct mc_EnterpriseFeatures
     uint64_t NET_Services();
     
     int HCH_GetPort();
-    std::string HCH_ProcessRequest(std::string strRequest,std::string* strHeader);    
+    std::string HCH_ProcessRequest(std::string strRequest,std::string* strHeader,map<string, string>& mapHeaders,int& http_code);    
     Value HCH_RPCHealthCheck(const Array& params);  
     
     std::string ENT_Edition();

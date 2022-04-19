@@ -1391,7 +1391,9 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
                     throw JSONRPCError(RPC_IN_WARMUP, rpcWarmupStatus);                    
                 }
             }
-            strReply=pEF->HCH_ProcessRequest(strRequest,&strHeader);
+            map<string, string> mapHeaders;
+            int http_code;
+            strReply=pEF->HCH_ProcessRequest(strRequest,&strHeader,mapHeaders,http_code);
         }
         else
         {            
