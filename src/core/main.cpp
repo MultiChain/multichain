@@ -5970,6 +5970,7 @@ void CompleteProcessVersion(CNode* pfrom)
             CMCAddrInfo *mcaddrinfo=addrman.GetMCAddrMan()->Find(pfrom->addrFromVersion,0);
             if(mcaddrinfo)
             {
+                mcaddrinfo->ResetLastTry(true);
                 mcaddrinfo->SetFlag(MC_AMF_IGNORED,0);
             }
             addrman.Add(pfrom->addrFromVersion, pfrom->addrFromVersion);
