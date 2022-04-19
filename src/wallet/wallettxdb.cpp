@@ -1238,7 +1238,11 @@ int mc_TxDB::DecrementSubKey(
         erow.m_Pos=1;
         erow.m_Flags=last_pos;
         erow.m_LastSubKeyPos=last_pos-1;        
-        mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);        
+        if( (IsCSkipped(entity->m_EntityType) == 0) && (pEF->STR_IsIndexSkipped(import,parent_entity,entity) == 0) )
+        {
+            mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);        
+        }
+        
     }
 exitlbl:
             
