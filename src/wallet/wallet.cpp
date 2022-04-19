@@ -1790,7 +1790,7 @@ void CWallet::ResendWalletTransactions(bool fForce)
     nLastResend = GetTime();
 
     // Rebroadcast any of our txes that aren't in a block yet
-    LogPrintf("ResendWalletTransactions()\n");
+    if(fDebug)LogPrint("wallet","ResendWalletTransactions()\n");
     {
         LOCK(cs_wallet);
         // Sort them in chronological order
