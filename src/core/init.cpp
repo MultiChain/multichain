@@ -1280,9 +1280,16 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 //        uiInterface.InitMessage.connect(SetRPCWarmupStatus);
         
         if (!InitHTTPServer())
-            return InitError("Couldn't start RPC HTTP Server");          
-        
-        StartHTTPServer();                
+        {
+            if(mc_gState->m_NetworkParams->m_Status != MC_PRM_STATUS_MINIMAL)
+            {
+                return InitError("Couldn't start RPC HTTP Server");          
+            }
+        }
+        else
+        {
+            StartHTTPServer();                
+        }
     }
     if(rpc_threads_error.size())
     {

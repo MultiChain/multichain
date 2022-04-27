@@ -5974,8 +5974,11 @@ void CompleteProcessVersion(CNode* pfrom)
                 mcaddrinfo->ResetLastTry(true);
                 mcaddrinfo->SetFlag(MC_AMF_IGNORED,0);
             }
-            addrman.Add(pfrom->addrFromVersion, pfrom->addrFromVersion);
-            addrman.Good(pfrom->addrFromVersion);
+            if(pfrom->addrFromVersion.GetPort() != MC_DEFAULT_NETWORK_PORT)
+            {
+                addrman.Add(pfrom->addrFromVersion, pfrom->addrFromVersion);
+                addrman.Good(pfrom->addrFromVersion);
+            }
         }         
         if (addrman.size() < 1000)
         {

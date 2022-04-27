@@ -636,14 +636,12 @@ void mc_InitRPCHelpMap04()
     
     mapHelpStrings.insert(std::make_pair("addnode",
             "addnode \"node\" \"add\"|\"remove\"|\"onetry\"\n"
-            "\nAttempts add or remove a node from the addnode list.\n"
+            "\nAttempts add or remove a node from the temporary addnode list.\n"
             "Or try a connection to a node once.\n"
             "\nArguments:\n"
             "1. \"node\"                           (string, required) The node (see getpeerinfo for nodes)\n"
             "2. \"command\"                        (string, required) 'add' to add a node to the list, 'remove' to remove a node from the list,\n"
             "                                                       'onetry' to try a connection to the node once,\n"
-            "                                                       'remember' to add address to the permanent list of known peers,\n"
-            "                                                       'forget' to remove address from the permanent list of known peers,\n"
             "\nExamples:\n"
             + HelpExampleCli("addnode", "\"192.168.0.6:8333\" \"onetry\"")
             + HelpExampleRpc("addnode", "\"192.168.0.6:8333\", \"onetry\"")
@@ -5773,7 +5771,7 @@ void mc_InitRPCHelpMap25()
             "liststorednodes  ( includeOldIgnores )\n"
             "\nReturns data about known network peers.\n"
             "\nArguments:\n"
-            "1. includeOldIgnores                 (bool, optional, default=false) Also include information about old ignored peers\n"
+            "1. includeOldIgnores                 (bool, optional, default=false) Also include information about peers ignored for over 90 days\n"
             "\nResult:\n"
             "Array of objects with peer information\n"            
             "\nExamples:\n"
@@ -5783,7 +5781,7 @@ void mc_InitRPCHelpMap25()
     
      mapHelpStrings.insert(std::make_pair("storenode",
             "storenode \"node\" \"tryconnect\"|\"ignore\"\n"
-            "\nAdds or removes a node from the list of peers used for outbound connections.\n"
+            "\nAdds or removes a node from the permanent list of peers used for outbound connections.\n"
             "\nArguments:\n"
             "1. \"node\"                           (string, required) The node (see getpeerinfo for nodes)\n"
             "2. \"command\"                        (string, optional, default='tryconnect') 'tryconnect' to add address to the permanent list of known peers,\n"
