@@ -1093,11 +1093,11 @@ void ThrottleTxFlow()
             int64_t block_size=MAX_BLOCK_SIZE;
             double blocks_required=(double)mempool_bytes/(double)block_size;
             
-            int64_t threshold=GetArg("-accepttxthreshold",200);
-            int64_t threshold_multiplier=GetArg("-accepttxthresholdmultiplier",2);
-            int64_t delay=GetArg("-accepttxmindelay",10);
-            int64_t max_delay=GetArg("-accepttxmaxdelay",1000);
-            int64_t delay_multiplier=GetArg("-accepttxdelaymultiplier",10);
+            int64_t threshold=GetArg("-accepttxthreshold",0);
+            int64_t threshold_multiplier=2;
+            int64_t delay=10;
+            int64_t max_delay=1000;
+            int64_t delay_multiplier=10;
             
             if(delay_multiplier <= 0)
             {

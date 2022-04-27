@@ -2946,7 +2946,8 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
             return state.Abort("Failed to read block");
         pblock = &block;
     }        
-    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Connecting block %s (height %d), %d transactions in mempool\n",pindexNew->GetBlockHash().ToString().c_str(),pindexNew->nHeight,(int)mempool.size());
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Connecting block %s (height %d), %d transactions in mempool, %d in orphan pool\n",
+            pindexNew->GetBlockHash().ToString().c_str(),pindexNew->nHeight,(int)mempool.size(),(int)OrphanPoolSize());
     // Apply the block atomically to the chain state.
     int64_t nTime2 = GetTimeMicros(); nTimeReadFromDisk += nTime2 - nTime1;
     int64_t nTime3;
@@ -3588,7 +3589,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
             pMultiChainFilterEngine->Reset(chainActive.Height(),0);
         }
         
-        if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Replaying mempool\n");
+        if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Replaying mempool started\n");
         ReplayMemPool(mempool,0,true);
         if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Defragmenting mempool hash list\n");
         mempool.defragmentHashList();
