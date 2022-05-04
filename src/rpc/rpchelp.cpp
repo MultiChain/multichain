@@ -636,12 +636,12 @@ void mc_InitRPCHelpMap04()
     
     mapHelpStrings.insert(std::make_pair("addnode",
             "addnode \"node\" \"add\"|\"remove\"|\"onetry\"\n"
-            "\nAttempts add or remove a node from the addnode list.\n"
+            "\nAttempts add or remove a node from the temporary addnode list.\n"
             "Or try a connection to a node once.\n"
             "\nArguments:\n"
             "1. \"node\"                           (string, required) The node (see getpeerinfo for nodes)\n"
             "2. \"command\"                        (string, required) 'add' to add a node to the list, 'remove' to remove a node from the list,\n"
-            "                                                       'onetry' to try a connection to the node once\n"
+            "                                                       'onetry' to try a connection to the node once,\n"
             "\nExamples:\n"
             + HelpExampleCli("addnode", "\"192.168.0.6:8333\" \"onetry\"")
             + HelpExampleRpc("addnode", "\"192.168.0.6:8333\", \"onetry\"")
@@ -4922,8 +4922,12 @@ void mc_InitRPCHelpMap20()
          ));
     
     mapHelpStrings.insert(std::make_pair("getlicenserequest",
-            "getlicenserequest \n"
+            "getlicenserequest ( new-owner-identity )\n"
             "\nReturns license request.\n"
+    
+            "\nArguments:\n"
+            "1. new-owner-identity                          (boolean, optional, default=false) If true, new node owner identity is generated. \n"
+    
             "\nExamples:\n"
             + HelpExampleCli("getlicenserequest", "") 
             + HelpExampleRpc("getlicenserequest", "")    
@@ -5757,13 +5761,37 @@ void mc_InitRPCHelpMap25()
             "2. \"token-identifier\"               (string, required) Token identifier\n"
             "3. verbose                          (boolean, optional, default=false) If true, returns list of issuers \n"
             "\nResult:\n"
-            "An array containing information about tokens\n"            
+            "Object with token details\n"            
             "\nExamples:\n"
             + HelpExampleCli("gettokeninfo", "\"asset1\" \"token1\"")
             + HelpExampleRpc("gettokeninfo", "\"asset1\", \"token1\"")
         ));
     
-    mapHelpStrings.insert(std::make_pair("AAAAAAA",
+    mapHelpStrings.insert(std::make_pair("liststorednodes",
+            "liststorednodes  ( includeOldIgnores )\n"
+            "\nReturns data about known network peers.\n"
+            "\nArguments:\n"
+            "1. includeOldIgnores                 (bool, optional, default=false) Also include information about peers ignored for over 90 days\n"
+            "\nResult:\n"
+            "Array of objects with peer information\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("liststorednodes", "")
+            + HelpExampleRpc("liststorednodes", "")
+        ));
+    
+     mapHelpStrings.insert(std::make_pair("storenode",
+            "storenode \"node\" \"tryconnect\"|\"ignore\"\n"
+            "\nAdds or removes a node from the permanent list of peers used for outbound connections.\n"
+            "\nArguments:\n"
+            "1. \"node\"                           (string, required) The node (see getpeerinfo for nodes)\n"
+            "2. \"command\"                        (string, optional, default='tryconnect') 'tryconnect' to add address to the permanent list of known peers,\n"
+            "                                                       'ignore' stop trying to connect to this address until inbound connection is established,\n"
+            "\nExamples:\n"
+            + HelpExampleCli("storenode", "\"192.168.0.6:8333\" \"tryconnect\"")
+            + HelpExampleRpc("storenode", "\"192.168.0.6:8333\", \"tryconnect\"")
+        ));
+    
+   mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));       
 }
@@ -5804,6 +5832,7 @@ void mc_InitRPCAllowedWhenWaitingForUpgradeSet()
     setAllowedWhenWaitingForUpgrade.insert("createmultisig");    
     setAllowedWhenWaitingForUpgrade.insert("validateaddress");    
     setAllowedWhenWaitingForUpgrade.insert("addnode");    
+    setAllowedWhenWaitingForUpgrade.insert("storenode");    
     setAllowedWhenWaitingForUpgrade.insert("getpeerinfo");    
     setAllowedWhenWaitingForUpgrade.insert("signmessage");    
     setAllowedWhenWaitingForUpgrade.insert("verifymessage");    

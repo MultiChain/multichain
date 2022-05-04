@@ -1280,9 +1280,16 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 //        uiInterface.InitMessage.connect(SetRPCWarmupStatus);
         
         if (!InitHTTPServer())
-            return InitError("Couldn't start RPC HTTP Server");          
-        
-        StartHTTPServer();                
+        {
+            if(mc_gState->m_NetworkParams->m_Status != MC_PRM_STATUS_MINIMAL)
+            {
+                return InitError("Couldn't start RPC HTTP Server");          
+            }
+        }
+        else
+        {
+            StartHTTPServer();                
+        }
     }
     if(rpc_threads_error.size())
     {
@@ -2175,7 +2182,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     uint32_t flags=0;
                     if(item.second.purpose == "license")
                     {
-                        flags |= MC_EFL_NOT_IN_LISTS;
+                        flags |= MC_EFL_LICENSE;
                     }
                     entstat.Zero();
                     if(lpKeyID)
@@ -3134,6 +3141,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         {    
             sprintf(bufOutput,"The license %s is available to this node but will not be used automatically, because it appears it was not previously in use.\n",
                     conflicting_licenses[l].c_str());
+            bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
+            sprintf(bufOutput,"This may happen also if the node was restarted with -rescan.\n");
             bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));        
             sprintf(bufOutput,"To use this license for this node and stop any other from using it, use the 'takelicense %s' command.\n\n",
                     conflicting_licenses[l].c_str());                    

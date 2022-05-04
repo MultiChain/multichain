@@ -1028,6 +1028,45 @@ exitlbl:
     return err;
 }
 
+int mc_TxDB::SaveEntityFlag(mc_TxEntity *entity,uint32_t flag,int set_flag)
+{
+    int row=m_Imports->FindEntity(entity);
+    if(row < 0)
+    {
+        return MC_ERR_NOT_FOUND;
+    }
+    
+    mc_TxEntityStat *lpStat;
+    char msg[256];
+    char enthex[65];
+    
+    lpStat=(mc_TxEntityStat *)(m_Imports->GetEntity(row));
+    
+    sprintf_hex(enthex,entity->m_EntityID,MC_TDB_ENTITY_ID_SIZE);
+
+    if(set_flag)
+    {
+        sprintf(msg,"Setting flag %08X to entity (%08X, %s)",flag,entity->m_EntityType,enthex);
+    }
+    else
+    {
+        sprintf(msg,"Unsetting flag %08X to entity (%08X, %s)",flag,entity->m_EntityType,enthex);        
+    }    
+    LogString(msg);
+
+    if(set_flag)
+    {
+        lpStat->m_Flags |= flag;
+    }
+    else
+    {
+        lpStat->m_Flags &= ~flag;
+    }
+    
+    return MC_ERR_NOERROR;
+}
+
+
 int mc_TxDB::FindEntity(mc_TxImport *import,
                         mc_TxEntity *entity)
 {
@@ -1199,7 +1238,11 @@ int mc_TxDB::DecrementSubKey(
         erow.m_Pos=1;
         erow.m_Flags=last_pos;
         erow.m_LastSubKeyPos=last_pos-1;        
-        mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);        
+        if( (IsCSkipped(entity->m_EntityType) == 0) && (pEF->STR_IsIndexSkipped(import,parent_entity,entity) == 0) )
+        {
+            mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);        
+        }
+        
     }
 exitlbl:
             

@@ -75,6 +75,7 @@ bool MultichainNode_IsLocal(CNode *pnode);
 bool MultichainNode_CollectChunks();
 bool IsTxBanned(uint256 txid);
 int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,vector<mc_UpgradeStatus> *vUpgrades);
+void SetRPCNewTxFlag();
 
 
 
@@ -1678,6 +1679,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         SyncWithWallets(tx, NULL);
     }
 
+    SetRPCNewTxFlag();
+    
     return true;
 }
 
@@ -2943,7 +2946,8 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
             return state.Abort("Failed to read block");
         pblock = &block;
     }        
-    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Connecting block %s (height %d), %d transactions in mempool\n",pindexNew->GetBlockHash().ToString().c_str(),pindexNew->nHeight,(int)mempool.size());
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Connecting block %s (height %d), %d transactions in mempool, %d in orphan pool\n",
+            pindexNew->GetBlockHash().ToString().c_str(),pindexNew->nHeight,(int)mempool.size(),(int)OrphanPoolSize());
     // Apply the block atomically to the chain state.
     int64_t nTime2 = GetTimeMicros(); nTimeReadFromDisk += nTime2 - nTime1;
     int64_t nTime3;
@@ -3585,7 +3589,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
             pMultiChainFilterEngine->Reset(chainActive.Height(),0);
         }
         
-        if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Replaying mempool\n");
+        if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Replaying mempool started\n");
         ReplayMemPool(mempool,0,true);
         if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Defragmenting mempool hash list\n");
         mempool.defragmentHashList();
@@ -5964,8 +5968,17 @@ void CompleteProcessVersion(CNode* pfrom)
     {
         if (((CNetAddr)pfrom->addr) == (CNetAddr)pfrom->addrFromVersion)
         {
-            addrman.Add(pfrom->addrFromVersion, pfrom->addrFromVersion);
-            addrman.Good(pfrom->addrFromVersion);
+            CMCAddrInfo *mcaddrinfo=addrman.GetMCAddrMan()->Find(pfrom->addrFromVersion,0);
+            if(mcaddrinfo)
+            {
+                mcaddrinfo->ResetLastTry(true);
+                mcaddrinfo->SetFlag(MC_AMF_IGNORED,0);
+            }
+            if(pfrom->addrFromVersion.GetPort() != MC_DEFAULT_NETWORK_PORT)
+            {
+                addrman.Add(pfrom->addrFromVersion, pfrom->addrFromVersion);
+                addrman.Good(pfrom->addrFromVersion);
+            }
         }         
         if (addrman.size() < 1000)
         {
@@ -6001,6 +6014,11 @@ void CompleteProcessVersion(CNode* pfrom)
             {
                 if(fDebug)LogPrint("mchn","Adding seed address %s\n",pfrom->addr.ToStringIPPort().c_str());
                 addrman.Add(pfrom->addr, CNetAddr("127.0.0.1"));
+                CMCAddrInfo *mcaddrinfo=addrman.GetMCAddrMan()->Find(pfrom->addr,0);
+                if(mcaddrinfo)
+                {
+                    mcaddrinfo->SetFlag(MC_AMF_SOURCE_SEED,1);
+                }                
             }
         }
         addrman.Good(pfrom->addr);
@@ -6140,68 +6158,13 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         
         pfrom->ssSend.SetVersion(min(pfrom->nVersion, PROTOCOL_VERSION));
         
-/* MCHN START */
         pfrom->addrFromVersion=addrFrom;
-/*        
-        if (pfrom->fInbound)
-        {
-            if (((CNetAddr)pfrom->addr) == (CNetAddr)addrFrom)
-            {
-                if(!pfrom->fDefaultMessageStart)
-                {
-                    addrman.Add(addrFrom, addrFrom);
-                    addrman.Good(addrFrom);
-                }
-            }            
-        }
-*/        
-/* MCHN END */
         
         if(pfrom->fParameterSetVerified)
         {
             CompleteProcessVersion(pfrom);
         }
         
-/*
-        if (!pfrom->fInbound)
-        {
-            // Advertise our address
-            if (fListen && !IsInitialBlockDownload())
-            {
-                CAddress addr = GetLocalAddress(&pfrom->addr);
-                if (addr.IsRoutable())
-                {
-                    pfrom->PushAddress(addr);
-                } else if (IsPeerAddrLocalGood(pfrom)) {
-                    addr.SetIP(pfrom->addrLocal);
-                    pfrom->PushAddress(addr);
-                }
-            }
-
-            // Get recent addresses
-            if (pfrom->fOneShot || pfrom->nVersion >= CADDR_TIME_VERSION || addrman.size() < 1000)
-            {
-                pfrom->PushMessage("getaddr");
-                pfrom->fGetAddr = true;
-            }
-            addrman.Good(pfrom->addr);
-        } else {
-            if (((CNetAddr)pfrom->addr) == (CNetAddr)addrFrom)
-            {
-                addrman.Add(addrFrom, addrFrom);
-                addrman.Good(addrFrom);
-            }
-        }
-
-        // Relay alerts
-        {
-            LOCK(cs_mapAlerts);
-            BOOST_FOREACH(PAIRTYPE(const uint256, CAlert)& item, mapAlerts)
-                item.second.RelayTo(pfrom);
-        }
-
-        pfrom->fSuccessfullyConnected = true;
-  */      
         string remoteAddr;
         if (fLogIPs)
             remoteAddr = ", peeraddr=" + pfrom->addr.ToString();

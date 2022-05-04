@@ -27,6 +27,7 @@ static const std::string vAPINames[] =
 {
 "addmultisigaddress",
 "addnode",
+"storenode",
 "addresses-all",
 "appendbinarycache",
 "appendrawchange",
@@ -108,6 +109,7 @@ static const std::string vAPINames[] =
 "getnetworkinfo",
 "getnewaddress",
 "getpeerinfo",
+"liststorednodes",
 "getrawchangeaddress",
 "getrawmempool",
 "getrawtransaction",
@@ -598,6 +600,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "getlicenseconfirmation", 1 },
     { "listlicenses", 0 },
     { "listlicenses", 1 },
+    { "getlicenserequest", 0 },
     { "createfeed", 1 },
     { "deletefeed", 1 },
     { "pausefeed", 1 },
@@ -643,6 +646,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "explorerlistaddressassettransactions", 4 },
     { "encodehexubjson", 0 },
     { "getdiagnostics", 0 },
+    { "liststorednodes", 0 },
 };
 
 class CRPCConvertTable

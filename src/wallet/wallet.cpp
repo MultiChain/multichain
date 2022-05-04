@@ -1661,7 +1661,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
         {
             if(!fOnlyUnsynced)
             {
-                printf("Rescan complete\n");                
+                printf("Rescan complete\n\n");                
             }
             LogPrint("wallet","Rescan completed successfully\n");            
         }
@@ -1676,7 +1676,7 @@ void CWallet::ReacceptWalletTransactions()
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {        
         pwalletTxsMain->Lock();
-        LogPrintf("ReacceptWalletTransactions: %ld txs in unconfirmed pool \n", pwalletTxsMain->m_UnconfirmedSends.size());
+        if(fDebug)LogPrint("wallet","ReacceptWalletTransactions: %ld txs in unconfirmed pool \n", pwalletTxsMain->m_UnconfirmedSends.size());
 //        BOOST_FOREACH(PAIRTYPE(const uint256, CWalletTx)& item, pwalletTxsMain->m_UnconfirmedSends)
         BOOST_FOREACH(const uint256& wtxid, pwalletTxsMain->m_UnconfirmedSendsHashes) 
         {
@@ -1790,7 +1790,7 @@ void CWallet::ResendWalletTransactions(bool fForce)
     nLastResend = GetTime();
 
     // Rebroadcast any of our txes that aren't in a block yet
-    LogPrintf("ResendWalletTransactions()\n");
+    if(fDebug)LogPrint("wallet","ResendWalletTransactions()\n");
     {
         LOCK(cs_wallet);
         // Sort them in chronological order
@@ -3159,7 +3159,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, stri
 {
     {
         LOCK2(cs_main, cs_wallet);
-        LogPrintf("CommitTransaction: %s, vin: %d, vout: %d\n",wtxNew.GetHash().ToString().c_str(),(int)wtxNew.vin.size(),(int)wtxNew.vout.size());
+        if(GetBoolArg("-logcommittx",true))LogPrintf("CommitTransaction: %s, vin: %d, vout: %d\n",wtxNew.GetHash().ToString().c_str(),(int)wtxNew.vin.size(),(int)wtxNew.vout.size());
         if(fDebug)LogPrint("wallet","CommitTransaction:\n%s", wtxNew.ToString());
         {
 /* MCHN START */            

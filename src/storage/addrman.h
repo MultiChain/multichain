@@ -27,6 +27,12 @@
 #define MC_AMM_TRIED_NET                        4
 #define MC_AMM_MODE_COUNT                       5
 
+#define MC_AMF_NONE                           0x000000000
+#define MC_AMF_IGNORED                        0x000000001
+#define MC_AMF_SOURCE_PEER                    0x000000000
+#define MC_AMF_SOURCE_ADDED                   0x000000100
+#define MC_AMF_SOURCE_SEED                    0x000000200
+#define MC_AMF_SOURCE_MASK                    0x00000FF00
 
 class CMCAddrInfo
 {
@@ -64,6 +70,7 @@ class CMCAddrInfo
         void SetFlag(uint32_t flag,int set_flag);
         void SetLastRow(uint32_t row);
         void SetPrevRow(uint32_t row);
+        void ResetLastTry(bool success);
         uint32_t GetFlags();
         uint32_t GetLastRow();
         uint32_t GetPrevRow();

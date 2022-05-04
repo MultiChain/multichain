@@ -333,6 +333,8 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
     int pos;
     uint256 hash;
     
+    double start_time=mc_TimeNowAsDouble();
+    
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
     {
         for(pos=from;pos<pool.hashList->m_Count;pos++)
@@ -426,6 +428,8 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
             }
         }
     }
+    
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Replaying mempool. %8d new transactions, total %8d, time %8.3fs\n",total_txs-from,total_txs,mc_TimeNowAsDouble()-start_time);
     
     return true;
 }
