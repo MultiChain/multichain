@@ -71,6 +71,8 @@ static const unsigned int MAX_P2SH_SIGOPS = 15;
 /* MCHN START */
 //static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 1000;
 static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 50000;
+static const unsigned int DEFAULT_MAX_ORPHAN_POOL_SIZE = 104857600;
+static const unsigned int DEFAULT_MAX_ORPHAN_TX_AGE = 300;
 static const unsigned int DEFAULT_MAX_SUCCESSORS_FROM_ONE_NODE = 10;
 /* MCHN END */
 extern int MAX_OP_RETURN_SHOWN;

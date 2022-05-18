@@ -135,6 +135,8 @@ extern CAddrMan addrman;
 extern int nMaxConnections;
 extern int nMaxOutConnections;
 extern int OutConnectionsAlgoritm;
+extern int OrphanHandlerVersion;
+extern int InitialNetLogTime;
 
 extern std::vector<CNode*> vNodes;
 extern CCriticalSection cs_vNodes;
@@ -275,6 +277,7 @@ public:
     // b) the peer may tell us in their version message that we should not relay tx invs
     //    until they have initialized their bloom filter.
     bool fRelayTxes;
+    bool fReadyForTxInv;
     CSemaphoreGrant grantOutbound;
     CCriticalSection cs_filter;
     CBloomFilter* pfilter;
@@ -296,6 +299,7 @@ public:
     bool fLastIgnoreIncoming;
     bool fCanConnectRemote;
     bool fCanConnectLocal;
+    bool fEmptyHeaders;
     CKeyID kAddrRemote;
     CKeyID kAddrLocal;
     int64_t nLastKBPerDestinationChangeTimestamp;

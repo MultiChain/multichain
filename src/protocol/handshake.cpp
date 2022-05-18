@@ -274,7 +274,10 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
 //        addrman.GetMCAddrMan()->Set(pfrom->addrFromVersion,pfrom->kAddrRemote);
         if(fIsVerackack)
         {
-            LogPrintf("mchn: Connection from %s received on peer=%d in verackack (%s)\n",CBitcoinAddress(pubKeyHash).ToString().c_str(), pfrom->id,pfrom->addr.ToString());
+            uint64_t nonce_to_print=(pfrom->nVerackNonceSent+pfrom->nVerackNonceReceived) & 0xffff;
+            LogPrintf("mchn: Connection from %s received on peer=%d in verackack (%s), %s, connection id: %d\n",
+                    CBitcoinAddress(pubKeyHash).ToString().c_str(), pfrom->id,pfrom->addr.ToString(),pfrom->fInbound ? "Inbound" : "Outbound",(int)nonce_to_print);
+                    
             if(!MultichainNode_CanConnect(pfrom))
             {
                 LogPrintf("mchn: Permission denied for address %s received from peer=%d\n",CBitcoinAddress(pubKeyHash).ToString().c_str(), pfrom->id);

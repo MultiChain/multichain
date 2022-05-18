@@ -93,6 +93,7 @@ CAddrMan addrman;
 int nMaxConnections = 125;
 int nMaxOutConnections = 8;
 int OutConnectionsAlgoritm=0;
+int InitialNetLogTime=0;
 bool fAddressesInitialized = false;
 
 vector<CNode*> vNodes;
@@ -481,7 +482,8 @@ void CNode::CloseSocketDisconnect()
     fDisconnect = true;
     if (hSocket != INVALID_SOCKET)
     {
-        if(fDebug)LogPrint("net", "disconnecting peer=%d\n", id);
+//        if(fDebug)LogPrint("net", "disconnecting peer=%d\n", id);
+        LogPrintf("disconnecting peer=%d\n", id);
         CloseSocket(hSocket);
     }
 
@@ -781,7 +783,13 @@ void SocketSendData(CNode *pnode)
     {
         return;
     }
-    
+    double start_time=0;
+    size_t start_size=0;
+    if(InitialNetLogTime)
+    {
+        start_time=mc_TimeNowAsDouble();
+        start_size=pnode->nSendSize;
+    }
     std::deque<CSerializeData>::iterator it = pnode->vSendMsg.begin();
 
     while (it != pnode->vSendMsg.end()) {
@@ -824,6 +832,14 @@ void SocketSendData(CNode *pnode)
         assert(pnode->nSendSize == 0);
     }
     pnode->vSendMsg.erase(pnode->vSendMsg.begin(), it);
+    
+    if(InitialNetLogTime)
+    {
+        if(start_size>pnode->nSendSize)
+        {
+            if(GetTime()-pnode->nTimeConnected<InitialNetLogTime)LogPrintf("mchn-inl: NSNT: sent %d bytes in %8.3fs\n",start_size-pnode->nSendSize,mc_TimeNowAsDouble()-start_time);            
+        }
+    }
 }
 
 static list<CNode*> vNodesDisconnected;
@@ -1153,17 +1169,17 @@ void ThreadSocketHandler()
                 }
                 else if (nTime - pnode->nLastSend > TIMEOUT_INTERVAL)
                 {
-                    LogPrintf("socket sending timeout: %is\n", nTime - pnode->nLastSend);
+                    LogPrintf("socket sending timeout: %is, peer %d\n", nTime - pnode->nLastSend,pnode->id);
                     pnode->fDisconnect = true;
                 }
                 else if (nTime - pnode->nLastRecv > (pnode->nVersion > BIP0031_VERSION ? TIMEOUT_INTERVAL : 90*60))
                 {
-                    LogPrintf("socket receive timeout: %is\n", nTime - pnode->nLastRecv);
+                    LogPrintf("socket receive timeout: %is, peer %d\n", nTime - pnode->nLastRecv,pnode->id);
                     pnode->fDisconnect = true;
                 }
                 else if (pnode->nPingNonceSent && pnode->nPingUsecStart + TIMEOUT_INTERVAL * 1000000 < GetTimeMicros())
                 {
-                    LogPrintf("ping timeout: %fs\n", 0.000001 * (GetTimeMicros() - pnode->nPingUsecStart));
+                    LogPrintf("ping timeout: %fs, peer %d\n", 0.000001 * (GetTimeMicros() - pnode->nPingUsecStart),pnode->id);
                     pnode->fDisconnect = true;
                 }
             }
@@ -2332,6 +2348,11 @@ void RelayTransaction(const CTransaction& tx, const CDataStream& ss)
     {
         if(!pnode->fRelayTxes)
             continue;
+        {
+            LOCK(pnode->cs_inventory);
+            if(!pnode->fReadyForTxInv && (OrphanHandlerVersion == 1))
+                continue;
+        }
         LOCK(pnode->cs_filter);
         if (pnode->pfilter)
         {
@@ -2536,6 +2557,7 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     nStartingHeight = -1;
     fGetAddr = false;
     fRelayTxes = false;
+    fReadyForTxInv = false;
     setInventoryKnown.max_size(SendBufferSize() / 1000);
     pfilter = new CBloomFilter();
     nPingNonceSent = 0;
@@ -2553,6 +2575,7 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     fCanConnectLocal=false;
     fCanConnectRemote=false;
     fLastIgnoreIncoming=false;
+    fEmptyHeaders=false;
     nLastKBPerDestinationChangeTimestamp=0;
     nMaxKBPerDestination=0;
     
@@ -2600,8 +2623,16 @@ CNode::~CNode()
 
 void CNode::AskFor(const CInv& inv)
 {
-    if (mapAskFor.size() > MAPASKFOR_MAX_SZ)
+//    if (mapAskFor.size() > MAPASKFOR_MAX_SZ)
+    if (mapAskFor.size() > 2 * MAX_INV_SZ)
+    {
+        if(!fDisconnect)
+        {
+            LogPrintf("mchn: Too many inv messages from single node, disconnecting, peer=%d\n",id);        
+        }
+        fDisconnect=true;
         return;
+    }
 /* MCHN START */
     if(mc_gState->m_NodePausedState & MC_NPS_INCOMING)                          
     {
@@ -2645,6 +2676,7 @@ void CNode::BeginMessage(const char* pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSen
     ssSend << CMessageHeader(pszCommand, 0);
     if(fDebug)LogPrint("net", "sending: %s ", SanitizeString(pszCommand));
     if(fDebug)LogPrint("mchnminor","mchn: SEND: %s\n",SanitizeString(pszCommand));
+    if(InitialNetLogTime)if(GetTime()-nTimeConnected<InitialNetLogTime)LogPrintf("mchn-inl: SEND: %s",SanitizeString(pszCommand));
 }
 
 void CNode::AbortMessage() UNLOCK_FUNCTION(cs_vSend)
@@ -2685,6 +2717,7 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
     memcpy((char*)&ssSend[CMessageHeader::CHECKSUM_OFFSET], &nChecksum, sizeof(nChecksum));
 
     if(fDebug)LogPrint("net", "(%d bytes) peer=%d\n", nSize, id);
+    if(InitialNetLogTime)if(GetTime()-nTimeConnected<InitialNetLogTime)LogPrintf("(%d bytes) peer=%d\n", nSize, id);
     if(pEntData)
     {
         pEF->NET_PushMsg(pEntData,ssSend);

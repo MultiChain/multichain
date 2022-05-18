@@ -179,6 +179,7 @@ public:
 
     mc_Buffer *hashList;
     int hashListPos;
+    uint256 hashSendStop;
     
     bool defragmentHashList();
     bool shiftHashList(uint32_t rows);

@@ -383,6 +383,8 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -loadblock=<file>      " + _("Imports blocks from external blk000??.dat file") + " " + _("on startup") + "\n";
     strUsage += "  -loadblockmaxsize=<n>  " + _("Maximal block size in the files specified in -loadblock") + "\n";
     strUsage += "  -maxorphantx=<n>       " + strprintf(_("Keep at most <n> unconnectable transactions in memory (default: %u)"), DEFAULT_MAX_ORPHAN_TRANSACTIONS) + "\n";
+    strUsage += "  -maxorphansize=<n>     " + strprintf(_("Keep at most <n> of unconnectable transactions in memory (default: %u)"), DEFAULT_MAX_ORPHAN_POOL_SIZE) + "\n";
+    strUsage += "  -orphanhandlerversion=0|1 " + _("Use unconnectable transactions processing algorithm optimized for high loads, default: 1") + "\n";
     strUsage += "  -par=<n>               " + strprintf(_("Set the number of script verification threads (%u to %d, 0 = auto, <0 = leave that many cores free, default: %d)"), -(int)boost::thread::hardware_concurrency(), MAX_SCRIPTCHECK_THREADS, DEFAULT_SCRIPTCHECK_THREADS) + "\n";
 #ifndef WIN32
     strUsage += "  -pid=<file>            " + strprintf(_("Specify pid file (default: %s)"), "multichain.pid") + "\n";
@@ -929,6 +931,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     // Check for -tor - as this is a privacy risk to continue, exit here
     if (GetBoolArg("-tor", false))
         return InitError(_("Error: Unsupported argument -tor found, use -onion."));
+
+    OrphanHandlerVersion=GetArg("-orphanhandlerversion",1);
+    InitialNetLogTime=GetArg("-initialnetlogtime",0);
     
     OutConnectionsAlgoritm=GetArg("-addrmanversion",1);
     if(OutConnectionsAlgoritm)

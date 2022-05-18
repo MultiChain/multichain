@@ -358,6 +358,12 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
     }    
     
     int total_txs=pool.hashList->m_Count;
+    int added_txs=0;
+    size_t added_size=0;
+    int rejected_txs=0;
+    size_t send_stop_size=MAX_BLOCK_SIZE;
+    
+    pool.hashSendStop=0;
     
     LogPrint("mchn", "mchn: Replaying memory pool (%d new transactions, total %d)\n",total_txs-from,total_txs);
     mc_gState->m_Permissions->MempoolPermissionsCopy();
@@ -411,10 +417,12 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
                 }
             }
 
+            added_txs++;
             if(removed_type.size())
             {
                 LogPrintf("mchn: Tx %s removed from the mempool (%s), reason: %s\n",tx.GetHash().ToString().c_str(),removed_type.c_str(),reason.c_str());
-                pool.remove(tx, removed, true, "replay: "+removed_type);                    
+                pool.remove(tx, removed, true, "replay: "+removed_type);    
+                rejected_txs++;                
             }
             else
             {
@@ -424,12 +432,25 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
                     reason="wallet";
                     LogPrintf("mchn: Tx %s removed from the mempool (%s), reason: %s\n",tx.GetHash().ToString().c_str(),removed_type.c_str(),reason.c_str());
                     pool.remove(tx, removed, true, "replay: "+reason);                                        
+                    rejected_txs++;                
+                }
+                else
+                {
+                    added_size+=entry.GetTxSize();
+                    if(added_size > send_stop_size)
+                    {
+                        if(pool.hashSendStop == 0)
+                        {
+                            pool.hashSendStop=hash;
+                        }
+                    }
                 }
             }
         }
     }
     
-    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Replaying mempool. %8d new transactions, total %8d, time %8.3fs\n",total_txs-from,total_txs,mc_TimeNowAsDouble()-start_time);
+    LogPrint("mcblockperf","mchn-block-perf: Replaying mempool after block %6d. New %8d, total %8d, added %8d, rejected %8d, time %8.3fs\n",
+            chainActive.Height(),total_txs-from,total_txs,added_txs-rejected_txs,rejected_txs,mc_TimeNowAsDouble()-start_time);
     
     return true;
 }
