@@ -921,7 +921,7 @@ void mc_InitRPCHelpMap05()
         ));
     
     mapHelpStrings.insert(std::make_pair("createrawtransaction",
-            "createrawtransaction [{\"txid\":\"id\",\"vout\":n},...] {\"address\":amount,...} ( [data] \"action\" ) \n"
+            "createrawtransaction [{\"txid\":\"id\",\"vout\":n},...] {\"address\":amount,...} ( [data] \"action\" privatekeys \"sighashtype\" ) \n"
             "\nCreate a transaction spending the given inputs.\n"
 
             "\nArguments:\n"
@@ -987,6 +987,18 @@ void mc_InitRPCHelpMap05()
  */ 
             "3. data                                   (array, optional) Array of hexadecimal strings or data objects, see help data-all for details.\n"
             "4. \"action\"                               (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
+            "5. privatekeys                            (array, optional) A JSON array of base58-encoded private keys for signing\n"
+            "    [                                     (JSON array of strings, or 'null' if none provided)\n"
+            "      \"privatekey\"                        (string) private key in base58-encoding\n"
+            "      ,...\n"
+            "    ]\n"
+            "6. \"sighashtype\"                          (string, optional, default=ALL) The signature hash type. Must be one of\n"
+            "       \"ALL\"\n"
+            "       \"NONE\"\n"
+            "       \"SINGLE\"\n"
+            "       \"ALL|ANYONECANPAY\"\n"
+            "       \"NONE|ANYONECANPAY\"\n"
+            "       \"SINGLE|ANYONECANPAY\"\n"
                 
 
             "\nResult:\n"
@@ -1619,7 +1631,7 @@ void mc_InitRPCHelpMap06()
 void mc_InitRPCHelpMap07()
 {
     mapHelpStrings.insert(std::make_pair("createrawsendfrom",
-            "createrawsendfrom \"from-address\" {\"address\":amount,...} ( [data] \"action\" ) \n"
+            "createrawsendfrom \"from-address\" {\"address\":amount,...} ( [data] \"action\" privatekeys \"sighashtype\" ) \n"
             "\nCreate a transaction using the given sending address.\n"
 
             "\nArguments:\n"
@@ -1629,6 +1641,18 @@ void mc_InitRPCHelpMap07()
             "2. addresses                                (array, required) Array of addresses objects, see help addresses-all for details.\n"
             "3. data                                     (array, optional) Array of hexadecimal strings or data objects, see help data-all for details.\n"
             "4. \"action\"                                 (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
+            "5. privatekeys                              (array, optional) A JSON array of base58-encoded private keys for signing\n"
+            "    [                                       (JSON array of strings, or 'null' if none provided)\n"
+            "      \"privatekey\"                          (string) private key in base58-encoding\n"
+            "      ,...\n"
+            "    ]\n"
+            "6. \"sighashtype\"                            (string, optional, default=ALL) The signature hash type. Must be one of\n"
+            "       \"ALL\"\n"
+            "       \"NONE\"\n"
+            "       \"SINGLE\"\n"
+            "       \"ALL|ANYONECANPAY\"\n"
+            "       \"NONE|ANYONECANPAY\"\n"
+            "       \"SINGLE|ANYONECANPAY\"\n"
                 
 
             "\nResult:\n"
@@ -3739,7 +3763,7 @@ void mc_InitRPCHelpMap16()
         ));
     
     mapHelpStrings.insert(std::make_pair("appendrawtransaction",
-            "appendrawtransaction \"tx-hex\" [{\"txid\":\"id\",\"vout\":n},...] ( {\"address\":amount,...} [data] \"action\" ) \n"
+            "appendrawtransaction \"tx-hex\" [{\"txid\":\"id\",\"vout\":n},...] ( {\"address\":amount,...} [data] \"action\" privatekeys \"sighashtype\" ) \n"
             "\nAppend inputs and outputs to raw transaction\n"
 
             "\nArguments:\n"
@@ -3760,6 +3784,18 @@ void mc_InitRPCHelpMap16()
             "3. addresses                              (array, required) Array of addresses objects, see help addresses-all for details.\n"
             "4. data                                   (array, optional) Array of hexadecimal strings or data objects, see help data-all for details.\n"
             "5.\"action\"                                (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
+            "6. privatekeys                            (array, optional) A JSON array of base58-encoded private keys for signing\n"
+            "    [                                     (JSON array of strings, or 'null' if none provided)\n"
+            "      \"privatekey\"                        (string) private key in base58-encoding\n"
+            "      ,...\n"
+            "    ]\n"
+            "7. \"sighashtype\"                          (string, optional, default=ALL) The signature hash type. Must be one of\n"
+            "       \"ALL\"\n"
+            "       \"NONE\"\n"
+            "       \"SINGLE\"\n"
+            "       \"ALL|ANYONECANPAY\"\n"
+            "       \"NONE|ANYONECANPAY\"\n"
+            "       \"SINGLE|ANYONECANPAY\"\n"
                 
 
             "\nResult:\n"

@@ -1425,7 +1425,7 @@ void AddCacheInputScriptIfNeeded(CMutableTransaction& rawTx,Array inputs, bool f
 
 Value appendrawtransaction(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 2 || params.size() > 5) 
+    if (fHelp || params.size() < 2 || params.size() > 7) 
         throw runtime_error("Help message not found\n");
     
     RPCTypeCheck(params, list_of(str_type)(array_type));
@@ -1618,6 +1618,21 @@ Value appendrawtransaction(const Array& params, bool fHelp)
         {
             signrawtransaction_params.push_back(inputs_for_signature);            
         }
+        else
+        {
+            if (params.size() > 5) 
+            {
+                signrawtransaction_params.push_back(inputs_for_signature);                            
+            }        
+        }
+        if (params.size() > 5) 
+        {
+            signrawtransaction_params.push_back(params[5]);            
+        }
+        if (params.size() > 6) 
+        {
+            signrawtransaction_params.push_back(params[6]);            
+        }
         signedTx=signrawtransaction(signrawtransaction_params,false);
     }
     if(lock_it)
@@ -1663,7 +1678,7 @@ Value appendrawtransaction(const Array& params, bool fHelp)
 
 Value createrawtransaction(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 2 || params.size() > 4)                                            // MCHN
+    if (fHelp || params.size() < 2 || params.size() > 6)                                            // MCHN
         throw runtime_error("Help message not found\n");
     
     RPCTypeCheck(params, list_of(array_type));
@@ -1676,148 +1691,6 @@ Value createrawtransaction(const Array& params, bool fHelp)
     }
     
     return appendrawtransaction(ext_params,fHelp);       
-    
-    Array inputs = params[0].get_array();
-    Object sendTo = params[1].get_obj();
-    Array inputs_for_signature;
-    
-    CMutableTransaction rawTx;
-
-    BOOST_FOREACH(const Value& input, inputs) {
-        const Object& o = input.get_obj();
-
-        uint256 txid = ParseHashO(o, "txid");
-
-        const Value& vout_v = find_value(o, "vout");
-        if (vout_v.type() != int_type)
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, missing vout key");
-        int nOutput = vout_v.get_int();
-        if (nOutput < 0)
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, vout must be positive");
-
-        CTxIn in(COutPoint(txid, nOutput));
-        rawTx.vin.push_back(in);
-        
-        const Value& scriptPubKey = find_value(o, "scriptPubKey");
-        if(!scriptPubKey.is_null())
-        {
-            inputs_for_signature.push_back(input);
-        }        
-    }
-
-    vector <pair<CScript, CAmount> > vecSend;
-    int required=0;
-    bool fCachedInputScriptRequired=false;
-    vecSend=ParseRawOutputMultiObject(sendTo,&required);
-    BOOST_FOREACH (const PAIRTYPE(CScript, CAmount)& s, vecSend)
-    {
-        CTxOut out(s.second, s.first);
-        rawTx.vout.push_back(out);        
-    }    
-
-    if( required & (MC_PTP_ADMIN | MC_PTP_MINE) )
-    {
-        if(mc_gState->m_NetworkParams->GetInt64Param("supportminerprecheck"))                                
-        {
-            fCachedInputScriptRequired=true;
-        }
-    }
-    
-    AddCacheInputScriptIfNeeded(rawTx,inputs,fCachedInputScriptRequired);    
-    
-    mc_EntityDetails entity;
-    mc_gState->m_TmpAssetsOut->Clear();
-    for(int i=0;i<(int)rawTx.vout.size();i++)
-    {
-        FindFollowOnsInScript(rawTx.vout[i].scriptPubKey,mc_gState->m_TmpAssetsOut,mc_gState->m_TmpScript);
-    }
-    entity.Zero();
-    if(mc_gState->m_TmpAssetsOut->GetCount())
-    {
-/*        
-        if(mc_gState->m_TmpAssetsOut->GetCount() > 1)
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Follow-on script rejected - follow-on for several assets");                                    
-        }       
- */  
-        if(!mc_gState->m_Assets->FindEntityByFullRef(&entity,mc_gState->m_TmpAssetsOut->GetRow(0)))
-        {
-            throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Follow-on script rejected - asset not found");                                                
-        }
-    }
-    
-
-    if (params.size() > 2 && params[2].type() != null_type) 
-    {
-        BOOST_FOREACH(const Value& data, params[2].get_array()) 
-        {
-            CScript scriptOpReturn=ParseRawMetadata(data,MC_DATA_API_PARAM_TYPE_ALL,&entity,NULL);
-            CTxOut out(0, scriptOpReturn);
-            rawTx.vout.push_back(out);            
-        }
-    }
-
-    string action="";
-    string hex=EncodeHexTx(rawTx);
-    Value signedTx;    
-    Value txid;
-    bool sign_it=false;
-    bool lock_it=false;
-    bool send_it=false;
-    if (params.size() > 3 && params[3].type() != null_type) 
-    {
-        ParseRawAction(params[3].get_str(),lock_it,sign_it,send_it);
-    }
-
-    if(sign_it)
-    {
-        Array signrawtransaction_params;
-        signrawtransaction_params.push_back(hex);
-        if(inputs_for_signature.size())
-        {
-            signrawtransaction_params.push_back(inputs_for_signature);            
-        }
-        signedTx=signrawtransaction(signrawtransaction_params,false);
-    }
-    if(lock_it)
-    {
-        BOOST_FOREACH(const CTxIn& txin, rawTx.vin)
-        {
-            COutPoint outpt(txin.prevout.hash, txin.prevout.n);
-            pwalletMain->LockCoin(outpt);
-        }
-    }    
-    if(send_it)
-    {
-        Array sendrawtransaction_params;
-        BOOST_FOREACH(const Pair& s, signedTx.get_obj()) 
-        {        
-            if(s.name_=="complete")
-            {
-                if(!s.value_.get_bool())
-                {
-                    throw JSONRPCError(RPC_TRANSACTION_ERROR, "Transaction was not signed properly");                    
-                }
-            }
-            if(s.name_=="hex")
-            {
-                sendrawtransaction_params.push_back(s.value_.get_str());                
-            }
-        }
-        txid=sendrawtransaction(sendrawtransaction_params,false);
-    }
-    
-    if(send_it)
-    {
-        return txid;
-    }
-    
-    if(sign_it)
-    {
-        return signedTx;
-    }
-    
-    return hex;
 }
   
 /* MCHN START */
