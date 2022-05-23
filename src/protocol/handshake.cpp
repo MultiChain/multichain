@@ -288,6 +288,26 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
                 }
 //                return false;                                                
             }
+            else
+            {
+                if(pfrom->fInbound)                                             // Wrong local address was reported in version message, but we can trust this peer
+                {
+                    if (((CNetAddr)pfrom->addr) != (CNetAddr)pfrom->addrFromVersion)
+                    {
+                        LogPrintf("mcaddrman: Wrong address reported in version message, replacing %s by ",pfrom->addrFromVersion.ToStringIPPort());
+                        pfrom->addrFromVersion=CAddress(CService((CNetAddr)pfrom->addr,pfrom->addrFromVersion.GetPort()),0);
+                        LogPrintf("%s\n",pfrom->addrFromVersion.ToStringIPPort());
+                        CMCAddrInfo *mcaddrinfo=addrman.GetMCAddrMan()->Find(pfrom->addrFromVersion,0);
+                        if(mcaddrinfo)
+                        {
+                            mcaddrinfo->ResetLastTry(true);
+                            mcaddrinfo->SetFlag(MC_AMF_IGNORED,0);
+                        }
+                        addrman.Add(pfrom->addrFromVersion, pfrom->addrFromVersion);
+                        addrman.Good(pfrom->addrFromVersion);
+                    }
+                }
+            }
 /*            
             {
                 LOCK(cs_vNodes);
