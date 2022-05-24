@@ -420,6 +420,17 @@ void CAddrMan::Attempt_(const CService& addr, int64_t nTime)
     info.nAttempts++;
 }
 
+void CAddrMan::SCSetSelected_(CAddress addr)
+{
+    std::map<CService, int>::iterator it = mapAddrWithPort.find(addr);
+    if(it != mapAddrWithPort.end())
+    {
+        nSCSelected=it->second;
+    }
+    nSCSelected=-1;
+}
+
+
 void CAddrMan::SetSC_(bool invalid,int64_t nNow)
 {
     if(nSCSelected >= 0)
@@ -496,14 +507,16 @@ void CAddrMan::SCRecalculate_(int64_t nNow)
         bool fNewDead;        
         int64_t nLastTried;
         
-        it->second.GetChance(nNow,NULL);
+        it->second.dSCChance=it->second.GetChance(nNow,NULL);
         dNewChance=it->second.GetSC(&fNewInvalid,&fNewDead,&nLastTried);
                 
         if(nLastTried)
         {
             if(!fNewInvalid && !fNewDead)
             {
-                dSCTotalChance += dNewChance;                
+                dSCTotalChance += dNewChance;              
+                LogPrint("addrman","%s: Chance %8.7f, last seen: %ds, last tried: %ds\n",it->second.ToStringIPPort().c_str(),dNewChance,nNow-it->second.nTime,nNow-it->second.nLastTry);
+                
                 mapSCAlive.insert(make_pair(it->second.ToStringIPPort(),it->first));
             }
         }        

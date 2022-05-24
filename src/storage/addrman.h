@@ -175,7 +175,7 @@ public:
         nRandomPos = -1;
         fSCInvalid=false;
         fSCDead=false;
-        dSCChance=false;
+        dSCChance=0;
     }
 
     CAddrInfo(const CAddress &addrIn, const CNetAddr &addrSource) : CAddress(addrIn), source(addrSource)
@@ -193,6 +193,8 @@ public:
         fSCInvalid=invalid;
         dSCChance=GetChance(nNow,&fSCDead);
     }
+
+    void SCSetSelected(CAddress addr);
     
     double GetSC(bool *invalid,bool *dead,int64_t *last_attempt = NULL) const
     {
@@ -380,6 +382,7 @@ protected:
     bool SCSelect_(int nUnkBias,int nNodes, CAddress &addr);
     void SCRecalculate_(int64_t nNow);
     
+    void SCSetSelected_(CAddress addr);
     void SetSC_(bool invalid,int64_t nNow);
     
     
@@ -655,6 +658,16 @@ public:
             SetSC_(invalid,nNow);
             Check();
         }        
+    }
+    
+    void SCSetSelected(CAddress addr)
+    {
+        {
+            LOCK(cs);
+            Check();
+            SCSetSelected_(addr);
+            Check();
+        }                
     }
 
     void SCRecalculate(int64_t nNow)

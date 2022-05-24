@@ -303,8 +303,11 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
                             mcaddrinfo->ResetLastTry(true);
                             mcaddrinfo->SetFlag(MC_AMF_IGNORED,0);
                         }
-                        addrman.Add(pfrom->addrFromVersion, pfrom->addrFromVersion);
-                        addrman.Good(pfrom->addrFromVersion);
+                        if(pfrom->addrFromVersion.GetPort() != MC_DEFAULT_NETWORK_PORT)
+                        {                        
+                            addrman.Add(pfrom->addrFromVersion, pfrom->addrFromVersion);
+                            addrman.Good(pfrom->addrFromVersion);
+                        }
                     }
                 }
             }
