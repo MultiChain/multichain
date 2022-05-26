@@ -932,6 +932,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     if (GetBoolArg("-tor", false))
         return InitError(_("Error: Unsupported argument -tor found, use -onion."));
 
+    fAcceptOnlyRequestedTxs = ( GetArg("-msghandlerversion", 1) == 1 );
     OrphanHandlerVersion=GetArg("-orphanhandlerversion",1);
     InitialNetLogTime=GetArg("-initialnetlogtime",0);
     

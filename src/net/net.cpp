@@ -498,6 +498,11 @@ void CNode::CloseSocketDisconnect()
         if (lockDataRecv)
             vRecvDataMsg.clear();
     }
+    {
+        TRY_LOCK(cs_vRecvTxDataMsg, lockTxDataRecv);
+        if (lockTxDataRecv)
+            vRecvDataMsg.clear();
+    }
 }
 
 void CNode::PushVersion()
@@ -569,6 +574,46 @@ bool CNode::Ban(const CNetAddr &addr) {
     return true;
 }
 
+bool CNode::IsTxInFlight(uint256 txid)
+{
+    LOCK(cs_sTxsInFlight);
+    return ( sTxsInFlight.find(txid) != sTxsInFlight.end() );
+}
+
+void CNode::AddTxsInFlight(std::vector<uint256> txids)
+{
+    LOCK(cs_sTxsInFlight);
+    for(unsigned int i=0;i<txids.size();i++)
+    {
+        if( sTxsInFlight.find(txids[i]) == sTxsInFlight.end() )
+        {
+            sTxsInFlight.insert(txids[i]);
+        }
+    }
+}
+
+void CNode::RemoveTxsInFlight(std::vector<uint256> txids)
+{
+    LOCK(cs_sTxsInFlight);
+    for(unsigned int i=0;i<txids.size();i++)
+    {
+        set <uint256>::iterator it=sTxsInFlight.find(txids[i]);
+        if( it != sTxsInFlight.end() )
+        {
+            sTxsInFlight.erase(it);
+        }
+    }    
+}
+
+void CNode::RemoveTxInFlight(uint256 txid)
+{
+    LOCK(cs_sTxsInFlight);    
+    set <uint256>::iterator it=sTxsInFlight.find(txid);
+    if( it != sTxsInFlight.end() )
+    {
+        sTxsInFlight.erase(it);
+    }
+}
 
 std::vector<CSubNet> CNode::vWhitelistedRange;
 CCriticalSection CNode::cs_vWhitelistedRange;
@@ -767,6 +812,7 @@ int CNetMessage::readData(const char *pch, unsigned int nBytes)
 
     return nCopy;
 }
+
 
 
 
@@ -1552,6 +1598,10 @@ void ThreadOpenConnections()
                                 addrman.GetMCAddrMan()->SetOutcome(addr->GetNetAddress(),0,outcome);                            
                                 addrman.GetMCAddrMan()->SetOutcome(addr->GetNetAddress(),addr->GetMCAddress(),outcome);                            
                             }
+                            
+//                            addrman.SCSetSelected(addrConnect);                 
+//                            addrman.SetSC(false,GetAdjustedTime());
+                            
                             boost::this_thread::interruption_point();                
                             MilliSleep(sleep_time);
                         }
@@ -1993,24 +2043,166 @@ void ThreadDataMessageHandler()
             if (pnode->fDisconnect)
                 continue;
 
+            CNetMessage msg(SER_NETWORK, pnode->nRecvVersion);
+            bool fFound=false;
             // Receive messages
             {
-                TRY_LOCK(pnode->cs_vRecvDataMsg, lockRecv);
-                if (lockRecv)
+                LOCK(pnode->cs_vRecvDataMsg);
+                std::deque<CNetMessage>::iterator it = pnode->vRecvDataMsg.begin();
+                if (!pnode->fDisconnect && it != pnode->vRecvDataMsg.end())
                 {
-
-                    if (!g_signals.ProcessDataMessages(pnode))
+                    msg = *it;
+                    fFound=true;
+                }
+            }
+            if(fFound)
+            {
+                if(g_signals.ProcessDataMessage(pnode,msg))
+                {
+                    if (!pnode->fDisconnect)
                     {
-                        if(fDebug)LogPrint("net","socket closed because of error in message processing\n");
-                        pnode->CloseSocketDisconnect();
-                    }
-
-                    if (!pnode->vRecvDataMsg.empty())
-                    {
-                        fSleep = false;
+                        LOCK(pnode->cs_vRecvDataMsg);
+                        pnode->vRecvDataMsg.pop_front();
+                        if (!pnode->vRecvDataMsg.empty())
+                        {
+                            fSleep = false;
+                        }
                     }
                 }
             }
+            
+            boost::this_thread::interruption_point();
+
+            if (pnode->fDisconnect)
+                continue;
+        }
+
+        boost::this_thread::interruption_point();
+        
+        {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodesCopy)
+                pnode->Release();
+        }
+
+        boost::this_thread::interruption_point();
+        
+        if (fSleep)
+            MilliSleep(100);
+    }
+}
+
+void ThreadTxDataMessageHandler()
+{
+    SetThreadPriority(THREAD_PRIORITY_BELOW_NORMAL);
+    while (true)
+    {
+        boost::this_thread::interruption_point();
+        vector<CNode*> vNodesCopy;
+        {
+            LOCK(cs_vNodes);
+            vNodesCopy = vNodes;
+            BOOST_FOREACH(CNode* pnode, vNodesCopy) {
+                pnode->AddRef();
+            }
+        }
+
+        bool fSleep = true;
+
+        BOOST_FOREACH(CNode* pnode, vNodesCopy)
+        {
+            if (pnode->fDisconnect)
+                continue;
+
+            CNetMessage msg(SER_NETWORK, pnode->nRecvVersion);
+            bool fFound=false;
+            // Receive messages
+            {
+                LOCK(pnode->cs_vRecvTxDataMsg);
+                std::deque<CNetMessage>::iterator it = pnode->vRecvTxDataMsg.begin();
+                if (!pnode->fDisconnect && it != pnode->vRecvTxDataMsg.end())
+                {
+                    msg = *it;
+                    fFound=true;
+                }
+            }
+            if(fFound)
+            {
+                if(g_signals.ProcessDataMessage(pnode,msg))
+                {
+                    if (!pnode->fDisconnect)
+                    {
+                        LOCK(pnode->cs_vRecvTxDataMsg);
+                        pnode->vRecvTxDataMsg.pop_front();
+                        if (!pnode->vRecvTxDataMsg.empty())
+                        {
+                            fSleep = false;
+                        }
+                    }
+                }
+            }
+            
+            boost::this_thread::interruption_point();
+
+            if (pnode->fDisconnect)
+                continue;
+        }
+
+        boost::this_thread::interruption_point();
+        
+        {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodesCopy)
+                pnode->Release();
+        }
+
+        boost::this_thread::interruption_point();
+        
+        if (fSleep)
+            MilliSleep(100);
+    }
+}
+
+
+void ThreadGetDataMessageHandler()
+{
+    SetThreadPriority(THREAD_PRIORITY_BELOW_NORMAL);
+    while (true)
+    {
+        boost::this_thread::interruption_point();
+        vector<CNode*> vNodesCopy;
+        {
+            LOCK(cs_vNodes);
+            vNodesCopy = vNodes;
+            BOOST_FOREACH(CNode* pnode, vNodesCopy) {
+                pnode->AddRef();
+            }
+        }
+
+        bool fSleep = true;
+
+        BOOST_FOREACH(CNode* pnode, vNodesCopy)
+        {
+            if (pnode->fDisconnect)
+                continue;
+
+            {
+                LOCK(pnode->cs_vRecvGetData);
+                pnode->vRecvGetData.insert(pnode->vRecvGetData.end(), pnode->vRecvGetDataBuf.begin(), pnode->vRecvGetDataBuf.end());    
+                pnode->vRecvGetDataBuf.clear();
+            }
+                
+            if (!g_signals.ProcessGetData(pnode))
+            {
+                if(fDebug)LogPrint("net","socket closed because of error in message processing\n");
+                pnode->CloseSocketDisconnect();
+            }
+
+            if (!pnode->vRecvGetData.empty())
+            {
+                fSleep = false;
+            }
+        
             boost::this_thread::interruption_point();
 
             if (pnode->fDisconnect)
@@ -2230,9 +2422,17 @@ void StartNode(boost::thread_group& threadGroup)
     // Process messages
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "msghand", &ThreadMessageHandler));
 
-    // Process data messages
-    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "dmsghand", &ThreadDataMessageHandler));
+    if((GetArg("-msghandlerversion",1) == 1))
+    {    
+        // Process block data messages
+        threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "dmsghand", &ThreadDataMessageHandler));
 
+        // Process tx data messages
+        threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "tmsghand", &ThreadTxDataMessageHandler));
+        
+        // Process getdata messages
+        threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "gmsghand", &ThreadGetDataMessageHandler));
+    }
     // Dump network addresses
     threadGroup.create_thread(boost::bind(&LoopForever<void (*)()>, "dumpaddr", &DumpAddresses, DUMP_ADDRESSES_INTERVAL * 1000));
 }

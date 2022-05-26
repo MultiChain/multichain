@@ -101,6 +101,7 @@ bool fImporting = false;
 bool fReindex = false;
 bool fRescan = false;
 bool fTxIndex = false;
+bool fAcceptOnlyRequestedTxs = false;
 bool fIsBareMultisigStd = true;
 unsigned int nCoinCacheSize = 5000;
 int GenesisBlockSize=0;
@@ -928,7 +929,8 @@ void RegisterNodeSignals(CNodeSignals& nodeSignals)
 {
     nodeSignals.GetHeight.connect(&GetHeight);
     nodeSignals.ProcessMessages.connect(&ProcessMessages);
-    nodeSignals.ProcessDataMessages.connect(&ProcessDataMessages);
+    nodeSignals.ProcessDataMessage.connect(&ProcessDataMessage);
+    nodeSignals.ProcessGetData.connect(&ProcessGetData);
     nodeSignals.SendMessages.connect(&SendMessages);
     nodeSignals.InitializeNode.connect(&InitializeNode);
     nodeSignals.FinalizeNode.connect(&FinalizeNode);
@@ -938,7 +940,8 @@ void UnregisterNodeSignals(CNodeSignals& nodeSignals)
 {
     nodeSignals.GetHeight.disconnect(&GetHeight);
     nodeSignals.ProcessMessages.disconnect(&ProcessMessages);
-    nodeSignals.ProcessDataMessages.disconnect(&ProcessDataMessages);
+    nodeSignals.ProcessDataMessage.disconnect(&ProcessDataMessage);
+    nodeSignals.ProcessGetData.disconnect(&ProcessGetData);
     nodeSignals.SendMessages.disconnect(&SendMessages);
     nodeSignals.InitializeNode.disconnect(&InitializeNode);
     nodeSignals.FinalizeNode.disconnect(&FinalizeNode);
@@ -3294,7 +3297,20 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
             LogPrintf("ConnectTip() : ConnectBlock %s failed, Wtxs CleanUpAfterBlock, error: %d", pindexNew->GetBlockHash().ToString(),err);
         }    
     }
-
+    
+    vector<uint256> vBlockTxs;
+    BOOST_FOREACH(const CTransaction &tx, pblock->vtx) {
+        vBlockTxs.push_back(tx.GetHash());
+    }    
+    
+    {
+        LOCK(cs_vNodes);
+        BOOST_FOREACH(CNode* pnode, vNodes)
+        {
+            pnode->RemoveTxsInFlight(vBlockTxs);
+        }        
+    }
+            
 /* MCHN END */    
     // Update chainActive & related variables.
     UpdateTip(pindexNew);
@@ -5976,7 +5992,7 @@ bool static AlreadyHave(const CInv& inv)
 }
 
 
-void static ProcessGetData(CNode* pfrom)
+bool ProcessGetData(CNode* pfrom)
 {
     std::deque<CInv>::iterator it = pfrom->vRecvGetData.begin();
 
@@ -5984,7 +6000,7 @@ void static ProcessGetData(CNode* pfrom)
     if(!MultichainNode_RespondToGetData(pfrom)) 
     {
         pfrom->vRecvGetData.erase(pfrom->vRecvGetData.begin(), pfrom->vRecvGetData.end());        
-        return;
+        return true;
     }
 /* MCHN END */    
     
@@ -6129,6 +6145,8 @@ void static ProcessGetData(CNode* pfrom)
         // having to download the entire memory pool.
         pfrom->PushMessage("notfound", vNotFound);
     }
+    
+    return true;
 }
 
 
@@ -6560,6 +6578,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         LOCK(cs_main);
 
         std::vector<CInv> vToFetch;
+        std::vector<uint256> vTxsToFetch;
 
         for (unsigned int nInv = 0; nInv < vInv.size(); nInv++)
         {
@@ -6572,8 +6591,14 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             if(fDebug)LogPrint("net", "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHave ? "have" : "new", pfrom->id);
 
             if (!fAlreadyHave && !fImporting && !fReindex && inv.type != MSG_BLOCK)
+            {
                 pfrom->AskFor(inv);
-
+                if(inv.type == MSG_TX)
+                {
+                    vTxsToFetch.push_back(inv.hash);
+                }
+            }
+            
             if (inv.type == MSG_BLOCK) {
                 if (!fAlreadyHave)
                 {
@@ -6622,6 +6647,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         if (!vToFetch.empty() && !MultichainNode_IgnoreIncoming(pfrom))      // MCHN
             pfrom->PushMessage("getdata", vToFetch);
+        
+        pfrom->AddTxsInFlight(vTxsToFetch);
     }
 
 
@@ -6641,8 +6668,16 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         if ((fDebug && vInv.size() > 0) || (vInv.size() == 1))
             if(fDebug)LogPrint("net", "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
 
-        pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
-        ProcessGetData(pfrom);
+        if((GetArg("-msghandlerversion",1) != 1))
+        {        
+            pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
+            ProcessGetData(pfrom);
+        }
+        else
+        {
+            LOCK(pfrom->cs_vRecvGetData);
+            pfrom->vRecvGetDataBuf.insert(pfrom->vRecvGetDataBuf.end(), vInv.begin(), vInv.end());            
+        }
     }
 
 
@@ -6743,9 +6778,12 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         CInv inv(MSG_TX, tx.GetHash());
         pfrom->AddInventoryKnown(inv);
-
+                    
         LOCK(cs_main);
 
+        if( !fAcceptOnlyRequestedTxs  || pfrom->IsTxInFlight(inv.hash) )
+        {
+            
         double start_time=mc_TimeNowAsDouble();
         
         bool fMissingInputs = false;
@@ -6907,8 +6945,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         {
             sdTxLockTime[siPos]+=end_time-start_time;
         }
-/* MCHN START */            
+        
+        pfrom->RemoveTxInFlight(inv.hash);
         }
+/* MCHN START */            
+        }        
 /* MCHN END */            
     }
 
@@ -7346,6 +7387,51 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     return true;
 }
 
+bool SplitInvMessage(CNode* pfrom, CNetMessage&  InvMessage)
+{    
+    CMessageHeader hdr("inv", 0);
+    
+    vector <CInv> vInv; 
+    InvMessage.vRecv >> vInv;
+    
+    vector <CInv> vInvTxs; 
+    vector <CInv> vInvBlocks; 
+    for (unsigned int nInv = 0; nInv < vInv.size(); nInv++)
+    {
+        const CInv &inv = vInv[nInv];
+        if(inv.type == MSG_TX)
+        {
+            vInvTxs.push_back(inv);
+        }
+        else
+        {
+            vInvBlocks.push_back(inv);
+        }
+    }
+     
+    if(vInvTxs.size())
+    {
+        CNetMessage msg(SER_NETWORK, PROTOCOL_VERSION);
+        msg.readHeader((const char*)&hdr,sizeof(CMessageHeader));
+        msg.vRecv << vInvTxs;
+        
+        LOCK(pfrom->cs_vRecvTxDataMsg);
+        pfrom->vRecvTxDataMsg.push_back(msg);        
+    }
+    
+    if(vInvBlocks.size())
+    {
+        CNetMessage msg(SER_NETWORK, PROTOCOL_VERSION);
+        msg.readHeader((const char*)&hdr,sizeof(CMessageHeader));
+        msg.vRecv << vInvBlocks;
+        
+        LOCK(pfrom->cs_vRecvDataMsg);
+        pfrom->vRecvDataMsg.push_back(msg);        
+    }
+    
+    return true;
+}
+
 // requires LOCK(cs_vRecvMsg)
 bool ProcessMessages(CNode* pfrom)
 {
@@ -7362,11 +7448,14 @@ bool ProcessMessages(CNode* pfrom)
     //
     bool fOk = true;
 
-    if (!pfrom->vRecvGetData.empty())
-        ProcessGetData(pfrom);
+    if((GetArg("-msghandlerversion",1) != 1))
+    {
+        if (!pfrom->vRecvGetData.empty())
+            ProcessGetData(pfrom);
 
-    // this maintains the order of responses
-    if (!pfrom->vRecvGetData.empty()) return fOk;
+        // this maintains the order of responses
+        if (!pfrom->vRecvGetData.empty()) return fOk;
+    }
 
 /* MCHN START */    
     {        
@@ -7531,9 +7620,24 @@ bool ProcessMessages(CNode* pfrom)
             {
                 if(fProcessInDataThread)
                 {
-                    LOCK(pfrom->cs_vRecvDataMsg);
-                    pfrom->vRecvDataMsg.push_back(msg);
-                    fRet=true;
+                    if(strCommand != "inv")
+                    {
+                        if(strCommand == "tx")
+                        {
+                            LOCK(pfrom->cs_vRecvTxDataMsg);
+                            pfrom->vRecvTxDataMsg.push_back(msg);
+                        }
+                        else
+                        {
+                            LOCK(pfrom->cs_vRecvDataMsg);
+                            pfrom->vRecvDataMsg.push_back(msg);
+                        }
+                    }
+                    else
+                    {
+                        SplitInvMessage(pfrom, msg);
+                    }
+                    fRet=true;                            
                 }
                 else
                 {
@@ -7585,144 +7689,102 @@ bool ProcessMessages(CNode* pfrom)
     return fOk;
 }
 
-// requires LOCK(cs_vRecvDataMsg)
-bool ProcessDataMessages(CNode* pfrom)
+bool ProcessDataMessage(CNode* pfrom,CNetMessage& msg)
 {
-    bool fOk = true;
+    if(!msg.complete())
+    {
+        return false;
+    }
 
+    
+    if(msg.hdr.GetCommand() == "block")
+    {
+        if(fDebug)LogPrint("mcblockperf","mchn-block-perf: New block, peer=%d\n", pfrom->id);
+    }                
         
-/* MCHN END */    
-
-    std::deque<CNetMessage>::iterator it = pfrom->vRecvDataMsg.begin();
-    while (!pfrom->fDisconnect && it != pfrom->vRecvDataMsg.end()) {
-        // Don't bother if send buffer is too full to respond anyway
-        CNetMessage& msg1 = *it;
-        if(msg1.complete())
-        {
-            if(msg1.hdr.GetCommand() == "block")
-            {
-                if(fDebug)LogPrint("mcblockperf","mchn-block-perf: New block, peer=%d\n", pfrom->id);
-            }                
-        }
-        
-        if (pfrom->nSendSize >= SendBufferSize())
-        {
-            LogPrintf("mchn: Send buffer full on processdatamessages (%ld bytes), msg %s for peer %d\n", msg1.hdr.GetCommand().c_str(),pfrom->nSendSize, pfrom->id);            
-            
-            CNetMessage& msg1 = *it;
-            if(msg1.complete())
-            {
-                if(msg1.hdr.GetCommand() == "block")
-                {
-                    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Processing block, though send buffer is full (%d), peer=%d\n", (int)pfrom->nSendSize,pfrom->id);
-                }                
-                else
-                {
-                    break;
-                }
-            }
-            else
-            {
-                break;
-            }
-        }
-        
-        
-        // get next message
-        CNetMessage& msg = *it;
-        
-        if(msg.hdr.GetCommand() == "inv")
-        {
-            if(pfrom->mapAskFor.size() >= MAX_INV_SZ)
-            {                
-                break;
-            }
-        }
+    if (pfrom->nSendSize >= SendBufferSize())
+    {
+        LogPrintf("mchn: Send buffer full on processdatamessage (%ld bytes), msg %s for peer %d\n", msg.hdr.GetCommand().c_str(),pfrom->nSendSize, pfrom->id);            
 
         if(msg.hdr.GetCommand() == "block")
         {
-            if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Processing new block, peer=%d\n",pfrom->id);
+            if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Processing block, though send buffer is full (%d), peer=%d\n", (int)pfrom->nSendSize,pfrom->id);
+        }                
+        else
+        {
+            return false;
         }
-        // at this point, any failure means we can delete the current message
-        it++;
+    }
+                
+    if(msg.hdr.GetCommand() == "inv")
+    {
+        if(pfrom->mapAskFor.size() >= MAX_INV_SZ)
+        {                
+            return false;
+        }
+    }
 
-
+    if(msg.hdr.GetCommand() == "block")
+    {
+        if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Processing new block, peer=%d\n",pfrom->id);
+    }
         // Read header
-        CMessageHeader& hdr = msg.hdr;
-        string strCommand = hdr.GetCommand();
+    CMessageHeader& hdr = msg.hdr;
+    string strCommand = hdr.GetCommand();
 
-        if(fDebug)LogPrint("mchnminor","mchn: DRCV: %s, peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
-        if(InitialNetLogTime)if(GetTime()-pfrom->nTimeConnected<InitialNetLogTime)LogPrintf("mchn-inl: DRCV: %s, peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
-        
-        // Message size
-        unsigned int nMessageSize = hdr.nMessageSize;
+    if(fDebug)LogPrint("mchnminor","mchn: DRCV: %s, peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
+    if(InitialNetLogTime)if(GetTime()-pfrom->nTimeConnected<InitialNetLogTime)LogPrintf("mchn-inl: DRCV: %s, peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
 
-        CDataStream& vRecv = msg.vRecv;
+    // Message size
+    unsigned int nMessageSize = hdr.nMessageSize;
 
-        // Process message
-        bool fRet = false;
-        try
-        {
-            if(pfrom->fDisconnect || !MultichainNode_DisconnectRemote(pfrom))
-            {
-                fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime);
-            }
-            boost::this_thread::interruption_point();
-        }
-        catch (std::ios_base::failure& e)
-        {
-            pfrom->PushMessage("reject", strCommand, REJECT_MALFORMED, string("error parsing message"));
-            if (strstr(e.what(), "end of data"))
-            {
-                // Allow exceptions from under-length message on vRecv
-                LogPrintf("ProcessDataMessages(%s, %u bytes) : Exception '%s' caught, normally caused by a message being shorter than its stated length\n", SanitizeString(strCommand), nMessageSize, e.what());
-            }
-            else if (strstr(e.what(), "size too large"))
-            {
-                // Allow exceptions from over-long size
-                LogPrintf("ProcessDataMessages(%s, %u bytes) : Exception '%s' caught\n", SanitizeString(strCommand), nMessageSize, e.what());
-            }
-            else
-            {
-                PrintExceptionContinue(&e, "ProcessDataMessages()");
-            }
-        }
-        catch (boost::thread_interrupted) {
-            throw;
-        }
-        catch (std::exception& e) {
-            PrintExceptionContinue(&e, "ProcessDataMessages()");
-        } catch (...) {
-            PrintExceptionContinue(NULL, "ProcessDataMessages()");
-        }
+    CDataStream& vRecv = msg.vRecv;
 
-        if (!fRet)
-            LogPrintf("ProcessDataMessage(%s, %u bytes) FAILED peer=%d\n", SanitizeString(strCommand), nMessageSize, pfrom->id);
-
-        if(OrphanHandlerVersion != 1)
-        {
-            break;
-        }
-    }
-    
-    // In case the connection got shut down, its receive buffer was wiped
-    if(it != pfrom->vRecvDataMsg.begin())
+    // Process message
+    bool fRet = false;
+    try
     {
-        if (!pfrom->fDisconnect)
-            pfrom->vRecvDataMsg.erase(pfrom->vRecvDataMsg.begin(), it);
-    }
-    else
-    {
-        if (!pfrom->vRecvDataMsg.empty())        
+        if(pfrom->fDisconnect || !MultichainNode_DisconnectRemote(pfrom))
         {
-            if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Too many data messages from node %d, waiting\n",pfrom->id);              
-            MilliSleep(100);
+            fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime);
+        }
+        boost::this_thread::interruption_point();
+    }
+    catch (std::ios_base::failure& e)
+    {
+        pfrom->PushMessage("reject", strCommand, REJECT_MALFORMED, string("error parsing message"));
+        if (strstr(e.what(), "end of data"))
+        {
+            // Allow exceptions from under-length message on vRecv
+            LogPrintf("ProcessDataMessage(%s, %u bytes) : Exception '%s' caught, normally caused by a message being shorter than its stated length\n", SanitizeString(strCommand), nMessageSize, e.what());
+        }
+        else if (strstr(e.what(), "size too large"))
+        {
+            // Allow exceptions from over-long size
+            LogPrintf("ProcessDataMessage(%s, %u bytes) : Exception '%s' caught\n", SanitizeString(strCommand), nMessageSize, e.what());
+        }
+        else
+        {
+            PrintExceptionContinue(&e, "ProcessDataMessage()");
         }
     }
-    
-    return fOk;
+    catch (boost::thread_interrupted) {
+        throw;
+    }
+    catch (std::exception& e) {
+        PrintExceptionContinue(&e, "ProcessDataMessage()");
+    } catch (...) {
+        PrintExceptionContinue(NULL, "ProcessDataMessage()");
+    }
+
+    if (!fRet)
+    {
+        LogPrintf("ProcessDataMessage(%s, %u bytes) FAILED peer=%d\n", SanitizeString(strCommand), nMessageSize, pfrom->id);
+        pfrom->fDisconnect=true;
+    }
+
+    return true;
 }
-
 
 bool SendMessages(CNode* pto, bool fSendTrickle)
 {
@@ -7885,13 +7947,20 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             int i=0;
             int hash_stop_pos=(int)pto->vInventoryToSend.size();
             
+            uint256 mempool_hash_stop=0;
+            
+            {
+                LOCK(mempool.cs);
+                mempool_hash_stop=mempool.hashSendStop;
+            }
+            
             if(OrphanHandlerVersion == 1)
             {
-                if(mempool.hashSendStop != 0)
+                if(mempool_hash_stop != 0)
                 {
                     while(i<(int)pto->vInventoryToSend.size())
                     {
-                        if(pto->vInventoryToSend[i].hash == mempool.hashSendStop)
+                        if(pto->vInventoryToSend[i].hash == mempool_hash_stop)
                         {
                             hash_stop_pos=i;
                             i=pto->vInventoryToSend.size();

@@ -84,19 +84,6 @@ int mc_QuerySeed(boost::thread_group& threadGroup,const char *seedAddr);
 
 typedef int NodeId;
 
-// Signals for message handling
-struct CNodeSignals
-{
-    boost::signals2::signal<int ()> GetHeight;
-    boost::signals2::signal<bool (CNode*)> ProcessMessages;
-    boost::signals2::signal<bool (CNode*)> ProcessDataMessages;
-    boost::signals2::signal<bool (CNode*, bool)> SendMessages;
-    boost::signals2::signal<void (NodeId, const CNode*)> InitializeNode;
-    boost::signals2::signal<void (NodeId)> FinalizeNode;
-};
-
-
-CNodeSignals& GetNodeSignals();
 
 
 enum
@@ -228,6 +215,20 @@ public:
 };
 
 
+// Signals for message handling
+struct CNodeSignals
+{
+    boost::signals2::signal<int ()> GetHeight;
+    boost::signals2::signal<bool (CNode*)> ProcessMessages;
+    boost::signals2::signal<bool (CNode*,CNetMessage&)> ProcessDataMessage;
+    boost::signals2::signal<bool (CNode*)> ProcessGetData;
+    boost::signals2::signal<bool (CNode*, bool)> SendMessages;
+    boost::signals2::signal<void (NodeId, const CNode*)> InitializeNode;
+    boost::signals2::signal<void (NodeId)> FinalizeNode;
+};
+
+
+CNodeSignals& GetNodeSignals();
 
 
 
@@ -245,11 +246,18 @@ public:
     std::deque<CSerializeData> vSendMsg;
     CCriticalSection cs_vSend;
 
+    std::deque<CInv> vRecvGetDataBuf;
     std::deque<CInv> vRecvGetData;
+    CCriticalSection cs_vRecvGetData;
     std::deque<CNetMessage> vRecvMsg;
     CCriticalSection cs_vRecvMsg;
     std::deque<CNetMessage> vRecvDataMsg;
     CCriticalSection cs_vRecvDataMsg;
+    std::deque<CNetMessage> vRecvTxDataMsg;
+    CCriticalSection cs_vRecvTxDataMsg;
+    std::set<uint256> sTxsInFlight;
+    CCriticalSection cs_sTxsInFlight;
+    
     uint64_t nRecvBytes;
     int nRecvVersion;
 
@@ -673,6 +681,11 @@ public:
     void CloseSocketDisconnect();
     
     bool DelayedSend();
+    
+    bool IsTxInFlight(uint256 txid);
+    void AddTxsInFlight(std::vector<uint256> txids);
+    void RemoveTxsInFlight(std::vector<uint256> txids);
+    void RemoveTxInFlight(uint256 txid);
 
     // Denial-of-service detection/prevention
     // The idea is to detect peers that are behaving
