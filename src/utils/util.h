@@ -41,6 +41,7 @@ extern bool fLogIPs;
 extern bool fLogTimeMillis;
 extern bool fInRecovery;
 extern volatile bool fReopenDebugLog;
+extern uint64_t nLockPrintThread;
 
 void SetupEnvironment();
 

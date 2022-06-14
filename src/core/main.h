@@ -148,6 +148,7 @@ extern int nScriptCheckThreads;
 extern bool fTxIndex;
 extern bool fAcceptOnlyRequestedTxs;
 extern bool fIsBareMultisigStd;
+extern uint32_t nMessageHandlerThreads;
 extern unsigned int nCoinCacheSize;
 extern CFeeRate minRelayTxFee;
 
@@ -163,6 +164,17 @@ static const uint64_t nMinDiskSpace = 52428800;
 #define MC_AMT_DEFAULT                                     0x00000000 
 #define MC_AMT_NO_ACCEPT                                   0x00000001
 #define MC_AMT_NO_FILTERS                                  0x00000002
+
+
+// Message handler threads
+
+#define MC_MHT_NONE                                        0x00000000 
+#define MC_MHT_GETDATA                                     0x00000001
+#define MC_MHT_PROCESSDATA                                 0x00000002
+#define MC_MHT_PROCESSTXDATA                               0x00000004
+#define MC_MHT_DEFAULT                                     0x00000007 
+
+
 
 
 bool AcceptMultiChainTransaction(const CTransaction& tx, 

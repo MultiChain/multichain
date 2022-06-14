@@ -312,7 +312,8 @@ public:
     CKeyID kAddrLocal;
     int64_t nLastKBPerDestinationChangeTimestamp;
     int nMaxKBPerDestination;
-
+    size_t nTotalBuffersSize;
+    int64_t nNextSizeCalcTimestamp;
     CAddress addrFromVersion;
     
     void *pEntData;
@@ -350,6 +351,7 @@ public:
     std::vector<CInv> vInventoryToSend;
     CCriticalSection cs_inventory;
     std::multimap<int64_t, CInv> mapAskFor;
+    CCriticalSection cs_askfor;
 
     // Ping time measurement:
     // The pong reply we're expecting, or 0 if no pong expected.
@@ -686,6 +688,7 @@ public:
     void AddTxsInFlight(std::vector<uint256> txids);
     void RemoveTxsInFlight(std::vector<uint256> txids);
     void RemoveTxInFlight(uint256 txid);
+    size_t TotalBuffersSize();
 
     // Denial-of-service detection/prevention
     // The idea is to detect peers that are behaving

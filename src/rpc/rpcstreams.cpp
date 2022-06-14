@@ -1150,7 +1150,7 @@ Value publishfrom(const Array& params, bool fHelp)
     LOCK (pwalletMain->cs_wallet_send);
     
     SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn,fromaddresses);
-
+    
     return wtx.GetHash().GetHex();    
 }
 

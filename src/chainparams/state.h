@@ -44,10 +44,10 @@
 #define MC_WMD_EXPLORER1             0x00000004
 #define MC_WMD_EXPLORER2             0x00000008
 #define MC_WMD_EXPLORER_MASK         0x0000000C
-#define MC_WMD_EXPLORER2             0x00000008
 #define MC_WMD_FLAT_DAT_FILE         0x00000100
 #define MC_WMD_MAP_TXS               0x00010000
-#define MC_WMD_MODE_MASK             0x00FFFFFF
+#define MC_WMD_MODE_MASK             0x000FFFFF
+#define MC_WMD_LOG_TXS               0x00100000
 #define MC_WMD_DEBUG                 0x01000000
 #define MC_WMD_AUTOSUBSCRIBE_STREAMS 0x02000000
 #define MC_WMD_AUTOSUBSCRIBE_ASSETS  0x04000000

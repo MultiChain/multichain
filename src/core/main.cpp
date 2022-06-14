@@ -57,6 +57,7 @@ bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs,
 bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& reason);
 bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string& reason);
 bool ReplayMemPool(CTxMemPool& pool, int from,bool accept);
+int64_t TotalMempoolsSize();
 bool VerifyBlockSignatureType(CBlock *block);
 bool VerifyBlockSignature(CBlock *block,bool force);
 bool VerifyBlockMiner(CBlock *block,CBlockIndex* pindexNew);
@@ -106,7 +107,10 @@ bool fIsBareMultisigStd = true;
 unsigned int nCoinCacheSize = 5000;
 int GenesisBlockSize=0;
 int nLastForkedHeight=0;
+int64_t nTotalMempoolsSize=0;
+int64_t nTotalNodeBuffersSize=0;
 uint256 GenesisCoinBaseTxID=0;
+uint32_t nMessageHandlerThreads=MC_MHT_DEFAULT;
 CTransaction GenesisCoinBaseTx;
 
 vector<CBlockIndex*> vFirstOnThisHeight;
@@ -592,7 +596,7 @@ bool PushMempoolToInv(CNode *pnode)
             return false;
     }    
     
-    LOCK2(mempool.cs,pnode->cs_inventory);    
+    LOCK2(pnode->cs_inventory,mempool.cs);    
     
     int push_count=0;
     std::vector<uint256> vtxid;
@@ -1077,7 +1081,8 @@ unsigned int CheckOrphanPeers()
     }            
     if(peertoerase > 0)
     {
-        if(0.000001*(GetTimeMicros()-mintime) > GetArg("-orphanmaxtxage",DEFAULT_MAX_ORPHAN_TX_AGE))
+//        if(0.000001*(GetTimeMicros()-mintime) > GetArg("-orphanmaxtxage",DEFAULT_MAX_ORPHAN_TX_AGE))
+        if(0.000001*(GetTimeMicros()-mintime) > GetArg("-orphanmaxtxage",2 * Params().TargetSpacing()))
         {
             nEvicted=EraseOrphansFor(peertoerase);
 
@@ -5255,6 +5260,22 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
             pEF->NET_CheckConnections();
         }
     }
+
+    nTotalMempoolsSize=TotalMempoolsSize();        
+
+    int node_count=0;
+    nTotalNodeBuffersSize=0;
+    {
+        LOCK(cs_vNodes);
+        BOOST_FOREACH(CNode* pnode, vNodes)
+        {
+            nTotalNodeBuffersSize+=pnode->nTotalBuffersSize;
+            node_count++;
+        }
+    }   
+
+    LogPrint("mcblockperf","mchn-block-perf: Network buffers size: %6dMB (%2d nodes)\n",nTotalNodeBuffersSize/1048576,node_count);            
+    
 /* MCHN START */    
 /*
     CBlockIndex* pblockindex = mapBlockIndex[pblock->GetHash()];
@@ -6012,7 +6033,7 @@ bool ProcessGetData(CNode* pfrom)
         // Don't bother if send buffer is too full to respond anyway
         if (pfrom->nSendSize >= SendBufferSize())
         {
-            LogPrintf("mchn: Send buffer full on getdata (%ld bytes) for peer %d\n", pfrom->nSendSize, pfrom->id);            
+            if(fDebug)LogPrint("mcminor","mchn: Send buffer full on getdata (%ld bytes) for peer %d\n", pfrom->nSendSize, pfrom->id);            
             break;
         }
 
@@ -6574,7 +6595,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             Misbehaving(pfrom->GetId(), 20);
             return error("message inv size() = %u", vInv.size());
         }
-
+        
         LOCK(cs_main);
 
         std::vector<CInv> vToFetch;
@@ -6668,15 +6689,15 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         if ((fDebug && vInv.size() > 0) || (vInv.size() == 1))
             if(fDebug)LogPrint("net", "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
 
-        if((GetArg("-msghandlerversion",1) != 1))
-        {        
-            pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
-            ProcessGetData(pfrom);
-        }
-        else
+        if( nMessageHandlerThreads & MC_MHT_GETDATA )
         {
             LOCK(pfrom->cs_vRecvGetData);
             pfrom->vRecvGetDataBuf.insert(pfrom->vRecvGetDataBuf.end(), vInv.begin(), vInv.end());            
+        }
+        else
+        {        
+            pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
+            ProcessGetData(pfrom);
         }
     }
 
@@ -6946,8 +6967,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             sdTxLockTime[siPos]+=end_time-start_time;
         }
         
-        pfrom->RemoveTxInFlight(inv.hash);
         }
+        pfrom->RemoveTxInFlight(inv.hash);
 /* MCHN START */            
         }        
 /* MCHN END */            
@@ -7448,7 +7469,7 @@ bool ProcessMessages(CNode* pfrom)
     //
     bool fOk = true;
 
-    if((GetArg("-msghandlerversion",1) != 1))
+    if((nMessageHandlerThreads & MC_MHT_GETDATA) == 0)
     {
         if (!pfrom->vRecvGetData.empty())
             ProcessGetData(pfrom);
@@ -7485,7 +7506,8 @@ bool ProcessMessages(CNode* pfrom)
     std::deque<CNetMessage>::iterator it = pfrom->vRecvMsg.begin();
     while (!pfrom->fDisconnect && it != pfrom->vRecvMsg.end()) {
         // Don't bother if send buffer is too full to respond anyway
-        bool fProcessInDataThread=(GetArg("-msghandlerversion",1) == 1);
+        int32_t fProcessInDataThread=nMessageHandlerThreads & MC_MHT_PROCESSDATA;
+        int32_t fProcessTxInSeparateDataThread=nMessageHandlerThreads & MC_MHT_PROCESSTXDATA;
         CNetMessage& msg1 = *it;
         if(msg1.complete())
         {
@@ -7497,7 +7519,7 @@ bool ProcessMessages(CNode* pfrom)
         
         if (pfrom->nSendSize >= SendBufferSize())
         {
-            LogPrintf("mchn: Send buffer full on processmessages (%ld bytes) for peer %d\n", pfrom->nSendSize, pfrom->id);            
+            if(fDebug)LogPrint("mcminor","mchn: Send buffer full on processmessages (%ld bytes) for peer %d\n", pfrom->nSendSize, pfrom->id);            
             
             CNetMessage& msg1 = *it;
             if(msg1.complete())
@@ -7620,22 +7642,30 @@ bool ProcessMessages(CNode* pfrom)
             {
                 if(fProcessInDataThread)
                 {
-                    if(strCommand != "inv")
+                    if(fProcessTxInSeparateDataThread)
                     {
-                        if(strCommand == "tx")
+                        if(strCommand != "inv")
                         {
-                            LOCK(pfrom->cs_vRecvTxDataMsg);
-                            pfrom->vRecvTxDataMsg.push_back(msg);
+                            if(strCommand == "tx")
+                            {
+                                LOCK(pfrom->cs_vRecvTxDataMsg);
+                                pfrom->vRecvTxDataMsg.push_back(msg);
+                            }
+                            else
+                            {
+                                LOCK(pfrom->cs_vRecvDataMsg);
+                                pfrom->vRecvDataMsg.push_back(msg);
+                            }
                         }
                         else
                         {
-                            LOCK(pfrom->cs_vRecvDataMsg);
-                            pfrom->vRecvDataMsg.push_back(msg);
+                            SplitInvMessage(pfrom, msg);
                         }
                     }
                     else
                     {
-                        SplitInvMessage(pfrom, msg);
+                        LOCK(pfrom->cs_vRecvDataMsg);
+                        pfrom->vRecvDataMsg.push_back(msg);                        
                     }
                     fRet=true;                            
                 }
@@ -7704,7 +7734,7 @@ bool ProcessDataMessage(CNode* pfrom,CNetMessage& msg)
         
     if (pfrom->nSendSize >= SendBufferSize())
     {
-        LogPrintf("mchn: Send buffer full on processdatamessage (%ld bytes), msg %s for peer %d\n", msg.hdr.GetCommand().c_str(),pfrom->nSendSize, pfrom->id);            
+        if(fDebug)LogPrint("mcminor","mchn: Send buffer full on processdatamessage (%ld bytes), msg %s for peer %d\n", msg.hdr.GetCommand().c_str(),pfrom->nSendSize, pfrom->id);            
 
         if(msg.hdr.GetCommand() == "block")
         {
@@ -7974,9 +8004,9 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             while(i<(int)pto->vInventoryToSend.size())
             {
                 CInv inv=pto->vInventoryToSend[i];
-                if (pto->setInventoryKnown.count(inv) == 0)
+                if( (i<hash_stop_pos) || (inv.type != MSG_TX) )
                 {
-                    if( (i<hash_stop_pos) || (inv.type != MSG_TX) )
+                    if (pto->setInventoryKnown.count(inv) == 0)
                     {
                         if (pto->setInventoryKnown.insert(inv).second)
                         {
@@ -7988,13 +8018,14 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                                     pto->PushMessage("inv", vInv);
                                 vInv.clear();
                             }
-                        }                        
+                        }    
                     }
-                    else
-                    {
-                        vInvWait.push_back(inv);                        
-                    }
+                }                
+                else
+                {
+                    vInvWait.push_back(inv);                        
                 }
+                
                 i++;
             } 
             pto->vInventoryToSend = vInvWait;                
@@ -8040,7 +8071,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         if (!vInv.empty())
             if(MultichainNode_SendInv(pto))                                     // MCNN
                 pto->PushMessage("inv", vInv);
-        if( (sent_count > 1000) || ( (sent_count > 0) && (pto->vInventoryToSend.size() > 0) ) )
+        if( (sent_count > 30000) || ( (sent_count > 0) && (pto->vInventoryToSend.size() > 0) ) )
         {
             LogPrint("mcblockperf","mchn-block-perf: Sent %d inv records to node %d, %d waiting\n",
                     sent_count,pto->id,(int)pto->vInventoryToSend.size());                    
@@ -8067,6 +8098,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                 BOOST_FOREACH(const QueuedBlock& entry, state.vBlocksInFlight)
                     mapBlocksInFlight.erase(entry.hash);
                 
+                LOCK(pto->cs_askfor);
                 state.vBlocksInFlight.clear();//.front().nTime=nNow;
                 vector <CInv> currentAskFor;
                 while (!pto->mapAskFor.empty())
@@ -8194,6 +8226,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
 /* MCHN START */        
         if(!ignore_incoming)
         {
+            LOCK(pto->cs_askfor);
 /* MCHN END */        
         while (!pto->fDisconnect && !pto->mapAskFor.empty() && (*pto->mapAskFor.begin()).first <= nNow)
         {

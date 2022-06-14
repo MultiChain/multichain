@@ -932,7 +932,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     if (GetBoolArg("-tor", false))
         return InitError(_("Error: Unsupported argument -tor found, use -onion."));
 
-    fAcceptOnlyRequestedTxs = ( GetArg("-msghandlerversion", 1) == 1 );
+    nMessageHandlerThreads=GetArg("-msghandlerversion",MC_MHT_DEFAULT);
+    fAcceptOnlyRequestedTxs = ( nMessageHandlerThreads > 0 );
     OrphanHandlerVersion=GetArg("-orphanhandlerversion",1);
     InitialNetLogTime=GetArg("-initialnetlogtime",0);
     
@@ -2010,6 +2011,11 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     mc_gState->m_WalletMode |= MC_WMD_EXPLORER2;
                 }
 
+                if(GetBoolArg("-logcommittx",true))
+                {
+                    mc_gState->m_WalletMode |= MC_WMD_LOG_TXS;                    
+                }
+                
                 if(pwalletTxsMain->Initialize(mc_gState->m_NetworkParams->Name(),mc_gState->m_WalletMode))
                 {
                     return InitError("Wallet tx database corrupted. Please restart multichaind with -rescan\n");                        

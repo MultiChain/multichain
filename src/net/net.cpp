@@ -507,8 +507,8 @@ void CNode::CloseSocketDisconnect()
 
 void CNode::PushVersion()
 {
-    int nBestHeight = g_signals.GetHeight().get_value_or(0);
-
+//    int nBestHeight = g_signals.GetHeight().get_value_or(0);
+    int nBestHeight=chainActive.Height();
     /// when NTP implemented, change to just nTime = GetAdjustedTime()
     int64_t nTime = (fInbound ? GetAdjustedTime() : GetTime());
     CAddress addrYou = (addr.IsRoutable() && !IsProxy(addr) ? addr : CAddress(CService("0.0.0.0",0)));
@@ -577,7 +577,12 @@ bool CNode::Ban(const CNetAddr &addr) {
 bool CNode::IsTxInFlight(uint256 txid)
 {
     LOCK(cs_sTxsInFlight);
-    return ( sTxsInFlight.find(txid) != sTxsInFlight.end() );
+//    return ( sTxsInFlight.find(txid) != sTxsInFlight.end() );
+    if ( sTxsInFlight.count(txid) > 0 )
+    {
+        return true;
+    }
+    return false;
 }
 
 void CNode::AddTxsInFlight(std::vector<uint256> txids)
@@ -585,7 +590,8 @@ void CNode::AddTxsInFlight(std::vector<uint256> txids)
     LOCK(cs_sTxsInFlight);
     for(unsigned int i=0;i<txids.size();i++)
     {
-        if( sTxsInFlight.find(txids[i]) == sTxsInFlight.end() )
+//        if( sTxsInFlight.find(txids[i]) == sTxsInFlight.end() )
+        if(sTxsInFlight.count(txids[i]) == 0)
         {
             sTxsInFlight.insert(txids[i]);
         }
@@ -613,6 +619,77 @@ void CNode::RemoveTxInFlight(uint256 txid)
     {
         sTxsInFlight.erase(it);
     }
+}
+
+size_t CNode::TotalBuffersSize()
+{
+    size_t total=0;
+    if(nMessageHandlerThreads != ( MC_MHT_GETDATA | MC_MHT_PROCESSDATA | MC_MHT_PROCESSTXDATA ) )                
+    {
+        return nTotalBuffersSize;
+    }
+    int64_t nNow=GetTime();
+    if(nNow < nNextSizeCalcTimestamp)
+    {
+        return nTotalBuffersSize;
+    }
+    nNextSizeCalcTimestamp=nNow+10;
+    
+    {
+        LOCK(cs_vSend);
+        total+=ssSend.size();
+    }
+    {
+        LOCK(cs_vRecvGetData);
+        total+=vRecvGetDataBuf.size()*sizeof(CInv);
+    }
+
+    {
+        LOCK(cs_vRecvMsg);
+        total+=vRecvMsg.size()*sizeof(CNetMessage);
+        std::deque<CNetMessage>::iterator it = vRecvMsg.begin();
+        while (it != vRecvMsg.end()) 
+        {
+            total+=it->vRecv.size();
+            it++;
+        }                
+    }
+
+    {
+        LOCK(cs_vRecvDataMsg);
+        total+=vRecvDataMsg.size()*sizeof(CNetMessage);
+        std::deque<CNetMessage>::iterator it = vRecvDataMsg.begin();
+        while (it != vRecvDataMsg.end()) 
+        {
+            total+=it->vRecv.size();
+            it++;
+        }                
+    }
+    {
+        LOCK(cs_vRecvTxDataMsg);
+        total+=vRecvTxDataMsg.size()*sizeof(CNetMessage);
+        std::deque<CNetMessage>::iterator it = vRecvTxDataMsg.begin();
+        while (it != vRecvTxDataMsg.end()) 
+        {
+            total+=it->vRecv.size();
+            it++;
+        }                
+    }
+    {
+        LOCK(cs_sTxsInFlight);
+        total+=sTxsInFlight.size()*sizeof(uint256);
+    }
+    {
+        LOCK(cs_inventory);
+        total+=setInventoryKnown.size()*sizeof(CInv);
+        total+=vInventoryToSend.size()*sizeof(CInv);
+    }
+    {
+        LOCK(cs_askfor);
+        total+=mapAskFor.size()*sizeof(CInv);
+    }
+    nTotalBuffersSize=total;
+    return total;
 }
 
 std::vector<CSubNet> CNode::vWhitelistedRange;
@@ -1987,6 +2064,8 @@ void ThreadMessageHandler()
                     }
                 }
             }
+                
+            pnode->TotalBuffersSize();
             boost::this_thread::interruption_point();
 
 /* MCHN START */
@@ -1998,10 +2077,15 @@ void ThreadMessageHandler()
         {
 /* MCHN END */
             // Send messages
+            if(nMessageHandlerThreads == 0)                
             {
                 TRY_LOCK(pnode->cs_vSend, lockSend);
                 if (lockSend)
                     g_signals.SendMessages(pnode, pnode == pnodeTrickle);
+            }
+            else                                                                // We cannot take this lock, possible deadlock 
+            {
+                g_signals.SendMessages(pnode, pnode == pnodeTrickle);                
             }
             boost::this_thread::interruption_point();
 /* MCHN START */            
@@ -2422,16 +2506,21 @@ void StartNode(boost::thread_group& threadGroup)
     // Process messages
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "msghand", &ThreadMessageHandler));
 
-    if((GetArg("-msghandlerversion",1) == 1))
-    {    
+    if(nMessageHandlerThreads & MC_MHT_GETDATA)
+    {
+        // Process getdata messages
+        threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "gmsghand", &ThreadGetDataMessageHandler));        
+    }
+    if(nMessageHandlerThreads & MC_MHT_PROCESSDATA)
+    {
         // Process block data messages
         threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "dmsghand", &ThreadDataMessageHandler));
 
-        // Process tx data messages
-        threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "tmsghand", &ThreadTxDataMessageHandler));
-        
-        // Process getdata messages
-        threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "gmsghand", &ThreadGetDataMessageHandler));
+        if(nMessageHandlerThreads & MC_MHT_PROCESSTXDATA)
+        {
+            // Process tx data messages
+            threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "tmsghand", &ThreadTxDataMessageHandler));
+        }
     }
     // Dump network addresses
     threadGroup.create_thread(boost::bind(&LoopForever<void (*)()>, "dumpaddr", &DumpAddresses, DUMP_ADDRESSES_INTERVAL * 1000));
@@ -2541,7 +2630,8 @@ void RelayTransaction(const CTransaction& tx, const CDataStream& ss)
 
         // Save original serialized message so newer versions are preserved
         mapRelay.insert(std::make_pair(inv, ss));
-        vRelayExpiration.push_back(std::make_pair(GetTime() + 15 * 60, inv));
+//        vRelayExpiration.push_back(std::make_pair(GetTime() + 15 * 60, inv));
+        vRelayExpiration.push_back(std::make_pair(GetTime() + 2 * Params().TargetSpacing(), inv));
     }
     LOCK(cs_vNodes);
     BOOST_FOREACH(CNode* pnode, vNodes)
@@ -2778,6 +2868,8 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     fEmptyHeaders=false;
     nLastKBPerDestinationChangeTimestamp=0;
     nMaxKBPerDestination=0;
+    nTotalBuffersSize=0;
+    nNextSizeCalcTimestamp=0;
     
     pEntData=NULL;
     nNextSendTime=0;    
@@ -2824,6 +2916,7 @@ CNode::~CNode()
 void CNode::AskFor(const CInv& inv)
 {
 //    if (mapAskFor.size() > MAPASKFOR_MAX_SZ)
+    LOCK(cs_askfor);
     if (mapAskFor.size() > 2 * MAX_INV_SZ)
     {
         if(!fDisconnect)
