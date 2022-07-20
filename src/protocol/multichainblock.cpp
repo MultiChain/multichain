@@ -331,6 +331,11 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
     return err;
 }
 
+int64_t TotalMempoolTxSize()
+{
+    return nTotalMempoolTxSize;
+}
+
 int64_t TotalMempoolsSize()
 {
     int64_t total_size;

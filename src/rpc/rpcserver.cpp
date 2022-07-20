@@ -60,6 +60,7 @@ static map<uint64_t, int> rpc_slots;
 static uint32_t rpc_thread_flags[MC_PRM_MAX_THREADS];
 
 void LockWallet(CWallet* pWallet);
+int TxThrottlingDelay(bool print);
 
 #define MC_ACF_NONE              0x00000000 
 #define MC_ACF_ENTERPRISE        0x00000001 
@@ -1089,6 +1090,13 @@ void ThrottleTxFlow()
     {
         if(rpc_thread_flags[slot_it->second] & MC_RPC_FLAG_NEW_TX)
         {
+            int tx_throttling_delay=TxThrottlingDelay(false);
+            if(tx_throttling_delay > 0)
+            {
+                MilliSleep(tx_throttling_delay);
+            }
+
+/*            
             int64_t mempool_bytes=(int64_t) mempool.GetTotalTxSize();
             int64_t block_size=MAX_BLOCK_SIZE;
             double blocks_required=(double)mempool_bytes/(double)block_size;
@@ -1125,6 +1133,7 @@ void ThrottleTxFlow()
             {
                 MilliSleep(millisleep_time);
             }
+ */ 
         }
     }        
 }

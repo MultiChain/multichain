@@ -58,6 +58,7 @@ bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& re
 bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string& reason);
 bool ReplayMemPool(CTxMemPool& pool, int from,bool accept);
 int64_t TotalMempoolsSize();
+int64_t TotalMempoolTxSize();
 bool VerifyBlockSignatureType(CBlock *block);
 bool VerifyBlockSignature(CBlock *block,bool force);
 bool VerifyBlockMiner(CBlock *block,CBlockIndex* pindexNew);
@@ -109,6 +110,9 @@ int GenesisBlockSize=0;
 int nLastForkedHeight=0;
 int64_t nTotalMempoolsSize=0;
 int64_t nTotalNodeBuffersSize=0;
+double dBlockProcessingTime[100];
+int nBlockTimeMeasured=0;
+double dAverageBlockTime=0;
 uint256 GenesisCoinBaseTxID=0;
 uint32_t nMessageHandlerThreads=MC_MHT_DEFAULT;
 CTransaction GenesisCoinBaseTx;
@@ -991,7 +995,7 @@ bool AddOrphanTx(const CTransaction& tx, NodeId peer)
     
     if(OrphanHandlerVersion == 1)
     {
-        int nMaxOrphanPoolSize = (int)std::max((int64_t)0, GetArg("-maxorphansize", DEFAULT_MAX_ORPHAN_POOL_SIZE));
+        int nMaxOrphanPoolSize = (int)std::max((int64_t)0, GetArg("-maxorphansize", DEFAULT_MAX_ORPHAN_POOL_SIZE) * 1048576);
 
         if((int)sz + nOrphanPoolSize > nMaxOrphanPoolSize)
         {
@@ -1526,6 +1530,79 @@ CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowF
         nMinFee = MAX_MONEY;
     return nMinFee;
 }
+
+int TxThrottlingDelay(bool print)
+{    
+    if( (nMessageHandlerThreads & MC_MHT_PROCESSTXDATA ) == 0)                
+    {
+        return 0;
+    }
+    
+    int64_t one_mb=1048576;
+    
+    double dDelay;
+    int nDelay;
+    
+    size_t max_memory=2048;//MB
+    int64_t max_mempool_blocks=((int64_t)GetArg("-mempoolthrottle", DEFAULT_MEMPOOL_THROTTLE)*one_mb)/MAX_BLOCK_SIZE;
+    if(max_mempool_blocks <= 0)
+    {
+        max_mempool_blocks=1;
+    }
+            
+    double dMemory,dTime,dSize,dMax;
+    dMax=0;
+    
+    size_t total_memory=nTotalMempoolsSize/one_mb;
+    total_memory*=3;
+    if(nMessageHandlerThreads == ( MC_MHT_GETDATA | MC_MHT_PROCESSDATA | MC_MHT_PROCESSTXDATA ) )                
+    {
+        total_memory+=2*nTotalNodeBuffersSize/one_mb;
+    }
+    dMemory=(double)total_memory/(double)max_memory;
+/*    
+    if(dMemory>dMax)
+    {
+        dMax=dMemory;
+    }
+*/    
+    dTime=dAverageBlockTime/Params().TargetSpacing();
+    if(dTime>dMax)
+    {
+        dMax=dTime;
+    }
+    
+    dSize=((double)TotalMempoolTxSize()/(double)MAX_BLOCK_SIZE)/max_mempool_blocks;
+    if(dSize>dMax)
+    {
+        dMax=dSize;
+    }
+    
+    dDelay=0;
+    if(dMax > 0.25)
+    {
+        dDelay=(dMax-0.25)*(dMax-0.25)*160;
+    }
+    
+    if(dDelay>500)
+    {
+        dDelay=500;
+    }
+    nDelay=(int)dDelay;
+    
+    if(print)
+    {
+        LogPrint("mcblockperf","mchn-block-perf: Block: %d, Tx delay %3dms (%5.2f). "
+                "Memory: %4.2f (%4dMB: Mempools: %3d, Network: %3d/%2u), "
+                "Time: %4.2f (%6.2fs), "
+                "Size: %4.2f (%6.2f)\n",
+                chainActive.Height(),nDelay, dMax, dMemory, total_memory, nTotalMempoolsSize/one_mb, nTotalNodeBuffersSize/one_mb, vNodes.size(), dTime, dAverageBlockTime,
+                dSize,(double)TotalMempoolTxSize()/(double)MAX_BLOCK_SIZE);            
+        
+    }
+    return nDelay;
+}
+
 
 bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransaction &tx, bool fLimitFree,
                         bool* pfMissingInputs, bool fRejectInsaneFee,CWalletTx *wtx)
@@ -5175,7 +5252,8 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
         }
     }
 /* MCHN END*/    
-    
+    int old_height=chainActive.Height();
+    double start_time=mc_TimeNowAsDouble();
     // Preliminary checks
     bool checked = CheckBlock(*pblock, state);
     bool activate=true;
@@ -5274,7 +5352,34 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
         }
     }   
 
-    LogPrint("mcblockperf","mchn-block-perf: Network buffers size: %6dMB (%2d nodes)\n",nTotalNodeBuffersSize/1048576,node_count);            
+    int new_height=chainActive.Height();
+    if(new_height>old_height)
+    {
+        double end_time=mc_TimeNowAsDouble();
+        int nBlockWindow=20;
+        for(int b=nBlockWindow-1;b>0;b--)
+        {
+            dBlockProcessingTime[b]=dBlockProcessingTime[b-1];
+        }
+        dBlockProcessingTime[0]=end_time-start_time;
+        nBlockTimeMeasured++;
+        int nb=nBlockWindow;
+        if(nb>nBlockTimeMeasured)
+        {
+           nb=nBlockTimeMeasured; 
+        }
+        double weight=0;
+        double total=0;
+        for(int b=0;b<nb;b++)
+        {
+            total+=(nb-b)*dBlockProcessingTime[b];
+            weight+=nb-b;
+        }
+        dAverageBlockTime=total/weight;
+
+        TxThrottlingDelay(true);
+    }
+    
     
 /* MCHN START */    
 /*
@@ -6799,7 +6904,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         CInv inv(MSG_TX, tx.GetHash());
         pfrom->AddInventoryKnown(inv);
-                    
+        
+        {
         LOCK(cs_main);
 
         if( !fAcceptOnlyRequestedTxs  || pfrom->IsTxInFlight(inv.hash) )
@@ -6969,6 +7075,15 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         
         }
         pfrom->RemoveTxInFlight(inv.hash);
+        }
+        
+        int tx_throttling_delay=TxThrottlingDelay(false);
+        if(tx_throttling_delay > 0)
+        {
+            MilliSleep(tx_throttling_delay);
+        }
+    
+        
 /* MCHN START */            
         }        
 /* MCHN END */            

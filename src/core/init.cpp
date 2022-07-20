@@ -383,8 +383,8 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -loadblock=<file>      " + _("Imports blocks from external blk000??.dat file") + " " + _("on startup") + "\n";
     strUsage += "  -loadblockmaxsize=<n>  " + _("Maximal block size in the files specified in -loadblock") + "\n";
     strUsage += "  -maxorphantx=<n>       " + strprintf(_("Keep at most <n> unconnectable transactions in memory (default: %u)"), DEFAULT_MAX_ORPHAN_TRANSACTIONS) + "\n";
-    strUsage += "  -maxorphansize=<n>     " + strprintf(_("Keep at most <n> of unconnectable transactions in memory (default: %u)"), DEFAULT_MAX_ORPHAN_POOL_SIZE) + "\n";
-    strUsage += "  -orphanhandlerversion=0|1 " + _("Use unconnectable transactions processing algorithm optimized for high loads, default: 1") + "\n";
+    strUsage += "  -maxorphansize=<n>     " + strprintf(_("Keep at most <n> megabytes of unconnectable transactions in memory (default: %u)"), DEFAULT_MAX_ORPHAN_POOL_SIZE) + "\n";
+    strUsage += "  -mempoolthrottle=<n>   " + strprintf(_("Slow down accepting new transactions if the memory pool approaches this total size in megabytes (default: %u)"), DEFAULT_MEMPOOL_THROTTLE) + "\n";
     strUsage += "  -par=<n>               " + strprintf(_("Set the number of script verification threads (%u to %d, 0 = auto, <0 = leave that many cores free, default: %d)"), -(int)boost::thread::hardware_concurrency(), MAX_SCRIPTCHECK_THREADS, DEFAULT_SCRIPTCHECK_THREADS) + "\n";
 #ifndef WIN32
     strUsage += "  -pid=<file>            " + strprintf(_("Specify pid file (default: %s)"), "multichain.pid") + "\n";
@@ -411,11 +411,12 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -externalip=<ip>       " + _("Specify your own public address") + "\n";
     strUsage += "  -forcednsseed          " + strprintf(_("Always query for peer addresses via DNS lookup (default: %u)"), 0) + "\n";
     strUsage += "  -listen=0|1            " + _("Accept connections from outside (default: 1 if no -proxy or -connect)") + "\n";
+    strUsage += "  -localtxbuffering=0|1  " + _("Use transactions relay algorithm optimized for high loads, default: 1") + "\n";
     strUsage += "  -maxconnections=<n>    " + strprintf(_("Maintain at most <n> connections to peers (default: %u)"), 125) + "\n";
     strUsage += "  -maxoutconnections=<n> " + strprintf(_("Open at most <n> outbound connections to peers (1-32, default: %u)"), 8) + "\n";
     strUsage += "  -maxreceivebuffer=<n>  " + strprintf(_("Maximum per-connection receive buffer, <n>*1000 bytes (default: %u)"), 5000) + "\n";
     strUsage += "  -maxsendbuffer=<n>     " + strprintf(_("Maximum per-connection send buffer, <n>*1000 bytes (default: %u)"), 100000) + "\n";
-    strUsage += "  -msghandlerversion=0|1 " + _("Process data messages in separate thread, default: 1") + "\n";
+    strUsage += "  -msghandlerversion=0|1 " + _("Process data messages in separate threads, default: 1") + "\n";
     strUsage += "  -onion=<ip:port>       " + strprintf(_("Use separate SOCKS5 proxy to reach peers via Tor hidden services (default: %s)"), "-proxy") + "\n";
     strUsage += "  -onlynet=<net>         " + _("Only connect to nodes in network <net> (ipv4, ipv6 or onion)") + "\n";
     strUsage += "  -permitbaremultisig    " + strprintf(_("Relay non-P2SH multisig (default: %u)"), 1) + "\n";
@@ -932,7 +933,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     if (GetBoolArg("-tor", false))
         return InitError(_("Error: Unsupported argument -tor found, use -onion."));
 
-    nMessageHandlerThreads=GetArg("-msghandlerversion",MC_MHT_DEFAULT);
+    nMessageHandlerThreads=GetArg("-msghandlerversion",1) * MC_MHT_DEFAULT;
     fAcceptOnlyRequestedTxs = ( nMessageHandlerThreads > 0 );
     OrphanHandlerVersion=GetArg("-orphanhandlerversion",1);
     InitialNetLogTime=GetArg("-initialnetlogtime",0);
