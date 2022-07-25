@@ -2,7 +2,7 @@
 
 ## 1. SonarCloud - Static Code Analysis
 
-A SonarCloud analysis has been run against a fork of the multichain repo inside a Github Action.
+A [SonarCloud](https://sonarcloud.io/) analysis has been run against a fork of the [MultiChain](https://github.com/MultiChain/multichain) repo inside a [Github Action](/.github/workflows/main.yml).
 
 ![Sonarcloud - Summary](img/sonar_summary.png)
 
