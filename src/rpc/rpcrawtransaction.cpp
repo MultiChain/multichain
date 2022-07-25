@@ -112,6 +112,75 @@ void ScriptPubKeyToJSON(const CScript& scriptPubKey, Object& out, bool fIncludeH
     out.push_back(Pair("addresses", a));
 }
 
+bool mc_FindTokenDetails(mc_Script *lpScript,string &token_id_str,uint256 &parent_txid)
+{
+    int err;
+    uint32_t value_offset,param_offset;
+    size_t value_size;
+    unsigned char* token_details;
+    unsigned char* token_id;
+    int token_details_size,token_id_size,token_details_element;
+    
+    token_details_element=-1;
+    for (int e = 0; e < lpScript->GetNumElements(); e++)
+    {
+        if(token_details_element < 0)
+        {
+            lpScript->SetElement(e);
+            err=lpScript->GetInlineDetails(&token_details,&token_details_size);
+            if(err == 0)
+            {
+                token_details_element=e;
+            }
+            else
+            {
+                if(err != MC_ERR_WRONG_SCRIPT)
+                {                
+                    return false;                                    
+                }
+            }                
+        }
+    }
+    
+    if(token_details_element < 0)
+    {
+        return false;
+    }
+    
+    value_offset=mc_FindSpecialParamInDetailsScriptFull(token_details,token_details_size,MC_ENT_SPRM_UPDATE_NAME,&value_size,&param_offset);
+    if(param_offset<(uint32_t)token_details_size)
+    {
+        token_id=token_details+value_offset;
+        token_id_size=(uint32_t)value_size;
+        if(token_id_size == 0)
+        {
+            return false;                                                                        
+        }
+        token_id_str.assign((char*)token_id,token_id_size);
+    }
+    else
+    {
+        return false;                                                                                
+    }
+    
+    value_offset=mc_FindSpecialParamInDetailsScriptFull(token_details,token_details_size,MC_ENT_SPRM_PARENT_ENTITY,&value_size,&param_offset);
+    if(param_offset<(uint32_t)token_details_size)
+    {
+        if(value_size != sizeof(uint256))
+        {
+            return false;                                                                                       
+        }
+        memcpy(&parent_txid,token_details+value_offset,value_size);
+    }
+    else
+    {
+        return false;                                                                                
+    }        
+    
+    return true;
+}
+
+
 void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
 {
     entry.push_back(Pair("txid", tx.GetHash().GetHex()));
@@ -317,6 +386,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                 ptr=(unsigned char *)asset_amounts->GetRow(a);
                 
                 uint256 hash=tx.GetHash();
+                string token_id="";
                 txid=(unsigned char*)&hash;
                 is_genesis=true;
                 is_valid_asset=true;
@@ -330,11 +400,19 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                         txid=entity.GetTxID();
                     }
                     else
-                    {
+                    {                            
                         is_valid_asset=false;
+                        if(mc_GetABScriptType(ptr) == MC_SCR_ASSET_SCRIPT_TYPE_TOKEN)
+                        {
+                            if(mc_FindTokenDetails(lpScript,token_id,hash))
+                            {
+                                is_valid_asset=true;
+                                is_genesis=false;                                       
+                                txid=(unsigned char*)&hash;
+                            }
+                        }
                     }
-                }                
-                
+                }
                 if(is_valid_asset)
                 {
                     asset_entry=AssetEntry(txid,mc_GetABQuantity(ptr),0x05);
@@ -357,6 +435,19 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                                 is_issuemore=true;
                                 break;
                             case MC_SCR_ASSET_SCRIPT_TYPE_TOKEN:
+                                if(token_id.size())
+                                {
+                                    Object new_asset_entry;
+                                    BOOST_FOREACH(const Pair& p, asset_entry) 
+                                    {
+                                        if(p.name_ == "qty")
+                                        {
+                                            new_asset_entry.push_back(Pair("token", token_id));
+                                        }
+                                        new_asset_entry.push_back(Pair(p.name_, p.value_));
+                                    }                                    
+                                    asset_entry=new_asset_entry;
+                                }
                                 asset_entry.push_back(Pair("type", "issuetoken"));                                            
                                 issuerawqty+=mc_GetABQuantity(ptr);
                                 break;

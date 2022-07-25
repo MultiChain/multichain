@@ -1095,45 +1095,6 @@ void ThrottleTxFlow()
             {
                 MilliSleep(tx_throttling_delay);
             }
-
-/*            
-            int64_t mempool_bytes=(int64_t) mempool.GetTotalTxSize();
-            int64_t block_size=MAX_BLOCK_SIZE;
-            double blocks_required=(double)mempool_bytes/(double)block_size;
-            
-            int64_t threshold=GetArg("-accepttxthreshold",0);
-            int64_t threshold_multiplier=2;
-            int64_t delay=10;
-            int64_t max_delay=1000;
-            int64_t delay_multiplier=10;
-            
-            if(delay_multiplier <= 0)
-            {
-                delay_multiplier=1;
-            }
-            
-            int64_t millisleep_time=0;
-            int count=0;
-            
-            while( (blocks_required > threshold * 0.01) && (millisleep_time <= max_delay) && (threshold > 0) && (count < 10) )
-            {
-                millisleep_time=delay;
-                
-                threshold *= threshold_multiplier;
-                delay *= delay_multiplier;
-                count++;
-            }                
-            
-            if(millisleep_time > max_delay)
-            {
-                millisleep_time=max_delay;
-            }
-            
-            if(millisleep_time > 0)
-            {
-                MilliSleep(millisleep_time);
-            }
- */ 
         }
     }        
 }
