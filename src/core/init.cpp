@@ -411,7 +411,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -externalip=<ip>       " + _("Specify your own public address") + "\n";
     strUsage += "  -forcednsseed          " + strprintf(_("Always query for peer addresses via DNS lookup (default: %u)"), 0) + "\n";
     strUsage += "  -listen=0|1            " + _("Accept connections from outside (default: 1 if no -proxy or -connect)") + "\n";
-    strUsage += "  -localtxbuffering=0|1  " + _("Use transactions relay algorithm optimized for high loads, default: 1") + "\n";
+    strUsage += "  -relaymanversion=0|1   " + _("Use transactions relay algorithm optimized for high loads, default: 1") + "\n";
     strUsage += "  -maxconnections=<n>    " + strprintf(_("Maintain at most <n> connections to peers (default: %u)"), 125) + "\n";
     strUsage += "  -maxoutconnections=<n> " + strprintf(_("Open at most <n> outbound connections to peers (1-32, default: %u)"), 8) + "\n";
     strUsage += "  -maxreceivebuffer=<n>  " + strprintf(_("Maximum per-connection receive buffer, <n>*1000 bytes (default: %u)"), 5000) + "\n";
@@ -935,7 +935,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 
     nMessageHandlerThreads=GetArg("-msghandlerversion",1) * MC_MHT_DEFAULT;
     fAcceptOnlyRequestedTxs = ( nMessageHandlerThreads > 0 );
-    OrphanHandlerVersion=GetArg("-orphanhandlerversion",1);
+    OrphanHandlerVersion=GetArg("-relaymanversion",1);
     InitialNetLogTime=GetArg("-initialnetlogtime",0);
     
     OutConnectionsAlgoritm=GetArg("-addrmanversion",1);
