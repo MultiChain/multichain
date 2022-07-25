@@ -8144,44 +8144,6 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                 i++;
             } 
             pto->vInventoryToSend = vInvWait;                
-/*            
-            bool passed_stop_hash=false;
-            BOOST_FOREACH(const CInv& inv, pto->vInventoryToSend)
-            {
-                if (pto->setInventoryKnown.count(inv))
-                    continue;
-
-                // returns true if wasn't already contained in the set
-                if(OrphanHandlerVersion == 1)
-                {
-                    if(inv.hash == mempool.hashSendStop)
-                    {
-                        passed_stop_hash=true;
-                    }
-                }
-                
-                if(!passed_stop_hash)
-                {
-                    if (pto->setInventoryKnown.insert(inv).second)
-                    {
-                        sent_count++;
-                        vInv.push_back(inv);
-                        if (vInv.size() >= 1000)
-                        {
-                            if(MultichainNode_SendInv(pto))                         // MCNN
-                                pto->PushMessage("inv", vInv);
-                            vInv.clear();
-                        }
-                    }
-                }
-                else
-                {
-                    vInvWait.push_back(inv);
-                }
-                    
-            }
-            pto->vInventoryToSend = vInvWait;
- */ 
         }
         if (!vInv.empty())
             if(MultichainNode_SendInv(pto))                                     // MCNN

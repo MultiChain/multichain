@@ -1985,23 +1985,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                 }
                 
                 mc_gState->m_WalletMode |= mc_AutosubscribeWalletMode(GetArg("-autosubscribe","none"),false);
-/*                
-                string autosubscribe=GetArg("-autosubscribe","none");
                 
-                if(autosubscribe=="streams")
-                {
-                    mc_gState->m_WalletMode |= MC_WMD_AUTOSUBSCRIBE_STREAMS;
-                }
-                if(autosubscribe=="assets")
-                {
-                    mc_gState->m_WalletMode |= MC_WMD_AUTOSUBSCRIBE_ASSETS;
-                }
-                if( (autosubscribe=="assets,streams") || (autosubscribe=="streams,assets"))
-                {
-                    mc_gState->m_WalletMode |= MC_WMD_AUTOSUBSCRIBE_STREAMS;
-                    mc_gState->m_WalletMode |= MC_WMD_AUTOSUBSCRIBE_ASSETS;
-                }                
-*/
                 int explorer_mode=GetArg("-explorersupport",explorer_support);
                 if(explorer_mode > 0)
                 {
@@ -2323,27 +2307,6 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
                     {
                         grant_message_printed=GrantMessagePrinted(OutputPipe,false);
                     }
-/*                    
-                    if(!GetBoolArg("-shortoutput", false))
-                    {    
-                        sprintf(bufOutput,"Blockchain successfully initialized.\n\n");             
-                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                        sprintf(bufOutput,"Please ask blockchain admin or user having activate permission to let you connect and/or transact:\n");
-                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-
-                        sprintf(bufOutput,"multichain-cli %s grant %s connect\n",mc_gState->m_NetworkParams->Name(),
-                             CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());
-                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                        sprintf(bufOutput,"multichain-cli %s grant %s connect,send,receive\n\n",mc_gState->m_NetworkParams->Name(),
-                             CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());
-                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                    }
-                    else
-                    {
-                        sprintf(bufOutput,"%s\n",CBitcoinAddress(pwalletMain->vchDefaultKey.GetID()).ToString().c_str());                            
-                        bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
-                    }
- */ 
                     return false;
                 }
             }
