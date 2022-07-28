@@ -662,6 +662,8 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
         return MC_ERR_INTERNAL_ERROR;
     }
     
+    m_Mode |= (mode & MC_WMD_LOG_TXS);
+    
     if((m_Mode & MC_WMD_NO_READ_POOLS) == 0)
     {
         m_WRPMemPool=new mc_Buffer;                                                // Key - entity with m_Pos set to 0 + txid
@@ -1487,7 +1489,7 @@ int mc_TxDB::AddTx(mc_TxImport *import,
     if(isrelevant == 0)
     {
         sprintf(msg,"Tx %s ignored for import %d",txhex,imp->m_ImportID);
-        LogString(msg);
+        if(m_Mode & MC_WMD_LOG_TXS)LogString(msg);
         goto exitlbl;        
     }
 
@@ -1711,7 +1713,7 @@ int mc_TxDB::AddTx(mc_TxImport *import,
         sprintf(msg,"%sTx %s, block %d, flags %08X, import %d",txtype,txhex,block,flags,imp->m_ImportID);
     }
     
-    LogString(msg);
+    if(m_Mode & MC_WMD_LOG_TXS)LogString(msg);
 exitlbl:
     return err;
 }
@@ -1781,7 +1783,7 @@ int mc_TxDB::AddData(mc_TxImport *import,
     if(isrelevant == 0)
     {
         sprintf(msg,"Data %s ignored for import %d",txhex,imp->m_ImportID);
-        LogString(msg);
+        if(m_Mode & MC_WMD_LOG_TXS)LogString(msg);
         goto exitlbl;        
     }
 
@@ -1971,7 +1973,7 @@ int mc_TxDB::AddData(mc_TxImport *import,
         sprintf(msg,"%sTx %s, block %d, flags %08X, import %d",txtype,txhex,block,flags,imp->m_ImportID);
     }
     
-    LogString(msg);
+    if(m_Mode & MC_WMD_LOG_TXS)LogString(msg);
 exitlbl:
     return err;
 }

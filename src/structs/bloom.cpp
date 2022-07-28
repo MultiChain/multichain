@@ -116,6 +116,11 @@ bool CBloomFilter::IsWithinSizeConstraints() const
     return vData.size() <= MAX_BLOOM_FILTER_SIZE && nHashFuncs <= MAX_HASH_FUNCS;
 }
 
+bool CBloomFilter::IsFull() const
+{
+    return isFull;
+}
+
 bool CBloomFilter::IsRelevantAndUpdate(const CTransaction& tx)
 {
     bool fFound = false;

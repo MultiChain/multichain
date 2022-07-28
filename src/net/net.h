@@ -84,19 +84,6 @@ int mc_QuerySeed(boost::thread_group& threadGroup,const char *seedAddr);
 
 typedef int NodeId;
 
-// Signals for message handling
-struct CNodeSignals
-{
-    boost::signals2::signal<int ()> GetHeight;
-    boost::signals2::signal<bool (CNode*)> ProcessMessages;
-    boost::signals2::signal<bool (CNode*)> ProcessDataMessages;
-    boost::signals2::signal<bool (CNode*, bool)> SendMessages;
-    boost::signals2::signal<void (NodeId, const CNode*)> InitializeNode;
-    boost::signals2::signal<void (NodeId)> FinalizeNode;
-};
-
-
-CNodeSignals& GetNodeSignals();
 
 
 enum
@@ -135,6 +122,8 @@ extern CAddrMan addrman;
 extern int nMaxConnections;
 extern int nMaxOutConnections;
 extern int OutConnectionsAlgoritm;
+extern int OrphanHandlerVersion;
+extern int InitialNetLogTime;
 
 extern std::vector<CNode*> vNodes;
 extern CCriticalSection cs_vNodes;
@@ -226,6 +215,20 @@ public:
 };
 
 
+// Signals for message handling
+struct CNodeSignals
+{
+    boost::signals2::signal<int ()> GetHeight;
+    boost::signals2::signal<bool (CNode*)> ProcessMessages;
+    boost::signals2::signal<bool (CNode*,CNetMessage&)> ProcessDataMessage;
+    boost::signals2::signal<bool (CNode*)> ProcessGetData;
+    boost::signals2::signal<bool (CNode*, bool)> SendMessages;
+    boost::signals2::signal<void (NodeId, const CNode*)> InitializeNode;
+    boost::signals2::signal<void (NodeId)> FinalizeNode;
+};
+
+
+CNodeSignals& GetNodeSignals();
 
 
 
@@ -243,11 +246,18 @@ public:
     std::deque<CSerializeData> vSendMsg;
     CCriticalSection cs_vSend;
 
+    std::deque<CInv> vRecvGetDataBuf;
     std::deque<CInv> vRecvGetData;
+    CCriticalSection cs_vRecvGetData;
     std::deque<CNetMessage> vRecvMsg;
     CCriticalSection cs_vRecvMsg;
     std::deque<CNetMessage> vRecvDataMsg;
     CCriticalSection cs_vRecvDataMsg;
+    std::deque<CNetMessage> vRecvTxDataMsg;
+    CCriticalSection cs_vRecvTxDataMsg;
+    std::set<uint256> sTxsInFlight;
+    CCriticalSection cs_sTxsInFlight;
+    
     uint64_t nRecvBytes;
     int nRecvVersion;
 
@@ -275,6 +285,7 @@ public:
     // b) the peer may tell us in their version message that we should not relay tx invs
     //    until they have initialized their bloom filter.
     bool fRelayTxes;
+    bool fReadyForTxInv;
     CSemaphoreGrant grantOutbound;
     CCriticalSection cs_filter;
     CBloomFilter* pfilter;
@@ -296,11 +307,13 @@ public:
     bool fLastIgnoreIncoming;
     bool fCanConnectRemote;
     bool fCanConnectLocal;
+    bool fEmptyHeaders;
     CKeyID kAddrRemote;
     CKeyID kAddrLocal;
     int64_t nLastKBPerDestinationChangeTimestamp;
     int nMaxKBPerDestination;
-
+    size_t nTotalBuffersSize;
+    int64_t nNextSizeCalcTimestamp;
     CAddress addrFromVersion;
     
     void *pEntData;
@@ -338,6 +351,7 @@ public:
     std::vector<CInv> vInventoryToSend;
     CCriticalSection cs_inventory;
     std::multimap<int64_t, CInv> mapAskFor;
+    CCriticalSection cs_askfor;
 
     // Ping time measurement:
     // The pong reply we're expecting, or 0 if no pong expected.
@@ -669,6 +683,12 @@ public:
     void CloseSocketDisconnect();
     
     bool DelayedSend();
+    
+    bool IsTxInFlight(uint256 txid);
+    void AddTxsInFlight(std::vector<uint256> txids);
+    void RemoveTxsInFlight(std::vector<uint256> txids);
+    void RemoveTxInFlight(uint256 txid);
+    size_t TotalBuffersSize();
 
     // Denial-of-service detection/prevention
     // The idea is to detect peers that are behaving

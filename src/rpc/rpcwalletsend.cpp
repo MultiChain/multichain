@@ -15,7 +15,7 @@ bool CreateAssetGroupingTransaction(CWallet *lpWallet, const vector<pair<CScript
 
 Value createrawsendfrom(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 2 || params.size() > 4)                                            // MCHN
+    if (fHelp || params.size() < 2 || params.size() > 6)                                            // MCHN
         throw runtime_error("Help message not found\n");
 
     vector<CTxDestination> fromaddresses;        
@@ -147,6 +147,16 @@ Value createrawsendfrom(const Array& params, bool fHelp)
     {
         Array signrawtransaction_params;
         signrawtransaction_params.push_back(hex);
+        if (params.size() > 4) 
+        {
+            Array inputs_for_signature;
+            signrawtransaction_params.push_back(inputs_for_signature);
+            signrawtransaction_params.push_back(params[4]);            
+        }
+        if (params.size() > 5) 
+        {
+            signrawtransaction_params.push_back(params[5]);            
+        }
         signedTx=signrawtransaction(signrawtransaction_params,false);
     }
     if(lock_it)

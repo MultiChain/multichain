@@ -1792,9 +1792,6 @@ void CWallet::ResendWalletTransactions(bool fForce)
     // Rebroadcast any of our txes that aren't in a block yet
     if(fDebug)LogPrint("wallet","ResendWalletTransactions()\n");
     {
-        LOCK(cs_wallet);
-        // Sort them in chronological order
-        
         if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
         {
             pwalletTxsMain->Lock();
@@ -1820,6 +1817,9 @@ void CWallet::ResendWalletTransactions(bool fForce)
         }
         else
         {
+            LOCK(cs_wallet);
+            // Sort them in chronological order
+        
             multimap<unsigned int, CWalletTx*> mapSorted;
             BOOST_FOREACH(PAIRTYPE(const uint256, CWalletTx)& item, mapWallet)
             {

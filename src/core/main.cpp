@@ -57,6 +57,8 @@ bool AcceptAssetTransfers(const CTransaction& tx, const CCoinsViewCache &inputs,
 bool AcceptAssetGenesis(const CTransaction &tx,int offset,bool accept,string& reason);
 bool AcceptPermissionsAndCheckForDust(const CTransaction &tx,bool accept,string& reason);
 bool ReplayMemPool(CTxMemPool& pool, int from,bool accept);
+int64_t TotalMempoolsSize();
+int64_t TotalMempoolTxSize();
 bool VerifyBlockSignatureType(CBlock *block);
 bool VerifyBlockSignature(CBlock *block,bool force);
 bool VerifyBlockMiner(CBlock *block,CBlockIndex* pindexNew);
@@ -101,11 +103,18 @@ bool fImporting = false;
 bool fReindex = false;
 bool fRescan = false;
 bool fTxIndex = false;
+bool fAcceptOnlyRequestedTxs = false;
 bool fIsBareMultisigStd = true;
 unsigned int nCoinCacheSize = 5000;
 int GenesisBlockSize=0;
 int nLastForkedHeight=0;
+int64_t nTotalMempoolsSize=0;
+int64_t nTotalNodeBuffersSize=0;
+double dBlockProcessingTime[100];
+int nBlockTimeMeasured=0;
+double dAverageBlockTime=0;
 uint256 GenesisCoinBaseTxID=0;
+uint32_t nMessageHandlerThreads=MC_MHT_DEFAULT;
 CTransaction GenesisCoinBaseTx;
 
 vector<CBlockIndex*> vFirstOnThisHeight;
@@ -121,7 +130,11 @@ CTxMemPool mempool(::minRelayTxFee);
 struct COrphanTx {
     CTransaction tx;
     NodeId fromPeer;
+    int64_t time;
+    int32_t size;
 };
+int OrphanHandlerVersion=1;
+int32_t nOrphanPoolSize=0;
 map<uint256, COrphanTx> mapOrphanTransactions;
 map<uint256, set<uint256> > mapOrphanTransactionsByPrev;
 set <uint256> setBannedTxs;
@@ -129,7 +142,7 @@ set <uint256> setBannedTxBlocks;
 uint256 hLockedBlock;
 CBlockIndex *pindexLockedBlock;
 
-void EraseOrphansFor(NodeId peer);
+int EraseOrphansFor(NodeId peer);
 
 /* MCHN START */
 #define MC_TXSET_BLOCKS 50
@@ -573,6 +586,37 @@ void MultichainNode_UpdateBlockByHeightList(CBlockIndex *pindex)
     }    
 }
 
+bool PushMempoolToInv(CNode *pnode)
+{
+    if(OrphanHandlerVersion != 1)    
+        return false;
+        
+    if(!pnode->fRelayTxes)
+        return false;
+    
+    {
+        LOCK(pnode->cs_filter);
+        if( (pnode->pfilter != NULL) && (!pnode->pfilter->IsFull()) )
+            return false;
+    }    
+    
+    LOCK2(pnode->cs_inventory,mempool.cs);    
+    
+    int push_count=0;
+    std::vector<uint256> vtxid;
+    mempool.queryHashes(vtxid);
+    vector<CInv> vInv;
+    BOOST_FOREACH(uint256& hash, vtxid) {
+        CInv inv(MSG_TX, hash);
+        pnode->PushInventory(inv);
+        push_count++;
+    }
+    
+    pnode->fReadyForTxInv=true;
+    LogPrintf("mchn: pushed %d inv records to queue\n",push_count);
+    return true;
+}
+
 bool MultichainNode_IsBlockChainSynced(CNode *pnode)
 {
     if(pnode->fSyncedOnce)
@@ -588,12 +632,38 @@ bool MultichainNode_IsBlockChainSynced(CNode *pnode)
     int sync_height = state->pindexBestKnownBlock ? state->pindexBestKnownBlock->nHeight : -1;
     int common_height = state->pindexLastCommonBlock ? state->pindexLastCommonBlock->nHeight : -1;
 
+    if(common_height <= 0)
+    {
+        if(state->pindexBestKnownBlock)
+        {
+            if(chainActive.Contains(state->pindexBestKnownBlock))
+            {
+                common_height=sync_height;
+                LogPrint("mcblockperf","mchn-block-perf: Lagging node %d, heights: our: %d,  known: %d\n",pnode->id,this_height,sync_height);        
+            }
+        }
+        else
+        {
+            if(pnode->fEmptyHeaders)
+            {
+                pnode->fSyncedOnce=true;
+                LogPrint("mcblockperf","mchn-block-perf: Lagging node %d, received empty headers, considered synced\n",pnode->id);  
+                return pnode->fSyncedOnce;
+            }
+        }
+    }
+    
     if((this_height > 0) && (common_height>0))
     {
         if(this_height == common_height)
         {
             if(sync_height == common_height)
             {
+                if(!pnode->fReadyForTxInv)
+                {
+                    LogPrintf("mchn: In sync with %d on block %d - start pushing txs\n",pnode->id,mc_gState->m_Permissions->m_Block);
+                    PushMempoolToInv(pnode);
+                }        
                 pnode->fSyncedOnce=true;
             }
         }
@@ -601,6 +671,11 @@ bool MultichainNode_IsBlockChainSynced(CNode *pnode)
         {
             pnode->fSyncedOnce=true;
         }
+    }
+    
+    if(pnode->fSyncedOnce)
+    {
+        LogPrint("mcblockperf","mchn-block-perf: Synced with node %d, heights: our: %d, common: %d, known: %d\n",pnode->id,this_height,common_height,sync_height);        
     }
     
     return pnode->fSyncedOnce;
@@ -862,7 +937,8 @@ void RegisterNodeSignals(CNodeSignals& nodeSignals)
 {
     nodeSignals.GetHeight.connect(&GetHeight);
     nodeSignals.ProcessMessages.connect(&ProcessMessages);
-    nodeSignals.ProcessDataMessages.connect(&ProcessDataMessages);
+    nodeSignals.ProcessDataMessage.connect(&ProcessDataMessage);
+    nodeSignals.ProcessGetData.connect(&ProcessGetData);
     nodeSignals.SendMessages.connect(&SendMessages);
     nodeSignals.InitializeNode.connect(&InitializeNode);
     nodeSignals.FinalizeNode.connect(&FinalizeNode);
@@ -872,7 +948,8 @@ void UnregisterNodeSignals(CNodeSignals& nodeSignals)
 {
     nodeSignals.GetHeight.disconnect(&GetHeight);
     nodeSignals.ProcessMessages.disconnect(&ProcessMessages);
-    nodeSignals.ProcessDataMessages.disconnect(&ProcessDataMessages);
+    nodeSignals.ProcessDataMessage.disconnect(&ProcessDataMessage);
+    nodeSignals.ProcessGetData.disconnect(&ProcessGetData);
     nodeSignals.SendMessages.disconnect(&SendMessages);
     nodeSignals.InitializeNode.disconnect(&InitializeNode);
     nodeSignals.FinalizeNode.disconnect(&FinalizeNode);
@@ -905,7 +982,7 @@ bool AddOrphanTx(const CTransaction& tx, NodeId peer)
 {
     uint256 hash = tx.GetHash();
     if (mapOrphanTransactions.count(hash))
-        return false;
+        return true;
 
     // Ignore big transactions, to avoid a
     // send-big-orphans memory exhaustion attack. If a peer has a legitimate
@@ -915,14 +992,33 @@ bool AddOrphanTx(const CTransaction& tx, NodeId peer)
     // 10,000 orphans, each of which is at most 5,000 bytes big is
     // at most 500 megabytes of orphans:
     unsigned int sz = tx.GetSerializeSize(SER_NETWORK, CTransaction::CURRENT_VERSION);
-    if (sz > 5000)
+    
+    if(OrphanHandlerVersion == 1)
     {
-        if(fDebug)if(fDebug)LogPrint("mempool", "ignoring large orphan tx (size: %u, hash: %s)\n", sz, hash.ToString());
-        return false;
+        int nMaxOrphanPoolSize = (int)std::max((int64_t)0, GetArg("-maxorphansize", DEFAULT_MAX_ORPHAN_POOL_SIZE) * 1048576);
+
+        if((int)sz + nOrphanPoolSize > nMaxOrphanPoolSize)
+        {
+            if(fDebug)LogPrint("mempool", "ignoring orphan tx (size: %u, hash: %s), orphan pool size: %d\n", sz, hash.ToString(),nOrphanPoolSize);
+            return false;        
+        }        
+    }
+    else
+    {
+        if (sz > 5000)
+        {
+            if(fDebug)LogPrint("mempool", "ignoring large orphan tx (size: %u, hash: %s)\n", sz, hash.ToString());
+            return false;
+        }
     }
 
+    
     mapOrphanTransactions[hash].tx = tx;
     mapOrphanTransactions[hash].fromPeer = peer;
+    mapOrphanTransactions[hash].size=sz;
+    mapOrphanTransactions[hash].time=GetTimeMicros();
+    nOrphanPoolSize+=sz;
+    
     BOOST_FOREACH(const CTxIn& txin, tx.vin)
         mapOrphanTransactionsByPrev[txin.prevout.hash].insert(hash);
 
@@ -945,10 +1041,11 @@ void static EraseOrphanTx(uint256 hash)
         if (itPrev->second.empty())
             mapOrphanTransactionsByPrev.erase(itPrev);
     }
+    nOrphanPoolSize-=it->second.size;
     mapOrphanTransactions.erase(it);
 }
 
-void EraseOrphansFor(NodeId peer)
+int EraseOrphansFor(NodeId peer)
 {
     int nErased = 0;
     map<uint256, COrphanTx>::iterator iter = mapOrphanTransactions.begin();
@@ -962,21 +1059,101 @@ void EraseOrphansFor(NodeId peer)
         }
     }
     if (nErased > 0) if(fDebug)LogPrint("mempool", "Erased %d orphan tx from peer %d\n", nErased, peer);
+    return nErased;
 }
 
+unsigned int CheckOrphanPeers()
+{
+    unsigned int nEvicted = 0;
+    
+    if(OrphanHandlerVersion != 1)
+        return 0;
+    if(mapOrphanTransactions.size() == 0)
+        return 0;
+    
+    int64_t mintime=GetTimeMicros();
+    int peertoerase=0;
+    map<uint256, COrphanTx>::iterator iter = mapOrphanTransactions.begin();
+    while (iter != mapOrphanTransactions.end())
+    {
+        if(iter->second.time<=mintime)
+        {
+            peertoerase=iter->second.fromPeer;
+            mintime=iter->second.time;
+        }
+        iter++;
+    }            
+    if(peertoerase > 0)
+    {
+//        if(0.000001*(GetTimeMicros()-mintime) > GetArg("-orphanmaxtxage",DEFAULT_MAX_ORPHAN_TX_AGE))
+        if(0.000001*(GetTimeMicros()-mintime) > GetArg("-orphanmaxtxage",2 * Params().TargetSpacing()))
+        {
+            nEvicted=EraseOrphansFor(peertoerase);
+
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodes)
+            {
+                if(pnode->id == peertoerase)
+                {
+                    LogPrintf("mchn: Stuck transactions in orphan pool, disconnecting peer %d, removed %d txs, first is %8.3fs old\n",
+                            peertoerase,nEvicted,0.000001*(double)(GetTimeMicros()-mintime));        
+                    pnode->fDisconnect=true;
+                }
+            }            
+        }
+    }    
+    return nEvicted;
+}
 
 unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans)
 {
     unsigned int nEvicted = 0;
-    while (mapOrphanTransactions.size() > nMaxOrphans)
+    
+    if(OrphanHandlerVersion == 1)
     {
-        // Evict a random orphan:
-        uint256 randomhash = GetRandHash();
-        map<uint256, COrphanTx>::iterator it = mapOrphanTransactions.lower_bound(randomhash);
-        if (it == mapOrphanTransactions.end())
-            it = mapOrphanTransactions.begin();
-        EraseOrphanTx(it->first);
-        ++nEvicted;
+        if(mapOrphanTransactions.size() > nMaxOrphans)
+        {
+            int64_t mintime=GetTimeMicros();
+            int peertoerase=0;
+            map<uint256, COrphanTx>::iterator iter = mapOrphanTransactions.begin();
+            while (iter != mapOrphanTransactions.end())
+            {
+                if(iter->second.time<=mintime)
+                {
+                    peertoerase=iter->second.fromPeer;
+                    mintime=iter->second.time;
+                }
+                iter++;
+            }            
+            if(peertoerase > 0)
+            {
+                nEvicted=EraseOrphansFor(peertoerase);
+                
+                LOCK(cs_vNodes);
+                BOOST_FOREACH(CNode* pnode, vNodes)
+                {
+                    if(pnode->id == peertoerase)
+                    {
+                        LogPrintf("mchn: Orphan pool full, disconnecting peer %d, removed %d txs, first is %8.3fs old\n",
+                                peertoerase,nEvicted,0.000001*(double)(GetTimeMicros()-mintime));        
+                        pnode->fDisconnect=true;
+                    }
+                }
+            }
+        }        
+    }
+    else
+    {
+        while (mapOrphanTransactions.size() > nMaxOrphans)
+        {
+            // Evict a random orphan:
+            uint256 randomhash = GetRandHash();
+            map<uint256, COrphanTx>::iterator it = mapOrphanTransactions.lower_bound(randomhash);
+            if (it == mapOrphanTransactions.end())
+                it = mapOrphanTransactions.begin();
+            EraseOrphanTx(it->first);
+            ++nEvicted;
+        }
     }
     return nEvicted;
 }
@@ -1353,6 +1530,79 @@ CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowF
         nMinFee = MAX_MONEY;
     return nMinFee;
 }
+
+int TxThrottlingDelay(bool print)
+{    
+    if( (nMessageHandlerThreads & MC_MHT_PROCESSTXDATA ) == 0)                
+    {
+        return 0;
+    }
+    
+    int64_t one_mb=1048576;
+    
+    double dDelay;
+    int nDelay;
+    
+    size_t max_memory=2048;//MB
+    int64_t max_mempool_blocks=((int64_t)GetArg("-mempoolthrottle", DEFAULT_MEMPOOL_THROTTLE)*one_mb)/MAX_BLOCK_SIZE;
+    if(max_mempool_blocks <= 0)
+    {
+        max_mempool_blocks=1;
+    }
+            
+    double dMemory,dTime,dSize,dMax;
+    dMax=0;
+    
+    size_t total_memory=nTotalMempoolsSize/one_mb;
+    total_memory*=3;
+    if(nMessageHandlerThreads == ( MC_MHT_GETDATA | MC_MHT_PROCESSDATA | MC_MHT_PROCESSTXDATA ) )                
+    {
+        total_memory+=2*nTotalNodeBuffersSize/one_mb;
+    }
+    dMemory=(double)total_memory/(double)max_memory;
+/*    
+    if(dMemory>dMax)
+    {
+        dMax=dMemory;
+    }
+*/    
+    dTime=dAverageBlockTime/Params().TargetSpacing();
+    if(dTime>dMax)
+    {
+        dMax=dTime;
+    }
+    
+    dSize=((double)TotalMempoolTxSize()/(double)MAX_BLOCK_SIZE)/max_mempool_blocks;
+    if(dSize>dMax)
+    {
+        dMax=dSize;
+    }
+    
+    dDelay=0;
+    if(dMax > 0.25)
+    {
+        dDelay=(dMax-0.25)*(dMax-0.25)*160;
+    }
+    
+    if(dDelay>500)
+    {
+        dDelay=500;
+    }
+    nDelay=(int)dDelay;
+    
+    if(print)
+    {
+        LogPrint("mcblockperf","mchn-block-perf: Block: %d, Tx delay %3dms (%5.2f). "
+                "Memory: %4.2f (%4dMB: Mempools: %3d, Network: %3d/%2u), "
+                "Time: %4.2f (%6.2fs), "
+                "Size: %4.2f (%6.2f)\n",
+                chainActive.Height(),nDelay, dMax, dMemory, total_memory, nTotalMempoolsSize/one_mb, nTotalNodeBuffersSize/one_mb, vNodes.size(), dTime, dAverageBlockTime,
+                dSize,(double)TotalMempoolTxSize()/(double)MAX_BLOCK_SIZE);            
+        
+    }
+    return nDelay;
+}
+
 
 bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransaction &tx, bool fLimitFree,
                         bool* pfMissingInputs, bool fRejectInsaneFee,CWalletTx *wtx)
@@ -2946,8 +3196,8 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
             return state.Abort("Failed to read block");
         pblock = &block;
     }        
-    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Connecting block %s (height %d), %d transactions in mempool, %d in orphan pool\n",
-            pindexNew->GetBlockHash().ToString().c_str(),pindexNew->nHeight,(int)mempool.size(),(int)OrphanPoolSize());
+    LogPrint("mcblockperf","mchn-block-perf: Connecting block %s (height %d), %d transactions in mempool, %d in orphan pool (%d bytes)\n",
+            pindexNew->GetBlockHash().ToString().c_str(),pindexNew->nHeight,(int)mempool.size(),(int)OrphanPoolSize(),nOrphanPoolSize);
     // Apply the block atomically to the chain state.
     int64_t nTime2 = GetTimeMicros(); nTimeReadFromDisk += nTime2 - nTime1;
     int64_t nTime3;
@@ -3020,7 +3270,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
     if(fDebug)LogPrint("bench", "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
     // Remove conflicting transactions from the mempool.
     list<CTransaction> txConflicted;
-    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Removing block txs from mempool\n");
+    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Updating feeds\n");
 
     int err=MC_ERR_NOERROR;
     if(pindexNew->nHeight)
@@ -3129,7 +3379,20 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
             LogPrintf("ConnectTip() : ConnectBlock %s failed, Wtxs CleanUpAfterBlock, error: %d", pindexNew->GetBlockHash().ToString(),err);
         }    
     }
-
+    
+    vector<uint256> vBlockTxs;
+    BOOST_FOREACH(const CTransaction &tx, pblock->vtx) {
+        vBlockTxs.push_back(tx.GetHash());
+    }    
+    
+    {
+        LOCK(cs_vNodes);
+        BOOST_FOREACH(CNode* pnode, vNodes)
+        {
+            pnode->RemoveTxsInFlight(vBlockTxs);
+        }        
+    }
+            
 /* MCHN END */    
     // Update chainActive & related variables.
     UpdateTip(pindexNew);
@@ -3593,6 +3856,8 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
         ReplayMemPool(mempool,0,true);
         if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Defragmenting mempool hash list\n");
         mempool.defragmentHashList();
+        
+        CheckOrphanPeers();
         
         if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Reaccepting wallet transactions\n");
         if(pwalletMain)
@@ -4987,7 +5252,8 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
         }
     }
 /* MCHN END*/    
-    
+    int old_height=chainActive.Height();
+    double start_time=mc_TimeNowAsDouble();
     // Preliminary checks
     bool checked = CheckBlock(*pblock, state);
     bool activate=true;
@@ -5072,6 +5338,49 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
             pEF->NET_CheckConnections();
         }
     }
+
+    nTotalMempoolsSize=TotalMempoolsSize();        
+
+    int node_count=0;
+    nTotalNodeBuffersSize=0;
+    {
+        LOCK(cs_vNodes);
+        BOOST_FOREACH(CNode* pnode, vNodes)
+        {
+            nTotalNodeBuffersSize+=pnode->nTotalBuffersSize;
+            node_count++;
+        }
+    }   
+
+    int new_height=chainActive.Height();
+    if(new_height>old_height)
+    {
+        double end_time=mc_TimeNowAsDouble();
+        int nBlockWindow=20;
+        for(int b=nBlockWindow-1;b>0;b--)
+        {
+            dBlockProcessingTime[b]=dBlockProcessingTime[b-1];
+        }
+        dBlockProcessingTime[0]=end_time-start_time;
+        nBlockTimeMeasured++;
+        int nb=nBlockWindow;
+        if(nb>nBlockTimeMeasured)
+        {
+           nb=nBlockTimeMeasured; 
+        }
+        double weight=0;
+        double total=0;
+        for(int b=0;b<nb;b++)
+        {
+            total+=(nb-b)*dBlockProcessingTime[b];
+            weight+=nb-b;
+        }
+        dAverageBlockTime=total/weight;
+
+        TxThrottlingDelay(true);
+    }
+    
+    
 /* MCHN START */    
 /*
     CBlockIndex* pblockindex = mapBlockIndex[pblock->GetHash()];
@@ -5809,7 +6118,7 @@ bool static AlreadyHave(const CInv& inv)
 }
 
 
-void static ProcessGetData(CNode* pfrom)
+bool ProcessGetData(CNode* pfrom)
 {
     std::deque<CInv>::iterator it = pfrom->vRecvGetData.begin();
 
@@ -5817,7 +6126,7 @@ void static ProcessGetData(CNode* pfrom)
     if(!MultichainNode_RespondToGetData(pfrom)) 
     {
         pfrom->vRecvGetData.erase(pfrom->vRecvGetData.begin(), pfrom->vRecvGetData.end());        
-        return;
+        return true;
     }
 /* MCHN END */    
     
@@ -5828,7 +6137,10 @@ void static ProcessGetData(CNode* pfrom)
     while (it != pfrom->vRecvGetData.end()) {
         // Don't bother if send buffer is too full to respond anyway
         if (pfrom->nSendSize >= SendBufferSize())
+        {
+            if(fDebug)LogPrint("mcminor","mchn: Send buffer full on getdata (%ld bytes) for peer %d\n", pfrom->nSendSize, pfrom->id);            
             break;
+        }
 
         const CInv &inv = *it;
         {
@@ -5873,6 +6185,8 @@ void static ProcessGetData(CNode* pfrom)
                         assert(!"cannot load block from disk");
                     
                     if(fDebug)LogPrint("mcnet","mcnet: Sending block: %s (height %d), to peer=%d\n",inv.hash.ToString().c_str(),block_height,pfrom->id);            
+                    LogPrint("mcblockperf","mchn-block-perf: Sending block %s (height %d), to node %d\n",
+                            inv.hash.ToString().c_str(),block_height,pfrom->id);                    
                     if (inv.type == MSG_BLOCK)
                         pfrom->PushMessage("block", block);
                     else // MSG_FILTERED_BLOCK)
@@ -5957,6 +6271,8 @@ void static ProcessGetData(CNode* pfrom)
         // having to download the entire memory pool.
         pfrom->PushMessage("notfound", vNotFound);
     }
+    
+    return true;
 }
 
 
@@ -6384,10 +6700,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             Misbehaving(pfrom->GetId(), 20);
             return error("message inv size() = %u", vInv.size());
         }
-
+        
         LOCK(cs_main);
 
         std::vector<CInv> vToFetch;
+        std::vector<uint256> vTxsToFetch;
 
         for (unsigned int nInv = 0; nInv < vInv.size(); nInv++)
         {
@@ -6400,9 +6717,23 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             if(fDebug)LogPrint("net", "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHave ? "have" : "new", pfrom->id);
 
             if (!fAlreadyHave && !fImporting && !fReindex && inv.type != MSG_BLOCK)
+            {
                 pfrom->AskFor(inv);
-
+                if(inv.type == MSG_TX)
+                {
+                    vTxsToFetch.push_back(inv.hash);
+                }
+            }
+            
             if (inv.type == MSG_BLOCK) {
+                if (!fAlreadyHave)
+                {
+                    if(!pfrom->fReadyForTxInv)
+                    {
+                        LogPrintf("mchn: New unknown header from node %d on block %d - start pushing txs\n",pfrom->id,mc_gState->m_Permissions->m_Block);
+                        PushMempoolToInv(pfrom);
+                    }
+                }
                 UpdateBlockAvailability(pfrom->GetId(), inv.hash);
                 if (!fAlreadyHave && !fImporting && !fReindex && !mapBlocksInFlight.count(inv.hash)) {
                     // First request the headers preceeding the announced block. In the normal fully-synced
@@ -6423,6 +6754,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                             // Mark block as in flight already, even though the actual "getdata" message only goes out
                             // later (within the same cs_main lock, though).
                             MarkBlockAsInFlight(pfrom->GetId(), inv.hash);
+                            if(fDebug)LogPrint("mcblockperf", "mchn-block-perf: Requesting block (inv) %s peer=%d\n", inv.hash.ToString().c_str(), pfrom->id);
+                            
                         }
                     }
                     if(fDebug)LogPrint("net", "getheaders (%d) %s to peer=%d\n", pindexBestHeader->nHeight, inv.hash.ToString(), pfrom->id);
@@ -6440,6 +6773,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         if (!vToFetch.empty() && !MultichainNode_IgnoreIncoming(pfrom))      // MCHN
             pfrom->PushMessage("getdata", vToFetch);
+        
+        pfrom->AddTxsInFlight(vTxsToFetch);
     }
 
 
@@ -6459,8 +6794,16 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         if ((fDebug && vInv.size() > 0) || (vInv.size() == 1))
             if(fDebug)LogPrint("net", "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
 
-        pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
-        ProcessGetData(pfrom);
+        if( nMessageHandlerThreads & MC_MHT_GETDATA )
+        {
+            LOCK(pfrom->cs_vRecvGetData);
+            pfrom->vRecvGetDataBuf.insert(pfrom->vRecvGetDataBuf.end(), vInv.begin(), vInv.end());            
+        }
+        else
+        {        
+            pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
+            ProcessGetData(pfrom);
+        }
     }
 
 
@@ -6551,7 +6894,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     else if (strCommand == "tx" && MultichainNode_AcceptData(pfrom))            // MCHN
     {
 /* MCHN START */        
-        if(!MultichainNode_IgnoreIncoming(pfrom))
+        if(!MultichainNode_IgnoreIncoming(pfrom) && !pfrom->fDisconnect)
         {
 /* MCHN END */        
         vector<uint256> vWorkQueue;
@@ -6561,9 +6904,13 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         CInv inv(MSG_TX, tx.GetHash());
         pfrom->AddInventoryKnown(inv);
-
+        
+        {
         LOCK(cs_main);
 
+        if( !fAcceptOnlyRequestedTxs  || pfrom->IsTxInFlight(inv.hash) )
+        {
+            
         double start_time=mc_TimeNowAsDouble();
         
         bool fMissingInputs = false;
@@ -6686,15 +7033,20 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             
             if(!found_in_oldblocks)
             {
-/* MCHN END */                        
-            AddOrphanTx(tx, pfrom->GetId());
-
-            // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
-            unsigned int nMaxOrphanTx = (unsigned int)std::max((int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
-            unsigned int nEvicted = LimitOrphanTxSize(nMaxOrphanTx);
-            if (nEvicted > 0)
-                if(fDebug)LogPrint("mempool", "mapOrphan overflow, removed %u tx\n", nEvicted);
-/* MCHN START */            
+                bool added=AddOrphanTx(tx, pfrom->GetId());
+                if(!added)
+                {
+                    if(OrphanHandlerVersion == 1)
+                    {
+                        LogPrintf("mchn: Couldn't add tx from peer %d to orphan pool, disconnecting.\n",pfrom->id);        
+                        pfrom->fDisconnect=true;                    
+                    }
+                }
+                // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
+                unsigned int nMaxOrphanTx = (unsigned int)std::max((int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
+                unsigned int nEvicted = LimitOrphanTxSize(nMaxOrphanTx);
+                if (nEvicted > 0)
+                    if(fDebug)LogPrint("mempool", "mapOrphan overflow, removed %u tx\n", nEvicted);
             }
 /* MCHN END */            
         } else if (pfrom->fWhitelisted) {
@@ -6720,8 +7072,20 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         {
             sdTxLockTime[siPos]+=end_time-start_time;
         }
-/* MCHN START */            
+        
         }
+        pfrom->RemoveTxInFlight(inv.hash);
+        }
+        
+        int tx_throttling_delay=TxThrottlingDelay(false);
+        if(tx_throttling_delay > 0)
+        {
+            MilliSleep(tx_throttling_delay);
+        }
+    
+        
+/* MCHN START */            
+        }        
 /* MCHN END */            
     }
 
@@ -6746,6 +7110,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         if (nCount == 0) {
             // Nothing interesting. Stop asking this peers for more headers.
+            if(chainActive.Height())
+            {
+                pfrom->fEmptyHeaders=true;
+            }
             return true;
         }
 
@@ -6915,26 +7283,45 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     else if (strCommand == "mempool" && MultichainNode_SendInv(pfrom))          // MCHN
     {
 //        LOCK2(cs_main, pfrom->cs_filter);
-        LOCK(pfrom->cs_filter);
-
-        std::vector<uint256> vtxid;
-        mempool.queryHashes(vtxid);
-        vector<CInv> vInv;
-        BOOST_FOREACH(uint256& hash, vtxid) {
-            CInv inv(MSG_TX, hash);
-            CTransaction tx;
-            bool fInMemPool = mempool.lookup(hash, tx);
-            if (!fInMemPool) continue; // another thread removed since queryHashes, maybe...
-            if ((pfrom->pfilter && pfrom->pfilter->IsRelevantAndUpdate(tx)) ||
-               (!pfrom->pfilter))
-                vInv.push_back(inv);
-            if (vInv.size() == MAX_INV_SZ) {
-                pfrom->PushMessage("inv", vInv);
-                vInv.clear();
-            }
+        
+        bool pushed=false;
+        if(!pfrom->fReadyForTxInv)
+        {
+            LogPrintf("mchn: mempool request from node %d on block %d - start pushing txs\n",pfrom->id,mc_gState->m_Permissions->m_Block);           
         }
-        if (vInv.size() > 0)
-            pfrom->PushMessage("inv", vInv);
+        pushed=PushMempoolToInv(pfrom);
+        
+        if(!pushed)
+        {
+            LOCK(pfrom->cs_filter);
+
+            int push_count=0;
+            std::vector<uint256> vtxid;
+            mempool.queryHashes(vtxid);
+            vector<CInv> vInv;
+            BOOST_FOREACH(uint256& hash, vtxid) {
+                CInv inv(MSG_TX, hash);
+                CTransaction tx;
+                bool fInMemPool = mempool.lookup(hash, tx);
+                if (!fInMemPool) continue; // another thread removed since queryHashes, maybe...
+                if ((pfrom->pfilter && pfrom->pfilter->IsRelevantAndUpdate(tx)) ||
+                   (!pfrom->pfilter))
+                    vInv.push_back(inv);
+                if (vInv.size() == MAX_INV_SZ) {
+                    push_count+=vInv.size();
+                    pfrom->PushMessage("inv", vInv);
+                    vInv.clear();
+                }
+            }
+            if (vInv.size() > 0)
+            {
+                pfrom->PushMessage("inv", vInv);
+                push_count+=vInv.size();
+            }
+            
+            LogPrintf("mchn: mempool request from node %d on block %d - start pushing txs\n",pfrom->id,mc_gState->m_Permissions->m_Block);
+            LogPrintf("mchn: pushed %d inv records directly\n",push_count);
+        }
     }
 
 
@@ -7136,6 +7523,51 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     return true;
 }
 
+bool SplitInvMessage(CNode* pfrom, CNetMessage&  InvMessage)
+{    
+    CMessageHeader hdr("inv", 0);
+    
+    vector <CInv> vInv; 
+    InvMessage.vRecv >> vInv;
+    
+    vector <CInv> vInvTxs; 
+    vector <CInv> vInvBlocks; 
+    for (unsigned int nInv = 0; nInv < vInv.size(); nInv++)
+    {
+        const CInv &inv = vInv[nInv];
+        if(inv.type == MSG_TX)
+        {
+            vInvTxs.push_back(inv);
+        }
+        else
+        {
+            vInvBlocks.push_back(inv);
+        }
+    }
+     
+    if(vInvTxs.size())
+    {
+        CNetMessage msg(SER_NETWORK, PROTOCOL_VERSION);
+        msg.readHeader((const char*)&hdr,sizeof(CMessageHeader));
+        msg.vRecv << vInvTxs;
+        
+        LOCK(pfrom->cs_vRecvTxDataMsg);
+        pfrom->vRecvTxDataMsg.push_back(msg);        
+    }
+    
+    if(vInvBlocks.size())
+    {
+        CNetMessage msg(SER_NETWORK, PROTOCOL_VERSION);
+        msg.readHeader((const char*)&hdr,sizeof(CMessageHeader));
+        msg.vRecv << vInvBlocks;
+        
+        LOCK(pfrom->cs_vRecvDataMsg);
+        pfrom->vRecvDataMsg.push_back(msg);        
+    }
+    
+    return true;
+}
+
 // requires LOCK(cs_vRecvMsg)
 bool ProcessMessages(CNode* pfrom)
 {
@@ -7152,11 +7584,14 @@ bool ProcessMessages(CNode* pfrom)
     //
     bool fOk = true;
 
-    if (!pfrom->vRecvGetData.empty())
-        ProcessGetData(pfrom);
+    if((nMessageHandlerThreads & MC_MHT_GETDATA) == 0)
+    {
+        if (!pfrom->vRecvGetData.empty())
+            ProcessGetData(pfrom);
 
-    // this maintains the order of responses
-    if (!pfrom->vRecvGetData.empty()) return fOk;
+        // this maintains the order of responses
+        if (!pfrom->vRecvGetData.empty()) return fOk;
+    }
 
 /* MCHN START */    
     {        
@@ -7186,7 +7621,8 @@ bool ProcessMessages(CNode* pfrom)
     std::deque<CNetMessage>::iterator it = pfrom->vRecvMsg.begin();
     while (!pfrom->fDisconnect && it != pfrom->vRecvMsg.end()) {
         // Don't bother if send buffer is too full to respond anyway
-        bool fProcessInDataThread=(GetArg("-msghandlerversion",1) == 1);
+        int32_t fProcessInDataThread=nMessageHandlerThreads & MC_MHT_PROCESSDATA;
+        int32_t fProcessTxInSeparateDataThread=nMessageHandlerThreads & MC_MHT_PROCESSTXDATA;
         CNetMessage& msg1 = *it;
         if(msg1.complete())
         {
@@ -7198,6 +7634,7 @@ bool ProcessMessages(CNode* pfrom)
         
         if (pfrom->nSendSize >= SendBufferSize())
         {
+            if(fDebug)LogPrint("mcminor","mchn: Send buffer full on processmessages (%ld bytes) for peer %d\n", pfrom->nSendSize, pfrom->id);            
             
             CNetMessage& msg1 = *it;
             if(msg1.complete())
@@ -7270,7 +7707,7 @@ bool ProcessMessages(CNode* pfrom)
         
 /* MCHN START */            
         if(fDebug)LogPrint("mchnminor","mchn: RECV: %s, peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
-        
+        if(InitialNetLogTime)if(GetTime()-pfrom->nTimeConnected<InitialNetLogTime)LogPrintf("mchn-inl: RECV: %s, peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
         if(mc_gState->m_NetworkParams->m_Status == MC_PRM_STATUS_EMPTY)
         {
             if((strCommand != "verack") && (strCommand != "version"))
@@ -7320,9 +7757,32 @@ bool ProcessMessages(CNode* pfrom)
             {
                 if(fProcessInDataThread)
                 {
-                    LOCK(pfrom->cs_vRecvDataMsg);
-                    pfrom->vRecvDataMsg.push_back(msg);
-                    fRet=true;
+                    if(fProcessTxInSeparateDataThread)
+                    {
+                        if(strCommand != "inv")
+                        {
+                            if(strCommand == "tx")
+                            {
+                                LOCK(pfrom->cs_vRecvTxDataMsg);
+                                pfrom->vRecvTxDataMsg.push_back(msg);
+                            }
+                            else
+                            {
+                                LOCK(pfrom->cs_vRecvDataMsg);
+                                pfrom->vRecvDataMsg.push_back(msg);
+                            }
+                        }
+                        else
+                        {
+                            SplitInvMessage(pfrom, msg);
+                        }
+                    }
+                    else
+                    {
+                        LOCK(pfrom->cs_vRecvDataMsg);
+                        pfrom->vRecvDataMsg.push_back(msg);                        
+                    }
+                    fRet=true;                            
                 }
                 else
                 {
@@ -7361,7 +7821,10 @@ bool ProcessMessages(CNode* pfrom)
         if (!fRet)
             LogPrintf("ProcessMessage(%s, %u bytes) FAILED peer=%d\n", SanitizeString(strCommand), nMessageSize, pfrom->id);
 
-        break;
+        if(OrphanHandlerVersion != 1)
+        {
+            break;
+        }
     }
 
     // In case the connection got shut down, its receive buffer was wiped
@@ -7371,117 +7834,102 @@ bool ProcessMessages(CNode* pfrom)
     return fOk;
 }
 
-// requires LOCK(cs_vRecvDataMsg)
-bool ProcessDataMessages(CNode* pfrom)
+bool ProcessDataMessage(CNode* pfrom,CNetMessage& msg)
 {
-    bool fOk = true;
+    if(!msg.complete())
+    {
+        return false;
+    }
 
+    
+    if(msg.hdr.GetCommand() == "block")
+    {
+        if(fDebug)LogPrint("mcblockperf","mchn-block-perf: New block, peer=%d\n", pfrom->id);
+    }                
         
-/* MCHN END */    
-
-    std::deque<CNetMessage>::iterator it = pfrom->vRecvDataMsg.begin();
-    while (!pfrom->fDisconnect && it != pfrom->vRecvDataMsg.end()) {
-        // Don't bother if send buffer is too full to respond anyway
-        CNetMessage& msg1 = *it;
-        if(msg1.complete())
-        {
-            if(msg1.hdr.GetCommand() == "block")
-            {
-                if(fDebug)LogPrint("mcblockperf","mchn-block-perf: New block, peer=%d\n", pfrom->id);
-            }                
-        }
-        
-        if (pfrom->nSendSize >= SendBufferSize())
-        {
-            
-            CNetMessage& msg1 = *it;
-            if(msg1.complete())
-            {
-                if(msg1.hdr.GetCommand() == "block")
-                {
-                    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Processing block, though send buffer is full (%d), peer=%d\n", (int)pfrom->nSendSize,pfrom->id);
-                }                
-                else
-                {
-                    break;
-                }
-            }
-            else
-            {
-                break;
-            }
-        }
-        // get next message
-        CNetMessage& msg = *it;
+    if (pfrom->nSendSize >= SendBufferSize())
+    {
+        if(fDebug)LogPrint("mcminor","mchn: Send buffer full on processdatamessage (%ld bytes), msg %s for peer %d\n", msg.hdr.GetCommand().c_str(),pfrom->nSendSize, pfrom->id);            
 
         if(msg.hdr.GetCommand() == "block")
         {
-            if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Processing new block, peer=%d\n",pfrom->id);
-        }
-        // at this point, any failure means we can delete the current message
-        it++;
-
-
-        // Read header
-        CMessageHeader& hdr = msg.hdr;
-        string strCommand = hdr.GetCommand();
-
-        if(fDebug)LogPrint("mchnminor","mchn: DATA-RECV: %s, peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
-        
-        // Message size
-        unsigned int nMessageSize = hdr.nMessageSize;
-
-        CDataStream& vRecv = msg.vRecv;
-
-        // Process message
-        bool fRet = false;
-        try
+            if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Processing block, though send buffer is full (%d), peer=%d\n", (int)pfrom->nSendSize,pfrom->id);
+        }                
+        else
         {
-            if(pfrom->fDisconnect || !MultichainNode_DisconnectRemote(pfrom))
-            {
-                fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime);
-            }
-            boost::this_thread::interruption_point();
+            return false;
         }
-        catch (std::ios_base::failure& e)
-        {
-            pfrom->PushMessage("reject", strCommand, REJECT_MALFORMED, string("error parsing message"));
-            if (strstr(e.what(), "end of data"))
-            {
-                // Allow exceptions from under-length message on vRecv
-                LogPrintf("ProcessDataMessages(%s, %u bytes) : Exception '%s' caught, normally caused by a message being shorter than its stated length\n", SanitizeString(strCommand), nMessageSize, e.what());
-            }
-            else if (strstr(e.what(), "size too large"))
-            {
-                // Allow exceptions from over-long size
-                LogPrintf("ProcessDataMessages(%s, %u bytes) : Exception '%s' caught\n", SanitizeString(strCommand), nMessageSize, e.what());
-            }
-            else
-            {
-                PrintExceptionContinue(&e, "ProcessDataMessages()");
-            }
+    }
+                
+    if(msg.hdr.GetCommand() == "inv")
+    {
+        if(pfrom->mapAskFor.size() >= MAX_INV_SZ)
+        {                
+            return false;
         }
-        catch (boost::thread_interrupted) {
-            throw;
-        }
-        catch (std::exception& e) {
-            PrintExceptionContinue(&e, "ProcessDataMessages()");
-        } catch (...) {
-            PrintExceptionContinue(NULL, "ProcessDataMessages()");
-        }
-
-        if (!fRet)
-            LogPrintf("ProcessDataMessage(%s, %u bytes) FAILED peer=%d\n", SanitizeString(strCommand), nMessageSize, pfrom->id);
-
-        break;
     }
 
-    // In case the connection got shut down, its receive buffer was wiped
-    if (!pfrom->fDisconnect)
-        pfrom->vRecvDataMsg.erase(pfrom->vRecvDataMsg.begin(), it);
-    return fOk;
-}
+    if(msg.hdr.GetCommand() == "block")
+    {
+        if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Processing new block, peer=%d\n",pfrom->id);
+    }
+        // Read header
+    CMessageHeader& hdr = msg.hdr;
+    string strCommand = hdr.GetCommand();
 
+    if(fDebug)LogPrint("mchnminor","mchn: DRCV: %s, peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
+    if(InitialNetLogTime)if(GetTime()-pfrom->nTimeConnected<InitialNetLogTime)LogPrintf("mchn-inl: DRCV: %s, peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
+
+    // Message size
+    unsigned int nMessageSize = hdr.nMessageSize;
+
+    CDataStream& vRecv = msg.vRecv;
+
+    // Process message
+    bool fRet = false;
+    try
+    {
+        if(pfrom->fDisconnect || !MultichainNode_DisconnectRemote(pfrom))
+        {
+            fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime);
+        }
+        boost::this_thread::interruption_point();
+    }
+    catch (std::ios_base::failure& e)
+    {
+        pfrom->PushMessage("reject", strCommand, REJECT_MALFORMED, string("error parsing message"));
+        if (strstr(e.what(), "end of data"))
+        {
+            // Allow exceptions from under-length message on vRecv
+            LogPrintf("ProcessDataMessage(%s, %u bytes) : Exception '%s' caught, normally caused by a message being shorter than its stated length\n", SanitizeString(strCommand), nMessageSize, e.what());
+        }
+        else if (strstr(e.what(), "size too large"))
+        {
+            // Allow exceptions from over-long size
+            LogPrintf("ProcessDataMessage(%s, %u bytes) : Exception '%s' caught\n", SanitizeString(strCommand), nMessageSize, e.what());
+        }
+        else
+        {
+            PrintExceptionContinue(&e, "ProcessDataMessage()");
+        }
+    }
+    catch (boost::thread_interrupted) {
+        throw;
+    }
+    catch (std::exception& e) {
+        PrintExceptionContinue(&e, "ProcessDataMessage()");
+    } catch (...) {
+        PrintExceptionContinue(NULL, "ProcessDataMessage()");
+    }
+
+    if (!fRet)
+    {
+        LogPrintf("ProcessDataMessage(%s, %u bytes) FAILED peer=%d\n", SanitizeString(strCommand), nMessageSize, pfrom->id);
+        pfrom->fDisconnect=true;
+    }
+
+    return true;
+}
 
 bool SendMessages(CNode* pto, bool fSendTrickle)
 {
@@ -7633,54 +8081,78 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         //
         // Message: inventory
         //
+
+        unsigned int sent_count=0;
         vector<CInv> vInv;
         vector<CInv> vInvWait;
         {
             LOCK(pto->cs_inventory);
             vInv.reserve(pto->vInventoryToSend.size());
             vInvWait.reserve(pto->vInventoryToSend.size());
-            BOOST_FOREACH(const CInv& inv, pto->vInventoryToSend)
+            int i=0;
+            int hash_stop_pos=(int)pto->vInventoryToSend.size();
+            
+            uint256 mempool_hash_stop=0;
+            
             {
-                if (pto->setInventoryKnown.count(inv))
-                    continue;
-
-                // trickle out tx inv to protect privacy
-/*                
-                if (inv.type == MSG_TX && !fSendTrickle)
-                {
-                    // 1/4 of tx invs blast to all immediately
-                    static uint256 hashSalt;
-                    if (hashSalt == 0)
-                        hashSalt = GetRandHash();
-                    uint256 hashRand = inv.hash ^ hashSalt;
-                    hashRand = Hash(BEGIN(hashRand), END(hashRand));
-                    bool fTrickleWait = ((hashRand & 3) != 0);
-
-                    if (fTrickleWait)
-                    {
-                        vInvWait.push_back(inv);
-                        continue;
-                    }
-                }
-*/
-                // returns true if wasn't already contained in the set
-                if (pto->setInventoryKnown.insert(inv).second)
-                {
-                    vInv.push_back(inv);
-                    if (vInv.size() >= 1000)
-                    {
-                        if(MultichainNode_SendInv(pto))                         // MCNN
-                            pto->PushMessage("inv", vInv);
-                        vInv.clear();
-                    }
-                }
+                LOCK(mempool.cs);
+                mempool_hash_stop=mempool.hashSendStop;
             }
-            pto->vInventoryToSend = vInvWait;
+            
+            if(OrphanHandlerVersion == 1)
+            {
+                if(mempool_hash_stop != 0)
+                {
+                    while(i<(int)pto->vInventoryToSend.size())
+                    {
+                        if(pto->vInventoryToSend[i].hash == mempool_hash_stop)
+                        {
+                            hash_stop_pos=i;
+                            i=pto->vInventoryToSend.size();
+                        }
+                        i++;
+                    }
+                }            
+            }            
+            
+            i=0;
+            while(i<(int)pto->vInventoryToSend.size())
+            {
+                CInv inv=pto->vInventoryToSend[i];
+                if( (i<hash_stop_pos) || (inv.type != MSG_TX) )
+                {
+                    if (pto->setInventoryKnown.count(inv) == 0)
+                    {
+                        if (pto->setInventoryKnown.insert(inv).second)
+                        {
+                            sent_count++;
+                            vInv.push_back(inv);
+                            if (vInv.size() >= 1000)
+                            {
+                                if(MultichainNode_SendInv(pto))                 
+                                    pto->PushMessage("inv", vInv);
+                                vInv.clear();
+                            }
+                        }    
+                    }
+                }                
+                else
+                {
+                    vInvWait.push_back(inv);                        
+                }
+                
+                i++;
+            } 
+            pto->vInventoryToSend = vInvWait;                
         }
         if (!vInv.empty())
             if(MultichainNode_SendInv(pto))                                     // MCNN
                 pto->PushMessage("inv", vInv);
-
+        if( (sent_count > 30000) || ( (sent_count > 0) && (pto->vInventoryToSend.size() > 0) ) )
+        {
+            LogPrint("mcblockperf","mchn-block-perf: Sent %d inv records to node %d, %d waiting\n",
+                    sent_count,pto->id,(int)pto->vInventoryToSend.size());                    
+        }
         // Detect whether we're stalling
         int64_t nNow = GetTimeMicros();
         if (!pto->fDisconnect && state.nStallingSince && state.nStallingSince < nNow - 1000000 * BLOCK_STALLING_TIMEOUT) {
@@ -7703,6 +8175,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                 BOOST_FOREACH(const QueuedBlock& entry, state.vBlocksInFlight)
                     mapBlocksInFlight.erase(entry.hash);
                 
+                LOCK(pto->cs_askfor);
                 state.vBlocksInFlight.clear();//.front().nTime=nNow;
                 vector <CInv> currentAskFor;
                 while (!pto->mapAskFor.empty())
@@ -7730,6 +8203,8 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
 //        if (!pto->fDisconnect && state.vBlocksInFlight.size() > 0 && state.vBlocksInFlight.front().nTime < nNow - 500000 * Params().TargetSpacing() * (4 + state.vBlocksInFlight.front().nValidatedQueuedBefore)) {
             bool fTimeout=true;
             
+            if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Block timeout, delay: %ld, in flight: %d, peer=%d\n",
+                    nNow-state.vBlocksInFlight.front().nTime,state.vBlocksInFlight.size(),pto->id);
             if(!pto->vRecvMsg.empty())
             {
                 std::deque<CNetMessage>::iterator it = pto->vRecvMsg.begin();
@@ -7774,6 +8249,8 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             NodeId staller = -1;            
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload, staller);
             BOOST_FOREACH(CBlockIndex *pindex, vToDownload) {
+                LogPrint("mcblockperf","mchn-block-perf: Request for block %s (A), to node %d\n",
+                        pindex->GetBlockHash().ToString().c_str(),pto->id);                    
                 vGetData.push_back(CInv(MSG_BLOCK, pindex->GetBlockHash()));
                 MarkBlockAsInFlight(pto->GetId(), pindex->GetBlockHash(), pindex);
                 if(fDebug)LogPrint("net", "Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
@@ -7826,6 +8303,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
 /* MCHN START */        
         if(!ignore_incoming)
         {
+            LOCK(pto->cs_askfor);
 /* MCHN END */        
         while (!pto->fDisconnect && !pto->mapAskFor.empty() && (*pto->mapAskFor.begin()).first <= nNow)
         {
@@ -7834,6 +8312,13 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             {
                 if (fDebug)
                     if(fDebug)LogPrint("net", "Requesting %s peer=%d\n", inv.ToString(), pto->id);
+                
+                if(inv.type == MSG_BLOCK)
+                {
+                    LogPrint("mcblockperf","mchn-block-perf: Request for block %s (B), to node %d\n",
+                            inv.ToString().c_str(),pto->id);                    
+                }
+                
                 vGetData.push_back(inv);
                 if (vGetData.size() >= 1000)
                 {

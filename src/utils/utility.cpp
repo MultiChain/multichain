@@ -9,6 +9,7 @@
 #endif
 
 #define MC_DCT_BUF_ALLOC_ITEMS          256
+#define MC_DCT_BUF_ALLOC_MAX_SIZE       33554432 //67108864
 #define MC_DCT_LIST_ALLOC_MIN_SIZE      32768
 #define MC_DCT_LIST_ALLOC_MAX_SIZE      268435456
 
@@ -398,6 +399,30 @@ int mc_Buffer::Initialize(int KeySize,int RowSize,uint32_t Mode)
     
 int mc_Buffer::Clear()
 {
+    unsigned char *lpNewBuffer;
+    int NewSize;
+    int err;
+    
+    if(m_AllocSize > MC_DCT_BUF_ALLOC_MAX_SIZE)
+    {
+        NewSize=mc_AllocSize(m_Count,MC_DCT_BUF_ALLOC_ITEMS,m_RowSize);
+        if(NewSize < MC_DCT_BUF_ALLOC_MAX_SIZE)
+        {
+            lpNewBuffer=(unsigned char*)mc_New(NewSize);
+
+            if(lpNewBuffer==NULL)
+            {
+                err=MC_ERR_ALLOCATION;
+                return err;
+            }
+
+            mc_Delete(m_lpData);
+
+            m_AllocSize=NewSize;
+            m_lpData=lpNewBuffer;                            
+        }
+    }
+    
     m_Size=0;
     m_Count=0;
     
@@ -413,7 +438,7 @@ int mc_Buffer::Clear()
 int mc_Buffer::Realloc(int Rows)
 {
     unsigned char *lpNewBuffer;
-    int NewSize;
+    int NewSize,ExtraRows;
     int err;
     
     err=MC_ERR_NOERROR;
@@ -421,6 +446,11 @@ int mc_Buffer::Realloc(int Rows)
     if(m_Size+m_RowSize*Rows>m_AllocSize)
     {
         NewSize=mc_AllocSize(m_Count+Rows,MC_DCT_BUF_ALLOC_ITEMS,m_RowSize);
+        ExtraRows=(int)((m_Count+Rows) * 0.1);
+        if( ExtraRows > MC_DCT_BUF_ALLOC_ITEMS)
+        {
+            NewSize=mc_AllocSize(m_Count+Rows+ExtraRows,MC_DCT_BUF_ALLOC_ITEMS,m_RowSize);            
+        }
         lpNewBuffer=(unsigned char*)mc_New(NewSize);
         
         if(lpNewBuffer==NULL)

@@ -282,7 +282,7 @@ Value liststorednodes(const Array& params, bool fHelp)
         switch(flags & MC_AMF_SOURCE_MASK)
         {
             case MC_AMF_SOURCE_ADDED:
-                entry.push_back(Pair("source","added"));                                                 
+                entry.push_back(Pair("source","stored"));                                                 
                 break;
             case MC_AMF_SOURCE_SEED:
                 entry.push_back(Pair("source","seed"));                                                 

@@ -157,6 +157,23 @@ bool LogAcceptCategory(const char* category)
 {
     if (category != NULL)
     {
+        static boost::thread_specific_ptr<set<string> > ptrPerfCategory;
+        if(!fDebug)
+        {
+            if(!mapMultiArgs.empty() && !mapMultiArgs["-debugperf"].empty())
+            {
+                if (ptrPerfCategory.get() == NULL)
+                {
+                    const vector<string>& categories = mapMultiArgs["-debugperf"];
+                    ptrPerfCategory.reset(new set<string>(categories.begin(), categories.end()));
+                    // thread_specific_ptr automatically deletes the set when the thread ends.
+                }
+                const set<string>& setPerfCategories = *ptrPerfCategory.get();
+                if (setPerfCategories.count(string(category)))
+                    return true;
+            }
+        }
+        
         if (!fDebug)
             return false;
 
@@ -713,6 +730,11 @@ void ShrinkDebugFile(const char* FileName)
 
 void ShrinkDebugFile()
 {
+    if(!mapMultiArgs["-debugperf"].empty())
+    {
+       return; 
+    }
+    
     ShrinkDebugFile("debug.log");
     ShrinkDebugFile("permissions.log");
     ShrinkDebugFile("wallet/txs.log");

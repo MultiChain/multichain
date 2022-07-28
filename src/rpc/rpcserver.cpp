@@ -60,6 +60,7 @@ static map<uint64_t, int> rpc_slots;
 static uint32_t rpc_thread_flags[MC_PRM_MAX_THREADS];
 
 void LockWallet(CWallet* pWallet);
+int TxThrottlingDelay(bool print);
 
 #define MC_ACF_NONE              0x00000000 
 #define MC_ACF_ENTERPRISE        0x00000001 
@@ -1089,41 +1090,10 @@ void ThrottleTxFlow()
     {
         if(rpc_thread_flags[slot_it->second] & MC_RPC_FLAG_NEW_TX)
         {
-            int64_t mempool_bytes=(int64_t) mempool.GetTotalTxSize();
-            int64_t block_size=MAX_BLOCK_SIZE;
-            double blocks_required=(double)mempool_bytes/(double)block_size;
-            
-            int64_t threshold=GetArg("-accepttxthreshold",0);
-            int64_t threshold_multiplier=2;
-            int64_t delay=10;
-            int64_t max_delay=1000;
-            int64_t delay_multiplier=10;
-            
-            if(delay_multiplier <= 0)
+            int tx_throttling_delay=TxThrottlingDelay(false);
+            if(tx_throttling_delay > 0)
             {
-                delay_multiplier=1;
-            }
-            
-            int64_t millisleep_time=0;
-            int count=0;
-            
-            while( (blocks_required > threshold * 0.01) && (millisleep_time <= max_delay) && (threshold > 0) && (count < 10) )
-            {
-                millisleep_time=delay;
-                
-                threshold *= threshold_multiplier;
-                delay *= delay_multiplier;
-                count++;
-            }                
-            
-            if(millisleep_time > max_delay)
-            {
-                millisleep_time=max_delay;
-            }
-            
-            if(millisleep_time > 0)
-            {
-                MilliSleep(millisleep_time);
+                MilliSleep(tx_throttling_delay);
             }
         }
     }        
