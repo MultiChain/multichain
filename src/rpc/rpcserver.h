@@ -199,8 +199,10 @@ extern json_spirit::Value stop(const json_spirit::Array& params, bool fHelp);
 
 extern json_spirit::Value getconnectioncount(const json_spirit::Array& params, bool fHelp); // in rpcnet.cpp
 extern json_spirit::Value getpeerinfo(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value liststorednodes(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value ping(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value addnode(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value storenode(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getaddednodeinfo(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getnettotals(const json_spirit::Array& params, bool fHelp);
 
@@ -353,6 +355,7 @@ extern json_spirit::Value setvariablevaluefrom(const json_spirit::Array& params,
 extern json_spirit::Value getvariablevalue(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getvariablehistory(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listassetissues(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value gettokeninfo(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listlibraries(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value addlibraryupdate(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value addlibraryupdatefrom(const json_spirit::Array& params, bool fHelp);

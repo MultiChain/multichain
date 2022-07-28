@@ -78,14 +78,13 @@ using namespace std;
 
 struct mc_ChunkCollector;
 
+string mc_MsgTypeStr(uint32_t msg_type);
 bool MultichainRelayResponse(uint32_t msg_type_stored, CNode *pto_stored,
                              uint32_t msg_type_in, uint32_t  flags, vector<unsigned char>& vPayloadIn,vector<CKeyID>&  vAddrIn,
                              uint32_t* msg_type_response,uint32_t  *flags_response,vector<unsigned char>& vPayloadResponse,vector<CKeyID>&  vAddrResponse,
                              uint32_t* msg_type_relay,uint32_t  *flags_relay,vector<unsigned char>& vPayloadRelay,vector<CKeyID>&  vAddrRelay,
                              string& strError);
 
-int MultichainCollectChunks(mc_ChunkCollector* collector);
-int MultichainCollectChunksQueueStats(mc_ChunkCollector* collector);
 
 
 
@@ -169,6 +168,24 @@ typedef struct mc_OffchainMessageID
         return strprintf("%s-%d",m_Nonce.ToString().c_str(),m_TimeStamp);
     }
 } mc_OffchainMessageID;
+
+typedef struct CRelayResponsePair
+{
+    mc_OffchainMessageID request_id;
+    int response_id;
+    
+    friend bool operator<(const CRelayResponsePair& a, const CRelayResponsePair& b)
+    {
+        return ((a.request_id < b.request_id) || 
+                (a.request_id == b.request_id && a.response_id < b.response_id));
+    }
+    
+} CRelayResponsePair;
+
+typedef struct CRelayRequestPairs
+{
+    map<int,int> m_Pairs;
+} CRelayRequestPairs;
 
 
 typedef struct mc_NodeFullAddress

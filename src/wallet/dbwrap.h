@@ -86,7 +86,7 @@ public:
     int RenameDb(const std::string& strOldFileName,const std::string& strNewFileName);
     bool Recover(std::string strFile, std::vector<CDBConstEnv::KeyValPair>& SalvagedData);
     
-    
+    int MinWalletDBVersion();    
 };
 
 extern CDBWrapEnv bitdbwrap;

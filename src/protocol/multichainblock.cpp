@@ -14,6 +14,9 @@
 
 extern mc_WalletTxs* pwalletTxsMain;
 
+size_t nTotalMempoolTxSize=0;
+size_t nTotalMempoolItems=0;
+size_t nMapRelaySize=0;
 
 using namespace std;
 /*
@@ -328,10 +331,53 @@ int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,
     return err;
 }
 
+int64_t TotalMempoolTxSize()
+{
+    return nTotalMempoolTxSize;
+}
+
+int64_t TotalMempoolsSize()
+{
+    int64_t total_size;
+    int64_t wallet_mempool_sizes[6];
+    int64_t one_mb=1048576;
+    size_t nMapRelayItems=mapRelay.size();   
+    
+    total_size=(int64_t)nTotalMempoolTxSize;
+    wallet_mempool_sizes[0]=pwalletTxsMain->m_Database->m_MemPools[0]->m_AllocSize;
+    wallet_mempool_sizes[1]=pwalletTxsMain->m_Database->m_RawMemPools[0]->m_AllocSize;
+    wallet_mempool_sizes[2]=pwalletTxsMain->m_Database->m_RawUpdatePool->m_AllocSize;
+    wallet_mempool_sizes[3]=pwalletTxsMain->m_Database->m_WRPMemPool->m_AllocSize;
+    wallet_mempool_sizes[4]=pwalletTxsMain->m_Database->m_WRPRawMemPool->m_AllocSize;
+    wallet_mempool_sizes[5]=pwalletTxsMain->m_Database->m_WRPRawUpdatePool->m_AllocSize;
+    
+    for(int i=0;i<6;i++)
+    {
+        total_size+=wallet_mempool_sizes[i];
+    }
+    
+    if(nTotalMempoolItems > 0)
+    {
+        nMapRelaySize=(size_t)( ((double)nTotalMempoolTxSize/(double)nTotalMempoolItems) * nMapRelayItems);
+        nMapRelaySize+=(2*sizeof(CInv)+sizeof(int64_t)) * nMapRelayItems;
+    }
+    
+    total_size+=nMapRelaySize;
+    
+    LogPrint("mcblockperf","mchn-block-perf: Mempool sizes: Total: %4dMB, Mempool: %4d (%7u txs), Relay: %4d (%7u txs), Wallet: (%3d, %3d, %3d, %3d, %3d, %3d)\n",
+            total_size/one_mb,nTotalMempoolTxSize/one_mb,nTotalMempoolItems,nMapRelaySize/one_mb,nMapRelayItems,
+            wallet_mempool_sizes[0]/one_mb,wallet_mempool_sizes[1]/one_mb,wallet_mempool_sizes[2]/one_mb,
+            wallet_mempool_sizes[3]/one_mb,wallet_mempool_sizes[4]/one_mb,wallet_mempool_sizes[5]/one_mb);
+    
+    return total_size;
+}
+
 bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
 {
     int pos;
     uint256 hash;
+    
+    double start_time=mc_TimeNowAsDouble();
     
     if(mc_gState->m_NetworkParams->IsProtocolMultichain() == 0)
     {
@@ -356,6 +402,12 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
     }    
     
     int total_txs=pool.hashList->m_Count;
+    int added_txs=0;
+    size_t added_size=0;
+    int rejected_txs=0;
+    size_t send_stop_size=MAX_BLOCK_SIZE;
+    
+    pool.hashSendStop=0;
     
     LogPrint("mchn", "mchn: Replaying memory pool (%d new transactions, total %d)\n",total_txs-from,total_txs);
     mc_gState->m_Permissions->MempoolPermissionsCopy();
@@ -409,10 +461,12 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
                 }
             }
 
+            added_txs++;
             if(removed_type.size())
             {
                 LogPrintf("mchn: Tx %s removed from the mempool (%s), reason: %s\n",tx.GetHash().ToString().c_str(),removed_type.c_str(),reason.c_str());
-                pool.remove(tx, removed, true, "replay: "+removed_type);                    
+                pool.remove(tx, removed, true, "replay: "+removed_type);    
+                rejected_txs++;                
             }
             else
             {
@@ -422,10 +476,28 @@ bool ReplayMemPool(CTxMemPool& pool, int from,bool accept)
                     reason="wallet";
                     LogPrintf("mchn: Tx %s removed from the mempool (%s), reason: %s\n",tx.GetHash().ToString().c_str(),removed_type.c_str(),reason.c_str());
                     pool.remove(tx, removed, true, "replay: "+reason);                                        
+                    rejected_txs++;                
+                }
+                else
+                {
+                    added_size+=entry.GetTxSize();
+                    if(added_size > send_stop_size)
+                    {
+                        if(pool.hashSendStop == 0)
+                        {
+                            pool.hashSendStop=hash;
+                        }
+                    }
                 }
             }
         }
     }
+    
+    nTotalMempoolTxSize=added_size;
+    nTotalMempoolItems=added_txs;
+    
+    LogPrint("mcblockperf","mchn-block-perf: Replaying mempool after block %6d. New %8d, total %8d, added %8d, rejected %8d, time %8.3fs\n",
+            chainActive.Height(),total_txs-from,total_txs,added_txs-rejected_txs,rejected_txs,mc_TimeNowAsDouble()-start_time);
     
     return true;
 }

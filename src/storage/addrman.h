@@ -18,6 +18,108 @@
 #include <stdint.h>
 #include <vector>
 
+
+#define MC_AMM_MIN_MODE                         0     
+#define MC_AMM_RECENT_SUCCESS                   0     
+#define MC_AMM_RECENT_FAIL                      1     
+#define MC_AMM_NEW_NET                          2
+#define MC_AMM_OLD_FAIL                         3     
+#define MC_AMM_TRIED_NET                        4
+#define MC_AMM_MODE_COUNT                       5
+
+#define MC_AMF_NONE                           0x000000000
+#define MC_AMF_IGNORED                        0x000000001
+#define MC_AMF_SOURCE_PEER                    0x000000000
+#define MC_AMF_SOURCE_ADDED                   0x000000100
+#define MC_AMF_SOURCE_SEED                    0x000000200
+#define MC_AMF_SOURCE_MASK                    0x00000FF00
+
+class CMCAddrInfo
+{
+    private:
+        CService m_NetAddress;
+        unsigned short m_Reserved1;
+        uint160 m_MCAddress;
+        int64_t m_LastSuccess;
+        int32_t m_Attempts;
+        uint32_t m_Flags;
+        int64_t m_LastTry;
+        uint32_t m_PrevRow;
+        uint32_t m_LastRow;
+        uint32_t m_LastSuccessRow;
+        uint32_t m_Reserved2;
+        
+    public:
+        CMCAddrInfo()
+        {
+            Init();            
+        }
+        
+        CMCAddrInfo(const CService &netaddr, uint160 mcaddr) 
+        {
+            Init();
+            m_NetAddress=netaddr;
+            m_MCAddress=mcaddr;
+        }
+        CMCAddrInfo(void *raw) 
+        {
+            Init();
+            memcpy(this, raw, sizeof(CMCAddrInfo));
+        }
+        void Init();
+        void SetFlag(uint32_t flag,int set_flag);
+        void SetLastRow(uint32_t row);
+        void SetPrevRow(uint32_t row);
+        void ResetLastTry(bool success);
+        uint32_t GetFlags();
+        uint32_t GetLastRow();
+        uint32_t GetPrevRow();
+        CService GetNetAddress();        
+        uint160 GetMCAddress();
+        int32_t GetLastTryInfo(int64_t *last_success,int64_t *last_try,uint32_t *last_success_row);
+        void Try();
+        void Set(uint32_t row);
+        bool IsNet();
+};
+
+class CMCAddrMan
+{
+    private:
+        mutable CCriticalSection cs;
+        
+        uint32_t m_RowSize;
+        uint32_t m_CurRow;
+        
+        std::vector<CMCAddrInfo> m_MCAddrs;
+        std::map<uint256, uint32_t> m_HashMap;
+        
+        uint256 GetHash(const CService &netaddr, uint160 mcaddr);
+        std::vector<CMCAddrInfo> m_Selected[MC_AMM_MODE_COUNT];
+        uint32_t m_Position[MC_AMM_MODE_COUNT];
+        std::set <uint160> m_MCAddrConnected;
+        std::set <uint160> m_MCAddrTried;
+        std::set <CService> m_NetAddrConnected;
+        std::set <CService> m_NetAddrTried;
+        
+    public:
+        CMCAddrMan()
+        {
+            Init();            
+        }
+        void Init();
+        void Try(const CService &netaddr, uint160 mcaddr);
+        void Set(const CService &netaddr, uint160 mcaddr);
+        bool SetOutcome(const CService &netaddr, uint160 mcaddr,bool outcome);
+        uint32_t Load();
+        void Save() const;
+        CMCAddrInfo *Find(const CService &netaddr, uint160 mcaddr);
+        CMCAddrInfo *Select(uint160 mcaddr,uint32_t mode);
+        void Reset();
+        CMCAddrInfo *Next();
+        uint32_t PrepareSelect(std::set<CService> setLocalAddr,uint32_t *counts);
+        CMCAddrInfo *Select(int mode);        
+};
+
 /** 
  * Extended statistics about a CAddress 
  */
@@ -73,7 +175,7 @@ public:
         nRandomPos = -1;
         fSCInvalid=false;
         fSCDead=false;
-        dSCChance=false;
+        dSCChance=0;
     }
 
     CAddrInfo(const CAddress &addrIn, const CNetAddr &addrSource) : CAddress(addrIn), source(addrSource)
@@ -91,6 +193,8 @@ public:
         fSCInvalid=invalid;
         dSCChance=GetChance(nNow,&fSCDead);
     }
+
+    void SCSetSelected(CAddress addr);
     
     double GetSC(bool *invalid,bool *dead,int64_t *last_attempt = NULL) const
     {
@@ -233,7 +337,9 @@ private:
     double dSCTotalChance;
     int nSCTotalBad;
     int64_t nLastRecalculate;
-
+    
+    CMCAddrMan cMCAddrMan;
+    
 protected:
 
     //! Find an entry.
@@ -276,6 +382,7 @@ protected:
     bool SCSelect_(int nUnkBias,int nNodes, CAddress &addr);
     void SCRecalculate_(int64_t nNow);
     
+    void SCSetSelected_(CAddress addr);
     void SetSC_(bool invalid,int64_t nNow);
     
     
@@ -322,6 +429,8 @@ public:
     {
         LOCK(cs);
 
+        cMCAddrMan.Save();
+        
         unsigned char nVersion = 0;
         s << nVersion;
         s << nKey;
@@ -366,6 +475,8 @@ public:
     {
         LOCK(cs);
 
+        cMCAddrMan.Load();
+        
         unsigned char nVersion;
         s >> nVersion;
         s >> nKey;
@@ -384,6 +495,7 @@ public:
         for (int n = 0; n < nNew; n++) {
             CAddrInfo &info = mapInfo[n];
             s >> info;
+            cMCAddrMan.Set(info,0);
             mapAddr[info] = n;
             mapAddrWithPort[info] = n;
             info.nRandomPos = vRandom.size();
@@ -398,6 +510,7 @@ public:
         for (int n = 0; n < nTried; n++) {
             CAddrInfo info;
             s >> info;
+            cMCAddrMan.Set(info,0);
             std::vector<int> &vTried = vvTried[info.GetTriedBucket(nKey)];
             if (vTried.size() < ADDRMAN_TRIED_BUCKET_SIZE) {
                 info.nRandomPos = vRandom.size();
@@ -546,6 +659,16 @@ public:
             Check();
         }        
     }
+    
+    void SCSetSelected(CAddress addr)
+    {
+        {
+            LOCK(cs);
+            Check();
+            SCSetSelected_(addr);
+            Check();
+        }                
+    }
 
     void SCRecalculate(int64_t nNow)
     {
@@ -594,6 +717,12 @@ public:
             }
         }
     }
+
+    CMCAddrMan *GetMCAddrMan()
+    {
+        return &cMCAddrMan;
+    }
+    
 };
 
 #endif // BITCOIN_ADDRMAN_H

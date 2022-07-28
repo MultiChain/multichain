@@ -34,63 +34,14 @@ You can use the pre-built headers and binaries of Google's V8 JavaScript engine 
 
 ## Install dependencies
 
-    brew install autoconf automake berkeley-db4 libtool boost@1.57 pkg-config rename python@2 nasm
-    export LDFLAGS=-L/usr/local/opt/openssl/lib
-    export CPPFLAGS=-I/usr/local/opt/openssl/include
-    brew link boost@1.57 --force
+    brew install autoconf automake libevent libtool boost pkg-config rename nasm
 
-If another Boost version was already installed, then do this:
-
-    brew uninstall boost
-    brew install boost@1.57
-    brew link boost@1.57 --force
-
-## Prepare for static linking
-
-Apple does not support statically linked binaries as [documented here](https://developer.apple.com/library/content/qa/qa1118/_index.html), however, it is convenient for end-users to launch a binary without having to first install brew, a third-party system designed for developers.
-
-To create a statically linked MultiChain which only depends on the default MacOS dylibs, the following steps are taken:
-
-1. Hide the brew boost dylibs from the build system:
-
-        rename -e 's/.dylib/.dylib.hidden/' /usr/local/opt/boost\@1.57/lib/*.dylib
-
-2. Hide the brew berkeley-db dylibs from the build system:
-
-        rename -e 's/.dylib/.dylib.hidden/' /usr/local/opt/berkeley-db\@4/lib/*.dylib
-
-3. Hide the brew openssl dylibs from the build system:
-
-        rename -e 's/.dylib/.dylib.hidden/' /usr/local/opt/openssl/lib/*.dylib
-
-The default brew cookbook for berkeley-db and boost builds static libraries, but the default cookbook for openssl only builds dylibs.
-
-3. Tell brew to build openssl static libraries:
-
-        brew uninstall --ignore-dependencies openssl
-        brew tap-new $USER/old-openssl
-        brew extract --version=1.0.2q openssl $USER/old-openssl
-        brew install openssl@1.0.2q
-        export LDFLAGS="-L/usr/local/opt/openssl@1.0.2q/lib"
-        export CPPFLAGS="-I/usr/local/opt/openssl@1.0.2q/include"
-        export PKG_CONFIG_PATH="/usr/local/opt/openssl@1.0.2q/lib/pkgconfig"
-        brew edit openssl
-        
 ## Compile MultiChain for Mac (64-bit)
 
     cd $MULTICHAIN_HOME
     ./autogen.sh
     ./configure --with-gui=no --with-libs=no --with-miniupnpc=no
     make
-
-## Clean up
-
-    rename -e 's/.dylib.hidden/.dylib/' /usr/local/opt/berkeley-db\@4/lib/*.dylib.hidden
-    rename -e 's/.dylib.hidden/.dylib/' /usr/local/opt/boost/lib/*.dylib.hidden
-    rename -e 's/.dylib.hidden/.dylib/' /usr/local/opt/openssl/lib/*.dylib.hidden
-    brew edit openssl
-    
-In 'def install' => 'args =' change 'no-shared' to 'shared'
 
 ## Notes
 

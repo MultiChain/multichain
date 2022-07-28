@@ -448,6 +448,7 @@ bool AppInit(int argc, char* argv[])
         detectShutdownThread = NULL;
     }
 
+    Interrupt();
     Shutdown();    
     DebugPrintClose();
     

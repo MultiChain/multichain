@@ -71,6 +71,9 @@ static const unsigned int MAX_P2SH_SIGOPS = 15;
 /* MCHN START */
 //static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 1000;
 static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 50000;
+static const unsigned int DEFAULT_MAX_ORPHAN_POOL_SIZE = 100;
+static const unsigned int DEFAULT_MAX_ORPHAN_TX_AGE = 300;
+static const unsigned int DEFAULT_MEMPOOL_THROTTLE = 500;
 static const unsigned int DEFAULT_MAX_SUCCESSORS_FROM_ONE_NODE = 10;
 /* MCHN END */
 extern int MAX_OP_RETURN_SHOWN;
@@ -144,7 +147,9 @@ extern bool fReindex;
 extern bool fRescan;
 extern int nScriptCheckThreads;
 extern bool fTxIndex;
+extern bool fAcceptOnlyRequestedTxs;
 extern bool fIsBareMultisigStd;
+extern uint32_t nMessageHandlerThreads;
 extern unsigned int nCoinCacheSize;
 extern CFeeRate minRelayTxFee;
 
@@ -160,6 +165,17 @@ static const uint64_t nMinDiskSpace = 52428800;
 #define MC_AMT_DEFAULT                                     0x00000000 
 #define MC_AMT_NO_ACCEPT                                   0x00000001
 #define MC_AMT_NO_FILTERS                                  0x00000002
+
+
+// Message handler threads
+
+#define MC_MHT_NONE                                        0x00000000 
+#define MC_MHT_GETDATA                                     0x00000001
+#define MC_MHT_PROCESSDATA                                 0x00000002
+#define MC_MHT_PROCESSTXDATA                               0x00000004
+#define MC_MHT_DEFAULT                                     0x00000007 
+
+
 
 
 bool AcceptMultiChainTransaction(const CTransaction& tx, 
@@ -222,6 +238,8 @@ bool LoadBlockIndex(std::string& strError);
 void UnloadBlockIndex();
 /** Process protocol messages received from a given node */
 bool ProcessMessages(CNode* pfrom);
+bool ProcessDataMessage(CNode* pfrom,CNetMessage& msg);
+bool ProcessGetData(CNode* pfrom);
 /** Send queued protocol messages to be sent to a give node */
 bool SendMessages(CNode* pto, bool fSendTrickle);
 /** Run an instance of the script checking thread */

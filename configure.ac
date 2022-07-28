@@ -6,13 +6,13 @@ define(_CLIENT_VERSION_REVISION, 0)
 define(_CLIENT_VERSION_BUILD, 0)
 define(_CLIENT_VERSION_IS_RELEASE, true)
 define(_COPYRIGHT_YEAR, 2015)
-AC_INIT([Bitcoin Core],[_CLIENT_VERSION_MAJOR._CLIENT_VERSION_MINOR._CLIENT_VERSION_REVISION],[info@bitcoin.org],[bitcoin])
+AC_INIT([Bitcoin Core],[_CLIENT_VERSION_MAJOR._CLIENT_VERSION_MINOR._CLIENT_VERSION_REVISION],[info@bitcoin.org],[bitcoin]) 
 AC_CONFIG_SRCDIR([src/core/main.cpp])
 AC_CONFIG_HEADERS([src/config/bitcoin-config.h])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([build-aux/m4])
 
-AC_CANONICAL_HOST
+AC_CANONICAL_HOST 
 
 AH_TOP([#ifndef BITCOIN_CONFIG_H])
 AH_TOP([#define BITCOIN_CONFIG_H])
@@ -86,6 +86,18 @@ AC_ARG_ENABLE([enterprise],
   [enable enterprise (default is no)])],
   [enable_enterprise=$enableval],
   [enable_enterprise=no])
+ 
+AC_ARG_ENABLE([berkeley],
+  [AS_HELP_STRING([--enable-berkeley],
+  [enable berkeley (default is no)])],
+  [enable_berkeley_db4=$enableval],
+  [enable_berkeley_db4=no])
+if test x$enable_berkeley_db4 = xyes; then
+      AC_MSG_WARN([enable_berkeley_db4=$enableval])
+    else
+      AC_MSG_WARN([enable_berkeley_db4=no.])
+    fi  
+
 
 AC_ARG_WITH([miniupnpc],
   [AS_HELP_STRING([--with-miniupnpc],
@@ -283,9 +295,20 @@ case $host in
          dnl Homebrew where each one is located, then adjust paths accordingly.
          dnl It's safe to add these paths even if the functionality is disabled by
          dnl the user (--without-wallet or --without-gui for example).
+	 
+ 	 if test x$enable_enterprise != xno; then
+ 		openssl_prefix=`$BREW --prefix openssl 2>/dev/null`
+	 else
+	 	openssl_prefix=``
+	 fi	 
+	 if test x$enable_berkeley_db4 !=xno; then
+		bdb_prefix=`$BREW --prefix berkeley-db4 2>/dev/null`
+	 else
+		bdb_prefix=``
+	 fi
 
-         openssl_prefix=`$BREW --prefix openssl 2>/dev/null`
-         bdb_prefix=`$BREW --prefix berkeley-db4 2>/dev/null`
+         #openssl_prefix=`$BREW --prefix openssl 2>/dev/null`
+         #bdb_prefix=`$BREW --prefix berkeley-db4 2>/dev/null`
          qt5_prefix=`$BREW --prefix qt5 2>/dev/null`
          if test x$openssl_prefix != x; then
            PKG_CONFIG_PATH="$openssl_prefix/lib/pkgconfig:$PKG_CONFIG_PATH"
@@ -511,8 +534,10 @@ AC_SUBST(LIBLEVELDB)
 AC_SUBST(LIBMEMENV)
 
 if test x$enable_wallet != xno; then
-    dnl Check for libdb_cxx only if wallet enabled
-    BITCOIN_FIND_BDB48
+    dnl Check for libdb_cxx only if wallet enabled and 
+    if test x$enable_berkeley_db4 != xno; then
+    	BITCOIN_FIND_BDB48
+    fi
 fi
 
 dnl Check for libminiupnpc (optional)
@@ -685,22 +710,25 @@ if test x$use_pkgconfig = xyes; then
   m4_ifdef(
     [PKG_CHECK_MODULES],
     [
-      PKG_CHECK_MODULES([SSL], [libssl],, [AC_MSG_ERROR(openssl  not found.)])
-      PKG_CHECK_MODULES([CRYPTO], [libcrypto],,[AC_MSG_ERROR(libcrypto  not found.)])
       BITCOIN_QT_CHECK([PKG_CHECK_MODULES([PROTOBUF], [protobuf], [have_protobuf=yes], [BITCOIN_QT_FAIL(libprotobuf not found)])])
       if test x$use_qr != xno; then
         BITCOIN_QT_CHECK([PKG_CHECK_MODULES([QR], [libqrencode], [have_qrencode=yes], [have_qrencode=no])])
       fi
+      if test x$enable_enterprise != xno; then
+        PKG_CHECK_MODULES([SSL], [libssl],, [AC_MSG_ERROR(openssl  not found.)])
+        PKG_CHECK_MODULES([CRYPTO], [libcrypto],,[AC_MSG_ERROR(libcrypto  not found.)])
+      fi
     ]
   )
 else
-  AC_CHECK_HEADER([openssl/crypto.h],,AC_MSG_ERROR(libcrypto headers missing))
-  AC_CHECK_LIB([crypto],      [main],CRYPTO_LIBS=-lcrypto, AC_MSG_ERROR(libcrypto missing))
-
-  AC_CHECK_HEADER([openssl/ssl.h],, AC_MSG_ERROR(libssl headers missing),)
-  AC_CHECK_LIB([ssl],         [main],SSL_LIBS=-lssl, AC_MSG_ERROR(libssl missing))
-
   BITCOIN_QT_CHECK(AC_CHECK_LIB([protobuf] ,[main],[PROTOBUF_LIBS=-lprotobuf], BITCOIN_QT_FAIL(libprotobuf not found)))
+  if test x$enable_enterprise != xno; then
+    AC_CHECK_HEADER([openssl/crypto.h],,AC_MSG_ERROR(libcrypto headers missing))
+    AC_CHECK_LIB([crypto],      [main],CRYPTO_LIBS=-lcrypto, AC_MSG_ERROR(libcrypto missing))
+
+    AC_CHECK_HEADER([openssl/ssl.h],, AC_MSG_ERROR(libssl headers missing),)
+    AC_CHECK_LIB([ssl],         [main],SSL_LIBS=-lssl, AC_MSG_ERROR(libssl missing))
+  fi
   if test x$use_qr != xno; then
     BITCOIN_QT_CHECK([AC_CHECK_LIB([qrencode], [main],[QR_LIBS=-lqrencode], [have_qrencode=no])])
     BITCOIN_QT_CHECK([AC_CHECK_HEADER([qrencode.h],, have_qrencode=no)])
@@ -711,7 +739,9 @@ CPPFLAGS_TEMP="$CPPFLAGS"
 LIBS_TEMP="$LIBS"
 CPPFLAGS="$CPPFLAGS $SSL_CFLAGS"
 LIBS="$LIBS $SSL_LIBS"
-AC_CHECK_HEADER([openssl/ec.h],, AC_MSG_ERROR(OpenSSL ec header missing),)
+if test x$enable_enterprise != xno; then
+  AC_CHECK_HEADER([openssl/ec.h],, AC_MSG_ERROR(OpenSSL ec header missing),)
+fi
 CPPFLAGS="$CPPFLAGS_TEMP"
 LIBS="$LIBS_TEMP"
 
@@ -773,6 +803,16 @@ else
   AC_MSG_RESULT(no)
 fi
 
+dnl enable berkeley_db4
+AC_MSG_CHECKING([if berkeley should be enabled])
+if test x$enable_berkeley_db4 != xno; then
+  AC_MSG_RESULT(yes)
+  AC_DEFINE_UNQUOTED([ENABLE_BERKELEY_DB],[1],[Define to 1 to enable Berkeley DB4])
+
+else
+  AC_MSG_RESULT(no)
+fi
+
 
 dnl enable upnp support
 AC_MSG_CHECKING([whether to build with support for UPnP])
@@ -795,11 +835,21 @@ else
     AC_DEFINE_UNQUOTED([USE_UPNP],[$upnp_setting],[UPnP support not compiled if undefined, otherwise value (0 or 1) determines default state])
     if test x$TARGET_OS = xwindows; then
       MINIUPNPC_CPPFLAGS="-DSTATICLIB -DMINIUPNP_STATICLIB"
+      NATPMP_CPPFLAGS="-DSTATICLIB -DNATPMP_STATICLIB"
     fi
   else
     AC_MSG_RESULT(no)
   fi
 fi
+
+dnl libevent check
+if test "$build_bitcoin_cli$build_bitcoind$bitcoin_enable_qt$use_tests$use_bench" != "nonononono"; then
+  PKG_CHECK_MODULES([EVENT], [libevent >= 2.0.21], [use_libevent=yes], [AC_MSG_ERROR([libevent version 2.0.21 or greater not found.])])
+  if test x$TARGET_OS != xwindows; then
+    PKG_CHECK_MODULES([EVENT_PTHREADS], [libevent_pthreads >= 2.0.21],, [AC_MSG_ERROR([libevent_pthreads version 2.0.21 or greater not found.])])
+  fi
+fi
+
 
 dnl these are only used when qt is enabled
 if test x$bitcoin_enable_qt != xno; then
@@ -865,6 +915,7 @@ AM_CONDITIONAL([BUILD_DARWIN], [test x$BUILD_OS = xdarwin])
 AM_CONDITIONAL([TARGET_WINDOWS], [test x$TARGET_OS = xwindows])
 AM_CONDITIONAL([ENABLE_WALLET],[test x$enable_wallet = xyes])
 AM_CONDITIONAL([ENABLE_ENTERPRISE],[test x$enable_enterprise = xyes])
+AM_CONDITIONAL([ENABLE_BERKELEY_DB],[test x$enable_berkeley_db4 = xyes])
 AM_CONDITIONAL([ENABLE_TESTS],[test x$use_tests = xyes])
 AM_CONDITIONAL([ENABLE_QT],[test x$bitcoin_enable_qt = xyes])
 AM_CONDITIONAL([ENABLE_QT_TESTS],[test x$use_tests$bitcoin_enable_qt_test = xyesyes])
@@ -873,7 +924,7 @@ AM_CONDITIONAL([USE_LCOV],[test x$use_lcov = xyes])
 AM_CONDITIONAL([USE_COMPARISON_TOOL],[test x$use_comparison_tool != xno])
 AM_CONDITIONAL([USE_COMPARISON_TOOL_REORG_TESTS],[test x$use_comparison_tool_reorg_test != xno])
 AM_CONDITIONAL([GLIBC_BACK_COMPAT],[test x$use_glibc_compat = xyes])
-
+AM_CONDITIONAL([USE_LIBEVENT], [test "$use_libevent" = "yes"])
 AC_DEFINE(CLIENT_VERSION_MAJOR, _CLIENT_VERSION_MAJOR, [Major version])
 AC_DEFINE(CLIENT_VERSION_MINOR, _CLIENT_VERSION_MINOR, [Minor version])
 AC_DEFINE(CLIENT_VERSION_REVISION, _CLIENT_VERSION_REVISION, [Build revision])
@@ -886,7 +937,8 @@ AC_SUBST(CLIENT_VERSION_REVISION, _CLIENT_VERSION_REVISION)
 AC_SUBST(CLIENT_VERSION_BUILD, _CLIENT_VERSION_BUILD)
 AC_SUBST(CLIENT_VERSION_IS_RELEASE, _CLIENT_VERSION_IS_RELEASE)
 AC_SUBST(COPYRIGHT_YEAR, _COPYRIGHT_YEAR)
-
+AC_SUBST(EVENT_LIBS)
+AC_SUBST(EVENT_PTHREADS_LIBS)
 AC_SUBST(RELDFLAGS)
 AC_SUBST(LIBTOOL_APP_LDFLAGS)
 AC_SUBST(USE_UPNP)

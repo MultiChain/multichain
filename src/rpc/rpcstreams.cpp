@@ -1150,7 +1150,7 @@ Value publishfrom(const Array& params, bool fHelp)
     LOCK (pwalletMain->cs_wallet_send);
     
     SendMoneyToSeveralAddresses(addresses, 0, wtx, lpScript, scriptOpReturn,fromaddresses);
-
+    
     return wtx.GetHash().GetHex();    
 }
 
@@ -1428,6 +1428,27 @@ Value unsubscribe(const Array& params, bool fHelp)
     return Value::null;
 }
 
+bool mc_CheckCanRetrieveStatus(mc_EntityDetails *entity,int *errCode,string *strError)
+{
+    if(entity->AnyoneCanRead() == 0)
+    {
+        string reason;
+        if(!pEF->LIC_VerifyFeature(MC_EFT_STREAM_READ_RESTRICTED_READ,reason))
+        {
+            *errCode=RPC_NOT_SUPPORTED;
+            *strError=reason + ": " + "Reading from read-restricted streams";
+            return false;
+        }
+        if(!pEF->WLT_FindReadPermissionedAddress(entity).IsValid())
+        {
+            *errCode=RPC_INSUFFICIENT_PERMISSIONS;
+            *strError=strprintf("This wallet doesn't have keys with read permission for stream %s",entity->GetName());
+            return false;
+        }
+    }
+    return true;
+}
+
 Value liststreamtxitems(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 3)
@@ -1487,6 +1508,11 @@ Value liststreamtxitems(const Array& params, bool fHelp)
     
     parseStreamIdentifier(params[0],&stream_entity,&errCode,&strError);           
     if(strError.size())
+    {
+        goto exitlbl;
+    }
+    
+    if(!mc_CheckCanRetrieveStatus(&stream_entity,&errCode,&strError))
     {
         goto exitlbl;
     }
@@ -1665,6 +1691,10 @@ Value liststreamitems(const Array& params, bool fHelp)
     {
         goto exitlbl;
     }
+    if(!mc_CheckCanRetrieveStatus(&stream_entity,&errCode,&strError))
+    {
+        goto exitlbl;
+    }
 
     entStat.Zero();
     memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
@@ -1796,6 +1826,10 @@ Value liststreamblockitems(const Array& params, bool fHelp)
     
     parseStreamIdentifier(params[0],&stream_entity,&errCode,&strError);           
     if(strError.size())
+    {
+        goto exitlbl;
+    }
+    if(!mc_CheckCanRetrieveStatus(&stream_entity,&errCode,&strError))
     {
         goto exitlbl;
     }
@@ -2170,6 +2204,10 @@ Value getstreamsummary(const Array& params, bool fPublisher)
     {
         goto exitlbl;
     }
+    if(!mc_CheckCanRetrieveStatus(&stream_entity,&errCode,&strError))
+    {
+        goto exitlbl;
+    }
     entStat.Zero();
     memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
     entStat.m_Entity.m_EntityType=MC_TET_STREAM_KEY;
@@ -2503,6 +2541,10 @@ Value liststreamkeyitems(const Array& params, bool fHelp)
     {
         goto exitlbl;
     }
+    if(!mc_CheckCanRetrieveStatus(&stream_entity,&errCode,&strError))
+    {
+        goto exitlbl;
+    }
     
     entStat.Zero();
     memcpy(&entStat,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,MC_AST_SHORT_TXID_SIZE);
@@ -2651,6 +2693,10 @@ Value liststreampublisheritems(const Array& params, bool fHelp)
 
     parseStreamIdentifier(params[0],&stream_entity,&errCode,&strError);           
     if(strError.size())
+    {
+        goto exitlbl;
+    }
+    if(!mc_CheckCanRetrieveStatus(&stream_entity,&errCode,&strError))
     {
         goto exitlbl;
     }
@@ -2920,6 +2966,10 @@ Value liststreamkeys_or_publishers(const Array& params,bool is_publishers)
     pwalletTxsMain->WRPReadLock();
     parseStreamIdentifier(params[0],&stream_entity,&errCode,&strError);           
     if(strError.size())
+    {
+        goto exitlbl;
+    }
+    if(!mc_CheckCanRetrieveStatus(&stream_entity,&errCode,&strError))
     {
         goto exitlbl;
     }
@@ -3470,6 +3520,10 @@ Value liststreamqueryitems(const Array& params, bool fHelp)
 
     parseStreamIdentifier(params[0],&stream_entity,&errCode,&strError);           
     if(strError.size())
+    {
+        goto exitlbl;
+    }
+    if(!mc_CheckCanRetrieveStatus(&stream_entity,&errCode,&strError))
     {
         goto exitlbl;
     }

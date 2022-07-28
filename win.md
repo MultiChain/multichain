@@ -26,6 +26,27 @@ The reminder of these instructions assumes that the the environment variable `MU
         sudo apt install -y g++-mingw-w64-x86-64 mingw-w64-x86-64-dev
         sudo pip install pathlib2
 
+Set the default `mingw32 g++` compiler option to POSIX:
+
+
+		sudo update-alternatives --config x86_64-w64-mingw32-g++
+
+
+After running the above command, you should see output similar to that below.
+Choose the option that ends with `posix`.
+
+```
+There are 2 choices for the alternative x86_64-w64-mingw32-g++ (providing /usr/bin/x86_64-w64-mingw32-g++).
+
+  Selection    Path                                   Priority   Status
+------------------------------------------------------------
+  0            /usr/bin/x86_64-w64-mingw32-g++-win32   60        auto mode
+* 1            /usr/bin/x86_64-w64-mingw32-g++-posix   30        manual mode
+  2            /usr/bin/x86_64-w64-mingw32-g++-win32   60        manual mode
+
+Press <enter> to keep the current choice[*], or type selection number:
+```
+
 ## Build Instructions
 
 **Note**: *If sources on the Windows system are accessible from Linux, you can ignore the stage "Prepare a build area on the Linux machine"*.
@@ -59,7 +80,7 @@ On Windows:
         cd v8build
 
     
-You can use pre-built headers and binaries of Google's V8 JavaScript engine by downloading and expanding [windows-v8.zip](https://github.com/MultiChain/multichain-binaries/raw/master/windows-v8.zip) in the current directory.
+You can use pre-built headers and binaries of Google's V8 JavaScript engine by downloading and expanding [windows-v8.zip](https://github.com/MultiChain/multichain-binaries/raw/master/windows-v8.zip) in the current directory (and skip the rest of this section).
 
 If, on the other hand, you prefer to build the V8 component yourself, please perform the following:
 
@@ -78,6 +99,8 @@ On Linux:
         python $MULTICHAIN_HOME/depends/v8_data_lib.py -m $MULTICHAIN_HOME -o win32
 
 -   Copy `obj/v8_data.lib` to `%MULTICHAIN_HOME%\v8build\v8\out.gn\x64.release\obj` on Windows.
+
+### Build V8 MultiChain additional library
 
 On Windows:
 

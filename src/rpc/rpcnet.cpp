@@ -14,6 +14,7 @@
 #include "utils/timedata.h"
 #include "utils/util.h"
 #include "version/bcversion.h"
+#include "storage/addrman.h"
 
 #ifdef HAVE_GETADDRINFO_A
 #include <netdb.h>
@@ -38,6 +39,8 @@
 using namespace json_spirit;
 using namespace std;
 void PushMultiChainRelay(CNode* pto, uint32_t msg_type,vector<CAddress>& path,vector<CAddress>& path_to_follow,vector<unsigned char>& payload);
+int64_t mc_PeerStatusDelayForget();
+bool paramtobool(Value param);
 
 Value getconnectioncount(const Array& params, bool fHelp)
 {
@@ -153,6 +156,191 @@ Value getpeerinfo(const Array& params, bool fHelp)
     return ret;
 }
 
+bool PeersCompareByTime(Value a,Value b)
+{ 
+    int64_t time_a=0;
+    int64_t time_b=0;
+
+    BOOST_FOREACH(const Pair& p, a.get_obj()) 
+    {
+        if(p.name_ == "lastsuccess")
+        {
+            time_a=p.value_.get_int64();
+        }
+    }
+
+    BOOST_FOREACH(const Pair& p, b.get_obj()) 
+    {
+        if(p.name_ == "lastsuccess")
+        {
+            time_b=p.value_.get_int64();
+        }
+    }
+
+    return (time_a >= time_b);
+}
+
+
+Value liststorednodes(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 1)
+        throw runtime_error("Help message not found\n");
+
+    bool take_ignored=false;
+    if (params.size() == 1)
+        take_ignored = paramtobool(params[0]);
+    
+    
+    vector<CNodeStats> vstats;
+    CopyNodeStats(vstats);
+
+    map<CService, bool> mConnected;
+
+    {
+        LOCK(cs_vNodes);
+        BOOST_FOREACH(CNode* pnode, vNodes) {
+            if(pnode->fInbound)
+            {
+                mConnected.insert(make_pair(pnode->addrFromVersion,true));
+            }
+            else
+            {
+                mConnected.insert(make_pair(pnode->addr,false));                
+            }
+        }
+    }
+    
+    vector <CMCAddrInfo> empty;
+    map<CService, vector<CMCAddrInfo> > mNetAddresses;
+    CMCAddrInfo *info;
+    
+    addrman.GetMCAddrMan()->Reset();
+    while((info=addrman.GetMCAddrMan()->Next()))
+    {
+        CService naddr=info->GetNetAddress();
+        if(!naddr.IsZero())
+        {        
+            if (naddr.IsValid() && (!IsLocal(naddr) || (naddr.GetPort() != GetListenPort())))
+            {
+                map<CService, vector<CMCAddrInfo> >::iterator nit = mNetAddresses.find(naddr);
+                if(nit == mNetAddresses.end())
+                {
+                    mNetAddresses.insert(make_pair(naddr,empty));
+                    nit = mNetAddresses.find(naddr);
+                }
+                nit->second.push_back(info);
+            }            
+        }
+    }    
+    
+    Array netaddresses;
+    BOOST_FOREACH(PAIRTYPE(CService, vector<CMCAddrInfo>) naddr, mNetAddresses)
+    {
+        Object entry;
+        int64_t lastattempt=0;
+        int netattempts=0;
+        uint32_t flags=0;
+        Array handshakes;
+        BOOST_FOREACH(CMCAddrInfo info, naddr.second)
+        {
+            Object handshake;
+            int64_t lastsuccess,lasttry;
+            int attempts;
+            attempts=info.GetLastTryInfo(&lastsuccess,&lasttry,NULL);
+            if(info.GetMCAddress() != 0)
+            {
+                handshake.push_back(Pair("address",CBitcoinAddress((CKeyID)info.GetMCAddress()).ToString()));
+                handshake.push_back(Pair("lastsuccess",lastsuccess));
+                handshakes.push_back(handshake);
+            }
+            else
+            {
+                lastattempt=lasttry;
+                netattempts=attempts;
+                flags=info.GetFlags();
+            }
+        }        
+        
+        sort(handshakes.begin(), handshakes.end(), PeersCompareByTime);
+
+        
+        entry.push_back(Pair("addr",naddr.first.ToStringIPPort()));                     
+        entry.push_back(Pair("handshakes",handshakes));                     
+        if(OutConnectionsAlgoritm == 1)
+        {
+            if(lastattempt != 0)
+            {
+                entry.push_back(Pair("lastfailure",lastattempt));
+            }
+            else
+            {
+                entry.push_back(Pair("lastfailure",Value::null));                                
+            }
+            entry.push_back(Pair("failcount",netattempts));                     
+        }
+        
+        switch(flags & MC_AMF_SOURCE_MASK)
+        {
+            case MC_AMF_SOURCE_ADDED:
+                entry.push_back(Pair("source","stored"));                                                 
+                break;
+            case MC_AMF_SOURCE_SEED:
+                entry.push_back(Pair("source","seed"));                                                 
+                break;
+            default:
+                entry.push_back(Pair("source","peers"));                                                 
+                break;
+        }
+        
+        map<CService, bool>::const_iterator pit=mConnected.find(naddr.first);
+        if(pit != mConnected.end())
+        {
+            if(pit->second)
+            {
+                entry.push_back(Pair("status","inbound"));                                                                 
+            }
+            else
+            {
+                entry.push_back(Pair("status","outbound"));                                                                                 
+            }
+        }
+        else
+        {
+            if(flags & MC_AMF_IGNORED)
+            {
+                entry.push_back(Pair("status","ignored"));                                                                 
+            }
+            else
+            {
+                entry.push_back(Pair("status","tryconnect"));                                                                                 
+            }
+        }
+        
+        
+        bool take_it=true;
+        if(!take_ignored)
+        {
+            if(flags & MC_AMF_IGNORED)
+            {
+                if(lastattempt < GetAdjustedTime() - mc_PeerStatusDelayForget())
+                {
+                    take_it=false;
+                }
+            }
+        }            
+
+        
+        
+        if(take_it)
+        {        
+            netaddresses.push_back(entry);
+        }        
+    }
+    
+    
+    return netaddresses;
+}
+
 Value addnode(const Array& params, bool fHelp)
 {
     string strCommand;
@@ -195,7 +383,7 @@ Value addnode(const Array& params, bool fHelp)
 
     if(!is_numeric)
     {
-        throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid node, only numeric addresses are allowed");        
+        throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid node, only numeric valid IPv4 addresses are allowed");        
     }
 /*    
     struct in_addr ipv4_addr;
@@ -212,7 +400,7 @@ Value addnode(const Array& params, bool fHelp)
         OpenNetworkConnection(addr, NULL, strNode.c_str());
         return Value::null;
     }
-
+    
     LOCK(cs_vAddedNodes);
     vector<string>::iterator it = vAddedNodes.begin();
     for(; it != vAddedNodes.end(); it++)
@@ -245,6 +433,135 @@ Value addnode(const Array& params, bool fHelp)
         
     }
 
+    return Value::null;
+}
+
+Value storenode(const Array& params, bool fHelp)
+{
+    string strCommand="tryconnect";
+    if (params.size() == 2)
+        strCommand = params[1].get_str();
+    
+    if (fHelp || params.size() < 1 || params.size() > 2 ||
+        (strCommand != "tryconnect" && strCommand != "ignore"))
+        throw runtime_error("Help message not found\n");
+    
+
+    string strNode = params[0].get_str();
+
+    int port = Params().GetDefaultPort();
+    std::string hostname = "";
+    SplitHostPort(strNode, port, hostname);
+
+    bool is_numeric=false;
+    struct in_addr ipv4_addr;
+#ifdef HAVE_GETADDRINFO_A
+#ifdef HAVE_INET_PTON    
+    if (inet_pton(AF_INET, hostname.c_str(), &ipv4_addr) > 0) {
+        is_numeric=true;
+    }
+
+    struct in6_addr ipv6_addr;
+    if (inet_pton(AF_INET6, hostname.c_str(), &ipv6_addr) > 0) {
+        is_numeric=true;
+    }    
+#else
+    ipv4_addr.s_addr = inet_addr(hostname.c_str());
+    if (ipv4_addr.s_addr != INADDR_NONE) {
+        is_numeric=true;
+    }
+#endif
+#else
+    ipv4_addr.s_addr = inet_addr(hostname.c_str());
+    if (ipv4_addr.s_addr != INADDR_NONE) {
+        is_numeric=true;
+    }
+#endif
+
+    if(!is_numeric)
+    {
+        throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid node, only numeric valid IPv4 addresses are allowed");        
+    }
+/*    
+    struct in_addr ipv4_addr;
+    ipv4_addr.s_addr = inet_addr(hostname.c_str());
+    if (ipv4_addr.s_addr == INADDR_NONE) 
+    {
+        throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid node, only numeric IPv4 addresses are allowed");
+    }
+*/    
+    
+    if (strCommand == "tryconnect")
+    {
+        CAddress addr=CAddress(CService(CNetAddr(hostname),port));
+        if(!addr.IsValid())
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid address");                    
+        }
+        CMCAddrInfo *mcaddrinfo=addrman.GetMCAddrMan()->Find(addr,0);
+        if(mcaddrinfo)
+        {
+            uint32_t flags=mcaddrinfo->GetFlags();
+            if(flags & MC_AMF_IGNORED)
+            {
+                mcaddrinfo->SetFlag(MC_AMF_IGNORED,0);
+                mcaddrinfo->SetFlag(MC_AMF_SOURCE_ADDED,1);
+                mcaddrinfo->ResetLastTry(true);
+                if(fDebug)LogPrint("addrman", "Recall forgotten address %s \n", addr.ToString());
+            }
+            else
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Node already is used for outbound connections");      
+//                if(fDebug)LogPrint("addrman", "Remember found address %s, ignored\n", addr.ToString());                
+            }
+        }
+        else
+        {
+            addrman.Add(addr, addr);
+            addrman.Good(addr);
+            mcaddrinfo=addrman.GetMCAddrMan()->Find(addr,0);
+            if(mcaddrinfo == NULL)
+            {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Internal error when adding new address");                    
+            }
+            mcaddrinfo->SetFlag(MC_AMF_SOURCE_ADDED,1);
+            
+            if(fDebug)LogPrint("addrman", "Remember new address %s\n", addr.ToString());                
+        }        
+        return Value::null;
+    }
+    
+    if (strCommand == "ignore")
+    {
+        CAddress addr=CAddress(CService(CNetAddr(hostname),port));
+        if(!addr.IsValid())
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Invalid address");                    
+        }
+        CMCAddrInfo *mcaddrinfo=addrman.GetMCAddrMan()->Find(addr,0);
+        if(mcaddrinfo)
+        {
+            uint32_t flags=mcaddrinfo->GetFlags();
+            if(flags & MC_AMF_IGNORED)
+            {
+                throw JSONRPCError(RPC_NOT_ALLOWED, "Node already ignored");      
+//                if(fDebug)LogPrint("addrman", "Ignore forgotten address %s, ignored\n", addr.ToString());
+            }
+            else
+            {
+                mcaddrinfo->SetFlag(MC_AMF_IGNORED,1);
+                mcaddrinfo->ResetLastTry(false);
+                if(fDebug)LogPrint("addrman", "Ignore address %s\n", addr.ToString());                
+            }
+        }
+        else
+        {
+            throw JSONRPCError(RPC_NOT_ALLOWED, "Node not found");      
+//            if(fDebug)LogPrint("addrman", "Ignore unknown address %s, ignored\n", addr.ToString());                
+        }        
+        return Value::null;
+    }
+    
     return Value::null;
 }
 

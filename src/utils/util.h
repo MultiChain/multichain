@@ -41,6 +41,7 @@ extern bool fLogIPs;
 extern bool fLogTimeMillis;
 extern bool fInRecovery;
 extern volatile bool fReopenDebugLog;
+extern uint64_t nLockPrintThread;
 
 void SetupEnvironment();
 
@@ -115,6 +116,7 @@ boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
 boost::filesystem::path GetTempPath();
 void ShrinkDebugFile();
 void runCommand(std::string strCommand);
+bool SetupNetworking();
 
 inline bool IsSwitchChar(char c)
 {

@@ -2833,7 +2833,7 @@ CScript ParseRawMetadata(Value param,uint32_t allowed_objects,mc_EntityDetails *
     
     if(found_entity)
     {
-        memcpy(found_entity,&entity,sizeof(mc_EntityDetails));
+        found_entity->Copy(&entity);
     }                        
     
     switch(param_type)

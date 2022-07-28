@@ -9,8 +9,6 @@
 #include <boost/thread.hpp>
 #include <boost/version.hpp>
 
-#include <openssl/rand.h>
-
 using namespace std;
 using namespace boost;
 
@@ -37,6 +35,11 @@ CDBWrapEnv::CDBWrapEnv()
 CDBWrapEnv::~CDBWrapEnv()
 {
     EnvShutdown();
+}
+
+int CDBWrapEnv::MinWalletDBVersion()
+{
+    return 3;
 }
 
 void CDBWrapEnv::Close()

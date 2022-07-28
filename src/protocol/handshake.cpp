@@ -4,6 +4,7 @@
 // Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
+#include "storage/addrman.h"
 #include "core/init.h"
 #include "core/main.h"
 #include "utils/util.h"
@@ -257,9 +258,26 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
         
         CKeyID pubKeyHash=pubKeyOut.GetID();
         pfrom->kAddrRemote=pubKeyHash;
+        
         if(fIsVerackack)
         {
-            LogPrintf("mchn: Connection from %s received on peer=%d in verackack (%s)\n",CBitcoinAddress(pubKeyHash).ToString().c_str(), pfrom->id,pfrom->addr.ToString());
+            if(addrman.GetMCAddrMan()->SetOutcome(pfrom->addrFromVersion,pfrom->kAddrRemote,true))
+            {
+                if(false)
+                {
+                    LogPrintf("mchn: Already connected to address %s, disconnecting peer=%d\n",CBitcoinAddress(pubKeyHash).ToString().c_str(), pfrom->id);            
+                    return false;
+                }
+            }
+        }
+        
+//        addrman.GetMCAddrMan()->Set(pfrom->addrFromVersion,pfrom->kAddrRemote);
+        if(fIsVerackack)
+        {
+            uint64_t nonce_to_print=(pfrom->nVerackNonceSent+pfrom->nVerackNonceReceived) & 0xffff;
+            LogPrintf("mchn: Connection from %s received on peer=%d in verackack (%s), %s, connection id: %d\n",
+                    CBitcoinAddress(pubKeyHash).ToString().c_str(), pfrom->id,pfrom->addr.ToString(),pfrom->fInbound ? "Inbound" : "Outbound",(int)nonce_to_print);
+                    
             if(!MultichainNode_CanConnect(pfrom))
             {
                 LogPrintf("mchn: Permission denied for address %s received from peer=%d\n",CBitcoinAddress(pubKeyHash).ToString().c_str(), pfrom->id);
@@ -269,6 +287,29 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
                     return false;                                                
                 }
 //                return false;                                                
+            }
+            else
+            {
+                if(pfrom->fInbound)                                             // Wrong local address was reported in version message, but we can trust this peer
+                {
+                    if (((CNetAddr)pfrom->addr) != (CNetAddr)pfrom->addrFromVersion)
+                    {
+                        LogPrintf("mcaddrman: Wrong address reported in version message, replacing %s by ",pfrom->addrFromVersion.ToStringIPPort());
+                        pfrom->addrFromVersion=CAddress(CService((CNetAddr)pfrom->addr,pfrom->addrFromVersion.GetPort()),0);
+                        LogPrintf("%s\n",pfrom->addrFromVersion.ToStringIPPort());
+                        CMCAddrInfo *mcaddrinfo=addrman.GetMCAddrMan()->Find(pfrom->addrFromVersion,0);
+                        if(mcaddrinfo)
+                        {
+                            mcaddrinfo->ResetLastTry(true);
+                            mcaddrinfo->SetFlag(MC_AMF_IGNORED,0);
+                        }
+                        if(pfrom->addrFromVersion.GetPort() != MC_DEFAULT_NETWORK_PORT)
+                        {                        
+                            addrman.Add(pfrom->addrFromVersion, pfrom->addrFromVersion);
+                            addrman.Good(pfrom->addrFromVersion);
+                        }
+                    }
+                }
             }
 /*            
             {

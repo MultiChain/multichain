@@ -436,6 +436,7 @@ CTxMemPool::CTxMemPool(const CFeeRate& _minRelayFee) :
     hashList=new mc_Buffer;
     hashList->Initialize(sizeof(uint256),sizeof(uint256),0);
     hashListPos=0;
+    hashSendStop=0;
 /* MCHN END */    
 }
 
@@ -790,8 +791,32 @@ void CTxMemPool::queryHashes(vector<uint256>& vtxid)
 
     LOCK(cs);
     vtxid.reserve(mapTx.size());
+/*    
     for (map<uint256, CTxMemPoolEntry>::iterator mi = mapTx.begin(); mi != mapTx.end(); ++mi)
         vtxid.push_back((*mi).first);
+ */ 
+
+    hashSendStop=0;
+    size_t added_size=0;
+    size_t send_stop_size=MAX_BLOCK_SIZE;
+    
+    for(int pos=0;pos<hashList->m_Count;pos++)
+    {
+        uint256 hash=*(uint256*)hashList->GetRow(pos);
+        if(exists(hash))
+        {
+            const CTxMemPoolEntry entry=mapTx[hash];
+            vtxid.push_back(hash);
+            added_size+=entry.GetTxSize();
+            if(added_size > send_stop_size)
+            {
+                if(hashSendStop == 0)
+                {
+                    hashSendStop=hash;
+                }
+            }
+        }
+    }
 }
 
 bool CTxMemPool::lookup(uint256 hash, CTransaction& result) const

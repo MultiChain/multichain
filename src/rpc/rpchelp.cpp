@@ -636,12 +636,12 @@ void mc_InitRPCHelpMap04()
     
     mapHelpStrings.insert(std::make_pair("addnode",
             "addnode \"node\" \"add\"|\"remove\"|\"onetry\"\n"
-            "\nAttempts add or remove a node from the addnode list.\n"
+            "\nAttempts add or remove a node from the temporary addnode list.\n"
             "Or try a connection to a node once.\n"
             "\nArguments:\n"
             "1. \"node\"                           (string, required) The node (see getpeerinfo for nodes)\n"
             "2. \"command\"                        (string, required) 'add' to add a node to the list, 'remove' to remove a node from the list,\n"
-            "                                                       'onetry' to try a connection to the node once\n"
+            "                                                       'onetry' to try a connection to the node once,\n"
             "\nExamples:\n"
             + HelpExampleCli("addnode", "\"192.168.0.6:8333\" \"onetry\"")
             + HelpExampleRpc("addnode", "\"192.168.0.6:8333\", \"onetry\"")
@@ -921,7 +921,7 @@ void mc_InitRPCHelpMap05()
         ));
     
     mapHelpStrings.insert(std::make_pair("createrawtransaction",
-            "createrawtransaction [{\"txid\":\"id\",\"vout\":n},...] {\"address\":amount,...} ( [data] \"action\" ) \n"
+            "createrawtransaction [{\"txid\":\"id\",\"vout\":n},...] {\"address\":amount,...} ( [data] \"action\" privatekeys \"sighashtype\" ) \n"
             "\nCreate a transaction spending the given inputs.\n"
 
             "\nArguments:\n"
@@ -987,6 +987,18 @@ void mc_InitRPCHelpMap05()
  */ 
             "3. data                                   (array, optional) Array of hexadecimal strings or data objects, see help data-all for details.\n"
             "4. \"action\"                               (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
+            "5. privatekeys                            (array, optional) A JSON array of base58-encoded private keys for signing\n"
+            "    [                                     (JSON array of strings, or 'null' if none provided)\n"
+            "      \"privatekey\"                        (string) private key in base58-encoding\n"
+            "      ,...\n"
+            "    ]\n"
+            "6. \"sighashtype\"                          (string, optional, default=ALL) The signature hash type. Must be one of\n"
+            "       \"ALL\"\n"
+            "       \"NONE\"\n"
+            "       \"SINGLE\"\n"
+            "       \"ALL|ANYONECANPAY\"\n"
+            "       \"NONE|ANYONECANPAY\"\n"
+            "       \"SINGLE|ANYONECANPAY\"\n"
                 
 
             "\nResult:\n"
@@ -1358,7 +1370,7 @@ void mc_InitRPCHelpMap06()
             "1. \"hex\"                            (string, required) The transaction hex string\n"
             "2. \"txid\"                           (string, required) Transaction ID of the output prepared by preparelockunspent.\n"
             "3. vout                             (numeric, required) Output index\n"
-            "4. ask-assets                       (object, required) A JSON object of assets to send, see help amounts-all for details. \n"
+            "4. ask-assets                       (object, required) A JSON object of assets and/or tokens to send, see help amounts-all for details. \n"
             "\nResult:\n"
             "{\n"
             "  \"hex\": \"value\",                   (string) The raw transaction with signature(s) (hex-encoded string)\n"
@@ -1606,7 +1618,7 @@ void mc_InitRPCHelpMap06()
             "\nArguments:\n"
             "1. \"txid\"                           (string, required) Transaction ID of the output prepared by preparelockunspent.\n"
             "2. vout                             (numeric, required) Output index\n"
-            "3. ask-assets                       (object, required) A JSON object of assets to send, see help amounts-all for details. \n"
+            "3. ask-assets                       (object, required) A JSON object of assets and/or tokens to send, see help amounts-all for details. \n"
             "\nResult:\n"
             "\"transaction\"                       (string) hex string of the transaction\n"
             "\nExamples:\n"
@@ -1619,7 +1631,7 @@ void mc_InitRPCHelpMap06()
 void mc_InitRPCHelpMap07()
 {
     mapHelpStrings.insert(std::make_pair("createrawsendfrom",
-            "createrawsendfrom \"from-address\" {\"address\":amount,...} ( [data] \"action\" ) \n"
+            "createrawsendfrom \"from-address\" {\"address\":amount,...} ( [data] \"action\" privatekeys \"sighashtype\" ) \n"
             "\nCreate a transaction using the given sending address.\n"
 
             "\nArguments:\n"
@@ -1629,6 +1641,18 @@ void mc_InitRPCHelpMap07()
             "2. addresses                                (array, required) Array of addresses objects, see help addresses-all for details.\n"
             "3. data                                     (array, optional) Array of hexadecimal strings or data objects, see help data-all for details.\n"
             "4. \"action\"                                 (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
+            "5. privatekeys                              (array, optional) A JSON array of base58-encoded private keys for signing\n"
+            "    [                                       (JSON array of strings, or 'null' if none provided)\n"
+            "      \"privatekey\"                          (string) private key in base58-encoding\n"
+            "      ,...\n"
+            "    ]\n"
+            "6. \"sighashtype\"                            (string, optional, default=ALL) The signature hash type. Must be one of\n"
+            "       \"ALL\"\n"
+            "       \"NONE\"\n"
+            "       \"SINGLE\"\n"
+            "       \"ALL|ANYONECANPAY\"\n"
+            "       \"NONE|ANYONECANPAY\"\n"
+            "       \"SINGLE|ANYONECANPAY\"\n"
                 
 
             "\nResult:\n"
@@ -3051,7 +3075,7 @@ void mc_InitRPCHelpMap13()
             "\nPrepares exchange transaction output for createrawexchange, appendrawexchange\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
-            "1. asset-quantities                 (object, required) A JSON object of assets and inline data to send, see help amounts-all for details. \n"
+            "1. asset-quantities                 (object, required) A JSON object of assets and/or tokens and inline data to send, see help amounts-all for details. \n"
             "2. lock                             (boolean, optional, default=true) Lock prepared unspent output\n"
             "\nResult:\n"
             "{\n"
@@ -3070,11 +3094,11 @@ void mc_InitRPCHelpMap13()
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
             "1. \"from-address\"                   (string, required) Address to send from .\n"
-            "2. asset-quantities                 (object, required) A JSON object of assets and inline data to send, see help amounts-all for details. \n"
+            "2. asset-quantities                 (object, required) A JSON object of assets and/or tokens and inline data to send, see help amounts-all for details. \n"
             "3. lock                             (boolean, optiona, default=true) Lock prepared unspent output\n"
             "\nResult:\n"
             "{\n"
-            "  \"txid\": \"transactionid\",          (string) Transaction ID of the output which can be spent in createrawexchange or createrawexchange\n"
+            "  \"txid\": \"transactionid\",          (string) Transaction ID of the output which can be spent in createrawexchange or appendrawexchange\n"
             "  \"vout\": n                         (numeric) Output index\n"
             "}\n"
             "\nExamples:\n"
@@ -3681,7 +3705,7 @@ void mc_InitRPCHelpMap16()
             "1. \"hex\"                            (string, required) The transaction hex string\n"
             "2. \"txid\"                           (string, required) Transaction ID of the output prepared by preparelockunspent.\n"
             "3. \"vout\"                           (numeric, required) Output index\n"
-            "4. \"ask-assets\"                     (object, required) A JSON object of assets, see help amounts-all for details. \n"
+            "4. \"ask-assets\"                     (object, required) A JSON object of assets and/or tokens, see help amounts-all for details. \n"
             "5. data|publish-new-stream-item     (string or object, optional) Data, see help data-with for details. \n"
             "\nResult:\n"
             "\"transaction\"                       (string) hex string of the transaction\n"
@@ -3739,7 +3763,7 @@ void mc_InitRPCHelpMap16()
         ));
     
     mapHelpStrings.insert(std::make_pair("appendrawtransaction",
-            "appendrawtransaction \"tx-hex\" [{\"txid\":\"id\",\"vout\":n},...] ( {\"address\":amount,...} [data] \"action\" ) \n"
+            "appendrawtransaction \"tx-hex\" [{\"txid\":\"id\",\"vout\":n},...] ( {\"address\":amount,...} [data] \"action\" privatekeys \"sighashtype\" ) \n"
             "\nAppend inputs and outputs to raw transaction\n"
 
             "\nArguments:\n"
@@ -3760,6 +3784,18 @@ void mc_InitRPCHelpMap16()
             "3. addresses                              (array, required) Array of addresses objects, see help addresses-all for details.\n"
             "4. data                                   (array, optional) Array of hexadecimal strings or data objects, see help data-all for details.\n"
             "5.\"action\"                                (string, optional, default \"\") Additional actions: \"lock\", \"sign\", \"lock,sign\", \"sign,lock\", \"send\". \n"
+            "6. privatekeys                            (array, optional) A JSON array of base58-encoded private keys for signing\n"
+            "    [                                     (JSON array of strings, or 'null' if none provided)\n"
+            "      \"privatekey\"                        (string) private key in base58-encoding\n"
+            "      ,...\n"
+            "    ]\n"
+            "7. \"sighashtype\"                          (string, optional, default=ALL) The signature hash type. Must be one of\n"
+            "       \"ALL\"\n"
+            "       \"NONE\"\n"
+            "       \"SINGLE\"\n"
+            "       \"ALL|ANYONECANPAY\"\n"
+            "       \"NONE|ANYONECANPAY\"\n"
+            "       \"SINGLE|ANYONECANPAY\"\n"
                 
 
             "\nResult:\n"
@@ -4922,8 +4958,12 @@ void mc_InitRPCHelpMap20()
          ));
     
     mapHelpStrings.insert(std::make_pair("getlicenserequest",
-            "getlicenserequest \n"
+            "getlicenserequest ( new-owner-identity )\n"
             "\nReturns license request.\n"
+    
+            "\nArguments:\n"
+            "1. new-owner-identity                          (boolean, optional, default=false) If true, new node owner identity is generated. \n"
+    
             "\nExamples:\n"
             + HelpExampleCli("getlicenserequest", "") 
             + HelpExampleRpc("getlicenserequest", "")    
@@ -5659,7 +5699,7 @@ void mc_InitRPCHelpMap24()
         ));
     
     mapHelpStrings.insert(std::make_pair("issuetokenfrom",
-            "issuetokenfrom \"from-address\" \"address\" \"asset-identifier\" \"token-identifier\" quantity ( native-amount token-details)\n"
+            "issuetokenfrom \"from-address\" \"address\" \"asset-identifier\" \"token-identifier\" quantity ( native-amount token-details )\n"
             "\nCreate tokens for non-fungible asset from specific address\n"
             + HelpRequiringPassphraseWrapper() +
             "\nArguments:\n"
@@ -5749,7 +5789,45 @@ void mc_InitRPCHelpMap25()
             + HelpExampleRpc("encodehexubjson", "'[{\"method\":\"getdiagnostics\",\"params\":[true]}]'")
         ));
    
-    mapHelpStrings.insert(std::make_pair("AAAAAAA",
+     mapHelpStrings.insert(std::make_pair("gettokeninfo",
+            "gettokeninfo \"asset-identifier\" \"token-identifier\" ( verbose )\n"
+            "\nReturns information about token\n"
+            "\nArguments:\n"
+            "1. \"asset-identifier\"               (string, required) Asset identifier - one of: issue txid, asset reference, asset name.\n"
+            "2. \"token-identifier\"               (string, required) Token identifier\n"
+            "3. verbose                          (boolean, optional, default=false) If true, returns list of issuers \n"
+            "\nResult:\n"
+            "Object with token details\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("gettokeninfo", "\"asset1\" \"token1\"")
+            + HelpExampleRpc("gettokeninfo", "\"asset1\", \"token1\"")
+        ));
+    
+    mapHelpStrings.insert(std::make_pair("liststorednodes",
+            "liststorednodes  ( includeOldIgnores )\n"
+            "\nReturns data about known network peers.\n"
+            "\nArguments:\n"
+            "1. includeOldIgnores                 (bool, optional, default=false) Also include information about peers ignored for over 90 days\n"
+            "\nResult:\n"
+            "Array of objects with peer information\n"            
+            "\nExamples:\n"
+            + HelpExampleCli("liststorednodes", "")
+            + HelpExampleRpc("liststorednodes", "")
+        ));
+    
+     mapHelpStrings.insert(std::make_pair("storenode",
+            "storenode \"node\" \"tryconnect\"|\"ignore\"\n"
+            "\nAdds or removes a node from the permanent list of peers used for outbound connections.\n"
+            "\nArguments:\n"
+            "1. \"node\"                           (string, required) The node (see getpeerinfo for nodes)\n"
+            "2. \"command\"                        (string, optional, default='tryconnect') 'tryconnect' to add address to the permanent list of known peers,\n"
+            "                                                       'ignore' stop trying to connect to this address until inbound connection is established,\n"
+            "\nExamples:\n"
+            + HelpExampleCli("storenode", "\"192.168.0.6:8333\" \"tryconnect\"")
+            + HelpExampleRpc("storenode", "\"192.168.0.6:8333\", \"tryconnect\"")
+        ));
+    
+   mapHelpStrings.insert(std::make_pair("AAAAAAA",
             ""
         ));       
 }
@@ -5790,6 +5868,7 @@ void mc_InitRPCAllowedWhenWaitingForUpgradeSet()
     setAllowedWhenWaitingForUpgrade.insert("createmultisig");    
     setAllowedWhenWaitingForUpgrade.insert("validateaddress");    
     setAllowedWhenWaitingForUpgrade.insert("addnode");    
+    setAllowedWhenWaitingForUpgrade.insert("storenode");    
     setAllowedWhenWaitingForUpgrade.insert("getpeerinfo");    
     setAllowedWhenWaitingForUpgrade.insert("signmessage");    
     setAllowedWhenWaitingForUpgrade.insert("verifymessage");    

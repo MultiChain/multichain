@@ -112,6 +112,75 @@ void ScriptPubKeyToJSON(const CScript& scriptPubKey, Object& out, bool fIncludeH
     out.push_back(Pair("addresses", a));
 }
 
+bool mc_FindTokenDetails(mc_Script *lpScript,string &token_id_str,uint256 &parent_txid)
+{
+    int err;
+    uint32_t value_offset,param_offset;
+    size_t value_size;
+    unsigned char* token_details;
+    unsigned char* token_id;
+    int token_details_size,token_id_size,token_details_element;
+    
+    token_details_element=-1;
+    for (int e = 0; e < lpScript->GetNumElements(); e++)
+    {
+        if(token_details_element < 0)
+        {
+            lpScript->SetElement(e);
+            err=lpScript->GetInlineDetails(&token_details,&token_details_size);
+            if(err == 0)
+            {
+                token_details_element=e;
+            }
+            else
+            {
+                if(err != MC_ERR_WRONG_SCRIPT)
+                {                
+                    return false;                                    
+                }
+            }                
+        }
+    }
+    
+    if(token_details_element < 0)
+    {
+        return false;
+    }
+    
+    value_offset=mc_FindSpecialParamInDetailsScriptFull(token_details,token_details_size,MC_ENT_SPRM_UPDATE_NAME,&value_size,&param_offset);
+    if(param_offset<(uint32_t)token_details_size)
+    {
+        token_id=token_details+value_offset;
+        token_id_size=(uint32_t)value_size;
+        if(token_id_size == 0)
+        {
+            return false;                                                                        
+        }
+        token_id_str.assign((char*)token_id,token_id_size);
+    }
+    else
+    {
+        return false;                                                                                
+    }
+    
+    value_offset=mc_FindSpecialParamInDetailsScriptFull(token_details,token_details_size,MC_ENT_SPRM_PARENT_ENTITY,&value_size,&param_offset);
+    if(param_offset<(uint32_t)token_details_size)
+    {
+        if(value_size != sizeof(uint256))
+        {
+            return false;                                                                                       
+        }
+        memcpy(&parent_txid,token_details+value_offset,value_size);
+    }
+    else
+    {
+        return false;                                                                                
+    }        
+    
+    return true;
+}
+
+
 void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
 {
     entry.push_back(Pair("txid", tx.GetHash().GetHex()));
@@ -317,6 +386,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                 ptr=(unsigned char *)asset_amounts->GetRow(a);
                 
                 uint256 hash=tx.GetHash();
+                string token_id="";
                 txid=(unsigned char*)&hash;
                 is_genesis=true;
                 is_valid_asset=true;
@@ -330,11 +400,19 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                         txid=entity.GetTxID();
                     }
                     else
-                    {
+                    {                            
                         is_valid_asset=false;
+                        if(mc_GetABScriptType(ptr) == MC_SCR_ASSET_SCRIPT_TYPE_TOKEN)
+                        {
+                            if(mc_FindTokenDetails(lpScript,token_id,hash))
+                            {
+                                is_valid_asset=true;
+                                is_genesis=false;                                       
+                                txid=(unsigned char*)&hash;
+                            }
+                        }
                     }
-                }                
-                
+                }
                 if(is_valid_asset)
                 {
                     asset_entry=AssetEntry(txid,mc_GetABQuantity(ptr),0x05);
@@ -357,6 +435,19 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
                                 is_issuemore=true;
                                 break;
                             case MC_SCR_ASSET_SCRIPT_TYPE_TOKEN:
+                                if(token_id.size())
+                                {
+                                    Object new_asset_entry;
+                                    BOOST_FOREACH(const Pair& p, asset_entry) 
+                                    {
+                                        if(p.name_ == "qty")
+                                        {
+                                            new_asset_entry.push_back(Pair("token", token_id));
+                                        }
+                                        new_asset_entry.push_back(Pair(p.name_, p.value_));
+                                    }                                    
+                                    asset_entry=new_asset_entry;
+                                }
                                 asset_entry.push_back(Pair("type", "issuetoken"));                                            
                                 issuerawqty+=mc_GetABQuantity(ptr);
                                 break;
@@ -590,7 +681,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
             entity_row.m_ScriptSize=details_script_size;
             if(details_script_size)
             {
-                memcpy(entity_row.m_Script,details_script,details_script_size);
+                entity_row.SetScript(details_script,details_script_size);
             }
             entity.Set(&entity_row);
             lpEntity=&entity;
@@ -1425,7 +1516,7 @@ void AddCacheInputScriptIfNeeded(CMutableTransaction& rawTx,Array inputs, bool f
 
 Value appendrawtransaction(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 2 || params.size() > 5) 
+    if (fHelp || params.size() < 2 || params.size() > 7) 
         throw runtime_error("Help message not found\n");
     
     RPCTypeCheck(params, list_of(str_type)(array_type));
@@ -1618,6 +1709,21 @@ Value appendrawtransaction(const Array& params, bool fHelp)
         {
             signrawtransaction_params.push_back(inputs_for_signature);            
         }
+        else
+        {
+            if (params.size() > 5) 
+            {
+                signrawtransaction_params.push_back(inputs_for_signature);                            
+            }        
+        }
+        if (params.size() > 5) 
+        {
+            signrawtransaction_params.push_back(params[5]);            
+        }
+        if (params.size() > 6) 
+        {
+            signrawtransaction_params.push_back(params[6]);            
+        }
         signedTx=signrawtransaction(signrawtransaction_params,false);
     }
     if(lock_it)
@@ -1663,7 +1769,7 @@ Value appendrawtransaction(const Array& params, bool fHelp)
 
 Value createrawtransaction(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 2 || params.size() > 4)                                            // MCHN
+    if (fHelp || params.size() < 2 || params.size() > 6)                                            // MCHN
         throw runtime_error("Help message not found\n");
     
     RPCTypeCheck(params, list_of(array_type));
@@ -1676,148 +1782,6 @@ Value createrawtransaction(const Array& params, bool fHelp)
     }
     
     return appendrawtransaction(ext_params,fHelp);       
-    
-    Array inputs = params[0].get_array();
-    Object sendTo = params[1].get_obj();
-    Array inputs_for_signature;
-    
-    CMutableTransaction rawTx;
-
-    BOOST_FOREACH(const Value& input, inputs) {
-        const Object& o = input.get_obj();
-
-        uint256 txid = ParseHashO(o, "txid");
-
-        const Value& vout_v = find_value(o, "vout");
-        if (vout_v.type() != int_type)
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, missing vout key");
-        int nOutput = vout_v.get_int();
-        if (nOutput < 0)
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, vout must be positive");
-
-        CTxIn in(COutPoint(txid, nOutput));
-        rawTx.vin.push_back(in);
-        
-        const Value& scriptPubKey = find_value(o, "scriptPubKey");
-        if(!scriptPubKey.is_null())
-        {
-            inputs_for_signature.push_back(input);
-        }        
-    }
-
-    vector <pair<CScript, CAmount> > vecSend;
-    int required=0;
-    bool fCachedInputScriptRequired=false;
-    vecSend=ParseRawOutputMultiObject(sendTo,&required);
-    BOOST_FOREACH (const PAIRTYPE(CScript, CAmount)& s, vecSend)
-    {
-        CTxOut out(s.second, s.first);
-        rawTx.vout.push_back(out);        
-    }    
-
-    if( required & (MC_PTP_ADMIN | MC_PTP_MINE) )
-    {
-        if(mc_gState->m_NetworkParams->GetInt64Param("supportminerprecheck"))                                
-        {
-            fCachedInputScriptRequired=true;
-        }
-    }
-    
-    AddCacheInputScriptIfNeeded(rawTx,inputs,fCachedInputScriptRequired);    
-    
-    mc_EntityDetails entity;
-    mc_gState->m_TmpAssetsOut->Clear();
-    for(int i=0;i<(int)rawTx.vout.size();i++)
-    {
-        FindFollowOnsInScript(rawTx.vout[i].scriptPubKey,mc_gState->m_TmpAssetsOut,mc_gState->m_TmpScript);
-    }
-    entity.Zero();
-    if(mc_gState->m_TmpAssetsOut->GetCount())
-    {
-/*        
-        if(mc_gState->m_TmpAssetsOut->GetCount() > 1)
-        {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Follow-on script rejected - follow-on for several assets");                                    
-        }       
- */  
-        if(!mc_gState->m_Assets->FindEntityByFullRef(&entity,mc_gState->m_TmpAssetsOut->GetRow(0)))
-        {
-            throw JSONRPCError(RPC_ENTITY_NOT_FOUND, "Follow-on script rejected - asset not found");                                                
-        }
-    }
-    
-
-    if (params.size() > 2 && params[2].type() != null_type) 
-    {
-        BOOST_FOREACH(const Value& data, params[2].get_array()) 
-        {
-            CScript scriptOpReturn=ParseRawMetadata(data,MC_DATA_API_PARAM_TYPE_ALL,&entity,NULL);
-            CTxOut out(0, scriptOpReturn);
-            rawTx.vout.push_back(out);            
-        }
-    }
-
-    string action="";
-    string hex=EncodeHexTx(rawTx);
-    Value signedTx;    
-    Value txid;
-    bool sign_it=false;
-    bool lock_it=false;
-    bool send_it=false;
-    if (params.size() > 3 && params[3].type() != null_type) 
-    {
-        ParseRawAction(params[3].get_str(),lock_it,sign_it,send_it);
-    }
-
-    if(sign_it)
-    {
-        Array signrawtransaction_params;
-        signrawtransaction_params.push_back(hex);
-        if(inputs_for_signature.size())
-        {
-            signrawtransaction_params.push_back(inputs_for_signature);            
-        }
-        signedTx=signrawtransaction(signrawtransaction_params,false);
-    }
-    if(lock_it)
-    {
-        BOOST_FOREACH(const CTxIn& txin, rawTx.vin)
-        {
-            COutPoint outpt(txin.prevout.hash, txin.prevout.n);
-            pwalletMain->LockCoin(outpt);
-        }
-    }    
-    if(send_it)
-    {
-        Array sendrawtransaction_params;
-        BOOST_FOREACH(const Pair& s, signedTx.get_obj()) 
-        {        
-            if(s.name_=="complete")
-            {
-                if(!s.value_.get_bool())
-                {
-                    throw JSONRPCError(RPC_TRANSACTION_ERROR, "Transaction was not signed properly");                    
-                }
-            }
-            if(s.name_=="hex")
-            {
-                sendrawtransaction_params.push_back(s.value_.get_str());                
-            }
-        }
-        txid=sendrawtransaction(sendrawtransaction_params,false);
-    }
-    
-    if(send_it)
-    {
-        return txid;
-    }
-    
-    if(sign_it)
-    {
-        return signedTx;
-    }
-    
-    return hex;
 }
   
 /* MCHN START */

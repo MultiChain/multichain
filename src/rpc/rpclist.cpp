@@ -71,10 +71,12 @@ static const CRPCCommand vRPCCommands[] =
     /* P2P networking */
     { "network",            "getnetworkinfo",         &getnetworkinfo,         true,      false,      false },
     { "network",            "addnode",                &addnode,                true,      true,       false },
+    { "network",            "storenode",              &storenode,              true,      true,       false },
     { "network",            "getaddednodeinfo",       &getaddednodeinfo,       true,      true,       false },
     { "network",            "getconnectioncount",     &getconnectioncount,     true,      false,      false },
     { "network",            "getnettotals",           &getnettotals,           true,      true,       false },
     { "network",            "getpeerinfo",            &getpeerinfo,            true,      false,      false },
+    { "network",            "liststorednodes",        &liststorednodes,        true,      false,      false },
     { "network",            "ping",                   &ping,                   true,      false,      false },
     { "network",            "getchunkqueueinfo",      &getchunkqueueinfo,      true,      true,       false },
     { "network",            "getchunkqueuetotals",    &getchunkqueuetotals,    true,      true,       false },
@@ -120,7 +122,8 @@ static const CRPCCommand vRPCCommands[] =
     { "blockchain",         "setvariablevaluefrom",   &setvariablevaluefrom,   true,      false,      false },
     { "blockchain",         "getvariablevalue",       &getvariablevalue,       true,      false,      false },
     { "blockchain",         "getvariablehistory",     &getvariablehistory,     true,      false,      false },
-    { "blockchain",         "listassetissues",        &listassetissues,     true,      false,      false },
+    { "blockchain",         "listassetissues",        &listassetissues,        true,      false,      false },
+    { "blockchain",         "gettokeninfo",           &gettokeninfo,        true,      false,      false },
 
     { "blockchain",         "listlibraries",          &listlibraries,          true,      false,      false },
     { "blockchain",         "addlibraryupdate",       &addlibraryupdate,       true,      false,      false },

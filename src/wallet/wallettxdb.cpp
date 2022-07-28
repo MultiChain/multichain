@@ -662,6 +662,8 @@ int mc_TxDB::Initialize(const char *name,uint32_t mode)
         return MC_ERR_INTERNAL_ERROR;
     }
     
+    m_Mode |= (mode & MC_WMD_LOG_TXS);
+    
     if((m_Mode & MC_WMD_NO_READ_POOLS) == 0)
     {
         m_WRPMemPool=new mc_Buffer;                                                // Key - entity with m_Pos set to 0 + txid
@@ -1028,6 +1030,45 @@ exitlbl:
     return err;
 }
 
+int mc_TxDB::SaveEntityFlag(mc_TxEntity *entity,uint32_t flag,int set_flag)
+{
+    int row=m_Imports->FindEntity(entity);
+    if(row < 0)
+    {
+        return MC_ERR_NOT_FOUND;
+    }
+    
+    mc_TxEntityStat *lpStat;
+    char msg[256];
+    char enthex[65];
+    
+    lpStat=(mc_TxEntityStat *)(m_Imports->GetEntity(row));
+    
+    sprintf_hex(enthex,entity->m_EntityID,MC_TDB_ENTITY_ID_SIZE);
+
+    if(set_flag)
+    {
+        sprintf(msg,"Setting flag %08X to entity (%08X, %s)",flag,entity->m_EntityType,enthex);
+    }
+    else
+    {
+        sprintf(msg,"Unsetting flag %08X to entity (%08X, %s)",flag,entity->m_EntityType,enthex);        
+    }    
+    LogString(msg);
+
+    if(set_flag)
+    {
+        lpStat->m_Flags |= flag;
+    }
+    else
+    {
+        lpStat->m_Flags &= ~flag;
+    }
+    
+    return MC_ERR_NOERROR;
+}
+
+
 int mc_TxDB::FindEntity(mc_TxImport *import,
                         mc_TxEntity *entity)
 {
@@ -1199,7 +1240,11 @@ int mc_TxDB::DecrementSubKey(
         erow.m_Pos=1;
         erow.m_Flags=last_pos;
         erow.m_LastSubKeyPos=last_pos-1;        
-        mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);        
+        if( (IsCSkipped(entity->m_EntityType) == 0) && (pEF->STR_IsIndexSkipped(import,parent_entity,entity) == 0) )
+        {
+            mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);        
+        }
+        
     }
 exitlbl:
             
@@ -1444,7 +1489,7 @@ int mc_TxDB::AddTx(mc_TxImport *import,
     if(isrelevant == 0)
     {
         sprintf(msg,"Tx %s ignored for import %d",txhex,imp->m_ImportID);
-        LogString(msg);
+        if(m_Mode & MC_WMD_LOG_TXS)LogString(msg);
         goto exitlbl;        
     }
 
@@ -1668,7 +1713,7 @@ int mc_TxDB::AddTx(mc_TxImport *import,
         sprintf(msg,"%sTx %s, block %d, flags %08X, import %d",txtype,txhex,block,flags,imp->m_ImportID);
     }
     
-    LogString(msg);
+    if(m_Mode & MC_WMD_LOG_TXS)LogString(msg);
 exitlbl:
     return err;
 }
@@ -1738,13 +1783,14 @@ int mc_TxDB::AddData(mc_TxImport *import,
     if(isrelevant == 0)
     {
         sprintf(msg,"Data %s ignored for import %d",txhex,imp->m_ImportID);
-        LogString(msg);
+        if(m_Mode & MC_WMD_LOG_TXS)LogString(msg);
         goto exitlbl;        
     }
 
     newtx=0;
     ondisk=0;
-//    err=GetTx(&txdef,hash,IsCSkipped(MC_TET_GETDB_ADD_TX));
+    err=GetTx(&txdef,hash,0);
+/*    
     if(m_TxCachedFlags & MC_TCF_FOUND)
     {
         memcpy(&txdef,&(m_TxCachedDef),sizeof(mc_TxDefRow));
@@ -1757,7 +1803,7 @@ int mc_TxDB::AddData(mc_TxImport *import,
     {
         err=MC_ERR_INTERNAL_ERROR;
     }
-    
+*/    
     if(err == MC_ERR_NOT_FOUND)                                                 // Data is not found, neither on disk, nor in the mempool    
     {
         err=MC_ERR_NOERROR;
@@ -1927,7 +1973,7 @@ int mc_TxDB::AddData(mc_TxImport *import,
         sprintf(msg,"%sTx %s, block %d, flags %08X, import %d",txtype,txhex,block,flags,imp->m_ImportID);
     }
     
-    LogString(msg);
+    if(m_Mode & MC_WMD_LOG_TXS)LogString(msg);
 exitlbl:
     return err;
 }

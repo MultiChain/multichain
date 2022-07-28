@@ -1234,6 +1234,20 @@ Value createkeypairs(const Array& params, bool fHelp)
     return retArray;
 }
 
+bool mc_GetDefaultLicenseAddress(CBitcoinAddress& license_address)
+{
+    BOOST_FOREACH(const PAIRTYPE(CBitcoinAddress, CAddressBookData)& item, pwalletMain->mapAddressBook)
+    {
+        const CBitcoinAddress& address = item.first;
+        if(item.second.purpose == "license")
+        {
+            license_address=address;
+            return true;
+        }
+    }    
+    return false;
+}
+
 Value getaddresses(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)                                            // MCHN
@@ -1262,24 +1276,30 @@ Value getaddresses(const Array& params, bool fHelp)
     {
         int entity_count;
         mc_TxEntityStat *lpEntity;
-
+        CBitcoinAddress license_address;
+//        bool has_license=mc_GetDefaultLicenseAddress(license_address);
+        bool has_license=false;
+        
         entity_count=pwalletTxsMain->GetEntityListCount();
         for(int i=0;i<entity_count;i++)
         {
             lpEntity=pwalletTxsMain->GetEntity(i);        
             CBitcoinAddress address;
             if( ((lpEntity->m_Entity.m_EntityType & MC_TET_ORDERMASK) == MC_TET_CHAINPOS) &&
-                ((lpEntity->m_Flags & MC_EFL_NOT_IN_LISTS) == 0 ) )   
+                ((lpEntity->m_Flags & MC_EFL_LICENSE) == 0 ) )   
             {
                 if(CBitcoinAddressFromTxEntity(address,&(lpEntity->m_Entity)))
                 {
-                    if(verbose)
+                    if(!has_license || !(address == license_address) )
                     {
-                        ret.push_back(AddressEntry(address,verbose));
-                    }
-                    else
-                    {
-                        ret.push_back(address.ToString());                        
+                        if(verbose)
+                        {
+                            ret.push_back(AddressEntry(address,verbose));
+                        }
+                        else
+                        {
+                            ret.push_back(address.ToString());                        
+                        }
                     }
                 }
             }
@@ -1633,7 +1653,7 @@ Value getdiagnostics(const Array& params, bool fHelp)
             lpEntity=pwalletTxsMain->GetEntity(i);
             if( ((lpEntity->m_Entity.m_EntityType == (MC_TET_PUBKEY_ADDRESS | MC_TET_CHAINPOS)) || 
                 (lpEntity->m_Entity.m_EntityType == (MC_TET_SCRIPT_ADDRESS | MC_TET_CHAINPOS))) &&
-                ((lpEntity->m_Flags & MC_EFL_NOT_IN_LISTS) == 0 ) )               
+                ((lpEntity->m_Flags & MC_EFL_LICENSE) == 0 ) )               
             {
                 address_count++;
             }

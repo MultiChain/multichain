@@ -7,7 +7,7 @@
 #include "version/clientversion.h"
 #include "rpc/rpcclient.h"
 #include "rpc/rpcprotocol.h"
-#include "rpc/rpcasio.h"
+#include "utils/random.h"
 #include "utils/util.h"
 #include "utils/utilstrencodings.h"
 
@@ -20,16 +20,23 @@
 //#include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
 
+#include <event2/buffer.h>
+#include <event2/keyvalq_struct.h>
+#include <rpc/rpcevents.h>
+
+
 #define _(x) std::string(x) /* Keep the _() around in case gettext or such will be used later to translate non-UI */
 
 using namespace std;
 using namespace boost;
-using namespace boost::asio;
 using namespace json_spirit;
 
 static const int CONTINUE_EXECUTION=-1;
 extern unsigned int JSON_NO_DOUBLE_FORMATTING;  
 extern int JSON_DOUBLE_DECIMAL_DIGITS;                             
+static const int DEFAULT_HTTP_CLIENT_TIMEOUT=900;
+
+string FormatFullMultiChainVersion();
 
 std::string HelpMessageCli()
 {
@@ -95,6 +102,7 @@ static int AppInitRPC(int argc, char* argv[])
     minargs=1;
 #endif
     
+    RandomInit();
     //
     // Parameters
     //
@@ -213,6 +221,71 @@ static int AppInitRPC(int argc, char* argv[])
     return CONTINUE_EXECUTION;
 }
 
+/** Reply structure for request_done to fill in */
+struct RPCHTTPReply
+{
+    RPCHTTPReply(): status(0), error(-1) {}
+
+    int status;
+    int error;
+    std::string body;
+};
+
+static std::string http_errorstring(int code)
+{
+    switch(code) {
+#if LIBEVENT_VERSION_NUMBER >= 0x02010300
+    case EVREQ_HTTP_TIMEOUT:
+        return "timeout reached";
+    case EVREQ_HTTP_EOF:
+        return "EOF reached";
+    case EVREQ_HTTP_INVALID_HEADER:
+        return "error while reading header, or invalid header";
+    case EVREQ_HTTP_BUFFER_ERROR:
+        return "error encountered while reading or writing";
+    case EVREQ_HTTP_REQUEST_CANCEL:
+        return "request was canceled";
+    case EVREQ_HTTP_DATA_TOO_LONG:
+        return "response body is larger than allowed";
+#endif
+    default:
+        return "unknown";
+    }
+}
+
+static void http_request_done(struct evhttp_request *req, void *ctx)
+{
+    RPCHTTPReply *reply = static_cast<RPCHTTPReply*>(ctx);
+
+    if (req == nullptr) {
+        /* If req is nullptr, it means an error occurred while connecting: the
+         * error code will have been passed to http_error_cb.
+         */
+        reply->status = 0;
+        return;
+    }
+
+    reply->status = evhttp_request_get_response_code(req);
+
+    struct evbuffer *buf = evhttp_request_get_input_buffer(req);
+    if (buf)
+    {
+        size_t size = evbuffer_get_length(buf);
+        const char *data = (const char*)evbuffer_pullup(buf, size);
+        if (data)
+            reply->body = std::string(data, size);
+        evbuffer_drain(buf, size);
+    }
+}
+
+#if LIBEVENT_VERSION_NUMBER >= 0x02010300
+static void http_error_cb(enum evhttp_request_error err, void *ctx)
+{
+    RPCHTTPReply *reply = static_cast<RPCHTTPReply*>(ctx);
+    reply->error = err;
+}
+#endif
+
 Object CallRPC(const string& strMethod, const Array& params)
 {
     if (mapArgs["-rpcuser"] == "" && mapArgs["-rpcpassword"] == "")
@@ -222,37 +295,93 @@ Object CallRPC(const string& strMethod, const Array& params)
               "If the file does not exist, create it with owner-readable-only file permissions."),
                 mc_gState->m_Params->NetworkName(),mc_gState->m_Params->DataDir(1,0)));
 
-    // Connect to localhost
-    bool fUseSSL = GetBoolArg("-rpcssl", false);
-    asio::io_service io_service;
-    ssl::context context(io_service, ssl::context::sslv23);
-    context.set_options(ssl::context::no_sslv2 | ssl::context::no_sslv3);
-    asio::ssl::stream<asio::ip::tcp::socket> sslStream(io_service, context);
-    SSLIOStreamDevice<asio::ip::tcp> d(sslStream, fUseSSL);
-    iostreams::stream< SSLIOStreamDevice<asio::ip::tcp> > stream(d);
-
-    const bool fConnected = d.connect(GetArg("-rpcconnect", "127.0.0.1"), GetArg("-rpcport", itostr(BaseParams().RPCPort())));
-    if (!fConnected)
-        throw CConnectionFailed("couldn't connect to server");
-
-    // HTTP basic authentication
+    std::string host;
+    // In preference order, we choose the following for the port:
+    //     1. -rpcport
+    //     2. port in -rpcconnect (ie following : in ipv4 or ]: in ipv6)
+    //     3. default port for chain
+    int port;
+    SplitHostPort(GetArg("-rpcconnect", "127.0.0.1"), port, host);
+    port = GetArg("-rpcport", BaseParams().RPCPort());
     
+    // Obtain event base
+    raii_event_base base = obtain_event_base();
+
+    // Synchronously look up hostname
+    raii_evhttp_connection evcon = obtain_evhttp_connection_base(base.get(), host, port);
+
+    // Set connection timeout
+    {
+        const int timeout = GetArg("-rpcclienttimeout", DEFAULT_HTTP_CLIENT_TIMEOUT);
+        if (timeout > 0) {
+            evhttp_connection_set_timeout(evcon.get(), timeout);
+        } else {
+            // Indefinite request timeouts are not possible in libevent-http, so we
+            // set the timeout to a very long time period instead.
+
+            constexpr int YEAR_IN_SECONDS = 31556952; // Average length of year in Gregorian calendar
+            evhttp_connection_set_timeout(evcon.get(), 5 * YEAR_IN_SECONDS);
+        }
+    }
+
+    RPCHTTPReply response;
+    raii_evhttp_request req = obtain_evhttp_request(http_request_done, (void*)&response);
+    if (req == nullptr)
+        throw std::runtime_error("create http request failed");
+#if LIBEVENT_VERSION_NUMBER >= 0x02010300
+    evhttp_request_set_error_cb(req.get(), http_error_cb);
+#endif
+    
+    // Get credentials
     string strUserPass64 = EncodeBase64(mapArgs["-rpcuser"] + ":" + mapArgs["-rpcpassword"]);
-    map<string, string> mapRequestHeaders;
-    mapRequestHeaders["Authorization"] = string("Basic ") + strUserPass64;
-    // Send request
-//    JSON_NO_DOUBLE_FORMATTING=1;    
-    
+    string strAuthorization=string("Basic ") + strUserPass64;
     int32_t id_nonce;
     id_nonce=mc_RandomInRange(10000000,99999999);
     Value req_id=strprintf("%08d-%u",id_nonce,mc_TimeNowAsUInt());
     
     string strRequest = JSONRPCRequest(strMethod, params, req_id);
-//    JSON_NO_DOUBLE_FORMATTING=0;    
-    JSON_DOUBLE_DECIMAL_DIGITS=GetArg("-apidecimaldigits",-1);        
-    string strPost = HTTPPost(strRequest, mapRequestHeaders);
-    stream << strPost << std::flush;
+    string strRequestLength=strprintf("%ld",strRequest.size());
 
+    struct evkeyvalq* output_headers = evhttp_request_get_output_headers(req.get());
+    assert(output_headers);
+    evhttp_add_header(output_headers, "User-Agent", ("multichain-json-rpc/" + FormatFullMultiChainVersion()).c_str());
+    evhttp_add_header(output_headers, "Host", host.c_str());
+    evhttp_add_header(output_headers, "Connection", "close");
+    evhttp_add_header(output_headers, "Content-Type", "application/json");
+    evhttp_add_header(output_headers, "Content-Length", strRequestLength.c_str());
+    evhttp_add_header(output_headers, "Accept", "application/json");
+    evhttp_add_header(output_headers, "Authorization", strAuthorization.c_str());
+
+    struct evbuffer* output_buffer = evhttp_request_get_output_buffer(req.get());
+    assert(output_buffer);
+    evbuffer_add(output_buffer, strRequest.data(), strRequest.size());
+
+    std::string endpoint = "/";
+
+    int r = evhttp_make_request(evcon.get(), req.get(), EVHTTP_REQ_POST, endpoint.c_str());
+    req.release(); // ownership moved to evcon in above call
+    if (r != 0) {
+        throw CConnectionFailed("send http request failed");
+    }
+    
+    event_base_dispatch(base.get());
+
+    if (response.status == 0) {
+        std::string responseErrorMessage;
+        if (response.error != -1) {
+            responseErrorMessage = strprintf(" (error code %d - \"%s\")", response.error, http_errorstring(response.error));
+        }
+        throw CConnectionFailed(strprintf("Could not connect to the server %s:%d%s\n\nMake sure the multichaind server is running and that you are connecting to the correct RPC port.", host, port, responseErrorMessage));
+    } else if (response.status == HTTP_UNAUTHORIZED) {
+        throw std::runtime_error("Authorization failed: Incorrect rpcuser or rpcpassword");
+    } else if (response.status == HTTP_SERVICE_UNAVAILABLE) {
+        throw std::runtime_error(strprintf("Server response: %s", response.body));
+    } else if (response.status >= 400 && response.status != HTTP_BAD_REQUEST && response.status != HTTP_NOT_FOUND && response.status != HTTP_INTERNAL_SERVER_ERROR)
+        throw std::runtime_error(strprintf("server returned HTTP error %d", response.status));
+    else if (response.body.empty())
+        throw std::runtime_error("no response from server");
+
+    
     string requestout=GetArg("-requestout","stderr");
     if(requestout == "stdout")
     {
@@ -263,25 +392,9 @@ Object CallRPC(const string& strMethod, const Array& params)
         fprintf(stderr, "%s\n", strRequest.c_str());        
     }
     
-    // Receive HTTP reply status
-    int nProto = 0;
-    int nStatus = ReadHTTPStatus(stream, nProto);
-
-    // Receive HTTP reply message headers and body
-    map<string, string> mapHeaders;
-    string strReply;
-    ReadHTTPMessage(stream, mapHeaders, strReply, nProto, std::numeric_limits<size_t>::max());
-
-    if (nStatus == HTTP_UNAUTHORIZED)
-        throw runtime_error("incorrect rpcuser or rpcpassword (authorization failed)");
-    else if (nStatus >= 400 && nStatus != HTTP_BAD_REQUEST && nStatus != HTTP_NOT_FOUND && nStatus != HTTP_INTERNAL_SERVER_ERROR)
-        throw runtime_error(strprintf("server returned HTTP error %d", nStatus));
-    else if (strReply.empty())
-        throw runtime_error("no response from server");
-
     // Parse reply
     Value valReply;
-    if (!read_string(strReply, valReply))
+    if (!read_string(response.body, valReply))
         throw runtime_error("couldn't parse reply from server");
     const Object& reply = valReply.get_obj();
     if (reply.empty())
@@ -386,6 +499,11 @@ int CommandLineRPC(int argc, char *argv[])
 int main(int argc, char* argv[])
 {
     SetupEnvironment();
+    if (!SetupNetworking()) {
+        printf("Error: Initializing networking failed\n");
+        return EXIT_FAILURE;
+    }
+    
     try {
         int ret = AppInitRPC(argc, argv);
         if (ret != CONTINUE_EXECUTION)
