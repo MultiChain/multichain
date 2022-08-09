@@ -21,7 +21,7 @@ void CChain::SetTip(CBlockIndex *pindex) {
     vChain.resize(pindex->nHeight + 1);
     while (pindex && vChain[pindex->nHeight] != pindex) {
         vChain[pindex->nHeight] = pindex;
-        pindex = pindex->pprev;
+        pindex = pindex->getpprev();
     }
     mc_gState->ChainUnLock();
 }
@@ -54,10 +54,54 @@ CBlockLocator CChain::GetLocator(const CBlockIndex *pindex) const {
     return CBlockLocator(vHave);
 }
 
-const CBlockIndex *CChain::FindFork(const CBlockIndex *pindex) const {
+/* BLMP removed const for both method and parameter */    
+
+CBlockIndex *CChain::FindFork(CBlockIndex *pindexIn) {
+    CBlockIndex *pindex=pindexIn;
     if (pindex->nHeight > Height())
         pindex = pindex->GetAncestor(Height());
     while (pindex && !Contains(pindex))
-        pindex = pindex->pprev;
+        pindex = pindex->getpprev();
     return pindex;
 }
+
+CBlockIndex* CBlockIndex::getpprev() {
+    return pprev;
+}
+
+void CBlockIndex::setpprev(CBlockIndex* p){
+    pprev=p;
+    hashPrev=0;
+    if(pprev)
+    {
+        hashPrev=pprev->GetBlockHash();
+    }
+}
+
+CBlockIndex* CBlockIndex::getpskip(){
+    return pskip;
+}
+
+void CBlockIndex::setpskip(CBlockIndex* p){
+    pskip=p;
+    hashSkip=0;
+    if(pskip)
+    {
+        hashSkip=pskip->GetBlockHash();
+    }
+}
+
+CBlockIndex* CBlockIndex::getnextonthisheight(){
+    return pNextOnThisHeight;
+}
+
+void CBlockIndex::setnextonthisheight(CBlockIndex* p){
+    pNextOnThisHeight=p;
+    hashNextOnThisHeight=0;
+    if(pskip)
+    {
+        hashNextOnThisHeight=pNextOnThisHeight->GetBlockHash();
+    }
+}
+
+

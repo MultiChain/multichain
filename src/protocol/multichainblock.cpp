@@ -713,7 +713,7 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
         return true;
     }
     
-    if(pindexNew->pprev == NULL)
+    if(pindexNew->getpprev() == NULL)
     {
         pindexNew->fPassedMinerPrecheck=true;
         return true;        
@@ -787,7 +787,7 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
         
         branch[pos]=pindex;
         pos--;
-        pindex=pindex->pprev;
+        pindex=pindex->getpprev();
     }
 
     last_after_fork=0;

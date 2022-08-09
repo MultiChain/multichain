@@ -93,7 +93,9 @@ public:
     }
 };
 
-bool UpdateTime(CBlockHeader* pblock, const CBlockIndex* pindexPrev)
+/* BLMP removed const for parameter */    
+
+bool UpdateTime(CBlockHeader* pblock, CBlockIndex* pindexPrev)
 {
 /* MCHN START */    
     uint32_t original_nTime=pblock->nTime;
@@ -967,7 +969,7 @@ set <CTxDestination> LastActiveMiners(CBlockIndex* pindexTip, CPubKey *kLastMine
                 {
                     *kLastMiner=pindex->kMiner;
                 }
-                pindex=pindex->pprev;
+                pindex=pindex->getpprev();
             }
         }
     }    
@@ -1108,7 +1110,7 @@ double GetMinerAndExpectedMiningStartTime(CWallet *pwallet,CPubKey *lpkMiner,set
                 dExpectedTimeByPast+=pindex->dTimeReceived;
                 nWindowSize++;
                 dAverageGap=pindex->dTimeReceived;
-                pindex=pindex->pprev;
+                pindex=pindex->getpprev();
             }
         }
                 
@@ -1459,7 +1461,7 @@ void static BitcoinMiner(CWallet *pwallet)
                         else
                         {
                             nEmptyBlocks++;
-                            pindex=pindex->pprev;
+                            pindex=pindex->getpprev();
                         }
                     }
                     if(pindex == NULL)

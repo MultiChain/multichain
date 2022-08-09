@@ -70,8 +70,9 @@ double GetDifficulty(const CBlockIndex* blockindex)
 
     return dDiff;
 }
+/* BLMP removed const for parameter */    
 
-Object blockToJSONForListBlocks(CBlock& block, const CBlockIndex* blockindex, bool verbose)
+Object blockToJSONForListBlocks(CBlock& block, CBlockIndex* blockindex, bool verbose)
 {
     Object result;
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
@@ -120,8 +121,8 @@ Object blockToJSONForListBlocks(CBlock& block, const CBlockIndex* blockindex, bo
         result.push_back(Pair("difficulty", GetDifficulty(blockindex)));
         result.push_back(Pair("chainwork", blockindex->nChainWork.GetHex()));
 
-        if (blockindex->pprev)
-            result.push_back(Pair("previousblockhash", blockindex->pprev->GetBlockHash().GetHex()));
+        if (blockindex->getpprev())
+            result.push_back(Pair("previousblockhash", blockindex->getpprev()->GetBlockHash().GetHex()));
         CBlockIndex *pnext = chainActive.Next(blockindex);
         if (pnext)
             result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
@@ -131,8 +132,9 @@ Object blockToJSONForListBlocks(CBlock& block, const CBlockIndex* blockindex, bo
 }
 
 
+/* BLMP removed const for parameter */    
 
-Object blockToJSON(CBlock& block, const CBlockIndex* blockindex, bool txDetails = false, int verbose_level = 1)
+Object blockToJSON(CBlock& block, CBlockIndex* blockindex, bool txDetails = false, int verbose_level = 1)
 {
     Object result;
     result.push_back(Pair("hash", block.GetHash().GetHex()));
@@ -217,8 +219,8 @@ Object blockToJSON(CBlock& block, const CBlockIndex* blockindex, bool txDetails 
         result.push_back(Pair("valid", false));        
     }
     
-    if (blockindex->pprev)
-        result.push_back(Pair("previousblockhash", blockindex->pprev->GetBlockHash().GetHex()));
+    if (blockindex->getpprev())
+        result.push_back(Pair("previousblockhash", blockindex->getpprev()->GetBlockHash().GetHex()));
     CBlockIndex *pnext = chainActive.Next(blockindex);
     if (pnext)
         result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
@@ -849,12 +851,15 @@ Value getchaintips(const Array& params, bool fHelp)
     /* Build up a list of chain tips.  We start with the list of all
        known blocks, and successively remove blocks that appear as pprev
        of another block.  */
-    std::set<const CBlockIndex*, CompareBlocksByHeight> setTips;
+    std::set<CBlockIndex*, CompareBlocksByHeight> setTips;
+    
+/* BLMP COB */
+    
     BOOST_FOREACH(const PAIRTYPE(const uint256, CBlockIndex*)& item, mapBlockIndex)
         setTips.insert(item.second);
     BOOST_FOREACH(const PAIRTYPE(const uint256, CBlockIndex*)& item, mapBlockIndex)
     {
-        const CBlockIndex* pprev = item.second->pprev;
+        CBlockIndex* pprev = item.second->getpprev();
         if (pprev)
             setTips.erase(pprev);
     }
@@ -864,7 +869,7 @@ Value getchaintips(const Array& params, bool fHelp)
 
     /* Construct the output array.  */
     Array res;
-    BOOST_FOREACH(const CBlockIndex* block, setTips)
+    BOOST_FOREACH(CBlockIndex* block, setTips)
     {
         Object obj;
         obj.push_back(Pair("height", block->nHeight));

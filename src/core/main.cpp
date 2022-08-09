@@ -574,11 +574,11 @@ void MultichainNode_UpdateBlockByHeightList(CBlockIndex *pindex)
     {
         CBlockIndex *pTmp;
         pTmp=vFirstOnThisHeight[pindex->nHeight];
-        while(pTmp->pNextOnThisHeight)
+        while(pTmp->getnextonthisheight())
         {
-            pTmp=pTmp->pNextOnThisHeight;
+            pTmp=pTmp->getnextonthisheight();
         }
-        pTmp->pNextOnThisHeight=pindex;
+        pTmp->setnextonthisheight(pindex);
     }
     else
     {
@@ -800,8 +800,8 @@ CBlockIndex* LastCommonAncestor(CBlockIndex* pa, CBlockIndex* pb) {
     }
 
     while (pa != pb && pa && pb) {
-        pa = pa->pprev;
-        pb = pb->pprev;
+        pa = pa->getpprev();
+        pb = pb->getpprev();
     }
 
     // Eventually all chain branches meet at the genesis block.
@@ -871,7 +871,7 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
         pindexWalk = pindexBestKnownBlock->GetAncestor(pindexWalk->nHeight + nToFetch);
         vToFetch[nToFetch - 1] = pindexWalk;
         for (unsigned int i = nToFetch - 1; i > 0; i--) {
-            vToFetch[i - 1] = vToFetch[i]->pprev;
+            vToFetch[i - 1] = vToFetch[i]->getpprev();
         }
 
         // Iterate over those blocks in vToFetch (in forward direction), adding the ones that
@@ -2183,10 +2183,10 @@ void CheckForkWarningConditionsOnNewFork(CBlockIndex* pindexNewForkTip)
     while (pfork && pfork != plonger)
     {
         while (plonger && plonger->nHeight > pfork->nHeight)
-            plonger = plonger->pprev;
+            plonger = plonger->getpprev();
         if (pfork == plonger)
             break;
-        pfork = pfork->pprev;
+        pfork = pfork->getpprev();
     }
 
     // We define a condition which we should warn the user about as a fork of at least 7 blocks
@@ -2473,7 +2473,7 @@ bool DisconnectBlock(CBlock& block, CValidationState& state, CBlockIndex* pindex
     CDiskBlockPos pos = pindex->GetUndoPos();
     if (pos.IsNull())
         return error("DisconnectBlock() : no undo data available");
-    if (!blockUndo.ReadFromDisk(pos, pindex->pprev->GetBlockHash()))
+    if (!blockUndo.ReadFromDisk(pos, pindex->getpprev()->GetBlockHash()))
         return error("DisconnectBlock() : failure reading undo data");
 
     if (blockUndo.vtxundo.size() + 1 != block.vtx.size())
@@ -2537,7 +2537,7 @@ bool DisconnectBlock(CBlock& block, CValidationState& state, CBlockIndex* pindex
     }
 
     // move best block pointer to prevout block
-    view.SetBestBlock(pindex->pprev->GetBlockHash());
+    view.SetBestBlock(pindex->getpprev()->GetBlockHash());
 
     if (pfClean) {
         *pfClean = fClean;
@@ -2629,15 +2629,15 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     block_hash=block.GetHash();
     if(!fJustCheck)
     {
-        if(pindex->pprev)
+        if(pindex->getpprev())
         {
-            if(fDebug)LogPrint("mchn","mchn: Connecting block %s (height %d) ...\n",block.GetHash().ToString().c_str(),pindex->pprev->nHeight+1);
+            if(fDebug)LogPrint("mchn","mchn: Connecting block %s (height %d) ...\n",block.GetHash().ToString().c_str(),pindex->getpprev()->nHeight+1);
         }
         else
         {
             if(fDebug)LogPrint("mchn","mchn: Connecting genesis block...\n");        
         }
-        if(!CheckBlockPermissions(block,pindex->pprev,miner_address))
+        if(!CheckBlockPermissions(block,pindex->getpprev(),miner_address))
         {
             return state.DoS(100, error("ConnectBlock() : invalid permission changes or miner has no permission"),
                              REJECT_INVALID, "bad-perm-chngs");        
@@ -2647,7 +2647,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     
     
     // verify that the view's current state corresponds to the previous block
-    uint256 hashPrevBlock = pindex->pprev == NULL ? uint256(0) : pindex->pprev->GetBlockHash();
+    uint256 hashPrevBlock = pindex->getpprev() == NULL ? uint256(0) : pindex->getpprev()->GetBlockHash();
     assert(hashPrevBlock == view.GetBestBlock());
     
 /* MCHN START */        
@@ -2772,7 +2772,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     unsigned int flags = fStrictPayToScriptHash ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE;
 
     // Start enforcing the DERSIG (BIP66) rules, for block.nVersion=3 blocks, when 75% of the network has upgraded:
-    if (block.nVersion >= 3 && CBlockIndex::IsSuperMajority(3, pindex->pprev, Params().EnforceBlockUpgradeMajority())) {
+    if (block.nVersion >= 3 && CBlockIndex::IsSuperMajority(3, pindex->getpprev(), Params().EnforceBlockUpgradeMajority())) {
         flags |= SCRIPT_VERIFY_DERSIG;
     }
 
@@ -2901,7 +2901,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             CDiskBlockPos pos;
             if (!FindUndoPos(state, pindex->nFile, pos, ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) + 40))
                 return error("ConnectBlock() : FindUndoPos failed");
-            if (!blockundo.WriteToDisk(pos, pindex->pprev->GetBlockHash()))
+            if (!blockundo.WriteToDisk(pos, pindex->getpprev()->GetBlockHash()))
                 return state.Abort("Failed to write undo data");
 
             // update nUndoPos in block index
@@ -3047,12 +3047,12 @@ void static UpdateTip(CBlockIndex *pindexNew) {
     if (!IsInitialBlockDownload() && !fWarned)
     {
         int nUpgraded = 0;
-        const CBlockIndex* pindex = chainActive.Tip();
+        CBlockIndex* pindex = chainActive.Tip();
         for (int i = 0; i < 100 && pindex != NULL; i++)
         {
             if (pindex->nVersion > CBlock::CURRENT_VERSION)
                 ++nUpgraded;
-            pindex = pindex->pprev;
+            pindex = pindex->getpprev();
         }
         if (nUpgraded > 0)
             LogPrintf("SetBestChain: %d of last 100 blocks above version %d\n", nUpgraded, (int)CBlock::CURRENT_VERSION);
@@ -3162,7 +3162,7 @@ bool static DisconnectTip(CValidationState &state) {
     
     mempool.check(pcoinsTip);
     // Update chainActive and related variables.
-    UpdateTip(pindexDelete->pprev);
+    UpdateTip(pindexDelete->getpprev());
     // Let wallets know transactions went from 1-confirmed to
     // 0-confirmed or conflicted:
     BOOST_FOREACH(const CTransaction &tx, block.vtx) {
@@ -3186,7 +3186,7 @@ static int64_t nTimePostConnect = 0;
  * corresponding to pindexNew, to bypass loading it again from disk.
  */
 bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *pblock) {
-    assert(pindexNew->pprev == chainActive.Tip());
+    assert(pindexNew->getpprev() == chainActive.Tip());
     mempool.check(pcoinsTip);
     // Read block from disk.
     int64_t nTime1 = GetTimeMicros();
@@ -3672,13 +3672,13 @@ static CBlockIndex* FindMostWorkChain() {
                 while (pindexTest != pindexFailed) {
                     pindexFailed->nStatus |= BLOCK_FAILED_CHILD;
                     setBlockIndexCandidates.erase(pindexFailed);
-                    pindexFailed = pindexFailed->pprev;
+                    pindexFailed = pindexFailed->getpprev();
                 }
                 setBlockIndexCandidates.erase(pindexTest);
                 fInvalidAncestor = true;
                 break;
             }
-            pindexTest = pindexTest->pprev;
+            pindexTest = pindexTest->getpprev();
         }
         if (!fInvalidAncestor)
             return pindexNew;
@@ -3713,9 +3713,9 @@ void UpdateChainMiningStatus(const CBlock &block,CBlockIndex *pindexNew)
             if(pwalletMain->GetKey(keyID,key))
             {
                 pindexNew->nHeightMinedByMe=pindexNew->nHeight;
-                if(pindexNew->pprev)
+                if(pindexNew->getpprev())
                 {
-                    pindexNew->nCanMine=pindexNew->pprev->nCanMine;
+                    pindexNew->nCanMine=pindexNew->getpprev()->nCanMine;
                 }                
                 else
                 {
@@ -3728,10 +3728,10 @@ void UpdateChainMiningStatus(const CBlock &block,CBlockIndex *pindexNew)
             }
             else
             {
-                if(pindexNew->pprev)
+                if(pindexNew->getpprev())
                 {
-                    pindexNew->nHeightMinedByMe=pindexNew->pprev->nHeightMinedByMe;
-                    pindexNew->nCanMine=pindexNew->pprev->nCanMine;
+                    pindexNew->nHeightMinedByMe=pindexNew->getpprev()->nHeightMinedByMe;
+                    pindexNew->nCanMine=pindexNew->getpprev()->nCanMine;
                     if(pindexNew->nHeightMinedByMe+mc_gState->m_Permissions->m_MinerCount-mc_gState->m_Permissions->GetActiveMinerCount() > pindexNew->nHeight)
                     {
                         pindexNew->nCanMine=0;
@@ -3743,10 +3743,10 @@ void UpdateChainMiningStatus(const CBlock &block,CBlockIndex *pindexNew)
                 }
             }
         }
-        if(pindexNew->pprev)
+        if(pindexNew->getpprev())
         {
             if(fDebug)LogPrint("mcblock","mchn-block: New block index:   %s, prev: %s, height: %d, mined-by-me: %d, can-mine: %d\n",pindexNew->GetBlockHash().ToString().c_str(),
-                    pindexNew->pprev->GetBlockHash().ToString().c_str(),
+                    pindexNew->getpprev()->GetBlockHash().ToString().c_str(),
                     pindexNew->nHeight,pindexNew->nHeightMinedByMe,pindexNew->nCanMine);
         }
     }    
@@ -3797,7 +3797,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     CBlockIndex *pindexIter = pindexMostWork->GetAncestor(nTargetHeight);
     while (pindexIter && pindexIter->nHeight != nHeight) {
         vpindexToConnect.push_back(pindexIter);
-        pindexIter = pindexIter->pprev;
+        pindexIter = pindexIter->getpprev();
     }
     nHeight = nTargetHeight;
     // Connect new blocks.
@@ -3942,9 +3942,9 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
                     chainActive.Tip()->nCanMine=pwalletMain->GetKeyFromAddressBook(pubkey,MC_PTP_MINE) ? MC_PTP_MINE : 0;
                     if(chainActive.Tip()->nHeightMinedByMe == 0)                    // Can happen if several blocks received in the wrong order 
                     {
-                        if(chainActive.Tip()->pprev)                                
+                        if(chainActive.Tip()->getpprev())                                
                         {
-                            chainActive.Tip()->nHeightMinedByMe=chainActive.Tip()->pprev->nHeightMinedByMe;
+                            chainActive.Tip()->nHeightMinedByMe=chainActive.Tip()->getpprev()->nHeightMinedByMe;
                         }
                     }
                 }
@@ -3968,7 +3968,7 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
                 return true;                
             }            
             
-            if(pindexMostWork->pprev != chainActive.Tip())
+            if(pindexMostWork->getpprev() != chainActive.Tip())
             {
                 if(chainActive.Tip())
                 {
@@ -4116,7 +4116,7 @@ string SetLastBlock(uint256 hash,bool *fNotFound)
                 }
             }
             
-            pindex=pindex->pprev;
+            pindex=pindex->getpprev();
         }
         
         while(pblockindex != chainActive.Tip())
@@ -4280,9 +4280,9 @@ string SetLockedBlock(string hash)
                 pindexWalk=pindexLockedBlock;
                 while( (pindexWalk != pindexFork) && ( (pindexWalk->nStatus & BLOCK_HAVE_DATA) == 0 ) )
                 {
-                    pindexWalk=pindexWalk->pprev;
+                    pindexWalk=pindexWalk->getpprev();
                 }
-                
+/* BLMP COB */
                 if(pindexWalk == pindexLockedBlock)
                 {
                     BlockMap::iterator it = mapBlockIndex.begin();
@@ -4299,7 +4299,7 @@ string SetLockedBlock(string hash)
                         it++;
                     }
                 }
-                
+
                 LogPrintf("Block %s found on alternative chain at height %d\n",
                         hLockedBlock.ToString().c_str(),pindexLockedBlock->nHeight);                
                 LogPrintf("Fork: %s at height %d\n",
@@ -4379,6 +4379,7 @@ bool InvalidateBlock(CValidationState& state, CBlockIndex *pindex) {
 
     // The resulting new best tip may not be in setBlockIndexCandidates anymore, so
     // add them again.
+/* BLMP COB */
     BlockMap::iterator it = mapBlockIndex.begin();
     while (it != mapBlockIndex.end()) {
         if (it->second->IsValid(BLOCK_VALID_TRANSACTIONS) && it->second->nChainTx && setBlockIndexCandidates.value_comp()(chainActive.Tip(), it->second)) {
@@ -4395,7 +4396,7 @@ bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
     AssertLockHeld(cs_main);
 
     int nHeight = pindex->nHeight;
-
+/* BLMP Commented out this block */
     // Remove the invalidity flag from this block and all its descendants.
     BlockMap::iterator it = mapBlockIndex.begin();
     while (it != mapBlockIndex.end()) {
@@ -4419,7 +4420,7 @@ bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
             pindex->nStatus &= ~BLOCK_FAILED_MASK;
             setDirtyBlockIndex.insert(pindex);
         }
-        pindex = pindex->pprev;
+        pindex = pindex->getpprev();
     }
     return true;
 }
@@ -4448,11 +4449,12 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     BlockMap::iterator miPrev = mapBlockIndex.find(block.hashPrevBlock);
     if (miPrev != mapBlockIndex.end())
     {
-        pindexNew->pprev = (*miPrev).second;
-        pindexNew->nHeight = pindexNew->pprev->nHeight + 1;
+//        pindexNew->pprev = (*miPrev).second;
+        pindexNew->setpprev((*miPrev).second);
+        pindexNew->nHeight = pindexNew->getpprev()->nHeight + 1;
         pindexNew->BuildSkip();
     }
-    pindexNew->nChainWork = (pindexNew->pprev ? pindexNew->pprev->nChainWork : 0) + GetBlockProof(*pindexNew);
+    pindexNew->nChainWork = (pindexNew->getpprev() ? pindexNew->getpprev()->nChainWork : 0) + GetBlockProof(*pindexNew);
     pindexNew->RaiseValidity(BLOCK_VALID_TREE);
     if (pindexBestHeader == NULL || pindexBestHeader->nChainWork < pindexNew->nChainWork)
         pindexBestHeader = pindexNew;
@@ -4485,7 +4487,7 @@ bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBl
     
 /* MCHN START */    
     UpdateChainMiningStatus(block,pindexNew);
-
+    
 /*    
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
@@ -4541,7 +4543,7 @@ bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBl
     
     setDirtyBlockIndex.insert(pindexNew);
 
-    if (pindexNew->pprev == NULL || pindexNew->pprev->nChainTx) {
+    if (pindexNew->getpprev() == NULL || pindexNew->getpprev()->nChainTx) {
         // If pindexNew is the genesis block or all parents are BLOCK_VALID_TRANSACTIONS.
         deque<CBlockIndex*> queue;
         queue.push_back(pindexNew);
@@ -4550,7 +4552,7 @@ bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBl
         while (!queue.empty()) {
             CBlockIndex *pindex = queue.front();
             queue.pop_front();
-            pindex->nChainTx = (pindex->pprev ? pindex->pprev->nChainTx : 0) + pindex->nTx;
+            pindex->nChainTx = (pindex->getpprev() ? pindex->getpprev()->nChainTx : 0) + pindex->nTx;
             {
                 LOCK(cs_nBlockSequenceId);
                 pindex->nSequenceId = nBlockSequenceId++;
@@ -4566,8 +4568,8 @@ bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBl
             }
         }
     } else {
-        if (pindexNew->pprev && pindexNew->pprev->IsValid(BLOCK_VALID_TREE)) {
-            mapBlocksUnlinked.insert(std::make_pair(pindexNew->pprev, pindexNew));
+        if (pindexNew->getpprev() && pindexNew->getpprev()->IsValid(BLOCK_VALID_TREE)) {
+            mapBlocksUnlinked.insert(std::make_pair(pindexNew->getpprev(), pindexNew));
         }
     }
 
@@ -4813,7 +4815,7 @@ bool CheckBranchForInvalidBlocks(CBlockIndex * const pindexPrev)
             return false;
         }
 
-        pindexTest=pindexTest->pprev;
+        pindexTest=pindexTest->getpprev();
     }
         
     return true;
@@ -4968,9 +4970,9 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
             *ppindex = pindex;
         if (pindex->nStatus & BLOCK_FAILED_MASK)
             return state.Invalid(error("%s : block is marked invalid", __func__), 0, "duplicate");
-        if(pindexChecked != pindex->pprev)                                         
+        if(pindexChecked != pindex->getpprev())                                         
         {
-            if(!CheckBranchForInvalidBlocks(pindex->pprev))
+            if(!CheckBranchForInvalidBlocks(pindex->getpprev()))
             {
                 return state.Invalid(error("%s : %s rejected - invalid branch", __func__,block.GetHash().ToString().c_str()),
                                      REJECT_INVALID, "reorg-invalid branch");                                
@@ -5027,7 +5029,7 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
                     lpNextForPrev=lpNext;
                 }
             }
-            pindexTmp=pindexTmp->pNextOnThisHeight;
+            pindexTmp=pindexTmp->getnextonthisheight();
         }
         if(successors_from_this_node >= GetArg("-maxheadersfrompeer", DEFAULT_MAX_SUCCESSORS_FROM_ONE_NODE))
         {
@@ -5108,9 +5110,9 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
 /* MCHN END*/    
     
 
-//    if ((!CheckBlock(block, state)) || !ContextualCheckBlock(block, state, pindex->pprev)) {
+//    if ((!CheckBlock(block, state)) || !ContextualCheckBlock(block, state, pindex->getpprev())) {
 // AcceptBlock is called only in context of ProcessNewBlock. CheckBlock is called before. No reason to call it again
-    if (!ContextualCheckBlock(block, state, pindex->pprev)) {
+    if (!ContextualCheckBlock(block, state, pindex->getpprev())) {
         if (state.IsInvalid() && !state.CorruptionPossible()) {
             pindex->nStatus |= BLOCK_FAILED_VALID;
             setDirtyBlockIndex.insert(pindex);
@@ -5130,7 +5132,7 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
     CBlockIndex *pindexTip=pindex;
     while((pindexTip != NULL) && pindexTip->nHeight > chainActive.Height())
     {
-        pindexTip=pindexTip->pprev;
+        pindexTip=pindexTip->getpprev();
     }
     if(pindexTip == chainActive.Tip())                                          // If we are on main chain
                                                                                 // If it is the next block, we can check upgradable constraints
@@ -5179,7 +5181,9 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
     return true;
 }
 
-bool CBlockIndex::IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned int nRequired)
+/* BLMP removed const for parameter*/    
+
+bool CBlockIndex::IsSuperMajority(int minVersion, CBlockIndex* pstart, unsigned int nRequired)
 {
     unsigned int nToCheck = Params().ToCheckBlockUpgradeMajority();
     unsigned int nFound = 0;
@@ -5187,7 +5191,7 @@ bool CBlockIndex::IsSuperMajority(int minVersion, const CBlockIndex* pstart, uns
     {
         if (pstart->nVersion >= minVersion)
             ++nFound;
-        pstart = pstart->pprev;
+        pstart = pstart->getpprev();
     }
     return (nFound >= nRequired);
 }
@@ -5223,7 +5227,7 @@ CBlockIndex* CBlockIndex::GetAncestor(int height)
             pindexWalk = pindexWalk->pskip;
             heightWalk = heightSkip;
         } else {
-            pindexWalk = pindexWalk->pprev;
+            pindexWalk = pindexWalk->getpprev();
             heightWalk--;
         }
     }
@@ -5237,8 +5241,8 @@ const CBlockIndex* CBlockIndex::GetAncestor(int height) const
 
 void CBlockIndex::BuildSkip()
 {
-    if (pprev)
-        pskip = pprev->GetAncestor(GetSkipHeight(nHeight));
+    if (getpprev())
+        pskip = getpprev()->GetAncestor(GetSkipHeight(nHeight));
 }
 
 bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDiskBlockPos *dbp)
@@ -5423,7 +5427,8 @@ bool TestBlockValidity(CValidationState &state, const CBlock& block, CBlockIndex
 
     CCoinsViewCache viewNew(pcoinsTip);
     CBlockIndex indexDummy(block);
-    indexDummy.pprev = pindexPrev;
+//    indexDummy.pprev = pindexPrev;
+    indexDummy.setpprev(pindexPrev);
     indexDummy.nHeight = pindexPrev->nHeight + 1;
 
     // NOTE: CheckBlockHeader is called by CheckBlock
@@ -5532,7 +5537,7 @@ bool static LoadBlockIndexDB(std::string& strError)
         return false;
 
     boost::this_thread::interruption_point();
-
+/* BLMP COB */
     // Calculate nChainWork
     vector<pair<int, CBlockIndex*> > vSortedByHeight;
     vSortedByHeight.reserve(mapBlockIndex.size());
@@ -5545,24 +5550,24 @@ bool static LoadBlockIndexDB(std::string& strError)
     BOOST_FOREACH(const PAIRTYPE(int, CBlockIndex*)& item, vSortedByHeight)
     {
         CBlockIndex* pindex = item.second;
-        pindex->nChainWork = (pindex->pprev ? pindex->pprev->nChainWork : 0) + GetBlockProof(*pindex);
+        pindex->nChainWork = (pindex->getpprev() ? pindex->getpprev()->nChainWork : 0) + GetBlockProof(*pindex);
         if (pindex->nStatus & BLOCK_HAVE_DATA) {
-            if (pindex->pprev) {
+            if (pindex->getpprev()) {
                 if (pindex->pprev->nChainTx) {
-                    pindex->nChainTx = pindex->pprev->nChainTx + pindex->nTx;
+                    pindex->nChainTx = pindex->getpprev()->nChainTx + pindex->nTx;
                 } else {
                     pindex->nChainTx = 0;
-                    mapBlocksUnlinked.insert(std::make_pair(pindex->pprev, pindex));
+                    mapBlocksUnlinked.insert(std::make_pair(pindex->getpprev(), pindex));
                 }
             } else {
                 pindex->nChainTx = pindex->nTx;
             }
         }
-        if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->pprev == NULL))
+        if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->getpprev() == NULL))
             setBlockIndexCandidates.insert(pindex);
         if (pindex->nStatus & BLOCK_FAILED_MASK && (!pindexBestInvalid || pindex->nChainWork > pindexBestInvalid->nChainWork))
             pindexBestInvalid = pindex;
-        if (pindex->pprev)
+        if (pindex->getpprev())
             pindex->BuildSkip();
         if (pindex->IsValid(BLOCK_VALID_TREE) && (pindexBestHeader == NULL || CBlockIndexWorkComparator()(pindexBestHeader, pindex)))
             pindexBestHeader = pindex;
@@ -5733,7 +5738,7 @@ CVerifyDB::~CVerifyDB()
 bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth)
 {
     LOCK(cs_main);
-    if (chainActive.Tip() == NULL || chainActive.Tip()->pprev == NULL)
+    if (chainActive.Tip() == NULL || chainActive.Tip()->getpprev() == NULL)
         return true;
 
     // Verify blocks in the best chain
@@ -5748,7 +5753,7 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
     CBlockIndex* pindexFailure = NULL;
     int nGoodTransactions = 0;
     CValidationState state;
-    for (CBlockIndex* pindex = chainActive.Tip(); pindex && pindex->pprev; pindex = pindex->pprev)
+    for (CBlockIndex* pindex = chainActive.Tip(); pindex && pindex->getpprev(); pindex = pindex->getpprev())
     {
         boost::this_thread::interruption_point();
         uiInterface.ShowProgress(_("Verifying blocks..."), std::max(1, std::min(99, (int)(((double)(chainActive.Height() - pindex->nHeight)) / (double)nCheckDepth * (nCheckLevel >= 4 ? 50 : 100)))));
@@ -5771,7 +5776,7 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
             CBlockUndo undo;
             CDiskBlockPos pos = pindex->GetUndoPos();
             if (!pos.IsNull()) {
-                if (!undo.ReadFromDisk(pos, pindex->pprev->GetBlockHash()))
+                if (!undo.ReadFromDisk(pos, pindex->getpprev()->GetBlockHash()))
                     return error("VerifyDB() : *** found bad undo data at %d, hash=%s\n", pindex->nHeight, pindex->GetBlockHash().ToString());
             }
         }
@@ -5798,7 +5803,7 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
             {
                 LogPrintf("ERROR: Cannot disconnect(after) block %s in feeds, error %d\n",pindex->GetBlockHash().ToString().c_str(),err);
             }        
-            pindexState = pindex->pprev;
+            pindexState = pindex->getpprev();
             if (!fClean) {
                 nGoodTransactions = 0;
                 pindexFailure = pindex;
@@ -8053,7 +8058,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             if (nSyncStarted == 0 || pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) {
                 state.fSyncStarted = true;
                 nSyncStarted++;
-                CBlockIndex *pindexStart = pindexBestHeader->pprev ? pindexBestHeader->pprev : pindexBestHeader;
+                CBlockIndex *pindexStart = pindexBestHeader->getpprev() ? pindexBestHeader->getpprev() : pindexBestHeader;
                 if(fDebug)LogPrint("net", "initial getheaders (%d) to peer=%d (startheight:%d)\n", pindexStart->nHeight, pto->id, pto->nStartingHeight);
                 pto->PushMessage("getheaders", chainActive.GetLocator(pindexStart), uint256(0));
             }
@@ -8422,9 +8427,11 @@ public:
     CMainCleanup() {}
     ~CMainCleanup() {
         // block headers
+/* BLMP COB */
         BlockMap::iterator it1 = mapBlockIndex.begin();
         for (; it1 != mapBlockIndex.end(); it1++)
             delete (*it1).second;
+ 
         mapBlockIndex.clear();
 
         // orphan transactions

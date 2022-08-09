@@ -12,6 +12,7 @@
 #endif
 
 #include "structs/amount.h"
+#include "chain/blockmap.h"
 #include "chain/chain.h"
 #include "chainparams/chainparams.h"
 #include "storage/coins.h"
@@ -124,11 +125,6 @@ static const unsigned char REJECT_NONSTANDARD = 0x40;
 static const unsigned char REJECT_DUST = 0x41;
 static const unsigned char REJECT_INSUFFICIENTFEE = 0x42;
 static const unsigned char REJECT_CHECKPOINT = 0x43;
-
-struct BlockHasher
-{
-    size_t operator()(const uint256& hash) const { return hash.GetLow64(); }
-};
 
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;

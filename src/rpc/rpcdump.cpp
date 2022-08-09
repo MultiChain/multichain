@@ -401,8 +401,8 @@ Value importwallet(const Array& params, bool fHelp)
     pwalletMain->ShowProgress("", 100); // hide progress dialog in GUI
 
     CBlockIndex *pindex = chainActive.Tip();
-    while (pindex && pindex->pprev && pindex->GetBlockTime() > nTimeBegin - 12 * Params().TargetSpacing()) // MCHN
-        pindex = pindex->pprev;
+    while (pindex && pindex->getpprev() && pindex->GetBlockTime() > nTimeBegin - 12 * Params().TargetSpacing()) // MCHN
+        pindex = pindex->getpprev();
 
     if (!pwalletMain->nTimeFirstKey || nTimeBegin < pwalletMain->nTimeFirstKey)
         pwalletMain->nTimeFirstKey = nTimeBegin;

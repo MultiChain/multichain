@@ -106,9 +106,17 @@ public:
 
     //! pointer to the index of the predecessor of this block
     CBlockIndex* pprev;
-
+    uint256 hashPrev;
+    
+    CBlockIndex* getpprev();
+    void setpprev(CBlockIndex* p);
+    
     //! pointer to the index of some further predecessor of this block
     CBlockIndex* pskip;
+    uint256 hashSkip;
+    
+    CBlockIndex* getpskip();
+    void setpskip(CBlockIndex* p);
 
     //! height of the entry in the chain. The genesis block has height 0
     int nHeight;
@@ -155,7 +163,12 @@ public:
     unsigned int nSize;
     bool fPassedMinerPrecheck;
     int32_t nFirstSuccessor;
+
     CBlockIndex *pNextOnThisHeight;
+    uint256 hashNextOnThisHeight;
+    
+    CBlockIndex* getnextonthisheight();
+    void setnextonthisheight(CBlockIndex* p);
 /* MCHN END */
     
     void SetNull()
@@ -179,6 +192,9 @@ public:
         nBits          = 0;
         nNonce         = 0;
         
+        hashPrev=0;
+        hashSkip=0;
+        
 /* MCHN START */    
         nHeightMinedByMe=0;
         nCanMine=0;
@@ -186,6 +202,7 @@ public:
         fPassedMinerPrecheck=false;
         nFirstSuccessor=0;
         pNextOnThisHeight=NULL;
+        hashNextOnThisHeight=0;
         nSize=0;
 /* MCHN END */
     }
@@ -228,8 +245,11 @@ public:
     {
         CBlockHeader block;
         block.nVersion       = nVersion;
-        if (pprev)
-            block.hashPrevBlock = pprev->GetBlockHash();
+/*        
+        if (getpprev())
+            block.hashPrevBlock = getpprev()->GetBlockHash();
+ */ 
+        block.hashPrevBlock  = hashPrev; 
         block.hashMerkleRoot = hashMerkleRoot;
         block.nTime          = nTime;
         block.nBits          = nBits;
@@ -249,14 +269,16 @@ public:
 
     enum { nMedianTimeSpan=11 };
 
-    int64_t GetMedianTimePast() const
+/* BLMP removed const for method */    
+    
+    int64_t GetMedianTimePast() 
     {
         int64_t pmedian[nMedianTimeSpan];
         int64_t* pbegin = &pmedian[nMedianTimeSpan];
         int64_t* pend = &pmedian[nMedianTimeSpan];
 
-        const CBlockIndex* pindex = this;
-        for (int i = 0; i < nMedianTimeSpan && pindex; i++, pindex = pindex->pprev)
+        CBlockIndex* pindex = this;
+        for (int i = 0; i < nMedianTimeSpan && pindex; i++, pindex = pindex->getpprev())
             *(--pbegin) = pindex->GetBlockTime();
 
         std::sort(pbegin, pend);
@@ -268,13 +290,13 @@ public:
      * in the last Params().ToCheckBlockUpgradeMajority() blocks, starting at pstart 
      * and going backwards.
      */
-    static bool IsSuperMajority(int minVersion, const CBlockIndex* pstart,
+    static bool IsSuperMajority(int minVersion, CBlockIndex* pstart,
                                 unsigned int nRequired);
 
     std::string ToString() const
     {
-        return strprintf("CBlockIndex(pprev=%p, nHeight=%d, merkle=%s, hashBlock=%s)",
-            pprev, nHeight,
+        return strprintf("CBlockIndex(hashPrev=%s, nHeight=%d, merkle=%s, hashBlock=%s)",
+            hashPrev.ToString(), nHeight,
             hashMerkleRoot.ToString(),
             GetBlockHash().ToString());
     }
@@ -327,7 +349,7 @@ public:
     }
 
     explicit CDiskBlockIndex(CBlockIndex* pindex) : CBlockIndex(*pindex) {
-        hashPrev = (pprev ? pprev->GetBlockHash() : 0);
+        hashPrev = (getpprev() ? getpprev()->GetBlockHash() : 0);
     }
 
     ADD_SERIALIZE_METHODS;
@@ -439,7 +461,7 @@ public:
     CBlockLocator GetLocator(const CBlockIndex *pindex = NULL) const;
 
     /** Find the last common block between this chain and a block index entry. */
-    const CBlockIndex *FindFork(const CBlockIndex *pindex) const;
+    CBlockIndex *FindFork(CBlockIndex *pindex) ;
 };
 
 #endif // BITCOIN_CHAIN_H

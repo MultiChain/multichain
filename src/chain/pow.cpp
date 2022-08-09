@@ -12,7 +12,9 @@
 #include "structs/uint256.h"
 #include "utils/util.h"
 
-unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock)
+/* BLMP removed const for parameter */    
+
+unsigned int GetNextWorkRequired(CBlockIndex* pindexLast, const CBlockHeader *pblock)
 {
     unsigned int nProofOfWorkLimit = Params().ProofOfWorkLimit().GetCompact();
 
@@ -39,9 +41,9 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
             else
             {
                 // Return the last non-special-min-difficulty-rules-block
-                const CBlockIndex* pindex = pindexLast;
-                while (pindex->pprev && pindex->nHeight % Params().Interval() != 0 && pindex->nBits == nProofOfWorkLimit)
-                    pindex = pindex->pprev;
+                CBlockIndex* pindex = pindexLast;
+                while (pindex->getpprev() && pindex->nHeight % Params().Interval() != 0 && pindex->nBits == nProofOfWorkLimit)
+                    pindex = pindex->getpprev();
                 return pindex->nBits;
             }
         }
@@ -49,9 +51,9 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     }
 
     // Go back by what we want to be 14 days worth of blocks
-    const CBlockIndex* pindexFirst = pindexLast;
+    CBlockIndex* pindexFirst = pindexLast;
     for (int i = 0; pindexFirst && i < Params().Interval()-1; i++)
-        pindexFirst = pindexFirst->pprev;
+        pindexFirst = pindexFirst->getpprev();
     assert(pindexFirst);
 
     // Limit adjustment step
