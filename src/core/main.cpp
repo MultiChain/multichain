@@ -955,7 +955,9 @@ void UnregisterNodeSignals(CNodeSignals& nodeSignals)
     nodeSignals.FinalizeNode.disconnect(&FinalizeNode);
 }
 
-CBlockIndex* FindForkInGlobalIndex(const CChain& chain, const CBlockLocator& locator)
+/* BLMP removed const for method */    
+
+CBlockIndex* FindForkInGlobalIndex(CChain& chain, const CBlockLocator& locator)
 {
     // Find the first block the caller has in the main chain
     BOOST_FOREACH(const uint256& hash, locator.vHave) {

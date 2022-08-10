@@ -8,25 +8,162 @@
 
 using namespace std;
 
+CBlockIndex *CChainPtrStorage::getptr(int nHeight)
+{
+    if (nHeight < 0 || nHeight >= (int)vChain.size())
+        return NULL;
+    return vChain[nHeight];
+}
+
+void CChainPtrStorage::setptr(int nHeight, CBlockIndex * ptr)
+{
+    if (nHeight < 0 || nHeight >= (int)vChain.size())
+        return;
+    
+    if(ptr)
+    {
+        cHashChain.sethash(nHeight,ptr->GetBlockHash());
+    }
+    else
+    {
+        cHashChain.sethash(nHeight,0);
+    }
+    
+    vChain[nHeight] = ptr;
+}
+
+int CChainPtrStorage::getsize() const
+{
+    return (int)vChain.size();
+}
+
+void CChainPtrStorage::setsize(int nHeight)
+{
+    cHashChain.setsize(nHeight);
+    
+    if (nHeight < 0)
+        return;
+    
+    if(nHeight == 0)
+    {        
+        vChain.clear();
+        return;
+    }
+    
+    vChain.resize(nHeight);
+}
+
+uint256 CChainPtrStorage::gethash(int nHeight)
+{
+    return cHashChain.gethash(nHeight);
+}
+
+
+uint256 CChainHashStorage::gethash(int nHeight)
+{
+    if (nHeight < 0 || nHeight >= (int)vChain.size())
+        return 0;
+    return vChain[nHeight];
+}
+
+void CChainHashStorage::sethash(int nHeight, uint256 hash)
+{
+    if (nHeight < 0 || nHeight >= (int)vChain.size())
+        return;
+    
+    vChain[nHeight] = hash;    
+}
+
+int CChainHashStorage::getsize() const
+{
+    return (int)vChain.size();    
+}
+
+void CChainHashStorage::setsize(int nHeight)
+{
+    if (nHeight < 0)
+        return;
+    
+    if(nHeight == 0)
+    {
+        vChain.clear();
+        return;
+    }
+    
+    vChain.resize(nHeight);
+}
+
+
 /**
  * CChain implementation
  */
+
+CBlockIndex * CChain::Genesis()  {
+    return cPtrChain.getsize() > 0 ? cPtrChain.getptr(0) : NULL;
+//        return vChain.size() > 0 ? vChain[0] : NULL;
+}
+
+/** Returns the index entry for the tip of this chain, or NULL if none. */
+CBlockIndex * CChain::Tip()  {
+    return cPtrChain.getsize() > 0 ? cPtrChain.getptr(cPtrChain.getsize() - 1) : NULL;
+//        return vChain.size() > 0 ? vChain[vChain.size() - 1] : NULL;
+}
+
+/** Returns the index entry at a particular height in this chain, or NULL if no such height exists. */
+CBlockIndex * CChain::operator[](int nHeight)  {
+    return cPtrChain.getptr(nHeight);
+
+//        if (nHeight < 0 || nHeight >= (int)vChain.size())
+//            return NULL;
+//        return vChain[nHeight];
+}
+
+
+/** Efficiently check whether a block is present in this chain. */
+bool  CChain::Contains(const CBlockIndex *pindex)  {
+    return cPtrChain.gethash(pindex->nHeight) == pindex->GetBlockHash();
+//        return (*this)[pindex->nHeight] == pindex;
+}
+
+/** Find the successor of a block in this chain, or NULL if the given index is not found or is the tip. */
+CBlockIndex *CChain::Next(const CBlockIndex *pindex)  {
+    if (Contains(pindex))
+        return cPtrChain.getptr(pindex->nHeight + 1);
+//            return (*this)[pindex->nHeight + 1];
+    else
+        return NULL;
+}
+
+/** Return the maximal height in the chain. Is equal to chain.Tip() ? chain.Tip()->nHeight : -1. */
+int  CChain::Height() const {
+    return cPtrChain.getsize() - 1;
+//        return vChain.size() - 1;
+}
+
 void CChain::SetTip(CBlockIndex *pindex) {
     mc_gState->ChainLock();
     if (pindex == NULL) {
-        vChain.clear();
+        cPtrChain.setsize(0);
+//        vChain.clear();
         mc_gState->ChainUnLock();
         return;
     }
-    vChain.resize(pindex->nHeight + 1);
-    while (pindex && vChain[pindex->nHeight] != pindex) {
-        vChain[pindex->nHeight] = pindex;
+    
+    cPtrChain.setsize(pindex->nHeight + 1);
+    while (pindex && cPtrChain.gethash(pindex->nHeight) != pindex->GetBlockHash()) {
+        cPtrChain.setptr(pindex->nHeight,pindex);
         pindex = pindex->getpprev();
     }
+    
+//    vChain.resize(pindex->nHeight + 1);
+//    while (pindex && vChain[pindex->nHeight] != pindex) {
+//        vChain[pindex->nHeight] = pindex;
+//        pindex = pindex->getpprev();
+//    }
     mc_gState->ChainUnLock();
 }
 
-CBlockLocator CChain::GetLocator(const CBlockIndex *pindex) const {
+CBlockLocator CChain::GetLocator(const CBlockIndex *pindex)  {
     int nStep = 1;
     std::vector<uint256> vHave;
     vHave.reserve(32);
