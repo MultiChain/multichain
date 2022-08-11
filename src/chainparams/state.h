@@ -174,14 +174,6 @@ typedef struct mc_Features
     int NFTokens();
 } mc_Features;
 
-typedef struct mc_BlockHeaderInfo
-{    
-    unsigned char m_Hash[32];
-    int32_t m_NodeId;
-    int32_t m_Next;
-    
-} mc_BlockHeaderInfo;
-
 typedef struct mc_TmpBuffers
 {
     mc_TmpBuffers()
@@ -310,8 +302,6 @@ typedef struct mc_State
     mc_Buffer               *m_TmpAssetsIn;
     mc_Buffer               *m_TmpAssetsTmp;
     
-    mc_Buffer               *m_BlockHeaderSuccessors;
-    
     mc_TmpBuffers           *m_TmpBuffers;
 
     mc_TmpBuffers           **m_TmpRPCBuffers;
@@ -344,12 +334,6 @@ typedef struct mc_State
         m_TmpAssetsTmp=new mc_Buffer;
         mc_InitABufferMap(m_TmpAssetsTmp);
         m_Compatibility=MC_VCM_NONE;
-        
-        m_BlockHeaderSuccessors=new mc_Buffer;
-        m_BlockHeaderSuccessors->Initialize(sizeof(mc_BlockHeaderInfo),sizeof(mc_BlockHeaderInfo),0);            
-        mc_BlockHeaderInfo bhi;
-        memset(&bhi,0,sizeof(mc_BlockHeaderInfo));
-        m_BlockHeaderSuccessors->Add(&bhi);
         
         m_TmpBuffers=new mc_TmpBuffers;
         
@@ -401,10 +385,6 @@ typedef struct mc_State
         if(m_TmpAssetsTmp)
         {
             delete m_TmpAssetsTmp;
-        }
-        if(m_BlockHeaderSuccessors)
-        {
-            delete m_BlockHeaderSuccessors;
         }
         if(m_TmpBuffers)
         {

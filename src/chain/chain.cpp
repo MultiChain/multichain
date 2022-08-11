@@ -228,19 +228,6 @@ void CBlockIndex::setpskip(CBlockIndex* p){
     }
 }
 
-CBlockIndex* CBlockIndex::getnextonthisheight(){
-    return pNextOnThisHeight;
-}
-
-void CBlockIndex::setnextonthisheight(CBlockIndex* p){
-    pNextOnThisHeight=p;
-    hashNextOnThisHeight=0;
-    if(pskip)
-    {
-        hashNextOnThisHeight=pNextOnThisHeight->GetBlockHash();
-    }
-}
-
 uint256 CChainPiece::TipHash()
 {
     return hashTip;

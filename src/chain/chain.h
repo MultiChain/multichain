@@ -164,11 +164,7 @@ public:
     bool fPassedMinerPrecheck;
     int32_t nFirstSuccessor;
 
-    CBlockIndex *pNextOnThisHeight;
-    uint256 hashNextOnThisHeight;
     
-    CBlockIndex* getnextonthisheight();
-    void setnextonthisheight(CBlockIndex* p);
 /* MCHN END */
     
     void SetNull()
@@ -201,8 +197,6 @@ public:
         dTimeReceived=0.;
         fPassedMinerPrecheck=false;
         nFirstSuccessor=0;
-        pNextOnThisHeight=NULL;
-        hashNextOnThisHeight=0;
         nSize=0;
 /* MCHN END */
     }

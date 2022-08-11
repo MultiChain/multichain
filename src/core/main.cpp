@@ -119,8 +119,6 @@ uint256 GenesisCoinBaseTxID=0;
 uint32_t nMessageHandlerThreads=MC_MHT_DEFAULT;
 CTransaction GenesisCoinBaseTx;
 
-vector<CBlockIndex*> vFirstOnThisHeight;
-
 /** Fees smaller than this (in satoshi) are considered zero fee (for relaying and mining) */
 /* MCHN START */
 //CFeeRate minRelayTxFee = CFeeRate(1000);
@@ -556,37 +554,6 @@ int MultichainNode_ApplyUpgrades(int current_height)
     return MC_ERR_NOERROR;
 }
 
-
-void MultichainNode_UpdateBlockByHeightList(CBlockIndex *pindex)
-{
-    if(pindex->nHeight < 0)
-    {
-        return;
-    }
-    unsigned int old_size=vFirstOnThisHeight.size();
-    if(pindex->nHeight + 1 > (int)old_size)
-    {
-        vFirstOnThisHeight.resize(pindex->nHeight + 1);
-        for(unsigned int i=old_size+1;i<(unsigned int)(pindex->nHeight+1);i++)
-        {
-            vFirstOnThisHeight[i]=NULL;
-        }
-    }
-    if(vFirstOnThisHeight[pindex->nHeight])
-    {
-        CBlockIndex *pTmp;
-        pTmp=vFirstOnThisHeight[pindex->nHeight];
-        while(pTmp->getnextonthisheight())
-        {
-            pTmp=pTmp->getnextonthisheight();
-        }
-        pTmp->setnextonthisheight(pindex);
-    }
-    else
-    {
-        vFirstOnThisHeight[pindex->nHeight]=pindex;
-    }    
-}
 
 bool PushMempoolToInv(CNode *pnode)
 {
@@ -4463,7 +4430,6 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     if (pindexBestHeader == NULL || pindexBestHeader->nChainWork < pindexNew->nChainWork)
         pindexBestHeader = pindexNew;
 
-    MultichainNode_UpdateBlockByHeightList(pindexNew);
     setDirtyBlockIndex.insert(pindexNew);
 
     return pindexNew;
@@ -5107,61 +5073,7 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
             }
         }
     }
-/*      
-    int successor=0;
-    int successors_from_this_node=0;
-    mc_BlockHeaderInfo *lpNext;
-    mc_BlockHeaderInfo *lpNextForPrev;
-    mc_BlockHeaderInfo new_info;
-    lpNext=NULL;    
-    if( (node_id > 0) && (pindexPrev != NULL) )
-    {
-        CBlockIndex *pindexTmp=NULL;
-        if( ((int)vFirstOnThisHeight.size() <= pindexPrev->nHeight) || (vFirstOnThisHeight[pindexPrev->nHeight] == NULL))
-        {
-            MultichainNode_UpdateBlockByHeightList(pindexPrev);
-        }
-        lpNextForPrev=NULL;
-        pindexTmp=vFirstOnThisHeight[pindexPrev->nHeight];
-        while(pindexTmp)
-        {
-            successor=pindexTmp->nFirstSuccessor;
-            while(successor)
-            {                
-                lpNext=(mc_BlockHeaderInfo *)mc_gState->m_BlockHeaderSuccessors->GetRow(successor);
-                if(lpNext->m_NodeId == node_id)
-                {
-                    successors_from_this_node++;
-                }
-                successor=lpNext->m_Next;
-                if(pindexTmp == pindexPrev)
-                {
-                    lpNextForPrev=lpNext;
-                }
-            }
-            pindexTmp=pindexTmp->pNextOnThisHeight;
-        }
-        if(successors_from_this_node >= GetArg("-maxheadersfrompeer", DEFAULT_MAX_SUCCESSORS_FROM_ONE_NODE))
-        {
-            return state.Invalid(error("%s : %s rejected - too many headers from node %d", __func__,block.GetHash().ToString().c_str(),node_id),
-                                 REJECT_INVALID, "too-man-headers");                                            
-        }
-        successor=mc_gState->m_BlockHeaderSuccessors->GetCount();
-        memset(&new_info,0,sizeof(mc_BlockHeaderInfo));
-        memcpy(new_info.m_Hash,&hash,sizeof(uint256));
-        new_info.m_NodeId=node_id;
-        
-        mc_gState->m_BlockHeaderSuccessors->Add(&new_info);
-        if(lpNextForPrev)
-        {
-            lpNextForPrev->m_Next=successor;
-        }
-        else
-        {
-            pindexPrev->nFirstSuccessor=successor;
-        }
-    }
-*/    
+    
     if (pindex == NULL)
         pindex = AddToBlockIndex(block);
 
