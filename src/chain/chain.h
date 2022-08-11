@@ -480,4 +480,27 @@ public:
     CBlockIndex *FindFork(CBlockIndex *pindex);
 };
 
+/* Piece of chain */
+
+class CChainPiece {
+
+private:    
+
+    uint256 hashTip;   
+    int heightTip;
+    
+public:    
+    
+    CChainPiece() {
+        hashTip = 0;   
+        heightTip = -1;
+    }
+    
+    uint256 TipHash();    
+    int Height();
+    
+    void SetTip(CBlockIndex *pindex);
+    
+};
+
 #endif // BITCOIN_CHAIN_H

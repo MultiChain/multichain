@@ -241,4 +241,27 @@ void CBlockIndex::setnextonthisheight(CBlockIndex* p){
     }
 }
 
+uint256 CChainPiece::TipHash()
+{
+    return hashTip;
+}
+
+int CChainPiece::Height()
+{
+    return heightTip;
+}
+
+void CChainPiece::SetTip(CBlockIndex *pindex)
+{
+    if(pindex == NULL)
+    {
+        hashTip = 0;
+        heightTip = -1;
+        return;
+    }
+    
+    hashTip = pindex->GetBlockHash();
+    heightTip = pindex->nHeight;
+}
+
 

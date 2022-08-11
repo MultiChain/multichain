@@ -79,6 +79,8 @@ bool IsTxBanned(uint256 txid);
 int CreateUpgradeLists(int current_height,vector<mc_UpgradedParameter> *vParams,vector<mc_UpgradeStatus> *vUpgrades);
 void SetRPCNewTxFlag();
 
+bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex **pindex, CDiskBlockPos* dbp = NULL, CNode* pfrom = NULL);
+bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex **ppindex= NULL, CNode* pfrom = NULL, CBlockIndex *pindexChecked = NULL);
 
 
 
@@ -4958,7 +4960,7 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
     return true;
 }
 
-bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex** ppindex, int node_id, CBlockIndex *pindexChecked)
+bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex** ppindex, CNode* pfrom, CBlockIndex *pindexChecked)
 {
     AssertLockHeld(cs_main);
     // Check for duplicate
@@ -5000,6 +5002,112 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
     if (!ContextualCheckBlockHeader(block, state, pindexPrev, pindexChecked))
         return false;
 
+    int piece_found=-1;
+    if( (pfrom != NULL) && (pindexPrev != NULL) )
+    {
+        int max_height=0;
+        for(int p=0;p<(int)pfrom->vChainPieces.size();p++)
+        {
+            if(pfrom->vChainPieces[p].TipHash() == pindexPrev->GetBlockHash())
+            {
+                piece_found=p;
+            }
+            if(pfrom->vChainPieces[p].Height() > max_height)
+            {
+                max_height=pfrom->vChainPieces[p].Height();
+            }
+        }
+        
+        if(piece_found < 0)
+        {
+            if(pfrom->vChainPieces.size())
+            {
+                for(int p=0;p<(int)pfrom->vChainPieces.size();p++)
+                {
+                    if(pindexPrev->nHeight > pfrom->vChainPieces[p].Height())
+                    {
+                        if(pindexPrev->GetAncestor(pfrom->vChainPieces[p].Height())->GetBlockHash() == pfrom->vChainPieces[p].TipHash())
+                        {
+                            piece_found=p;
+                            pfrom->vChainPieces[p].SetTip(pindexPrev);                            
+                            LogPrintf("Old chain header with gap from node %d, tip: %s\n",pfrom->GetId(),pindexPrev->GetBlockHash().ToString().c_str());                
+                        }
+                        
+                    }
+                }                
+            }            
+        }
+                
+        if(piece_found < 0)
+        {
+            if(pindexPrev->nHeight > max_height)
+            {
+                if(pfrom->vChainPieces.size() > 0)
+                {
+                    pfrom->nChainBanTimestamp=0;
+                    pfrom->vChainPieces.clear();
+                    LogPrintf("New longest chain, removing side chains from node %d\n",pfrom->GetId());                
+                }
+            }
+        }
+        
+        if(piece_found < 0)
+        {
+            if((int)pfrom->vChainPieces.size() >= GetArg("-maxchainsfrompeer", DEFAULT_MAX_SIDE_CHAINS_FROM_ONE_NODE))
+            {
+                int64_t time_now=GetTime();
+                if(pfrom->nChainBanTimestamp > 0)
+                {
+                    if(time_now >= pfrom->nChainBanTimestamp + DEFAULT_REJECT_NEW_CHAIN_BAN_LENGTH)
+                    {
+                        pfrom->nChainBanTimestamp=0;
+                        pfrom->vChainPieces.clear();
+                        LogPrintf("Resuming accepting headers from node %d\n",pfrom->GetId());
+                    }
+                }
+                else
+                {
+                    pfrom->nChainBanTimestamp=time_now;
+                    LogPrintf("Starting rejecting headers from node %d\n",pfrom->GetId());
+                }
+            }            
+            if(pfrom->nChainBanTimestamp > 0)
+            {
+                if (ppindex)
+                    *ppindex = NULL;
+                return error("%s : %s rejected - too many alternative chains from node %d", __func__,block.GetHash().ToString().c_str(),pfrom->GetId());
+            }
+            CChainPiece piece;
+            piece.SetTip(pindexPrev);
+            piece_found=(int)pfrom->vChainPieces.size();
+            pfrom->vChainPieces.push_back(piece);
+        }        
+        else
+        {
+            if(pfrom->vChainPieces.size() > 1)
+            {
+                bool longest_chain=true;
+                for(int p=0;p<(int)pfrom->vChainPieces.size();p++)
+                {
+                    if(p != piece_found)
+                    {
+                        if(pfrom->vChainPieces[p].Height() > pindexPrev->nHeight)
+                        {
+                            longest_chain=false;
+                        }
+                    }
+                }                
+                if(longest_chain)
+                {
+                    pfrom->vChainPieces[0] = pfrom->vChainPieces[piece_found];
+                    pfrom->vChainPieces.resize(1);
+                    piece_found=0;
+                    LogPrintf("Extending longest chain, removing side chains from node %d\n",pfrom->GetId());
+                }
+            }
+        }
+    }
+/*      
     int successor=0;
     int successors_from_this_node=0;
     mc_BlockHeaderInfo *lpNext;
@@ -5031,7 +5139,7 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
                     lpNextForPrev=lpNext;
                 }
             }
-            pindexTmp=pindexTmp->getnextonthisheight();
+            pindexTmp=pindexTmp->pNextOnThisHeight;
         }
         if(successors_from_this_node >= GetArg("-maxheadersfrompeer", DEFAULT_MAX_SUCCESSORS_FROM_ONE_NODE))
         {
@@ -5053,10 +5161,15 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
             pindexPrev->nFirstSuccessor=successor;
         }
     }
-
+*/    
     if (pindex == NULL)
         pindex = AddToBlockIndex(block);
 
+    if(piece_found >= 0)
+    {
+        pfrom->vChainPieces[piece_found].SetTip(pindex);
+    }
+    
     if (ppindex)
         *ppindex = pindex;
 
@@ -5080,13 +5193,13 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
     return true;
 }
 
-bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, CDiskBlockPos* dbp, int node_id)
+bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, CDiskBlockPos* dbp, CNode* pfrom)
 {
     AssertLockHeld(cs_main);
 
     CBlockIndex *&pindex = *ppindex;
 
-    if (!AcceptBlockHeader(block, state, &pindex, node_id))
+    if (!AcceptBlockHeader(block, state, &pindex, pfrom))
         return false;
 
     if (pindex->nStatus & BLOCK_HAVE_DATA) {
@@ -5273,7 +5386,7 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
 
         // Store to disk
         CBlockIndex *pindex = NULL;
-        bool ret = AcceptBlock(*pblock, state, &pindex, dbp, pfrom ? pfrom->GetId() : 0);
+        bool ret = AcceptBlock(*pblock, state, &pindex, dbp, pfrom);
         if (pindex && pfrom) {
             mapBlockSource[pindex->GetBlockHash()] = pfrom->GetId();
         }
@@ -7126,36 +7239,47 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         CBlockIndex *pindexLast = NULL;
         int first_height=-1;
+        bool ignored_headers=false;
         BOOST_FOREACH(const CBlockHeader& header, headers) {
-            CValidationState state;
-            if (pindexLast != NULL && header.hashPrevBlock != pindexLast->GetBlockHash()) {
-                Misbehaving(pfrom->GetId(), 20);
-                return error("non-continuous headers sequence");
-            }
-            if (!AcceptBlockHeader(header, state, &pindexLast, pfrom->GetId(),pindexLast)) {
-                int nDoS;
-                if (state.IsInvalid(nDoS)) {
-                    if (nDoS > 0)
-                        Misbehaving(pfrom->GetId(), nDoS);
-                    return error("invalid header received");
+            if(!ignored_headers)
+            {
+                CValidationState state;
+                if (pindexLast != NULL && header.hashPrevBlock != pindexLast->GetBlockHash()) {
+                    Misbehaving(pfrom->GetId(), 20);
+                    return error("non-continuous headers sequence");
+                }
+                if (!AcceptBlockHeader(header, state, &pindexLast, pfrom,pindexLast)) {
+                    int nDoS;
+                    if (state.IsInvalid(nDoS)) {
+                        if (nDoS > 0)
+                            Misbehaving(pfrom->GetId(), nDoS);
+                        return error("invalid header received");
+                    }
+                    ignored_headers=true;
+                }
+                else
+                {
+                    if(first_height < 0)
+                    {
+                        first_height=pindexLast->nHeight;
+                    }
                 }
             }
-            if(first_height < 0)
-            {
-                first_height=pindexLast->nHeight;
-            }
         }
-        if (pindexLast)
+        if(!ignored_headers)
         {
-            if(fDebug)LogPrint("mcblock","mchn-block: Received headers: %d-%d,  peer=%d\n",first_height,pindexLast->nHeight,pfrom->id);            
-            UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
-        }
-        if (nCount == MAX_HEADERS_RESULTS && pindexLast) {
-            // Headers message had its maximum size; the peer may have more headers.
-            // TODO: optimize: if pindexLast is an ancestor of chainActive.Tip or pindexBestHeader, continue
-            // from there instead.
-            if(fDebug)LogPrint("net", "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id, pfrom->nStartingHeight);
-            pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256(0));
+            if (pindexLast)
+            {
+                if(fDebug)LogPrint("mcblock","mchn-block: Received headers: %d-%d,  peer=%d\n",first_height,pindexLast->nHeight,pfrom->id);            
+                UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
+            }
+            if (nCount == MAX_HEADERS_RESULTS && pindexLast) {
+                // Headers message had its maximum size; the peer may have more headers.
+                // TODO: optimize: if pindexLast is an ancestor of chainActive.Tip or pindexBestHeader, continue
+                // from there instead.
+                if(fDebug)LogPrint("net", "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id, pfrom->nStartingHeight);
+                pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256(0));
+            }
         }
     }
                                                                                 // MCHN

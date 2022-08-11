@@ -19,6 +19,7 @@
 #include "utils/sync.h"
 #include "structs/uint256.h"
 #include "utils/utilstrencodings.h"
+#include "chain/chain.h"
 
 /* MCHN START */
 #include "keys/pubkey.h"
@@ -318,6 +319,9 @@ public:
     
     void *pEntData;
     int64_t nNextSendTime;
+    
+    std::vector<CChainPiece> vChainPieces;
+    int64_t nChainBanTimestamp;
     
 /* MCHN END*/    
     

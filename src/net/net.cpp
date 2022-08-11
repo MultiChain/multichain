@@ -2874,6 +2874,9 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     pEntData=NULL;
     nNextSendTime=0;    
     
+    vChainPieces.clear();
+    nChainBanTimestamp=0;
+    
 /* MCHN END */    
     
     {

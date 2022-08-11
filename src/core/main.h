@@ -75,7 +75,8 @@ static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 50000;
 static const unsigned int DEFAULT_MAX_ORPHAN_POOL_SIZE = 100;
 static const unsigned int DEFAULT_MAX_ORPHAN_TX_AGE = 300;
 static const unsigned int DEFAULT_MEMPOOL_THROTTLE = 500;
-static const unsigned int DEFAULT_MAX_SUCCESSORS_FROM_ONE_NODE = 10;
+static const unsigned int DEFAULT_MAX_SIDE_CHAINS_FROM_ONE_NODE = 10;
+static const unsigned int DEFAULT_REJECT_NEW_CHAIN_BAN_LENGTH = 60;
 /* MCHN END */
 extern int MAX_OP_RETURN_SHOWN;
 extern int DEFAULT_ACCEPT_FILTER_TIMEOUT;
@@ -130,7 +131,7 @@ extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern CCriticalSection cs_NodeStatus;
 extern CTxMemPool mempool;
-typedef boost::unordered_map<uint256, CBlockIndex*, BlockHasher> BlockMap;
+//typedef boost::unordered_map<uint256, CBlockIndex*, BlockHasher> BlockMap;
 extern BlockMap mapBlockIndex;
 extern uint64_t nLastBlockTx;
 extern uint64_t nLastBlockSize;
@@ -442,8 +443,8 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
 bool TestBlockValidity(CValidationState &state, const CBlock& block, CBlockIndex *pindexPrev, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
 
 /** Store block on disk. If dbp is provided, the file is known to already reside on disk */
-bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex **pindex, CDiskBlockPos* dbp = NULL, int node_id = 0);
-bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex **ppindex= NULL, int node_id = 0, CBlockIndex *pindexChecked = NULL);
+//bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex **pindex, CDiskBlockPos* dbp = NULL, int node_id = 0);
+//bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex **ppindex= NULL, int node_id = 0, CBlockIndex *pindexChecked = NULL);
 
 
 
