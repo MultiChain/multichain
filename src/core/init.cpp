@@ -850,6 +850,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     fLogIPs = GetBoolArg("-logips", false);
 /* MCHN START */    
     fLogTimeMillis = GetBoolArg("-logtimemillis", false);
+    fInMemoryBlockIndex = GetBoolArg("-inmemoryblockindex", true);
+    nBlockIndexCacheSize = GetArg("-blockindexcachesize",DEFAULT_MAX_BLOCK_INDEX_CACHE_SIZE);
 /* MCHN END */    
 
     if (mapArgs.count("-bind") || mapArgs.count("-whitebind")) {

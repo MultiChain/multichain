@@ -225,6 +225,7 @@ libbitcoin_server_a_SOURCES = \
   storage/addrman.cpp \
   structs/alert.cpp \
   structs/bloom.cpp \
+  chain/blockmap.cpp \
   chain/chain.cpp \
   chain/checkpoints.cpp \
   core/init.cpp \

@@ -77,6 +77,7 @@ static const unsigned int DEFAULT_MAX_ORPHAN_TX_AGE = 300;
 static const unsigned int DEFAULT_MEMPOOL_THROTTLE = 500;
 static const unsigned int DEFAULT_MAX_SIDE_CHAINS_FROM_ONE_NODE = 10;
 static const unsigned int DEFAULT_REJECT_NEW_CHAIN_BAN_LENGTH = 60;
+static const unsigned int DEFAULT_MAX_BLOCK_INDEX_CACHE_SIZE = 1000;
 /* MCHN END */
 extern int MAX_OP_RETURN_SHOWN;
 extern int DEFAULT_ACCEPT_FILTER_TIMEOUT;
@@ -149,9 +150,10 @@ extern bool fIsBareMultisigStd;
 extern uint32_t nMessageHandlerThreads;
 extern unsigned int nCoinCacheSize;
 extern CFeeRate minRelayTxFee;
+extern std::map<uint256,uint32_t> mapBlockCachedStatus;
 
 /** Best header we've seen so far (used for getheaders queries' starting points). */
-extern CBlockIndex *pindexBestHeader;
+extern uint256 hashBestHeader;
 
 /** Minimum disk space required - used in CheckDiskSpace() */
 static const uint64_t nMinDiskSpace = 52428800;
@@ -172,6 +174,13 @@ static const uint64_t nMinDiskSpace = 52428800;
 #define MC_MHT_PROCESSTXDATA                               0x00000004
 #define MC_MHT_DEFAULT                                     0x00000007 
 
+// Block cached status
+
+#define MC_BCS_NONE                                        0x00000000 
+#define MC_BCS_BLOCK_INDEX_CANDIDATE                       0x00000001
+#define MC_BCS_BEST_HEADER                                 0x00000002
+#define MC_BCS_BEST_INVALID                                0x00000004
+#define MC_BCS_UNLINKED                                    0x00000008 
 
 
 

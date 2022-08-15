@@ -90,6 +90,7 @@ enum BlockStatus {
     
     BLOCK_HAVE_SIZE          =  128, // block has calculated size
     BLOCK_HAVE_MINER_PUBKEY  =  256, // block has miner pubkey
+    BLOCK_HAVE_CHAIN_CACHE   =  512, // block has chain tx count, chain work and index skip hash
     
 };
 
@@ -140,7 +141,7 @@ public:
     //! (memory only) Number of transactions in the chain up to and including this block.
     //! This value will be non-zero only if and only if transactions for this block and all its parents are available.
     //! Change to 64-bit type when necessary; won't happen before 2030
-    unsigned int nChainTx;
+    uint64_t nChainTx;
 
     //! Verification status of this block. See enum BlockStatus
     unsigned int nStatus;
@@ -163,7 +164,7 @@ public:
     unsigned int nSize;
     bool fPassedMinerPrecheck;
     int32_t nFirstSuccessor;
-
+    bool fUpdated;
     
 /* MCHN END */
     
@@ -198,6 +199,7 @@ public:
         fPassedMinerPrecheck=false;
         nFirstSuccessor=0;
         nSize=0;
+        fUpdated=false;
 /* MCHN END */
     }
 
@@ -367,6 +369,13 @@ public:
             READWRITE(VARINT(nSize));
         if (nStatus & BLOCK_HAVE_MINER_PUBKEY)
             READWRITE(kMiner);
+
+        if (nStatus & BLOCK_HAVE_CHAIN_CACHE)
+        {
+            READWRITE(nChainWork);
+            READWRITE(nChainTx);
+            READWRITE(hashSkip);
+        }
 
         // block header
         READWRITE(this->nVersion);

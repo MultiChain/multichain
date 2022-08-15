@@ -107,6 +107,7 @@ bool fLogTimestamps = false;
 bool fLogIPs = false;
 bool fLogTimeMillis = false;
 bool fInRecovery = false;
+bool fInMemoryBlockIndex = true;
 volatile bool fReopenDebugLog = false;
 
 /**

@@ -785,7 +785,7 @@ Value getblockchaininfo(const Array& params, bool fHelp)
     obj.push_back(Pair("reindex",       fReindex));    
 /* MCHN END*/
     obj.push_back(Pair("blocks",                (int)chainActive.Height()));
-    obj.push_back(Pair("headers",               pindexBestHeader ? pindexBestHeader->nHeight : -1));
+    obj.push_back(Pair("headers",               (hashBestHeader != 0) ? mapBlockIndex[hashBestHeader]->nHeight : -1));
     obj.push_back(Pair("bestblockhash",         chainActive.Tip()->GetBlockHash().GetHex()));
     obj.push_back(Pair("difficulty",            (double)GetDifficulty()));
     obj.push_back(Pair("verificationprogress",  Checkpoints::GuessVerificationProgress(chainActive.Tip())));

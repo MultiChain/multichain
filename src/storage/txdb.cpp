@@ -188,6 +188,12 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue) {
 
 bool CBlockTreeDB::LoadBlockIndexGuts()
 {
+    mapBlockCachedStatus.clear();
+    if(Exists('I'))
+    {
+        return Read('I', mapBlockCachedStatus);        
+    }
+    
     boost::scoped_ptr<leveldb::Iterator> pcursor(NewIterator());
 
     CDataStream ssKeySet(SER_DISK, CLIENT_VERSION);
@@ -208,6 +214,14 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
                 CDiskBlockIndex diskindex;
                 ssValue >> diskindex;
 
+                if( !fInMemoryBlockIndex && (diskindex.GetBlockHash() == 0) )
+                {
+                    if( (diskindex.nStatus & BLOCK_HAVE_CHAIN_CACHE) == BLOCK_HAVE_CHAIN_CACHE )
+                    {
+                        break;
+                    }
+                }
+                
                 // Construct block index object
                 CBlockIndex* pindexNew = InsertBlockIndex(diskindex.GetBlockHash());
 //                pindexNew->pprev          = InsertBlockIndex(diskindex.hashPrev);
@@ -226,6 +240,9 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
                 
                 pindexNew->nSize          = diskindex.nSize;
                 pindexNew->kMiner         = diskindex.kMiner;
+                
+                pindexNew->nChainTx       = diskindex.nChainTx;
+                pindexNew->nChainWork     = diskindex.nChainWork;
                
                 if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits))
                     return error("LoadBlockIndex() : CheckProofOfWork failed: %s", pindexNew->ToString());
@@ -238,6 +255,19 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
             return error("%s : Deserialize or I/O error - %s", __func__, e.what());
         }
     }
+    
+    if(fInMemoryBlockIndex && (mapBlockIndex.size() > 0) )
+    {
+        
+    }
 
     return true;
+}
+
+bool CBlockTreeDB::WriteBlockCasedStatus(bool erase)
+{
+    if (!erase)
+        return Write('I', mapBlockCachedStatus);
+    else
+        return Erase('I');    
 }
