@@ -2971,6 +2971,7 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
             return state.Abort("Failed to write to block index");
         }
         for (set<uint256>::iterator it = setDirtyBlockIndex.begin(); it != setDirtyBlockIndex.end(); ) {
+             mapBlockIndex[*it]->nStatus |= BLOCK_HAVE_CHAIN_CACHE;
              if (!pblocktree->WriteBlockIndex(CDiskBlockIndex(mapBlockIndex[*it]))) {
                  return state.Abort("Failed to write to block index");
              }
@@ -4524,6 +4525,7 @@ bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBl
             queue.pop_front();
             pindex->fUpdated=true;
             pindex->nChainTx = (pindex->getpprev() ? pindex->getpprev()->nChainTx : 0) + pindex->nTx;
+            setDirtyBlockIndex.insert(pindex->GetBlockHash());
             {
                 LOCK(cs_nBlockSequenceId);
                 pindex->nSequenceId = nBlockSequenceId++;
@@ -5270,7 +5272,7 @@ const CBlockIndex* CBlockIndex::GetAncestor(int height) const
 void CBlockIndex::BuildSkip()
 {
     if (getpprev())
-        pskip = getpprev()->GetAncestor(GetSkipHeight(nHeight));
+        setpskip(getpprev()->GetAncestor(GetSkipHeight(nHeight)));
 }
 
 bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDiskBlockPos *dbp)
@@ -5559,6 +5561,65 @@ CBlockIndex * InsertBlockIndex(uint256 hash)
     return pindexNew;
 }
 
+uint256 mc_GetAncestorHash(std::map<uint256,CBlockIndex>& mapTempBlockIndex,uint256 block_hash,int height)
+{
+    if (block_hash == 0)
+        return 0;
+
+    uint256 hashWalk = block_hash;
+    int heightWalk = mapTempBlockIndex[hashWalk].nHeight;
+    while (heightWalk > height) {
+        int heightSkip = GetSkipHeight(heightWalk);
+        int heightSkipPrev = GetSkipHeight(heightWalk - 1);
+        if (heightSkip == height ||
+            (heightSkip > height && !(heightSkipPrev < heightSkip - 2 &&
+                                      heightSkipPrev >= height))) {
+            // Only follow pskip if pprev->pskip isn't better than pskip->pprev.
+            hashWalk = mapTempBlockIndex[hashWalk].hashSkip;
+            heightWalk = heightSkip;
+        } else {
+            hashWalk = mapTempBlockIndex[hashWalk].hashPrev;
+            heightWalk--;
+        }
+    }
+    return hashWalk;
+}
+
+bool mc_UpdateBlockCacheValues(std::map<uint256,CBlockIndex>& mapTempBlockIndex)
+{
+    vector<pair<int, uint256> > vSortedByHeight;
+    vSortedByHeight.reserve(mapTempBlockIndex.size());
+    BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex)& item, mapTempBlockIndex)
+    {
+        vSortedByHeight.push_back(make_pair(item.second.nHeight, item.first));
+    }
+    
+    sort(vSortedByHeight.begin(), vSortedByHeight.end());
+    BOOST_FOREACH(const PAIRTYPE(int, uint256)& item, vSortedByHeight)
+    {
+        uint256 prevHash=mapTempBlockIndex[item.second].hashPrev;
+        mapTempBlockIndex[item.second].nChainWork = ( (prevHash != 0) ? mapTempBlockIndex[prevHash].nChainWork : 0) + GetBlockProof(mapTempBlockIndex[item.second]);
+        if (mapTempBlockIndex[item.second].nStatus & BLOCK_HAVE_DATA) {
+            if (prevHash != 0) {
+                if (mapTempBlockIndex[prevHash].nChainTx) {
+                    mapTempBlockIndex[item.second].nChainTx = mapTempBlockIndex[prevHash].nChainTx + mapTempBlockIndex[item.second].nTx;
+                } else {
+                    mapTempBlockIndex[item.second].nChainTx = 0;
+                }
+            } else {
+                mapTempBlockIndex[item.second].nChainTx = mapTempBlockIndex[item.second].nTx;
+            }
+        }
+        
+        if(prevHash != 0)
+        {
+            mapTempBlockIndex[item.second].hashSkip = mc_GetAncestorHash(mapTempBlockIndex,prevHash,GetSkipHeight(mapTempBlockIndex[item.second].nHeight));
+        }
+    }
+    
+    return true;
+}
+
 bool static LoadBlockIndexDB(std::string& strError)
 {
     if (!pblocktree->LoadBlockIndexGuts())
@@ -5618,7 +5679,7 @@ bool static LoadBlockIndexDB(std::string& strError)
 
 /* BLMP COB */
     // Calculate nChainWork
-    
+/*    
     vector<pair<int, CBlockIndex*> > vSortedByHeight;
     vSortedByHeight.reserve(mapBlockIndex.size());
     BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
@@ -5659,7 +5720,39 @@ bool static LoadBlockIndexDB(std::string& strError)
         if (pindex->IsValid(BLOCK_VALID_TREE) && ((hashBestHeader == 0) || CBlockIndexWorkComparator()(hashBestHeader, pindex->GetBlockHash())))
             hashBestHeader = pindex->GetBlockHash();
     }
-
+*/
+    it = mapBlockIndex.begin();
+    while (it != mapBlockIndex.end()) 
+    {
+        CBlockIndex* pindex = it->second;
+        if (pindex->pskip == NULL)
+        {
+            if(pindex->hashSkip != 0)
+            {
+                pindex->setpskip(mapBlockIndex[pindex->hashSkip]);
+            }
+        }
+        
+        if (pindex->nStatus & BLOCK_HAVE_DATA) {
+            if(pindex->nChainTx == 0)
+            {
+                mapBlocksUnlinked.insert(std::make_pair(pindex->getpprev()->GetBlockHash(), pindex->GetBlockHash()));                
+            }
+        }
+        
+        if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->getpprev() == NULL))
+            if(!setBlockIndexCandidates.value_comp()(pindex->GetBlockHash(), chainActive.Tip()->GetBlockHash()))
+            {
+                setBlockIndexCandidates.insert(pindex->GetBlockHash());
+            }
+        if (pindex->nStatus & BLOCK_FAILED_MASK && ((hashBestInvalid == 0) || pindex->nChainWork > mapBlockIndex[hashBestInvalid]->nChainWork))
+            hashBestInvalid = pindex->GetBlockHash();
+        if (pindex->IsValid(BLOCK_VALID_TREE) && ((hashBestHeader == 0) || CBlockIndexWorkComparator()(hashBestHeader, pindex->GetBlockHash())))
+            hashBestHeader = pindex->GetBlockHash();
+        
+        it++;
+    }
+    
     PruneBlockIndexCandidates();
 /* MCHN START */
     

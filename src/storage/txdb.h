@@ -60,6 +60,7 @@ public:
     bool WriteTxIndex(const std::vector<std::pair<uint256, CDiskTxPos> > &list);
     bool WriteFlag(const std::string &name, bool fValue);
     bool ReadFlag(const std::string &name, bool &fValue);
+    bool UpdateBlockCacheValues();
     bool LoadBlockIndexGuts();
     bool WriteBlockCasedStatus(bool erase);
 };

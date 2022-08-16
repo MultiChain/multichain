@@ -15,6 +15,8 @@
 
 using namespace std;
 
+bool mc_UpdateBlockCacheValues(std::map<uint256,CBlockIndex>& mapTempBlockIndex);
+
 void static BatchWriteCoins(CLevelDBBatch &batch, const uint256 &hash, const CCoins &coins) {
     if (coins.IsPruned())
     {
@@ -186,12 +188,107 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue) {
     return true;
 }
 
+void DiskBlockIndexToCBlockIndex(CBlockIndex* pindexNew,CDiskBlockIndex &diskindex)
+{
+    pindexNew->nHeight        = diskindex.nHeight;
+    pindexNew->nFile          = diskindex.nFile;
+    pindexNew->nDataPos       = diskindex.nDataPos;
+    pindexNew->nUndoPos       = diskindex.nUndoPos;
+    pindexNew->nVersion       = diskindex.nVersion;
+    pindexNew->hashMerkleRoot = diskindex.hashMerkleRoot;
+    pindexNew->nTime          = diskindex.nTime;
+    pindexNew->nBits          = diskindex.nBits;
+    pindexNew->nNonce         = diskindex.nNonce;
+    pindexNew->nStatus        = diskindex.nStatus;
+    pindexNew->nTx            = diskindex.nTx;
+
+    pindexNew->nSize          = diskindex.nSize;
+    pindexNew->kMiner         = diskindex.kMiner;
+
+    pindexNew->nChainTx       = diskindex.nChainTx;
+    pindexNew->nChainWork     = diskindex.nChainWork;
+    pindexNew->hashSkip       = diskindex.hashSkip;    
+}
+
+bool CBlockTreeDB::UpdateBlockCacheValues()
+{
+    std::map <uint256,CBlockIndex> mapTempBlockIndex;
+
+    boost::scoped_ptr<leveldb::Iterator> pcursor(NewIterator());
+
+    CDataStream ssKeySet(SER_DISK, CLIENT_VERSION);
+    ssKeySet << make_pair('b', uint256(0));
+    pcursor->Seek(ssKeySet.str());
+
+    // Load mapBlockIndex
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+        try {
+            leveldb::Slice slKey = pcursor->key();
+            CDataStream ssKey(slKey.data(), slKey.data()+slKey.size(), SER_DISK, CLIENT_VERSION);
+            char chType;
+            ssKey >> chType;
+            if (chType == 'b') {
+                leveldb::Slice slValue = pcursor->value();
+                CDataStream ssValue(slValue.data(), slValue.data()+slValue.size(), SER_DISK, CLIENT_VERSION);
+                CDiskBlockIndex diskindex;
+                CBlockIndex blockindex;
+                
+                ssValue >> diskindex;
+
+                blockindex.SetNull();
+                DiskBlockIndexToCBlockIndex(&blockindex,diskindex);                
+                blockindex.hashPrev=diskindex.hashPrev;
+                mapTempBlockIndex.insert(make_pair(diskindex.GetBlockHash(), blockindex));
+                        
+                pcursor->Next();
+            } else {
+                break; // if shutdown requested or finished loading block index
+            }
+        } catch (std::exception &e) {
+            return error("%s : Deserialize or I/O error - %s", __func__, e.what());
+        }
+    }
+    
+    if(!mc_UpdateBlockCacheValues(mapTempBlockIndex))
+    {
+        return false;
+    }
+    
+    BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex)& item, mapTempBlockIndex)
+    {
+        mapTempBlockIndex[item.first].nStatus |= BLOCK_HAVE_CHAIN_CACHE;
+        mapTempBlockIndex[item.first].phashBlock = &(item.first);
+        CDiskBlockIndex diskindex=CDiskBlockIndex(&mapTempBlockIndex[item.first]);
+        diskindex.hashPrev=mapTempBlockIndex[item.first].hashPrev;
+
+        if (!WriteBlockIndex(diskindex)) 
+        {
+            return error("Failed to write to block index");
+        }
+    }
+
+    pblocktree->Sync();
+    return true;
+}
+
 bool CBlockTreeDB::LoadBlockIndexGuts()
 {
+    bool fBlockCacheValues;
+
+    if(!ReadFlag("blockcachedvalues",fBlockCacheValues))
+    {
+        if(!UpdateBlockCacheValues())
+        {
+            return error("LoadBlockIndex() : Couldn't update block cached values");            
+        }
+        WriteFlag("blockcachedvalues",true);
+    }
+
     mapBlockCachedStatus.clear();
     if(Exists('I'))
     {
-        return Read('I', mapBlockCachedStatus);        
+        Read('I', mapBlockCachedStatus);        
     }
     
     boost::scoped_ptr<leveldb::Iterator> pcursor(NewIterator());
@@ -214,39 +311,14 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
                 CDiskBlockIndex diskindex;
                 ssValue >> diskindex;
 
-                if( !fInMemoryBlockIndex && (diskindex.GetBlockHash() == 0) )
-                {
-                    if( (diskindex.nStatus & BLOCK_HAVE_CHAIN_CACHE) == BLOCK_HAVE_CHAIN_CACHE )
-                    {
-                        break;
-                    }
-                }
-                
                 // Construct block index object
                 CBlockIndex* pindexNew = InsertBlockIndex(diskindex.GetBlockHash());
 //                pindexNew->pprev          = InsertBlockIndex(diskindex.hashPrev);
                 pindexNew->setpprev(InsertBlockIndex(diskindex.hashPrev));
-                pindexNew->nHeight        = diskindex.nHeight;
-                pindexNew->nFile          = diskindex.nFile;
-                pindexNew->nDataPos       = diskindex.nDataPos;
-                pindexNew->nUndoPos       = diskindex.nUndoPos;
-                pindexNew->nVersion       = diskindex.nVersion;
-                pindexNew->hashMerkleRoot = diskindex.hashMerkleRoot;
-                pindexNew->nTime          = diskindex.nTime;
-                pindexNew->nBits          = diskindex.nBits;
-                pindexNew->nNonce         = diskindex.nNonce;
-                pindexNew->nStatus        = diskindex.nStatus;
-                pindexNew->nTx            = diskindex.nTx;
-                
-                pindexNew->nSize          = diskindex.nSize;
-                pindexNew->kMiner         = diskindex.kMiner;
-                
-                pindexNew->nChainTx       = diskindex.nChainTx;
-                pindexNew->nChainWork     = diskindex.nChainWork;
-               
+                DiskBlockIndexToCBlockIndex(pindexNew,diskindex);
                 if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits))
                     return error("LoadBlockIndex() : CheckProofOfWork failed: %s", pindexNew->ToString());
-
+                
                 pcursor->Next();
             } else {
                 break; // if shutdown requested or finished loading block index
@@ -256,11 +328,6 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
         }
     }
     
-    if(fInMemoryBlockIndex && (mapBlockIndex.size() > 0) )
-    {
-        
-    }
-
     return true;
 }
 
