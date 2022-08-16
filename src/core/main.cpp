@@ -142,6 +142,7 @@ set <uint256> setBannedTxs;
 set <uint256> setBannedTxBlocks;
 uint256 hLockedBlock;
 CBlockIndex *pindexLockedBlock;
+set<uint256> setChainTips;
 
 int EraseOrphansFor(NodeId peer);
 
@@ -4425,6 +4426,11 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
         pindexNew->setpprev((*miPrev).second);
         pindexNew->nHeight = pindexNew->getpprev()->nHeight + 1;
         pindexNew->BuildSkip();
+        if( (pindexNew->getpprev()->nStatus & BLOCK_HAVE_SUCCESSOR) == 0 )
+        {
+            pindexNew->getpprev()->nStatus |= BLOCK_HAVE_SUCCESSOR;
+            setDirtyBlockIndex.insert(block.hashPrevBlock);
+        }
     }
     pindexNew->nChainWork = (pindexNew->getpprev() ? pindexNew->getpprev()->nChainWork : 0) + GetBlockProof(*pindexNew);
     pindexNew->RaiseValidity(BLOCK_VALID_TREE);
@@ -5609,11 +5615,12 @@ bool mc_UpdateBlockCacheValues(std::map<uint256,CBlockIndex>& mapTempBlockIndex)
             } else {
                 mapTempBlockIndex[item.second].nChainTx = mapTempBlockIndex[item.second].nTx;
             }
-        }
+        }        
         
         if(prevHash != 0)
         {
             mapTempBlockIndex[item.second].hashSkip = mc_GetAncestorHash(mapTempBlockIndex,prevHash,GetSkipHeight(mapTempBlockIndex[item.second].nHeight));
+            mapTempBlockIndex[prevHash].nStatus |= BLOCK_HAVE_SUCCESSOR;
         }
     }
     
@@ -5736,7 +5743,7 @@ bool static LoadBlockIndexDB(std::string& strError)
         if (pindex->nStatus & BLOCK_HAVE_DATA) {
             if(pindex->nChainTx == 0)
             {
-                mapBlocksUnlinked.insert(std::make_pair(pindex->getpprev()->GetBlockHash(), pindex->GetBlockHash()));                
+                mapBlocksUnlinked.insert(std::make_pair(pindex->hashPrev, pindex->GetBlockHash()));                
             }
         }
         
@@ -5749,6 +5756,11 @@ bool static LoadBlockIndexDB(std::string& strError)
             hashBestInvalid = pindex->GetBlockHash();
         if (pindex->IsValid(BLOCK_VALID_TREE) && ((hashBestHeader == 0) || CBlockIndexWorkComparator()(hashBestHeader, pindex->GetBlockHash())))
             hashBestHeader = pindex->GetBlockHash();
+        
+        if( (pindex->nStatus & BLOCK_HAVE_SUCCESSOR) == 0 )
+        {
+            setChainTips.insert(pindex->GetBlockHash());
+        }
         
         it++;
     }

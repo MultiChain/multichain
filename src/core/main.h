@@ -151,6 +151,7 @@ extern uint32_t nMessageHandlerThreads;
 extern unsigned int nCoinCacheSize;
 extern CFeeRate minRelayTxFee;
 extern std::map<uint256,uint32_t> mapBlockCachedStatus;
+extern std::set<uint256> setChainTips;
 
 /** Best header we've seen so far (used for getheaders queries' starting points). */
 extern uint256 hashBestHeader;

@@ -91,6 +91,8 @@ enum BlockStatus {
     BLOCK_HAVE_SIZE          =  128, // block has calculated size
     BLOCK_HAVE_MINER_PUBKEY  =  256, // block has miner pubkey
     BLOCK_HAVE_CHAIN_CACHE   =  512, // block has chain tx count, chain work and index skip hash
+
+    BLOCK_HAVE_SUCCESSOR     =  1024, // there is another block (maybe invalid) for which it is a previous
     
 };
 

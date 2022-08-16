@@ -854,14 +854,10 @@ Value getchaintips(const Array& params, bool fHelp)
     std::set<CBlockIndex*, CompareBlocksByHeight> setTips;
     
 /* BLMP COB */
-    
-    BOOST_FOREACH(const PAIRTYPE(const uint256, CBlockIndex*)& item, mapBlockIndex)
-        setTips.insert(item.second);
-    BOOST_FOREACH(const PAIRTYPE(const uint256, CBlockIndex*)& item, mapBlockIndex)
+
+    BOOST_FOREACH(const uint256& hashTip, setChainTips)
     {
-        CBlockIndex* pprev = item.second->getpprev();
-        if (pprev)
-            setTips.erase(pprev);
+        setTips.insert(mapBlockIndex[hashTip]);
     }
 
     // Always report the currently active tip.
