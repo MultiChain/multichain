@@ -53,6 +53,11 @@ BlockMap::iterator CBlockMap::end() {
     return mapBlockIndex.end();
 }
 
+BlockMap::iterator CBlockMap::next(BlockMap::iterator& it){
+    return it++;
+}
+
+
 std::pair<BlockMap::iterator, bool> CBlockMap::insert(std::pair<uint256, CBlockIndex*> x) {
     return mapBlockIndex.insert(x);
 }
@@ -68,5 +73,10 @@ size_t CBlockMap::size() {
 }
 
 void CBlockMap::clear() {
+    
+    BlockMap::iterator it1 = mapBlockIndex.begin();
+    for (; it1 != mapBlockIndex.end(); it1++)
+        delete (*it1).second;
+    
     return mapBlockIndex.clear();
 }

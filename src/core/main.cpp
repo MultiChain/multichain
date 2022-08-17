@@ -4226,6 +4226,22 @@ string SetLockedBlock(string hash)
 /* BLMP COB */
                 if(pindexWalk == pindexLockedBlock)
                 {
+                    BOOST_FOREACH(const uint256& hashTip, setChainTips)
+                    {
+                        CBlockIndex *pindexCandidate=mapBlockIndex[hashTip];
+                        while( (pindexCandidate != NULL) && 
+                               (setBlockIndexCandidates.value_comp()(pindexWalk->GetBlockHash(), pindexCandidate->GetBlockHash())) && 
+                               (pindexCandidate->GetAncestor(pindexWalk->nHeight) == pindexWalk) )
+                        {
+                            if (pindexCandidate->IsValid(BLOCK_VALID_TRANSACTIONS) && pindexCandidate->nChainTx) 
+                            {
+                                pindexWalk=pindexCandidate;                                
+                            }
+                            pindexCandidate = pindexCandidate->getpprev();
+                        }
+                    }
+
+/*                    
                     BlockMap::iterator it = mapBlockIndex.begin();
                     while (it != mapBlockIndex.end()) 
                     {
@@ -4239,6 +4255,7 @@ string SetLockedBlock(string hash)
                         }
                         it++;
                     }
+ */ 
                 }
 
                 LogPrintf("Block %s found on alternative chain at height %d\n",
@@ -4321,6 +4338,21 @@ bool InvalidateBlock(CValidationState& state, CBlockIndex *pindex) {
     // The resulting new best tip may not be in setBlockIndexCandidates anymore, so
     // add them again.
 /* BLMP COB */
+
+    BOOST_FOREACH(const uint256& hashTip, setChainTips)
+    {
+        CBlockIndex *pindexCandidate=mapBlockIndex[hashTip];
+        while( (pindexCandidate != NULL) && 
+               (setBlockIndexCandidates.value_comp()(chainActive.Tip()->GetBlockHash(), pindexCandidate->GetBlockHash())) )
+        {
+            if (pindexCandidate->IsValid(BLOCK_VALID_TRANSACTIONS) && pindexCandidate->nChainTx) 
+            {
+                setBlockIndexCandidates.insert(pindexCandidate->GetBlockHash());
+            }
+            pindexCandidate = pindexCandidate->getpprev();
+        }
+    }
+/*    
     BlockMap::iterator it = mapBlockIndex.begin();
     while (it != mapBlockIndex.end()) {
         if (it->second->IsValid(BLOCK_VALID_TRANSACTIONS) && it->second->nChainTx && setBlockIndexCandidates.value_comp()(chainActive.Tip()->GetBlockHash(), it->second->GetBlockHash())) {
@@ -4328,7 +4360,7 @@ bool InvalidateBlock(CValidationState& state, CBlockIndex *pindex) {
         }
         it++;
     }
-
+*/
     InvalidChainFound(pindex);
     return true;
 }
@@ -4336,9 +4368,36 @@ bool InvalidateBlock(CValidationState& state, CBlockIndex *pindex) {
 bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
     AssertLockHeld(cs_main);
 
-    int nHeight = pindex->nHeight;
-/* BLMP Commented out this block */
+/* BLMP COB */
     // Remove the invalidity flag from this block and all its descendants.
+
+    BOOST_FOREACH(const uint256& hashTip, setChainTips)
+    {
+        CBlockIndex *pindexCandidate=mapBlockIndex[hashTip];
+        while( (pindexCandidate != NULL) && 
+               (setBlockIndexCandidates.value_comp()(pindex->GetBlockHash(), pindexCandidate->GetBlockHash())) && 
+               (pindexCandidate->GetAncestor(pindex->nHeight) == pindex) )
+        {
+            if (!pindexCandidate->IsValid()) 
+            {
+                pindexCandidate->nStatus &= ~BLOCK_FAILED_MASK;
+                pindexCandidate->fUpdated=true;
+                setDirtyBlockIndex.insert(pindexCandidate->GetBlockHash());
+                if (pindexCandidate->IsValid(BLOCK_VALID_TRANSACTIONS) && pindexCandidate->nChainTx && 
+                        setBlockIndexCandidates.value_comp()(chainActive.Tip()->GetBlockHash(), pindexCandidate->GetBlockHash())) 
+                {
+                    setBlockIndexCandidates.insert(pindexCandidate->GetBlockHash());
+                }
+                if (pindexCandidate->GetBlockHash() == hashBestInvalid) {
+                    // Reset invalid block marker if it was pointing to one of those.
+                    hashBestInvalid = 0;
+                }
+            }
+            pindexCandidate = pindexCandidate->getpprev();
+        }
+    }
+
+/*    
     BlockMap::iterator it = mapBlockIndex.begin();
     while (it != mapBlockIndex.end()) {
         if (!it->second->IsValid() && it->second->GetAncestor(nHeight) == pindex) {
@@ -4354,7 +4413,8 @@ bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
         }
         it++;
     }
-
+*/
+    
     // Remove the invalidity flag from all ancestors too.
     while (pindex != NULL) {
         if (pindex->nStatus & BLOCK_FAILED_MASK) {
@@ -5619,9 +5679,10 @@ bool static LoadBlockIndexDB(std::string& strError)
             break;
         }
     }
-
+/*
     // Check presence of blk files
     LogPrintf("Checking all blk files are present...\n");
+    
     set<int> setBlkDataFiles;
     
     BlockMap::iterator it = mapBlockIndex.begin();
@@ -5641,7 +5702,7 @@ bool static LoadBlockIndexDB(std::string& strError)
             return false;
         }
     }
-
+*/
     // Check whether we need to continue reindexing
     bool fReindexing = false;
     pblocktree->ReadReindexing(fReindexing);
@@ -5652,7 +5713,7 @@ bool static LoadBlockIndexDB(std::string& strError)
     LogPrintf("LoadBlockIndexDB(): transaction index %s\n", fTxIndex ? "enabled" : "disabled");
 
     // Load pointer to end of best chain
-    it = mapBlockIndex.find(pcoinsTip->GetBestBlock());
+    BlockMap::iterator it = mapBlockIndex.find(pcoinsTip->GetBestBlock());
     if (it == mapBlockIndex.end())
         return true;
     chainActive.SetTip(it->second);
@@ -5701,6 +5762,7 @@ bool static LoadBlockIndexDB(std::string& strError)
             hashBestHeader = pindex->GetBlockHash();
     }
 */
+    int maxblockfile=-1;
     it = mapBlockIndex.begin();
     while (it != mapBlockIndex.end()) 
     {
@@ -5734,8 +5796,27 @@ bool static LoadBlockIndexDB(std::string& strError)
         {
             setChainTips.insert(pindex->GetBlockHash());
         }
+
+        if (pindex->nStatus & BLOCK_HAVE_DATA) 
+        {
+            if(pindex->nFile > maxblockfile)
+            {
+                maxblockfile = pindex->nFile;
+            }
+        }
         
-        it++;
+        mapBlockIndex.next(it);
+//        it++;
+    }
+    
+    // Check presence of blk files
+    LogPrintf("Checking all blk files are present...\n");
+    for (int bfi = 0; bfi <= maxblockfile; bfi++)
+    {
+        CDiskBlockPos pos(bfi, 0);
+        if (CAutoFile(OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION).IsNull()) {
+            return false;
+        }
     }
     
     PruneBlockIndexCandidates();
@@ -8553,10 +8634,6 @@ public:
     CMainCleanup() {}
     ~CMainCleanup() {
         // block headers
-/* BLMP COB */
-        BlockMap::iterator it1 = mapBlockIndex.begin();
-        for (; it1 != mapBlockIndex.end(); it1++)
-            delete (*it1).second;
  
         mapBlockIndex.clear();
 
