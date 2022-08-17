@@ -54,7 +54,8 @@ BlockMap::iterator CBlockMap::end() {
 }
 
 BlockMap::iterator CBlockMap::next(BlockMap::iterator& it){
-    return it++;
+    it++;
+    return it;
 }
 
 

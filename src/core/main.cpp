@@ -241,7 +241,6 @@ namespace {
     /** Blocks that are in flight, and that are in the queue to be downloaded. Protected by cs_main. */
     struct QueuedBlock {
         uint256 hash;
-        CBlockIndex *pindex;  //! Optional.
         int64_t nTime;  //! Time of "getdata" request in microseconds.
         int nValidatedQueuedBefore;  //! Number of blocks queued with validated headers (globally) at the time this one is requested.
         bool fValidatedHeaders;  //! Whether this block has validated headers at the time of request.
@@ -352,11 +351,13 @@ struct CNodeState {
     //! List of asynchronously-determined block rejections to notify this peer about.
     std::vector<CBlockReject> rejects;
     //! The best known block we know this peer has announced.
-    CBlockIndex *pindexBestKnownBlock;
+    uint256 hashBestKnownBlock;
+//    CBlockIndex *pindexBestKnownBlock;
     //! The hash of the last unknown block this peer has announced.
     uint256 hashLastUnknownBlock;
     //! The last full block we both have.
-    CBlockIndex *pindexLastCommonBlock;
+    uint256 hashLastCommonBlock;
+//    CBlockIndex *pindexLastCommonBlock;
     //! Whether we've started headers synchronization with this peer.
     bool fSyncStarted;
     //! Since when we're stalling block download progress (in microseconds), or 0.
@@ -369,9 +370,9 @@ struct CNodeState {
     CNodeState() {
         nMisbehavior = 0;
         fShouldBan = false;
-        pindexBestKnownBlock = NULL;
+        hashBestKnownBlock = uint256(0);
         hashLastUnknownBlock = uint256(0);
-        pindexLastCommonBlock = NULL;
+        hashLastCommonBlock = uint256(0);
         fSyncStarted = false;
         nStallingSince = 0;
         nBlocksInFlight = 0;
@@ -613,14 +614,16 @@ bool MultichainNode_IsBlockChainSynced(CNode *pnode)
     if (it == mapNodeState.end())
         return false;
     CNodeState *state = &it->second;
-    int sync_height = state->pindexBestKnownBlock ? state->pindexBestKnownBlock->nHeight : -1;
-    int common_height = state->pindexLastCommonBlock ? state->pindexLastCommonBlock->nHeight : -1;
+    CBlockIndex *pindexBestKnownBlock=(state->hashBestKnownBlock != 0) ? mapBlockIndex[state->hashBestKnownBlock] : NULL;
+            
+    int sync_height = pindexBestKnownBlock ? pindexBestKnownBlock->nHeight : -1;
+    int common_height = (state->hashLastCommonBlock > 0) ? mapBlockIndex[state->hashLastCommonBlock]->nHeight : -1;
 
     if(common_height <= 0)
     {
-        if(state->pindexBestKnownBlock)
+        if(pindexBestKnownBlock)
         {
-            if(chainActive.Contains(state->pindexBestKnownBlock))
+            if(chainActive.Contains(pindexBestKnownBlock))
             {
                 common_height=sync_height;
                 LogPrint("mcblockperf","mchn-block-perf: Lagging node %d, heights: our: %d,  known: %d\n",pnode->id,this_height,sync_height);        
@@ -734,7 +737,7 @@ void MarkBlockAsInFlight(NodeId nodeid, const uint256& hash, CBlockIndex *pindex
     // Make sure it's not listed somewhere already.
     MarkBlockAsReceived(hash);
 
-    QueuedBlock newentry = {hash, pindex, GetTimeMicros(), nQueuedValidatedHeaders, pindex != NULL};
+    QueuedBlock newentry = {hash, GetTimeMicros(), nQueuedValidatedHeaders, pindex != NULL};
     nQueuedValidatedHeaders += newentry.fValidatedHeaders;
     list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
     state->nBlocksInFlight++;
@@ -745,12 +748,14 @@ void MarkBlockAsInFlight(NodeId nodeid, const uint256& hash, CBlockIndex *pindex
 void ProcessBlockAvailability(NodeId nodeid) {
     CNodeState *state = State(nodeid);
     assert(state != NULL);
+    
+    CBlockIndex *pindexBestKnownBlock=(state->hashBestKnownBlock != 0) ? mapBlockIndex[state->hashBestKnownBlock] : NULL;
 
     if (state->hashLastUnknownBlock != 0) {
         BlockMap::iterator itOld = mapBlockIndex.find(state->hashLastUnknownBlock);
         if (itOld != mapBlockIndex.end() && itOld->second->nChainWork > 0) {
-            if (state->pindexBestKnownBlock == NULL || itOld->second->nChainWork >= state->pindexBestKnownBlock->nChainWork)
-                state->pindexBestKnownBlock = itOld->second;
+            if (pindexBestKnownBlock == NULL || itOld->second->nChainWork >= pindexBestKnownBlock->nChainWork)
+                state->hashBestKnownBlock = itOld->second->GetBlockHash();
             state->hashLastUnknownBlock = uint256(0);
         }
     }
@@ -763,11 +768,13 @@ void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash) {
 
     ProcessBlockAvailability(nodeid);
 
+    CBlockIndex *pindexBestKnownBlock=(state->hashBestKnownBlock != 0) ? mapBlockIndex[state->hashBestKnownBlock] : NULL;
+    
     BlockMap::iterator it = mapBlockIndex.find(hash);
     if (it != mapBlockIndex.end() && it->second->nChainWork > 0) {
         // An actually better block was announced.
-        if (state->pindexBestKnownBlock == NULL || it->second->nChainWork >= state->pindexBestKnownBlock->nChainWork)
-            state->pindexBestKnownBlock = it->second;
+        if (pindexBestKnownBlock == NULL || it->second->nChainWork >= pindexBestKnownBlock->nChainWork)
+            state->hashBestKnownBlock = it->second->GetBlockHash();
     } else {
         // An unknown block was announced; just assume that the latest one is the best one.
         state->hashLastUnknownBlock = hash;
@@ -806,7 +813,8 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
     // Make sure pindexBestKnownBlock is up to date, we'll need it.
     ProcessBlockAvailability(nodeid);
 
-    CBlockIndex *pindexBestKnownBlock=state->pindexBestKnownBlock;
+    CBlockIndex *pindexBestKnownBlock=(state->hashBestKnownBlock != 0) ? mapBlockIndex[state->hashBestKnownBlock] : NULL;
+    CBlockIndex *pindexBestKnownBlockInitial=pindexBestKnownBlock;
     
     if( (hLockedBlock != 0) && (mapBlockIndex.count(hLockedBlock) > 0) )
     {
@@ -814,7 +822,7 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
         if(pindexBestKnownBlock)
         {
             CBlockIndex *pindexCommonAncestor;
-            pindexCommonAncestor=LastCommonAncestor(state->pindexBestKnownBlock,pindexLockedBlock);
+            pindexCommonAncestor=LastCommonAncestor(pindexBestKnownBlockInitial,pindexLockedBlock);
             if(pindexCommonAncestor != pindexLockedBlock)
             {
                 pindexBestKnownBlock=pindexCommonAncestor;
@@ -827,24 +835,27 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
         return;
     }
 
-    if (state->pindexLastCommonBlock == NULL) {
+    if (state->hashLastCommonBlock == 0) {
         // Bootstrap quickly by guessing a parent of our best tip is the forking point.
         // Guessing wrong in either direction is not a problem.
-        state->pindexLastCommonBlock = chainActive[std::min(pindexBestKnownBlock->nHeight, chainActive.Height())];
+        state->hashLastCommonBlock = chainActive[std::min(pindexBestKnownBlock->nHeight, chainActive.Height())]->GetBlockHash();
     }
 
     // If the peer reorganized, our previous pindexLastCommonBlock may not be an ancestor
     // of their current tip anymore. Go back enough to fix that.
-    state->pindexLastCommonBlock = LastCommonAncestor(state->pindexLastCommonBlock, pindexBestKnownBlock);
-    if (state->pindexLastCommonBlock == pindexBestKnownBlock)
+    state->hashLastCommonBlock = LastCommonAncestor(mapBlockIndex[state->hashLastCommonBlock], pindexBestKnownBlock)->GetBlockHash();
+    
+    CBlockIndex *pindexLastCommonBlock=(state->hashLastCommonBlock != 0) ? mapBlockIndex[state->hashLastCommonBlock] : NULL;
+    
+    if (pindexLastCommonBlock == pindexBestKnownBlock)
         return;
 
     std::vector<CBlockIndex*> vToFetch;
-    CBlockIndex *pindexWalk = state->pindexLastCommonBlock;
+    CBlockIndex *pindexWalk = pindexLastCommonBlock;
     // Never fetch further than the best block we know the peer has, or more than BLOCK_DOWNLOAD_WINDOW + 1 beyond the last
     // linked block we have in common with this peer. The +1 is so we can detect stalling, namely if we would be able to
     // download that next block if the window were 1 larger.
-    int nWindowEnd = state->pindexLastCommonBlock->nHeight + BLOCK_DOWNLOAD_WINDOW;
+    int nWindowEnd = pindexLastCommonBlock->nHeight + BLOCK_DOWNLOAD_WINDOW;
     int nMaxHeight = std::min<int>(pindexBestKnownBlock->nHeight, nWindowEnd + 1);
     NodeId waitingfor = -1;
     while (pindexWalk->nHeight < nMaxHeight) {
@@ -878,7 +889,10 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
 /* MCHN END */            
             if (pindex->nStatus & BLOCK_HAVE_DATA) {
                 if (pindex->nChainTx)
-                    state->pindexLastCommonBlock = pindex;
+                {                    
+                    pindexLastCommonBlock = pindex;
+                    state->hashLastCommonBlock = pindex->GetBlockHash();
+                }
             } else if (mapBlocksInFlight.count(pindex->GetBlockHash()) == 0) {
                 // The block is not already downloaded, and not yet in flight.
                 if (pindex->nHeight > nWindowEnd) {
@@ -909,12 +923,16 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
     if (state == NULL)
         return false;
     stats.nMisbehavior = state->nMisbehavior;
-    stats.nSyncHeight = state->pindexBestKnownBlock ? state->pindexBestKnownBlock->nHeight : -1;
-    stats.nCommonHeight = state->pindexLastCommonBlock ? state->pindexLastCommonBlock->nHeight : -1;
+    stats.nSyncHeight = (state->hashBestKnownBlock != 0) ? mapBlockIndex[state->hashBestKnownBlock]->nHeight : -1;
+    stats.nCommonHeight = (state->hashLastCommonBlock != 0) ? mapBlockIndex[state->hashLastCommonBlock]->nHeight : -1;
+
     BOOST_FOREACH(const QueuedBlock& queue, state->vBlocksInFlight) {
-        if (queue.pindex)
-            stats.vHeightInFlight.push_back(queue.pindex->nHeight);
+        if( (queue.hash != 0) && (mapBlockIndex.count(queue.hash) > 0) )
+        {            
+            stats.vHeightInFlight.push_back(mapBlockIndex[queue.hash]->nHeight);
+        }
     }
+
     return true;
 }
 
@@ -2104,7 +2122,9 @@ bool IsInitialBlockDownload()
 
 bool fLargeWorkForkFound = false;
 bool fLargeWorkInvalidChainFound = false;
-CBlockIndex *pindexBestForkTip = NULL, *pindexBestForkBase = NULL;
+
+uint256 hashBestForkTip = 0;
+uint256 hashBestForkBase = 0;
 
 void CheckForkWarningConditions()
 {
@@ -2114,12 +2134,24 @@ void CheckForkWarningConditions()
     if (IsInitialBlockDownload())
         return;
 
+    CBlockIndex *pindexBestForkTip = NULL, *pindexBestForkBase = NULL;
+    if(hashBestForkTip > 0)
+    {
+        pindexBestForkTip=mapBlockIndex[hashBestForkTip];
+    }
+    if(hashBestForkBase > 0)
+    {
+        pindexBestForkBase=mapBlockIndex[hashBestForkBase];
+    }
     // If our best fork is no longer within 72 blocks (+/- 12 hours if no one mines it)
     // of our head, drop it
 /* MCHN START */    
 //    if (pindexBestForkTip && chainActive.Height() - pindexBestForkTip->nHeight >= 72)
     if (pindexBestForkTip && chainActive.Height() - pindexBestForkTip->nHeight >= 43200 / MCP_TARGET_BLOCK_TIME)
+    {
         pindexBestForkTip = NULL;
+        hashBestForkTip = 0;
+    }
 /* MCHN END */    
 
     if (pindexBestForkTip || ( (hashBestInvalid != 0) && mapBlockIndex[hashBestInvalid]->nChainWork > chainActive.Tip()->nChainWork + (GetBlockProof(*chainActive.Tip()) * 6)))
@@ -2154,6 +2186,16 @@ void CheckForkWarningConditionsOnNewFork(CBlockIndex* pindexNewForkTip)
 {
     AssertLockHeld(cs_main);
     // If we are on a fork that is sufficiently large, set a warning flag
+    CBlockIndex *pindexBestForkTip = NULL, *pindexBestForkBase = NULL;
+    if(hashBestForkTip > 0)
+    {
+        pindexBestForkTip=mapBlockIndex[hashBestForkTip];
+    }
+    if(hashBestForkBase > 0)
+    {
+        pindexBestForkBase=mapBlockIndex[hashBestForkBase];
+    }
+    
     CBlockIndex* pfork = pindexNewForkTip;
     CBlockIndex* plonger = chainActive.Tip();
     while (pfork && pfork != plonger)
@@ -2180,7 +2222,9 @@ void CheckForkWarningConditionsOnNewFork(CBlockIndex* pindexNewForkTip)
 /* MCHN END */    
     {
         pindexBestForkTip = pindexNewForkTip;
+        hashBestForkTip = pindexNewForkTip->GetBlockHash();
         pindexBestForkBase = pfork;
+        hashBestForkBase = pindexBestForkBase->GetBlockHash();
     }
 
     CheckForkWarningConditions();
