@@ -94,7 +94,7 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
 
 CCriticalSection cs_main;
 
-BlockMap mapBlockIndex;
+CBlockMap mapBlockIndex;
 CChain chainActive;
 uint256 hashBestHeader = 0;
 int64_t nTimeBestReceived = 0;
@@ -3548,21 +3548,8 @@ static CBlockIndex* FindMostWorkChain() {
             set<uint256, CBlockIndexWorkComparator> setTempBlockIndexCandidates;
             std::set<uint256, CBlockIndexWorkComparator>::iterator fit;
             
-/*            
-            const CBlockIndex *pindexLockedFork;
-            pindexLockedFork=NULL;
-            if(pindexLockedBlock)
-            {
-                if(!chainActive.Contains(pindexLockedBlock))
-                {
-                    pindexLockedFork=chainActive.FindFork(pindexLockedBlock);                
-                }
-            }
-*/
-            
             for (fit = setBlockIndexCandidates.begin(); fit != setBlockIndexCandidates.end(); ++fit)
             {
-//                bool fLocked=false;                
                 CBlockIndex *pindexCandidate=mapBlockIndex[*fit];
                 if(pindexLockedBlock)
                 {
@@ -3572,24 +3559,6 @@ static CBlockIndex* FindMostWorkChain() {
                     {
                         pindexCandidate=pindexCommonAncestor;
                     }
-/*                    
-                    const CBlockIndex *pindexFork;
-                    pindexFork=chainActive.FindFork(*fit);
-                    if(pindexLockedFork)
-                    {
-                        if(pindexFork->nHeight < pindexLockedFork->nHeight)
-                        {
-                            fLocked=true;
-                        }                        
-                    }
-                    else
-                    {
-                        if(pindexFork->nHeight < pindexLockedBlock->nHeight)
-                        {
-                            fLocked=true;
-                        }            
-                    }                    
- */ 
                 }
                 if(!pindexCandidate->fPassedMinerPrecheck)
                 {
@@ -5654,16 +5623,20 @@ bool static LoadBlockIndexDB(std::string& strError)
     // Check presence of blk files
     LogPrintf("Checking all blk files are present...\n");
     set<int> setBlkDataFiles;
-    BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
+    
+    BlockMap::iterator it = mapBlockIndex.begin();
+    while (it != mapBlockIndex.end()) 
     {
-        CBlockIndex* pindex = item.second;
+        CBlockIndex* pindex = it->second;
         if (pindex->nStatus & BLOCK_HAVE_DATA) {
             setBlkDataFiles.insert(pindex->nFile);
         }
+        it++;
     }
-    for (std::set<int>::iterator it = setBlkDataFiles.begin(); it != setBlkDataFiles.end(); it++)
+    
+    for (std::set<int>::iterator bfit = setBlkDataFiles.begin(); bfit != setBlkDataFiles.end(); bfit++)
     {
-        CDiskBlockPos pos(*it, 0);
+        CDiskBlockPos pos(*bfit, 0);
         if (CAutoFile(OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION).IsNull()) {
             return false;
         }
@@ -5679,7 +5652,7 @@ bool static LoadBlockIndexDB(std::string& strError)
     LogPrintf("LoadBlockIndexDB(): transaction index %s\n", fTxIndex ? "enabled" : "disabled");
 
     // Load pointer to end of best chain
-    BlockMap::iterator it = mapBlockIndex.find(pcoinsTip->GetBestBlock());
+    it = mapBlockIndex.find(pcoinsTip->GetBestBlock());
     if (it == mapBlockIndex.end())
         return true;
     chainActive.SetTip(it->second);

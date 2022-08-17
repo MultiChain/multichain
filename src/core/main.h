@@ -133,7 +133,7 @@ extern CCriticalSection cs_main;
 extern CCriticalSection cs_NodeStatus;
 extern CTxMemPool mempool;
 //typedef boost::unordered_map<uint256, CBlockIndex*, BlockHasher> BlockMap;
-extern BlockMap mapBlockIndex;
+extern CBlockMap mapBlockIndex;
 extern uint64_t nLastBlockTx;
 extern uint64_t nLastBlockSize;
 extern const std::string strMessageMagic;
