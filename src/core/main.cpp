@@ -141,7 +141,6 @@ map<uint256, set<uint256> > mapOrphanTransactionsByPrev;
 set <uint256> setBannedTxs;
 set <uint256> setBannedTxBlocks;
 uint256 hLockedBlock;
-CBlockIndex *pindexLockedBlock;
 set<uint256> setChainTips;
 
 int EraseOrphansFor(NodeId peer);
@@ -809,8 +808,9 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
 
     CBlockIndex *pindexBestKnownBlock=state->pindexBestKnownBlock;
     
-    if(pindexLockedBlock)
+    if( (hLockedBlock != 0) && (mapBlockIndex.count(hLockedBlock) > 0) )
     {
+        CBlockIndex *pindexLockedBlock=mapBlockIndex[hLockedBlock];
         if(pindexBestKnownBlock)
         {
             CBlockIndex *pindexCommonAncestor;
@@ -3551,8 +3551,9 @@ static CBlockIndex* FindMostWorkChain() {
             for (fit = setBlockIndexCandidates.begin(); fit != setBlockIndexCandidates.end(); ++fit)
             {
                 CBlockIndex *pindexCandidate=mapBlockIndex[*fit];
-                if(pindexLockedBlock)
+                if( (hLockedBlock != 0) && (mapBlockIndex.count(hLockedBlock) > 0) )
                 {
+                    CBlockIndex *pindexLockedBlock=mapBlockIndex[hLockedBlock];                    
                     CBlockIndex *pindexCommonAncestor;
                     pindexCommonAncestor=LastCommonAncestor(pindexCandidate,pindexLockedBlock);
                     if(pindexCommonAncestor != pindexLockedBlock)
@@ -4162,10 +4163,13 @@ bool IsTxBanned(uint256 txid)
 string SetLockedBlock(string hash)
 {
     uint256 hashOld;
-    CBlockIndex* pindexLockedBlockOld;
+    CBlockIndex* pindexLockedBlock=NULL;
+    if( (hLockedBlock != 0) && (mapBlockIndex.count(hLockedBlock) > 0) )
+    {
+        pindexLockedBlock=mapBlockIndex[hLockedBlock];
+    }
     
     hashOld=hLockedBlock;
-    pindexLockedBlockOld=pindexLockedBlock;
     
     if(hash.size())
     {
@@ -4270,7 +4274,6 @@ string SetLockedBlock(string hash)
                 {
                     LogPrintf("ERROR: Cannot switch to chain with block %s: %d\n",hLockedBlock.ToString().c_str(),error.c_str());                                    
                     hLockedBlock=hashOld;
-                    pindexLockedBlock=pindexLockedBlockOld;
                     return string("Cannot switch to locked block: ")+error;                
                 }
             }
@@ -4286,9 +4289,9 @@ string SetLockedBlock(string hash)
 
 bool CanMineWithLockedBlock()
 {
-    if(pindexLockedBlock)
+    if(hLockedBlock != 0)
     {
-        if(!chainActive.Contains(pindexLockedBlock))
+        if(!chainActive.Contains(mapBlockIndex[hLockedBlock]))
         {
             return false;
         }        
@@ -4858,9 +4861,9 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
                          REJECT_CHECKPOINT, "checkpoint mismatch");
 
     bool fWaitingForLocked=false;
-    if(pindexLockedBlock)
+    if( (hLockedBlock != 0) && (mapBlockIndex.count(hLockedBlock) > 0) )
     {
-        if(!chainActive.Contains(pindexLockedBlock))
+        if(!chainActive.Contains(mapBlockIndex[hLockedBlock]))
         {
             fWaitingForLocked=true;
         }
@@ -5123,6 +5126,11 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
     if (ppindex)
         *ppindex = pindex;
 
+    CBlockIndex *pindexLockedBlock = NULL;
+    if( (hLockedBlock != 0) && (mapBlockIndex.count(hLockedBlock) > 0) )
+    {
+        pindexLockedBlock = mapBlockIndex[hLockedBlock];
+    }
     if(pindexLockedBlock == NULL)
     {
         if(hLockedBlock == pindex->GetBlockHash())
@@ -5340,13 +5348,7 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
         if (pindex && pfrom) {
             mapBlockSource[pindex->GetBlockHash()] = pfrom->GetId();
         }
-        if(pindexLockedBlock == NULL)
-        {
-            if(hLockedBlock == pblock->GetHash())
-            {
-                pindexLockedBlock=pindex;
-            }
-        }
+                
         if (!ret)
             return error("%s : AcceptBlock FAILED", __func__);
         if(pindex)
