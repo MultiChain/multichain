@@ -4141,16 +4141,19 @@ int mc_WalletTxs::AddExplorerTx(
                 goto exitlbl;
             }
 
-            entity.Zero();
-            entity.m_EntityType=MC_TET_ENTITY_KEY | MC_TET_CHAINPOS;
-            subkey_entity.Zero();
-            memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
-            subkey_entity.m_EntityType=MC_TET_SUBKEY_ENTITY_KEY | MC_TET_CHAINPOS;
-            err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,tx_tag,fFound ? 0 : 1);
-            if(err)
+            if(imp->m_ImportID == 0)
             {
-                goto exitlbl;
-            }                            
+                entity.Zero();
+                entity.m_EntityType=MC_TET_ENTITY_KEY | MC_TET_CHAINPOS;
+                subkey_entity.Zero();
+                memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
+                subkey_entity.m_EntityType=MC_TET_SUBKEY_ENTITY_KEY | MC_TET_CHAINPOS;
+                err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,tx_tag,fFound ? 0 : 1);
+                if(err)
+                {
+                    goto exitlbl;
+                }                            
+            }
         }
     }
     else
