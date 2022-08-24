@@ -4,6 +4,7 @@
 // Copyright (c) 2014-2019 Coin Sciences Ltd
 // MultiChain code distributed under the GPLv3 license, see COPYING file.
 
+#include "chain/blockmap.h"
 #include "chain/chain.h"
 
 using namespace std;
@@ -216,15 +217,20 @@ void CBlockIndex::setpprev(CBlockIndex* p){
 }
 
 CBlockIndex* CBlockIndex::getpskip(){
-    return pskip;
+    if(hashSkip != 0)
+    {
+        return mapBlockIndex[hashSkip];
+    }
+    return NULL;
+//    return pskip;
 }
 
 void CBlockIndex::setpskip(CBlockIndex* p){
-    pskip=p;
+//    pskip=p;
     hashSkip=0;
-    if(pskip)
+    if(p)
     {
-        hashSkip=pskip->GetBlockHash();
+        hashSkip=p->GetBlockHash();
     }
 }
 

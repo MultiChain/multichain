@@ -115,7 +115,6 @@ public:
     void setpprev(CBlockIndex* p);
     
     //! pointer to the index of some further predecessor of this block
-    CBlockIndex* pskip;
     uint256 hashSkip;
     
     CBlockIndex* getpskip();
@@ -174,7 +173,6 @@ public:
     {
         phashBlock = NULL;
         pprev = NULL;
-        pskip = NULL;
         nHeight = 0;
         nFile = 0;
         nDataPos = 0;

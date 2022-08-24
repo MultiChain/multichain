@@ -53,6 +53,7 @@ public:
     void flush();
 };
 
+extern CBlockMap mapBlockIndex;
 
 #endif /* MULTICHAIN_BLOCKMAP_H */
 

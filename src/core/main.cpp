@@ -5346,7 +5346,8 @@ CBlockIndex* CBlockIndex::GetAncestor(int height)
             (heightSkip > height && !(heightSkipPrev < heightSkip - 2 &&
                                       heightSkipPrev >= height))) {
             // Only follow pskip if pprev->pskip isn't better than pskip->pprev.
-            pindexWalk = pindexWalk->pskip;
+//            pindexWalk = pindexWalk->pskip;
+            pindexWalk = pindexWalk->getpskip();
             heightWalk = heightSkip;
         } else {
             pindexWalk = pindexWalk->getpprev();
@@ -5818,6 +5819,7 @@ bool static LoadBlockIndexDB(std::string& strError)
     while (it != mapBlockIndex.end()) 
     {
         CBlockIndex* pindex = it->second;
+/*        
         if (pindex->pskip == NULL)
         {
             if(pindex->hashSkip != 0)
@@ -5825,7 +5827,7 @@ bool static LoadBlockIndexDB(std::string& strError)
                 pindex->setpskip(mapBlockIndex[pindex->hashSkip]);
             }
         }
-        
+*/        
         if (pindex->nStatus & BLOCK_HAVE_DATA) {
             if(pindex->nChainTx == 0)
             {
