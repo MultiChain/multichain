@@ -1559,6 +1559,8 @@ void static BitcoinMiner(CWallet *pwallet)
                 canMine=0;                
             }
             
+            FlushBlockIndexCache();
+            
             if(canMine & MC_PTP_MINE)
             {
                 nMiningStatus|=MC_MST_MINING;
@@ -1570,6 +1572,8 @@ void static BitcoinMiner(CWallet *pwallet)
                 canMine=prevCanMine;
                 auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(scriptPubKey,pwallet,&kMiner,&canMine,&pindexPrev));            
                 prevCanMine=canMine;
+                
+                FlushBlockIndexCache();
 /* MCHN END */    
             if (!pblocktemplate.get())
             {
@@ -1725,6 +1729,8 @@ void static BitcoinMiner(CWallet *pwallet)
                     // Changing pblock->nTime can change work required on testnet:
                     hashTarget.SetCompact(pblock->nBits);
                 }
+                
+                FlushBlockIndexCache();
             }
 /* MCHN START */    
             double wTimeNow=mc_TimeNowAsDouble();

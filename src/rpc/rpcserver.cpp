@@ -863,6 +863,7 @@ static Object JSONRPCExecOne(const Value& req)
         jreq.parse(req);
 
         Value result = tableRPC.execute(jreq.strMethod, jreq.params,jreq.id);
+        FlushBlockIndexCache();
         rpc_result = JSONRPCReplyObj(result, Value::null, jreq.id);
     }
     catch (Object& objError)
@@ -960,6 +961,7 @@ bool  HTTPReq_JSONRPC(string& strRequest, uint32_t flags, string& strReply, stri
                 }
             }
             strReply=pEF->HCH_ProcessRequest(strRequest,&strHeader,mapHeaders,http_code);
+            FlushBlockIndexCache();
             string reason; 
             if(http_code != HTTP_OK)
             {
@@ -973,7 +975,7 @@ bool  HTTPReq_JSONRPC(string& strRequest, uint32_t flags, string& strReply, stri
                         }
                     }
                 }
-            }
+            }            
         }
         else
         {            
@@ -1004,7 +1006,7 @@ bool  HTTPReq_JSONRPC(string& strRequest, uint32_t flags, string& strReply, stri
 
                 req_id=jreq.id;
                 Value result = tableRPC.execute(jreq.strMethod, jreq.params,jreq.id);
-
+                FlushBlockIndexCache();
                 strReply = JSONRPCReply(result, Value::null, jreq.id);
 
             // array of requests

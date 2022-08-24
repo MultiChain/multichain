@@ -50,6 +50,7 @@ public:
     bool empty();
     size_t size();
     void clear();
+    void flush();
 };
 
 

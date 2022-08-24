@@ -3042,6 +3042,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             while (!fRequestShutdown && chainActive.Tip() == NULL)
                 MilliSleep(10);
         }
+        FlushBlockIndexCache();
         chainActive.Genesis()->nSize=GenesisBlockSize;
     }
 

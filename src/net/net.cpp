@@ -117,6 +117,8 @@ CCriticalSection cs_nLastNodeId;
 
 static CSemaphore *semOutbound = NULL;
 
+void FlushBlockIndexCache();
+
 // Signals for message handling
 static CNodeSignals g_signals;
 CNodeSignals& GetNodeSignals() { return g_signals; }
@@ -1999,6 +2001,8 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOu
     CNode* pnode = ConnectNode(addrConnect, pszDest);
     boost::this_thread::interruption_point();
 
+    FlushBlockIndexCache();    
+    
     if (!pnode)
     {
 /* MCHN START */    
@@ -2054,7 +2058,7 @@ void ThreadMessageHandler()
                         if(fDebug)LogPrint("net","socket closed because of error in message processing\n");
 /* MCHN END */                    
                         pnode->CloseSocketDisconnect();
-                    }
+                    }                    
                     if (pnode->nSendSize < SendBufferSize())
                     {
                         if (!pnode->vRecvGetData.empty() || (!pnode->vRecvMsg.empty() && pnode->vRecvMsg[0].complete()))
@@ -2066,6 +2070,7 @@ void ThreadMessageHandler()
             }
                 
             pnode->TotalBuffersSize();
+            FlushBlockIndexCache();
             boost::this_thread::interruption_point();
 
 /* MCHN START */
@@ -2087,6 +2092,7 @@ void ThreadMessageHandler()
             {
                 g_signals.SendMessages(pnode, pnode == pnodeTrickle);                
             }
+            FlushBlockIndexCache();                    
             boost::this_thread::interruption_point();
 /* MCHN START */            
         }
@@ -2155,6 +2161,7 @@ void ThreadDataMessageHandler()
                 }
             }
             
+            FlushBlockIndexCache();                    
             boost::this_thread::interruption_point();
 
             if (pnode->fDisconnect)
@@ -2226,6 +2233,7 @@ void ThreadTxDataMessageHandler()
                 }
             }
             
+            FlushBlockIndexCache();                    
             boost::this_thread::interruption_point();
 
             if (pnode->fDisconnect)
@@ -2287,6 +2295,7 @@ void ThreadGetDataMessageHandler()
                 fSleep = false;
             }
         
+            FlushBlockIndexCache();                    
             boost::this_thread::interruption_point();
 
             if (pnode->fDisconnect)

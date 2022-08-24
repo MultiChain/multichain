@@ -81,3 +81,7 @@ void CBlockMap::clear() {
     
     return mapBlockIndex.clear();
 }
+
+void CBlockMap::flush() {
+    
+}

@@ -917,6 +917,11 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
 
 } // anon namespace
 
+void FlushBlockIndexCache()
+{
+    mapBlockIndex.flush();
+}
+
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
     LOCK(cs_main);
     CNodeState *state = State(nodeid);
@@ -6260,6 +6265,7 @@ bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp)
                                 queue.push_back(block.GetHash());
                             }
                         }
+                        FlushBlockIndexCache();
                         range.first++;
                         mapBlocksUnknownParent.erase(it);
                     }
