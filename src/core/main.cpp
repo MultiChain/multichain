@@ -2987,6 +2987,46 @@ enum FlushStateMode {
     FLUSH_STATE_ALWAYS
 };
 
+void SetBlockStatus(uint256 hash,uint32_t status)
+{
+    map<uint256, uint32_t>::iterator it = mapBlockCachedStatus.find(hash);
+    if(it == mapBlockCachedStatus.end())
+    {
+        mapBlockCachedStatus.insert(make_pair(hash, status));
+    }
+    else
+    {
+        it->second |= status;
+    }
+}
+
+void UpdateBlockCacheStatus()
+{
+    mapBlockCachedStatus.clear();
+    BOOST_FOREACH(PAIRTYPE(const uint256, uint256)& item, mapBlocksUnlinked)
+    {
+        SetBlockStatus(item.second,MC_BCS_UNLINKED);
+    }
+    for (set<uint256>::iterator it = setBlockIndexCandidates.begin(); it != setBlockIndexCandidates.end(); ) 
+    {
+        SetBlockStatus(*it,MC_BCS_CANDIDATE);        
+        it++;
+    }
+    for (set<uint256>::iterator it = setChainTips.begin(); it != setChainTips.end(); ) 
+    {
+        SetBlockStatus(*it,MC_BCS_TIP);        
+        it++;
+    }
+    if(hashBestHeader != 0)
+    {
+        SetBlockStatus(hashBestHeader,MC_BCS_BEST_HEADER);        
+    }
+    if(hashBestInvalid != 0)
+    {
+        SetBlockStatus(hashBestInvalid,MC_BCS_BEST_INVALID);            
+    }
+}   
+
 /**
  * Update the on-disk chain state.
  * The caches and indexes are flushed if either they're too large, forceWrite is set, or
@@ -3006,6 +3046,9 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
         // overwrite one. Still, use a conservative safety factor of 2.
         if (!CheckDiskSpace(100 * 2 * 2 * pcoinsTip->GetCacheSize()))
             return state.Error("out of disk space");
+
+        UpdateBlockCacheStatus();
+
         // First make sure all block and undo data is flushed to disk.
         FlushBlockFile();
         // Then update all block file information (which may refer to block and undo files).
@@ -3027,6 +3070,11 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
              }
              setDirtyBlockIndex.erase(it++);
         }
+        
+        if (!pblocktree->WriteBlockCasedStatus(false)) {
+            return state.Abort("Failed to write block cached status");
+        }
+        
         pblocktree->Sync();
         // Finally flush the chainstate (which may refer to block index entries).
         if (!pcoinsTip->Flush())
@@ -4511,8 +4559,14 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
         {
             pindexNew->getpprev()->nStatus |= BLOCK_HAVE_SUCCESSOR;
             setDirtyBlockIndex.insert(block.hashPrevBlock);
+            set<uint256>::iterator itTip = setChainTips.find(block.hashPrevBlock);
+            if (itTip != setChainTips.end()) 
+            {
+                setChainTips.erase(itTip);
+            }            
         }
     }
+    setChainTips.insert(pindexNew->GetBlockHash());
     pindexNew->nChainWork = (pindexNew->getpprev() ? pindexNew->getpprev()->nChainWork : 0) + GetBlockProof(*pindexNew);
     pindexNew->RaiseValidity(BLOCK_VALID_TREE);
     if ( (hashBestHeader == 0) || mapBlockIndex[hashBestHeader]->nChainWork < pindexNew->nChainWork)
@@ -5815,55 +5869,92 @@ bool static LoadBlockIndexDB(std::string& strError)
     }
 */
     int maxblockfile=-1;
-    it = mapBlockIndex.begin();
-    while (it != mapBlockIndex.end()) 
+    
+    if(mapBlockCachedStatus.size())
     {
-        CBlockIndex* pindex = it->second;
-/*        
-        if (pindex->pskip == NULL)
+        BOOST_FOREACH(PAIRTYPE(const uint256, uint32_t)& item, mapBlockCachedStatus)
         {
-            if(pindex->hashSkip != 0)
+            if(item.second & MC_BCS_CANDIDATE)
             {
-                pindex->setpskip(mapBlockIndex[pindex->hashSkip]);
+                setBlockIndexCandidates.insert(item.first);                
             }
-        }
-*/        
-        if (pindex->nStatus & BLOCK_HAVE_DATA) {
-            if(pindex->nChainTx == 0)
+            if(item.second & MC_BCS_BEST_HEADER)
             {
-                mapBlocksUnlinked.insert(std::make_pair(pindex->hashPrev, pindex->GetBlockHash()));                
+                hashBestHeader=item.first;                
             }
-        }
-        
-        if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->getpprev() == NULL))
-            if(!setBlockIndexCandidates.value_comp()(pindex->GetBlockHash(), chainActive.Tip()->GetBlockHash()))
+            if(item.second & MC_BCS_BEST_INVALID)
             {
-                setBlockIndexCandidates.insert(pindex->GetBlockHash());
+                hashBestInvalid=item.first;                  
             }
-        if (pindex->nStatus & BLOCK_FAILED_MASK && ((hashBestInvalid == 0) || pindex->nChainWork > mapBlockIndex[hashBestInvalid]->nChainWork))
-            hashBestInvalid = pindex->GetBlockHash();
-        if (pindex->IsValid(BLOCK_VALID_TREE) && ((hashBestHeader == 0) || CBlockIndexWorkComparator()(hashBestHeader, pindex->GetBlockHash())))
-            hashBestHeader = pindex->GetBlockHash();
-        
-        if( (pindex->nStatus & BLOCK_HAVE_SUCCESSOR) == 0 )
-        {
-            setChainTips.insert(pindex->GetBlockHash());
-        }
-
-        if (pindex->nStatus & BLOCK_HAVE_DATA) 
-        {
-            if(pindex->nFile > maxblockfile)
+            if(item.second & MC_BCS_UNLINKED)
             {
-                maxblockfile = pindex->nFile;
+                mapBlocksUnlinked.insert(std::make_pair(mapBlockIndex[item.first]->hashPrev, item.first));                
             }
-        }
-        
-        mapBlockIndex.next(it);
-//        it++;
+            if(item.second & MC_BCS_TIP)
+            {
+                setChainTips.insert(item.first);                
+            }
+        }        
     }
+    else
+    {
+        it = mapBlockIndex.begin();
+        while (it != mapBlockIndex.end()) 
+        {
+            CBlockIndex* pindex = it->second;
+    /*        
+            if (pindex->pskip == NULL)
+            {
+                if(pindex->hashSkip != 0)
+                {
+                    pindex->setpskip(mapBlockIndex[pindex->hashSkip]);
+                }
+            }
+    */        
+            if (pindex->nStatus & BLOCK_HAVE_DATA) {
+                if(pindex->nChainTx == 0)
+                {
+                    mapBlocksUnlinked.insert(std::make_pair(pindex->hashPrev, pindex->GetBlockHash()));              
+                }
+            }
+
+            if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->getpprev() == NULL))
+                if(!setBlockIndexCandidates.value_comp()(pindex->GetBlockHash(), chainActive.Tip()->GetBlockHash()))
+                {
+                    setBlockIndexCandidates.insert(pindex->GetBlockHash());
+                }
+            if (pindex->nStatus & BLOCK_FAILED_MASK && ((hashBestInvalid == 0) || pindex->nChainWork > mapBlockIndex[hashBestInvalid]->nChainWork))
+            {
+                hashBestInvalid = pindex->GetBlockHash();
+            }
+            if (pindex->IsValid(BLOCK_VALID_TREE) && ((hashBestHeader == 0) || CBlockIndexWorkComparator()(hashBestHeader, pindex->GetBlockHash())))
+            {
+                hashBestHeader = pindex->GetBlockHash();
+            }
+
+            if( (pindex->nStatus & BLOCK_HAVE_SUCCESSOR) == 0 )
+            {
+                setChainTips.insert(pindex->GetBlockHash());
+            }
+    /*
+            if (pindex->nStatus & BLOCK_HAVE_DATA) 
+            {
+                if(pindex->nFile > maxblockfile)
+                {
+                    maxblockfile = pindex->nFile;
+                }
+            }
+    */        
+            mapBlockIndex.next(it);
+    //        it++;
+        }
+    }
+    
+    
     
     // Check presence of blk files
     LogPrintf("Checking all blk files are present...\n");
+    maxblockfile=nLastBlockFile;
     for (int bfi = 0; bfi <= maxblockfile; bfi++)
     {
         CDiskBlockPos pos(bfi, 0);

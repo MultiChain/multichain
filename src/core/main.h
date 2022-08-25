@@ -178,10 +178,11 @@ static const uint64_t nMinDiskSpace = 52428800;
 // Block cached status
 
 #define MC_BCS_NONE                                        0x00000000 
-#define MC_BCS_BLOCK_INDEX_CANDIDATE                       0x00000001
+#define MC_BCS_CANDIDATE                                   0x00000001
 #define MC_BCS_BEST_HEADER                                 0x00000002
 #define MC_BCS_BEST_INVALID                                0x00000004
 #define MC_BCS_UNLINKED                                    0x00000008 
+#define MC_BCS_TIP                                         0x00000010 
 
 
 
