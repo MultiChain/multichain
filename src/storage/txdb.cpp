@@ -282,7 +282,14 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
         {
             return error("LoadBlockIndex() : Couldn't update block cached values");            
         }
-        WriteFlag("blockcachedvalues",true);
+        if(!WriteBlockCasedStatus(false))
+        {
+            return error("LoadBlockIndex() : Couldn't update block cached status");            
+        }
+        if(!WriteFlag("blockcachedvalues",true))
+        {
+            return error("LoadBlockIndex() : Couldn't set blockcachedvalues flag");            
+        }
     }
 
     mapBlockCachedStatus.clear();

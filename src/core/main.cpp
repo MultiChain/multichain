@@ -5726,6 +5726,35 @@ uint256 mc_GetAncestorHash(std::map<uint256,CBlockIndex>& mapTempBlockIndex,uint
     return hashWalk;
 }
 
+void mc_UpdateMapBlockCachedStatus(CBlockIndex* pindex)
+{
+    if (pindex->nStatus & BLOCK_HAVE_DATA) {
+        if(pindex->nChainTx == 0)
+        {
+            mapBlocksUnlinked.insert(std::make_pair(pindex->hashPrev, pindex->GetBlockHash()));              
+        }
+    }
+
+    if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->getpprev() == NULL))
+        if(!setBlockIndexCandidates.value_comp()(pindex->GetBlockHash(), chainActive.Tip()->GetBlockHash()))
+        {
+            setBlockIndexCandidates.insert(pindex->GetBlockHash());
+        }
+    if (pindex->nStatus & BLOCK_FAILED_MASK && ((hashBestInvalid == 0) || pindex->nChainWork > mapBlockIndex[hashBestInvalid]->nChainWork))
+    {
+        hashBestInvalid = pindex->GetBlockHash();
+    }
+    if (pindex->IsValid(BLOCK_VALID_TREE) && ((hashBestHeader == 0) || CBlockIndexWorkComparator()(hashBestHeader, pindex->GetBlockHash())))
+    {
+        hashBestHeader = pindex->GetBlockHash();
+    }
+
+    if( (pindex->nStatus & BLOCK_HAVE_SUCCESSOR) == 0 )
+    {
+        setChainTips.insert(pindex->GetBlockHash());
+    }    
+}
+
 bool mc_UpdateBlockCacheValues(std::map<uint256,CBlockIndex>& mapTempBlockIndex)
 {
     vector<pair<int, uint256> > vSortedByHeight;
@@ -5757,7 +5786,11 @@ bool mc_UpdateBlockCacheValues(std::map<uint256,CBlockIndex>& mapTempBlockIndex)
             mapTempBlockIndex[item.second].hashSkip = mc_GetAncestorHash(mapTempBlockIndex,prevHash,GetSkipHeight(mapTempBlockIndex[item.second].nHeight));
             mapTempBlockIndex[prevHash].nStatus |= BLOCK_HAVE_SUCCESSOR;
         }
+        
+        mc_UpdateMapBlockCachedStatus(&mapTempBlockIndex[item.second]);        
     }
+    
+    UpdateBlockCacheStatus();
     
     return true;
 }
@@ -5898,55 +5931,16 @@ bool static LoadBlockIndexDB(std::string& strError)
     }
     else
     {
+        if(fInMemoryBlockIndex)
+        {
+            LogPrintf("ERROR: Block status values not found\n");                                    
+            return false;        
+        }
         it = mapBlockIndex.begin();
         while (it != mapBlockIndex.end()) 
         {
-            CBlockIndex* pindex = it->second;
-    /*        
-            if (pindex->pskip == NULL)
-            {
-                if(pindex->hashSkip != 0)
-                {
-                    pindex->setpskip(mapBlockIndex[pindex->hashSkip]);
-                }
-            }
-    */        
-            if (pindex->nStatus & BLOCK_HAVE_DATA) {
-                if(pindex->nChainTx == 0)
-                {
-                    mapBlocksUnlinked.insert(std::make_pair(pindex->hashPrev, pindex->GetBlockHash()));              
-                }
-            }
-
-            if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->getpprev() == NULL))
-                if(!setBlockIndexCandidates.value_comp()(pindex->GetBlockHash(), chainActive.Tip()->GetBlockHash()))
-                {
-                    setBlockIndexCandidates.insert(pindex->GetBlockHash());
-                }
-            if (pindex->nStatus & BLOCK_FAILED_MASK && ((hashBestInvalid == 0) || pindex->nChainWork > mapBlockIndex[hashBestInvalid]->nChainWork))
-            {
-                hashBestInvalid = pindex->GetBlockHash();
-            }
-            if (pindex->IsValid(BLOCK_VALID_TREE) && ((hashBestHeader == 0) || CBlockIndexWorkComparator()(hashBestHeader, pindex->GetBlockHash())))
-            {
-                hashBestHeader = pindex->GetBlockHash();
-            }
-
-            if( (pindex->nStatus & BLOCK_HAVE_SUCCESSOR) == 0 )
-            {
-                setChainTips.insert(pindex->GetBlockHash());
-            }
-    /*
-            if (pindex->nStatus & BLOCK_HAVE_DATA) 
-            {
-                if(pindex->nFile > maxblockfile)
-                {
-                    maxblockfile = pindex->nFile;
-                }
-            }
-    */        
+            mc_UpdateMapBlockCachedStatus(it->second);        
             mapBlockIndex.next(it);
-    //        it++;
         }
     }
     
