@@ -2289,6 +2289,7 @@ void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state
     }
     if (!state.CorruptionPossible()) {
         pindex->nStatus |= BLOCK_FAILED_VALID;
+        pindex->fUpdated = true;
         setDirtyBlockIndex.insert(pindex->GetBlockHash());
         setBlockIndexCandidates.erase(pindex->GetBlockHash());
         InvalidChainFound(pindex);
@@ -2935,6 +2936,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         }
 
         pindex->RaiseValidity(BLOCK_VALID_SCRIPTS);
+        pindex->fUpdated = true;
         setDirtyBlockIndex.insert(pindex->GetBlockHash());
     }
 
@@ -3068,6 +3070,7 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
              if (!pblocktree->WriteBlockIndex(CDiskBlockIndex(mapBlockIndex[*it]))) {
                  return state.Abort("Failed to write to block index");
              }
+             mapBlockIndex[*it]->fUpdated = false;
              setDirtyBlockIndex.erase(it++);
         }
         
@@ -3663,6 +3666,7 @@ static CBlockIndex* FindMostWorkChain() {
                     if(!VerifyBlockMiner(NULL,pindexCandidate))
                     {
                         pindexCandidate->nStatus |= BLOCK_FAILED_VALID;
+                        pindexCandidate->fUpdated = true;
                         setDirtyBlockIndex.insert(pindexCandidate->GetBlockHash());
                     }
                 }
@@ -4420,12 +4424,14 @@ bool InvalidateBlock(CValidationState& state, CBlockIndex *pindex) {
 
     // Mark the block itself as invalid.
     pindex->nStatus |= BLOCK_FAILED_VALID;
+    pindex->fUpdated = true;
     setDirtyBlockIndex.insert(pindex->GetBlockHash());
     setBlockIndexCandidates.erase(pindex->GetBlockHash());
 
     while (chainActive.Contains(pindex)) {
         CBlockIndex *pindexWalk = chainActive.Tip();
         pindexWalk->nStatus |= BLOCK_FAILED_CHILD;
+        pindexWalk->fUpdated = true;
         setDirtyBlockIndex.insert(pindexWalk->GetBlockHash());
         setBlockIndexCandidates.erase(pindexWalk->GetBlockHash());
         // ActivateBestChain considers blocks already in chainActive
@@ -4519,6 +4525,7 @@ bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
     while (pindex != NULL) {
         if (pindex->nStatus & BLOCK_FAILED_MASK) {
             pindex->nStatus &= ~BLOCK_FAILED_MASK;
+            pindex->fUpdated = true;
             setDirtyBlockIndex.insert(pindex->GetBlockHash());
         }
         pindex = pindex->getpprev();
@@ -4551,13 +4558,13 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     BlockMap::iterator miPrev = mapBlockIndex.find(block.hashPrevBlock);
     if (miPrev != mapBlockIndex.end())
     {
-//        pindexNew->pprev = (*miPrev).second;
         pindexNew->setpprev((*miPrev).second);
         pindexNew->nHeight = pindexNew->getpprev()->nHeight + 1;
         pindexNew->BuildSkip();
         if( (pindexNew->getpprev()->nStatus & BLOCK_HAVE_SUCCESSOR) == 0 )
         {
             pindexNew->getpprev()->nStatus |= BLOCK_HAVE_SUCCESSOR;
+            pindexNew->getpprev()->fUpdated = true;
             setDirtyBlockIndex.insert(block.hashPrevBlock);
             set<uint256>::iterator itTip = setChainTips.find(block.hashPrevBlock);
             if (itTip != setChainTips.end()) 
@@ -4572,6 +4579,7 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     if ( (hashBestHeader == 0) || mapBlockIndex[hashBestHeader]->nChainWork < pindexNew->nChainWork)
         hashBestHeader = pindexNew->GetBlockHash();
 
+    pindexNew->fUpdated = true;
     setDirtyBlockIndex.insert(pindexNew->GetBlockHash());
 
     return pindexNew;
@@ -4597,62 +4605,9 @@ bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBl
     }
  */ 
     
-/* MCHN START */    
-    UpdateChainMiningStatus(block,pindexNew);
+    UpdateChainMiningStatus(block,pindexNew);    
     
-/*    
-    if(mc_gState->m_NetworkParams->IsProtocolMultichain())
-    {
-        std::vector<unsigned char> vchPubKey=std::vector<unsigned char> (block.vSigner+1, block.vSigner+1+block.vSigner[0]);
-        CPubKey pubKeyOut(vchPubKey);
-        CKeyID keyID=pubKeyOut.GetID();
-        CKey key;
-        pindexNew->nCanMine=mc_gState->m_Permissions->CanMine(NULL,keyID.begin());
-        if(pwalletMain)
-        {
-            if(pwalletMain->GetKey(keyID,key))
-            {
-                pindexNew->nHeightMinedByMe=pindexNew->nHeight;
-                if(pindexNew->pprev)
-                {
-                    pindexNew->nCanMine=pindexNew->pprev->nCanMine;
-                }                
-                else
-                {
-                    pindexNew->nCanMine=MC_PTP_MINE;                    
-                }
-                if(mc_gState->m_Permissions->GetActiveMinerCount()<mc_gState->m_Permissions->m_MinerCount)
-                {
-                    pindexNew->nCanMine=0;
-                } 
-            }
-            else
-            {
-                if(pindexNew->pprev)
-                {
-                    pindexNew->nHeightMinedByMe=pindexNew->pprev->nHeightMinedByMe;
-                    pindexNew->nCanMine=pindexNew->pprev->nCanMine;
-                    if(pindexNew->nHeightMinedByMe+mc_gState->m_Permissions->m_MinerCount-mc_gState->m_Permissions->GetActiveMinerCount() > pindexNew->nHeight)
-                    {
-                        pindexNew->nCanMine=0;
-                    }
-                }
-                else
-                {
-                    pindexNew->nCanMine=0;
-                }
-            }
-        }
-        if(pindexNew->pprev)
-        {
-            if(fDebug)LogPrint("mchn","mchn: New block index: %s, prev: %s, height: %d, mined-by-me: %d, can-mine: %d\n",block.GetHash().ToString().c_str(),
-                    pindexNew->pprev->GetBlockHash().ToString().c_str(),
-                    pindexNew->nHeight,pindexNew->nHeightMinedByMe,pindexNew->nCanMine);
-        }
-    }    
- */ 
-/* MCHN END */    
-    
+    pindexNew->fUpdated = true;
     setDirtyBlockIndex.insert(pindexNew->GetBlockHash());
 
     if (pindexNew->getpprev() == NULL || pindexNew->getpprev()->nChainTx) {
@@ -5291,6 +5246,7 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
     if (!ContextualCheckBlock(block, state, pindex->getpprev())) {
         if (state.IsInvalid() && !state.CorruptionPossible()) {
             pindex->nStatus |= BLOCK_FAILED_VALID;
+            pindex->fUpdated = true;
             setDirtyBlockIndex.insert(pindex->GetBlockHash());
         }
         return false;
@@ -5301,6 +5257,7 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
     if(!VerifyBlockMiner(&block,pindex))
     {
         pindex->nStatus |= BLOCK_FAILED_VALID;
+        pindex->fUpdated = true;
         setDirtyBlockIndex.insert(pindex->GetBlockHash());
         return false;
     }
@@ -5481,24 +5438,6 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
     }
 
     
-/*    
-    if(GetBoolArg("-waitforbetterblock",false))
-    {
-        uint256 hash=pblock->GetHash();
-        BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
-        {            
-            if(item.second->pprev)
-            {
-                if(item.second->pprev->GetBlockHash() == hash)
-                {
-                    activate=false;
-                    if(fDebug)LogPrint("mcblockperf","mchn-block-perf: Found better block than %s (height %d) - %s\n",
-                            hash.ToString().c_str(),item.second->pprev->nHeight,item.second->GetBlockHash().ToString().c_str());
-                }
-            }
-        }
-    }
- */ 
     if(activate)
     {
         {
@@ -5598,7 +5537,7 @@ bool TestBlockValidity(CValidationState &state, const CBlock& block, CBlockIndex
 
     CCoinsViewCache viewNew(pcoinsTip);
     CBlockIndex indexDummy(block);
-//    indexDummy.pprev = pindexPrev;
+
     indexDummy.setpprev(pindexPrev);
     indexDummy.nHeight = pindexPrev->nHeight + 1;
 
@@ -5857,50 +5796,6 @@ bool static LoadBlockIndexDB(std::string& strError)
         return true;
     chainActive.SetTip(it->second);
 
-/* BLMP COB */
-    // Calculate nChainWork
-/*    
-    vector<pair<int, CBlockIndex*> > vSortedByHeight;
-    vSortedByHeight.reserve(mapBlockIndex.size());
-    BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
-    {
-        CBlockIndex* pindex = item.second;
-        vSortedByHeight.push_back(make_pair(pindex->nHeight, pindex));
-    }
-    sort(vSortedByHeight.begin(), vSortedByHeight.end());
-    BOOST_FOREACH(const PAIRTYPE(int, CBlockIndex*)& item, vSortedByHeight)
-    {
-        CBlockIndex* pindex = item.second;
-        pindex->nChainWork = (pindex->getpprev() ? pindex->getpprev()->nChainWork : 0) + GetBlockProof(*pindex);
-        if (pindex->getpprev())
-            pindex->BuildSkip();
-    }
-    BOOST_FOREACH(const PAIRTYPE(int, CBlockIndex*)& item, vSortedByHeight)
-    {
-        CBlockIndex* pindex = item.second;
-        if (pindex->nStatus & BLOCK_HAVE_DATA) {
-            if (pindex->getpprev()) {
-                if (pindex->pprev->nChainTx) {
-                    pindex->nChainTx = pindex->getpprev()->nChainTx + pindex->nTx;
-                } else {
-                    pindex->nChainTx = 0;
-                    mapBlocksUnlinked.insert(std::make_pair(pindex->getpprev()->GetBlockHash(), pindex->GetBlockHash()));
-                }
-            } else {
-                pindex->nChainTx = pindex->nTx;
-            }
-        }
-        if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->getpprev() == NULL))
-            if(!setBlockIndexCandidates.value_comp()(pindex->GetBlockHash(), chainActive.Tip()->GetBlockHash()))
-            {
-                setBlockIndexCandidates.insert(pindex->GetBlockHash());
-            }
-        if (pindex->nStatus & BLOCK_FAILED_MASK && ((hashBestInvalid == 0) || pindex->nChainWork > mapBlockIndex[hashBestInvalid]->nChainWork))
-            hashBestInvalid = pindex->GetBlockHash();
-        if (pindex->IsValid(BLOCK_VALID_TREE) && ((hashBestHeader == 0) || CBlockIndexWorkComparator()(hashBestHeader, pindex->GetBlockHash())))
-            hashBestHeader = pindex->GetBlockHash();
-    }
-*/
     int maxblockfile=-1;
     
     if(mapBlockCachedStatus.size())

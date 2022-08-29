@@ -1332,63 +1332,9 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
         LogPrintf("%s", strErrors.str());
         LogPrintf(" wallet      %15dms\n", GetTimeMillis() - nStart);
 
-/*        
-        RegisterValidationInterface(pwalletMain);
-
-        CBlockIndex *pindexRescan = chainActive.Tip();
-        if (GetBoolArg("-rescan", false))
-            pindexRescan = chainActive.Genesis();
-        else
-        {
-            if( (mc_gState->m_WalletMode & MC_WMD_TXS) == 0 )
-            {            
-                CWalletDB walletdb(strWalletFile);
-                CBlockLocator locator;
-                if (walletdb.ReadBestBlock(locator))
-                    pindexRescan = FindForkInGlobalIndex(chainActive, locator);
-                else
-                    pindexRescan = chainActive.Genesis();
-            }
-        }
- */ 
 /* MCHN START */  
         pwalletTxsMain->BindWallet(pwalletMain);
 /* MCHN END */        
-/*        
-        if (chainActive.Tip() && chainActive.Tip() != pindexRescan)
-        {
-            uiInterface.InitMessage(_("Rescanning..."));
-            LogPrintf("Rescanning last %i blocks (from block %i)...\n", chainActive.Height() - pindexRescan->nHeight, pindexRescan->nHeight);
-            nStart = GetTimeMillis();
-            pwalletMain->ScanForWalletTransactions(pindexRescan, true, false);
-            LogPrintf(" rescan      %15dms\n", GetTimeMillis() - nStart);
-            pwalletMain->SetBestChain(chainActive.GetLocator());
-            nWalletDBUpdated++;
-
-            // Restore wallet transaction metadata after -zapwallettxes=1
-            if (GetBoolArg("-zapwallettxes", false) && GetArg("-zapwallettxes", "1") != "2")
-            {
-                BOOST_FOREACH(const CWalletTx& wtxOld, vWtx)
-                {
-                    uint256 hash = wtxOld.GetHash();
-                    std::map<uint256, CWalletTx>::iterator mi = pwalletMain->mapWallet.find(hash);
-                    if (mi != pwalletMain->mapWallet.end())
-                    {
-                        const CWalletTx* copyFrom = &wtxOld;
-                        CWalletTx* copyTo = &mi->second;
-                        copyTo->mapValue = copyFrom->mapValue;
-                        copyTo->vOrderForm = copyFrom->vOrderForm;
-                        copyTo->nTimeReceived = copyFrom->nTimeReceived;
-                        copyTo->nTimeSmart = copyFrom->nTimeSmart;
-                        copyTo->fFromMe = copyFrom->fFromMe;
-                        copyTo->strFromAccount = copyFrom->strFromAccount;
-                        copyTo->nOrderPos = copyFrom->nOrderPos;
-                        copyTo->WriteToDisk();
-                    }
-                }
-            }
-        }
- */ 
 /* MCHN START */  
         pwalletMain->lpWalletTxs=pwalletTxsMain;
         pwalletMain->InitializeUnspentList();
@@ -1417,7 +1363,6 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
 
     //// debug print
     LogPrintf("mapBlockIndex.size() = %u\n",   mapBlockIndex.size());
-    LogPrintf("nBestHeight = %d\n",                   chainActive.Height());
 #ifdef ENABLE_WALLET
     LogPrintf("setKeyPool.size() = %u\n",      pwalletMain ? pwalletMain->setKeyPool.size() : 0);
     if(mc_gState->m_WalletMode & MC_WMD_TXS)

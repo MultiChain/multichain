@@ -108,7 +108,6 @@ public:
     const uint256* phashBlock;
 
     //! pointer to the index of the predecessor of this block
-    CBlockIndex* pprev;
     uint256 hashPrev;
     
     CBlockIndex* getpprev();
@@ -166,13 +165,13 @@ public:
     bool fPassedMinerPrecheck;
     int32_t nFirstSuccessor;
     bool fUpdated;
+    int64_t nLastUsed;
     
 /* MCHN END */
     
     void SetNull()
     {
         phashBlock = NULL;
-        pprev = NULL;
         nHeight = 0;
         nFile = 0;
         nDataPos = 0;
@@ -200,6 +199,7 @@ public:
         nFirstSuccessor=0;
         nSize=0;
         fUpdated=false;
+        nLastUsed=0;
 /* MCHN END */
     }
 

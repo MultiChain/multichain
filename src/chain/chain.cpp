@@ -204,15 +204,14 @@ CBlockIndex *CChain::FindFork(CBlockIndex *pindexIn) {
 }
 
 CBlockIndex* CBlockIndex::getpprev() {
-    return pprev;
+    return mapBlockIndex[hashPrev];
 }
 
 void CBlockIndex::setpprev(CBlockIndex* p){
-    pprev=p;
     hashPrev=0;
-    if(pprev)
+    if(p)
     {
-        hashPrev=pprev->GetBlockHash();
+        hashPrev=p->GetBlockHash();
     }
 }
 
