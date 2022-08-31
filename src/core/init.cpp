@@ -850,7 +850,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     fLogIPs = GetBoolArg("-logips", false);
 /* MCHN START */    
     fLogTimeMillis = GetBoolArg("-logtimemillis", false);
-    fInMemoryBlockIndex = GetBoolArg("-inmemoryblockindex", true);
+    fInMemoryBlockIndex = GetBoolArg("-inmemoryblockindex", false);
     nBlockIndexCacheSize = GetArg("-blockindexcachesize",DEFAULT_MAX_BLOCK_INDEX_CACHE_SIZE);
 /* MCHN END */    
 

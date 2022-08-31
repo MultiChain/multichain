@@ -11,14 +11,15 @@ using namespace std;
 
 CBlockIndex *CChainPtrStorage::getptr(int nHeight)
 {
-    if (nHeight < 0 || nHeight >= (int)vChain.size())
+    if (nHeight < 0 || nHeight >= getsize())
         return NULL;
-    return vChain[nHeight];
+    
+    return mapBlockIndex[cHashChain.gethash(nHeight)];
 }
 
 void CChainPtrStorage::setptr(int nHeight, CBlockIndex * ptr)
 {
-    if (nHeight < 0 || nHeight >= (int)vChain.size())
+    if (nHeight < 0 || nHeight >= getsize())
         return;
     
     if(ptr)
@@ -29,29 +30,16 @@ void CChainPtrStorage::setptr(int nHeight, CBlockIndex * ptr)
     {
         cHashChain.sethash(nHeight,0);
     }
-    
-    vChain[nHeight] = ptr;
 }
 
 int CChainPtrStorage::getsize() const
 {
-    return (int)vChain.size();
+    return cHashChain.getsize();
 }
 
 void CChainPtrStorage::setsize(int nHeight)
 {
     cHashChain.setsize(nHeight);
-    
-    if (nHeight < 0)
-        return;
-    
-    if(nHeight == 0)
-    {        
-        vChain.clear();
-        return;
-    }
-    
-    vChain.resize(nHeight);
 }
 
 uint256 CChainPtrStorage::gethash(int nHeight)

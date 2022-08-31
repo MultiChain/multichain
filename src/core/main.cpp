@@ -158,6 +158,49 @@ const string strMessageMagic = "MultiChain Signed Message:\n";
 // Internal stuff
 namespace {
 
+    bool mc_CompareBlockIndexes(CBlockIndex *pa,CBlockIndex *pb,uint256 ha, uint256 hb) {
+
+        // First sort by most total work, ...
+        if (pa->nChainWork > pb->nChainWork) return false;
+        if (pa->nChainWork < pb->nChainWork) return true;
+
+
+/* MCHN START */
+        // Prefer chains we mined long time ago 
+        if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+        {
+            if((pa->nCanMine > 0) && (pb->nCanMine == 0)) return false;
+            if((pa->nCanMine == 0) && (pb->nCanMine > 0)) return true;
+            if((pa->nCanMine == 0) && (pb->nCanMine == 0))
+            {
+                if (pa->nHeightMinedByMe < pb->nHeightMinedByMe) return false;
+                if (pa->nHeightMinedByMe > pb->nHeightMinedByMe) return true;
+            }
+        }
+/* MCHN END */
+
+        // ... then by earliest time received, ...
+        if(pa->nFile < pb->nFile) return false;
+        if(pa->nFile > pb->nFile) return true;
+
+        if(pa->nDataPos < pb->nDataPos) return false;
+        if(pa->nDataPos > pb->nDataPos) return true;
+
+//            if (pa->nSequenceId < pb->nSequenceId) return false;
+//            if (pa->nSequenceId > pb->nSequenceId) return true;
+
+        // Use pointer address as tie breaker (should only happen with blocks
+        // loaded from disk, as those all have id 0).
+
+        if (ha < hb) return false;
+        if (ha > hb) return true;
+//            if (pa < pb) return false;
+//            if (pa > pb) return true;
+
+        // Identical blocks.
+        return false;
+    }
+        
     struct CBlockIndexWorkComparator
     {
         bool operator()(uint256 ha, uint256 hb) {
@@ -165,45 +208,8 @@ namespace {
             CBlockIndex *pa=mapBlockIndex[ha];
             CBlockIndex *pb=mapBlockIndex[hb];
             
-            // First sort by most total work, ...
-            if (pa->nChainWork > pb->nChainWork) return false;
-            if (pa->nChainWork < pb->nChainWork) return true;
+            return mc_CompareBlockIndexes(pa,pb,ha,hb);
             
-            
-/* MCHN START */
-            // Prefer chains we mined long time ago 
-            if(mc_gState->m_NetworkParams->IsProtocolMultichain())
-            {
-                if((pa->nCanMine > 0) && (pb->nCanMine == 0)) return false;
-                if((pa->nCanMine == 0) && (pb->nCanMine > 0)) return true;
-                if((pa->nCanMine == 0) && (pb->nCanMine == 0))
-                {
-                    if (pa->nHeightMinedByMe < pb->nHeightMinedByMe) return false;
-                    if (pa->nHeightMinedByMe > pb->nHeightMinedByMe) return true;
-                }
-            }
-/* MCHN END */
-            
-            // ... then by earliest time received, ...
-            if(pa->nFile < pb->nFile) return false;
-            if(pa->nFile > pb->nFile) return true;
-            
-            if(pa->nDataPos < pb->nDataPos) return false;
-            if(pa->nDataPos > pb->nDataPos) return true;
-            
-//            if (pa->nSequenceId < pb->nSequenceId) return false;
-//            if (pa->nSequenceId > pb->nSequenceId) return true;
-
-            // Use pointer address as tie breaker (should only happen with blocks
-            // loaded from disk, as those all have id 0).
-            
-            if (ha < hb) return false;
-            if (ha > hb) return true;
-//            if (pa < pb) return false;
-//            if (pa > pb) return true;
-
-            // Identical blocks.
-            return false;
         }
     };
 
@@ -3037,6 +3043,7 @@ void UpdateBlockCacheStatus()
 bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
     LOCK(cs_main);
     static int64_t nLastWrite = 0;
+    LogPrint("mcblin","Block Index: FlushStateToDisk In\n");
     try {
     if ((mode == FLUSH_STATE_ALWAYS) ||
         ((mode == FLUSH_STATE_PERIODIC || mode == FLUSH_STATE_IF_NEEDED) && pcoinsTip->GetCacheSize() > nCoinCacheSize) ||
@@ -3066,6 +3073,7 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
             return state.Abort("Failed to write to block index");
         }
         for (set<uint256>::iterator it = setDirtyBlockIndex.begin(); it != setDirtyBlockIndex.end(); ) {
+             LogPrint("mcblin","Block Index: Save      : %s\n",mapBlockIndex[*it]->ToString().c_str());
              mapBlockIndex[*it]->nStatus |= BLOCK_HAVE_CHAIN_CACHE;
              if (!pblocktree->WriteBlockIndex(CDiskBlockIndex(mapBlockIndex[*it]))) {
                  return state.Abort("Failed to write to block index");
@@ -3087,6 +3095,7 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
             g_signals.SetBestChain(chainActive.GetLocator());
         }
         nLastWrite = GetTimeMicros();
+        LogPrint("mcblin","Block Index: FlushStateToDisk Out\n");        
     }
     } catch (const std::runtime_error& e) {
         return state.Abort(std::string("System error while flushing: ") + e.what());
@@ -5713,6 +5722,7 @@ bool mc_UpdateBlockCacheValues(std::map<uint256,CBlockIndex>& mapTempBlockIndex)
                 if (mapTempBlockIndex[prevHash].nChainTx) {
                     mapTempBlockIndex[item.second].nChainTx = mapTempBlockIndex[prevHash].nChainTx + mapTempBlockIndex[item.second].nTx;
                 } else {
+                    mapBlocksUnlinked.insert(std::make_pair(prevHash, item.second));         
                     mapTempBlockIndex[item.second].nChainTx = 0;
                 }
             } else {
@@ -5725,8 +5735,33 @@ bool mc_UpdateBlockCacheValues(std::map<uint256,CBlockIndex>& mapTempBlockIndex)
             mapTempBlockIndex[item.second].hashSkip = mc_GetAncestorHash(mapTempBlockIndex,prevHash,GetSkipHeight(mapTempBlockIndex[item.second].nHeight));
             mapTempBlockIndex[prevHash].nStatus |= BLOCK_HAVE_SUCCESSOR;
         }
+    }
+    
+    BOOST_FOREACH(const PAIRTYPE(int, uint256)& item, vSortedByHeight)
+    {
+        CBlockIndex *pindex=&mapTempBlockIndex[item.second];
+        uint256 tipHash=pcoinsTip->GetBestBlock();
         
-        mc_UpdateMapBlockCachedStatus(&mapTempBlockIndex[item.second]);        
+        if (pindex->nStatus & BLOCK_FAILED_MASK && ((hashBestInvalid == 0) || pindex->nChainWork > mapTempBlockIndex[hashBestInvalid].nChainWork))
+        {
+            hashBestInvalid = item.second;
+        }
+        
+        if (pindex->IsValid(BLOCK_VALID_TREE) && ((hashBestHeader == 0) || mc_CompareBlockIndexes(&mapTempBlockIndex[hashBestHeader],pindex,hashBestHeader, item.second)))
+        {
+            hashBestHeader = item.second;
+        }
+        
+        if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->hashPrev == 0))
+            if(!mc_CompareBlockIndexes(pindex, &mapTempBlockIndex[tipHash],item.second, tipHash))
+            {
+                setBlockIndexCandidates.insert(item.second);
+            }
+        
+        if( (pindex->nStatus & BLOCK_HAVE_SUCCESSOR) == 0 )
+        {
+            setChainTips.insert(item.second);
+        }            
     }
     
     UpdateBlockCacheStatus();
@@ -5826,7 +5861,7 @@ bool static LoadBlockIndexDB(std::string& strError)
     }
     else
     {
-        if(fInMemoryBlockIndex)
+        if(!fInMemoryBlockIndex)
         {
             LogPrintf("ERROR: Block status values not found\n");                                    
             return false;        

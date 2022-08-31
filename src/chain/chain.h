@@ -348,6 +348,10 @@ public:
         hashPrev = (getpprev() ? getpprev()->GetBlockHash() : 0);
     }
 
+    explicit CDiskBlockIndex(CBlockIndex* pindex, uint256 prev) : CBlockIndex(*pindex) {
+        hashPrev = prev;
+    }
+    
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
@@ -425,7 +429,7 @@ public:
 class CChainPtrStorage{
 
 private:     
-    std::vector<CBlockIndex *> vChain;
+//    std::vector<CBlockIndex *> vChain;
     CChainHashStorage cHashChain;
 
 public:    
