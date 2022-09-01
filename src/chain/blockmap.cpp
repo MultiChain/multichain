@@ -111,7 +111,7 @@ bool CBlockMap::load(uint256 hash)
         return true;
     }
     
-    LogPrint("mcblin","Block Index: Loading   : %s\n",hash.ToString().c_str());
+//    LogPrint("mcblin","Block Index: Loading   : %s\n",hash.ToString().c_str());
     CBlockIndex *pindex=pblocktree->ReadBlockIndex(hash);
     
     if(pindex == NULL)
@@ -153,7 +153,7 @@ bool CBlockMap::unload(uint256 hash)
             LogPrint("mcblin","Block Index: Unloading : %8d (%s)\n",mi->second->nHeight,mi->first.ToString().c_str());
             delete mi->second;
             m_MapBlockIndex.erase(mi);
-            LogPrint("mcblin","Block Index: Unloaded  : %s\n",hash.ToString().c_str());
+//            LogPrint("mcblin","Block Index: Unloaded  : %s\n",hash.ToString().c_str());
         }
 
         return true;

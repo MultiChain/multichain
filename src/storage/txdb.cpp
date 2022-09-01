@@ -355,7 +355,7 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
     }
     else
     {
-        mapBlockIndex.init(MC_BMM_LIMITED_SIZE,GetArg("-maxblockindexsize",4));
+        mapBlockIndex.init(MC_BMM_LIMITED_SIZE,GetArg("-maxblockindexsize",0));
     }
     
     return true;

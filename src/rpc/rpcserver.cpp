@@ -863,7 +863,6 @@ static Object JSONRPCExecOne(const Value& req)
         jreq.parse(req);
 
         Value result = tableRPC.execute(jreq.strMethod, jreq.params,jreq.id);
-        FlushBlockIndexCache();
         rpc_result = JSONRPCReplyObj(result, Value::null, jreq.id);
     }
     catch (Object& objError)
@@ -884,6 +883,7 @@ static Object JSONRPCExecOne(const Value& req)
                                      JSONRPCError(RPC_PARSE_ERROR, e.what()), jreq.id);
     }
 
+    FlushBlockIndexCache();
     return rpc_result;
 }
 
@@ -1029,6 +1029,7 @@ bool  HTTPReq_JSONRPC(string& strRequest, uint32_t flags, string& strReply, stri
         if(fDebug)LogPrint("mcapi","mcapi: API request failure: %s, code: %d\n",JSONRPCMethodIDForLog(jreq.strMethod,jreq.id).c_str(),find_value(objError, "code").get_int());
         
         valError=objError;
+        FlushBlockIndexCache();
         return false;
     }
     catch (std::exception& e)
@@ -1037,6 +1038,7 @@ bool  HTTPReq_JSONRPC(string& strRequest, uint32_t flags, string& strReply, stri
         CheckFlagsOnException(jreq.strMethod,jreq.id,e.what());
         if(fDebug)LogPrint("mcapi","mcapi: API request failure D: %s\n",JSONRPCMethodIDForLog(jreq.strMethod,jreq.id).c_str());        
         valError=JSONRPCError(RPC_PARSE_ERROR, e.what());
+        FlushBlockIndexCache();
         return false;
     }
     

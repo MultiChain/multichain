@@ -1558,9 +1558,7 @@ void static BitcoinMiner(CWallet *pwallet)
                 nMiningStatus|=MC_MST_REINDEX;
                 canMine=0;                
             }
-            
-            FlushBlockIndexCache();
-            
+                        
             if(canMine & MC_PTP_MINE)
             {
                 nMiningStatus|=MC_MST_MINING;
@@ -1573,7 +1571,6 @@ void static BitcoinMiner(CWallet *pwallet)
                 auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(scriptPubKey,pwallet,&kMiner,&canMine,&pindexPrev));            
                 prevCanMine=canMine;
                 
-                FlushBlockIndexCache();
 /* MCHN END */    
             if (!pblocktemplate.get())
             {
@@ -1597,6 +1594,9 @@ void static BitcoinMiner(CWallet *pwallet)
 
             double wStartTime=mc_TimeNowAsDouble();
             uint64_t wThisCount=0;
+            
+            uint256 prev_hash=pindexPrev->GetBlockHash();
+            
             while (true) {
                 
                 if(EmptyBlockToMine)
@@ -1653,6 +1653,7 @@ void static BitcoinMiner(CWallet *pwallet)
                             {
                                 LogPrint("mcminer","mchn-miner: Block successfully processed\n");
                             }
+                            FlushBlockIndexCache();
                         }
 /* MCHN END */                        
                         
@@ -1713,12 +1714,12 @@ void static BitcoinMiner(CWallet *pwallet)
                     break;
                 if (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 60)
                     break;
-                if (pindexPrev != chainActive.Tip())
+                if (prev_hash != chainActive.Tip()->GetBlockHash())
                     break;
 
                 // Update nTime every few seconds
                 
-                if(UpdateTime(pblock, pindexPrev))
+                if(UpdateTime(pblock, chainActive.Tip()))
                 {
 /* MCHN START */                    
                     CreateBlockSignature(pblock,BLOCKSIGHASH_NO_SIGNATURE_AND_NONCE,pwallet,NULL);
@@ -1752,6 +1753,8 @@ void static BitcoinMiner(CWallet *pwallet)
                 }
             }
             nLastStatus=nMiningStatus;
+            FlushBlockIndexCache();
+            
 /* MCHN END */    
         }
     }

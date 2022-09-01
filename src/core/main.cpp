@@ -3073,7 +3073,7 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
             return state.Abort("Failed to write to block index");
         }
         for (set<uint256>::iterator it = setDirtyBlockIndex.begin(); it != setDirtyBlockIndex.end(); ) {
-             LogPrint("mcblin","Block Index: Save      : %s\n",mapBlockIndex[*it]->ToString().c_str());
+             LogPrint("mcblin","Block Index: Save      : %8d (%s)\n",mapBlockIndex[*it]->nHeight,it->ToString().c_str());
              mapBlockIndex[*it]->nStatus |= BLOCK_HAVE_CHAIN_CACHE;
              if (!pblocktree->WriteBlockIndex(CDiskBlockIndex(mapBlockIndex[*it]))) {
                  return state.Abort("Failed to write to block index");

@@ -137,7 +137,7 @@ void CChain::SetTip(CBlockIndex *pindex) {
         mc_gState->ChainUnLock();
         return;
     }
-    
+/* BLMP Full scan on initialization if hashes not stored, if flush here make sure pindex is not required in caller */    
     cPtrChain.setsize(pindex->nHeight + 1);
     while (pindex && cPtrChain.gethash(pindex->nHeight) != pindex->GetBlockHash()) {
         cPtrChain.setptr(pindex->nHeight,pindex);

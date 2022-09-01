@@ -1496,6 +1496,11 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
     int64_t nNow = GetTime();
 
     CBlockIndex* pindex = pindexStart;
+    int start_height=0;
+    if(pindexStart)
+    {
+        start_height=pindexStart->nHeight;
+    }
     {
         LOCK2(cs_main, cs_wallet);
 
@@ -1517,10 +1522,18 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
     
         if(imp)
         {
+
+            if(pindex->nHeight <= imp->m_Block + 1)
+            {
+                pindex=chainActive[imp->m_Block + 1];
+            }
+
+/*            
             while(pindex && (pindex->nHeight <= imp->m_Block))
             {
                 pindex = chainActive.Next(pindex);            
             }
+*/ 
         }        
 
         ShowProgress(_("Rescanning..."), 0); // show rescan progress in GUI as dialog or on splashscreen, if -rescan on startup
@@ -1601,7 +1614,16 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
                     printf("%d of %d blocks rescanned\n",pindex->nHeight,chainActive.Height());
                 }
             }
+            
             pindex = chainActive.Next(pindex);
+            
+            if(pindex)
+            {
+                int height=pindex->nHeight;
+                FlushBlockIndexCache();
+                pindex=chainActive[height];
+            }
+            
             if (GetTime() >= nNow + 60) {
                 nNow = GetTime();
                 LogPrintf("Still rescanning. At block %d. Progress=%f\n", pindex->nHeight, Checkpoints::GuessVerificationProgress(pindex));
@@ -1636,7 +1658,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
                 pwalletTxsMain->WRPWriteLock();
                 if(fDebug)LogPrint("mcwrp","mcwrp: Synchronization for import started\n");
 
-                err=pwalletTxsMain->CompleteImport(imp,((pindexStart->nHeight > 0) && !fOnlySubscriptions) ? MC_EFL_NOT_IN_SYNC_AFTER_IMPORT : 0);
+                err=pwalletTxsMain->CompleteImport(imp,((start_height > 0) && !fOnlySubscriptions) ? MC_EFL_NOT_IN_SYNC_AFTER_IMPORT : 0);
 
                 
                 pwalletTxsMain->WRPSync(1);
