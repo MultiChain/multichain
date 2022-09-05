@@ -3071,7 +3071,7 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
         }
         if (fileschanged && !pblocktree->WriteLastBlockFile(nLastBlockFile)) {
             return state.Abort("Failed to write to block index");
-        }
+        }                
         for (set<uint256>::iterator it = setDirtyBlockIndex.begin(); it != setDirtyBlockIndex.end(); ) {
              LogPrint("mcblin","Block Index: Save      : %8d (%s)\n",mapBlockIndex[*it]->nHeight,it->ToString().c_str());
              mapBlockIndex[*it]->nStatus |= BLOCK_HAVE_CHAIN_CACHE;
@@ -3082,7 +3082,12 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
              setDirtyBlockIndex.erase(it++);
         }
         
-        if (!pblocktree->WriteBlockCasedStatus(false)) {
+        if(!chainActive.Flush())
+        {
+            return state.Abort("Failed to write active chain");            
+        }
+        
+        if (!pblocktree->WriteBlockCachedStatus(false)) {
             return state.Abort("Failed to write block cached status");
         }
         

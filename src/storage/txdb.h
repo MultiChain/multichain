@@ -63,7 +63,9 @@ public:
     bool ReadFlag(const std::string &name, bool &fValue);
     bool UpdateBlockCacheValues();
     bool LoadBlockIndexGuts();
-    bool WriteBlockCasedStatus(bool erase);
+    bool WriteBlockCachedStatus(bool erase);
+    bool ReadChainActiveHash(int height, uint256& hash);
+    bool WriteChainActiveHash(int height, uint256 hash);
 };
 
 #endif // BITCOIN_TXDB_H

@@ -414,39 +414,47 @@ public:
     }
 };
 
-class CChainHashStorage{
+class CChainStorage{
 
 private:     
     std::vector<uint256> vChain;
-
+    
+    int nSize;
+    int nCacheSize;
+    std::map<int,int> mapLoaded;
+    std::vector<uint256> vHash;
+    std::vector<int64_t> vLastUsed;
+    std::vector<int> vHeight;
+    void *m_Semaphore;           
+    std::map<int,uint256> mapModified;
+    
+    uint32_t m_Mode;
+    bool fInMemory;
+    
 public:    
-    uint256 gethash(int nHeight);
-    void sethash(int nHeight, uint256 hash);
-    int getsize() const;
-    void setsize(int nHeight);
-};
-
-class CChainPtrStorage{
-
-private:     
-//    std::vector<CBlockIndex *> vChain;
-    CChainHashStorage cHashChain;
-
-public:    
+    
+    void zero();
+    int init(uint32_t mode,int maxsize);
+    void destroy();
+    void lock();
+    void unlock();
+    int load(int nHeight);
     
     CBlockIndex * getptr(int nHeight);
     void setptr(int nHeight, CBlockIndex * ptr);
-    int getsize() const;
-    void setsize(int nHeight);
     uint256 gethash(int nHeight);
+    void sethash(int nHeight, uint256 hash);
+    int getsize() const;
+    void setsize(int size);
     
+    bool flush();
 };
 
 /** An in-memory indexed chain of blocks. */
 class CChain {
 private:
     
-    CChainPtrStorage cPtrChain;
+    CChainStorage cChain;
     
 public:
     /** Returns the index entry for the genesis block of this chain, or NULL if none. */
@@ -485,6 +493,11 @@ public:
 
     /** Find the last common block between this chain and a block index entry. */
     CBlockIndex *FindFork(CBlockIndex *pindex);
+    
+    bool Flush(); 
+    
+    int InitStorage(uint32_t mode,int maxsize);
+
 };
 
 /* Piece of chain */

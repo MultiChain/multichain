@@ -188,6 +188,21 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue) {
     return true;
 }
 
+bool CBlockTreeDB::ReadChainActiveHash(int height, uint256& hash)
+{
+    return Read(std::make_pair('a', height), hash);
+}
+
+bool CBlockTreeDB::WriteChainActiveHash(int height, uint256 hash)
+{
+    if(hash == 0)
+    {
+        return Erase(std::make_pair('a', height));            
+    }
+    
+    return Write(std::make_pair('a', height), hash);
+}
+
 void DiskBlockIndexToCBlockIndex(CBlockIndex* pindexNew,CDiskBlockIndex &diskindex)
 {
     pindexNew->nHeight        = diskindex.nHeight;
@@ -299,7 +314,7 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
         {
             return error("LoadBlockIndex() : Couldn't update block cached values");            
         }
-        if(!WriteBlockCasedStatus(false))
+        if(!WriteBlockCachedStatus(false))
         {
             return error("LoadBlockIndex() : Couldn't update block cached status");            
         }
@@ -356,12 +371,13 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
     else
     {
         mapBlockIndex.init(MC_BMM_LIMITED_SIZE,GetArg("-maxblockindexsize",0));
+        chainActive.InitStorage(MC_BMM_LIMITED_SIZE,GetArg("-chaincachesize",1));
     }
     
     return true;
 }
 
-bool CBlockTreeDB::WriteBlockCasedStatus(bool erase)
+bool CBlockTreeDB::WriteBlockCachedStatus(bool erase)
 {
     if (!erase)
         return Write('I', mapBlockCachedStatus);
