@@ -15,6 +15,7 @@
 
 using namespace std;
 
+void mc_InitCachedBlockIndex();
 bool mc_UpdateBlockCacheValues(std::map<uint256,CBlockIndex>& mapTempBlockIndex);
 
 void static BatchWriteCoins(CLevelDBBatch &batch, const uint256 &hash, const CCoins &coins) {
@@ -368,11 +369,8 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
             }
         }
     }
-    else
-    {
-        mapBlockIndex.init(MC_BMM_LIMITED_SIZE,GetArg("-maxblockindexsize",0));
-        chainActive.InitStorage(MC_BMM_LIMITED_SIZE,GetArg("-chaincachesize",1));
-    }
+    
+    mc_InitCachedBlockIndex();
     
     return true;
 }

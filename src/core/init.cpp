@@ -45,6 +45,7 @@ std::string BurnAddress(const std::vector<unsigned char>& vchVersion);
 std::string SetBannedTxs(std::string txlist);
 std::string SetLockedBlock(std::string hash);
 bool RecoverAfterCrash();
+void mc_InitCachedBlockIndex();
 
 /* MCHN END */
 
@@ -3034,6 +3035,12 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         BOOST_FOREACH(string strFile, mapMultiArgs["-loadblock"])
             vImportFiles.push_back(strFile);
     }
+    
+    if(fReindex)
+    {
+        mc_InitCachedBlockIndex();
+    }
+    
     if(!GetBoolArg("-offline",false))
     {    
         threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));

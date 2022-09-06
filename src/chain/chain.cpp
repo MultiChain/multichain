@@ -109,7 +109,7 @@ int CChainStorage::load(int nHeight)
         return min_index;
     }
     
-    uint256 hash;
+    uint256 hash=0;
     
     if(!pblocktree->ReadChainActiveHash(nHeight,hash))
     {

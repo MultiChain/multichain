@@ -433,6 +433,17 @@ private:
     
 public:    
     
+    CChainStorage()
+    {
+        zero();
+    }
+    
+    ~CChainStorage()
+    {
+        destroy();
+    }
+    
+    
     void zero();
     int init(uint32_t mode,int maxsize);
     void destroy();

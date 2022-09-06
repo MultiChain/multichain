@@ -5708,6 +5708,15 @@ void mc_UpdateMapBlockCachedStatus(CBlockIndex* pindex)
     }    
 }
 
+void mc_InitCachedBlockIndex()
+{
+    if(!fInMemoryBlockIndex)
+    {
+        mapBlockIndex.init(MC_BMM_LIMITED_SIZE,GetArg("-maxblockindexsize",0));
+        chainActive.InitStorage(MC_BMM_LIMITED_SIZE,GetArg("-chaincachesize",1));
+    }    
+}
+
 bool mc_UpdateBlockCacheValues(std::map<uint256,CBlockIndex>& mapTempBlockIndex)
 {
     vector<pair<int, uint256> > vSortedByHeight;
