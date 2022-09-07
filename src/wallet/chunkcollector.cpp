@@ -351,7 +351,10 @@ int mc_ChunkCollector::SeekDB(void *dbrow)
         return MC_ERR_NOT_SUPPORTED;
     }
     
-    memcpy((unsigned char*)&m_DBRow+m_KeyDBOffset,(unsigned char*)dbrow,m_KeyDBSize);
+    if(dbrow != (unsigned char*)&m_DBRow+m_KeyDBOffset)
+    {
+        memcpy((unsigned char*)&m_DBRow+m_KeyDBOffset,(unsigned char*)dbrow,m_KeyDBSize);
+    }
     memcpy((unsigned char*)&m_DBRow+m_ValueDBOffset,ptr,m_ValueDBSize);
     memcpy(&m_LastDBRow,&m_DBRow,m_TotalDBSize);
     

@@ -2972,7 +2972,7 @@ int mc_TSScriptHeap::Destroy()
             delete m_lppScriptBuffers[j];
         }
 
-        delete m_lppScriptBuffers;      
+        delete [] m_lppScriptBuffers;      
     }
     
     if(m_Semaphore)

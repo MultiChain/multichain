@@ -181,6 +181,10 @@ void mc_TxImport::Destroy()
     {
         delete m_TmpEntities;
     }
+    if(m_TmpGlobalSubKeyEntities)
+    {
+        delete m_TmpGlobalSubKeyEntities;        
+    }
     
     Zero();
 }

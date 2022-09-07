@@ -475,7 +475,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "\n" + _("Debugging/Testing options:") + "\n";
     if (GetBoolArg("-help-debug", false))
     {
-        strUsage += "  -checkpoints=0|1       " + strprintf(_("Only accept block chain matching built-in checkpoints (default: %u)"), 1) + "\n";
+//        strUsage += "  -checkpoints=0|1       " + strprintf(_("Only accept block chain matching built-in checkpoints (default: %u)"), 1) + "\n";
         strUsage += "  -dblogsize=<n>         " + strprintf(_("Flush database activity from memory pool to disk log every <n> megabytes (default: %u)"), 100) + "\n";
         strUsage += "  -disablesafemode       " + strprintf(_("Disable safemode, override a real safe mode event (default: %u)"), 0) + "\n";
         strUsage += "  -testsafemode          " + strprintf(_("Force safe mode (default: %u)"), 0) + "\n";
@@ -3049,7 +3049,6 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
             while (!fRequestShutdown && chainActive.Tip() == NULL)
                 MilliSleep(10);
         }
-        FlushBlockIndexCache();
         chainActive.Genesis()->nSize=GenesisBlockSize;
     }
 
@@ -3083,6 +3082,8 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     LogPrintf("mapAddressBook.size() = %u\n",  pwalletMain ? pwalletMain->mapAddressBook.size() : 0);
 #endif
 
+    FlushBlockIndexCache();
+    
     if (pwalletMain)
         bitdbwrap.Flush(false);
     
@@ -3172,6 +3173,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         bytes_written=write(OutputPipe,bufOutput,strlen(bufOutput));
     }
     mc_InitRPCHelpMap();
+    FlushBlockIndexCache();
 
     LogPrintf("Node started\n");    
 /* MCHN END */    
