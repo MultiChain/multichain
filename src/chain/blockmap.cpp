@@ -123,7 +123,7 @@ bool CBlockMap::load(uint256 hash)
     pindex->nLastUsed=time_now;
     m_ChangeCount++;
     
-    BlockMap::iterator mi = m_MapBlockIndex.insert(make_pair(hash, pindex)).first;
+    m_MapBlockIndex.insert(make_pair(hash, pindex));
 //    pindex->phashBlock = &((*mi).first);
     pindex->hashBlock=hash;
     
@@ -168,6 +168,7 @@ bool CBlockMap::unload(uint256 hash)
 
 void CBlockMap::defragment()
 {
+    return;    
     if(m_ChangeCount < 1000)
     {
         return;
@@ -242,25 +243,37 @@ size_t CBlockMap::count(uint256 hash) {
     return result;
 }
 
-BlockMap::iterator CBlockMap::find(uint256 hash) {
+CBlockIndex* CBlockMap::find(uint256 hash) {
+    BlockMap::iterator mi;
     if(fInMemory)
     {
-        return m_MapBlockIndex.find(hash);
+        mi = m_MapBlockIndex.find(hash);
+        if(mi != m_MapBlockIndex.end())
+        {
+            return mi->second;
+        }        
+        return NULL;
     }
     
 //    LogPrintf("Block Index: find : %s\n",hash.ToString().c_str());
-    BlockMap::iterator mi=m_MapBlockIndex.end();
 
+    CBlockIndex *result=NULL;
+    
     lock();
 
+    mi=m_MapBlockIndex.end();
     if(load(hash))
     {
         mi=m_MapBlockIndex.find(hash);
+        if(mi != m_MapBlockIndex.end())
+        {
+            result=mi->second;
+        }
     }
     
     unlock();
     
-    return mi;
+    return result;
 }
 
 BlockMap::iterator CBlockMap::begin() {
@@ -295,10 +308,11 @@ BlockMap::iterator CBlockMap::next(BlockMap::iterator& it){
 }
 
 
-std::pair<BlockMap::iterator, bool> CBlockMap::insert(std::pair<uint256, CBlockIndex*> x) {
+void CBlockMap::insert(std::pair<uint256, CBlockIndex*> x) {
     if(fInMemory)
     {
-        return m_MapBlockIndex.insert(x);
+        m_MapBlockIndex.insert(x);
+        return;
     }
     
     lock();
@@ -307,11 +321,9 @@ std::pair<BlockMap::iterator, bool> CBlockMap::insert(std::pair<uint256, CBlockI
     x.second->fUpdated = true;
     
     LogPrint("mcblin","Block Index: Inserting : %8d (%s)\n",x.second->nHeight,x.first.ToString().c_str());
-    std::pair<BlockMap::iterator, bool> itres=m_MapBlockIndex.insert(x);
+    m_MapBlockIndex.insert(x);
     
-    unlock();
-    
-    return itres;    
+    unlock();    
 }
 
 bool CBlockMap::empty() {

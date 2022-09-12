@@ -130,6 +130,7 @@ int CChainStorage::load(int nHeight)
 
 void CChainStorage::defragment()
 {
+    return;
     if(m_ChangeCount < 1000)
     {
         return;

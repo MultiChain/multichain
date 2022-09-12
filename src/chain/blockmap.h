@@ -72,11 +72,11 @@ public:
     
     CBlockIndex *operator[](uint256 hash);
     size_t count(uint256 hash);    
-    BlockMap::iterator find(uint256 hash);
+    CBlockIndex *find(uint256 hash);
     BlockMap::iterator begin();
     BlockMap::iterator end();
     BlockMap::iterator next(BlockMap::iterator& it);
-    std::pair<BlockMap::iterator, bool> insert(std::pair<uint256, CBlockIndex*> x);
+    void insert(std::pair<uint256, CBlockIndex*> x);
     bool empty();
     size_t size();
     void clear();

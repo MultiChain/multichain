@@ -359,9 +359,9 @@ Value getblocktemplate(const Array& params, bool fHelp)
                 throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
 
             uint256 hash = block.GetHash();
-            BlockMap::iterator mi = mapBlockIndex.find(hash);
-            if (mi != mapBlockIndex.end()) {
-                CBlockIndex *pindex = mi->second;
+            CBlockIndex* pmi = mapBlockIndex.find(hash);
+            if (pmi != NULL) {
+                CBlockIndex *pindex = pmi;
                 if (pindex->IsValid(BLOCK_VALID_SCRIPTS))
                     return "duplicate";
                 if (pindex->nStatus & BLOCK_FAILED_MASK)
@@ -580,9 +580,9 @@ Value submitblock(const Array& params, bool fHelp)
     {
          LOCK(cs_main);    
          
-        BlockMap::iterator mi = mapBlockIndex.find(hash);
-        if (mi != mapBlockIndex.end()) {
-            CBlockIndex *pindex = mi->second;
+        CBlockIndex* pmi = mapBlockIndex.find(hash);
+        if (pmi != NULL) {
+            CBlockIndex *pindex = pmi;
             if (pindex->IsValid(BLOCK_VALID_SCRIPTS))
                 return "duplicate";
             if (pindex->nStatus & BLOCK_FAILED_MASK)
