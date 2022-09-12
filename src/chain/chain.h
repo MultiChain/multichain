@@ -105,8 +105,9 @@ class CBlockIndex
 {
 public:
     //! pointer to the hash of the block, if any. memory is owned by this CBlockIndex
-    const uint256* phashBlock;
-
+//    const uint256* phashBlock;
+    uint256 hashBlock;
+    
     //! pointer to the index of the predecessor of this block
     uint256 hashPrev;
     
@@ -171,7 +172,8 @@ public:
     
     void SetNull()
     {
-        phashBlock = NULL;
+//        phashBlock = NULL;
+        hashBlock=0;
         nHeight = 0;
         nFile = 0;
         nDataPos = 0;
@@ -255,7 +257,8 @@ public:
 
     uint256 GetBlockHash() const
     {
-        return *phashBlock;
+//        return *phashBlock;
+        return hashBlock;
     }
 
     int64_t GetBlockTime() const
@@ -427,6 +430,7 @@ private:
     std::vector<int> vHeight;
     void *m_Semaphore;           
     std::map<int,uint256> mapModified;
+    int m_ChangeCount;
     
     uint32_t m_Mode;
     bool fInMemory;
@@ -450,6 +454,7 @@ public:
     void lock();
     void unlock();
     int load(int nHeight);
+    void defragment();
     
     CBlockIndex * getptr(int nHeight);
     void setptr(int nHeight, CBlockIndex * ptr);

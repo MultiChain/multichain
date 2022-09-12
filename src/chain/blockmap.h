@@ -45,6 +45,7 @@ private:
     int m_MaxSize;
     uint32_t m_Mode;
     bool fInMemory;
+    int m_ChangeCount;
 
 public:
     
@@ -67,6 +68,7 @@ public:
     bool canunload(uint256 hash);
     bool unload(uint256 hash);
     void lockhash(uint256 hash);
+    void defragment();
     
     CBlockIndex *operator[](uint256 hash);
     size_t count(uint256 hash);    

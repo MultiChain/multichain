@@ -17,6 +17,7 @@ using namespace std;
 
 void mc_InitCachedBlockIndex();
 bool mc_UpdateBlockCacheValues(std::map<uint256,CBlockIndex>& mapTempBlockIndex);
+bool mc_UpdateBlockCacheValues(CBlockList *block_list);
 
 void static BatchWriteCoins(CLevelDBBatch &batch, const uint256 &hash, const CCoins &coins) {
     if (coins.IsPruned())
@@ -226,6 +227,241 @@ void DiskBlockIndexToCBlockIndex(CBlockIndex* pindexNew,CDiskBlockIndex &diskind
     pindexNew->hashSkip       = diskindex.hashSkip;    
 }
 
+void CBlockList::Zero()
+{
+    m_BlockList=NULL;
+    m_Pos=NULL;
+    m_Height=NULL;    
+    m_First=NULL;
+}
+
+int CBlockList::Init()
+{
+    m_BlockList=new mc_Buffer;
+    return m_BlockList->Initialize(sizeof(uint256),sizeof(uint256)+sizeof(CBlockIndex),MC_BUF_MODE_DEFAULT);
+}
+
+void CBlockList::Destroy()
+{
+    if(m_BlockList)
+    {
+        delete m_BlockList;
+    }
+    if(m_Pos)
+    {
+        delete [] m_Pos;
+    }
+    if(m_Height)
+    {
+        delete [] m_Height;
+    }
+    if(m_First)
+    {
+        delete [] m_First;
+    }
+
+}
+
+int CBlockList::Add(uint256 hash,CBlockIndex *pindex)
+{
+    return m_BlockList->Add(&hash,pindex);
+}
+
+void CBlockList::Sort(int from_height,int to_height,int from, int to)
+{
+    if(from_height + 1 >= to_height)
+    {
+        return;
+    }
+    
+    if(from + 1 >= to)
+    {
+        return;
+    }
+    
+    int left=from;
+    int right=to;
+    int mid_height=(from_height+to_height)/2;
+    int t;
+    
+    
+    while(left<right)
+    {
+        while( (left<right) && (m_Height[left]<mid_height) )
+        {
+            left++;
+        }
+
+        while( (right>left) && (m_Height[right-1]>=mid_height) )
+        {
+            right--;
+        }
+        
+        if(left<right)
+        {
+            t=m_Height[right-1];
+            m_Height[right-1]=m_Height[left];
+            m_Height[left]=t;
+            
+            t=m_Pos[right-1];
+            m_Pos[right-1]=m_Pos[left];
+            m_Pos[left]=t;            
+        }
+    }
+    
+    Sort(from_height,mid_height,from,left);
+    Sort(mid_height,to_height,left,to);
+}
+
+int CBlockList::Sort()
+{
+    int max_height=0;
+    m_Pos=new int[m_BlockList->GetCount()];
+    m_Height=new int[m_BlockList->GetCount()];
+    
+    for(int r=0;r<m_BlockList->GetCount();r++)
+    {
+        CBlockIndex *pindex=(CBlockIndex *)(m_BlockList->GetRow(r)+sizeof(uint256));
+        m_Pos[r]=r;
+        m_Height[r]=pindex->nHeight;
+        pindex->hashBlock=*(uint256*)m_BlockList->GetRow(r);
+        if(pindex->nHeight > max_height)
+        {
+            max_height=pindex->nHeight;
+        }
+    }
+    
+    Sort(0,max_height+1,0,m_BlockList->GetCount());
+    
+    m_First=new int[max_height];
+    
+    for(int r=m_BlockList->GetCount()-1;r>=0;r--)
+    {
+        m_First[m_Height[r]]=r;
+    }
+    
+    return MC_ERR_NOERROR;
+}
+
+CBlockIndex* CBlockList::GetBlockIndex(int height,uint256 hash)
+{
+    if(height<0)
+    {
+        return NULL;
+    }
+    
+    int r=m_First[height];
+    while(m_Height[r] == height)
+    {
+        if(*(uint256*)m_BlockList->GetRow(m_Pos[r]) == hash)
+        {
+            return (CBlockIndex *)(m_BlockList->GetRow(m_Pos[r])+sizeof(uint256));
+        }
+        r++;
+    }
+    
+    return NULL;
+}
+
+int CBlockList::GetSize()
+{
+    return m_BlockList->GetCount();
+}
+
+CBlockIndex *CBlockList::GetBlockIndex(int r)
+{
+    return (CBlockIndex *)(m_BlockList->GetRow(m_Pos[r])+sizeof(uint256));
+}
+
+
+bool CBlockTreeDB::UpdateBlockCacheValues()
+{
+    CBlockList *block_list=new CBlockList();
+    block_list->Init();
+    
+    boost::scoped_ptr<leveldb::Iterator> pcursor(NewIterator());
+
+    CDataStream ssKeySet(SER_DISK, CLIENT_VERSION);
+    ssKeySet << make_pair('b', uint256(0));
+    pcursor->Seek(ssKeySet.str());
+
+    // Load mapBlockIndex
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+        try {
+            leveldb::Slice slKey = pcursor->key();
+            CDataStream ssKey(slKey.data(), slKey.data()+slKey.size(), SER_DISK, CLIENT_VERSION);
+            char chType;
+            ssKey >> chType;
+            if (chType == 'b') {
+                leveldb::Slice slValue = pcursor->value();
+                CDataStream ssValue(slValue.data(), slValue.data()+slValue.size(), SER_DISK, CLIENT_VERSION);
+                CDiskBlockIndex diskindex;
+                CBlockIndex blockindex;
+                
+                ssValue >> diskindex;
+
+                blockindex.SetNull();
+                DiskBlockIndexToCBlockIndex(&blockindex,diskindex);                
+                blockindex.hashPrev=diskindex.hashPrev;
+                
+                block_list->Add(diskindex.GetBlockHash(), &blockindex);
+                        
+                pcursor->Next();
+            } else {
+                break; // if shutdown requested or finished loading block index
+            }
+        } catch (std::exception &e) {
+            return error("%s : Deserialize or I/O error - %s", __func__, e.what());
+        }
+    }
+    
+    block_list->Sort();
+    
+    if(!mc_UpdateBlockCacheValues(block_list))
+    {
+        return false;
+    }
+    
+    uint256 tipHash=pcoinsTip->GetBestBlock();
+    CBlockIndex *pChainTip=NULL;
+    
+    for(int r=0;r<block_list->GetSize();r++)
+    {
+        CBlockIndex *pindex=block_list->GetBlockIndex(r);
+        pindex->nStatus |= BLOCK_HAVE_CHAIN_CACHE;
+        
+        if(pindex->GetBlockHash() == tipHash)
+        {
+            pChainTip=pindex;
+        }
+        
+        CDiskBlockIndex diskindex=CDiskBlockIndex(pindex,pindex->hashPrev);        
+
+        if (!WriteBlockIndex(diskindex)) 
+        {
+            return error("Failed to write to block index");
+        }
+    }
+    
+    CBlockIndex *pwalk=pChainTip;
+    
+    while(pwalk)
+    {
+        if(!WriteChainActiveHash(pwalk->nHeight,pwalk->GetBlockHash()))
+        {
+            return error("Failed to write to active chain");            
+        }
+        pwalk=block_list->GetBlockIndex(pwalk->nHeight-1,pwalk->hashPrev);
+    }
+    
+    delete block_list;
+
+    pblocktree->Sync();
+    return true;
+}
+
+/*
 bool CBlockTreeDB::UpdateBlockCacheValues()
 {
     std::map <uint256,CBlockIndex> mapTempBlockIndex;
@@ -288,6 +524,7 @@ bool CBlockTreeDB::UpdateBlockCacheValues()
     pblocktree->Sync();
     return true;
 }
+*/
 
 CBlockIndex *CBlockTreeDB::ReadBlockIndex(uint256 hash) {
     

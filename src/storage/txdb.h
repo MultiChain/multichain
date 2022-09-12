@@ -40,6 +40,36 @@ public:
     bool GetStats(CCoinsStats &stats) const;
 };
 
+class CBlockList
+{
+    private: 
+        mc_Buffer *m_BlockList;
+        int *m_Pos;
+        int *m_Height;
+        int *m_First;
+        
+        void Sort(int from_height,int to_height,int from, int to);
+    public:
+        CBlockList()
+        {
+            Zero();
+        }
+        ~CBlockList()
+        {
+            Destroy();
+        }
+        
+        void Zero();
+        int Init();
+        void Destroy();
+        
+        int Add(uint256 hash,CBlockIndex *pindex);
+        int Sort();
+        CBlockIndex* GetBlockIndex(int height,uint256 hash);
+        int GetSize();
+        CBlockIndex *GetBlockIndex(int r);        
+};
+
 /** Access to the block database (blocks/index/) */
 class CBlockTreeDB : public CLevelDBWrapper
 {

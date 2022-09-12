@@ -41,6 +41,7 @@ void CBlockMap::zero()
     m_MapBlockIndex.clear();
     m_MapLocked.clear();
     fInMemory=true;
+    m_ChangeCount=0;
 }
 
 int CBlockMap::init(uint32_t mode,int maxsize)
@@ -120,13 +121,15 @@ bool CBlockMap::load(uint256 hash)
     }
     
     pindex->nLastUsed=time_now;
+    m_ChangeCount++;
     
     BlockMap::iterator mi = m_MapBlockIndex.insert(make_pair(hash, pindex)).first;
-    pindex->phashBlock = &((*mi).first);
+//    pindex->phashBlock = &((*mi).first);
+    pindex->hashBlock=hash;
     
 //    printf("Load: %4d -> %s\n",pindex->nHeight,pindex->phashBlock->ToString().c_str());
     
-    LogPrint("mcblin","Block Index: Loaded    : %8d (%s)\n",pindex->nHeight,pindex->phashBlock->ToString().c_str());
+    LogPrint("mcblin","Block Index: Loaded    : %8d (%s)\n",pindex->nHeight,pindex->hashBlock.ToString().c_str());
     return true;
 }
 
@@ -152,6 +155,7 @@ bool CBlockMap::unload(uint256 hash)
         {
             LogPrint("mcblin","Block Index: Unloading : %8d (%s)\n",mi->second->nHeight,mi->first.ToString().c_str());
             delete mi->second;
+            m_ChangeCount++;
             m_MapBlockIndex.erase(mi);
 //            LogPrint("mcblin","Block Index: Unloaded  : %s\n",hash.ToString().c_str());
         }
@@ -160,6 +164,38 @@ bool CBlockMap::unload(uint256 hash)
     }
     
     return false;
+}
+
+void CBlockMap::defragment()
+{
+    if(m_ChangeCount < 1000)
+    {
+        return;
+    }
+    
+    BOOST_FOREACH(PAIRTYPE(uint64_t, std::set <uint256>) item, m_MapLocked)
+    {
+        set <uint256> setTmp;
+        for (set<uint256>::iterator lit = item.second.begin(); lit != item.second.end(); lit++)
+        {
+            setTmp.insert(*lit);
+        }
+        
+        item.second.swap(setTmp);
+    }
+    
+    BlockMap mapTmp;
+    
+    BlockMap::iterator it = m_MapBlockIndex.begin();
+    while (it != m_MapBlockIndex.end()) 
+    {
+        mapTmp.insert(make_pair(it->first,it->second));
+        it++;
+    }
+    m_MapBlockIndex.swap(mapTmp);    
+    
+    
+    m_ChangeCount=0;
 }
 
 
@@ -350,7 +386,7 @@ void CBlockMap::flush() {
     }    
     
     lock();
-    
+
     vector<pair<int64_t, uint256> > vSortedByTime;    
     std::map <uint64_t, std::set <uint256> >::iterator thit=m_MapLocked.find(__US_ThreadID());
     
@@ -390,6 +426,8 @@ void CBlockMap::flush() {
 
         LogPrint("mcblin","Flushed block index, %d -> %d\n",start_map_size,(int)m_MapBlockIndex.size());
     }
+    
+    defragment();
     
     unlock();
 }

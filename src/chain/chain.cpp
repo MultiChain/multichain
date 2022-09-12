@@ -123,10 +123,44 @@ int CChainStorage::load(int nHeight)
     vHash[min_index]=hash;
     
     mapLoaded.insert(make_pair(nHeight,min_index));
-
+    m_ChangeCount+=2;
+    
     return min_index;
 }
 
+void CChainStorage::defragment()
+{
+    if(m_ChangeCount < 1000)
+    {
+        return;
+    }
+    
+    std::map<int,int> mapLoadedTmp;
+    std::map<int,uint256> mapModifiedTmp;
+/*    
+    mapLoadedTmp.swap(mapLoaded);
+    mapLoaded.swap(mapLoadedTmp);    
+    
+    mapModifiedTmp.swap(mapModified);
+    mapModified.swap(mapModifiedTmp);    
+*/    
+    BOOST_FOREACH(PAIRTYPE(const int, int)& item, mapLoaded)
+    {
+        mapLoadedTmp.insert(make_pair(item.first,item.second));
+    }
+    
+    mapLoaded.swap(mapLoaded);       
+    
+    BOOST_FOREACH(PAIRTYPE(const int, uint256)& item, mapModified)
+    {
+        mapModifiedTmp.insert(make_pair(item.first,item.second));
+    }
+    
+    mapModified.swap(mapModifiedTmp);       
+    
+    m_ChangeCount=0;    
+    
+}
 
 CBlockIndex *CChainStorage::getptr(int nHeight)
 {
@@ -197,6 +231,7 @@ void CChainStorage::sethash(int nHeight, uint256 hash)
     
     lock();
     
+    m_ChangeCount++;
     mapModified.insert(make_pair(nHeight,hash));
     LogPrint("mcblin","ActiveChain: Inserting : %8d (%s)\n",nHeight,hash.ToString().c_str());
     
@@ -267,8 +302,7 @@ bool CChainStorage::flush()
     
     bool result=true;
             
-    lock();
-    
+    lock();    
     
     BOOST_FOREACH(PAIRTYPE(const int, uint256)& item, mapModified)
     {
@@ -278,8 +312,11 @@ bool CChainStorage::flush()
     
     if(result)
     {
+        m_ChangeCount+=(int)mapModified.size();
         mapModified.clear();
     }
+    
+    defragment();
     
     unlock();
     

@@ -2170,14 +2170,14 @@ void CheckForkWarningConditions()
         if (!fLargeWorkForkFound && pindexBestForkBase)
         {
             std::string warning = std::string("'Warning: Large-work fork detected, forking after block ") +
-                pindexBestForkBase->phashBlock->ToString() + std::string("'");
+                pindexBestForkBase->hashBlock.ToString() + std::string("'");
             CAlert::Notify(warning, true);
         }
         if (pindexBestForkTip && pindexBestForkBase)
         {
             LogPrintf("CheckForkWarningConditions: Warning: Large valid fork found\n  forking the chain at height %d (%s)\n  lasting to height %d (%s).\nChain state database corruption likely.\n",
-                   pindexBestForkBase->nHeight, pindexBestForkBase->phashBlock->ToString(),
-                   pindexBestForkTip->nHeight, pindexBestForkTip->phashBlock->ToString());
+                   pindexBestForkBase->nHeight, pindexBestForkBase->hashBlock.ToString(),
+                   pindexBestForkTip->nHeight, pindexBestForkTip->hashBlock.ToString());
             fLargeWorkForkFound = true;
         }
         else
@@ -2781,7 +2781,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     // Now that the whole chain is irreversibly beyond that time it is applied to all blocks except the
     // two in the chain that violate it. This prevents exploiting the issue against nodes in their
     // initial block download.
-    bool fEnforceBIP30 = (!pindex->phashBlock) || // Enforce on CreateNewBlock invocations which don't have a hash.
+//    bool fEnforceBIP30 = (!pindex->phashBlock) || // Enforce on CreateNewBlock invocations which don't have a hash.
+    bool fEnforceBIP30 = (pindex->hashBlock == 0) || // Enforce on CreateNewBlock invocations which don't have a hash.
                           !((pindex->nHeight==91842 && pindex->GetBlockHash() == uint256("0x00000000000a4d0a398161ffc163c503763b1f4360639393e0e4c8e300e0caec")) ||
                            (pindex->nHeight==91880 && pindex->GetBlockHash() == uint256("0x00000000000743f190a18c5577a3c2d2a1f610ae9601ac046a38084ccb7cd721")));
     if (fEnforceBIP30) {
@@ -3804,7 +3805,7 @@ void UpdateChainMiningStatus(const CBlock &block,CBlockIndex *pindexNew)
         }
         if(pindexNew->getpprev())
         {
-            if(fDebug)LogPrint("mcblock","mchn-block: New block index:   %s, prev: %s, height: %d, mined-by-me: %d, can-mine: %d\n",pindexNew->GetBlockHash().ToString().c_str(),
+            if(fDebug)LogPrint("mcblock","mchn-block: New block index: %s, prev: %s, height: %d, m-b-m: %d, c-m: %d\n",pindexNew->GetBlockHash().ToString().c_str(),
                     pindexNew->getpprev()->GetBlockHash().ToString().c_str(),
                     pindexNew->nHeight,pindexNew->nHeightMinedByMe,pindexNew->nCanMine);
         }
@@ -4570,7 +4571,8 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     BlockMap::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
     mc_gState->ChainUnLock();
     if(fDebug)LogPrint("mcblock","mchn-block: Added block %s\n",hash.ToString().c_str());
-    pindexNew->phashBlock = &((*mi).first);
+//    pindexNew->phashBlock = &((*mi).first);
+    pindexNew->hashBlock = hash;
     BlockMap::iterator miPrev = mapBlockIndex.find(block.hashPrevBlock);
     if (miPrev != mapBlockIndex.end())
     {
@@ -5633,7 +5635,8 @@ CBlockIndex * InsertBlockIndex(uint256 hash)
     mc_gState->ChainLock();
     mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
     mc_gState->ChainUnLock();
-    pindexNew->phashBlock = &((*mi).first);
+//    pindexNew->phashBlock = &((*mi).first);
+    pindexNew->hashBlock = hash;
 
     return pindexNew;
 }
@@ -5660,6 +5663,27 @@ uint256 mc_GetAncestorHash(std::map<uint256,CBlockIndex>& mapTempBlockIndex,uint
         }
     }
     return hashWalk;
+}
+
+uint256 mc_GetAncestorHash(CBlockList *block_list,CBlockIndex *pprev,int height)
+{
+    if (pprev == NULL)
+        return 0;
+
+    CBlockIndex *pwalk=pprev;
+    while (pwalk->nHeight > height) {
+        int heightSkip = GetSkipHeight(pwalk->nHeight);
+        int heightSkipPrev = GetSkipHeight(pwalk->nHeight - 1);
+        if (heightSkip == height ||
+            (heightSkip > height && !(heightSkipPrev < heightSkip - 2 &&
+                                      heightSkipPrev >= height))) {
+            // Only follow pskip if pprev->pskip isn't better than pskip->pprev.
+            pwalk=block_list->GetBlockIndex(heightSkip,pwalk->hashSkip);
+        } else {
+            pwalk=block_list->GetBlockIndex(pwalk->nHeight-1,pwalk->hashPrev);
+        }
+    }
+    return pwalk->GetBlockHash();
 }
 
 void mc_UpdateMapBlockCachedStatus(CBlockIndex* pindex)
@@ -5698,6 +5722,80 @@ void mc_InitCachedBlockIndex()
         mapBlockIndex.init(MC_BMM_LIMITED_SIZE,GetArg("-maxblockindexsize",0));
         chainActive.InitStorage(MC_BMM_LIMITED_SIZE,GetArg("-chaincachesize",1));
     }    
+}
+
+bool mc_UpdateBlockCacheValues(CBlockList *block_list)
+{
+    uint256 tipHash=pcoinsTip->GetBestBlock();
+    CBlockIndex *pChainTip=NULL;
+    for(int r=0;r<block_list->GetSize();r++)
+    {
+        CBlockIndex *pindex=block_list->GetBlockIndex(r);        
+        uint256 prevHash=pindex->hashPrev;
+        CBlockIndex *pprev=block_list->GetBlockIndex(pindex->nHeight-1,prevHash);
+        
+        if(pindex->GetBlockHash() == tipHash)
+        {
+            pChainTip=pindex;
+        }
+        
+        pindex->nChainWork = ( (prevHash != 0) ? pprev->nChainWork : 0) + GetBlockProof(*pindex);
+   
+        if (pindex->nStatus & BLOCK_HAVE_DATA) {
+            if (pprev) {
+                if (pprev->nChainTx) {
+                    pindex->nChainTx = pprev->nChainTx + pindex->nTx;
+                } else {
+                    mapBlocksUnlinked.insert(std::make_pair(prevHash, pindex->GetBlockHash()));         
+                    pindex->nChainTx = 0;
+                }
+            } else {
+                pindex->nChainTx = pindex->nTx;
+            }
+        }        
+        
+        if(pprev)
+        {
+            pindex->hashSkip = mc_GetAncestorHash(block_list,pprev,GetSkipHeight(pindex->nHeight));
+            pprev->nStatus |= BLOCK_HAVE_SUCCESSOR;
+        }
+    }
+        
+    CBlockIndex *pBestInvalid=NULL;
+    CBlockIndex *pBestHeader=NULL;
+    
+    for(int r=0;r<block_list->GetSize();r++)
+    {
+        CBlockIndex *pindex=block_list->GetBlockIndex(r);        
+        uint256 hash=pindex->GetBlockHash();
+        
+        if (pindex->nStatus & BLOCK_FAILED_MASK && ((pBestInvalid == NULL) || pindex->nChainWork > pBestInvalid->nChainWork))
+        {
+            pBestInvalid=pindex;
+            hashBestInvalid = hash;
+        }
+        
+        if (pindex->IsValid(BLOCK_VALID_TREE) && ((pBestHeader == NULL) || mc_CompareBlockIndexes(pBestHeader,pindex,hashBestHeader, hash)))
+        {
+            pBestHeader=pindex;
+            hashBestHeader = hash;
+        }
+        
+        if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->hashPrev == 0))
+            if(!mc_CompareBlockIndexes(pindex, pChainTip,hash, tipHash))
+            {
+                setBlockIndexCandidates.insert(hash);
+            }
+        
+        if( (pindex->nStatus & BLOCK_HAVE_SUCCESSOR) == 0 )
+        {
+            setChainTips.insert(hash);
+        }         
+    }
+    
+    UpdateBlockCacheStatus();
+    
+    return true;
 }
 
 bool mc_UpdateBlockCacheValues(std::map<uint256,CBlockIndex>& mapTempBlockIndex)
