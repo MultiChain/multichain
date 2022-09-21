@@ -3114,6 +3114,33 @@ void FlushStateToDisk() {
     FlushStateToDisk(state, FLUSH_STATE_ALWAYS);
 }
 
+unsigned long mc_GetMemoryUsage()
+{
+    unsigned long d1,d2,d3,d4,d5,d6,d7;
+    
+    d6=0;
+    
+#ifndef WIN32
+#ifndef MAC_OSX
+    
+    const char* statm_path = "/proc/self/statm";
+
+    FILE *fHan = fopen(statm_path,"r");
+    if(fHan)
+    {
+        if(fscanf(fHan,"%ld %ld %ld %ld %ld %ld %ld",&d1,&d2,&d3,&d4,&d5,&d6,&d7) != 7)
+        {   
+            d6=0;
+        }
+        fclose(fHan);        
+    }    
+    
+#endif
+#endif
+    
+    return d6;
+}
+
 /** Update chainActive and related internal data structures. */
 void static UpdateTip(CBlockIndex *pindexNew) {
     chainActive.SetTip(pindexNew);
@@ -3122,10 +3149,10 @@ void static UpdateTip(CBlockIndex *pindexNew) {
     nTimeBestReceived = GetTime();
     mempool.AddTransactionsUpdated(1);
 
-    LogPrintf("UpdateTip:            new best=%s  height=%d  log2_work=%.8g  tx=%lu  date=%s cache=%u\n",
+    LogPrintf("UpdateTip:            new best=%s  height=%d  log2_work=%.8g  tx=%lu  date=%s mem=%ld\n",
       chainActive.Tip()->GetBlockHash().ToString(), chainActive.Height(), log(chainActive.Tip()->nChainWork.getdouble())/log(2.0), (unsigned long)chainActive.Tip()->nChainTx,
       DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
-      (unsigned int)pcoinsTip->GetCacheSize());
+      mc_GetMemoryUsage());
     
     if(chainActive.Tip()->kMiner.IsValid())
     {
@@ -5524,6 +5551,7 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
     
     pEF->ENT_MaybeStop();
     
+    LogGlobalStatus();    
 /* MCHN END */    
     
     return true;

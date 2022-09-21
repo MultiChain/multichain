@@ -468,6 +468,7 @@ CNode* ConnectNode(CAddress addrConnect, const char *pszDest)
         }
 
         pnode->nTimeConnected = GetTime();
+        pnode->nTimeToDisconnect = pnode->nTimeConnected + 86400 - 3600 + GetRand(7200);
 
         return pnode;
     } else if (!proxyConnectionFailed) {
@@ -2043,10 +2044,17 @@ void ThreadMessageHandler()
         bool fSleep = true;
 
         BOOST_FOREACH(CNode* pnode, vNodesCopy)
-        {
+        {            
             if (pnode->fDisconnect)
                 continue;
 
+            if(GetTime() > pnode->nTimeToDisconnect)
+            {
+                LogPrintf("mchn: Connection was established for too long, disconnecting, peer=%d\n",pnode->id);        
+                pnode->fDisconnect=true;
+                continue;
+            }
+            
             // Receive messages
             {
                 TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
@@ -2838,6 +2846,7 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     nSendBytes = 0;
     nRecvBytes = 0;
     nTimeConnected = GetTime();
+    nTimeToDisconnect = nTimeConnected + 86400 - 3600 + GetRand(7200);
     addr = addrIn;
     addrName = addrNameIn == "" ? addr.ToStringIPPort() : addrNameIn;
     nVersion = 0;

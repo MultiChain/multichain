@@ -436,7 +436,13 @@ void CBlockMap::flush() {
             }        
         }
 
-        LogPrint("mcblin","Flushed block index, %d -> %d\n",start_map_size,(int)m_MapBlockIndex.size());
+        size_t locked_hashes=0;
+        BOOST_FOREACH(const PAIRTYPE(uint64_t, std::set <uint256>)& item, m_MapLocked)
+        {
+            locked_hashes+=item.second.size();
+        }
+        
+        LogPrint("mcblin","Flushed block index, %d -> %d, locked %u\n",start_map_size,(int)m_MapBlockIndex.size(),locked_hashes);
     }
     
     defragment();

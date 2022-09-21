@@ -265,6 +265,7 @@ public:
     int64_t nLastSend;
     int64_t nLastRecv;
     int64_t nTimeConnected;
+    int64_t nTimeToDisconnect;
     CAddress addr;
     std::string addrName;
     CService addrLocal;
