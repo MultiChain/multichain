@@ -5551,7 +5551,6 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDis
     
     pEF->ENT_MaybeStop();
     
-    LogGlobalStatus();    
 /* MCHN END */    
     
     return true;
