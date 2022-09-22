@@ -1,6 +1,9 @@
 MultiChain
 ==========
 
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=cetic_multichain&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=cetic_multichain)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=cetic_multichain&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=cetic_multichain)
+
 [MultiChain](http://www.multichain.com/) is an open source platform for private blockchains, which offers a rich set of features including extensive configurability, rapid deployment, permissions management, native assets and data streams. Although it is designed to enable private blockchains, MultiChain provides maximal compatibility with the bitcoin ecosystem, including the peer-to-peer protocol, transaction/block formats and [Bitcoin Core](https://bitcoin.org/en/bitcoin-core/) APIs/runtime parameters.
 
     Copyright (c) 2014-2019 Coin Sciences Ltd
