@@ -6362,7 +6362,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     static double sdBlockLockTime[10];
     static double sdStartTime[10];
 /* MCHN END */
-
+    LogPrintf("MESSAGE: Thread: %lu, Message: %s\n",__US_ThreadID(),strCommand.c_str());
 //    RandAddSeedPerfmon();
     if(fDebug)LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
     if (mapArgs.count("-dropmessagestest") && (atoi(mapArgs["-dropmessagestest"]) > 0) && (GetRand(atoi(mapArgs["-dropmessagestest"])) == 0) )
@@ -7623,6 +7623,7 @@ bool ProcessMessages(CNode* pfrom)
         // Don't bother if send buffer is too full to respond anyway
         int32_t fProcessInDataThread=nMessageHandlerThreads & MC_MHT_PROCESSDATA;
         int32_t fProcessTxInSeparateDataThread=nMessageHandlerThreads & MC_MHT_PROCESSTXDATA;
+        int32_t fProcessInOffchainThread=nMessageHandlerThreads & MC_MHT_OFFCHAIN;
         CNetMessage& msg1 = *it;
         if(msg1.complete())
         {
@@ -7747,9 +7748,16 @@ bool ProcessMessages(CNode* pfrom)
 
         // Process message
         bool fRet = false;
-        if( fProcessInDataThread && (strCommand != "block") && (strCommand != "tx") && (strCommand != "headers") && (strCommand != "inv") )
+        if( fProcessInDataThread && (strCommand != "block") && (strCommand != "tx") && (strCommand != "headers") && (strCommand != "inv")  && (strCommand != "offchain") )
         {
             fProcessInDataThread=false;
+        }
+        if(!fProcessInOffchainThread)
+        {
+            if(strCommand == "offchain")
+            {
+                fProcessInDataThread=false;
+            }
         }
         try
         {
@@ -7757,30 +7765,38 @@ bool ProcessMessages(CNode* pfrom)
             {
                 if(fProcessInDataThread)
                 {
-                    if(fProcessTxInSeparateDataThread)
+                    if(strCommand == "offchain")
                     {
-                        if(strCommand != "inv")
+                        LOCK(pfrom->cs_vRecvOffchainMsg);
+                        pfrom->vRecvOffchainMsg.push_back(msg);
+                    }
+                    else
+                    {
+                        if(fProcessTxInSeparateDataThread)
                         {
-                            if(strCommand == "tx")
+                            if(strCommand != "inv")
                             {
-                                LOCK(pfrom->cs_vRecvTxDataMsg);
-                                pfrom->vRecvTxDataMsg.push_back(msg);
+                                if(strCommand == "tx")
+                                {
+                                    LOCK(pfrom->cs_vRecvTxDataMsg);
+                                    pfrom->vRecvTxDataMsg.push_back(msg);
+                                }
+                                else
+                                {
+                                    LOCK(pfrom->cs_vRecvDataMsg);
+                                    pfrom->vRecvDataMsg.push_back(msg);
+                                }
                             }
                             else
                             {
-                                LOCK(pfrom->cs_vRecvDataMsg);
-                                pfrom->vRecvDataMsg.push_back(msg);
+                                SplitInvMessage(pfrom, msg);
                             }
                         }
                         else
                         {
-                            SplitInvMessage(pfrom, msg);
+                            LOCK(pfrom->cs_vRecvDataMsg);
+                            pfrom->vRecvDataMsg.push_back(msg);
                         }
-                    }
-                    else
-                    {
-                        LOCK(pfrom->cs_vRecvDataMsg);
-                        pfrom->vRecvDataMsg.push_back(msg);                        
                     }
                     fRet=true;                            
                 }
