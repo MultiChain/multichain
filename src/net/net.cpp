@@ -506,6 +506,11 @@ void CNode::CloseSocketDisconnect()
         if (lockTxDataRecv)
             vRecvDataMsg.clear();
     }
+    {
+        TRY_LOCK(cs_vRecvOffchainMsg, lockOffchainRecv);
+        if (lockOffchainRecv)
+            vRecvOffchainMsg.clear();
+    }
 }
 
 void CNode::PushVersion()
@@ -673,6 +678,16 @@ size_t CNode::TotalBuffersSize()
         total+=vRecvTxDataMsg.size()*sizeof(CNetMessage);
         std::deque<CNetMessage>::iterator it = vRecvTxDataMsg.begin();
         while (it != vRecvTxDataMsg.end()) 
+        {
+            total+=it->vRecv.size();
+            it++;
+        }                
+    }
+    {
+        LOCK(cs_vRecvOffchainMsg);
+        total+=vRecvOffchainMsg.size()*sizeof(CNetMessage);
+        std::deque<CNetMessage>::iterator it = vRecvOffchainMsg.begin();
+        while (it != vRecvOffchainMsg.end()) 
         {
             total+=it->vRecv.size();
             it++;
@@ -2263,6 +2278,77 @@ void ThreadTxDataMessageHandler()
     }
 }
 
+void ThreadOffchainMessageHandler()
+{
+    SetThreadPriority(THREAD_PRIORITY_BELOW_NORMAL);
+    while (true)
+    {
+        boost::this_thread::interruption_point();
+        vector<CNode*> vNodesCopy;
+        {
+            LOCK(cs_vNodes);
+            vNodesCopy = vNodes;
+            BOOST_FOREACH(CNode* pnode, vNodesCopy) {
+                pnode->AddRef();
+            }
+        }
+
+        bool fSleep = true;
+
+        BOOST_FOREACH(CNode* pnode, vNodesCopy)
+        {
+            if (pnode->fDisconnect)
+                continue;
+
+            CNetMessage msg(SER_NETWORK, pnode->nRecvVersion);
+            bool fFound=false;
+            // Receive messages
+            {
+                LOCK(pnode->cs_vRecvOffchainMsg);
+                std::deque<CNetMessage>::iterator it = pnode->vRecvOffchainMsg.begin();
+                if (!pnode->fDisconnect && it != pnode->vRecvOffchainMsg.end())
+                {
+                    msg = *it;
+                    fFound=true;
+                }
+            }
+            if(fFound)
+            {
+                if(g_signals.ProcessDataMessage(pnode,msg))
+                {
+                    if (!pnode->fDisconnect)
+                    {
+                        LOCK(pnode->cs_vRecvOffchainMsg);
+                        pnode->vRecvOffchainMsg.pop_front();
+                        if (!pnode->vRecvOffchainMsg.empty())
+                        {
+                            fSleep = false;
+                        }
+                    }
+                }
+            }
+            
+            boost::this_thread::interruption_point();
+
+            if (pnode->fDisconnect)
+                continue;
+        }
+
+        boost::this_thread::interruption_point();
+        
+        {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodesCopy)
+                pnode->Release();
+        }
+
+        boost::this_thread::interruption_point();
+        
+        if (fSleep)
+            MilliSleep(100);
+    }
+}
+
 
 void ThreadGetDataMessageHandler()
 {
@@ -2538,6 +2624,11 @@ void StartNode(boost::thread_group& threadGroup)
             // Process tx data messages
             threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "tmsghand", &ThreadTxDataMessageHandler));
         }
+    }
+    if(nMessageHandlerThreads & MC_MHT_OFFCHAIN)
+    {
+        // Process offchain messages
+        threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "omsghand", &ThreadOffchainMessageHandler));
     }
     // Dump network addresses
     threadGroup.create_thread(boost::bind(&LoopForever<void (*)()>, "dumpaddr", &DumpAddresses, DUMP_ADDRESSES_INTERVAL * 1000));

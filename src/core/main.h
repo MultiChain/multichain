@@ -173,7 +173,8 @@ static const uint64_t nMinDiskSpace = 52428800;
 #define MC_MHT_GETDATA                                     0x00000001
 #define MC_MHT_PROCESSDATA                                 0x00000002
 #define MC_MHT_PROCESSTXDATA                               0x00000004
-#define MC_MHT_DEFAULT                                     0x00000007 
+#define MC_MHT_OFFCHAIN                                    0x00000008
+#define MC_MHT_DEFAULT                                     0x0000000F 
 
 // Block cached status
 

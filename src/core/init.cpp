@@ -937,6 +937,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         return InitError(_("Error: Unsupported argument -tor found, use -onion."));
 
     nMessageHandlerThreads=GetArg("-msghandlerversion",1) * MC_MHT_DEFAULT;
+    nMessageHandlerThreads=GetArg("-msghandlerthreads",nMessageHandlerThreads);
     fAcceptOnlyRequestedTxs = ( nMessageHandlerThreads > 0 );
     OrphanHandlerVersion=GetArg("-relaymanversion",1);
     InitialNetLogTime=GetArg("-initialnetlogtime",0);
@@ -1060,7 +1061,13 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 /* MCHN START */    
     if(mc_gState->m_NetworkParams->IsProtocolMultichain())
     {
-        LogPrintf("MultiChain version build %s protocol %s (%s)\n", mc_BuildDescription(mc_gState->GetNumericVersion()), mc_gState->GetProtocolVersion(), CLIENT_DATE);
+        string edition=pEF->ENT_Edition();
+        if(edition.size())
+        {
+            edition=", "+edition+" Edition,";
+        }
+        
+        LogPrintf("MultiChain version build %s%s protocol %s (%s)\n", mc_BuildDescription(mc_gState->GetNumericVersion()), edition.c_str(), mc_gState->GetProtocolVersion(), __DATE__);
     }
 
 /* MCHN END */    

@@ -256,6 +256,8 @@ public:
     CCriticalSection cs_vRecvDataMsg;
     std::deque<CNetMessage> vRecvTxDataMsg;
     CCriticalSection cs_vRecvTxDataMsg;
+    std::deque<CNetMessage> vRecvOffchainMsg;
+    CCriticalSection cs_vRecvOffchainMsg;
     std::set<uint256> sTxsInFlight;
     CCriticalSection cs_sTxsInFlight;
     
