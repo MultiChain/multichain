@@ -6753,7 +6753,6 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     static double sdBlockLockTime[10];
     static double sdStartTime[10];
 /* MCHN END */
-    LogPrintf("MESSAGE: Thread: %lu, Message: %s\n",__US_ThreadID(),strCommand.c_str());
 //    RandAddSeedPerfmon();
     if(fDebug)LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
     if (mapArgs.count("-dropmessagestest") && (atoi(mapArgs["-dropmessagestest"]) > 0) && (GetRand(atoi(mapArgs["-dropmessagestest"])) == 0) )
