@@ -1265,7 +1265,7 @@ bool CMCAddrInfoCompareByAttempts(CMCAddrInfo a,CMCAddrInfo b)
     a_attempts=a.GetLastTryInfo(NULL,NULL,NULL);
     b_attempts=b.GetLastTryInfo(NULL,NULL,NULL);
         
-    if(a_attempts <= b_attempts)
+    if(a_attempts < b_attempts)
     {
         return true;
     }
@@ -1279,7 +1279,7 @@ bool CMCAddrInfoCompareByLastSuccess(CMCAddrInfo a,CMCAddrInfo b)
     a.GetLastTryInfo(&a_lastsuccess,NULL,NULL);
     b.GetLastTryInfo(&b_lastsuccess,NULL,NULL);
     
-    if(a_lastsuccess >= b_lastsuccess)
+    if(a_lastsuccess > b_lastsuccess)
     {
         return true;
     }
@@ -1525,7 +1525,7 @@ uint32_t CMCAddrMan::PrepareSelect(set<CService> setLocalAddr,uint32_t *counts)
         }
         if(mode>=0)
         {
-            m_Selected[mode].push_back(addr);
+            m_Selected[mode].push_back(*addr);
         }
     }
     
