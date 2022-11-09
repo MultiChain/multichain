@@ -167,6 +167,7 @@ public:
     int32_t nFirstSuccessor;
     bool fUpdated;
     int64_t nLastUsed;
+    uint64_t nLockedByThread;
     
 /* MCHN END */
     
@@ -202,6 +203,7 @@ public:
         nSize=0;
         fUpdated=false;
         nLastUsed=0;
+        nLockedByThread=0;
 /* MCHN END */
     }
 

@@ -40,7 +40,7 @@ class CBlockMap {
 private:
     
     BlockMap m_MapBlockIndex;
-    std::map <uint64_t, std::set <uint256> > m_MapLocked;
+    std::map <uint64_t, int> m_MapThreads;
     void *m_Semaphore;                                                          
     int m_MaxSize;
     uint32_t m_Mode;
@@ -65,9 +65,8 @@ public:
     void lock();
     void unlock();
     bool load(uint256 hash);
-    bool canunload(uint256 hash);
     bool unload(uint256 hash);
-    void lockhash(uint256 hash);
+    uint64_t getthreadbit();
     void defragment();
     
     CBlockIndex *operator[](uint256 hash);

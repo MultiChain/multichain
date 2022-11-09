@@ -303,7 +303,16 @@ bool CChainStorage::flush()
     
     bool result=true;
             
-    lock();    
+    int64_t time_before_lock=GetTimeMillis();
+    
+    lock();
+
+    int64_t time_after_lock=GetTimeMillis();
+
+    if(time_after_lock-time_before_lock > 2000)
+    {
+        LogPrint("mcblin","Waiting for chain flush for %dms\n",time_after_lock-time_before_lock);        
+    }
     
     BOOST_FOREACH(PAIRTYPE(const int, uint256)& item, mapModified)
     {
