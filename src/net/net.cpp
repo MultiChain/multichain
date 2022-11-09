@@ -1044,16 +1044,25 @@ void ThreadSocketHandler()
                             TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
                             if (lockRecv)
                             {
-                                TRY_LOCK(pnode->cs_vRecvMsg, lockDataRecv);
+                                TRY_LOCK(pnode->cs_vRecvDataMsg, lockDataRecv);
                                 if (lockDataRecv)
                                 {
-                                    TRY_LOCK(pnode->cs_inventory, lockInv);
-                                    if (lockInv)
-                                        fDelete = true;
+                                    TRY_LOCK(pnode->cs_vRecvTxDataMsg, lockTxDataRecv);
+                                    if (lockTxDataRecv)
+                                    {
+                                        TRY_LOCK(pnode->cs_vRecvOffchainMsg, lockOffchainRecv);
+                                        if (lockOffchainRecv)
+                                        {
+                                            TRY_LOCK(pnode->cs_inventory, lockInv);
+                                            if (lockInv)
+                                                fDelete = true;
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
+                                        
                     if (fDelete)
                     {
                         vNodesDisconnected.remove(pnode);
@@ -1681,13 +1690,25 @@ void ThreadOpenConnections()
                         {
                             CSemaphoreGrant grant(*semOutbound);
                             CAddress addrConnect(addr->GetNetAddress());
-
-                            bool outcome=OpenNetworkConnection(addrConnect, &grant);
+                                
+                            const char *pszDest=NULL;
+                            if( (mc_gState->m_pSeedNode == NULL) && !fSeedAbandoned )
+                            {
+                                if(mc_gState->GetSeedNode())
+                                {
+                                    if(strcmp(addrConnect.ToStringIPPort().c_str(),mc_gState->GetSeedNode()) == 0)
+                                    {
+                                        pszDest=mc_gState->GetSeedNode();
+                                    }                                    
+                                }
+                            }
+                            
+                            bool outcome=OpenNetworkConnection(addrConnect, &grant, pszDest);
                             if(outcome)
                             {
                                 addrman.GetMCAddrMan()->SetOutcome(addr->GetNetAddress(),0,outcome);
                                 nRemaining--;
-                            }
+                            }                                
                             else
                             {
                                 addrman.GetMCAddrMan()->SetOutcome(addr->GetNetAddress(),0,outcome);                            

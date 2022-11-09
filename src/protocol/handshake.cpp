@@ -34,7 +34,7 @@ bool MultichainNode_CanConnect(CNode *pnode)
         }
         else
         {
-            LogPrintf("Seed node doesn't have connect permission, ignored\n");
+            LogPrintf("Seed node %d doesn't have connect permission, ignored\n",pnode->id);
         }
     }
     

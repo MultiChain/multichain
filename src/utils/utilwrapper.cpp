@@ -67,6 +67,7 @@
 #include <boost/program_options/detail/config_file.hpp>
 */
 using namespace std;
+bool fSeedAbandoned = false;
 
 const boost::filesystem::path mc_GetDataDir(const char *network_name,int create);
 const boost::filesystem::path mc_GetLogDir(const char *network_name,int create);
@@ -202,6 +203,10 @@ const char *mc_Params::SeedNode()
 
 const char* mc_State::GetSeedNode()
 {
+    if(fSeedAbandoned)
+    {
+        return NULL;
+    }
     if(m_SeedResolvedAddress[0])
     {
         return m_SeedResolvedAddress;

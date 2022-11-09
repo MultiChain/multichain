@@ -5746,8 +5746,8 @@ void mc_InitCachedBlockIndex()
 {
     if(!fInMemoryBlockIndex)
     {
-        mapBlockIndex.init(MC_BMM_LIMITED_SIZE,GetArg("-maxblockindexsize",0));
-        chainActive.InitStorage(MC_BMM_LIMITED_SIZE,GetArg("-chaincachesize",1));
+        mapBlockIndex.init(MC_BMM_LIMITED_SIZE,GetArg("-maxblockindexsize",3000));
+        chainActive.InitStorage(MC_BMM_LIMITED_SIZE,GetArg("-chaincachesize",3000));
     }    
 }
 
@@ -7612,6 +7612,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                         LogPrintf("mchn: Seed node lost connect permission on block %d\n",mc_gState->m_Permissions->m_Block);
                         mc_RemoveFile(mc_gState->m_NetworkParams->Name(),"seed",".dat",MC_FOM_RELATIVE_TO_DATADIR);
                         mc_gState->m_pSeedNode=NULL;
+                        fSeedAbandoned=true;
                     }
                 }
             }
@@ -8707,6 +8708,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                         {
                             LogPrintf("mchn: Disconnecting seed node\n");
                             pto->fDisconnect=true;
+                            fSeedAbandoned=true;
                         }
                     }
                 }

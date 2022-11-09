@@ -147,6 +147,7 @@ extern int nScriptCheckThreads;
 extern bool fTxIndex;
 extern bool fAcceptOnlyRequestedTxs;
 extern bool fIsBareMultisigStd;
+extern bool fSeedAbandoned;
 extern uint32_t nMessageHandlerThreads;
 extern unsigned int nCoinCacheSize;
 extern CFeeRate minRelayTxFee;
