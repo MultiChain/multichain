@@ -245,10 +245,6 @@ public:
     {
         CBlockHeader block;
         block.nVersion       = nVersion;
-/*        
-        if (getpprev())
-            block.hashPrevBlock = getpprev()->GetBlockHash();
- */ 
         block.hashPrevBlock  = hashPrev; 
         block.hashMerkleRoot = hashMerkleRoot;
         block.nTime          = nTime;
@@ -279,6 +275,7 @@ public:
         int64_t* pend = &pmedian[nMedianTimeSpan];
 
         CBlockIndex* pindex = this;
+/* BLMP LOOP */
         for (int i = 0; i < nMedianTimeSpan && pindex; i++, pindex = pindex->getpprev())
             *(--pbegin) = pindex->GetBlockTime();
 

@@ -872,6 +872,7 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
         vToFetch.resize(nToFetch);
         pindexWalk = pindexBestKnownBlock->GetAncestor(pindexWalk->nHeight + nToFetch);
         vToFetch[nToFetch - 1] = pindexWalk;
+/* BLMP LOOP */
         for (unsigned int i = nToFetch - 1; i > 0; i--) {
             vToFetch[i - 1] = vToFetch[i]->getpprev();
         }
@@ -980,7 +981,9 @@ CBlockIndex* FindForkInGlobalIndex(CChain& chain, const CBlockLocator& locator)
         {
             CBlockIndex* pindex = pmi;
             if (chain.Contains(pindex))
+            {
                 return pindex;
+            }
         }
     }
     return chain.Genesis();
@@ -2206,6 +2209,7 @@ void CheckForkWarningConditionsOnNewFork(CBlockIndex* pindexNewForkTip)
     {
         pindexBestForkBase=mapBlockIndex[hashBestForkBase];
     }
+/* BLMP LOOP */
     
     CBlockIndex* pfork = pindexNewForkTip;
     CBlockIndex* plonger = chainActive.Tip();
@@ -3748,6 +3752,7 @@ static CBlockIndex* FindMostWorkChain() {
         // Just going until the active chain is an optimization, as we know all blocks in it are valid already.
         CBlockIndex *pindexTest = pindexNew;
         bool fInvalidAncestor = false;
+/* BLMP LOOP */
         while (pindexTest && !chainActive.Contains(pindexTest)) {
             assert(pindexTest->nStatus & BLOCK_HAVE_DATA);
             assert(pindexTest->nChainTx || pindexTest->nHeight == 0);
@@ -3756,6 +3761,7 @@ static CBlockIndex* FindMostWorkChain() {
                 if ((hashBestInvalid == 0) || pindexNew->nChainWork > mapBlockIndex[hashBestInvalid]->nChainWork)
                     hashBestInvalid = pindexNew->GetBlockHash();
                 CBlockIndex *pindexFailed = pindexNew;
+/* BLMP LOOP */
                 while (pindexTest != pindexFailed) {
                     pindexFailed->nStatus |= BLOCK_FAILED_CHILD;
                     setBlockIndexCandidates.erase(pindexFailed->GetBlockHash());
@@ -3882,6 +3888,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     vpindexToConnect.clear();
     vpindexToConnect.reserve(nTargetHeight - nHeight);
     CBlockIndex *pindexIter = pindexMostWork->GetAncestor(nTargetHeight);
+/* BLMP LOOP */
     while (pindexIter && pindexIter->nHeight != nHeight) {
         vpindexToConnect.push_back(pindexIter);
         pindexIter = pindexIter->getpprev();
@@ -4175,6 +4182,7 @@ string SetLastBlock(uint256 hash,bool *fNotFound)
 
         CBlockIndex *pindex;
         pindex=pblockindex;
+/* BLMP LOOP */
         while(pindex != pindexFork)
         {
             if (pblockindex->nStatus & BLOCK_FAILED_MASK)
@@ -4368,11 +4376,12 @@ string SetLockedBlock(string hash)
                 
                 CBlockIndex *pindexWalk;
                 pindexWalk=pindexLockedBlock;
+/* BLMP LOOP */
                 while( (pindexWalk != pindexFork) && ( (pindexWalk->nStatus & BLOCK_HAVE_DATA) == 0 ) )
                 {
                     pindexWalk=pindexWalk->getpprev();
                 }
-/* BLMP COB */
+/* BLMP LOOP */
                 if(pindexWalk == pindexLockedBlock)
                 {
                     BOOST_FOREACH(const uint256& hashTip, setChainTips)
@@ -4487,7 +4496,7 @@ bool InvalidateBlock(CValidationState& state, CBlockIndex *pindex) {
 
     // The resulting new best tip may not be in setBlockIndexCandidates anymore, so
     // add them again.
-/* BLMP COB */
+/* BLMP LOOP */
 
     BOOST_FOREACH(const uint256& hashTip, setChainTips)
     {
@@ -4518,7 +4527,8 @@ bool InvalidateBlock(CValidationState& state, CBlockIndex *pindex) {
 bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
     AssertLockHeld(cs_main);
 
-/* BLMP COB */
+/* BLMP LOOP */
+
     // Remove the invalidity flag from this block and all its descendants.
 
     BOOST_FOREACH(const uint256& hashTip, setChainTips)
@@ -4566,6 +4576,7 @@ bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
 */
     
     // Remove the invalidity flag from all ancestors too.
+/* BLMP LOOP */
     while (pindex != NULL) {
         if (pindex->nStatus & BLOCK_FAILED_MASK) {
             pindex->nStatus &= ~BLOCK_FAILED_MASK;
@@ -4585,6 +4596,8 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     if (pit != NULL)
         return pit;
 
+    mc_gState->ChainLock();
+    
     // Construct new block index object
     CBlockIndex* pindexNew = new CBlockIndex(block);
     pindexNew->fUpdated=true;
@@ -4594,9 +4607,8 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     // competitive advantage.
     pindexNew->nSequenceId = 0;
     if(fDebug)LogPrint("mcblock","mchn-block: Adding block %s\n",hash.ToString().c_str());
-    mc_gState->ChainLock();
+    
     mapBlockIndex.insert(make_pair(hash, pindexNew));
-    mc_gState->ChainUnLock();
     if(fDebug)LogPrint("mcblock","mchn-block: Added block %s\n",hash.ToString().c_str());
 //    pindexNew->phashBlock = &((*mi).first);
     pindexNew->hashBlock = hash;
@@ -4627,6 +4639,8 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     pindexNew->fUpdated = true;
     setDirtyBlockIndex.insert(pindexNew->GetBlockHash());
 
+    mc_gState->ChainUnLock();
+    
     return pindexNew;
 }
 
@@ -4921,6 +4935,7 @@ bool CheckBranchForInvalidBlocks(CBlockIndex * const pindexPrev)
     
     CBlockIndex *pindexTest;
     pindexTest=pindexPrev;
+/* BLMP LOOP */
     while(pindexTest != pindexFork)
     {
         if(pindexTest->nStatus & BLOCK_FAILED_MASK)
@@ -5283,6 +5298,7 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
         setDirtyBlockIndex.insert(pindex->GetBlockHash());
         return false;
     }
+/* BLMP LOOP */
     
     CBlockIndex *pindexTip=pindex;
     while((pindexTip != NULL) && pindexTip->nHeight > chainActive.Height())
@@ -5345,6 +5361,7 @@ bool CBlockIndex::IsSuperMajority(int minVersion, CBlockIndex* pstart, unsigned 
     
 //    return true;
     return (pstart->nHeight >= (int)nRequired);
+/* BLMP LOOP */
     
     for (unsigned int i = 0; i < nToCheck && nFound < nRequired && pstart != NULL; i++)
     {
@@ -5373,6 +5390,7 @@ CBlockIndex* CBlockIndex::GetAncestor(int height)
 {
     if (height > nHeight || height < 0)
         return NULL;
+/* BLMP LOOP */
 
     CBlockIndex* pindexWalk = this;
     int heightWalk = nHeight;
@@ -5384,6 +5402,7 @@ CBlockIndex* CBlockIndex::GetAncestor(int height)
                                       heightSkipPrev >= height))) {
             // Only follow pskip if pprev->pskip isn't better than pskip->pprev.
 //            pindexWalk = pindexWalk->pskip;
+/* BLMP LOOP */
             pindexWalk = pindexWalk->getpskip();
             heightWalk = heightSkip;
         } else {
@@ -6203,6 +6222,7 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
 
     // check level 4: try reconnecting blocks
     if (nCheckLevel >= 4) {
+/* BLMP LOOP */
         CBlockIndex *pindex = pindexState;
         while (pindex != chainActive.Tip()) {
             boost::this_thread::interruption_point();
@@ -7213,6 +7233,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             pindex = chainActive.Next(pindex);
         int nLimit = 500;
         if(fDebug)LogPrint("net", "getblocks %d to %s limit %d from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop==uint256(0) ? "end" : hashStop.ToString(), nLimit, pfrom->id);
+/* BLMP LOOP */
         for (; pindex; pindex = chainActive.Next(pindex))
         {
             if (pindex->GetBlockHash() == hashStop)
@@ -7263,19 +7284,83 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             // Find the last block the caller has in the main chain
             pindex = FindForkInGlobalIndex(chainActive, locator);
             if (pindex)
+            {
                 pindex = chainActive.Next(pindex);
+            }
         }
 
         // we must use CBlocks, as CBlockHeaders won't include the 0x00 nTx count at the end
         vector<CBlock> vHeaders;
         int nLimit = MAX_HEADERS_RESULTS;
         if(fDebug)LogPrint("net", "getheaders %d to %s from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop.ToString(), pfrom->id);
-        for (; pindex; pindex = chainActive.Next(pindex))
+/* BLMP LOOP FIXED */
+        if(fOptimizedBlockIndexLoops)
         {
-            vHeaders.push_back(pindex->GetBlockHeader());
-            if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
-                break;
+            if(pindex)
+            {                
+                int begin_height,end_height;
+                begin_height=pindex->nHeight;
+                end_height=begin_height+MAX_HEADERS_RESULTS;
+                if(end_height > chainActive.Height()+1)
+                {
+                    end_height = chainActive.Height()+1; 
+                }
+                CBlockIndex* pstop = mapBlockIndex.find(hashStop);
+                if(pstop)
+                {
+                    if(chainActive.Contains(pstop))
+                    {
+                        if(pstop->nHeight+1 < end_height)
+                        {
+                            end_height = pstop->nHeight+1;
+                        }
+                    }
+                }
+                if(end_height > begin_height)
+                {
+                    vHeaders.resize(end_height-begin_height);
+                    int outpos=end_height-begin_height-1;
+                    uint256 hashWalk=chainActive[end_height-1]->hashBlock;
+                    while(outpos >= 0)
+                    {
+                        bool fDelete=false;
+                        CBlockIndex *pWalk=mapBlockIndex.softfind(hashWalk);
+
+                        if(pWalk == NULL)
+                        {
+                            pWalk=pblocktree->ReadBlockIndex(hashWalk);
+                            fDelete=true;
+                        }
+
+                        if(pWalk == NULL)
+                        {
+                            outpos=0;
+                        }
+                        else
+                        {
+                            pWalk->hashBlock=hashWalk;
+                            vHeaders[outpos]=pWalk->GetBlockHeader();   
+                            hashWalk=pWalk->hashPrev;
+                            if(fDelete)
+                            {
+                                delete pWalk;
+                            }
+                        }                    
+                        outpos--;
+                    }
+                }
+                if(fDebug)LogPrint("net", "prepared headers %d-%d for peer=%d\n", begin_height, end_height-1, pfrom->id);                
+            }            
         }
+        else
+        {
+            for (; pindex; pindex = chainActive.Next(pindex))
+            {
+                vHeaders.push_back(pindex->GetBlockHeader());
+                if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
+                    break;
+            }            
+        }        
         mc_gState->ChainUnLock();
         pfrom->PushMessage("headers", vHeaders);
     }

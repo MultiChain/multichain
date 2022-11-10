@@ -41,6 +41,7 @@ extern bool fLogIPs;
 extern bool fLogTimeMillis;
 extern bool fInRecovery;
 extern bool fInMemoryBlockIndex;
+extern bool fOptimizedBlockIndexLoops;
 extern volatile bool fReopenDebugLog;
 extern uint64_t nLockPrintThread;
 

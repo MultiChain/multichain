@@ -852,6 +852,7 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 /* MCHN START */    
     fLogTimeMillis = GetBoolArg("-logtimemillis", false);
     fInMemoryBlockIndex = GetBoolArg("-inmemoryblockindex", false);
+    fOptimizedBlockIndexLoops = GetBoolArg("-optimizedblockindexloops", true);
     nBlockIndexCacheSize = GetArg("-blockindexcachesize",DEFAULT_MAX_BLOCK_INDEX_CACHE_SIZE);
 /* MCHN END */    
 

@@ -173,6 +173,9 @@ void CBlockMap::defragment()
 
 
 CBlockIndex *CBlockMap::operator[](uint256 hash) {
+    
+    return find(hash);
+            
     if(fInMemory)
     {
         return m_MapBlockIndex[hash];
@@ -213,6 +216,27 @@ size_t CBlockMap::count(uint256 hash) {
     unlock();
     
     return result;
+}
+
+CBlockIndex* CBlockMap::softfind(uint256 hash) 
+{
+    BlockMap::iterator mi;
+    
+    lock();
+    
+    CBlockIndex *presult=NULL;
+    
+    mi = m_MapBlockIndex.find(hash);
+    if(mi != m_MapBlockIndex.end())
+    {
+        presult=mi->second;
+        presult->nLockedByThread |= getthreadbit();
+//    LogPrintf("Block Index: soft : %s\n",hash.ToString().c_str());
+    }        
+    
+    unlock();
+    
+    return presult;
 }
 
 CBlockIndex* CBlockMap::find(uint256 hash) {
@@ -387,12 +411,16 @@ void CBlockMap::flush() {
     uint64_t threadbit=getthreadbit();
     uint64_t notthreadbit=~threadbit;
             
+    BOOST_FOREACH(PAIRTYPE(uint256, CBlockIndex*) item, m_MapBlockIndex)
+    {
+        item.second->nLockedByThread &= notthreadbit;
+    }
+    
     if(map_size > m_MaxSize)
     {    
         size_t locked_hashes=0;
         BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, m_MapBlockIndex)
         {
-            item.second->nLockedByThread &= notthreadbit;
             if(!item.second->fUpdated)
             {
                 if(item.second->nLockedByThread == 0)

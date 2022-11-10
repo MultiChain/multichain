@@ -108,6 +108,7 @@ bool fLogIPs = false;
 bool fLogTimeMillis = false;
 bool fInRecovery = false;
 bool fInMemoryBlockIndex = true;
+bool fOptimizedBlockIndexLoops = true;
 volatile bool fReopenDebugLog = false;
 
 /**

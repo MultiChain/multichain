@@ -776,6 +776,7 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
     
     LogPrint("mchn","VerifyBlockMiner: Block: %d, Fork: %d, Chain: %d\n",pindexNew->nHeight,pindexFork->nHeight,mc_gState->m_Permissions->m_Block);
     
+/* BLMP LOOP */
     while(pindex != pindexFork)
     {
         if(pindex->nStatus & BLOCK_FAILED_MASK)

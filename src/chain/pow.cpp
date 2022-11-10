@@ -42,6 +42,7 @@ unsigned int GetNextWorkRequired(CBlockIndex* pindexLast, const CBlockHeader *pb
             {
                 // Return the last non-special-min-difficulty-rules-block
                 CBlockIndex* pindex = pindexLast;
+/* BLMP LOOP */
                 while (pindex->getpprev() && pindex->nHeight % Params().Interval() != 0 && pindex->nBits == nProofOfWorkLimit)
                     pindex = pindex->getpprev();
                 return pindex->nBits;
@@ -52,6 +53,7 @@ unsigned int GetNextWorkRequired(CBlockIndex* pindexLast, const CBlockHeader *pb
 
     // Go back by what we want to be 14 days worth of blocks
     CBlockIndex* pindexFirst = pindexLast;
+/* BLMP LOOP */
     for (int i = 0; pindexFirst && i < Params().Interval()-1; i++)
         pindexFirst = pindexFirst->getpprev();
     assert(pindexFirst);

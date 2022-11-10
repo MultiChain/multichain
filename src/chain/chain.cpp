@@ -339,36 +339,28 @@ bool CChainStorage::flush()
 
 CBlockIndex * CChain::Genesis()  {
     return cChain.getsize() > 0 ? cChain.getptr(0) : NULL;
-//        return vChain.size() > 0 ? vChain[0] : NULL;
 }
 
 /** Returns the index entry for the tip of this chain, or NULL if none. */
 CBlockIndex * CChain::Tip()  {
     return cChain.getsize() > 0 ? cChain.getptr(cChain.getsize() - 1) : NULL;
-//        return vChain.size() > 0 ? vChain[vChain.size() - 1] : NULL;
 }
 
 /** Returns the index entry at a particular height in this chain, or NULL if no such height exists. */
 CBlockIndex * CChain::operator[](int nHeight)  {
     return cChain.getptr(nHeight);
-
-//        if (nHeight < 0 || nHeight >= (int)vChain.size())
-//            return NULL;
-//        return vChain[nHeight];
 }
 
 
 /** Efficiently check whether a block is present in this chain. */
 bool  CChain::Contains(const CBlockIndex *pindex)  {
     return cChain.gethash(pindex->nHeight) == pindex->GetBlockHash();
-//        return (*this)[pindex->nHeight] == pindex;
 }
 
 /** Find the successor of a block in this chain, or NULL if the given index is not found or is the tip. */
 CBlockIndex *CChain::Next(const CBlockIndex *pindex)  {
     if (Contains(pindex))
         return cChain.getptr(pindex->nHeight + 1);
-//            return (*this)[pindex->nHeight + 1];
     else
         return NULL;
 }
@@ -376,29 +368,23 @@ CBlockIndex *CChain::Next(const CBlockIndex *pindex)  {
 /** Return the maximal height in the chain. Is equal to chain.Tip() ? chain.Tip()->nHeight : -1. */
 int  CChain::Height() const {
     return cChain.getsize() - 1;
-//        return vChain.size() - 1;
 }
 
 void CChain::SetTip(CBlockIndex *pindex) {
     mc_gState->ChainLock();
     if (pindex == NULL) {
         cChain.setsize(0);
-//        vChain.clear();
         mc_gState->ChainUnLock();
         return;
     }
 /* BLMP Full scan on initialization if hashes not stored, if flush here make sure pindex is not required in caller */    
+/* BLMP LOOP */    
     cChain.setsize(pindex->nHeight + 1);
     while (pindex && cChain.gethash(pindex->nHeight) != pindex->GetBlockHash()) {
         cChain.setptr(pindex->nHeight,pindex);
         pindex = pindex->getpprev();
     }
     
-//    vChain.resize(pindex->nHeight + 1);
-//    while (pindex && vChain[pindex->nHeight] != pindex) {
-//        vChain[pindex->nHeight] = pindex;
-//        pindex = pindex->getpprev();
-//    }
     mc_gState->ChainUnLock();
 }
 
@@ -417,7 +403,7 @@ CBlockLocator CChain::GetLocator(const CBlockIndex *pindex)  {
     int nStep = 1;
     std::vector<uint256> vHave;
     vHave.reserve(32);
-
+/* BLMP LOOP */
     if (!pindex)
         pindex = Tip();
     while (pindex) {
@@ -447,6 +433,7 @@ CBlockIndex *CChain::FindFork(CBlockIndex *pindexIn) {
     CBlockIndex *pindex=pindexIn;
     if (pindex->nHeight > Height())
         pindex = pindex->GetAncestor(Height());
+/* BLMP LOOP */
     while (pindex && !Contains(pindex))
         pindex = pindex->getpprev();
     return pindex;
@@ -470,11 +457,9 @@ CBlockIndex* CBlockIndex::getpskip(){
         return mapBlockIndex[hashSkip];
     }
     return NULL;
-//    return pskip;
 }
 
 void CBlockIndex::setpskip(CBlockIndex* p){
-//    pskip=p;
     hashSkip=0;
     if(p)
     {
