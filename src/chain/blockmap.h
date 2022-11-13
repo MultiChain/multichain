@@ -72,7 +72,7 @@ public:
     CBlockIndex *operator[](uint256 hash);
     size_t count(uint256 hash);    
     CBlockIndex *find(uint256 hash);
-    CBlockIndex *softfind(uint256 hash);
+    CBlockIndex *softfind(uint256 hash,bool *fNotInMap);
     BlockMap::iterator begin();
     BlockMap::iterator end();
     BlockMap::iterator next(BlockMap::iterator& it);

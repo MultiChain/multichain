@@ -218,7 +218,7 @@ size_t CBlockMap::count(uint256 hash) {
     return result;
 }
 
-CBlockIndex* CBlockMap::softfind(uint256 hash) 
+CBlockIndex* CBlockMap::softfind(uint256 hash,bool *fNotInMap) 
 {
     BlockMap::iterator mi;
     
@@ -229,10 +229,16 @@ CBlockIndex* CBlockMap::softfind(uint256 hash)
     mi = m_MapBlockIndex.find(hash);
     if(mi != m_MapBlockIndex.end())
     {
+        *fNotInMap=false;
         presult=mi->second;
         presult->nLockedByThread |= getthreadbit();
 //    LogPrintf("Block Index: soft : %s\n",hash.ToString().c_str());
     }        
+    else
+    {
+        *fNotInMap=true;
+        presult=pblocktree->ReadBlockIndex(hash);
+    }
     
     unlock();
     

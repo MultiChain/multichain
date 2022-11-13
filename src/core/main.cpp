@@ -4933,20 +4933,58 @@ bool CheckBranchForInvalidBlocks(CBlockIndex * const pindexPrev)
     const CBlockIndex *pindexFork;
     pindexFork=chainActive.FindFork(pindexPrev);
     
-    CBlockIndex *pindexTest;
-    pindexTest=pindexPrev;
-/* BLMP LOOP */
-    while(pindexTest != pindexFork)
+/* BLMP LOOP FIXED */
+    
+    if(fOptimizedBlockIndexLoops)
     {
-        if(pindexTest->nStatus & BLOCK_FAILED_MASK)
-        {
-            LogPrintf("Block is on branch containing invalid block %s (height %d)\n",pindexTest->GetBlockHash().ToString().c_str(),pindexTest->nHeight);
-            return false;
-        }
-
-        pindexTest=pindexTest->getpprev();
-    }
+        CBlockIndex *pWalk;
+        uint256 hashWalk=pindexPrev->GetBlockHash();
+        uint256 hashFork=pindexFork->GetBlockHash();
         
+        while(hashWalk != hashFork)
+        {
+            bool fFailed=false;
+            bool fDelete=false;
+            int height;
+            CBlockIndex *pWalk=mapBlockIndex.softfind(hashWalk,&fDelete);
+            if(pWalk == NULL)
+            {
+                LogPrintf("ERROR: Couldn't find block %s in CheckBranchForInvalidBlocks\n",hashWalk.ToString().c_str());
+                return false;                
+            }        
+            if(pWalk->nStatus & BLOCK_FAILED_MASK)
+            {
+                fFailed=true;
+            }
+            height=pWalk->nHeight;
+            hashWalk=pWalk->hashPrev;
+            if(fDelete)
+            {
+                delete pWalk;
+            }            
+            if(fFailed)
+            {
+                LogPrintf("Block is on branch containing invalid block %s (height %d)\n",hashWalk.ToString().c_str(),height);
+                return false;
+            }
+        }
+    }
+    else
+    {
+        CBlockIndex *pindexTest;
+        pindexTest=pindexPrev;
+        while(pindexTest != pindexFork)
+        {
+            if(pindexTest->nStatus & BLOCK_FAILED_MASK)
+            {
+                LogPrintf("Block is on branch containing invalid block %s (height %d)\n",pindexTest->GetBlockHash().ToString().c_str(),pindexTest->nHeight);
+                return false;
+            }
+
+            pindexTest=pindexTest->getpprev();
+        }        
+    }
+            
     return true;
 }
 
@@ -7324,13 +7362,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                     while(outpos >= 0)
                     {
                         bool fDelete=false;
-                        CBlockIndex *pWalk=mapBlockIndex.softfind(hashWalk);
-
-                        if(pWalk == NULL)
-                        {
-                            pWalk=pblocktree->ReadBlockIndex(hashWalk);
-                            fDelete=true;
-                        }
+                        CBlockIndex *pWalk=mapBlockIndex.softfind(hashWalk,&fDelete);
 
                         if(pWalk == NULL)
                         {
