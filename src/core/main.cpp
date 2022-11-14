@@ -372,7 +372,9 @@ struct CNodeState {
     int nBlocksInFlight;
     //! Whether we consider this a preferred download peer.
     bool fPreferredDownload;
-
+    int nBestKnownHeight;
+    bool fDelayedHeaders;
+    
     CNodeState() {
         nMisbehavior = 0;
         fShouldBan = false;
@@ -383,6 +385,8 @@ struct CNodeState {
         nStallingSince = 0;
         nBlocksInFlight = 0;
         fPreferredDownload = false;
+        nBestKnownHeight = -1;
+        fDelayedHeaders = false;
     }
 };
 
@@ -780,7 +784,10 @@ void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash) {
     if (pit != NULL && pit->nChainWork > 0) {
         // An actually better block was announced.
         if (pindexBestKnownBlock == NULL || pit->nChainWork >= pindexBestKnownBlock->nChainWork)
+        {
             state->hashBestKnownBlock = pit->GetBlockHash();
+            state->nBestKnownHeight = pit->nHeight;
+        }
     } else {
         // An unknown block was announced; just assume that the latest one is the best one.
         state->hashLastUnknownBlock = hash;
@@ -872,7 +879,7 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
         vToFetch.resize(nToFetch);
         pindexWalk = pindexBestKnownBlock->GetAncestor(pindexWalk->nHeight + nToFetch);
         vToFetch[nToFetch - 1] = pindexWalk;
-/* BLMP LOOP */
+/* BLMP LOOP LIMITED */
         for (unsigned int i = nToFetch - 1; i > 0; i--) {
             vToFetch[i - 1] = vToFetch[i]->getpprev();
         }
@@ -3147,14 +3154,22 @@ unsigned long mc_GetMemoryUsage()
 
 /** Update chainActive and related internal data structures. */
 void static UpdateTip(CBlockIndex *pindexNew) {
+    
+    bool fUp=(pindexNew->nHeight > chainActive.Height());
+    
     chainActive.SetTip(pindexNew);
 
     // New best block
     nTimeBestReceived = GetTime();
     mempool.AddTransactionsUpdated(1);
-
+/*
     LogPrintf("UpdateTip:            new best=%s  height=%d  log2_work=%.8g  tx=%lu  date=%s mem=%ld\n",
       chainActive.Tip()->GetBlockHash().ToString(), chainActive.Height(), log(chainActive.Tip()->nChainWork.getdouble())/log(2.0), (unsigned long)chainActive.Tip()->nChainTx,
+      DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
+      mc_GetMemoryUsage());
+*/    
+    LogPrintf("UpdateTip:            new best=%s  height=%d %s tx=%lu date=%s mem=%ld\n",
+      chainActive.Tip()->GetBlockHash().ToString(), chainActive.Height(), fUp ? "+" : "-" , (unsigned long)chainActive.Tip()->nChainTx,
       DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
       mc_GetMemoryUsage());
     
@@ -3267,7 +3282,10 @@ bool static DisconnectTip(CValidationState &state) {
         CValidationState stateDummy;
         if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, false, NULL))
         {
-            LogPrintf("Tx not accepted in resurrection after block: %s\n",tx.GetHash().ToString().c_str());
+            if(!tx.IsCoinBase())
+            {
+                LogPrintf("Tx not accepted in resurrection after block: %s\n",tx.GetHash().ToString().c_str());
+            }
             string reason=(stateDummy.GetRejectReason().size() > 0) ? stateDummy.GetRejectReason() : "unknown";
             mempool.remove(tx, removed, true, "resurrection: "+reason);
         }
@@ -4608,15 +4626,20 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     pindexNew->nSequenceId = 0;
     if(fDebug)LogPrint("mcblock","mchn-block: Adding block %s\n",hash.ToString().c_str());
     
-    mapBlockIndex.insert(make_pair(hash, pindexNew));
-    if(fDebug)LogPrint("mcblock","mchn-block: Added block %s\n",hash.ToString().c_str());
 //    pindexNew->phashBlock = &((*mi).first);
     pindexNew->hashBlock = hash;
+    
     CBlockIndex* pmiPrev = mapBlockIndex.find(block.hashPrevBlock);
     if (pmiPrev != NULL)
     {
+        pindexNew->nHeight = pmiPrev->nHeight + 1;        
+    }
+    mapBlockIndex.insert(make_pair(hash, pindexNew));
+    if(fDebug)LogPrint("mcblock","mchn-block: Added block %s\n",hash.ToString().c_str());
+    if (pmiPrev != NULL)
+    {
         pindexNew->setpprev(pmiPrev);
-        pindexNew->nHeight = pindexNew->getpprev()->nHeight + 1;
+//        pindexNew->nHeight = pindexNew->getpprev()->nHeight + 1;
         pindexNew->BuildSkip();
         if( (pindexNew->getpprev()->nStatus & BLOCK_HAVE_SUCCESSOR) == 0 )
         {
@@ -4937,32 +4960,21 @@ bool CheckBranchForInvalidBlocks(CBlockIndex * const pindexPrev)
     
     if(fOptimizedBlockIndexLoops)
     {
-        CBlockIndex *pWalk;
         uint256 hashWalk=pindexPrev->GetBlockHash();
         uint256 hashFork=pindexFork->GetBlockHash();
         
         while(hashWalk != hashFork)
         {
-            bool fFailed=false;
-            bool fDelete=false;
             int height;
-            CBlockIndex *pWalk=mapBlockIndex.softfind(hashWalk,&fDelete);
+            CBlockIndex *pWalk=mapBlockIndex.softfind(hashWalk);
             if(pWalk == NULL)
             {
                 LogPrintf("ERROR: Couldn't find block %s in CheckBranchForInvalidBlocks\n",hashWalk.ToString().c_str());
                 return false;                
             }        
-            if(pWalk->nStatus & BLOCK_FAILED_MASK)
-            {
-                fFailed=true;
-            }
             height=pWalk->nHeight;
             hashWalk=pWalk->hashPrev;
-            if(fDelete)
-            {
-                delete pWalk;
-            }            
-            if(fFailed)
+            if(pWalk->nStatus & BLOCK_FAILED_MASK)
             {
                 LogPrintf("Block is on branch containing invalid block %s (height %d)\n",hashWalk.ToString().c_str(),height);
                 return false;
@@ -5804,7 +5816,7 @@ void mc_InitCachedBlockIndex()
     if(!fInMemoryBlockIndex)
     {
         mapBlockIndex.init(MC_BMM_LIMITED_SIZE,GetArg("-maxblockindexsize",3000));
-        chainActive.InitStorage(MC_BMM_LIMITED_SIZE,GetArg("-chaincachesize",3000));
+        chainActive.InitStorage(MC_BMM_LIMITED_SIZE,GetArg("-chaincachesize",30));
     }    
 }
 
@@ -7192,21 +7204,30 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                     // time the block arrives, the header chain leading up to it is already validated. Not
                     // doing this will result in the received block being rejected as an orphan in case it is
                     // not a direct successor.
-                    pfrom->PushMessage("getheaders", chainActive.GetLocator(mapBlockIndex[hashBestHeader]), inv.hash);
                     CNodeState *nodestate = State(pfrom->GetId());
-                    if(!MultichainNode_IgnoreIncoming(pfrom))
+                    
+                    if(nodestate->nBestKnownHeight > chainActive.Height() + MAX_AHEAD_HEADERS)
                     {
-                        if (chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - Params().TargetSpacing() * 20 &&
-                            nodestate->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
-                            vToFetch.push_back(inv);                            
-                            // Mark block as in flight already, even though the actual "getdata" message only goes out
-                            // later (within the same cs_main lock, though).
-                            MarkBlockAsInFlight(pfrom->GetId(), inv.hash);
-                            if(fDebug)LogPrint("mcblockperf", "mchn-block-perf: Requesting block (inv) %s peer=%d\n", inv.hash.ToString().c_str(), pfrom->id);
-                            
-                        }
+                        nodestate->fDelayedHeaders=true;
+                        if(fDebug)LogPrint("net", "skipped block inv message - peer=%d is far ahead (best height %d), \n",pfrom->GetId(), nodestate->nBestKnownHeight);                    
                     }
-                    if(fDebug)LogPrint("net", "getheaders (%d) %s to peer=%d\n", mapBlockIndex[hashBestHeader]->nHeight, inv.hash.ToString(), pfrom->id);
+                    else
+                    {
+                        pfrom->PushMessage("getheaders", chainActive.GetLocator(mapBlockIndex[hashBestHeader]), inv.hash);
+                        if(!MultichainNode_IgnoreIncoming(pfrom))
+                        {
+                            if (chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - Params().TargetSpacing() * 20 &&
+                                nodestate->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
+                                vToFetch.push_back(inv);                            
+                                // Mark block as in flight already, even though the actual "getdata" message only goes out
+                                // later (within the same cs_main lock, though).
+                                MarkBlockAsInFlight(pfrom->GetId(), inv.hash);
+                                if(fDebug)LogPrint("mcblockperf", "mchn-block-perf: Requesting block (inv) %s peer=%d\n", inv.hash.ToString().c_str(), pfrom->id);
+
+                            }
+                        }
+                        if(fDebug)LogPrint("net", "getheaders (%d) %s to peer=%d\n", mapBlockIndex[hashBestHeader]->nHeight, inv.hash.ToString(), pfrom->id);
+                    }
                 }
             }
 
@@ -7334,6 +7355,13 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 /* BLMP LOOP FIXED */
         if(fOptimizedBlockIndexLoops)
         {
+            CNodeState *nodestate = State(pfrom->GetId());
+            if(nodestate->nBestKnownHeight > chainActive.Height() + MAX_AHEAD_HEADERS)
+            {
+                if(fDebug)LogPrint("net", "skipped getheaders message - peer=%d  is far ahead (best height %d),  \n",pfrom->GetId(),nodestate->nBestKnownHeight);     
+                pindex=NULL;
+            }
+            
             if(pindex)
             {                
                 int begin_height,end_height;
@@ -7361,8 +7389,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                     uint256 hashWalk=chainActive[end_height-1]->hashBlock;
                     while(outpos >= 0)
                     {
-                        bool fDelete=false;
-                        CBlockIndex *pWalk=mapBlockIndex.softfind(hashWalk,&fDelete);
+                        CBlockIndex *pWalk=mapBlockIndex.softfind(hashWalk);
 
                         if(pWalk == NULL)
                         {
@@ -7373,10 +7400,6 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                             pWalk->hashBlock=hashWalk;
                             vHeaders[outpos]=pWalk->GetBlockHeader();   
                             hashWalk=pWalk->hashPrev;
-                            if(fDelete)
-                            {
-                                delete pWalk;
-                            }
                         }                    
                         outpos--;
                     }
@@ -7664,8 +7687,18 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 // Headers message had its maximum size; the peer may have more headers.
                 // TODO: optimize: if pindexLast is an ancestor of chainActive.Tip or pindexBestHeader, continue
                 // from there instead.
-                if(fDebug)LogPrint("net", "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id, pfrom->nStartingHeight);
-                pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256(0));
+                CNodeState *nodestate = State(pfrom->GetId());
+                if(nodestate->nBestKnownHeight > chainActive.Height() + MAX_AHEAD_HEADERS)
+                {
+                    nodestate->fDelayedHeaders=true;
+                    if(fDebug)LogPrint("net", "skipped getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id, pfrom->nStartingHeight);                    
+                }
+                else
+                {
+                    if(fDebug)LogPrint("net", "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id, pfrom->nStartingHeight);
+                    pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256(0));
+                }
+                FlushStateToDisk();
             }
         }
     }
@@ -8593,6 +8626,18 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                 pto->PushMessage("getheaders", chainActive.GetLocator(pindexStart), uint256(0));
             }
         }
+        
+        if (state.fDelayedHeaders && !pto->fClient && fFetch && !fImporting && !fReindex) {
+            if(state.nBestKnownHeight <= chainActive.Height() + MAX_AHEAD_HEADERS)
+            {
+                state.fDelayedHeaders = true;
+                CBlockIndex *pindexStart = mapBlockIndex[hashBestHeader]->getpprev() ? mapBlockIndex[hashBestHeader]->getpprev() : mapBlockIndex[hashBestHeader];
+                if(fDebug)LogPrint("net", "delayed getheaders (%d) to peer=%d (startheight:%d)\n", pindexStart->nHeight, pto->id, pto->nStartingHeight);
+                pto->PushMessage("getheaders", chainActive.GetLocator(pindexStart), uint256(0));
+            }            
+        }
+                    
+        
 
         // Resend wallet transactions that haven't gotten in a block yet
         // Except during reindex, importing and IBD, when old wallet
