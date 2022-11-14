@@ -526,7 +526,7 @@ bool CBlockTreeDB::UpdateBlockCacheValues()
 }
 */
 
-CBlockIndex *CBlockTreeDB::ReadBlockIndex(uint256 hash) {
+CBlockIndex *CBlockTreeDB::ReadBlockIndex(uint256 hash,CBlockIndex *pindexIn) {
     
     CDiskBlockIndex diskindex;
     if(!Read(make_pair('b', hash), diskindex))
@@ -534,7 +534,12 @@ CBlockIndex *CBlockTreeDB::ReadBlockIndex(uint256 hash) {
         return NULL;
     }
     
-    CBlockIndex* pindexNew = new CBlockIndex();
+    CBlockIndex* pindexNew=pindexIn;
+    
+    if(pindexNew == NULL)
+    {
+        pindexNew = new CBlockIndex();
+    }
     
     DiskBlockIndexToCBlockIndex(pindexNew,diskindex);
     pindexNew->hashPrev=diskindex.hashPrev;

@@ -2063,6 +2063,10 @@ void StartHTTPServer()
     
     if(fDebug)LogPrint("rpc", "Starting RPC HTTP server\n");
     int rpcThreads = std::max((long)GetArg("-rpcthreads", DEFAULT_HTTP_THREADS), 1L);
+    if(rpcThreads > 48)
+    {
+        rpcThreads=48;
+    }
     LogPrintf("HTTP: starting %d worker threads\n", rpcThreads);
     g_thread_http = std::thread(ThreadHTTP, eventBase);
 

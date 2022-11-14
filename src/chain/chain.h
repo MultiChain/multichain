@@ -275,7 +275,7 @@ public:
         int64_t* pend = &pmedian[nMedianTimeSpan];
 
         CBlockIndex* pindex = this;
-/* BLMP LOOP */
+/* BLMP LOOP IGNORE */
         for (int i = 0; i < nMedianTimeSpan && pindex; i++, pindex = pindex->getpprev())
             *(--pbegin) = pindex->GetBlockTime();
 

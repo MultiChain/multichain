@@ -440,7 +440,16 @@ CBlockIndex *CChain::FindFork(CBlockIndex *pindexIn) {
 }
 
 CBlockIndex* CBlockIndex::getpprev() {
-    return mapBlockIndex[hashPrev];
+    CBlockIndex *presult=NULL;
+    presult=mapBlockIndex[hashPrev];
+    if(presult == NULL)
+    {
+        if(nHeight > 0)
+        {
+            LogPrintf("ERROR: Couldn't find previous block (%s) for block %s, height %d\n",hashPrev.ToString().c_str(),GetBlockHash().ToString().c_str(),nHeight);                    
+        }
+    }
+    return presult;
 }
 
 void CBlockIndex::setpprev(CBlockIndex* p){

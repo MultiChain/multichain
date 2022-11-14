@@ -42,6 +42,10 @@ void CBlockMap::zero()
     m_MapThreads.clear();
     fInMemory=true;
     m_ChangeCount=0;
+    for(int i=0;i<64;i++)
+    {
+        m_SoftEntry[i]=NULL;
+    }
 }
 
 int CBlockMap::init(uint32_t mode,int maxsize)
@@ -62,12 +66,24 @@ int CBlockMap::init(uint32_t mode,int maxsize)
         LogPrintf("Block Index: Cannot initialize semaphore");
         return MC_ERR_INTERNAL_ERROR;
     }
-        
+
+    for(int i=0;i<64;i++)
+    {
+        m_SoftEntry[i]=new CBlockIndex();
+    }
     return MC_ERR_NOERROR;
 }
 
 void CBlockMap::destroy()
 {
+    for(int i=0;i<64;i++)
+    {
+        if(m_SoftEntry[i])
+        {
+            delete m_SoftEntry[i];
+        }
+    }
+    
     if(m_Semaphore)
     {
         __US_SemDestroy(m_Semaphore);
@@ -86,7 +102,7 @@ void CBlockMap::unlock()
     __US_SemPost(m_Semaphore);    
 }
 
-uint64_t CBlockMap::getthreadbit()
+int CBlockMap::getthreadid()
 {
     uint64_t this_thread=__US_ThreadID();
     std::map <uint64_t, int >::iterator thit=m_MapThreads.find(this_thread);
@@ -97,9 +113,14 @@ uint64_t CBlockMap::getthreadbit()
             LogPrintf("ERROR: Too many block index threads\n");            
             return -1;
         }
-        m_MapThreads.insert(make_pair(this_thread,(int)m_MapThreads.size()-1));
+        m_MapThreads.insert(make_pair(this_thread,(int)m_MapThreads.size()));
     }
-    return 1 << thit->second;
+    return thit->second;
+}
+
+uint64_t CBlockMap::getthreadbit()
+{
+    return 1 << getthreadid();
 }
 
 bool CBlockMap::load(uint256 hash)
@@ -218,7 +239,7 @@ size_t CBlockMap::count(uint256 hash) {
     return result;
 }
 
-CBlockIndex* CBlockMap::softfind(uint256 hash,bool *fNotInMap) 
+CBlockIndex* CBlockMap::softfind(uint256 hash) 
 {
     BlockMap::iterator mi;
     
@@ -229,18 +250,26 @@ CBlockIndex* CBlockMap::softfind(uint256 hash,bool *fNotInMap)
     mi = m_MapBlockIndex.find(hash);
     if(mi != m_MapBlockIndex.end())
     {
-        *fNotInMap=false;
         presult=mi->second;
         presult->nLockedByThread |= getthreadbit();
 //    LogPrintf("Block Index: soft : %s\n",hash.ToString().c_str());
     }        
     else
     {
-        *fNotInMap=true;
-        presult=pblocktree->ReadBlockIndex(hash);
+        int thread_id=getthreadid();
+        if(thread_id >= 0)
+        {
+            presult=m_SoftEntry[thread_id];                        
+        }
+        presult=pblocktree->ReadBlockIndex(hash,presult);
     }
     
     unlock();
+    
+    if(presult == NULL)
+    {
+        LogPrintf("ERROR: Block Index: couldn't retrieve block %s\n",hash.ToString().c_str());        
+    }
     
     return presult;
 }
@@ -259,7 +288,7 @@ CBlockIndex* CBlockMap::find(uint256 hash) {
     
 //    LogPrintf("Block Index: find : %s\n",hash.ToString().c_str());
 
-    CBlockIndex *result=NULL;
+    CBlockIndex *presult=NULL;
     
     lock();
 
@@ -269,13 +298,13 @@ CBlockIndex* CBlockMap::find(uint256 hash) {
         mi=m_MapBlockIndex.find(hash);
         if(mi != m_MapBlockIndex.end())
         {
-            result=mi->second;
+            presult=mi->second;
         }
     }
     
     unlock();
     
-    return result;
+    return presult;
 }
 
 BlockMap::iterator CBlockMap::begin() {

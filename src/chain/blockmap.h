@@ -46,7 +46,8 @@ private:
     uint32_t m_Mode;
     bool fInMemory;
     int m_ChangeCount;
-
+    CBlockIndex *m_SoftEntry[64];
+    
 public:
     
     CBlockMap()
@@ -66,13 +67,14 @@ public:
     void unlock();
     bool load(uint256 hash);
     bool unload(uint256 hash);
+    int getthreadid();
     uint64_t getthreadbit();
     void defragment();
     
     CBlockIndex *operator[](uint256 hash);
     size_t count(uint256 hash);    
     CBlockIndex *find(uint256 hash);
-    CBlockIndex *softfind(uint256 hash,bool *fNotInMap);
+    CBlockIndex *softfind(uint256 hash);
     BlockMap::iterator begin();
     BlockMap::iterator end();
     BlockMap::iterator next(BlockMap::iterator& it);

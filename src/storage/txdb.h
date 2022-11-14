@@ -79,7 +79,7 @@ private:
     CBlockTreeDB(const CBlockTreeDB&);
     void operator=(const CBlockTreeDB&);
 public:
-    CBlockIndex *ReadBlockIndex(uint256 hash);
+    CBlockIndex *ReadBlockIndex(uint256 hash,CBlockIndex *pindexIn = NULL);
     bool WriteBlockIndex(const CDiskBlockIndex& blockindex);
     bool ReadBlockFileInfo(int nFile, CBlockFileInfo &fileinfo);
     bool WriteBlockFileInfo(int nFile, const CBlockFileInfo &fileinfo);

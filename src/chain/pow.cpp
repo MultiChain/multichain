@@ -42,7 +42,7 @@ unsigned int GetNextWorkRequired(CBlockIndex* pindexLast, const CBlockHeader *pb
             {
                 // Return the last non-special-min-difficulty-rules-block
                 CBlockIndex* pindex = pindexLast;
-/* BLMP LOOP */
+/* BLMP LOOP IGNORE */
                 while (pindex->getpprev() && pindex->nHeight % Params().Interval() != 0 && pindex->nBits == nProofOfWorkLimit)
                     pindex = pindex->getpprev();
                 return pindex->nBits;
