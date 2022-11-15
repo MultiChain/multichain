@@ -865,15 +865,15 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
                 CPubKey pubKey(vchPubKey);
                 CKeyID pubKeyHash=pubKey.GetID();
                 miners[pos]=*(uint160*)(pubKeyHash.begin());      
+                if(mc_gState->m_Permissions->CanMineBlockOnFork(&miners[pos],pindex->nHeight,last_after_fork) == 0)
+                {
+                    LogPrintf("VerifyBlockMiner: Permission denied for miner %s received in block signature, height %d\n",CBitcoinAddress(pubKeyHash).ToString().c_str(),pindex->nHeight);
+                    fReject=true;
+                    goto exitlbl;                    
+                }
                 if(miners[pos] == miners[branch_size - 1])
                 {
                     last_after_fork=pindex->nHeight;
-                }
-                if(mc_gState->m_Permissions->CanMineBlockOnFork(&miners[pos],pindex->nHeight,last_after_fork) == 0)
-                {
-                    LogPrintf("VerifyBlockMiner: Permission denied for miner %s received in block signature\n",CBitcoinAddress(pubKeyHash).ToString().c_str());
-                    fReject=true;
-                    goto exitlbl;                    
                 }
             }
             else
@@ -881,7 +881,7 @@ bool VerifyBlockMiner(CBlock *block_in,CBlockIndex* pindexNew)
                 LogPrint("mcvrf","VerifyBlockMiner: New block %s (height %d)\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);
                 if(mc_gState->m_Permissions->CanMineBlockOnFork(&miners[pos],pindex->nHeight,last_after_fork) == 0)
                 {
-                    LogPrintf("VerifyBlockMiner: Permission denied for miner %s received in block signature\n",CBitcoinAddress(pubKeyHashNew).ToString().c_str());
+                    LogPrintf("VerifyBlockMiner: Permission denied for miner %s received in block signature, height %d\n",CBitcoinAddress(pubKeyHashNew).ToString().c_str(),pindex->nHeight);
                     fReject=true;
                     goto exitlbl;                    
                 }
