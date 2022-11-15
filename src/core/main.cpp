@@ -608,7 +608,7 @@ bool PushMempoolToInv(CNode *pnode)
     }
     
     pnode->fReadyForTxInv=true;
-    LogPrintf("mchn: pushed %d inv records to queue\n",push_count);
+    LogPrint("mchn","mchn: pushed %d inv records to queue\n",push_count);
     return true;
 }
 
@@ -5351,10 +5351,16 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
 /* BLMP LOOP */
     
     CBlockIndex *pindexTip=pindex;
+    if((pindexTip != NULL) && pindexTip->nHeight > chainActive.Height())
+    {
+        pindexTip=pindexTip->GetAncestor(chainActive.Height());
+    }
+/*    
     while((pindexTip != NULL) && pindexTip->nHeight > chainActive.Height())
     {
         pindexTip=pindexTip->getpprev();
     }
+ */ 
     if(pindexTip == chainActive.Tip())                                          // If we are on main chain
                                                                                 // If it is the next block, we can check upgradable constraints
                                                                                 // If some blocks are missing and constraints are broken - ignore block
@@ -5435,13 +5441,11 @@ int static inline GetSkipHeight(int height) {
     // up to 2**18 blocks).
     return (height & 1) ? InvertLowestOne(InvertLowestOne(height - 1)) + 1 : InvertLowestOne(height);
 }
-
+/*
 CBlockIndex* CBlockIndex::GetAncestor(int height)
 {
     if (height > nHeight || height < 0)
         return NULL;
-/* BLMP LOOP */
-
     CBlockIndex* pindexWalk = this;
     int heightWalk = nHeight;
     while (heightWalk > height) {
@@ -5452,7 +5456,6 @@ CBlockIndex* CBlockIndex::GetAncestor(int height)
                                       heightSkipPrev >= height))) {
             // Only follow pskip if pprev->pskip isn't better than pskip->pprev.
 //            pindexWalk = pindexWalk->pskip;
-/* BLMP LOOP */
             pindexWalk = pindexWalk->getpskip();
             heightWalk = heightSkip;
         } else {
@@ -5461,6 +5464,39 @@ CBlockIndex* CBlockIndex::GetAncestor(int height)
         }
     }
     return pindexWalk;
+}
+*/
+
+CBlockIndex* CBlockIndex::GetAncestor(int height)
+{
+    if (height > nHeight || height < 0)
+        return NULL;
+/* BLMP LOOP */
+
+    CBlockIndex* pindexWalk = this;
+    uint256 hashWalk=GetBlockHash();
+    int heightWalk = nHeight;
+    while (heightWalk > height) {
+        int heightSkip = GetSkipHeight(heightWalk);
+        int heightSkipPrev = GetSkipHeight(heightWalk - 1);
+        if (heightSkip == height ||
+            (heightSkip > height && !(heightSkipPrev < heightSkip - 2 &&
+                                      heightSkipPrev >= height))) {
+            // Only follow pskip if pprev->pskip isn't better than pskip->pprev.
+//            pindexWalk = pindexWalk->pskip;
+/* BLMP LOOP */
+            hashWalk=pindexWalk->hashSkip;
+//            pindexWalk = pindexWalk->getpskip();
+            heightWalk = heightSkip;
+        } else {
+            hashWalk=pindexWalk->hashPrev;
+//            pindexWalk = pindexWalk->getpprev();
+            heightWalk--;
+        }
+        pindexWalk=mapBlockIndex.softfind(hashWalk);
+    }
+    
+    return mapBlockIndex[hashWalk];
 }
 
 const CBlockIndex* CBlockIndex::GetAncestor(int height) const
@@ -6945,9 +6981,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         if (fLogIPs)
             remoteAddr = ", peeraddr=" + pfrom->addr.ToString();
 
-        LogPrintf("receive version message: %s: version %d, blocks=%d, us=%s, peer=%d%s\n",
-                  pfrom->cleanSubVer, pfrom->nVersion,
-                  pfrom->nStartingHeight, addrMe.ToString(), pfrom->id,
+        LogPrintf("Peer %6d: receive version message: %s: version %d, blocks=%d, us=%s, %s\n",
+                  pfrom->id, pfrom->cleanSubVer, pfrom->nVersion,
+                  pfrom->nStartingHeight, addrMe.ToString(), 
                   remoteAddr);
 
         AddTimeData(pfrom->addr, nTime);
@@ -7054,11 +7090,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 pfrom->fDisconnect |= disconnect_flag;
                 if(pfrom->fDisconnect)
                 {
-                    LogPrintf("mchn: Invalid verackack message from peer=%d, disconnecting\n", pfrom->id);
+                    LogPrintf("Peer %6d: Invalid verackack message, disconnecting\n", pfrom->id);
                 }
                 else
                 {
-                    LogPrintf("mchn: Parameter set from peer=%d verified\n", pfrom->id);
+                    LogPrintf("Peer %6d: Parameter set verified, connection established\n", pfrom->id);
                     pfrom->fParameterSetVerified=true;                    
                     CompleteProcessVersion(pfrom);
                 }
@@ -7839,7 +7875,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         bool pushed=false;
         if(!pfrom->fReadyForTxInv)
         {
-            LogPrintf("mchn: mempool request from node %d on block %d - start pushing txs\n",pfrom->id,mc_gState->m_Permissions->m_Block);           
+            LogPrint("mchn","mchn: mempool request from node %d on block %d - start pushing txs\n",pfrom->id,mc_gState->m_Permissions->m_Block);           
         }
         pushed=PushMempoolToInv(pfrom);
         
@@ -7871,8 +7907,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 push_count+=vInv.size();
             }
             
-            LogPrintf("mchn: mempool request from node %d on block %d - start pushing txs\n",pfrom->id,mc_gState->m_Permissions->m_Block);
-            LogPrintf("mchn: pushed %d inv records directly\n",push_count);
+            LogPrint("mchn","mchn: mempool request from node %d on block %d - start pushing txs\n",pfrom->id,mc_gState->m_Permissions->m_Block);
+            LogPrint("mchn","mchn: pushed %d inv records directly\n",push_count);
         }
     }
 

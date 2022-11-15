@@ -34,7 +34,7 @@ bool MultichainNode_CanConnect(CNode *pnode)
         }
         else
         {
-            LogPrintf("Seed node %d doesn't have connect permission, ignored\n",pnode->id);
+            LogPrint("mchn","Seed node %d doesn't have connect permission, ignored\n",pnode->id);
         }
     }
     
@@ -275,8 +275,8 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
         if(fIsVerackack)
         {
             uint64_t nonce_to_print=(pfrom->nVerackNonceSent+pfrom->nVerackNonceReceived) & 0xffff;
-            LogPrintf("mchn: Connection from %s received on peer=%d in verackack (%s), %s, connection id: %d\n",
-                    CBitcoinAddress(pubKeyHash).ToString().c_str(), pfrom->id,pfrom->addr.ToString(),pfrom->fInbound ? "Inbound" : "Outbound",(int)nonce_to_print);
+            LogPrintf("Peer %6d: Connection from %s received in verackack (%s), %s, connection id: %d\n",
+                    pfrom->id,CBitcoinAddress(pubKeyHash).ToString().c_str(), pfrom->addr.ToString(),pfrom->fInbound ? "Inbound" : "Outbound",(int)nonce_to_print);
                     
             if(!MultichainNode_CanConnect(pfrom))
             {
@@ -334,7 +334,7 @@ bool ProcessMultichainVerack(CNode* pfrom, CDataStream& vRecv,bool fIsVerackack,
         }
         else
         {
-            LogPrintf("mchn: Connection from %s received on peer=%d in verack\n",CBitcoinAddress(pubKeyHash).ToString().c_str(), pfrom->id);
+            LogPrint("mchn","mchn: Connection from %s received on peer=%d in verack\n",CBitcoinAddress(pubKeyHash).ToString().c_str(), pfrom->id);
         }
         
         CHashWriter ss(SER_GETHASH, 0);
@@ -482,7 +482,7 @@ bool PushMultiChainVerack(CNode* pfrom, bool fIsVerackack)
             {
                 NumFieldsToSend=7;                
             }
-            LogPrintf("mchn: Sending minimal parameter set to %s\n", pfrom->addr.ToString());
+            LogPrint("mchn","mchn: Sending minimal parameter set to %s\n", pfrom->addr.ToString());
             for(int f=0;f<NumFieldsToSend;f++)
             {
                 vParameterSet.insert(vParameterSet.end(),(unsigned char*)(fields_to_send[f].c_str()),(unsigned char*)(fields_to_send[f].c_str())+fields_to_send[f].size()+1);
@@ -576,7 +576,7 @@ bool PushMultiChainVerack(CNode* pfrom, bool fIsVerackack)
     {
         if(!pwalletMain->GetKeyFromAddressBook(pkey,MC_PTP_CONNECT))
         {
-            LogPrintf("mchn: Cannot find address having connect permission, trying default key\n");
+            LogPrint("mchn","mchn: Cannot find address having connect permission, trying default key\n");
             pkey=pwalletMain->vchDefaultKey;
         }
         keyID=pkey.GetID();
