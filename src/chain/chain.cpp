@@ -234,7 +234,16 @@ void CChainStorage::sethash(int nHeight, uint256 hash)
     
     m_ChangeCount++;
     mapModified.insert(make_pair(nHeight,hash));
-    LogPrint("mcblin","ActiveChain: Inserting : %8d (%s)\n",nHeight,hash.ToString().c_str());
+    
+    map<int,int>::iterator it=mapLoaded.find(nHeight);
+    
+    if(it != mapLoaded.end())
+    {
+        vLastUsed[it->second]=GetTimeMicros();
+        vHash[it->second]=hash;
+    }
+    
+    LogPrint("mcblin","ActiveChain: Set       : %8d (%s)\n",nHeight,hash.ToString().c_str());
     
     unlock();
 }
@@ -378,11 +387,12 @@ void CChain::SetTip(CBlockIndex *pindex) {
         return;
     }
 /* BLMP Full scan on initialization if hashes not stored, if flush here make sure pindex is not required in caller */    
-/* BLMP LOOP */    
+/* BLMP LOOP FIXED */    
     cChain.setsize(pindex->nHeight + 1);
     while (pindex && cChain.gethash(pindex->nHeight) != pindex->GetBlockHash()) {
         cChain.setptr(pindex->nHeight,pindex);
-        pindex = pindex->getpprev();
+        pindex=mapBlockIndex.softfind(pindex->hashPrev);
+//        pindex = pindex->getpprev();
     }
     
     mc_gState->ChainUnLock();
@@ -403,7 +413,7 @@ CBlockLocator CChain::GetLocator(const CBlockIndex *pindex)  {
     int nStep = 1;
     std::vector<uint256> vHave;
     vHave.reserve(32);
-/* BLMP LOOP */
+/* BLMP LOOP IGNORED */
     if (!pindex)
         pindex = Tip();
     while (pindex) {
@@ -433,9 +443,14 @@ CBlockIndex *CChain::FindFork(CBlockIndex *pindexIn) {
     CBlockIndex *pindex=pindexIn;
     if (pindex->nHeight > Height())
         pindex = pindex->GetAncestor(Height());
-/* BLMP LOOP */
+/* BLMP LOOP FIXED */
     while (pindex && !Contains(pindex))
-        pindex = pindex->getpprev();
+        pindex = mapBlockIndex.softfind(pindex->hashPrev);
+//        pindex = pindex->getpprev();
+    if(pindex)
+    {
+        pindex = mapBlockIndex.find(pindex->GetBlockHash());
+    }
     return pindex;
 }
 
