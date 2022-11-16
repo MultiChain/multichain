@@ -262,6 +262,10 @@ CBlockIndex* CBlockMap::softfind(uint256 hash)
             presult=m_SoftEntry[thread_id];                        
         }
         presult=pblocktree->ReadBlockIndex(hash,presult);
+        if(presult)
+        {
+            presult->hashBlock=hash;
+        }
     }
     
     unlock();

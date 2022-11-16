@@ -7,6 +7,7 @@
 #include "chain/pow.h"
 
 #include "chain/chain.h"
+#include "chain/blockmap.h"
 #include "chainparams/chainparams.h"
 #include "primitives/block.h"
 #include "structs/uint256.h"
@@ -42,7 +43,7 @@ unsigned int GetNextWorkRequired(CBlockIndex* pindexLast, const CBlockHeader *pb
             {
                 // Return the last non-special-min-difficulty-rules-block
                 CBlockIndex* pindex = pindexLast;
-/* BLMP LOOP IGNORE */
+/* BLMP LOOP IGNORED */
                 while (pindex->getpprev() && pindex->nHeight % Params().Interval() != 0 && pindex->nBits == nProofOfWorkLimit)
                     pindex = pindex->getpprev();
                 return pindex->nBits;
@@ -53,9 +54,15 @@ unsigned int GetNextWorkRequired(CBlockIndex* pindexLast, const CBlockHeader *pb
 
     // Go back by what we want to be 14 days worth of blocks
     CBlockIndex* pindexFirst = pindexLast;
-/* BLMP LOOP */
+/* BLMP LOOP FIXED */
     for (int i = 0; pindexFirst && i < Params().Interval()-1; i++)
-        pindexFirst = pindexFirst->getpprev();
+        pindexFirst = mapBlockIndex.softfind(pindexFirst->hashPrev);
+    
+    if(pindexFirst)
+    {
+        pindexFirst = mapBlockIndex.find(pindexFirst->GetBlockHash());
+    }
+//        pindexFirst = pindexFirst->getpprev();
     assert(pindexFirst);
 
     // Limit adjustment step

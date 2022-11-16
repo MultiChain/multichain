@@ -2216,9 +2216,13 @@ void CheckForkWarningConditionsOnNewFork(CBlockIndex* pindexNewForkTip)
     {
         pindexBestForkBase=mapBlockIndex[hashBestForkBase];
     }
-/* BLMP LOOP */
+/* BLMP LOOP FIXED */
     
     CBlockIndex* pfork = pindexNewForkTip;
+    chainActive.FindFork(pindexNewForkTip);
+    
+/*  
+    //  The code below looks for fork   
     CBlockIndex* plonger = chainActive.Tip();
     while (pfork && pfork != plonger)
     {
@@ -2228,7 +2232,7 @@ void CheckForkWarningConditionsOnNewFork(CBlockIndex* pindexNewForkTip)
             break;
         pfork = pfork->getpprev();
     }
-
+*/
     // We define a condition which we should warn the user about as a fork of at least 7 blocks
     // who's tip is within 72 blocks (+/- 12 hours if no one mines it) of ours
     // We use 7 blocks rather arbitrarily as it represents just under 10% of sustained network
@@ -4200,14 +4204,14 @@ string SetLastBlock(uint256 hash,bool *fNotFound)
 
         CBlockIndex *pindex;
         pindex=pblockindex;
-/* BLMP LOOP */
-        while(pindex != pindexFork)
+/* BLMP LOOP FIXED */
+        while(pindex->GetBlockHash() != pindexFork->GetBlockHash())
         {
-            if (pblockindex->nStatus & BLOCK_FAILED_MASK)
+            if (pindex->nStatus & BLOCK_FAILED_MASK)
             {
                 return "Block is invalid";
             }        
-            if ( (pblockindex->nStatus & BLOCK_HAVE_DATA) == 0 )
+            if ( (pindex->nStatus & BLOCK_HAVE_DATA) == 0 )
     //        if (!pblockindex->IsValid(BLOCK_VALID_SCRIPTS))
             {
                 if(fNotFound)
@@ -4217,7 +4221,7 @@ string SetLastBlock(uint256 hash,bool *fNotFound)
                 return "Block is invalid, probably we have only header";            
             }
 
-            if(pindex == pblockindex)
+            if(pindex->GetBlockHash() == pblockindex->GetBlockHash())
             {
                 if(!ReadBlockFromDisk(block, pblockindex))
                 {
@@ -4229,7 +4233,8 @@ string SetLastBlock(uint256 hash,bool *fNotFound)
                 }
             }
             
-            pindex=pindex->getpprev();
+//            pindex=pindex->getpprev();
+            pindex=mapBlockIndex.softfind(pindex->hashPrev);
         }
         
         while(pblockindex != chainActive.Tip())
@@ -4416,22 +4421,6 @@ string SetLockedBlock(string hash)
                             pindexCandidate = pindexCandidate->getpprev();
                         }
                     }
-
-/*                    
-                    BlockMap::iterator it = mapBlockIndex.begin();
-                    while (it != mapBlockIndex.end()) 
-                    {
-                        if (it->second->IsValid(BLOCK_VALID_TRANSACTIONS) && it->second->nChainTx && setBlockIndexCandidates.value_comp()(pindexWalk->GetBlockHash(), it->second->GetBlockHash())) 
-                        {
-                            CBlockIndex *pindexCandidate=it->second;
-                            if(pindexCandidate->GetAncestor(pindexWalk->nHeight) == pindexWalk)
-                            {
-                                pindexWalk=pindexCandidate;
-                            }
-                        }
-                        it++;
-                    }
- */ 
                 }
 
                 LogPrintf("Block %s found on alternative chain at height %d\n",
@@ -5312,6 +5301,8 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
     }
 
 /* MCHN START*/    
+    LogPrint("mchn","Accepting block %s at height %d\n",pindex->GetBlockHash().ToString().c_str(),pindex->nHeight);                        
+    
     pindex->dTimeReceived=mc_TimeNowAsDouble();
             
     if(!VerifyBlockSignature(&block,false))
@@ -5348,7 +5339,7 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
         setDirtyBlockIndex.insert(pindex->GetBlockHash());
         return false;
     }
-/* BLMP LOOP */
+/* BLMP LOOP FIXED */
     
     CBlockIndex *pindexTip=pindex;
     if((pindexTip != NULL) && pindexTip->nHeight > chainActive.Height())
@@ -5417,13 +5408,13 @@ bool CBlockIndex::IsSuperMajority(int minVersion, CBlockIndex* pstart, unsigned 
     
 //    return true;
     return (pstart->nHeight >= (int)nRequired);
-/* BLMP LOOP */
+/* BLMP LOOP FIXED */
     
     for (unsigned int i = 0; i < nToCheck && nFound < nRequired && pstart != NULL; i++)
     {
         if (pstart->nVersion >= minVersion)
             ++nFound;
-        pstart = pstart->getpprev();
+        pstart = mapBlockIndex.softfind(pstart->hashPrev);
     }
     return (nFound >= nRequired);
 }
@@ -5471,7 +5462,7 @@ CBlockIndex* CBlockIndex::GetAncestor(int height)
 {
     if (height > nHeight || height < 0)
         return NULL;
-/* BLMP LOOP */
+/* BLMP LOOP FIXED */
 
     CBlockIndex* pindexWalk = this;
     uint256 hashWalk=GetBlockHash();
@@ -5484,7 +5475,6 @@ CBlockIndex* CBlockIndex::GetAncestor(int height)
                                       heightSkipPrev >= height))) {
             // Only follow pskip if pprev->pskip isn't better than pskip->pprev.
 //            pindexWalk = pindexWalk->pskip;
-/* BLMP LOOP */
             hashWalk=pindexWalk->hashSkip;
 //            pindexWalk = pindexWalk->getpskip();
             heightWalk = heightSkip;
@@ -6243,6 +6233,7 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
     CBlockIndex* pindexFailure = NULL;
     int nGoodTransactions = 0;
     CValidationState state;
+/* BLMP LOOP */
     for (CBlockIndex* pindex = chainActive.Tip(); pindex && pindex->getpprev(); pindex = pindex->getpprev())
     {
         boost::this_thread::interruption_point();
