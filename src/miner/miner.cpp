@@ -951,6 +951,7 @@ set <CTxDestination> LastActiveMiners(CBlockIndex* pindexTip, CPubKey *kLastMine
                         {
                             pindex->kMiner.Set(block.vSigner+1, block.vSigner+1+block.vSigner[0]);
                             pindex->nStatus |= BLOCK_HAVE_MINER_PUBKEY;
+                            pindex->fUpdated = true;
                         }
                     }
                 }

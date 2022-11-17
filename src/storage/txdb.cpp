@@ -430,6 +430,7 @@ bool CBlockTreeDB::UpdateBlockCacheValues()
     {
         CBlockIndex *pindex=block_list->GetBlockIndex(r);
         pindex->nStatus |= BLOCK_HAVE_CHAIN_CACHE;
+        pindex->fUpdated = true;
         
         if(pindex->GetBlockHash() == tipHash)
         {

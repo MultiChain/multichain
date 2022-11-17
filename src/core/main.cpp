@@ -201,7 +201,7 @@ namespace {
         return false;
     }
         
-    struct CBlockIndexWorkComparator
+    struct CBlockIndexWorkComparatorOld
     {
         bool operator()(uint256 ha, uint256 hb) {
             
@@ -213,6 +213,67 @@ namespace {
         }
     };
 
+    struct CBlockIndexWorkComparator
+    {
+        bool operator()(uint256 ha, uint256 hb) {
+            
+            uint256 anChainWork,bnChainWork;
+            uint32_t anCanMine,bnCanMine;
+            int anHeightMinedByMe,bnHeightMinedByMe;            
+            int anFile,bnFile;
+            unsigned int anDataPos,bnDataPos;
+            
+            CBlockIndex *pa=mapBlockIndex.softfind(ha);
+            anChainWork = pa->nChainWork;
+            anCanMine = pa->nCanMine;
+            anHeightMinedByMe = pa->nHeightMinedByMe;
+            anFile = pa->nFile;
+            anDataPos = pa->nDataPos;
+            
+            CBlockIndex *pb=mapBlockIndex.softfind(hb);
+            bnChainWork = pb->nChainWork;
+            bnCanMine = pb->nCanMine;
+            bnHeightMinedByMe = pb->nHeightMinedByMe;
+            bnFile = pb->nFile;
+            bnDataPos = pb->nDataPos;
+            
+            // First sort by most total work, ...
+            if (anChainWork > bnChainWork) return false;
+            if (anChainWork < bnChainWork) return true;
+
+            // Prefer chains we mined long time ago 
+            if(mc_gState->m_NetworkParams->IsProtocolMultichain())
+            {
+                if((anCanMine > 0) && (bnCanMine == 0)) return false;
+                if((anCanMine == 0) && (bnCanMine > 0)) return true;
+                if((anCanMine == 0) && (bnCanMine == 0))
+                {
+                    if (anHeightMinedByMe < bnHeightMinedByMe) return false;
+                    if (anHeightMinedByMe > bnHeightMinedByMe) return true;
+                }
+            }
+
+            // ... then by earliest time received, ...
+            if(anFile < bnFile) return false;
+            if(anFile > bnFile) return true;
+
+            if(anDataPos < bnDataPos) return false;
+            if(anDataPos > bnDataPos) return true;
+
+    //            if (pa->nSequenceId < pb->nSequenceId) return false;
+    //            if (pa->nSequenceId > pb->nSequenceId) return true;
+
+            // Use hash as tie breaker (should only happen with blocks
+            // loaded from disk, as those all have id 0).
+
+            if (ha < hb) return false;
+            if (ha > hb) return true;
+
+            // Identical blocks.
+            return false;
+        }
+    };
+    
     uint256 hashBestInvalid;
 
     /**
@@ -796,21 +857,38 @@ void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash) {
 
 /** Find the last common ancestor two blocks have.
  *  Both pa and pb must be non-NULL. */
+
 CBlockIndex* LastCommonAncestor(CBlockIndex* pa, CBlockIndex* pb) {
     if (pa->nHeight > pb->nHeight) {
         pa = pa->GetAncestor(pb->nHeight);
     } else if (pb->nHeight > pa->nHeight) {
         pb = pb->GetAncestor(pa->nHeight);
     }
+/* BLMP LOOP FIXED */
+//    while (pa != pb && pa && pb) {
 
-    while (pa != pb && pa && pb) {
-        pa = pa->getpprev();
-        pb = pb->getpprev();
+    uint256 aHash=0;
+    uint256 bHash=0;
+    if(pa && pb)
+    {
+        aHash=pa->GetBlockHash();
+        bHash=pb->GetBlockHash();
+        while ((aHash != 0) && (bHash != 0) && (aHash != bHash)) {
+            pa = mapBlockIndex.softfind(pa->hashPrev);
+            aHash=pa->GetBlockHash();
+            pb = mapBlockIndex.softfind(pb->hashPrev);
+            bHash=pb->GetBlockHash();
+    //        pa = pa->getpprev();
+    //        pb = pb->getpprev();
+        }
     }
 
     // Eventually all chain branches meet at the genesis block.
-    assert(pa == pb);
-    return pa;
+//    assert(pa == pb);
+//    return pa;
+    assert(aHash == bHash);
+    
+    return mapBlockIndex[aHash];
 }
 
 /** Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
@@ -2955,6 +3033,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             // update nUndoPos in block index
             pindex->nUndoPos = pos.nPos;
             pindex->nStatus |= BLOCK_HAVE_UNDO;
+            pindex->fUpdated = true;
         }
 
         pindex->RaiseValidity(BLOCK_VALID_SCRIPTS);
@@ -3664,6 +3743,7 @@ bool RecoverAfterCrash()
  * known to be invalid (it's however far from certain to be valid).
  */
 static CBlockIndex* FindMostWorkChain() {
+/* BLMP LOOP IGNORED */    
     do {
         CBlockIndex *pindexNew = NULL;
 
@@ -3774,7 +3854,7 @@ static CBlockIndex* FindMostWorkChain() {
         // Just going until the active chain is an optimization, as we know all blocks in it are valid already.
         CBlockIndex *pindexTest = pindexNew;
         bool fInvalidAncestor = false;
-/* BLMP LOOP */
+/* BLMP LOOP FIXED */
         while (pindexTest && !chainActive.Contains(pindexTest)) {
             assert(pindexTest->nStatus & BLOCK_HAVE_DATA);
             assert(pindexTest->nChainTx || pindexTest->nHeight == 0);
@@ -3783,8 +3863,8 @@ static CBlockIndex* FindMostWorkChain() {
                 if ((hashBestInvalid == 0) || pindexNew->nChainWork > mapBlockIndex[hashBestInvalid]->nChainWork)
                     hashBestInvalid = pindexNew->GetBlockHash();
                 CBlockIndex *pindexFailed = pindexNew;
-/* BLMP LOOP */
-                while (pindexTest != pindexFailed) {
+/* BLMP LOOP IGNORED*/
+                while (pindexTest->GetBlockHash() != pindexFailed->GetBlockHash()) {
                     pindexFailed->nStatus |= BLOCK_FAILED_CHILD;
                     setBlockIndexCandidates.erase(pindexFailed->GetBlockHash());
                     pindexFailed = pindexFailed->getpprev();
@@ -3793,7 +3873,8 @@ static CBlockIndex* FindMostWorkChain() {
                 fInvalidAncestor = true;
                 break;
             }
-            pindexTest = pindexTest->getpprev();
+//            pindexTest = pindexTest->getpprev();
+            pindexTest = mapBlockIndex.softfind(pindexTest->hashPrev);
         }
         if (!fInvalidAncestor)
             return pindexNew;
@@ -3910,7 +3991,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     vpindexToConnect.clear();
     vpindexToConnect.reserve(nTargetHeight - nHeight);
     CBlockIndex *pindexIter = pindexMostWork->GetAncestor(nTargetHeight);
-/* BLMP LOOP */
+/* BLMP LOOP IGNORED */
     while (pindexIter && pindexIter->nHeight != nHeight) {
         vpindexToConnect.push_back(pindexIter);
         pindexIter = pindexIter->getpprev();
@@ -4666,6 +4747,7 @@ bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBl
     pindexNew->nDataPos = pos.nPos;
     pindexNew->nUndoPos = 0;
     pindexNew->nStatus |= BLOCK_HAVE_DATA;
+    pindexNew->fUpdated = true;
     pindexNew->RaiseValidity(BLOCK_VALID_TRANSACTIONS);
     mc_gState->ChainUnLock();
     
@@ -5314,6 +5396,7 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
     {
         pindex->kMiner.Set(block.vSigner+1, block.vSigner+1+block.vSigner[0]);
         pindex->nStatus |= BLOCK_HAVE_MINER_PUBKEY;
+        pindex->fUpdated = true;
     }
             
 /* MCHN END*/    
@@ -5380,6 +5463,7 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
         unsigned int nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
         pindex->nSize=nBlockSize;
         pindex->nStatus |= BLOCK_HAVE_SIZE;
+        pindex->fUpdated = true;
 
         CDiskBlockPos blockPos;
         if (dbp != NULL)
@@ -5880,6 +5964,7 @@ bool mc_UpdateBlockCacheValues(CBlockList *block_list)
         {
             pindex->hashSkip = mc_GetAncestorHash(block_list,pprev,GetSkipHeight(pindex->nHeight));
             pprev->nStatus |= BLOCK_HAVE_SUCCESSOR;
+            pprev->fUpdated = true;
         }
     }
         
