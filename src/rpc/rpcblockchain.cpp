@@ -853,11 +853,12 @@ Value getchaintips(const Array& params, bool fHelp)
        of another block.  */
     std::set<CBlockIndex*, CompareBlocksByHeight> setTips;
     
-/* BLMP COB */
+/* BLMP LOOP */
 
-    BOOST_FOREACH(const uint256& hashTip, setChainTips)
+//    BOOST_FOREACH(const uint256& hashTip, setChainTips)
+    for (map<uint256,int>::iterator it = mapChainTips.begin(); it != mapChainTips.end(); ) 
     {
-        setTips.insert(mapBlockIndex[hashTip]);
+        setTips.insert(mapBlockIndex[it->first]);
     }
 
     // Always report the currently active tip.

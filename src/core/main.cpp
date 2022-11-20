@@ -141,7 +141,7 @@ map<uint256, set<uint256> > mapOrphanTransactionsByPrev;
 set <uint256> setBannedTxs;
 set <uint256> setBannedTxBlocks;
 uint256 hLockedBlock;
-set<uint256> setChainTips;
+map<uint256,int> mapChainTips;
 
 int EraseOrphansFor(NodeId peer);
 
@@ -3115,9 +3115,9 @@ void UpdateBlockCacheStatus()
         SetBlockStatus(*it,MC_BCS_CANDIDATE);        
         it++;
     }
-    for (set<uint256>::iterator it = setChainTips.begin(); it != setChainTips.end(); ) 
+    for (map<uint256,int>::iterator it = mapChainTips.begin(); it != mapChainTips.end(); ) 
     {
-        SetBlockStatus(*it,MC_BCS_TIP);        
+        SetBlockStatus(it->first,MC_BCS_TIP);        
         it++;
     }
     if(hashBestHeader != 0)
@@ -4480,26 +4480,33 @@ string SetLockedBlock(string hash)
                 
                 CBlockIndex *pindexWalk;
                 pindexWalk=pindexLockedBlock;
-/* BLMP LOOP */
-                while( (pindexWalk != pindexFork) && ( (pindexWalk->nStatus & BLOCK_HAVE_DATA) == 0 ) )
+/* BLMP LOOP FIXED */
+                while( (pindexWalk->GetBlockHash() != pindexFork->GetBlockHash()) && ( (pindexWalk->nStatus & BLOCK_HAVE_DATA) == 0 ) )
                 {
-                    pindexWalk=pindexWalk->getpprev();
+                    pindexWalk=mapBlockIndex.softfind(pindexWalk->hashPrev);
+//                    pindexWalk=pindexWalk->getpprev();
                 }
-/* BLMP LOOP */
-                if(pindexWalk == pindexLockedBlock)
+                pindexWalk=mapBlockIndex.find(pindexWalk->GetBlockHash());
+/* BLMP LOOP FIXED */
+                if(pindexWalk->GetBlockHash() == pindexLockedBlock->GetBlockHash())
                 {
-                    BOOST_FOREACH(const uint256& hashTip, setChainTips)
+//                    BOOST_FOREACH(const uint256& hashTip, setChainTips)
+                    for (map<uint256,int>::iterator it = mapChainTips.begin(); it != mapChainTips.end(); ) 
                     {
-                        CBlockIndex *pindexCandidate=mapBlockIndex[hashTip];
-                        while( (pindexCandidate != NULL) && 
-                               (setBlockIndexCandidates.value_comp()(pindexWalk->GetBlockHash(), pindexCandidate->GetBlockHash())) && 
-                               (pindexCandidate->GetAncestor(pindexWalk->nHeight) == pindexWalk) )
+                        CBlockIndex *pindexCandidate=mapBlockIndex.softfind(it->first);
+                        if(it->second >= pindexLockedBlock->nHeight)
                         {
-                            if (pindexCandidate->IsValid(BLOCK_VALID_TRANSACTIONS) && pindexCandidate->nChainTx) 
+                            while( (pindexCandidate != NULL) && 
+                                   (setBlockIndexCandidates.value_comp()(pindexWalk->GetBlockHash(), pindexCandidate->GetBlockHash())) && 
+                                   (pindexCandidate->GetAncestor(pindexWalk->nHeight) == pindexWalk) )
                             {
-                                pindexWalk=pindexCandidate;                                
+                                if (pindexCandidate->IsValid(BLOCK_VALID_TRANSACTIONS) && pindexCandidate->nChainTx) 
+                                {
+                                    pindexWalk=mapBlockIndex.find(pindexCandidate->GetBlockHash());                                
+                                }
+                                pindexCandidate = mapBlockIndex.softfind(pindexCandidate->hashPrev);
+//                                pindexCandidate = pindexCandidate->getpprev();
                             }
-                            pindexCandidate = pindexCandidate->getpprev();
                         }
                     }
                 }
@@ -4586,9 +4593,9 @@ bool InvalidateBlock(CValidationState& state, CBlockIndex *pindex) {
     // add them again.
 /* BLMP LOOP */
 
-    BOOST_FOREACH(const uint256& hashTip, setChainTips)
+    for (map<uint256,int>::iterator it = mapChainTips.begin(); it != mapChainTips.end(); ) 
     {
-        CBlockIndex *pindexCandidate=mapBlockIndex[hashTip];
+        CBlockIndex *pindexCandidate=mapBlockIndex[it->first];
         while( (pindexCandidate != NULL) && 
                (setBlockIndexCandidates.value_comp()(chainActive.Tip()->GetBlockHash(), pindexCandidate->GetBlockHash())) )
         {
@@ -4619,9 +4626,9 @@ bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
 
     // Remove the invalidity flag from this block and all its descendants.
 
-    BOOST_FOREACH(const uint256& hashTip, setChainTips)
+    for (map<uint256,int>::iterator it = mapChainTips.begin(); it != mapChainTips.end(); ) 
     {
-        CBlockIndex *pindexCandidate=mapBlockIndex[hashTip];
+        CBlockIndex *pindexCandidate=mapBlockIndex[it->first];
         while( (pindexCandidate != NULL) && 
                (setBlockIndexCandidates.value_comp()(pindex->GetBlockHash(), pindexCandidate->GetBlockHash())) && 
                (pindexCandidate->GetAncestor(pindex->nHeight) == pindex) )
@@ -4716,14 +4723,14 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
             pindexNew->getpprev()->nStatus |= BLOCK_HAVE_SUCCESSOR;
             pindexNew->getpprev()->fUpdated = true;
             setDirtyBlockIndex.insert(block.hashPrevBlock);
-            set<uint256>::iterator itTip = setChainTips.find(block.hashPrevBlock);
-            if (itTip != setChainTips.end()) 
+            map<uint256,int>::iterator itTip = mapChainTips.find(block.hashPrevBlock);
+            if (itTip != mapChainTips.end()) 
             {
-                setChainTips.erase(itTip);
+                mapChainTips.erase(itTip);
             }            
         }
     }
-    setChainTips.insert(pindexNew->GetBlockHash());
+    mapChainTips.insert(make_pair(pindexNew->GetBlockHash(),pindexNew->nHeight));
     pindexNew->nChainWork = (pindexNew->getpprev() ? pindexNew->getpprev()->nChainWork : 0) + GetBlockProof(*pindexNew);
     pindexNew->RaiseValidity(BLOCK_VALID_TREE);
     if ( (hashBestHeader == 0) || mapBlockIndex[hashBestHeader]->nChainWork < pindexNew->nChainWork)
@@ -5917,7 +5924,7 @@ void mc_UpdateMapBlockCachedStatus(CBlockIndex* pindex)
 
     if( (pindex->nStatus & BLOCK_HAVE_SUCCESSOR) == 0 )
     {
-        setChainTips.insert(pindex->GetBlockHash());
+        mapChainTips.insert(make_pair(pindex->GetBlockHash(),pindex->nHeight));
     }    
 }
 
@@ -5996,7 +6003,7 @@ bool mc_UpdateBlockCacheValues(CBlockList *block_list)
         
         if( (pindex->nStatus & BLOCK_HAVE_SUCCESSOR) == 0 )
         {
-            setChainTips.insert(hash);
+            mapChainTips.insert(make_pair(hash,pindex->nHeight));
         }         
     }
     
@@ -6062,7 +6069,7 @@ bool mc_UpdateBlockCacheValues(std::map<uint256,CBlockIndex>& mapTempBlockIndex)
         
         if( (pindex->nStatus & BLOCK_HAVE_SUCCESSOR) == 0 )
         {
-            setChainTips.insert(item.second);
+            mapChainTips.insert(make_pair(item.second,pindex->nHeight));
         }            
     }
     
@@ -6157,7 +6164,7 @@ bool static LoadBlockIndexDB(std::string& strError)
             }
             if(item.second & MC_BCS_TIP)
             {
-                setChainTips.insert(item.first);                
+                mapChainTips.insert(make_pair(item.first,mapBlockIndex[item.first]->nHeight));                
             }
         }        
     }
