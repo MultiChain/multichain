@@ -4490,6 +4490,7 @@ string SetLockedBlock(string hash)
 /* BLMP LOOP FIXED */
                 if(pindexWalk->GetBlockHash() == pindexLockedBlock->GetBlockHash())
                 {
+                    set<uint256> setChecked;
 //                    BOOST_FOREACH(const uint256& hashTip, setChainTips)
                     for (map<uint256,int>::iterator it = mapChainTips.begin(); it != mapChainTips.end(); ) 
                     {
@@ -4497,9 +4498,11 @@ string SetLockedBlock(string hash)
                         if(it->second >= pindexLockedBlock->nHeight)
                         {
                             while( (pindexCandidate != NULL) && 
+                                   (setChecked.find(pindexCandidate->GetBlockHash()) == setChecked.end()) && 
                                    (setBlockIndexCandidates.value_comp()(pindexWalk->GetBlockHash(), pindexCandidate->GetBlockHash())) && 
                                    (pindexCandidate->GetAncestor(pindexWalk->nHeight) == pindexWalk) )
                             {
+                                setChecked.insert(pindexCandidate->GetBlockHash());
                                 if (pindexCandidate->IsValid(BLOCK_VALID_TRANSACTIONS) && pindexCandidate->nChainTx) 
                                 {
                                     pindexWalk=mapBlockIndex.find(pindexCandidate->GetBlockHash());                                
@@ -4591,19 +4594,26 @@ bool InvalidateBlock(CValidationState& state, CBlockIndex *pindex) {
 
     // The resulting new best tip may not be in setBlockIndexCandidates anymore, so
     // add them again.
-/* BLMP LOOP */
+/* BLMP LOOP FIXED */
 
     for (map<uint256,int>::iterator it = mapChainTips.begin(); it != mapChainTips.end(); ) 
     {
-        CBlockIndex *pindexCandidate=mapBlockIndex[it->first];
-        while( (pindexCandidate != NULL) && 
-               (setBlockIndexCandidates.value_comp()(chainActive.Tip()->GetBlockHash(), pindexCandidate->GetBlockHash())) )
+        set<uint256> setChecked;
+        if(it->second >= pindex->nHeight)
         {
-            if (pindexCandidate->IsValid(BLOCK_VALID_TRANSACTIONS) && pindexCandidate->nChainTx) 
+            CBlockIndex *pindexCandidate=mapBlockIndex.softfind(it->first);
+            while( (pindexCandidate != NULL) && 
+                    (setChecked.find(pindexCandidate->GetBlockHash()) == setChecked.end()) && 
+                   (setBlockIndexCandidates.value_comp()(chainActive.Tip()->GetBlockHash(), pindexCandidate->GetBlockHash())) )
             {
-                setBlockIndexCandidates.insert(pindexCandidate->GetBlockHash());
+                setChecked.insert(pindexCandidate->GetBlockHash());
+                if (pindexCandidate->IsValid(BLOCK_VALID_TRANSACTIONS) && pindexCandidate->nChainTx) 
+                {
+                    setBlockIndexCandidates.insert(pindexCandidate->GetBlockHash());
+                }
+                pindexCandidate = mapBlockIndex.softfind(pindexCandidate->hashPrev);
+    //            pindexCandidate = pindexCandidate->getpprev();
             }
-            pindexCandidate = pindexCandidate->getpprev();
         }
     }
 /*    
@@ -4622,33 +4632,41 @@ bool InvalidateBlock(CValidationState& state, CBlockIndex *pindex) {
 bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
     AssertLockHeld(cs_main);
 
-/* BLMP LOOP */
+/* BLMP LOOP FIXED */
 
     // Remove the invalidity flag from this block and all its descendants.
 
+    set<uint256> setChecked;
     for (map<uint256,int>::iterator it = mapChainTips.begin(); it != mapChainTips.end(); ) 
     {
-        CBlockIndex *pindexCandidate=mapBlockIndex[it->first];
-        while( (pindexCandidate != NULL) && 
-               (setBlockIndexCandidates.value_comp()(pindex->GetBlockHash(), pindexCandidate->GetBlockHash())) && 
-               (pindexCandidate->GetAncestor(pindex->nHeight) == pindex) )
+        if(it->second >= pindex->nHeight)
         {
-            if (!pindexCandidate->IsValid()) 
+            CBlockIndex *pindexCandidate=mapBlockIndex.softfind(it->first);
+            while( (pindexCandidate != NULL) && 
+                    (setChecked.find(pindexCandidate->GetBlockHash()) == setChecked.end()) && 
+                   (setBlockIndexCandidates.value_comp()(pindex->GetBlockHash(), pindexCandidate->GetBlockHash())) && 
+                   (pindexCandidate->GetAncestor(pindex->nHeight) == pindex) )
             {
-                pindexCandidate->nStatus &= ~BLOCK_FAILED_MASK;
-                pindexCandidate->fUpdated=true;
-                setDirtyBlockIndex.insert(pindexCandidate->GetBlockHash());
-                if (pindexCandidate->IsValid(BLOCK_VALID_TRANSACTIONS) && pindexCandidate->nChainTx && 
-                        setBlockIndexCandidates.value_comp()(chainActive.Tip()->GetBlockHash(), pindexCandidate->GetBlockHash())) 
+                setChecked.insert(pindexCandidate->GetBlockHash());
+                if (!pindexCandidate->IsValid()) 
                 {
-                    setBlockIndexCandidates.insert(pindexCandidate->GetBlockHash());
+                    pindexCandidate=mapBlockIndex.find(it->first);
+                    pindexCandidate->nStatus &= ~BLOCK_FAILED_MASK;
+                    pindexCandidate->fUpdated=true;
+                    setDirtyBlockIndex.insert(pindexCandidate->GetBlockHash());
+                    if (pindexCandidate->IsValid(BLOCK_VALID_TRANSACTIONS) && pindexCandidate->nChainTx && 
+                            setBlockIndexCandidates.value_comp()(chainActive.Tip()->GetBlockHash(), pindexCandidate->GetBlockHash())) 
+                    {
+                        setBlockIndexCandidates.insert(pindexCandidate->GetBlockHash());
+                    }
+                    if (pindexCandidate->GetBlockHash() == hashBestInvalid) {
+                        // Reset invalid block marker if it was pointing to one of those.
+                        hashBestInvalid = 0;
+                    }
                 }
-                if (pindexCandidate->GetBlockHash() == hashBestInvalid) {
-                    // Reset invalid block marker if it was pointing to one of those.
-                    hashBestInvalid = 0;
-                }
+                pindexCandidate = mapBlockIndex.softfind(pindexCandidate->hashPrev);
+    //            pindexCandidate = pindexCandidate->getpprev();
             }
-            pindexCandidate = pindexCandidate->getpprev();
         }
     }
 
@@ -4671,7 +4689,7 @@ bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
 */
     
     // Remove the invalidity flag from all ancestors too.
-/* BLMP LOOP */
+/* BLMP LOOP IGNORED */
     while (pindex != NULL) {
         if (pindex->nStatus & BLOCK_FAILED_MASK) {
             pindex->nStatus &= ~BLOCK_FAILED_MASK;
@@ -6325,7 +6343,7 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
     CBlockIndex* pindexFailure = NULL;
     int nGoodTransactions = 0;
     CValidationState state;
-/* BLMP LOOP */
+/* BLMP LOOP IGNORED */
     for (CBlockIndex* pindex = chainActive.Tip(); pindex && pindex->getpprev(); pindex = pindex->getpprev())
     {
         boost::this_thread::interruption_point();
@@ -6391,7 +6409,7 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
 
     // check level 4: try reconnecting blocks
     if (nCheckLevel >= 4) {
-/* BLMP LOOP */
+/* BLMP LOOP IGNORED */
         CBlockIndex *pindex = pindexState;
         while (pindex != chainActive.Tip()) {
             boost::this_thread::interruption_point();
@@ -7409,9 +7427,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         // Send the rest of the chain
         if (pindex)
             pindex = chainActive.Next(pindex);
-        int nLimit = 500;
+//        int nLimit = 500;
+        int nLimit = 50;                                                        // Not used in stabdard implementation, reduce possible block index cache size
         if(fDebug)LogPrint("net", "getblocks %d to %s limit %d from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop==uint256(0) ? "end" : hashStop.ToString(), nLimit, pfrom->id);
-/* BLMP LOOP */
+/* BLMP LOOP IGNORED */
         for (; pindex; pindex = chainActive.Next(pindex))
         {
             if (pindex->GetBlockHash() == hashStop)
