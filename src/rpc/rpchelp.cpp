@@ -137,9 +137,11 @@ void mc_InitRPCHelpMap01()
         ));
     
     mapHelpStrings.insert(std::make_pair("getchaintips",
-            "getchaintips\n"
-            "Return information about all known tips in the block tree,"
-            " including the main chain as well as orphaned branches.\n"
+            "getchaintips ( count maxheight )\n"
+            "Return information about known tips in the block tree,"
+            " including the main chain (always the first result) as well as orphaned branches.\n"
+            "1. count                            (number, optional, default=10) The number of tips to display\n"
+            "2. maxheight                        (number, optional, default=unlimited) Maximal height of tip to display\n"
             "\nResult:\n"
             "[\n"
             "  {\n"

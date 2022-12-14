@@ -10,6 +10,7 @@
 #include "rpc/rpcserver.h"
 #include "utils/sync.h"
 #include "utils/util.h"
+#include "rpc/rpcutils.h"
 
 #include <stdint.h>
 
@@ -843,31 +844,70 @@ struct CompareBlocksByHeight
     }
 };
 
+struct CompareHashVectorsByHeight
+{
+    bool operator()(const pair<uint256, int>& t1,
+                    const pair<uint256, int>& t2) const
+    {
+        if (t1.second != t2.second)
+          return (t1.second > t2.second);
+        
+        return (t1.first < t2.first);
+    }
+};
+
 Value getchaintips(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() != 0)
+    if (fHelp || params.size() > 2)
         throw runtime_error("Help message not found\n");
 
-    /* Build up a list of chain tips.  We start with the list of all
-       known blocks, and successively remove blocks that appear as pprev
-       of another block.  */
-    std::set<CBlockIndex*, CompareBlocksByHeight> setTips;
+    int max_count, max_height;
     
-/* BLMP LOOP */
+    max_count=10;
+    if (params.size() > 0)    
+    {
+        max_count=paramtoint(params[0],true,0,"Invalid count");
+    }
+    
+    max_height=2147483647;
+    if (params.size() > 1)    
+    {
+        max_height=paramtoint(params[1],true,0,"Invalid maxheight");
+    }
+    
+/* BLMP LOOP FIXED */
 
-//    BOOST_FOREACH(const uint256& hashTip, setChainTips)
+    uint256 active_chain_hash=chainActive.Tip()->GetBlockHash(); 
+    
+    unsigned int tip=0;
+    vector <pair<uint256,int> > vTips;
+    vTips.resize(mapChainTips.size());
     for (map<uint256,int>::iterator it = mapChainTips.begin(); it != mapChainTips.end(); ) 
     {
-        setTips.insert(mapBlockIndex[it->first]);
+        vTips[tip]=make_pair(it->first,it->second);
+        it++;
+        tip++;
     }
-
-    // Always report the currently active tip.
-    setTips.insert(chainActive.Tip());
+    
+    sort(vTips.begin(),vTips.end(),CompareHashVectorsByHeight());
+    
+    vector <uint256>  vResultHashes;
+    vResultHashes.push_back(active_chain_hash);
+    tip=0;
+    while((tip<vTips.size()) && ((int)vResultHashes.size()<max_count))
+    {
+        if((vTips[tip].first != active_chain_hash) && (vTips[tip].second <= max_height))
+        {
+            vResultHashes.push_back(vTips[tip].first);
+        }
+        tip++;
+    }
 
     /* Construct the output array.  */
     Array res;
-    BOOST_FOREACH(CBlockIndex* block, setTips)
+    for(unsigned int t=0;t<vResultHashes.size();t++)
     {
+        CBlockIndex* block=mapBlockIndex[vResultHashes[t]];
         Object obj;
         obj.push_back(Pair("height", block->nHeight));
 //        obj.push_back(Pair("hash", block->phashBlock->GetHex()));
