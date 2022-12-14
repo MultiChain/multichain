@@ -332,14 +332,14 @@ int CBlockList::Sort()
     }
     
     Sort(0,max_height+1,0,m_BlockList->GetCount());
-    
-    m_First=new int[max_height];
+
+    m_First=new int[max_height+1];
     
     for(int r=m_BlockList->GetCount()-1;r>=0;r--)
     {
         m_First[m_Height[r]]=r;
     }
-    
+
     return MC_ERR_NOERROR;
 }
 
@@ -404,8 +404,8 @@ bool CBlockTreeDB::UpdateBlockCacheValues()
                 blockindex.SetNull();
                 DiskBlockIndexToCBlockIndex(&blockindex,diskindex);                
                 blockindex.hashPrev=diskindex.hashPrev;
-                
-                block_list->Add(diskindex.GetBlockHash(), &blockindex);
+                blockindex.hashBlock=diskindex.GetBlockHash();
+                block_list->Add(blockindex.hashBlock, &blockindex);
                         
                 pcursor->Next();
             } else {
@@ -554,6 +554,7 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
 
     if(!ReadFlag("blockcachedvalues",fBlockCacheValues))
     {
+        LogPrintf("Node was created with previous version of MultiChain, upgrading block index database...\n");
         if(!UpdateBlockCacheValues())
         {
             return error("LoadBlockIndex() : Couldn't update block cached values");            
@@ -566,6 +567,7 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
         {
             return error("LoadBlockIndex() : Couldn't set blockcachedvalues flag");            
         }
+        LogPrintf("Node block index database upgraded\n");
     }
 
     mapBlockCachedStatus.clear();

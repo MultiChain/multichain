@@ -374,6 +374,11 @@ CBlockIndex *CChain::Next(const CBlockIndex *pindex)  {
         return NULL;
 }
 
+uint256 CChain::GetHash(int nHeight)
+{
+    return cChain.gethash(nHeight);
+}
+
 /** Return the maximal height in the chain. Is equal to chain.Tip() ? chain.Tip()->nHeight : -1. */
 int  CChain::Height() const {
     return cChain.getsize() - 1;

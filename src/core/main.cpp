@@ -4511,6 +4511,7 @@ string SetLockedBlock(string hash)
 //                                pindexCandidate = pindexCandidate->getpprev();
                             }
                         }
+                        it++;
                     }
                 }
 
@@ -4613,8 +4614,9 @@ bool InvalidateBlock(CValidationState& state, CBlockIndex *pindex) {
                 }
                 pindexCandidate = mapBlockIndex.softfind(pindexCandidate->hashPrev);
     //            pindexCandidate = pindexCandidate->getpprev();
-            }
+            }            
         }
+        it++;
     }
 /*    
     BlockMap::iterator it = mapBlockIndex.begin();
@@ -4636,8 +4638,10 @@ bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
 
     // Remove the invalidity flag from this block and all its descendants.
 
+    bool tip_found=false;
+    
     set<uint256> setChecked;
-    for (map<uint256,int>::iterator it = mapChainTips.begin(); it != mapChainTips.end(); ) 
+    for (map<uint256,int>::iterator it = mapChainTips.begin(); it != mapChainTips.end();) 
     {
         if(it->second >= pindex->nHeight)
         {
@@ -4647,6 +4651,7 @@ bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
                    (setBlockIndexCandidates.value_comp()(pindex->GetBlockHash(), pindexCandidate->GetBlockHash())) && 
                    (pindexCandidate->GetAncestor(pindex->nHeight) == pindex) )
             {
+                tip_found=true;
                 setChecked.insert(pindexCandidate->GetBlockHash());
                 if (!pindexCandidate->IsValid()) 
                 {
@@ -4668,6 +4673,12 @@ bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
     //            pindexCandidate = pindexCandidate->getpprev();
             }
         }
+        it++;
+    }
+    
+    if(!tip_found)
+    {
+        mapChainTips.insert(make_pair(pindex->GetBlockHash(),pindex->nHeight));        
     }
 
 /*    
@@ -4698,6 +4709,7 @@ bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
         }
         pindex = pindex->getpprev();
     }
+    
     return true;
 }
 
@@ -5956,9 +5968,11 @@ void mc_InitCachedBlockIndex()
 }
 
 bool mc_UpdateBlockCacheValues(CBlockList *block_list)
-{
+{    
+    
     uint256 tipHash=pcoinsTip->GetBestBlock();
     CBlockIndex *pChainTip=NULL;
+
     for(int r=0;r<block_list->GetSize();r++)
     {
         CBlockIndex *pindex=block_list->GetBlockIndex(r);        
@@ -5992,10 +6006,10 @@ bool mc_UpdateBlockCacheValues(CBlockList *block_list)
             pprev->fUpdated = true;
         }
     }
-        
+
     CBlockIndex *pBestInvalid=NULL;
     CBlockIndex *pBestHeader=NULL;
-    
+        
     for(int r=0;r<block_list->GetSize();r++)
     {
         CBlockIndex *pindex=block_list->GetBlockIndex(r);        
@@ -6018,7 +6032,7 @@ bool mc_UpdateBlockCacheValues(CBlockList *block_list)
             {
                 setBlockIndexCandidates.insert(hash);
             }
-        
+
         if( (pindex->nStatus & BLOCK_HAVE_SUCCESSOR) == 0 )
         {
             mapChainTips.insert(make_pair(hash,pindex->nHeight));

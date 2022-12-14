@@ -400,11 +400,14 @@ Value importwallet(const Array& params, bool fHelp)
     file.close();
     pwalletMain->ShowProgress("", 100); // hide progress dialog in GUI
 
-/* BLMP LOOP */
+/* BLMP LOOP FIXED */
     CBlockIndex *pindex = chainActive.Tip();
+    while (pindex && (pindex->hashPrev != 0) && pindex->GetBlockTime() > nTimeBegin - 12 * Params().TargetSpacing()) // MCHN
+        pindex = mapBlockIndex.softfind(pindex->hashPrev);
+/*    
     while (pindex && pindex->getpprev() && pindex->GetBlockTime() > nTimeBegin - 12 * Params().TargetSpacing()) // MCHN
         pindex = pindex->getpprev();
-
+*/
     if (!pwalletMain->nTimeFirstKey || nTimeBegin < pwalletMain->nTimeFirstKey)
         pwalletMain->nTimeFirstKey = nTimeBegin;
 

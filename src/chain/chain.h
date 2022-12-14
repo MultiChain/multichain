@@ -497,6 +497,9 @@ public:
     /** Find the successor of a block in this chain, or NULL if the given index is not found or is the tip. */
     CBlockIndex *Next(const CBlockIndex *pindex);
 
+    /** Find hash of the block on specific height. */
+    uint256 GetHash(int nHeight);
+    
     /** Return the maximal height in the chain. Is equal to chain.Tip() ? chain.Tip()->nHeight : -1. */
     int Height() const;
     

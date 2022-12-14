@@ -1549,7 +1549,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
             }
         }
         
-/* BLMP LOOP */
+/* BLMP LOOP FIXED */
         while (pindex)
         {
             if (pindex->nHeight % 100 == 0 && dProgressTip - dProgressStart > 0.0)
@@ -1616,6 +1616,15 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
                 }
             }
             
+            if(pindex->nHeight < chainActive.Height())
+            {
+                pindex=mapBlockIndex.softfind(chainActive.GetHash(pindex->nHeight+1));
+            }
+            else
+            {
+                pindex=0;
+            }
+/*            
             pindex = chainActive.Next(pindex);
             
             if(pindex)
@@ -1624,7 +1633,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate,bo
                 FlushBlockIndexCache();
                 pindex=chainActive[height];
             }
-            
+*/            
             if (GetTime() >= nNow + 60) {
                 nNow = GetTime();
                 LogPrintf("Still rescanning. At block %d. Progress=%f\n", pindex->nHeight, Checkpoints::GuessVerificationProgress(pindex));
