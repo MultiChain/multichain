@@ -363,6 +363,10 @@ CBlockIndex * CChain::operator[](int nHeight)  {
 
 /** Efficiently check whether a block is present in this chain. */
 bool  CChain::Contains(const CBlockIndex *pindex)  {
+    if(pindex == NULL)
+    {
+        return false;
+    }
     return cChain.gethash(pindex->nHeight) == pindex->GetBlockHash();
 }
 
