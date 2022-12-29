@@ -264,24 +264,7 @@ public:
         return (int64_t)nTime;
     }
 
-    enum { nMedianTimeSpan=11 };
-
-/* BLMP removed const for method */    
-    
-    int64_t GetMedianTimePast() 
-    {
-        int64_t pmedian[nMedianTimeSpan];
-        int64_t* pbegin = &pmedian[nMedianTimeSpan];
-        int64_t* pend = &pmedian[nMedianTimeSpan];
-
-        CBlockIndex* pindex = this;
-/* BLMP LOOP IGNORED */
-        for (int i = 0; i < nMedianTimeSpan && pindex; i++, pindex = pindex->getpprev())
-            *(--pbegin) = pindex->GetBlockTime();
-
-        std::sort(pbegin, pend);
-        return pbegin[(pend - pbegin)/2];
-    }
+    int64_t GetMedianTimePast(); 
 
     /**
      * Returns true if there are nRequired or more blocks of minVersion or above
@@ -470,6 +453,8 @@ class CChain {
 private:
     
     CChainStorage cChain;
+    uint256 hashCachedForFork;
+    uint256 hashCachedFork;
     
 public:
     /** Returns the index entry for the genesis block of this chain, or NULL if none. */

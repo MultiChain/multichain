@@ -3866,6 +3866,7 @@ static CBlockIndex* FindMostWorkChain() {
 /* BLMP LOOP IGNORED*/
                 while (pindexTest->GetBlockHash() != pindexFailed->GetBlockHash()) {
                     pindexFailed->nStatus |= BLOCK_FAILED_CHILD;
+                    pindexFailed->fUpdated=true;
                     setBlockIndexCandidates.erase(pindexFailed->GetBlockHash());
                     pindexFailed = pindexFailed->getpprev();
                 }
@@ -7444,8 +7445,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 //        int nLimit = 500;
         int nLimit = 50;                                                        // Not used in stabdard implementation, reduce possible block index cache size
         if(fDebug)LogPrint("net", "getblocks %d to %s limit %d from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop==uint256(0) ? "end" : hashStop.ToString(), nLimit, pfrom->id);
-/* BLMP LOOP IGNORED */
-        for (; pindex; pindex = chainActive.Next(pindex))
+/* BLMP LOOP FIXED */
+//        for (; pindex; pindex = chainActive.Next(pindex))
+        for (; pindex; pindex = mapBlockIndex.softfind(chainActive.GetHash(pindex->nHeight+1)))
         {
             if (pindex->GetBlockHash() == hashStop)
             {

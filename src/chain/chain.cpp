@@ -390,12 +390,14 @@ int  CChain::Height() const {
 
 void CChain::SetTip(CBlockIndex *pindex) {
     mc_gState->ChainLock();
+    hashCachedForFork=0;
+    hashCachedFork=0;
     if (pindex == NULL) {
         cChain.setsize(0);
         mc_gState->ChainUnLock();
         return;
     }
-/* BLMP Full scan on initialization if hashes not stored, if flush here make sure pindex is not required in caller */    
+    
 /* BLMP LOOP FIXED */    
     cChain.setsize(pindex->nHeight + 1);
     while (pindex && cChain.gethash(pindex->nHeight) != pindex->GetBlockHash()) {
@@ -414,6 +416,9 @@ bool CChain::Flush()
 
 int CChain::InitStorage(uint32_t mode,int maxsize)
 {
+    hashCachedForFork=0;
+    hashCachedFork=0;
+    
     return cChain.init(mode,maxsize);
 }
 
@@ -446,6 +451,32 @@ CBlockLocator CChain::GetLocator(const CBlockIndex *pindex)  {
     return CBlockLocator(vHave);
 }
 
+enum { nMedianTimeSpan=11 };
+
+/* BLMP removed const for method */    
+    
+int64_t CBlockIndex::GetMedianTimePast() 
+{
+    int64_t pmedian[nMedianTimeSpan];
+    int64_t* pbegin = &pmedian[nMedianTimeSpan];
+    int64_t* pend = &pmedian[nMedianTimeSpan];
+
+    CBlockIndex* pindex = this;
+/* BLMP LOOP IGNORED */
+/*    
+    for (int i = 0; i < nMedianTimeSpan && pindex; i++, pindex = pindex->getpprev())
+        *(--pbegin) = pindex->GetBlockTime();
+*/
+    for (int i = 0; i < nMedianTimeSpan && pindex; i++)
+    {
+        *(--pbegin) = pindex->GetBlockTime();
+        pindex=mapBlockIndex.softfind(pindex->hashPrev);
+    }
+    
+    std::sort(pbegin, pend);
+    return pbegin[(pend - pbegin)/2];
+}
+
 /* BLMP removed const for both method and parameter */    
 
 CBlockIndex *CChain::FindFork(CBlockIndex *pindexIn) {
@@ -453,11 +484,22 @@ CBlockIndex *CChain::FindFork(CBlockIndex *pindexIn) {
     if (pindex->nHeight > Height())
         pindex = pindex->GetAncestor(Height());
 /* BLMP LOOP FIXED */
+    
     while (pindex && !Contains(pindex))
+    {
+        if(pindex->GetBlockHash() == hashCachedForFork)
+        {
+            hashCachedForFork=pindexIn->GetBlockHash();
+            pindex = mapBlockIndex.find(hashCachedFork);
+            return pindex;
+        }
         pindex = mapBlockIndex.softfind(pindex->hashPrev);
+    }
 //        pindex = pindex->getpprev();
     if(pindex)
     {
+        hashCachedForFork=pindexIn->GetBlockHash();
+        hashCachedFork=pindex->GetBlockHash();
         pindex = mapBlockIndex.find(pindex->GetBlockHash());
     }
     return pindex;
