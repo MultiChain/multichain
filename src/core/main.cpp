@@ -5085,7 +5085,7 @@ bool CheckBranchForInvalidBlocks(CBlockIndex * const pindexPrev)
             hashWalk=pWalk->hashPrev;
             if(pWalk->nStatus & BLOCK_FAILED_MASK)
             {
-                LogPrintf("Block is on branch containing invalid block %s (height %d)\n",hashWalk.ToString().c_str(),height);
+                LogPrintf("Block is on branch containing invalid block %s (height %d)\n",pWalk->GetBlockHash().ToString().c_str(),height);
                 return false;
             }
         }
