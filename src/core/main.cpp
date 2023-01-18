@@ -8647,7 +8647,10 @@ bool ProcessDataMessage(CNode* pfrom,CNetMessage& msg)
     if (!fRet)
     {
         LogPrintf("ProcessDataMessage(%s, %u bytes) FAILED peer=%d\n", SanitizeString(strCommand), nMessageSize, pfrom->id);
-        pfrom->fDisconnect=true;
+        if(!GetBoolArg("-ignoreinvaliddata",false))
+        {
+            pfrom->fDisconnect=true;            
+        }
     }
 
     return true;
