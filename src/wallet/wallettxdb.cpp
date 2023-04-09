@@ -1233,16 +1233,16 @@ int mc_TxDB::DecrementSubKey(
         {
             memcpy((char*)&erow+m_Database->m_ValueOffset,ptr,m_Database->m_ValueSize);
             last_pos=erow.m_LastSubKeyPos;
-        }
-        erow.Zero();                                                            
-        memcpy(&erow.m_Entity,entity,sizeof(mc_TxEntity));
-        erow.m_Generation=stat->m_Generation;
-        erow.m_Pos=1;
-        erow.m_Flags=last_pos;
-        erow.m_LastSubKeyPos=last_pos-1;        
-        if( (IsCSkipped(entity->m_EntityType) == 0) && (pEF->STR_IsIndexSkipped(import,parent_entity,entity) == 0) )
-        {
-            mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);        
+            erow.Zero();                                                            
+            memcpy(&erow.m_Entity,entity,sizeof(mc_TxEntity));
+            erow.m_Generation=stat->m_Generation;
+            erow.m_Pos=1;
+            erow.m_Flags=last_pos;
+            erow.m_LastSubKeyPos=last_pos-1;        
+            if( (IsCSkipped(entity->m_EntityType) == 0) && (pEF->STR_IsIndexSkipped(import,parent_entity,entity) == 0) )
+            {
+                mempool->Add(&erow,(unsigned char*)&erow+MC_TDB_ENTITY_KEY_SIZE+MC_TDB_TXID_SIZE);        
+            }
         }
         
     }
@@ -2621,6 +2621,8 @@ int mc_TxDB::RollBack(mc_TxImport *import,int block)
             }
             from -= count;
         }
+        
+        delete lpEntRowBuffer;
     }
     
     
@@ -2644,7 +2646,7 @@ int mc_TxDB::RollBack(mc_TxImport *import,int block)
                     goto exitlbl;
                 }
             }
-            if(lperow->m_LastSubKeyPos)                                     // Updating first subkey row
+            if(lperow->m_LastSubKeyPos>0)                                     // Updating first subkey row
             {
                 erow.Zero();
                 memcpy(&erow.m_Entity,&(lperow->m_Entity),sizeof(mc_TxEntity));
