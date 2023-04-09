@@ -4579,6 +4579,13 @@ bool InvalidateBlock(CValidationState& state, CBlockIndex *pindex) {
     pindex->nStatus |= BLOCK_FAILED_VALID;
     pindex->fUpdated = true;
     setDirtyBlockIndex.insert(pindex->GetBlockHash());
+    if(setBlockIndexCandidates.find(pindex->GetBlockHash()) != setBlockIndexCandidates.end())
+    {
+        if(setBlockIndexCandidates.find(pindex->hashPrev) == setBlockIndexCandidates.end())
+        {
+            setBlockIndexCandidates.insert(pindex->hashPrev);
+        }
+    }
     setBlockIndexCandidates.erase(pindex->GetBlockHash());
 
     while (chainActive.Contains(pindex)) {
@@ -4586,6 +4593,13 @@ bool InvalidateBlock(CValidationState& state, CBlockIndex *pindex) {
         pindexWalk->nStatus |= BLOCK_FAILED_CHILD;
         pindexWalk->fUpdated = true;
         setDirtyBlockIndex.insert(pindexWalk->GetBlockHash());
+        if(setBlockIndexCandidates.find(pindexWalk->GetBlockHash()) != setBlockIndexCandidates.end())
+        {
+            if(setBlockIndexCandidates.find(pindexWalk->hashPrev) == setBlockIndexCandidates.end())
+            {
+                setBlockIndexCandidates.insert(pindexWalk->hashPrev);
+            }
+        }
         setBlockIndexCandidates.erase(pindexWalk->GetBlockHash());
         // ActivateBestChain considers blocks already in chainActive
         // unconditionally valid already, so force disconnect away from it.
