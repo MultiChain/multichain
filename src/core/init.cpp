@@ -487,7 +487,7 @@ std::string HelpMessage(HelpMessageMode mode)                                   
     strUsage += "  -debug=<category>      " + strprintf(_("Output debugging information (default: %u, supplying <category> is optional)"), 0) + "\n";
     strUsage += "                         " + _("If <category> is not supplied, output all debugging information.") + "\n";
     strUsage += "                         " + _("<category> can be: addrman, alert, bench, coindb, db, lock, rand, rpc, selectcoins, mempool, net,") + "\n";
-    strUsage += "                         " + _("                   mchn, mcblock, mcnet, mcminer, mcapi, wallet, filter, v8filter, chunks, offchain") + "\n";
+    strUsage += "                         " + _("                   mchn, mcblock, mcnet, mcminer, mcapi, mcblin, wallet, filter, v8filter, chunks, offchain") + "\n";
     if (mode == HMM_BITCOIN_QT)
         strUsage += ", qt";
 //    strUsage += ".\n";

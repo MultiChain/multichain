@@ -272,7 +272,10 @@ CBlockIndex* CBlockMap::softfind(uint256 hash)
     
     if(presult == NULL)
     {
-        LogPrintf("ERROR: Block Index: couldn't retrieve block %s\n",hash.ToString().c_str());        
+        if(hash != 0)
+        {
+            LogPrintf("ERROR: Block Index: couldn't retrieve block %s\n",hash.ToString().c_str());        
+        }
     }
     
     return presult;
