@@ -1549,7 +1549,8 @@ static bool HTTPBindAddresses(struct evhttp* http,struct evhttp* http_hc)
     }
     
     // Determine what addresses to bind to
-    if (mapMultiArgs.count("-rpcallowip") == 0) { // Default to loopback if not allowing external IPs
+    if ((mapMultiArgs.count("-rpcallowip") == 0) || (mapMultiArgs.count("-rpcbind") == 0)) { // Default to loopback if not allowing external IPs
+//    if (mapMultiArgs.count("-rpcallowip") == 0) { // Default to loopback if not allowing external IPs
 //    if (!((mapMultiArgs.count("-rpcallowip") > 0) && (mapMultiArgs.count("-rpcbind") > 0))) { // Default to loopback if not allowing external IPs
         endpoints.push_back(std::make_pair("::1", http_port));
         endpoints.push_back(std::make_pair("127.0.0.1", http_port));
@@ -1558,11 +1559,11 @@ static bool HTTPBindAddresses(struct evhttp* http,struct evhttp* http_hc)
             endpoints.push_back(std::make_pair("::1", hcPort));
             endpoints.push_back(std::make_pair("127.0.0.1", hcPort));
         }
-/*        
+
         if (mapMultiArgs.count("-rpcallowip") > 0) {
             LogPrintf("WARNING: option -rpcallowip was specified without -rpcbind; this doesn't usually make sense\n");
         }
-*/
+
         if (mapMultiArgs.count("-rpcbind") > 0) {
             LogPrintf("WARNING: option -rpcbind was ignored because -rpcallowip was not specified, refusing to allow everyone to connect\n");
         }
