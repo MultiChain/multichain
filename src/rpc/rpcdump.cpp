@@ -296,7 +296,15 @@ Value importaddress(const Array& params, bool fHelp)
         if (fRescan)
         {
             pwalletMain->ScanForWalletTransactions(chainActive[start_block], true, true);
+            if(pwalletTxsMain)
+            {
+                pwalletTxsMain->WRPWriteLock();
+            }
             pwalletMain->ReacceptWalletTransactions();
+            if(pwalletTxsMain)
+            {
+                pwalletTxsMain->WRPWriteUnLock();
+            }
         }
     }
 

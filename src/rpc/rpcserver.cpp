@@ -696,7 +696,15 @@ Value resumecmd(const Array& params, bool fHelp)
     
     if( type & MC_NPS_REACCEPT )
     {
+        if(pwalletTxsMain)
+        {
+            pwalletTxsMain->WRPWriteLock();
+        }
         pwalletMain->ReacceptWalletTransactions();                                                                                            
+        if(pwalletTxsMain)
+        {
+            pwalletTxsMain->WRPWriteUnLock();
+        }
     }
     
     LogPrintf("Node paused state is set to %08X\n",mc_gState->m_NodePausedState);

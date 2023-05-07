@@ -1522,7 +1522,7 @@ Value liststreamtxitems(const Array& params, bool fHelp)
     for(int j=0;j<(int)inputTxIDs.size();j++)
     {
         mc_TxDefRow txdef;
-        const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(inputTxIDs[j],&txdef,NULL);
+        const CWalletTx& wtx=pwalletTxsMain->WRPGetWalletTx(inputTxIDs[j],&txdef,NULL);
 
         int first_output=0;
         int stream_output;
@@ -3581,7 +3581,7 @@ Value liststreamqueryitems(const Array& params, bool fHelp)
             last_hash=hash;
             if(first_output >= 0)
             {
-                const CWalletTx& wtx=pwalletTxsMain->GetWalletTx(hash,&txdef,NULL);
+                const CWalletTx& wtx=pwalletTxsMain->WRPGetWalletTx(hash,&txdef,NULL);
                 Object entry=StreamItemEntry(rpc_slot,wtx,first_output,stream_entity.GetTxID()+MC_AST_SHORT_TXID_OFFSET,verbose,lpConditions,&last_output,&txdef,chain_height);
                 if(entry.size())
                 {
