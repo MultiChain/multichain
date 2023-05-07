@@ -3114,7 +3114,15 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
         if (pwalletMain) {
             // Add wallet transactions that aren't already in a block to mapTransactions
             uiInterface.InitMessage(_("Reaccepting unconfirmed wallet transactions..."));
+            if(pwalletTxsMain)
+            {
+                pwalletTxsMain->WRPWriteLock();
+            }
             pwalletMain->ReacceptWalletTransactions();
+            if(pwalletTxsMain)
+            {
+                pwalletTxsMain->WRPWriteUnLock();
+            }
         }
 #endif
     }
