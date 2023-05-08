@@ -358,6 +358,9 @@ bool AppInit2_Cold(boost::thread_group& threadGroup,int OutputPipe)
     // ********************************************************* Step 3: parameter-to-internal-flags
 
     fDebug = !mapMultiArgs["-debug"].empty();
+    InitMapDebugValues();
+    SetDebugCategories();
+    
     // Special-case: if -debug=0/-nodebug is set, turn off debugging messages
     const vector<string>& categories = mapMultiArgs["-debug"];
     if (GetBoolArg("-nodebug", false) || find(categories.begin(), categories.end(), string("0")) != categories.end())

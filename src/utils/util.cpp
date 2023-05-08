@@ -96,7 +96,13 @@ using namespace std;
 
 map<string, string> mapArgs;
 map<string, vector<string> > mapMultiArgs;
+map<string, uint64_t> mapDebugValue;
+uint64_t nDebugCategories=0;
+uint64_t nDebugPerfCategories=0;
+        
 bool fDebug = false;
+bool fDebugAll = false;
+bool fDebugOther = false;
 bool fPrintToConsole = false;
 bool fPrintToDebugLog = true;
 bool fPauseLogPrint = false;
@@ -153,9 +159,157 @@ void DebugPrintClose()
     }
 }
 
+void InitMapDebugValues()
+{
+    mapDebugValue.insert(make_pair("net",        (1UL <<  0)));
+    mapDebugValue.insert(make_pair("---free-01", (1UL <<  1)));
+    mapDebugValue.insert(make_pair("mempool",    (1UL <<  2)));
+    mapDebugValue.insert(make_pair("---free-03", (1UL <<  3)));
+    mapDebugValue.insert(make_pair("bench",      (1UL <<  4)));
+    mapDebugValue.insert(make_pair("---free-05", (1UL <<  5)));
+    mapDebugValue.insert(make_pair("db",         (1UL <<  6)));
+    mapDebugValue.insert(make_pair("rpc",        (1UL <<  7)));
+    mapDebugValue.insert(make_pair("estimatefee",(1UL <<  8)));
+    mapDebugValue.insert(make_pair("addrman",    (1UL <<  9)));
+    mapDebugValue.insert(make_pair("selectcoins",(1UL << 10)));            
+    mapDebugValue.insert(make_pair("reindex",    (1UL << 11)));
+    mapDebugValue.insert(make_pair("---free-12", (1UL << 12)));
+    mapDebugValue.insert(make_pair("rand",       (1UL << 13)));
+    mapDebugValue.insert(make_pair("---free-14", (1UL << 14)));
+    mapDebugValue.insert(make_pair("---free-15", (1UL << 15)));
+    mapDebugValue.insert(make_pair("---free-16", (1UL << 16)));
+    mapDebugValue.insert(make_pair("libevent",   (1UL << 17)));
+    mapDebugValue.insert(make_pair("coindb",     (1UL << 18)));
+    mapDebugValue.insert(make_pair("---free-19", (1UL << 19)));
+    mapDebugValue.insert(make_pair("---free-20", (1UL << 20)));
+    mapDebugValue.insert(make_pair("---free-21", (1UL << 21)));
+    mapDebugValue.insert(make_pair("---free-22", (1UL << 22)));
+    mapDebugValue.insert(make_pair("---free-23", (1UL << 23)));
+    mapDebugValue.insert(make_pair("mchn",       (1UL << 24)));
+    mapDebugValue.insert(make_pair("mcapi",      (1UL << 25)));
+    mapDebugValue.insert(make_pair("mcblock",    (1UL << 26)));
+    mapDebugValue.insert(make_pair("mcminer",    (1UL << 27)));
+    mapDebugValue.insert(make_pair("wallet",     (1UL << 28)));
+    mapDebugValue.insert(make_pair("offchain",   (1UL << 29)));
+    mapDebugValue.insert(make_pair("chunks",     (1UL << 30)));
+    mapDebugValue.insert(make_pair("mcaddrman",  (1UL << 31)));
+    mapDebugValue.insert(make_pair("mcblin",     (1UL << 32)));
+    mapDebugValue.insert(make_pair("mcvrf",      (1UL << 33)));
+    mapDebugValue.insert(make_pair("mcblockperf",(1UL << 34)));
+    mapDebugValue.insert(make_pair("filter",     (1UL << 35)));
+    mapDebugValue.insert(make_pair("mcatxo",     (1UL << 36)));
+    mapDebugValue.insert(make_pair("mcperf",     (1UL << 37)));
+    mapDebugValue.insert(make_pair("v8filter",   (1UL << 38)));
+    mapDebugValue.insert(make_pair("mccoin",     (1UL << 39)));
+    mapDebugValue.insert(make_pair("mcwrp",      (1UL << 40)));
+    mapDebugValue.insert(make_pair("mchnminor",  (1UL << 41)));
+    mapDebugValue.insert(make_pair("mcnet",      (1UL << 42)));
+    mapDebugValue.insert(make_pair("mcnetcrypto",(1UL << 43)));
+    mapDebugValue.insert(make_pair("walletcompare",(1UL << 44)));
+    mapDebugValue.insert(make_pair("alert",      (1UL << 45)));
+    mapDebugValue.insert(make_pair("---free-46", (1UL << 46)));
+    mapDebugValue.insert(make_pair("---free-47", (1UL << 47)));
+    mapDebugValue.insert(make_pair("---free-48", (1UL << 48)));
+    mapDebugValue.insert(make_pair("---free-49", (1UL << 49)));
+    mapDebugValue.insert(make_pair("drsrv01",    (1UL << 50)));
+    mapDebugValue.insert(make_pair("drutl01",    (1UL << 51)));
+    mapDebugValue.insert(make_pair("drutl02",    (1UL << 52)));
+    mapDebugValue.insert(make_pair("drwlt01",    (1UL << 53)));
+    mapDebugValue.insert(make_pair("drwut01",    (1UL << 54)));
+    mapDebugValue.insert(make_pair("drwut02",    (1UL << 55)));
+    mapDebugValue.insert(make_pair("drwut03",    (1UL << 56)));
+    mapDebugValue.insert(make_pair("drwut04",    (1UL << 57)));
+    mapDebugValue.insert(make_pair("dwtxs01",    (1UL << 58)));
+    mapDebugValue.insert(make_pair("dwtxs02",    (1UL << 59)));
+    mapDebugValue.insert(make_pair("---free-60", (1UL << 60)));
+    mapDebugValue.insert(make_pair("other",      (1UL << 61)));
+    mapDebugValue.insert(make_pair("all",        (1UL << 62)));
+    mapDebugValue.insert(make_pair("---free-63", (1UL << 63)));
+}
+
+int SetDebugCategories()
+{
+    int result=0;
+    
+    nDebugCategories=0;
+    nDebugPerfCategories=0;
+        
+    fDebug = !mapMultiArgs["-debug"].empty();    
+    fDebugAll = false;
+    fDebugOther = false;
+    
+    for(int i=0;i<(int)mapMultiArgs["-debug"].size();i++)
+    {
+        map<string, uint64_t>::const_iterator it=mapDebugValue.find(mapMultiArgs["-debug"][i]);
+        if(it != mapDebugValue.end())
+        {
+            nDebugCategories |= it->second;
+        }
+        else
+        {
+            result=1;
+        }
+    }
+    if(nDebugCategories & (1UL << 61))
+    {
+        fDebugOther=true;
+    }
+    if(nDebugCategories & (1UL << 62))
+    {
+        fDebugAll=true;
+    }
+    
+    for(int i=0;i<(int)mapMultiArgs["-debugperf"].size();i++)
+    {
+        map<string, uint64_t>::const_iterator it=mapDebugValue.find(mapMultiArgs["-debugperf"][i]);
+        if(it != mapDebugValue.end())
+        {
+            nDebugPerfCategories |= it->second;
+        }
+    }
+    
+    return result;
+}
+
+uint64_t LogAcceptCategory(const char* category)
+{
+    if (category != NULL)
+    {        
+        if(!fDebug)
+        {
+            if(nDebugPerfCategories)
+            {
+                map<string, uint64_t>::const_iterator it=mapDebugValue.find(string(category));                
+                if(it != mapDebugValue.end())
+                {
+                    return it->second & nDebugPerfCategories; 
+                }
+            }
+            return 0;
+        }
+        if(fDebugAll)
+        {
+            return (1UL << 62);
+        }
+        
+        map<string, uint64_t>::const_iterator it=mapDebugValue.find(string(category));
+        if(it != mapDebugValue.end())
+        {
+            return it->second & nDebugCategories;             
+        }     
+        
+        if(!fDebugOther) 
+        {
+            return 0;
+        }
+    }    
+    
+    return (1UL << 61);
+}
+
 /* MCHN END */
 
-bool LogAcceptCategory(const char* category)
+bool LogAcceptCategory1(const char* category)
 {
     if (category != NULL)
     {

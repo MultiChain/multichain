@@ -6766,7 +6766,7 @@ bool ProcessGetData(CNode* pfrom)
         // Don't bother if send buffer is too full to respond anyway
         if (pfrom->nSendSize >= SendBufferSize())
         {
-            if(fDebug)LogPrint("mcminor","mchn: Send buffer full on getdata (%ld bytes) for peer %d\n", pfrom->nSendSize, pfrom->id);            
+            if(fDebug)LogPrint("mchnminor","mchn: Send buffer full on getdata (%ld bytes) for peer %d\n", pfrom->nSendSize, pfrom->id);            
             break;
         }
 
@@ -8356,7 +8356,7 @@ bool ProcessMessages(CNode* pfrom)
         
         if (pfrom->nSendSize >= SendBufferSize())
         {
-            if(fDebug)LogPrint("mcminor","mchn: Send buffer full on processmessages (%ld bytes) for peer %d\n", pfrom->nSendSize, pfrom->id);            
+            if(fDebug)LogPrint("mchnminor","mchn: Send buffer full on processmessages (%ld bytes) for peer %d\n", pfrom->nSendSize, pfrom->id);            
             
             CNetMessage& msg1 = *it;
             if(msg1.complete())
@@ -8586,7 +8586,7 @@ bool ProcessDataMessage(CNode* pfrom,CNetMessage& msg)
         
     if (pfrom->nSendSize >= SendBufferSize())
     {
-        if(fDebug)LogPrint("mcminor","mchn: Send buffer full on processdatamessage (%ld bytes), msg %s for peer %d\n", msg.hdr.GetCommand().c_str(),pfrom->nSendSize, pfrom->id);            
+        if(fDebug)LogPrint("mchnminor","mchn: Send buffer full on processdatamessage (%ld bytes), msg %s for peer %d\n", msg.hdr.GetCommand().c_str(),pfrom->nSendSize, pfrom->id);            
 
         if(msg.hdr.GetCommand() == "block")
         {
