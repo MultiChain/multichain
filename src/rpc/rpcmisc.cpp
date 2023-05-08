@@ -470,7 +470,20 @@ Value getruntimeparams(const json_spirit::Array& params, bool fHelp)
     obj.push_back(Pair("genproclimit",GetArg("-genproclimit", 1)));                    
     obj.push_back(Pair("lockinlinemetadata",GetBoolArg("-lockinlinemetadata", true)));                    
     obj.push_back(Pair("acceptfiltertimeout",GetArg("-acceptfiltertimeout", DEFAULT_ACCEPT_FILTER_TIMEOUT)));                    
-    obj.push_back(Pair("sendfiltertimeout",GetArg("-sendfiltertimeout", DEFAULT_SEND_FILTER_TIMEOUT)));                    
+    obj.push_back(Pair("sendfiltertimeout",GetArg("-sendfiltertimeout", DEFAULT_SEND_FILTER_TIMEOUT)));                 
+    
+    const vector<string>& categories = mapMultiArgs["-debug"];
+    string debug_switches="";
+    for(int i=0;i<(int)categories.size();i++)
+    {
+        if(i)
+        {
+            debug_switches+=" ";
+        }
+        debug_switches+=categories[i];
+    }
+    
+    obj.push_back(Pair("debug",debug_switches));                 
 /*
     obj.push_back(Pair("shortoutput",GetBoolArg("-shortoutput",false)));                    
     obj.push_back(Pair("walletdbversion", mc_gState->GetWalletDBVersion()));                
@@ -787,6 +800,55 @@ Value setruntimeparam(const json_spirit::Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value type");                                                        
         }
         fFound=true;
+    }
+    
+    if(param_name.substr(0,6) == "debug-")
+    {
+        if( (params[1].type() == int_type) || (params[1].type() == str_type) )
+        {
+            int nValue;
+            if(params[1].type() == int_type)
+            {
+                nValue=params[1].get_int();
+            }
+            else
+            {
+                nValue=atoi(params[1].get_str().c_str());
+            }
+            
+            fFound=true;
+            string category=param_name.substr(6,param_name.size()-6);
+
+            int found=-1;
+            for(int i=0;i<(int)mapMultiArgs["-debug"].size();i++)
+            {
+                if(mapMultiArgs["-debug"][i] == category)
+                {
+                    found=i;
+                }
+            }
+            
+            if(found>=0)
+            {
+                if(nValue == 0)
+                {
+                    mapMultiArgs["-debug"].erase(mapMultiArgs["-debug"].begin()+found);
+                }
+            }
+            else
+            {
+                if(nValue)
+                {
+                    mapMultiArgs["-debug"].push_back(category);
+                }
+            }
+            
+            SetDebugCategories();
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter value type");                                            
+        }        
     }
     
     if(!fFound)
