@@ -271,7 +271,7 @@ int SetDebugCategories()
     return result;
 }
 
-uint64_t LogAcceptCategory(const char* category)
+bool LogAcceptCategory(const char* category)
 {
     if (category != NULL)
     {        
@@ -282,29 +282,29 @@ uint64_t LogAcceptCategory(const char* category)
                 map<string, uint64_t>::const_iterator it=mapDebugValue.find(string(category));                
                 if(it != mapDebugValue.end())
                 {
-                    return it->second & nDebugPerfCategories; 
+                    return ((it->second & nDebugPerfCategories) != 0); 
                 }
             }
-            return 0;
+            return false;
         }
         if(fDebugAll)
         {
-            return (1UL << 62);
+            return true;
         }
         
         map<string, uint64_t>::const_iterator it=mapDebugValue.find(string(category));
         if(it != mapDebugValue.end())
         {
-            return it->second & nDebugCategories;             
+            return ((it->second & nDebugCategories) != 0);             
         }     
         
         if(!fDebugOther) 
         {
-            return 0;
+            return false;
         }
     }    
     
-    return (1UL << 61);
+    return true;
 }
 
 /* MCHN END */
