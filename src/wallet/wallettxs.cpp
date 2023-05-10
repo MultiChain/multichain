@@ -4109,7 +4109,7 @@ int mc_WalletTxs::AddExplorerTx(
     }
     
     if(tx_tag & (MC_MTX_TAG_ENTITY_CREATE | MC_MTX_TAG_ASSET_GENESIS))
-    {
+    {        
         uint32_t entity_key=mc_EntityExplorerCodeToType((tx_tag & MC_MTX_TAG_ENTITY_MASK) >> MC_MTX_TAG_ENTITY_MASK_SHIFT);
         if(entity_key == 0)
         {
@@ -4131,23 +4131,25 @@ int mc_WalletTxs::AddExplorerTx(
 
         if(entity_key)
         {            
-            memcpy(&subkey_hash160,&entity_key,sizeof(uint32_t));
-            subkey_hash256=0;
-            memcpy(&subkey_hash256,&subkey_hash160,sizeof(subkey_hash160));
-
-            err=m_Database->AddSubKeyDef(imp,(unsigned char*)&subkey_hash256,NULL,0,MC_SFL_SUBKEY);
-            if(err)
+            entity.Zero();
+            entity.m_EntityType=MC_TET_ENTITY_KEY | MC_TET_CHAINPOS;
+            
+            if(imp->FindEntity(&entity) >= 0)
             {
-                goto exitlbl;
-            }
+                memcpy(&subkey_hash160,&entity_key,sizeof(uint32_t));
+                subkey_hash256=0;
+                memcpy(&subkey_hash256,&subkey_hash160,sizeof(subkey_hash160));
 
-            if(imp->m_ImportID == 0)
-            {
-                entity.Zero();
-                entity.m_EntityType=MC_TET_ENTITY_KEY | MC_TET_CHAINPOS;
+                err=m_Database->AddSubKeyDef(imp,(unsigned char*)&subkey_hash256,NULL,0,MC_SFL_SUBKEY);
+                if(err)
+                {
+                    goto exitlbl;
+                }
+
                 subkey_entity.Zero();
                 memcpy(subkey_entity.m_EntityID,&subkey_hash160,MC_TDB_ENTITY_ID_SIZE);
                 subkey_entity.m_EntityType=MC_TET_SUBKEY_ENTITY_KEY | MC_TET_CHAINPOS;
+
                 err= m_Database->IncrementSubKey(imp,&entity,&subkey_entity,(unsigned char*)&subkey_hash160,(unsigned char*)&hash,NULL,block,tx_tag,fFound ? 0 : 1);
                 if(err)
                 {
