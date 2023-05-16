@@ -1675,6 +1675,91 @@ void CWallet::ReacceptWalletTransactions()
     LOCK2(cs_main, cs_wallet);
     if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
     {        
+        vector<uint256> unconfirmed_hashes;
+        std::map<uint256,CWalletTx> unconfirmed_wtxs;
+        
+        pwalletTxsMain->Lock();
+        unconfirmed_hashes=pwalletTxsMain->m_UnconfirmedSendsHashes;
+        BOOST_FOREACH(const uint256& wtxid, unconfirmed_hashes) 
+        {
+            map<uint256,CWalletTx>::iterator item = pwalletTxsMain->m_UnconfirmedSends.find(wtxid);
+            if(item != pwalletTxsMain->m_UnconfirmedSends.end())
+            {                
+                CWalletTx& wtx = item->second;
+                unconfirmed_wtxs.insert(make_pair(wtxid, wtx));
+            }
+        }
+        pwalletTxsMain->UnLock();
+        
+        if(fDebug)LogPrint("wallet","ReacceptWalletTransactions: %ld txs in unconfirmed pool \n", pwalletTxsMain->m_UnconfirmedSends.size());
+        BOOST_FOREACH(const uint256& wtxid, unconfirmed_hashes) 
+        {
+            map<uint256,CWalletTx>::iterator item = unconfirmed_wtxs.find(wtxid);
+            if(item != unconfirmed_wtxs.end())
+            {                
+//                const uint256& wtxid = item.first;
+                CWalletTx& wtx = item->second;
+
+                if (!wtx.IsCoinBase())// && nDepth < 0)
+                {
+                    LOCK(mempool.cs);
+
+                    if (!mempool.exists(wtxid))
+                    {
+                        int nDepth = wtx.GetDepthInMainChain();
+                        LogPrint("wallet","Unconfirmed wtx: %s, depth: %d\n", wtxid.ToString(),nDepth);
+                        if(nDepth < 0)
+                        {
+                            LogPrint("wallet","Reaccepting wtx %s\n", wtxid.ToString());
+                            if(!wtx.AcceptToMemoryPool(false))
+                            {
+                                LogPrintf("Tx %s was not accepted to mempool, setting INVALID flag\n", wtxid.ToString());
+                                pwalletTxsMain->SaveTxFlag((unsigned char*)&wtxid,MC_TFL_INVALID,1);
+                            }
+                            pwalletTxsMain->WRPSync(0);
+                        }
+                        else
+                        {
+                            LogPrintf("wtxs: Internal error! Unconfirmed wtx %s already in the chain\n", wtxid.ToString());                                                                
+                        }
+                    }
+                    else
+                    {
+                        LogPrint("wallet","Unconfirmed wtx %s already in mempool, ignoring\n", wtxid.ToString());                    
+                    }
+                }            
+            }
+            else
+            {
+                LogPrintf("wtxs: Internal error! Unconfirmed wtx %s details not found\n", wtxid.ToString());                                    
+            }
+        }                    
+    }
+    else
+    {
+        BOOST_FOREACH(PAIRTYPE(const uint256, CWalletTx)& item, mapWallet)
+        {
+            const uint256& wtxid = item.first;
+            CWalletTx& wtx = item.second;
+            assert(wtx.GetHash() == wtxid);
+
+            int nDepth = wtx.GetDepthInMainChain();
+
+            if (!wtx.IsCoinBase() && nDepth < 0)
+            {
+                // Try to add to memory pool
+                LOCK(mempool.cs);
+                wtx.AcceptToMemoryPool(false);
+            }
+        }
+    }
+}
+/*
+void CWallet::ReacceptWalletTransactions()
+{
+    LOCK2(cs_main, cs_wallet);
+    if(mc_gState->m_WalletMode & MC_WMD_ADDRESS_TXS)
+    {        
         pwalletTxsMain->Lock();
         if(fDebug)LogPrint("wallet","ReacceptWalletTransactions: %ld txs in unconfirmed pool \n", pwalletTxsMain->m_UnconfirmedSends.size());
 //        BOOST_FOREACH(PAIRTYPE(const uint256, CWalletTx)& item, pwalletTxsMain->m_UnconfirmedSends)
@@ -1702,9 +1787,9 @@ void CWallet::ReacceptWalletTransactions()
                                 LogPrintf("Tx %s was not accepted to mempool, setting INVALID flag\n", wtxid.ToString());
                                 pwalletTxsMain->SaveTxFlag((unsigned char*)&wtxid,MC_TFL_INVALID,1);
                             }
-                            pwalletTxsMain->WRPWriteLock();        
+//                            pwalletTxsMain->WRPWriteLock();        
                             pwalletTxsMain->WRPSync(0);
-                            pwalletTxsMain->WRPWriteUnLock();                            
+//                            pwalletTxsMain->WRPWriteUnLock();                            
                         }
                         else
                         {
@@ -1743,7 +1828,7 @@ void CWallet::ReacceptWalletTransactions()
         }
     }
 }
-
+*/
 void CWalletTx::RelayWalletTransaction()
 {
     if (!IsCoinBase())

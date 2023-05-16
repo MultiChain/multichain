@@ -285,6 +285,11 @@ int ParseAssetKey(const char* asset_key,unsigned char *txid,unsigned char *asset
         return MC_ASSET_KEY_INVALID_EMPTY;
     }
     
+    if(type)
+    {
+        *type=0;
+    }
+    
     uint256 hash=0;
     if(size == 64)
     {

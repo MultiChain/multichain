@@ -696,7 +696,15 @@ Value resumecmd(const Array& params, bool fHelp)
     
     if( type & MC_NPS_REACCEPT )
     {
+        if(pwalletTxsMain)
+        {
+            pwalletTxsMain->WRPWriteLock();
+        }
         pwalletMain->ReacceptWalletTransactions();                                                                                            
+        if(pwalletTxsMain)
+        {
+            pwalletTxsMain->WRPWriteUnLock();
+        }
     }
     
     LogPrintf("Node paused state is set to %08X\n",mc_gState->m_NodePausedState);
@@ -1543,8 +1551,8 @@ static bool HTTPBindAddresses(struct evhttp* http,struct evhttp* http_hc)
         uiInterface.ThreadSafeMessageBox("Health checker and RPC ports should be different", "", CClientUIInterface::MSG_ERROR);
         return false;
     }
-    
-    // Determine what addresses to bind to
+
+// Determine what addresses to bind to
     if (mapMultiArgs.count("-rpcallowip") == 0) { // Default to loopback if not allowing external IPs
 //    if (!((mapMultiArgs.count("-rpcallowip") > 0) && (mapMultiArgs.count("-rpcbind") > 0))) { // Default to loopback if not allowing external IPs
         endpoints.push_back(std::make_pair("::1", http_port));
@@ -1577,6 +1585,11 @@ static bool HTTPBindAddresses(struct evhttp* http,struct evhttp* http_hc)
     } else { // No specific bind address specified, bind to any
         endpoints.push_back(std::make_pair("::", http_port));
         endpoints.push_back(std::make_pair("0.0.0.0", http_port));
+        if(hcPort)
+        {
+            endpoints.push_back(std::make_pair("::", hcPort));
+            endpoints.push_back(std::make_pair("0.0.0.0", hcPort));            
+        }
     }
     
     bool hcOK=hcPort ? false : true;

@@ -918,6 +918,9 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
     // ********************************************************* Step 3: parameter-to-internal-flags
 
     fDebug = !mapMultiArgs["-debug"].empty();
+    InitMapDebugValues();
+    SetDebugCategories();
+    
     // Special-case: if -debug=0/-nodebug is set, turn off debugging messages
     const vector<string>& categories = mapMultiArgs["-debug"];
     if (GetBoolArg("-nodebug", false) || find(categories.begin(), categories.end(), string("0")) != categories.end())
@@ -3100,9 +3103,19 @@ bool AppInit2(boost::thread_group& threadGroup,int OutputPipe)
 */    
 #ifdef ENABLE_WALLET
         if (pwalletMain) {
+            LOCK2(cs_main, pwalletMain->cs_wallet);
+
             // Add wallet transactions that aren't already in a block to mapTransactions
             uiInterface.InitMessage(_("Reaccepting unconfirmed wallet transactions..."));
+            if(pwalletTxsMain)
+            {
+                pwalletTxsMain->WRPWriteLock();
+            }
             pwalletMain->ReacceptWalletTransactions();
+            if(pwalletTxsMain)
+            {
+                pwalletTxsMain->WRPWriteUnLock();
+            }
         }
 #endif
     }

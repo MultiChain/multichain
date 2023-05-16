@@ -3685,10 +3685,12 @@ void mc_InitRPCHelpMap15()
             "                                                       acceptfiltertimeout\n"
             "                                                       sendfiltertimeout\n"
             "                                                       lockinlinemetadata\n"
+            "                                                       debug-<value> e.g. debug-mcapi (parameter-value 0 or 1)\n"    
             "2. parameter-value                  (required) parameter value\n"
             "\nResult:\n"
             "\nExamples:\n"
             + HelpExampleCli("setruntimeparam", "\"miningturnover\" 0.3")
+            + HelpExampleCli("setruntimeparam", "\"debug-mcapi\" 1")
             + HelpExampleRpc("setruntimeparam", "\"miningturnover\", 0.3")
         ));
     

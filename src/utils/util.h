@@ -45,6 +45,8 @@ extern uint64_t nLockPrintThread;
 
 void SetupEnvironment();
 
+void InitMapDebugValues();
+int SetDebugCategories();
 /** Return true if log accepts specified category */
 bool LogAcceptCategory(const char* category);
 /** Send a string to the log output */
