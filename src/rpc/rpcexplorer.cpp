@@ -469,7 +469,7 @@ Value explorerlisttransactions(const json_spirit::Array& params, bool fHelp)
 
     if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=2 -rescan\" ");        
     }   
            
 //    LOCK(cs_main);
@@ -595,7 +595,7 @@ Value explorergetrawtransaction(const json_spirit::Array& params, bool fHelp)
 
     if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=2 -rescan\" ");        
     }   
     
     uint256 hash = ParseHashV(params[0], "parameter 1");
@@ -903,7 +903,7 @@ Value explorerlistaddresses(const json_spirit::Array& params, bool fHelp)
     
     if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=2 -rescan\" ");        
     }   
            
     mc_TxEntity entity;
@@ -1011,7 +1011,7 @@ Value explorerlistaddresstransactions(const json_spirit::Array& params, bool fHe
 
     if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=2 -rescan\" ");        
     }   
            
     mc_TxEntityStat entStat;
@@ -1146,7 +1146,7 @@ Value explorerlistblocktransactions(const json_spirit::Array& params, bool fHelp
 
     if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=2 -rescan\" ");        
     }   
                
     mc_TxEntityStat entStat;
@@ -1284,7 +1284,7 @@ Value explorerlistredeemtransactions(const json_spirit::Array& params, bool fHel
 
     if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=2 -rescan\" ");        
     }   
            
     mc_TxEntityStat entStat;
@@ -1375,7 +1375,7 @@ Value explorerlistaddressstreams(const json_spirit::Array& params, bool fHelp)
 
     if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=2 -rescan\" ");        
     }   
            
     mc_TxEntityStat entStat;
@@ -1516,7 +1516,7 @@ Value explorerlistaddressassets(const json_spirit::Array& params, bool fHelp)
 
     if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=2 -rescan\" ");        
     }   
            
     mc_TxEntityStat entStat;
@@ -1687,7 +1687,7 @@ Value explorerlistassetaddresses(const json_spirit::Array& params, bool fHelp)
 
     if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=2 -rescan\" ");        
     }   
            
     mc_TxEntityStat entStat;
@@ -1859,7 +1859,7 @@ Value explorerlistaddressassettransactions(const json_spirit::Array& params, boo
 
     if((mc_gState->m_WalletMode & MC_WMD_EXPLORER_MASK) == 0)
     {
-        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=1 -rescan\" ");        
+        throw JSONRPCError(RPC_NOT_SUPPORTED, "Explorer APIs are not enabled. To enable them, please run \"multichaind -explorersupport=2 -rescan\" ");        
     }   
            
     mc_TxEntityStat entStat;
